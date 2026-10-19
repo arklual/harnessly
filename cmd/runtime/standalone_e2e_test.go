@@ -161,6 +161,23 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 			<-done
 		}
 	}
+	// The panes' shells write into the temp HOME as they exit (history, the fake agents' logs): the server goes, and
+	// then its panes, before the temp dirs are removed.
+	killTmux := func() {
+		out, _ := tmuxCmd("list-panes", "-a", "-F", "#{pane_pid}").Output()
+		_ = tmuxCmd("kill-server").Run()
+		for deadline, pids := time.Now().Add(10*time.Second), strings.Fields(string(out)); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+			alive := false
+			for _, pid := range pids {
+				if _, err := os.Stat("/proc/" + pid); err == nil {
+					alive = true
+				}
+			}
+			if !alive {
+				return
+			}
+		}
+	}
 	t.Cleanup(func() {
 		if gateCmd != nil && gateCmd.ProcessState == nil {
 			stop(gateCmd)
@@ -176,7 +193,7 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 			calls, _ := os.ReadFile(filepath.Join(home, "claude-calls.log"))
 			t.Logf("claude calls:\n%s", calls)
 		}
-		_ = tmuxCmd("kill-server").Run()
+		killTmux()
 	})
 	client := &http.Client{Timeout: 20 * time.Second}
 	var cookie, token string
@@ -430,7 +447,7 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(data, "acme.lock")); err == nil {
 		t.Fatal("lock left by a stopped gate")
 	}
-	_ = tmuxCmd("kill-server").Run()
+	killTmux()
 	gateCmd = start()
 	waitFor("the restarted gate", 30*time.Second, func() bool { code, _ := call("GET", "/api/health", "", true); return code == 200 })
 	waitFor("the working agent to be resumed", 60*time.Second, func() bool {
