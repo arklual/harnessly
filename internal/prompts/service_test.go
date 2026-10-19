@@ -212,25 +212,25 @@ func TestTakeNewPrompt(t *testing.T) {
 
 func TestSteerErrors(t *testing.T) {
 	r := newRig(t, tui(t, "claude-input-draft.ansi.txt"), Tab{CliState: StateBusy})
-	if got := r.svc.Steer("tab-x", "q"); got.Status != 404 || got.Message != msgNoTab {
+	if got := r.svc.Steer("tab-x", "q"); got.Status != 404 || got.Message != msgNoTab.String() {
 		t.Errorf("unknown tab: %+v", got)
 	}
 	if got := r.svc.Steer("tab-1", "q-none"); got.Status != 409 || got.Message != "Сообщения уже нет в очереди" {
 		t.Errorf("gone: %+v", got)
 	}
 	it, _ := r.svc.Queue().Add("tab-1", "x", nil)
-	if got := r.svc.Steer("tab-1", it.ID); got.Status != 409 || got.Message != steerErrors[OutcomeBlocked] || len(queueTexts(r, "tab-1")) != 1 {
+	if got := r.svc.Steer("tab-1", it.ID); got.Status != 409 || got.Message != steerErrors[OutcomeBlocked].String() || len(queueTexts(r, "tab-1")) != 1 {
 		t.Errorf("blocked: %+v", got)
 	}
 	r.panes.mu.Lock()
 	r.panes.styled = func() (string, bool) { return "", false }
 	r.panes.mu.Unlock()
-	if got := r.svc.Steer("tab-1", it.ID); got.Status != 409 || got.Message != steerErrors[OutcomeWait] {
+	if got := r.svc.Steer("tab-1", it.ID); got.Status != 409 || got.Message != steerErrors[OutcomeWait].String() {
 		t.Errorf("wait: %+v", got)
 	}
 	r.panes.setScreen(tui(t, "claude-idle-placeholder.ansi.txt"))
 	pic, _ := r.svc.Queue().Add("tab-1", "картинка", []string{"/uploads/a.png"})
-	if got := r.svc.Steer("tab-1", pic.ID); got.Status != 500 || got.Message != steerErrors[OutcomeFailed] {
+	if got := r.svc.Steer("tab-1", pic.ID); got.Status != 500 || got.Message != steerErrors[OutcomeFailed].String() {
 		t.Errorf("failed pictures: %+v", got)
 	}
 }

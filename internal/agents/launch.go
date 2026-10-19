@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"harnessly/internal/jscompat"
+	"harnessly/internal/locale"
 )
 
 // Launch is the model and reasoning effort a conversation starts with; nil means the CLI's own default («Авто»). Same
@@ -175,17 +176,17 @@ var startEnvValue = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,80}$`)
 // need no quoting. The error is the message for the caller (a 400).
 func FormatStartEnv(env []EnvVar, keyPrefix string) (string, error) {
 	if len(env) > StartEnvLimit {
-		return "", errors.New("Слишком много переменных окружения")
+		return "", errors.New(locale.Pick("Too many environment variables", "Слишком много переменных окружения"))
 	}
 	keyRe := regexp.MustCompile(`^` + regexp.QuoteMeta(keyPrefix) + `[A-Z_]{1,40}$`)
 	var b strings.Builder
 	for _, e := range env {
 		if !keyRe.MatchString(e.Key) {
-			return "", errors.New("Недопустимая переменная окружения " + jscompat.Slice(e.Key, 48))
+			return "", errors.New(locale.Pick("Invalid environment variable "+jscompat.Slice(e.Key, 48), "Недопустимая переменная окружения "+jscompat.Slice(e.Key, 48)))
 		}
 		// The value is not echoed back: it may be a session id.
 		if !startEnvValue.MatchString(e.Value) {
-			return "", errors.New("Недопустимое значение переменной " + e.Key)
+			return "", errors.New(locale.Pick("Invalid value of variable "+e.Key, "Недопустимое значение переменной "+e.Key))
 		}
 		b.WriteString(e.Key + "='" + e.Value + "' ")
 	}
@@ -213,14 +214,14 @@ func ResolvePromptFiles(provider string, files []string, dataDir, dataDirDisplay
 		return []string{}, nil
 	}
 	if provider != Claude {
-		return nil, errors.New("Файлы инструкций поддерживает только Claude")
+		return nil, errors.New(locale.Pick("Only Claude supports instruction files", "Файлы инструкций поддерживает только Claude"))
 	}
 	if len(files) > StartPromptFilesLimit {
-		return nil, errors.New("Слишком много файлов инструкций")
+		return nil, errors.New(locale.Pick("Too many instruction files", "Слишком много файлов инструкций"))
 	}
 	root, err := filepath.EvalSymlinks(dataDir)
 	if err != nil {
-		return nil, errors.New("Каталог " + dataDirDisplay + " недоступен")
+		return nil, errors.New(locale.Pick("Folder "+dataDirDisplay+" is unavailable", "Каталог "+dataDirDisplay+" недоступен"))
 	}
 	out := make([]string, 0, len(files))
 	for _, f := range files {
@@ -237,7 +238,7 @@ func ResolvePromptFiles(provider string, files []string, dataDir, dataDirDisplay
 			ok = err == nil && st.Mode().IsRegular()
 		}
 		if !ok {
-			return nil, errors.New("Файл инструкций не найден в " + dataDirDisplay)
+			return nil, errors.New(locale.Pick("Instruction file not found in "+dataDirDisplay, "Файл инструкций не найден в "+dataDirDisplay))
 		}
 		out = append(out, real)
 	}

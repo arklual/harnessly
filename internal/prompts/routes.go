@@ -84,7 +84,7 @@ func (s *Service) PromptQueue(body []byte) Response {
 	f := decodeFields(body)
 	tabID, action := f.text("tabId"), f.text("action")
 	if !tabIDRE.MatchString(tabID) || !slices.Contains([]string{"add", "remove", "take", "steer"}, action) {
-		return fail(400, "Нужны tabId и action")
+		return fail(400, msgNeedTabAction.String())
 	}
 	if action == "add" {
 		var raw []json.RawMessage
@@ -97,11 +97,11 @@ func (s *Service) PromptQueue(body []byte) Response {
 		}
 		for _, im := range images {
 			if !s.cfg.IsUploadImage(im) {
-				return fail(400, "Картинка не из загрузок")
+				return fail(400, msgNotUploadImage.String())
 			}
 		}
 		if _, known := s.cfg.Tabs.Tab(tabID); !known {
-			return fail(404, msgNoTab)
+			return fail(404, msgNoTab.String())
 		}
 		item, err := s.queue.Add(tabID, f.text("text"), images)
 		if err != nil {
@@ -111,7 +111,7 @@ func (s *Service) PromptQueue(body []byte) Response {
 	}
 	id := f.text("id")
 	if id == "" {
-		return fail(400, "Нужен id")
+		return fail(400, msgNeedID.String())
 	}
 	if action == "steer" {
 		if r := s.Steer(tabID, id); !r.OK {
@@ -121,7 +121,7 @@ func (s *Service) PromptQueue(body []byte) Response {
 	}
 	item, found := s.queue.Take(tabID, id)
 	if !found {
-		return fail(404, "Сообщения уже нет в очереди")
+		return fail(404, msgNotQueued.String())
 	}
 	return ok(QueueTaken{item})
 }
@@ -144,23 +144,23 @@ func (s *Service) PromptText(body []byte) Response {
 	f := decodeFields(body)
 	tabID, text := f.text("tabId"), f.text("text")
 	if tabID == "" || text == "" {
-		return fail(400, "Нужны tabId и text")
+		return fail(400, msgNeedTabText.String())
 	}
 	if jscompat.Len(text) > PromptTextMax {
-		return fail(413, "Сообщение слишком длинное")
+		return fail(413, msgTooLong.String())
 	}
 	messageID := f.text("messageId")
 	via, err := s.TypePrompt(tabID, text, !f.isFalse("submit"), messageID, steps)
 	s.info("prompt typed", "tabId", tabID, "via", via, "messageId", nullable(messageID), "chars", jscompat.Len(text), "steps", steps)
 	switch {
 	case err == ErrNoTab:
-		return fail(404, msgNoTab)
+		return fail(404, msgNoTab.String())
 	case err == ErrCodexNeedsSubmit:
-		return fail(400, "Codex принимает сообщение только с отправкой")
+		return fail(400, msgCodexSubmit.String())
 	case err != nil:
-		return fail(500, "Не удалось передать сообщение агенту")
+		return fail(500, msgTypeFailed.String())
 	case via == ViaFailed:
-		return fail(500, "Агент не принял сообщение — оно осталось в его поле ввода")
+		return fail(500, msgTypeRejected.String())
 	}
 	return ok(PromptTyped{Via: via, Steps: steps})
 }
@@ -177,12 +177,12 @@ func (s *Service) SendNowRoute(body []byte) Response {
 	f := decodeFields(body)
 	tabID, text := f.text("tabId"), f.text("text")
 	if tabID == "" || blank(text) {
-		return fail(400, "Нужны tabId и text")
+		return fail(400, msgNeedTabText.String())
 	}
 	r, found := s.SendNow(tabID, text)
 	switch {
 	case !found:
-		return fail(404, msgNoTab)
+		return fail(404, msgNoTab.String())
 	case r.OK:
 		return ok(SendNowBody{r.Outcome})
 	}
@@ -195,10 +195,10 @@ func (s *Service) SendNowRoute(body []byte) Response {
 func (s *Service) InterruptRoute(body []byte) Response {
 	tabID := decodeFields(body).text("tabId")
 	if tabID == "" {
-		return fail(400, "Нужен tabId")
+		return fail(400, msgNeedTab.String())
 	}
 	if !s.Interrupt(tabID) {
-		return fail(404, msgNoTab)
+		return fail(404, msgNoTab.String())
 	}
 	return Response{Status: 204}
 }
@@ -218,7 +218,7 @@ func (s *Service) SwitchModel(body []byte) Response {
 	f := decodeFields(body)
 	session, model := f.text("session"), f.text("model")
 	if session == "" || !ModelIDRE.MatchString(model) {
-		return fail(400, "Неизвестная модель")
+		return fail(400, msgUnknownModel.String())
 	}
 	r := s.RunCommand(RunInput{Session: session, Provider: ProviderClaude, Line: "/model " + model, ExpectModel: true})
 	if r.Status != 200 {
@@ -236,9 +236,9 @@ func (s *Service) SwitchModel(body []byte) Response {
 	if b != nil && b.Outcome == "menu" {
 		tab, known := s.cfg.Tabs.TabOfSession(session)
 		if known && s.MarkNeedsInputFromScreen(tab.ID) {
-			return fail(409, msgMenu)
+			return fail(409, msgMenu.String())
 		}
-		return fail(409, "Агент показал меню — ответьте в терминале")
+		return fail(409, msgMenuInTerminal.String())
 	}
 	return ok(SwitchModelBody{OK: true, Confirmed: b != nil && b.Outcome == "confirmed" && b.Asked != nil && *b.Asked})
 }
@@ -250,15 +250,15 @@ func (s *Service) RunCommandRoute(body []byte) Response {
 	f := decodeFields(body)
 	session, hasSession := f.str("session")
 	if !hasSession || session == "" {
-		return Response{400, &RunError{Error: RunInvalid, Message: "Нужна сессия"}}
+		return Response{400, &RunError{Error: RunInvalid, Message: msgNeedSession.String()}}
 	}
 	provider := f.text("provider")
 	if provider != ProviderClaude && provider != ProviderCodex {
-		return Response{400, &RunError{Error: RunInvalid, Message: "Неизвестный агент"}}
+		return Response{400, &RunError{Error: RunInvalid, Message: msgUnknownAgent.String()}}
 	}
 	line, isString := f.str("line")
 	if !isString {
-		return Response{400, &RunError{Error: RunInvalid, Message: "Нужна строка команды"}}
+		return Response{400, &RunError{Error: RunInvalid, Message: msgNeedLine.String()}}
 	}
 	r := s.RunCommand(RunInput{Session: session, Provider: provider, Line: line})
 	return Response(r)
@@ -279,10 +279,10 @@ type MirrorScreen struct {
 
 func (s *Service) mirrorSession(session string) (Response, bool) {
 	if !SessionNameRE.MatchString(session) {
-		return fail(400, "Неверная сессия"), false
+		return fail(400, msgBadSession.String()), false
 	}
 	if !s.cfg.Panes.HasSession(session) {
-		return fail(404, "Сессия не найдена"), false
+		return fail(404, msgNoSession.String()), false
 	}
 	return Response{}, true
 }
@@ -290,7 +290,7 @@ func (s *Service) mirrorSession(session string) (Response, bool) {
 func (s *Service) readMirror(session string) Response {
 	styled, captured := s.cfg.Panes.CaptureStyled(session)
 	if !captured {
-		return fail(500, "Не получилось прочитать экран агента")
+		return fail(500, msgNoMirror.String())
 	}
 	st := screen.Read(styled)
 	return ok(MirrorScreen{Menu: st.Menu, Panel: st.Panel, Busy: st.Busy, Screen: screen.PanelSnapshot(st.Plain)})
@@ -314,13 +314,13 @@ func (s *Service) CommandScreenKey(body []byte) Response {
 	}
 	key := f.text("key")
 	if !slices.Contains(MirrorKeys, key) {
-		return fail(400, "Эту клавишу из веба нажать нельзя")
+		return fail(400, msgKeyNotAllowed.String())
 	}
 	if cmd := s.cfg.Panes.PaneCurrentCommand(session); cmd == "" || s.cfg.IsShell(cmd) {
-		return fail(409, "Агент в этом диалоге не запущен")
+		return fail(409, msgAgentNotRunning.String())
 	}
 	if s.cfg.Panes.SendRawKeys(session, key) != nil {
-		return fail(500, "Не получилось нажать клавишу")
+		return fail(500, msgKeyFailed.String())
 	}
 	s.clock.Sleep(mirrorKeySettle)
 	return s.readMirror(session)

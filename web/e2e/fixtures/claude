@@ -1,0 +1,53 @@
+#!/bin/bash
+# A stand-in for Claude Code: it answers --version, writes its transcript and session file where Claude does, plays
+# the hooks of its --settings file, and answers every line typed into it with a tool call and a reply.
+if [ "$1" = "--version" ]; then echo "2.1.99 (Claude Code)"; exit 0; fi
+# The runtime tells an agent from a shell by the pane's command name (argv[0]): run as "claude", not "bash".
+if [ -z "$FAKE_AGENT_NAMED" ]; then FAKE_AGENT_NAMED=1 exec -a claude /bin/bash "$0" "$@"; fi
+echo "$*" >> "$HOME/claude-calls.log"
+settings=""; sid=""; prompt=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --settings) settings="$2"; shift ;;
+    --resume) sid="$2"; shift ;;
+    --*) case "$2" in --*|"") ;; *) shift ;; esac ;;
+    *) prompt="$1" ;;
+  esac
+  shift
+done
+[ -n "$sid" ] || sid=$(cat /proc/sys/kernel/random/uuid)
+cwd=$(pwd)
+project="$HOME/.claude/projects/$(printf '%s' "$cwd" | sed 's/[^A-Za-z0-9]/-/g')"
+mkdir -p "$project" "$HOME/.claude/sessions"
+transcript="$project/$sid.jsonl"
+touch "$transcript"
+printf '{"pid":%s,"sessionId":"%s","cwd":"%s","startedAt":%s000}\n' "$$" "$sid" "$cwd" "$(date +%s)" > "$HOME/.claude/sessions/$$.json"
+hook() {
+  [ -n "$settings" ] || return 0
+  cmd=$(sed -n 's/^ *"command": "\(.*\)",\{0,1\}$/\1/p' "$settings" | sed 's/\\"/"/g' | grep -- "$1\$" | head -1)
+  [ -n "$cmd" ] && eval "$cmd" > /dev/null 2>&1
+}
+json() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+now() { date -u +%Y-%m-%dT%H:%M:%S.000Z; }
+turn() {
+  text=$(json "$1"); n=$RANDOM
+  printf '{"type":"user","message":{"role":"user","content":"%s"},"uuid":"u-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$text" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  echo "{\"session_id\":\"$sid\",\"prompt\":\"$text\"}" | hook prompt-submit
+  sleep 1
+  # A message asking for a long task keeps the agent working for a while.
+  case "$1" in *long*) sleep 20 ;; esac
+  printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_%s","name":"Bash","input":{"command":"ls -la","description":"List files"}}]},"uuid":"t-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  sleep 0.5
+  printf '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%s","content":"total 0"}]},"uuid":"r-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Fake agent reply: %s"}]},"uuid":"a-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$text" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  sleep 0.3
+  echo "{\"session_id\":\"$sid\"}" | hook stop
+}
+sleep 0.5
+echo "{\"session_id\":\"$sid\"}" | hook session-start
+echo "fake claude ready $sid"
+[ -n "$prompt" ] && turn "$prompt"
+while IFS= read -r line; do
+  line=$(printf '%s' "$line" | sed 's/\x1b\[20[01]~//g' | tr -d '\r')
+  [ -n "$line" ] && turn "$line"
+done

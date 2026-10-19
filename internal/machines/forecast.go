@@ -6,6 +6,7 @@ import (
 
 	"harnessly/internal/jscompat"
 	"harnessly/internal/limits"
+	"harnessly/internal/locale"
 )
 
 // When a subscription window runs out. With the person's spend history the forecast follows their usual hours: the
@@ -85,19 +86,29 @@ const (
 
 func str(s string) *string { return &s }
 
-// formatSpan: «20 мин», «6 ч», «1 ч 30 мин».
+// The forecast's reasons, picked by RUNTIME_LOCALE when the forecast is made; the Russian ones are the previous
+// runtime's texts, byte for byte.
+var (
+	reasonNoSamples   = locale.T("no samples", "нет замеров")
+	reasonWindowReset = locale.T("the window reset, waiting for new samples", "окно сбросилось, ждём новых замеров")
+	reasonNoFresh     = locale.T("no fresh samples", "нет свежих замеров")
+	reasonFlat        = locale.T("usage is below the measurement step (1%)", "расход меньше шага измерения (1%)")
+)
+
+// formatSpan: "20 min", "6 h", "1 h 30 min" (in Russian «20 мин», «6 ч», «1 ч 30 мин»).
 func formatSpan(seconds float64) string {
+	mins, hrs := locale.Pick(" min", " мин"), locale.Pick(" h", " ч")
 	minutes := jsRound(seconds / 60)
 	hours := math.Floor(minutes / 60)
 	rest := math.Mod(minutes, 60)
 	m, h, r := jscompat.Number(minutes), jscompat.Number(hours), jscompat.Number(rest)
 	if hours == 0 {
-		return m + " мин"
+		return m + mins
 	}
 	if rest == 0 {
-		return h + " ч"
+		return h + hrs
 	}
-	return h + " ч " + r + " мин"
+	return h + hrs + " " + r + mins
 }
 
 // jsRound is Math.round: halves go up.
@@ -395,12 +406,12 @@ func forecastByProfile(all []limits.Sample, last limits.Sample, now float64, spe
 // the forecast extends the pace of the last samples.
 func ForecastWindow(all []limits.Sample, now float64, spec WindowSpec, a *Activity) Forecast {
 	if len(all) == 0 {
-		return Forecast{Status: statusInsufficient, Reason: str("нет замеров")}
+		return Forecast{Status: statusInsufficient, Reason: str(reasonNoSamples.String())}
 	}
 	last := all[len(all)-1]
 	base := Forecast{LastAt: num(last.T), ResetsAt: num(last.R)}
 	if last.R <= now {
-		base.Status, base.Reason = statusInsufficient, str("окно сбросилось, ждём новых замеров")
+		base.Status, base.Reason = statusInsufficient, str(reasonWindowReset.String())
 		return base
 	}
 	if last.U >= 100 {
@@ -408,7 +419,7 @@ func ForecastWindow(all []limits.Sample, now float64, spec WindowSpec, a *Activi
 		return base
 	}
 	if now-last.T > spec.Fresh {
-		base.Status, base.Reason = statusStale, str("нет свежих замеров")
+		base.Status, base.Reason = statusStale, str(reasonNoFresh.String())
 		return base
 	}
 	p := measurePace(all, last, now, spec)
@@ -427,7 +438,8 @@ func ForecastWindow(all []limits.Sample, now float64, spec WindowSpec, a *Activi
 		f.Status, f.Reason = statusInsufficient, str(reason)
 		return f
 	}
-	need := "нужно ≥ " + formatSpan(spec.MinSpan) + " замеров"
+	minSpan := formatSpan(spec.MinSpan)
+	need := locale.Pick("needs at least "+minSpan+" of samples", "нужно ≥ "+minSpan+" замеров")
 	if len(p.series) < 4 || p.span < spec.MinSpan {
 		return insufficient(need)
 	}
@@ -443,7 +455,7 @@ func ForecastWindow(all []limits.Sample, now float64, spec WindowSpec, a *Activi
 		if p.span >= 2*spec.MinSpan {
 			return lasts(0, confidenceMedium)
 		}
-		return insufficient("расход меньше шага измерения (1%)")
+		return insufficient(reasonFlat.String())
 	}
 	if p.rates == nil {
 		return insufficient(need)

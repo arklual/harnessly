@@ -355,27 +355,19 @@ type SteerResult struct {
 	Message string
 }
 
-var steerErrors = map[Outcome]string{
-	OutcomeWait:    "Не удалось прочитать экран агента — попробуйте ещё раз",
-	OutcomeBlocked: "В поле ввода агента уже есть текст или открыто меню — ответьте там",
-	OutcomeFailed:  "Картинки не дошли до агента — сообщение осталось в очереди",
-}
-
-const msgNoTab = "Вкладка не найдена"
-
 // Steer sends a queued message now, into the running turn if there is one; a menu or foreign text still stops it and the
 // message goes back to the head. A Claude message steered into a running Bash or MCP call is then handed over like
 // "send now", so it does not wait for the call to end.
 func (s *Service) Steer(tabID, id string) SteerResult {
 	tab, ok := s.cfg.Tabs.Tab(tabID)
 	if !ok || tab.Session == "" {
-		return SteerResult{Status: 404, Message: msgNoTab}
+		return SteerResult{Status: 404, Message: msgNoTab.String()}
 	}
 	var res SteerResult
 	if !s.flights.run(tabID, func() {
 		item, ok := s.queue.Take(tabID, id)
 		if !ok {
-			res = SteerResult{Status: 409, Message: "Сообщения уже нет в очереди"}
+			res = SteerResult{Status: 409, Message: msgNotQueued.String()}
 			return
 		}
 		steeredAt := s.clock.Now()
@@ -393,9 +385,9 @@ func (s *Service) Steer(tabID, id string) SteerResult {
 		if out == OutcomeFailed {
 			status = 500
 		}
-		res = SteerResult{Status: status, Message: steerErrors[out]}
+		res = SteerResult{Status: status, Message: steerErrors[out].String()}
 	}) {
-		return SteerResult{Status: 409, Message: msgInFlight}
+		return SteerResult{Status: 409, Message: msgInFlight.String()}
 	}
 	return res
 }
@@ -431,7 +423,7 @@ func (s *Service) SendNow(tabID, text string) (SendNowResult, bool) {
 			s.reg.Release(id)
 		}
 	}) {
-		return sendNowFailure(409, msgInFlight, false), true
+		return sendNowFailure(409, msgInFlight.String(), false), true
 	}
 	return res, true
 }

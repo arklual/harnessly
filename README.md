@@ -156,6 +156,21 @@ logins) and ask for a `claude-code` or `codex-cli` tab with a prompt:
 
 More in [Getting started](docs/getting-started.md).
 
+### The web page
+
+`web/` is a browser front-end for a machine run on its own: sign-in, workspaces, panes with terminal and agent tabs
+(live state, the conversation, sending and interrupting) and the machine's load and limits. Built into the runtime, it
+is served at `RUNTIME_APP_BASE_PATH` (default `/agents`, and `/` redirects there):
+
+```sh
+make runtime-web               # pnpm build in web/, then bin/runtime with the page compiled in
+HOME=$(mktemp -d) RUNTIME_GATE_LISTEN=127.0.0.1:4321 ./bin/runtime &
+xdg-open http://127.0.0.1:4321/   # the first visit sets the machine's password
+```
+
+`make web-check` runs what CI runs for the page; `make web-browser-test` drives it in headless Chrome against a
+standalone runtime with stand-in agents. See [the page's settings](docs/configuration.md#web-page).
+
 ## Architecture
 
 ```mermaid

@@ -1,0 +1,5 @@
+#!/bin/sh
+if [ "$1" = "--version" ]; then echo "codex-cli 0.50.0"; exit 0; fi
+echo "$*" >> "$HOME/codex-calls.log"
+echo "fake codex ready"
+exec -a codex sleep 3600

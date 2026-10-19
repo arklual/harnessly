@@ -11,6 +11,19 @@ import (
 	"harnessly/internal/status"
 )
 
+func TestMain(m *testing.M) {
+	// The goldens are the previous runtime's answers, which were in Russian.
+	os.Setenv("RUNTIME_LOCALE", "ru")
+	os.Exit(m.Run())
+}
+
+func TestResolveCwdInEnglish(t *testing.T) {
+	t.Setenv("RUNTIME_LOCALE", "en")
+	if _, err := ResolveCwd("rel", t.TempDir(), nil); err == nil || err.Error() != "The launch folder must be an absolute path" {
+		t.Fatalf("%v", err)
+	}
+}
+
 func TestResolveCwd(t *testing.T) {
 	root := t.TempDir()
 	inside, other := filepath.Join(root, "proj"), t.TempDir()

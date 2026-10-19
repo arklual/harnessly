@@ -61,6 +61,7 @@ it stays with the previous runtime.
 | `HOST` | the hook route's network access rule, as the previous runtime read it (`localhost`, `tailscale`, `lan`, `all` or CIDRs, comma-separated); unset takes `networkAccess` of the runtime config (`localhost`, `tailscale` or `all`, default `all`) |
 | `RUNTIME_AGENT_TOKEN_HEADER` | header of the machine agent's loopback routes, for committing state to the cluster |
 | `RUNTIME_RELEASE_FILE` | the release file (`{"version", "commit"}`) the snapshot and `/api/health` report (unset: none; health then says `0.0.0-development`) |
+| `RUNTIME_LOCALE` | the language of the texts the routes answer people with: `en` (default) or `ru`, the previous runtime's texts byte for byte (set it where pages show those texts as they were) |
 | `RUNTIME_HEALTH_APP` | the app name `/api/health` reports (default `harnessly`) |
 | `RUNTIME_MANIFEST_FILE` | the installable app's manifest served at `/api/manifest` (unset: the previous runtime's) |
 | `RUNTIME_API_GUIDE_FILE` | the CLI's API guide served at `/api/cli/api-guide` (default `runtime-static/api-guide.md` beside `RUNTIME_RELEASE_FILE`; no file: the previous runtime's) |
@@ -74,7 +75,7 @@ it stays with the previous runtime.
 | --- | --- |
 | `RUNTIME_TMUX_SOCKET`, `RUNTIME_TMUX_LEGACY_SOCKET` | the runtime's tmux servers (`-L`; default `harnessly`, no legacy one) |
 | `RUNTIME_SESSION_PREFIX`, `RUNTIME_LEGACY_SESSION_PREFIX` | tab session name prefixes (default `hs-`); a legacy one may live on either server |
-| `RUNTIME_TMUX_CONF` | the tmux.conf a new tmux server reads and is re-read after each new session (none: tmux defaults) |
+| `RUNTIME_TMUX_CONF` | the tmux.conf a new tmux server reads and is re-read after each new session (set but empty: tmux defaults; unset: none in front of the previous runtime, and standalone `tmux.conf` in the data directory, written with the status bar off when missing) |
 | `RUNTIME_PANE_BIN_DIR` | folder put first on a new pane shell's `PATH` (pane-side wrappers) |
 | `RUNTIME_AGENT_NICE` | niceness of a tmux server the runtime starts, 0–19, `0` = off (default 10) |
 | `RUNTIME_TAB_META_KEY` | the layout tab field holding the platform's own metadata (launch choice, mode) |
@@ -205,3 +206,15 @@ These apply when `RUNTIME_GATE_UPSTREAM` is empty and the runtime does the start
 | `RUNTIME_TELEMETRY_URL`, `RUNTIME_TELEMETRY_KEY` | a PostHog-compatible batch endpoint and project key a released runtime reports corrected tab states to (unset: logged only) |
 | `RUNTIME_TELEMETRY_PROPERTIES`, `RUNTIME_TELEMETRY_ANONYMOUS_ID`, `RUNTIME_TELEMETRY_MISMATCH_EVENT` | the properties every event starts with (a JSON object), who the events are about without an owner e-mail (default `runtime`), the event's name (default `platform_status_mismatch`) |
 | `RUNTIME_PLUGIN_RELOAD_MARK` | the plugin reconciler's mark file (`{"plugins": ms, "skills": ms}`); unset: no reloads |
+
+### Web page
+
+The browser page in `web/` (see the [README](../README.md#the-web-page)). A standalone runtime serves it at
+`RUNTIME_APP_BASE_PATH` (default `/agents`; `/` redirects there) and fills that base and the API prefixes into the page.
+It answers its API under that base too (`<base>/api/…` besides `/api/…`), so one proxy prefix covers both. In front of
+the previous runtime the pages are someone else's and the gate leaves those paths alone.
+
+| Variable | Meaning |
+| --- | --- |
+| `RUNTIME_WEB` | `on` serves the page in front of the previous runtime too, `off` never; unset: standalone only |
+| `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page |

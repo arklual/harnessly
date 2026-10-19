@@ -67,10 +67,10 @@ func TestPromptQueueRoute(t *testing.T) {
 	expectError(t, "bad tab", r.svc.PromptQueue(body(map[string]any{"tabId": "a b", "action": "add"})), 400, "Нужны tabId и action")
 	expectError(t, "bad action", r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "drop"})), 400, "Нужны tabId и action")
 	expectError(t, "not an object", r.svc.PromptQueue([]byte(`[1]`)), 400, "Нужны tabId и action")
-	expectError(t, "unknown tab", r.svc.PromptQueue(body(map[string]any{"tabId": "tab-9", "action": "add", "text": "x"})), 404, msgNoTab)
+	expectError(t, "unknown tab", r.svc.PromptQueue(body(map[string]any{"tabId": "tab-9", "action": "add", "text": "x"})), 404, msgNoTab.String())
 	expectError(t, "blank", r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "add", "text": "  "})), 409, "Пустое сообщение")
 	expectError(t, "no id", r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "take"})), 400, "Нужен id")
-	expectError(t, "steer blocked", r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "steer", "id": queued.ID})), 409, steerErrors[OutcomeBlocked])
+	expectError(t, "steer blocked", r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "steer", "id": queued.ID})), 409, steerErrors[OutcomeBlocked].String())
 
 	res = r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "take", "id": queued.ID}))
 	if got := asJSON(t, res); res.Status != 200 || got["item"].(map[string]any)["id"] != queued.ID {
@@ -89,7 +89,7 @@ func TestPromptTextRoute(t *testing.T) {
 	r := newRig(t, "❯ ", Tab{})
 	expectError(t, "empty", r.svc.PromptText(body(map[string]any{"tabId": "tab-1", "text": ""})), 400, "Нужны tabId и text")
 	expectError(t, "long", r.svc.PromptText(body(map[string]any{"tabId": "tab-1", "text": strings.Repeat("x", PromptTextMax+1)})), 413, "Сообщение слишком длинное")
-	expectError(t, "unknown tab", r.svc.PromptText(body(map[string]any{"tabId": "tab-9", "text": "x"})), 404, msgNoTab)
+	expectError(t, "unknown tab", r.svc.PromptText(body(map[string]any{"tabId": "tab-9", "text": "x"})), 404, msgNoTab.String())
 	res := r.svc.PromptText(body(map[string]any{"tabId": "tab-1", "text": "a\nb", "messageId": "m1"}))
 	got := asJSON(t, res)
 	if res.Status != 200 || got["via"] != "paste" {
@@ -114,9 +114,9 @@ func TestSendNowRoute(t *testing.T) {
 	stream := transcript(t, "claude-2.1.296-send-now-stream.jsonl")
 	r.svc.cfg.ReadTranscript = func(string) ([]string, bool) { return stream[:2], true }
 	expectError(t, "blank", r.svc.SendNowRoute(body(map[string]any{"tabId": "tab-1", "text": "  "})), 400, "Нужны tabId и text")
-	expectError(t, "unknown", r.svc.SendNowRoute(body(map[string]any{"tabId": "tab-9", "text": "x"})), 404, msgNoTab)
+	expectError(t, "unknown", r.svc.SendNowRoute(body(map[string]any{"tabId": "tab-9", "text": "x"})), 404, msgNoTab.String())
 	res := r.svc.SendNowRoute(body(map[string]any{"tabId": "tab-1", "text": "Then also say QUEUED-MSG-3 right after STORY-END"}))
-	if got := asJSON(t, res); res.Status != 409 || got["waits"] != true || got["error"] != msgWriting {
+	if got := asJSON(t, res); res.Status != 409 || got["waits"] != true || got["error"] != msgWriting.String() {
 		t.Fatalf("writing: %v", got)
 	}
 	r.svc.cfg.ReadTranscript = func(string) ([]string, bool) { return stream, true }
@@ -129,7 +129,7 @@ func TestSendNowRoute(t *testing.T) {
 func TestInterruptRoute(t *testing.T) {
 	r := newRig(t, "", Tab{})
 	expectError(t, "no tab", r.svc.InterruptRoute([]byte(`{}`)), 400, "Нужен tabId")
-	expectError(t, "unknown", r.svc.InterruptRoute(body(map[string]any{"tabId": "tab-9"})), 404, msgNoTab)
+	expectError(t, "unknown", r.svc.InterruptRoute(body(map[string]any{"tabId": "tab-9"})), 404, msgNoTab.String())
 	if res := r.svc.InterruptRoute(body(map[string]any{"tabId": "tab-1"})); res.Status != 204 || res.Body != nil {
 		t.Fatalf("got %+v", res)
 	}
@@ -167,7 +167,7 @@ func TestSwitchModelRoute(t *testing.T) {
 		}
 	}
 	r.events.menuMoves = true
-	expectError(t, "menu", r.svc.SwitchModel(body(map[string]any{"session": testSession, "model": "opus"})), 409, msgMenu)
+	expectError(t, "menu", r.svc.SwitchModel(body(map[string]any{"session": testSession, "model": "opus"})), 409, msgMenu.String())
 
 	r.panes.current = "zsh"
 	res = r.svc.SwitchModel(body(map[string]any{"session": testSession, "model": "opus"}))

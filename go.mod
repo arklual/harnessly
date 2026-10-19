@@ -2,6 +2,9 @@ module harnessly
 
 go 1.26.0
 
+// The front-end's npm packages may carry Go files of their own.
+ignore ./web/node_modules
+
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/coder/websocket v1.8.15

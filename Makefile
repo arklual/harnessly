@@ -8,7 +8,7 @@ LDFLAGS       := -s -w -X harnessly/internal/agent.BuildVersion=$(or $(VERSION),
 CROSS         := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
 .DEFAULT_GOAL := help
-.PHONY: help build test test-race lint fmt fmt-check vet cover cross clean
+.PHONY: help build test test-race lint fmt fmt-check vet cover cross clean web web-check web-browser-test runtime-web
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -46,3 +46,21 @@ cross: ## Compile every package for linux and darwin, amd64 and arm64
 
 clean: ## Remove build outputs
 	rm -rf $(BIN) dist coverage.out
+
+PNPM ?= pnpm
+
+web/node_modules: web/package.json web/pnpm-lock.yaml
+	cd web && $(PNPM) install --frozen-lockfile
+	@touch $@
+
+web: web/node_modules ## Build the web page into web/dist
+	cd web && $(PNPM) build
+
+web-check: web/node_modules ## Lint, type-check, unit-test and build the web page (what CI runs for it)
+	cd web && $(PNPM) lint && $(PNPM) typecheck && $(PNPM) test && $(PNPM) build
+
+runtime-web: web ## Build bin/runtime with the web page compiled in (the webui tag)
+	CGO_ENABLED=0 $(GO) build -trimpath -tags webui -ldflags "$(LDFLAGS)" -o $(BIN)/runtime ./cmd/runtime
+
+web-browser-test: web ## Drive the web page in headless Chrome against a standalone runtime with stand-in agents
+	cd web && $(PNPM) e2e

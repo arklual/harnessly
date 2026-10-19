@@ -181,7 +181,7 @@ func TestSendQueuedNow(t *testing.T) {
 	}
 
 	w = newWorld(tui(t, "claude-2.1.296-queued-stream.ansi.txt"), stream[:2], nil)
-	expect("writing", w, run(w, "Then also say QUEUED-MSG-3 right after STORY-END"), SendNowResult{Status: 409, Message: msgWriting, Waits: true}, nil)
+	expect("writing", w, run(w, "Then also say QUEUED-MSG-3 right after STORY-END"), SendNowResult{Status: 409, Message: msgWriting.String(), Waits: true}, nil)
 
 	webFetch := []string{bash[0], call("toolu_x", "WebFetch"), bash[2]}
 	w = newWorld(bashQueued, webFetch, nil)
@@ -211,13 +211,13 @@ func TestSendQueuedNow(t *testing.T) {
 	expect("tool ended between the reads", w, run(w, bashText), deliveredNow, nil)
 
 	w = newWorld(tui(t, "claude-2.1.296-queued-draft.ansi.txt"), bash[:3], nil)
-	expect("draft", w, run(w, bashText), SendNowResult{Status: 409, Message: msgConflict}, nil)
+	expect("draft", w, run(w, bashText), SendNowResult{Status: 409, Message: msgConflict.String()}, nil)
 
 	w = newWorld(permissionFrame, bash[:3], nil)
-	expect("permission prompt", w, run(w, bashText), SendNowResult{Status: 409, Message: msgMenu}, nil)
+	expect("permission prompt", w, run(w, bashText), SendNowResult{Status: 409, Message: msgMenu.String()}, nil)
 
 	w = newWorld(bashAfter, bash[:3], nil)
-	expect("never on screen", w, run(w, bashText), SendNowResult{Status: 409, Message: msgUnseen}, nil)
+	expect("never on screen", w, run(w, bashText), SendNowResult{Status: 409, Message: msgUnseen.String()}, nil)
 	if w.elapsed() < 1500*time.Millisecond {
 		t.Errorf("gave up after %v", w.elapsed())
 	}
@@ -232,7 +232,7 @@ func TestSendQueuedNow(t *testing.T) {
 	expect("shows up a moment later", w, run(w, bashText), sentNow, chord)
 
 	w = newWorld(bashQueued, bash[:3], nil)
-	expect("queue stays after the chord", w, run(w, bashText), SendNowResult{Status: 500, Message: msgNotAccepted}, chord)
+	expect("queue stays after the chord", w, run(w, bashText), SendNowResult{Status: 500, Message: msgNotAccepted.String()}, chord)
 	if e := w.elapsed(); e < 5*time.Second || e >= 5500*time.Millisecond {
 		t.Errorf("gave up after %v", e)
 	}
@@ -242,12 +242,12 @@ func TestSendQueuedNow(t *testing.T) {
 			w.screen = func(time.Duration) (string, bool) { return permissionFrame, true }
 		}
 	})
-	expect("menu after the chord", w, run(w, bashText), SendNowResult{Status: 409, Message: msgMenu}, chord)
+	expect("menu after the chord", w, run(w, bashText), SendNowResult{Status: 409, Message: msgMenu.String()}, chord)
 
 	w = newWorld("", bash[:3], nil)
-	expect("no screen", w, run(w, bashText), SendNowResult{Status: 500, Message: msgNoScreen}, nil)
+	expect("no screen", w, run(w, bashText), SendNowResult{Status: 500, Message: msgNoScreen.String()}, nil)
 	w = newWorld(bashQueued, nil, nil)
-	expect("no transcript", w, run(w, bashText), SendNowResult{Status: 500, Message: msgNoTranscript}, nil)
+	expect("no transcript", w, run(w, bashText), SendNowResult{Status: 500, Message: msgNoTranscript.String()}, nil)
 
 	for i, w := range []*world{
 		newWorld(bashQueued, bash[:3], nil),
@@ -284,7 +284,7 @@ func TestSendNowOnePerTab(t *testing.T) {
 		r.svc.flights.run("tab-1", func() { close(entered); <-release })
 	}()
 	<-entered
-	if got, found := r.svc.SendNow("tab-1", bashText); !found || !reflect.DeepEqual(got, SendNowResult{Status: 409, Message: msgInFlight}) {
+	if got, found := r.svc.SendNow("tab-1", bashText); !found || !reflect.DeepEqual(got, SendNowResult{Status: 409, Message: msgInFlight.String()}) {
 		t.Fatalf("second send: %+v", got)
 	}
 	close(release)

@@ -21,6 +21,7 @@ import (
 	"harnessly/internal/gate"
 	"harnessly/internal/jsvalue"
 	"harnessly/internal/launch"
+	"harnessly/internal/locale"
 	"harnessly/internal/nodejson"
 	"harnessly/internal/preflight"
 )
@@ -186,12 +187,18 @@ func availability(r preflight.Result, panelType string) *layoutapi.Unavailable {
 
 var (
 	claudeEfforts = []string{"low", "medium", "high", "xhigh", "max", "ultracode"}
-	effortLabels  = map[string]string{"none": "Без рассуждения", "minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High",
+	effortLabels  = map[string]string{"minimal": "Minimal", "low": "Low", "medium": "Medium", "high": "High",
 		"xhigh": "Extra high", "max": "Max", "ultra": "Ultra", "ultracode": "Ultracode"}
 	providerTitles = map[string]string{agents.Claude: "Claude", agents.Codex: "Codex"}
 )
 
+// effortNone is the label of "none", the one effort whose label is not the same in every language.
+var effortNone = locale.T("No reasoning", "Без рассуждения")
+
 func effortLabel(e string) string {
+	if e == "none" {
+		return effortNone.String()
+	}
 	if l, ok := effortLabels[e]; ok {
 		return l
 	}
@@ -235,7 +242,7 @@ func (a *coreAgents) ValidateLaunch(provider string, model, effort any) (*agents
 	if model != nil {
 		s, ok := model.(string)
 		if !ok || !agents.ModelIDRe.MatchString(s) {
-			return nil, "Недопустимое имя модели"
+			return nil, locale.Pick("Invalid model name", "Недопустимое имя модели")
 		}
 		l.Model = &s
 	}
@@ -246,22 +253,27 @@ func (a *coreAgents) ValidateLaunch(provider string, model, effort any) (*agents
 			known = ok && slices.Contains(claudeEfforts, s)
 		}
 		if !known {
-			return nil, "Недопустимая глубина рассуждения"
+			return nil, locale.Pick("Invalid reasoning effort", "Недопустимая глубина рассуждения")
 		}
 		l.Effort = &s
 	}
 	o := a.options.Launch(provider)
 	if l.Model != nil && findModel(o.Models, *l.Model) == nil {
-		return nil, "Модель «" + *l.Model + "» недоступна для " + providerTitles[provider] + " на этой машине"
+		return nil, locale.Pick(`Model "`+*l.Model+`" is not available for `+providerTitles[provider]+" on this machine",
+			"Модель «"+*l.Model+"» недоступна для "+providerTitles[provider]+" на этой машине")
 	}
 	if l.Effort != nil && !slices.Contains(effortsFor(provider, o, l.Model), *l.Effort) {
-		who := "по умолчанию"
+		label := effortLabel(*l.Effort)
+		var who *string
 		if l.Model != nil {
-			who = *l.Model
+			who = l.Model
 		} else if o.CliDefault.Model != nil {
-			who = *o.CliDefault.Model
+			who = o.CliDefault.Model
 		}
-		return nil, "Модель " + who + " не поддерживает глубину «" + effortLabel(*l.Effort) + "»"
+		if who == nil {
+			return nil, locale.Pick(`The default model does not support reasoning effort "`+label+`"`, "Модель по умолчанию не поддерживает глубину «"+label+"»")
+		}
+		return nil, locale.Pick("Model "+*who+` does not support reasoning effort "`+label+`"`, "Модель "+*who+" не поддерживает глубину «"+label+"»")
 	}
 	return l, ""
 }
@@ -373,13 +385,13 @@ func (a *coreAgents) startOld(r layoutapi.StartRequest) layoutapi.StartResult {
 	}
 	if err != nil || status != http.StatusOK || json.Unmarshal(raw, &answer) != nil {
 		agent.Log("warn", "core: the old runtime did not start the agent", agent.F{K: "status", V: status})
-		return layoutapi.StartResult{Status: http.StatusBadGateway, Body: []byte(`{"error":"Не удалось запустить агента: старый рантайм не ответил"}`)}
+		return layoutapi.StartResult{Status: http.StatusBadGateway, Body: errorJSON(locale.Pick("Could not start the agent: the old runtime did not answer", "Не удалось запустить агента: старый рантайм не ответил"))}
 	}
 	if answer.OK && answer.Conversation.ID != "" {
 		return layoutapi.StartResult{ConversationID: answer.Conversation.ID}
 	}
 	if answer.Status == 0 || len(answer.Body) == 0 {
-		return layoutapi.StartResult{Status: http.StatusInternalServerError, Body: []byte(`{"error":"Не удалось запустить агента"}`)}
+		return layoutapi.StartResult{Status: http.StatusInternalServerError, Body: errorJSON(locale.Pick("Could not start the agent", "Не удалось запустить агента"))}
 	}
 	return layoutapi.StartResult{Status: answer.Status, Body: answer.Body}
 }
@@ -412,3 +424,9 @@ var (
 	autoResumeWait  = 3 * time.Minute
 	autoResumeRetry = 3 * time.Second
 )
+
+// errorJSON is {"error": text} as a body.
+func errorJSON(text string) []byte {
+	raw, _ := json.Marshal(errorBody(text))
+	return raw
+}

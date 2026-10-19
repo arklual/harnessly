@@ -14,6 +14,7 @@ import (
 	"harnessly/internal/agents"
 	"harnessly/internal/jscompat"
 	"harnessly/internal/jsvalue"
+	"harnessly/internal/locale"
 	"harnessly/internal/state"
 	"harnessly/internal/status"
 )
@@ -161,10 +162,10 @@ func realpath(p string) string {
 // extraRoots once symlinks are resolved. The error is the message for the caller.
 func ResolveCwd(requested, workspaceRoot string, extraRoots []string) (string, error) {
 	if workspaceRoot == "" && len(extraRoots) == 0 {
-		return "", errors.New("На этой машине не задан корневой каталог проектов")
+		return "", errors.New(msgNoWorkspaceRoot.String())
 	}
 	if !filepath.IsAbs(requested) {
-		return "", errors.New("Каталог запуска должен быть абсолютным путём")
+		return "", errors.New(msgCwdNotAbsolute.String())
 	}
 	var roots []string
 	for _, r := range append([]string{workspaceRoot}, extraRoots...) {
@@ -176,7 +177,7 @@ func ResolveCwd(requested, workspaceRoot string, extraRoots []string) (string, e
 		}
 	}
 	if len(roots) == 0 {
-		return "", errors.New("Корневой каталог проектов недоступен")
+		return "", errors.New(msgRootUnavailable.String())
 	}
 	resolved := realpath(requested)
 	inside := false
@@ -184,10 +185,10 @@ func ResolveCwd(requested, workspaceRoot string, extraRoots []string) (string, e
 		inside = inside || resolved != "" && isInside(resolved, r)
 	}
 	if !inside {
-		return "", errors.New("Каталог запуска вне корневого каталога проектов")
+		return "", errors.New(msgCwdOutsideRoot.String())
 	}
 	if st, err := os.Stat(resolved); err != nil || !st.IsDir() {
-		return "", errors.New("Каталог запуска не найден")
+		return "", errors.New(msgCwdNotFound.String())
 	}
 	return resolved, nil
 }
@@ -212,7 +213,7 @@ func (s *Starter) workspaceFor(id string) (*jsvalue.Object, *Result, error) {
 	if id != "" {
 		ws := s.cfg.Store.Workspace(id)
 		if ws == nil {
-			r := fail(404, "Проект не найден")
+			r := fail(404, msgNoWorkspace.String())
 			return nil, &r, nil
 		}
 		return ws, nil, nil
@@ -247,7 +248,7 @@ func envList(entries []EnvEntry) []agents.EnvVar {
 // is a failure the old runtime answered with a bare 500.
 func (s *Starter) Start(o Options) (Result, error) {
 	if o.Provider != agents.Claude && o.Provider != agents.Codex {
-		return fail(400, "Неизвестный агент"), nil
+		return fail(400, msgUnknownAgent.String()), nil
 	}
 	env, err := agents.FormatStartEnv(envList(o.Env), s.cfg.EnvPrefix)
 	if err != nil {
@@ -292,7 +293,7 @@ func (s *Starter) Start(o Options) (Result, error) {
 	}
 	panes := state.Panes(layout)
 	if len(panes) == 0 {
-		return fail(500, "В проекте нет панели для диалога"), nil
+		return fail(500, msgNoPane.String()), nil
 	}
 	launch := o.Launch
 	if launch != nil && launch.Model == nil && launch.Effort == nil {
@@ -326,7 +327,7 @@ func (s *Starter) Start(o Options) (Result, error) {
 	tab, err := s.cfg.Store.AddTab(wsID, panes[0].String("id"), state.TabOptions{Name: name, Cwd: cwd, PanelType: panelType, Command: command})
 	var se *state.Error
 	if errors.As(err, &se) || err == nil && tab == nil {
-		return fail(500, "Не удалось запустить сессию"), nil
+		return fail(500, msgStartFailed.String()), nil
 	}
 	if err != nil {
 		return Result{}, err
@@ -361,7 +362,7 @@ func (s *Starter) Start(o Options) (Result, error) {
 	}
 	// The tab vanished between the two layout writes: the session runs, but without its mode it must not look ordinary.
 	if stored == nil {
-		return fail(500, "Диалог запущен, но его параметры не сохранились"), nil
+		return fail(500, msgMetaNotSaved.String()), nil
 	}
 	trimmed := jscompat.Trim(prompt)
 	// The list names a tab by its last prompt until Claude titles it.
@@ -392,3 +393,18 @@ func launchJSON(l *agents.Launch) *jsvalue.Object {
 	}
 	return o
 }
+
+// The texts Start answers people with, picked by RUNTIME_LOCALE when the answer is built; the Russian ones are the
+// previous runtime's texts, byte for byte.
+var (
+	msgNoWorkspaceRoot = locale.T("No projects root folder is set on this machine", "На этой машине не задан корневой каталог проектов")
+	msgCwdNotAbsolute  = locale.T("The launch folder must be an absolute path", "Каталог запуска должен быть абсолютным путём")
+	msgRootUnavailable = locale.T("The projects root folder is unavailable", "Корневой каталог проектов недоступен")
+	msgCwdOutsideRoot  = locale.T("The launch folder is outside the projects root folder", "Каталог запуска вне корневого каталога проектов")
+	msgCwdNotFound     = locale.T("Launch folder not found", "Каталог запуска не найден")
+	msgNoWorkspace     = locale.T("Project not found", "Проект не найден")
+	msgUnknownAgent    = locale.T("Unknown agent", "Неизвестный агент")
+	msgNoPane          = locale.T("The project has no pane for a conversation", "В проекте нет панели для диалога")
+	msgStartFailed     = locale.T("Could not start the session", "Не удалось запустить сессию")
+	msgMetaNotSaved    = locale.T("The conversation started, but its settings were not saved", "Диалог запущен, но его параметры не сохранились")
+)

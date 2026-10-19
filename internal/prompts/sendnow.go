@@ -34,22 +34,6 @@ const (
 // The chord as tmux key names.
 var sendNowChord = []string{"C-x", "C-s"}
 
-const (
-	msgNoScreen      = "Не удалось прочитать экран терминала"
-	msgNoTranscript  = "Не удалось прочитать запись сессии агента"
-	msgNotAccepted   = "Claude не принял «Отправить сейчас» — сообщение осталось в очереди"
-	msgConflict      = "В поле ввода терминала уже есть текст — отправьте или сотрите его"
-	msgMenu          = "Claude открыл меню — ответьте на него в карточке ниже"
-	msgUnseen        = "Claude не показывает очередь на экране — попробуйте ещё раз"
-	msgWriting       = "Агент сейчас пишет ответ — сообщение дойдёт сразу после него. Прерывать ответ я не буду"
-	msgInFlight      = "Уже отправляю"
-	msgSendNowFailed = "Не удалось отправить сообщение"
-)
-
-func msgTool(tool string) string {
-	return "Сейчас идёт шаг «" + tool + "» — отделить его без отмены нельзя, сообщение дойдёт сразу после него"
-}
-
 // isHandOverTool: verified on Claude 2.1.296, a Bash command and an MCP call go to the background.
 func isHandOverTool(tool string) bool { return tool == "Bash" || strings.HasPrefix(tool, "mcp__") }
 
@@ -114,13 +98,13 @@ func answerFor(step SendNowStep, probe Probe) (SendNowResult, bool) {
 	case StepDelivered:
 		return SendNowResult{OK: true, Outcome: "delivered"}, true
 	case StepMenu:
-		return sendNowFailure(409, msgMenu, false), true
+		return sendNowFailure(409, msgMenu.String(), false), true
 	case StepConflict:
-		return sendNowFailure(409, msgConflict, false), true
+		return sendNowFailure(409, msgConflict.String(), false), true
 	case StepUnseen:
-		return sendNowFailure(409, msgUnseen, false), true
+		return sendNowFailure(409, msgUnseen.String(), false), true
 	case StepWriting:
-		return sendNowFailure(409, msgWriting, true), true
+		return sendNowFailure(409, msgWriting.String(), true), true
 	}
 	tool := ""
 	for _, t := range probe.Running {
@@ -144,7 +128,7 @@ func SendQueuedNow(text string, d SendNowDriver, clock Clock, steeredAtMs int64)
 		styled, ok := d.Capture()
 		lines, haveLines := d.ReadTranscript()
 		if !ok {
-			r := sendNowFailure(500, msgNoScreen, false)
+			r := sendNowFailure(500, msgNoScreen.String(), false)
 			return sendNowLook{}, &r
 		}
 		probe, known := Probe{}, false
@@ -152,7 +136,7 @@ func SendQueuedNow(text string, d SendNowDriver, clock Clock, steeredAtMs int64)
 			probe, known = ProbeTranscript(lines, text, float64(steeredAtMs))
 		}
 		if !known {
-			r := sendNowFailure(500, msgNoTranscript, false)
+			r := sendNowFailure(500, msgNoTranscript.String(), false)
 			return sendNowLook{}, &r
 		}
 		return sendNowLook{frame: screen.ObserveSendNow(styled), probe: probe}, nil
@@ -179,7 +163,7 @@ func SendQueuedNow(text string, d SendNowDriver, clock Clock, steeredAtMs int64)
 		return r
 	}
 	if d.SendKeys(sendNowChord...) != nil {
-		return sendNowFailure(500, msgSendNowFailed, false)
+		return sendNowFailure(500, msgSendNowFailed.String(), false)
 	}
 	deadline := clock.Now().Add(sendNowAcceptLimit)
 	for {
@@ -187,7 +171,7 @@ func SendQueuedNow(text string, d SendNowDriver, clock Clock, steeredAtMs int64)
 		if steered {
 			if l, failed := look(); failed == nil {
 				if l.frame.Menu {
-					return sendNowFailure(409, msgMenu, false)
+					return sendNowFailure(409, msgMenu.String(), false)
 				}
 				if l.probe.Delivered {
 					return SendNowResult{OK: true, Outcome: "sent"}
@@ -196,14 +180,14 @@ func SendQueuedNow(text string, d SendNowDriver, clock Clock, steeredAtMs int64)
 		} else if styled, ok := d.Capture(); ok {
 			frame := screen.ObserveSendNow(styled)
 			if frame.Menu {
-				return sendNowFailure(409, msgMenu, false)
+				return sendNowFailure(409, msgMenu.String(), false)
 			}
 			if !frame.Queued {
 				return SendNowResult{OK: true, Outcome: "sent"}
 			}
 		}
 		if !clock.Now().Before(deadline) {
-			return sendNowFailure(500, msgNotAccepted, false)
+			return sendNowFailure(500, msgNotAccepted.String(), false)
 		}
 	}
 }

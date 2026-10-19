@@ -35,11 +35,6 @@ type QueueError struct{ Message string }
 
 func (e *QueueError) Error() string { return e.Message }
 
-var (
-	errQueueFull  = &QueueError{"В очереди уже слишком много сообщений"}
-	errQueueEmpty = &QueueError{"Пустое сообщение"}
-)
-
 // Queue is every tab's FIFO of messages, kept in one JSON file ({tabId: [items]}) written 200 ms after the last change.
 // A tab without messages has no key.
 type Queue struct {
@@ -178,9 +173,9 @@ func (q *Queue) Add(tabID, text string, images []string) (Item, error) {
 	q.change(tabID, func(items []Item) ([]Item, bool) {
 		switch {
 		case len(items) >= MaxQueuedPerTab:
-			err = errQueueFull
+			err = &QueueError{msgQueueFull.String()}
 		case blank(text) && len(images) == 0:
-			err = errQueueEmpty
+			err = &QueueError{msgQueueEmpty.String()}
 		default:
 			return append(copyItems(items), item), true
 		}

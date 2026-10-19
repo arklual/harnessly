@@ -138,7 +138,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			Prefix:       env("RUNTIME_SESSION_PREFIX", "hs-"),
 			LegacyPrefix: os.Getenv("RUNTIME_LEGACY_SESSION_PREFIX"),
 		},
-		ConfigFile: os.Getenv("RUNTIME_TMUX_CONF"),
+		ConfigFile: tmuxConfigFile(cfg),
 		PaneBinDir: os.Getenv("RUNTIME_PANE_BIN_DIR"),
 		Nice:       tmux.ParseNiceness(nice, niceSet),
 		Home:       home,
@@ -377,6 +377,9 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(f.AsRoutes(stateRoutes(d, settingsStore, ref.c.agents.ValidateLaunch)...)...)
 	f.Add(f.AsRoutes(ref.c.stateCoreRoutes(d)...)...)
 	f.Add(unshadowed(f, append(automationRoutes(d, settingsStore), ref.c.browserTabRoutes(d)...))...)
+	if w := webConfigFromEnv(cfg.Standalone()); w != nil {
+		f.Add(gate.Route{Match: w.matches, Handler: w.handler()})
+	}
 	// Last: what no route above took and the previous runtime had no route for either.
 	f.Add(fallbackRoute(d))
 	// The machine agent's status and sync relays move to the core slice whole: sockets the old runtime holds are closed
@@ -388,6 +391,28 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		f.SetFallback(standaloneFallback())
 	}
 	return &runtimeGate{Gate: f, terms: terms, core: ref, tmux: tm, home: home}, nil
+}
+
+// defaultTmuxConf is the tmux.conf a standalone runtime writes when none is named: the page's terminals have tabs
+// of their own, so tmux's status bar (with the host name and clock) stays off.
+const defaultTmuxConf = `# Written by the runtime because RUNTIME_TMUX_CONF names no file. It is never overwritten: edit it freely.
+set -g status off
+`
+
+// tmuxConfigFile is RUNTIME_TMUX_CONF; set but empty, tmux's defaults. Unset on a standalone runtime, it is tmux.conf in
+// the data directory, written with defaultTmuxConf when missing; in front of the previous runtime, none.
+func tmuxConfigFile(cfg gate.Config) string {
+	if f, ok := os.LookupEnv("RUNTIME_TMUX_CONF"); ok || !cfg.Standalone() || cfg.DataDir == "" {
+		return f
+	}
+	f := filepath.Join(cfg.DataDir, "tmux.conf")
+	if _, err := os.Stat(f); errors.Is(err, os.ErrNotExist) {
+		if err := os.WriteFile(f, []byte(defaultTmuxConf), 0o644); err != nil {
+			agent.Log("warn", "standalone: default tmux.conf not written; tmux runs with its defaults", agent.F{K: "err", V: err.Error()})
+			return ""
+		}
+	}
+	return f
 }
 
 // runtimePort is the port the previous runtime reported as its own: its inner one in front of it, the gate's alone.
@@ -440,7 +465,11 @@ func run(ctx context.Context, cfg gate.Config) error {
 		go alone.cleanUp(f.home, env("RUNTIME_UPLOADS_DIR", filepath.Join(cfg.DataDir, "uploads")))
 	}
 	terms := f.terms
-	srv := &http.Server{Handler: f, ReadHeaderTimeout: 10 * time.Second, ConnContext: gate.ConnContext}
+	var handler http.Handler = f
+	if cfg.Standalone() {
+		handler = apiAlias(appBase(), f)
+	}
+	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, ConnContext: gate.ConnContext}
 	go f.WatchSlices(ctx)
 	go func() {
 		t := time.NewTicker(cfg.CountEvery)

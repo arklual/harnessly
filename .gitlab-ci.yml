@@ -34,6 +34,23 @@ verify:
     - GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/...
     - go test -race -count=1 ./...
 
+web:
+  stage: verify
+  image: docker.io/node:22-bookworm
+  cache:
+    key: web-$CI_COMMIT_REF_SLUG
+    paths: [.cache/pnpm/]
+  before_script:
+    - corepack enable
+    - cd web
+    - pnpm config set store-dir "$CI_PROJECT_DIR/.cache/pnpm"
+  script:
+    - pnpm install --frozen-lockfile
+    - pnpm lint
+    - pnpm typecheck
+    - pnpm test
+    - pnpm build
+
 build:
   stage: build
   rules:

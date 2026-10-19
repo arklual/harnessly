@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"harnessly/internal/gate"
+	"harnessly/internal/locale"
 	"harnessly/internal/prompts"
 )
 
@@ -211,7 +212,7 @@ func (c *core) servePrompt(w http.ResponseWriter, r *http.Request, d promptRoute
 		return
 	}
 	if d.needJSON && r.Method == http.MethodPost && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		writeTagged(w, r, http.StatusUnsupportedMediaType, errorBody("Нужен JSON"), h)
+		writeTagged(w, r, http.StatusUnsupportedMediaType, errorBody(locale.Pick("JSON is required", "Нужен JSON")), h)
 		return
 	}
 	svc := c.promptService()

@@ -1,0 +1,207 @@
+/*
+ * Design tokens. Raw colours live only here; components read the semantic var(--k-*) names.
+ * Light is the default; [data-theme='dark'] on any element re-themes its subtree.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  --k-bg: oklch(0.992 0.004 95);
+  --k-surface: oklch(1 0 0);
+  --k-surface-raised: oklch(0.98 0 0);
+  --k-surface-sunken: oklch(0.965 0.004 255);
+  --k-surface-input: oklch(0.98 0 0);
+  --k-surface-input-hover: oklch(0.96 0 0);
+  --k-popup-bg: oklch(1 0 0);
+
+  --k-border: oklch(0.92 0.01 255);
+  --k-border-hover: oklch(0.84 0.02 255);
+  --k-border-subtle: oklch(0.145 0 0 / 0.08);
+  --k-border-default: oklch(0.145 0 0 / 0.14);
+  --k-border-strong: oklch(0.145 0 0 / 0.22);
+  --k-border-input: oklch(0.145 0 0 / 0.14);
+  --k-border-input-focus: oklch(0.145 0 0 / 0.45);
+
+  --k-text: oklch(0.26 0.02 255);
+  --k-text-primary: oklch(0.145 0 0);
+  --k-text-secondary: oklch(0.48 0.015 255);
+  --k-text-muted: oklch(0.62 0.014 255);
+  --k-text-faint: oklch(0.62 0.014 255 / 0.55);
+
+  --k-accent: oklch(0.55 0.24 285);
+  --k-accent-soft: oklch(0.49 0.19 285);
+  --k-accent-bg: oklch(0.55 0.24 285 / 10%);
+  --k-on-accent: oklch(1 0 0);
+  --k-green: oklch(0.72 0.19 155);
+  --k-green-soft: oklch(0.48 0.13 155);
+  --k-green-bg: oklch(0.72 0.19 155 / 11%);
+  --k-blue: oklch(0.6 0.19 255);
+  --k-blue-soft: oklch(0.47 0.15 255);
+  --k-blue-bg: oklch(0.6 0.19 255 / 10%);
+  --k-amber: oklch(0.8 0.16 80);
+  --k-amber-soft: oklch(0.56 0.13 80);
+  --k-amber-bg: oklch(0.8 0.16 80 / 12%);
+  --k-rose: oklch(0.64 0.24 15);
+  --k-rose-soft: oklch(0.56 0.19 15);
+  --k-rose-bg: oklch(0.64 0.24 15 / 11%);
+  --k-teal: oklch(0.75 0.12 180);
+  --k-teal-soft: oklch(0.44 0.09 180);
+  --k-teal-bg: oklch(0.75 0.12 180 / 12%);
+
+  --k-danger: oklch(0.62 0.22 22);
+  --k-danger-bg: oklch(0.62 0.22 22 / 0.1);
+  --k-danger-border: oklch(0.62 0.22 22 / 0.3);
+  --k-success: oklch(0.72 0.19 155);
+  --k-success-bg: oklch(0.72 0.19 155 / 0.1);
+
+  --k-focus-ring: oklch(0.68 0.24 295 / 0.65);
+
+  /* One state layer for every interactive surface: light darkens, dark lightens. */
+  --k-hover: oklch(0.145 0 0 / 0.05);
+  --k-pressed: oklch(0.145 0 0 / 0.1);
+  --k-hover-inverse: oklch(1 0 0 / 0.14);
+  --k-pressed-inverse: oklch(1 0 0 / 0.22);
+
+  --k-outline-ring: oklch(0.26 0.02 255 / 0.16);
+  --k-secondary-fill: oklch(0.26 0.02 255 / 0.07);
+
+  --k-shadow-sm: 0 0.0625rem 0.125rem oklch(0 0 0 / 6%);
+  --k-shadow-popup: 0 0.375rem 2rem oklch(0 0 0 / 0.12), 0 0 0 0.0625rem oklch(0 0 0 / 0.08);
+  --k-shadow-dialog: 0 1.125rem 3rem oklch(0 0 0 / 22%), 0 0 0 0.0625rem var(--k-border-default);
+  --k-scrim: oklch(0.2 0.01 265 / 0.38);
+
+  --k-tooltip-bg: oklch(0.26 0.02 255);
+  --k-tooltip-fg: oklch(0.98 0 0);
+
+  --k-skeleton: oklch(0.91 0.006 255);
+
+  /* Terminal colours follow the theme too. */
+  --k-term-bg: oklch(0.985 0.003 95);
+  --k-term-fg: oklch(0.26 0.02 255);
+  --k-term-cursor: oklch(0.55 0.24 285);
+  --k-term-selection: oklch(0.55 0.24 285 / 22%);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --k-bg: oklch(0.13 0 0);
+  --k-surface: oklch(0.17 0 0);
+  --k-surface-raised: oklch(0.22 0 0);
+  --k-surface-sunken: oklch(0.15 0 0);
+  --k-surface-input: oklch(0.19 0 0);
+  --k-surface-input-hover: oklch(0.26 0 0);
+  --k-popup-bg: oklch(0.2 0 0);
+
+  --k-border: oklch(0.21 0 0);
+  --k-border-hover: oklch(0.27 0 0);
+  --k-border-subtle: oklch(1 0 0 / 0.08);
+  --k-border-default: oklch(1 0 0 / 0.14);
+  --k-border-strong: oklch(1 0 0 / 0.22);
+  --k-border-input: oklch(1 0 0 / 0.18);
+  --k-border-input-focus: oklch(1 0 0 / 0.45);
+
+  --k-text: oklch(0.98 0 0);
+  --k-text-primary: oklch(1 0 0);
+  --k-text-secondary: oklch(0.55 0 0);
+  --k-text-muted: oklch(0.42 0 0);
+  --k-text-faint: oklch(1 0 0 / 0.28);
+
+  --k-accent-soft: oklch(0.72 0.17 285);
+  --k-accent-bg: oklch(0.55 0.24 285 / 12%);
+  --k-green-soft: oklch(0.8 0.17 155);
+  --k-green-bg: oklch(0.72 0.19 155 / 12%);
+  --k-blue-soft: oklch(0.73 0.14 255);
+  --k-blue-bg: oklch(0.6 0.19 255 / 12%);
+  --k-amber-soft: oklch(0.85 0.14 85);
+  --k-amber-bg: oklch(0.8 0.16 80 / 12%);
+  --k-rose-soft: oklch(0.74 0.18 15);
+  --k-rose-bg: oklch(0.64 0.24 15 / 12%);
+  --k-teal-soft: oklch(0.82 0.1 180);
+  --k-teal-bg: oklch(0.75 0.12 180 / 12%);
+
+  --k-danger: oklch(0.72 0.19 22);
+  --k-danger-bg: oklch(0.72 0.19 22 / 0.12);
+  --k-danger-border: oklch(0.72 0.19 22 / 0.3);
+  --k-success: oklch(0.79 0.18 155);
+  --k-success-bg: oklch(0.79 0.18 155 / 0.1);
+
+  --k-hover: oklch(1 0 0 / 0.07);
+  --k-pressed: oklch(1 0 0 / 0.12);
+  --k-hover-inverse: oklch(0 0 0 / 0.1);
+  --k-pressed-inverse: oklch(0 0 0 / 0.18);
+
+  --k-outline-ring: oklch(1 0 0 / 0.16);
+  --k-secondary-fill: oklch(1 0 0 / 0.09);
+
+  --k-shadow-sm: 0 0.0625rem 0.125rem oklch(0 0 0 / 30%);
+  --k-shadow-popup: 0 0.375rem 2rem oklch(0 0 0 / 0.48), 0 0 0 0.0625rem oklch(1 0 0 / 0.1);
+  --k-shadow-dialog: 0 1.125rem 3rem oklch(0 0 0 / 48%), 0 0 0 0.0625rem var(--k-border-default);
+  --k-scrim: oklch(0.08 0.01 265 / 0.6);
+
+  --k-tooltip-bg: oklch(0.96 0 0);
+  --k-tooltip-fg: oklch(0.17 0 0);
+
+  --k-skeleton: oklch(0.26 0 0);
+
+  --k-term-bg: oklch(0.15 0 0);
+  --k-term-fg: oklch(0.92 0 0);
+  --k-term-cursor: oklch(0.72 0.17 285);
+  --k-term-selection: oklch(0.72 0.17 285 / 30%);
+}
+
+:root {
+  --k-radius-xs: 0.25rem;
+  --k-radius-sm: 0.4375rem;
+  --k-radius-md: 0.625rem;
+  --k-radius-lg: 0.75rem;
+  --k-radius-xl: 0.875rem;
+  --k-radius-2xl: 1rem;
+  --k-radius-3xl: 1.25rem;
+
+  --k-space-0: 0;
+  --k-space-1: 0.25rem;
+  --k-space-2: 0.5rem;
+  --k-space-3: 0.75rem;
+  --k-space-4: 1rem;
+  --k-space-5: 1.25rem;
+  --k-space-6: 1.5rem;
+  --k-space-8: 2rem;
+  --k-space-10: 2.5rem;
+  --k-space-12: 3rem;
+
+  /* Control heights. */
+  --k-control-xs: 1.5rem;
+  --k-control-s: 2rem;
+  --k-control-m: 2.25rem;
+  --k-control-l: 2.75rem;
+
+  --k-font-ui: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --k-font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --k-text-2xs: 0.6875rem;
+  --k-text-xs: 0.75rem;
+  --k-text-s: 0.8125rem;
+  --k-text-m: 0.875rem;
+  --k-text-l: 1rem;
+  --k-text-xl: 1.25rem;
+  --k-text-2xl: 1.625rem;
+  --k-text-3xl: 2.125rem;
+  --k-leading: 1.5;
+
+  --k-weight-regular: 400;
+  --k-weight-medium: 500;
+  --k-weight-semibold: 600;
+  --k-weight-bold: 700;
+
+  --k-ease: cubic-bezier(0.3, 0, 0.3, 1);
+  --k-ease-out: cubic-bezier(0.1, 0.7, 0.3, 1);
+  --k-fast: 120ms;
+  --k-normal: 180ms;
+  --k-slow: 260ms;
+
+  --k-z-popup: 1000;
+  --k-z-dialog: 1100;
+  --k-z-tooltip: 1200;
+}

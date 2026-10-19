@@ -105,7 +105,8 @@ func newLiveGate(t *testing.T) *liveGate {
 		if c := f.core.c; c != nil {
 			c.stop()
 		}
-		tmuxNames.KillServer()
+		// Its own server by name: tmuxNames is the latest gate's, and a test may start several.
+		_ = exec.Command("tmux", "-L", socket, "kill-server").Run()
 		_ = os.Remove(filepath.Join(os.TempDir(), "tmux-"+strconv.Itoa(os.Getuid()), socket))
 	})
 	deadline := time.Now().Add(20 * time.Second)

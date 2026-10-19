@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"harnessly/internal/agents"
+	"harnessly/internal/locale"
 	"harnessly/internal/status"
 )
 
@@ -14,9 +15,13 @@ import (
 // trying again does not help, unlike a tmux call that failed.
 var ErrResumeLine = errors.New("resume line not built")
 
-const (
-	resumeNoSession = "У разговора нет сессии, которую можно поднять"
-	resumeBusyShell = "Во вкладке занят терминал — сначала освободите его"
+// The texts sessionProcess answers people with, picked by RUNTIME_LOCALE when the answer is built; the Russian ones
+// are the previous runtime's texts, byte for byte.
+var (
+	msgNeedTabAction = locale.T("tabId and action are required", "Нужны tabId и action")
+	msgNoTab         = locale.T("Conversation not found", "Разговор не найден")
+	resumeNoSession  = locale.T("The conversation has no session to resume", "У разговора нет сессии, которую можно поднять")
+	resumeBusyShell  = locale.T("The tab's terminal is busy; free it first", "Во вкладке занят терминал — сначала освободите его")
 )
 
 // sessionProcess: {tabId, action: kill} stops a conversation's agent and everything it started, keeping the tab and
@@ -30,11 +35,11 @@ func (c *Config) sessionProcess(r *http.Request, body any) (int, any, http.Heade
 	tabID, _ := f["tabId"].(string)
 	action := f["action"]
 	if tabID == "" || action != "kill" && action != "resume" {
-		return answer(r, http.StatusBadRequest, errorBody("Нужны tabId и action"), nil)
+		return answer(r, http.StatusBadRequest, errorBody(msgNeedTabAction.String()), nil)
 	}
 	found, ok := c.Tabs.FindTab(tabID)
 	if !ok {
-		return answer(r, http.StatusNotFound, errorBody("Разговор не найден"), nil)
+		return answer(r, http.StatusNotFound, errorBody(msgNoTab.String()), nil)
 	}
 	if action == "kill" {
 		return answer(r, 200, map[string]int{"killed": c.Kill(found.Tab)}, nil)
@@ -46,9 +51,9 @@ func (c *Config) sessionProcess(r *http.Request, body any) (int, any, http.Heade
 	}
 	switch result {
 	case "no-session":
-		return answer(r, http.StatusConflict, errorBody(resumeNoSession), nil)
+		return answer(r, http.StatusConflict, errorBody(resumeNoSession.String()), nil)
 	case "busy-shell":
-		return answer(r, http.StatusConflict, errorBody(resumeBusyShell), nil)
+		return answer(r, http.StatusConflict, errorBody(resumeBusyShell.String()), nil)
 	}
 	return answer(r, 200, map[string]string{"result": result}, nil)
 }

@@ -17,6 +17,7 @@ import (
 	"harnessly/internal/jscompat"
 	"harnessly/internal/jsvalue"
 	"harnessly/internal/launch"
+	"harnessly/internal/locale"
 	"harnessly/internal/sidechat"
 	"harnessly/internal/status"
 )
@@ -103,13 +104,13 @@ func (a *api) conversations(c *call) {
 		pv, _ := c.field("provider")
 		provider, _ := pv.(string)
 		if provider != agents.Claude && provider != agents.Codex {
-			c.fail(400, "Неизвестный агент")
+			c.fail(400, msgUnknownAgent.String())
 			return
 		}
 		ws, _ := c.field("workspaceId")
 		wsID, isStr := ws.(string)
 		if jsvalue.Truthy(ws) && !isStr {
-			c.fail(400, "Неверный проект")
+			c.fail(400, msgBadWorkspace.String())
 			return
 		}
 		model, _ := c.field("model")
@@ -152,7 +153,7 @@ func (a *api) automationStart(c *call) {
 	pv, _ := c.field("prompt")
 	prompt, isStr := pv.(string)
 	if !isStr || jscompat.Trim(prompt) == "" {
-		c.fail(400, "Пустой промпт автоматизации")
+		c.fail(400, msgEmptyAutomation.String())
 		return
 	}
 	model := any("sonnet")
@@ -195,7 +196,7 @@ func (a *api) docsDeliver(c *call) {
 	mv, _ := c.field("message")
 	message, isStr := mv.(string)
 	if !isStr || jscompat.Trim(message) == "" {
-		c.fail(400, "Пустое сообщение")
+		c.fail(400, msgEmptyMessage.String())
 		return
 	}
 	opt := func(k string) string { s, _ := c.str(k); return s }
@@ -212,7 +213,7 @@ func (a *api) docsResolvePane(c *call) {
 	}
 	pane, isStr := c.str("tmuxPane")
 	if !isStr {
-		c.fail(400, "Нужен tmuxPane")
+		c.fail(400, msgNeedTmuxPane.String())
 		return
 	}
 	socket, _ := c.str("tmuxSocket")
@@ -259,7 +260,7 @@ func (a *api) evalStart(c *call) {
 	}
 	if stop, ok := c.qString("stop"); ok {
 		if !evalRunID.MatchString(stop) {
-			c.fail(400, "Неверный прогон")
+			c.fail(400, msgBadRun.String())
 			return
 		}
 		dir := filepath.Join(a.l.EvalRuns, stop)
@@ -271,7 +272,7 @@ func (a *api) evalStart(c *call) {
 	}
 	runID, ok := isEvalRequest(c.body)
 	if !ok {
-		c.fail(400, "Неполный запрос прогона")
+		c.fail(400, msgIncompleteRun.String())
 		return
 	}
 	dir := filepath.Join(a.l.EvalRuns, runID)
@@ -287,11 +288,11 @@ func (a *api) evalStart(c *call) {
 		return
 	}
 	if a.l.EvalRunner == "" {
-		c.fail(501, "В этом выпуске нет прогонщика")
+		c.fail(501, msgNoRunner.String())
 		return
 	}
 	if _, err := os.Stat(a.l.EvalRunner); err != nil {
-		c.fail(501, "В этом выпуске нет прогонщика")
+		c.fail(501, msgNoRunner.String())
 		return
 	}
 	must(os.MkdirAll(dir, 0o777))
@@ -312,11 +313,11 @@ func (a *api) evalStart(c *call) {
 
 var sideChatRefusals = map[string]struct {
 	status int
-	text   string
+	text   locale.Text
 }{
-	"unknown":     {404, "Вкладка не найдена"},
-	"unsupported": {422, "Side chat пока только для Claude"},
-	"no-session":  {409, "Агент ещё не начал сессию: напишите ему что-нибудь и попробуйте снова"},
+	"unknown":     {404, locale.T("Tab not found", "Вкладка не найдена")},
+	"unsupported": {422, locale.T("Side chat is only available for Claude for now", "Side chat пока только для Claude")},
+	"no-session":  {409, locale.T("The agent has not started a session yet: send it something and try again", "Агент ещё не начал сессию: напишите ему что-нибудь и попробуйте снова")},
 }
 
 var errNoAgents = errors.New("agent lines are not available")
@@ -362,7 +363,7 @@ func (a *api) sideChat(c *call) {
 		return
 	}
 	if !strings.HasPrefix(c.r.Header.Get("Content-Type"), "application/json") {
-		c.fail(415, "Нужен application/json")
+		c.fail(415, msgNeedJSON.String())
 		return
 	}
 	req, msg := sidechat.ParseRequest(c.body)
@@ -373,12 +374,12 @@ func (a *api) sideChat(c *call) {
 	sessionID, cwd, refusal := a.sideChatTab(req.TabID)
 	if refusal != "" {
 		r := sideChatRefusals[refusal]
-		c.reply(r.status, jsvalue.NewObject("error", r.text, "code", refusal))
+		c.reply(r.status, jsvalue.NewObject("error", r.text.String(), "code", refusal))
 		return
 	}
 	release := sidechat.Claim(req.TabID)
 	if release == nil {
-		c.reply(409, jsvalue.NewObject("error", "Предыдущий вопрос ещё в работе", "code", "busy"))
+		c.reply(409, jsvalue.NewObject("error", msgSideChatBusy.String(), "code", "busy"))
 		return
 	}
 	r := c.r
@@ -473,7 +474,7 @@ func (a *api) codexLaunchCommand(c *call) {
 	// A restart repeats the conversation's stored choice, so only its shape is checked here.
 	l, ok := c.launchShape()
 	if !ok {
-		c.fail(400, "Недопустимая модель или глубина рассуждения")
+		c.fail(400, msgBadLaunchShape.String())
 		return
 	}
 	if u := a.availability(agents.CodexPanel); u != nil {

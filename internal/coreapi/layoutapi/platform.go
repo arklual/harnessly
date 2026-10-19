@@ -51,7 +51,7 @@ func (a *api) paneShell(c *call) {
 		name, ok = a.d.Tmux.PaneShellName(tabID, false)
 	}
 	if !ok {
-		c.fail(400, "Нужен tabId")
+		c.fail(400, msgNeedTab.String())
 		return
 	}
 	legacy, hasLegacy := a.d.Tmux.PaneShellName(tabID, true)
@@ -90,7 +90,7 @@ func (a *api) paneShell(c *call) {
 		}
 	}
 	if found == nil {
-		c.fail(404, "Разговор не найден")
+		c.fail(404, msgNoConversation.String())
 		return
 	}
 	cwd := a.d.Tmux.SessionCwd(found.String("sessionName"))
@@ -127,18 +127,18 @@ func (a *api) paneIntents(c *call) {
 	case "GET":
 		tabID, ok := c.qString("tabId")
 		if !ok || !intentTabRe.MatchString(tabID) {
-			c.fail(400, "Нужен tabId")
+			c.fail(400, msgNeedTab.String())
 			return
 		}
 		c.reply(200, intentsJSON(a.d.Intents.List(tabID)))
 	case "POST":
 		if !c.contentTypeJSON() {
-			c.fail(415, "Нужен application/json")
+			c.fail(415, msgNeedJSON.String())
 			return
 		}
 		tabID, ok := c.str("tabId")
 		if !ok || !intentTabRe.MatchString(tabID) {
-			c.fail(400, "Нужен tabId")
+			c.fail(400, msgNeedTab.String())
 			return
 		}
 		v, _ := c.field("ids")
@@ -151,12 +151,12 @@ func (a *api) paneIntents(c *call) {
 			strs = append(strs, s)
 		}
 		if !valid {
-			c.fail(400, "Нужны id намерений")
+			c.fail(400, msgNeedIntentIDs.String())
 			return
 		}
 		device, _ := c.field("device")
 		if device != "desktop" && device != "phone" {
-			c.fail(400, "device: desktop или phone")
+			c.fail(400, msgBadDevice.String())
 			return
 		}
 		c.reply(200, intentsJSON(a.d.Intents.MarkApplied(tabID, strs, device.(string))))
@@ -179,7 +179,7 @@ func (c *call) resultGuard() bool {
 		return false
 	}
 	if !c.contentTypeJSON() {
-		c.fail(415, "Нужен application/json")
+		c.fail(415, msgNeedJSON.String())
 		return false
 	}
 	return true
@@ -193,11 +193,11 @@ func (a *api) panelResult(c *call) {
 	id, _ := c.str("id")
 	result := panel.ParseResult(c.body)
 	if !uuidRe.MatchString(id) || result == nil {
-		c.fail(400, "Некорректный ответ")
+		c.fail(400, msgBadResult.String())
 		return
 	}
 	if !a.d.Panel.Answer(id, *result) {
-		c.fail(404, "Команда уже выполнена или не найдена")
+		c.fail(404, msgCommandGone.String())
 		return
 	}
 	c.reply(200, jsvalue.NewObject("accepted", true))
@@ -211,11 +211,11 @@ func (a *api) vaultResult(c *call) {
 	id, _ := c.str("id")
 	result := vault.ParseResult(c.body)
 	if !uuidRe.MatchString(id) || result == nil {
-		c.fail(400, "Некорректный ответ")
+		c.fail(400, msgBadResult.String())
 		return
 	}
 	if !a.d.Vault.Answer(id, *result) {
-		c.fail(404, "Просьба уже закрыта или не найдена")
+		c.fail(404, msgVaultAskGone.String())
 		return
 	}
 	c.reply(200, jsvalue.NewObject("accepted", true))
