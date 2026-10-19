@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http/httptest"
 	"os"
@@ -84,6 +85,12 @@ func (f *fakeService) serve(conn net.Conn) {
 				continue
 			}
 			if audios == 1 && mode == "close-after-ready" {
+				// Closing with audio still unread would make the kernel answer with a reset instead of an end of
+				// stream; the service the goldens recorded ended its side cleanly.
+				if cw, ok := conn.(interface{ CloseWrite() error }); ok {
+					_ = cw.CloseWrite()
+				}
+				_, _ = io.Copy(io.Discard, r)
 				return
 			}
 			if audios == 1 && mode == "no-text" {
