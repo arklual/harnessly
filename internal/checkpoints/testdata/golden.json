@@ -1,0 +1,4227 @@
+{
+ "script": {
+  "roots": [
+   "work-a",
+   "work-b",
+   "work-c"
+  ],
+  "limits": {
+   "default": {
+    "maxFileBytes": 4096,
+    "maxFiles": 200,
+    "maxCheckpoints": 5,
+    "minIntervalMs": 3000,
+    "maxDiffBytes": 6000,
+    "gitTimeoutMs": 30000
+   },
+   "small": {
+    "maxFileBytes": 4096,
+    "maxFiles": 3,
+    "maxCheckpoints": 5,
+    "minIntervalMs": 3000,
+    "maxDiffBytes": 6000,
+    "gitTimeoutMs": 30000
+   }
+  },
+  "steps": [
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a",
+      "mkdir": true
+     }
+    ]
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-b",
+      "mkdir": true
+     }
+    ]
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-c",
+      "mkdir": true
+     }
+    ]
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a/README.md",
+      "write": "line 0 of 1 x\nline 1 of 1 xxxxxxxx\nline 2 of 1 xxxxxxxxxxxxxxx\nline 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\nline 4 of 1 xxxxxx\nline 5 of 1 xxxxxxxxxxxxx\nline 6 of 1 xxxxxxxxxxxxxxxxxxxx\nline 7 of 1 xxxx\nline 8 of 1 xxxxxxxxxxx\nline 9 of 1 xxxxxxxxxxxxxxxxxx\nline 10 of 1 xx\nline 11 of 1 xxxxxxxxx\nline 12 of 1 xxxxxxxxxxxxxxxx\nline 13 of 1 \nline 14 of 1 xxxxxxx\nline 15 of 1 xxxxxxxxxxxxxx\nline 16 of 1 xxxxxxxxxxxxxxxxxxxxx\nline 17 of 1 xxxxx\nline 18 of 1 xxxxxxxxxxxx\nline 19 of 1 xxxxxxxxxxxxxxxxxxx\nline 20 of 1 xxx\nline 21 of 1 xxxxxxxxxx\nline 22 of 1 xxxxxxxxxxxxxxxxx\nline 23 of 1 x\nline 24 of 1 xxxxxxxx\nline 25 of 1 xxxxxxxxxxxxxxx\nline 26 of 1 xxxxxxxxxxxxxxxxxxxxxx\nline 27 of 1 xxxxxx\nline 28 of 1 xxxxxxxxxxxxx\nline 29 of 1 xxxxxxxxxxxxxxxxxxxx\n"
+     },
+     {
+      "path": "work-a/src/main.go",
+      "write": "line 0 of 2 xx\nline 1 of 2 xxxxxxxxx\nline 2 of 2 xxxxxxxxxxxxxxxx\nline 3 of 2 \nline 4 of 2 xxxxxxx\nline 5 of 2 xxxxxxxxxxxxxx\nline 6 of 2 xxxxxxxxxxxxxxxxxxxxx\nline 7 of 2 xxxxx\nline 8 of 2 xxxxxxxxxxxx\nline 9 of 2 xxxxxxxxxxxxxxxxxxx\nline 10 of 2 xxx\nline 11 of 2 xxxxxxxxxx\nline 12 of 2 xxxxxxxxxxxxxxxxx\nline 13 of 2 x\nline 14 of 2 xxxxxxxx\nline 15 of 2 xxxxxxxxxxxxxxx\nline 16 of 2 xxxxxxxxxxxxxxxxxxxxxx\nline 17 of 2 xxxxxx\nline 18 of 2 xxxxxxxxxxxxx\nline 19 of 2 xxxxxxxxxxxxxxxxxxxx\nline 20 of 2 xxxx\nline 21 of 2 xxxxxxxxxxx\nline 22 of 2 xxxxxxxxxxxxxxxxxx\nline 23 of 2 xx\nline 24 of 2 xxxxxxxxx\nline 25 of 2 xxxxxxxxxxxxxxxx\nline 26 of 2 \nline 27 of 2 xxxxxxx\nline 28 of 2 xxxxxxxxxxxxxx\nline 29 of 2 xxxxxxxxxxxxxxxxxxxxx\nline 30 of 2 xxxxx\nline 31 of 2 xxxxxxxxxxxx\nline 32 of 2 xxxxxxxxxxxxxxxxxxx\nline 33 of 2 xxx\nline 34 of 2 xxxxxxxxxx\nline 35 of 2 xxxxxxxxxxxxxxxxx\nline 36 of 2 x\nline 37 of 2 xxxxxxxx\nline 38 of 2 xxxxxxxxxxxxxxx\nline 39 of 2 xxxxxxxxxxxxxxxxxxxxxx\n"
+     },
+     {
+      "path": "work-a/src/util/strings.go",
+      "write": "line 0 of 3 xxx\nline 1 of 3 xxxxxxxxxx\nline 2 of 3 xxxxxxxxxxxxxxxxx\nline 3 of 3 x\nline 4 of 3 xxxxxxxx\nline 5 of 3 xxxxxxxxxxxxxxx\nline 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\nline 7 of 3 xxxxxx\nline 8 of 3 xxxxxxxxxxxxx\nline 9 of 3 xxxxxxxxxxxxxxxxxxxx\nline 10 of 3 xxxx\nline 11 of 3 xxxxxxxxxxx\n"
+     },
+     {
+      "path": "work-a/bin/run.sh",
+      "write": "#!/bin/sh\necho hi\n",
+      "mode": 493
+     },
+     {
+      "path": "work-a/link-to-readme",
+      "link": "README.md"
+     },
+     {
+      "path": "work-a/dangling",
+      "link": "nowhere/file"
+     },
+     {
+      "path": "work-a/.gitignore",
+      "write": "*.log\nbuild/\n"
+     },
+     {
+      "path": "work-a/app.log",
+      "write": "log\n"
+     },
+     {
+      "path": "work-a/build/out.bin",
+      "write": "out\n"
+     },
+     {
+      "path": "work-a/big.dat",
+      "write": "",
+      "repeat": "b",
+      "count": 5000
+     },
+     {
+      "path": "work-a/ünïcode/файл.txt",
+      "write": "привет\n"
+     },
+     {
+      "path": "work-a/with space/a b.txt",
+      "write": "spaced\n"
+     },
+     {
+      "path": "work-a/weird/back\\slash.txt",
+      "write": "slash\n"
+     },
+     {
+      "path": "work-a/weird/tab\there.txt",
+      "write": "tab\n"
+     },
+     {
+      "path": "work-a/node_modules/pkg/index.js",
+      "write": "module.exports = 1;\n"
+     },
+     {
+      "path": "work-a/.GIT/x",
+      "write": "nope\n"
+     },
+     {
+      "pathB64": "d29yay1hL2JhZC3/LW5hbWUudHh0",
+      "write": "",
+      "b64": "YmFkIG5hbWUK"
+     },
+     {
+      "path": "work-a/binary.bin",
+      "write": "",
+      "b64": "AAECAwD/Cg=="
+     },
+     {
+      "path": "work-a/latin1.txt",
+      "write": "",
+      "b64": "Y2Fm6SBjcuhtZQo="
+     },
+     {
+      "path": "work-a/emoji.txt",
+      "write": "é€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\n"
+     },
+     {
+      "path": "work-a/notes/todo.txt",
+      "write": "todo\n"
+     },
+     {
+      "path": "work-a/gen/f1.txt",
+      "write": "line 0 of 11 xxxxxxxxxxx\nline 1 of 11 xxxxxxxxxxxxxxxxxx\nline 2 of 11 xx\nline 3 of 11 xxxxxxxxx\nline 4 of 11 xxxxxxxxxxxxxxxx\nline 5 of 11 \nline 6 of 11 xxxxxxx\nline 7 of 11 xxxxxxxxxxxxxx\nline 8 of 11 xxxxxxxxxxxxxxxxxxxxx\nline 9 of 11 xxxxx\nline 10 of 11 xxxxxxxxxxxx\nline 11 of 11 xxxxxxxxxxxxxxxxxxx\nline 12 of 11 xxx\nline 13 of 11 xxxxxxxxxx\nline 14 of 11 xxxxxxxxxxxxxxxxx\nline 15 of 11 x\nline 16 of 11 xxxxxxxx\nline 17 of 11 xxxxxxxxxxxxxxx\nline 18 of 11 xxxxxxxxxxxxxxxxxxxxxx\nline 19 of 11 xxxxxx\nline 20 of 11 xxxxxxxxxxxxx\nline 21 of 11 xxxxxxxxxxxxxxxxxxxx\nline 22 of 11 xxxx\nline 23 of 11 xxxxxxxxxxx\nline 24 of 11 xxxxxxxxxxxxxxxxxx\nline 25 of 11 xx\nline 26 of 11 xxxxxxxxx\nline 27 of 11 xxxxxxxxxxxxxxxx\nline 28 of 11 \nline 29 of 11 xxxxxxx\nline 30 of 11 xxxxxxxxxxxxxx\nline 31 of 11 xxxxxxxxxxxxxxxxxxxxx\nline 32 of 11 xxxxx\nline 33 of 11 xxxxxxxxxxxx\nline 34 of 11 xxxxxxxxxxxxxxxxxxx\nline 35 of 11 xxx\nline 36 of 11 xxxxxxxxxx\nline 37 of 11 xxxxxxxxxxxxxxxxx\nline 38 of 11 x\nline 39 of 11 xxxxxxxx\nline 40 of 11 xxxxxxxxxxxxxxx\nline 41 of 11 xxxxxxxxxxxxxxxxxxxxxx\nline 42 of 11 xxxxxx\nline 43 of 11 xxxxxxxxxxxxx\nline 44 of 11 xxxxxxxxxxxxxxxxxxxx\nline 45 of 11 xxxx\nline 46 of 11 xxxxxxxxxxx\nline 47 of 11 xxxxxxxxxxxxxxxxxx\nline 48 of 11 xx\nline 49 of 11 xxxxxxxxx\nline 50 of 11 xxxxxxxxxxxxxxxx\nline 51 of 11 \nline 52 of 11 xxxxxxx\nline 53 of 11 xxxxxxxxxxxxxx\nline 54 of 11 xxxxxxxxxxxxxxxxxxxxx\nline 55 of 11 xxxxx\nline 56 of 11 xxxxxxxxxxxx\nline 57 of 11 xxxxxxxxxxxxxxxxxxx\nline 58 of 11 xxx\nline 59 of 11 xxxxxxxxxx\nline 60 of 11 xxxxxxxxxxxxxxxxx\nline 61 of 11 x\nline 62 of 11 xxxxxxxx\nline 63 of 11 xxxxxxxxxxxxxxx\nline 64 of 11 xxxxxxxxxxxxxxxxxxxxxx\nline 65 of 11 xxxxxx\nline 66 of 11 xxxxxxxxxxxxx\nline 67 of 11 xxxxxxxxxxxxxxxxxxxx\nline 68 of 11 xxxx\nline 69 of 11 xxxxxxxxxxx\nline 70 of 11 xxxxxxxxxxxxxxxxxx\nline 71 of 11 xx\nline 72 of 11 xxxxxxxxx\nline 73 of 11 xxxxxxxxxxxxxxxx\nline 74 of 11 \nline 75 of 11 xxxxxxx\nline 76 of 11 xxxxxxxxxxxxxx\nline 77 of 11 xxxxxxxxxxxxxxxxxxxxx\nline 78 of 11 xxxxx\nline 79 of 11 xxxxxxxxxxxx\nline 80 of 11 xxxxxxxxxxxxxxxxxxx\nline 81 of 11 xxx\nline 82 of 11 xxxxxxxxxx\nline 83 of 11 xxxxxxxxxxxxxxxxx\nline 84 of 11 x\nline 85 of 11 xxxxxxxx\nline 86 of 11 xxxxxxxxxxxxxxx\nline 87 of 11 xxxxxxxxxxxxxxxxxxxxxx\nline 88 of 11 xxxxxx\nline 89 of 11 xxxxxxxxxxxxx\n"
+     },
+     {
+      "path": "work-a/gen/f2.txt",
+      "write": "line 0 of 12 xxxxxxxxxxxx\nline 1 of 12 xxxxxxxxxxxxxxxxxxx\nline 2 of 12 xxx\nline 3 of 12 xxxxxxxxxx\nline 4 of 12 xxxxxxxxxxxxxxxxx\nline 5 of 12 x\nline 6 of 12 xxxxxxxx\nline 7 of 12 xxxxxxxxxxxxxxx\nline 8 of 12 xxxxxxxxxxxxxxxxxxxxxx\nline 9 of 12 xxxxxx\nline 10 of 12 xxxxxxxxxxxxx\nline 11 of 12 xxxxxxxxxxxxxxxxxxxx\nline 12 of 12 xxxx\nline 13 of 12 xxxxxxxxxxx\nline 14 of 12 xxxxxxxxxxxxxxxxxx\nline 15 of 12 xx\nline 16 of 12 xxxxxxxxx\nline 17 of 12 xxxxxxxxxxxxxxxx\nline 18 of 12 \nline 19 of 12 xxxxxxx\nline 20 of 12 xxxxxxxxxxxxxx\nline 21 of 12 xxxxxxxxxxxxxxxxxxxxx\nline 22 of 12 xxxxx\nline 23 of 12 xxxxxxxxxxxx\nline 24 of 12 xxxxxxxxxxxxxxxxxxx\nline 25 of 12 xxx\nline 26 of 12 xxxxxxxxxx\nline 27 of 12 xxxxxxxxxxxxxxxxx\nline 28 of 12 x\nline 29 of 12 xxxxxxxx\nline 30 of 12 xxxxxxxxxxxxxxx\nline 31 of 12 xxxxxxxxxxxxxxxxxxxxxx\nline 32 of 12 xxxxxx\nline 33 of 12 xxxxxxxxxxxxx\nline 34 of 12 xxxxxxxxxxxxxxxxxxxx\nline 35 of 12 xxxx\nline 36 of 12 xxxxxxxxxxx\nline 37 of 12 xxxxxxxxxxxxxxxxxx\nline 38 of 12 xx\nline 39 of 12 xxxxxxxxx\nline 40 of 12 xxxxxxxxxxxxxxxx\nline 41 of 12 \nline 42 of 12 xxxxxxx\nline 43 of 12 xxxxxxxxxxxxxx\nline 44 of 12 xxxxxxxxxxxxxxxxxxxxx\nline 45 of 12 xxxxx\nline 46 of 12 xxxxxxxxxxxx\nline 47 of 12 xxxxxxxxxxxxxxxxxxx\nline 48 of 12 xxx\nline 49 of 12 xxxxxxxxxx\nline 50 of 12 xxxxxxxxxxxxxxxxx\nline 51 of 12 x\nline 52 of 12 xxxxxxxx\nline 53 of 12 xxxxxxxxxxxxxxx\nline 54 of 12 xxxxxxxxxxxxxxxxxxxxxx\nline 55 of 12 xxxxxx\nline 56 of 12 xxxxxxxxxxxxx\nline 57 of 12 xxxxxxxxxxxxxxxxxxxx\nline 58 of 12 xxxx\nline 59 of 12 xxxxxxxxxxx\nline 60 of 12 xxxxxxxxxxxxxxxxxx\nline 61 of 12 xx\nline 62 of 12 xxxxxxxxx\nline 63 of 12 xxxxxxxxxxxxxxxx\nline 64 of 12 \nline 65 of 12 xxxxxxx\nline 66 of 12 xxxxxxxxxxxxxx\nline 67 of 12 xxxxxxxxxxxxxxxxxxxxx\nline 68 of 12 xxxxx\nline 69 of 12 xxxxxxxxxxxx\nline 70 of 12 xxxxxxxxxxxxxxxxxxx\nline 71 of 12 xxx\nline 72 of 12 xxxxxxxxxx\nline 73 of 12 xxxxxxxxxxxxxxxxx\nline 74 of 12 x\nline 75 of 12 xxxxxxxx\nline 76 of 12 xxxxxxxxxxxxxxx\nline 77 of 12 xxxxxxxxxxxxxxxxxxxxxx\nline 78 of 12 xxxxxx\nline 79 of 12 xxxxxxxxxxxxx\nline 80 of 12 xxxxxxxxxxxxxxxxxxxx\nline 81 of 12 xxxx\nline 82 of 12 xxxxxxxxxxx\nline 83 of 12 xxxxxxxxxxxxxxxxxx\nline 84 of 12 xx\nline 85 of 12 xxxxxxxxx\nline 86 of 12 xxxxxxxxxxxxxxxx\nline 87 of 12 \nline 88 of 12 xxxxxxx\nline 89 of 12 xxxxxxxxxxxxxx\n"
+     },
+     {
+      "path": "work-a/gen/f3.txt",
+      "write": "line 0 of 13 xxxxxxxxxxxxx\nline 1 of 13 xxxxxxxxxxxxxxxxxxxx\nline 2 of 13 xxxx\nline 3 of 13 xxxxxxxxxxx\nline 4 of 13 xxxxxxxxxxxxxxxxxx\nline 5 of 13 xx\nline 6 of 13 xxxxxxxxx\nline 7 of 13 xxxxxxxxxxxxxxxx\nline 8 of 13 \nline 9 of 13 xxxxxxx\nline 10 of 13 xxxxxxxxxxxxxx\nline 11 of 13 xxxxxxxxxxxxxxxxxxxxx\nline 12 of 13 xxxxx\nline 13 of 13 xxxxxxxxxxxx\nline 14 of 13 xxxxxxxxxxxxxxxxxxx\nline 15 of 13 xxx\nline 16 of 13 xxxxxxxxxx\nline 17 of 13 xxxxxxxxxxxxxxxxx\nline 18 of 13 x\nline 19 of 13 xxxxxxxx\nline 20 of 13 xxxxxxxxxxxxxxx\nline 21 of 13 xxxxxxxxxxxxxxxxxxxxxx\nline 22 of 13 xxxxxx\nline 23 of 13 xxxxxxxxxxxxx\nline 24 of 13 xxxxxxxxxxxxxxxxxxxx\nline 25 of 13 xxxx\nline 26 of 13 xxxxxxxxxxx\nline 27 of 13 xxxxxxxxxxxxxxxxxx\nline 28 of 13 xx\nline 29 of 13 xxxxxxxxx\nline 30 of 13 xxxxxxxxxxxxxxxx\nline 31 of 13 \nline 32 of 13 xxxxxxx\nline 33 of 13 xxxxxxxxxxxxxx\nline 34 of 13 xxxxxxxxxxxxxxxxxxxxx\nline 35 of 13 xxxxx\nline 36 of 13 xxxxxxxxxxxx\nline 37 of 13 xxxxxxxxxxxxxxxxxxx\nline 38 of 13 xxx\nline 39 of 13 xxxxxxxxxx\nline 40 of 13 xxxxxxxxxxxxxxxxx\nline 41 of 13 x\nline 42 of 13 xxxxxxxx\nline 43 of 13 xxxxxxxxxxxxxxx\nline 44 of 13 xxxxxxxxxxxxxxxxxxxxxx\nline 45 of 13 xxxxxx\nline 46 of 13 xxxxxxxxxxxxx\nline 47 of 13 xxxxxxxxxxxxxxxxxxxx\nline 48 of 13 xxxx\nline 49 of 13 xxxxxxxxxxx\nline 50 of 13 xxxxxxxxxxxxxxxxxx\nline 51 of 13 xx\nline 52 of 13 xxxxxxxxx\nline 53 of 13 xxxxxxxxxxxxxxxx\nline 54 of 13 \nline 55 of 13 xxxxxxx\nline 56 of 13 xxxxxxxxxxxxxx\nline 57 of 13 xxxxxxxxxxxxxxxxxxxxx\nline 58 of 13 xxxxx\nline 59 of 13 xxxxxxxxxxxx\nline 60 of 13 xxxxxxxxxxxxxxxxxxx\nline 61 of 13 xxx\nline 62 of 13 xxxxxxxxxx\nline 63 of 13 xxxxxxxxxxxxxxxxx\nline 64 of 13 x\nline 65 of 13 xxxxxxxx\nline 66 of 13 xxxxxxxxxxxxxxx\nline 67 of 13 xxxxxxxxxxxxxxxxxxxxxx\nline 68 of 13 xxxxxx\nline 69 of 13 xxxxxxxxxxxxx\nline 70 of 13 xxxxxxxxxxxxxxxxxxxx\nline 71 of 13 xxxx\nline 72 of 13 xxxxxxxxxxx\nline 73 of 13 xxxxxxxxxxxxxxxxxx\nline 74 of 13 xx\nline 75 of 13 xxxxxxxxx\nline 76 of 13 xxxxxxxxxxxxxxxx\nline 77 of 13 \nline 78 of 13 xxxxxxx\nline 79 of 13 xxxxxxxxxxxxxx\nline 80 of 13 xxxxxxxxxxxxxxxxxxxxx\nline 81 of 13 xxxxx\nline 82 of 13 xxxxxxxxxxxx\nline 83 of 13 xxxxxxxxxxxxxxxxxxx\nline 84 of 13 xxx\nline 85 of 13 xxxxxxxxxx\nline 86 of 13 xxxxxxxxxxxxxxxxx\nline 87 of 13 x\nline 88 of 13 xxxxxxxx\nline 89 of 13 xxxxxxxxxxxxxxx\n"
+     },
+     {
+      "path": "work-a/deep/a/b/c.txt",
+      "write": "deep\n"
+     },
+     {
+      "path": "work-a/keep/dir/x.txt",
+      "write": "x\n"
+     }
+    ]
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a/nested",
+      "mkdir": true
+     },
+     {
+      "path": "work-a/nested",
+      "git": [
+       "init",
+       "-q"
+      ]
+     },
+     {
+      "path": "work-a/nested/inner.txt",
+      "write": "inner\n"
+     }
+    ]
+   },
+   {
+    "op": "scope",
+    "name": "a",
+    "tab": "tab-a",
+    "cwd": "work-a"
+   },
+   {
+    "op": "take",
+    "scope": "a",
+    "now": 1760000000000
+   },
+   {
+    "op": "take",
+    "scope": "a",
+    "now": 1760000001000
+   },
+   {
+    "op": "list",
+    "scope": "a"
+   },
+   {
+    "op": "rewinds",
+    "scope": "a"
+   },
+   {
+    "op": "dump",
+    "scope": "a"
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a/README.md",
+      "write": "line 0 of 4 xxxx\nline 1 of 4 xxxxxxxxxxx\nline 2 of 4 xxxxxxxxxxxxxxxxxx\nline 3 of 4 xx\nline 4 of 4 xxxxxxxxx\nline 5 of 4 xxxxxxxxxxxxxxxx\nline 6 of 4 \nline 7 of 4 xxxxxxx\nline 8 of 4 xxxxxxxxxxxxxx\nline 9 of 4 xxxxxxxxxxxxxxxxxxxxx\nline 10 of 4 xxxxx\nline 11 of 4 xxxxxxxxxxxx\nline 12 of 4 xxxxxxxxxxxxxxxxxxx\nline 13 of 4 xxx\nline 14 of 4 xxxxxxxxxx\nline 15 of 4 xxxxxxxxxxxxxxxxx\nline 16 of 4 x\nline 17 of 4 xxxxxxxx\nline 18 of 4 xxxxxxxxxxxxxxx\nline 19 of 4 xxxxxxxxxxxxxxxxxxxxxx\nline 20 of 4 xxxxxx\nline 21 of 4 xxxxxxxxxxxxx\nline 22 of 4 xxxxxxxxxxxxxxxxxxxx\nline 23 of 4 xxxx\nline 24 of 4 xxxxxxxxxxx\nline 25 of 4 xxxxxxxxxxxxxxxxxx\nline 26 of 4 xx\nline 27 of 4 xxxxxxxxx\nline 28 of 4 xxxxxxxxxxxxxxxx\nline 29 of 4 \nline 30 of 4 xxxxxxx\n"
+     },
+     {
+      "path": "work-a/src/util/strings.go",
+      "rm": true
+     },
+     {
+      "path": "work-a/bin/run.sh",
+      "chmod": 420
+     },
+     {
+      "path": "work-a/link-to-readme",
+      "write": "now a file\n"
+     },
+     {
+      "path": "work-a/new/dir/file.txt",
+      "write": "new\n"
+     },
+     {
+      "path": "work-a/app.log",
+      "write": "log 2\n"
+     },
+     {
+      "path": "work-a/big.dat",
+      "write": "",
+      "repeat": "b",
+      "count": 100
+     },
+     {
+      "path": "work-a/emoji.txt",
+      "write": "é€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\né€😀 the quick brown fox\n"
+     },
+     {
+      "path": "work-a/.gitignore",
+      "write": "*.log\nbuild/\nnotes/\n"
+     },
+     {
+      "path": "work-a/gen",
+      "rm": true
+     },
+     {
+      "path": "work-a/deep",
+      "rm": true
+     },
+     {
+      "path": "work-a/latin1.txt",
+      "write": "",
+      "b64": "Y2Fm6SBjcuhtZSBicvts6WUK"
+     }
+    ]
+   },
+   {
+    "op": "take",
+    "scope": "a",
+    "now": 1760000005000
+   },
+   {
+    "op": "list",
+    "scope": "a"
+   },
+   {
+    "op": "diff",
+    "scope": "a",
+    "id": "1760000000000-turn"
+   },
+   {
+    "op": "diff",
+    "scope": "a",
+    "id": "1760000005000-turn"
+   },
+   {
+    "op": "diff",
+    "scope": "a",
+    "id": "1-turn"
+   },
+   {
+    "op": "diff",
+    "scope": "a",
+    "id": "nope"
+   },
+   {
+    "op": "dump",
+    "scope": "a"
+   },
+   {
+    "op": "rewind",
+    "scope": "a",
+    "id": "1760000000000-turn",
+    "now": 1760000060000
+   },
+   {
+    "op": "dump",
+    "scope": "a"
+   },
+   {
+    "op": "rewinds",
+    "scope": "a"
+   },
+   {
+    "op": "rewind",
+    "scope": "a",
+    "id": "1760000060000-before-rewind",
+    "now": 1760000060000
+   },
+   {
+    "op": "dump",
+    "scope": "a"
+   },
+   {
+    "op": "list",
+    "scope": "a"
+   },
+   {
+    "op": "rewind",
+    "scope": "a",
+    "id": "1760000000000-turn",
+    "now": 1760000070000,
+    "beforeApply": [
+     {
+      "path": "work-a/README.md",
+      "write": "edited meanwhile\n"
+     },
+     {
+      "path": "work-a/new/dir/file.txt",
+      "rm": true
+     },
+     {
+      "path": "work-a/gen/f1.txt",
+      "write": "recreated\n"
+     },
+     {
+      "path": "work-a/deep",
+      "rm": true
+     },
+     {
+      "path": "work-a/deep",
+      "write": "a file where a folder was\n"
+     }
+    ],
+    "beforeReplace": {
+     "src/main.go": [
+      {
+       "path": "work-a/src/main.go",
+       "write": "raced\n"
+      }
+     ],
+     "emoji.txt": [
+      {
+       "path": "work-a/emoji.txt",
+       "rm": true
+      }
+     ],
+     "link-to-readme": [
+      {
+       "path": "work-a/link-to-readme",
+       "write": "raced link\n"
+      }
+     ]
+    }
+   },
+   {
+    "op": "dump",
+    "scope": "a"
+   },
+   {
+    "op": "rewinds",
+    "scope": "a"
+   },
+   {
+    "op": "rewind",
+    "scope": "a",
+    "id": "1760000000000-turn",
+    "now": 1760000080000,
+    "busy": true
+   },
+   {
+    "op": "rewind",
+    "scope": "a",
+    "id": "1760000000001-turn",
+    "now": 1760000080000
+   },
+   {
+    "op": "rewind",
+    "scope": "a",
+    "id": "bad",
+    "now": 1760000080000
+   },
+   {
+    "op": "list",
+    "scope": "a"
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a/counter.txt",
+      "write": "1\n"
+     }
+    ]
+   },
+   {
+    "op": "take",
+    "scope": "a",
+    "now": 1760000104000
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a/counter.txt",
+      "write": "2\n"
+     }
+    ]
+   },
+   {
+    "op": "take",
+    "scope": "a",
+    "now": 1760000108000
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a/counter.txt",
+      "write": "3\n"
+     }
+    ]
+   },
+   {
+    "op": "take",
+    "scope": "a",
+    "now": 1760000112000
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a/counter.txt",
+      "write": "4\n"
+     }
+    ]
+   },
+   {
+    "op": "take",
+    "scope": "a",
+    "now": 1760000116000
+   },
+   {
+    "op": "list",
+    "scope": "a"
+   },
+   {
+    "op": "dump",
+    "scope": "a"
+   },
+   {
+    "op": "seedFile",
+    "scope": "a",
+    "file": "rewinds.json",
+    "text": "[{\"at\":1760000000000,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":0,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000001,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":1,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000002,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":2,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000003,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":3,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000004,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":4,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000005,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":5,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000006,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":6,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000007,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":7,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000008,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":8,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000009,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":9,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000010,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":10,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000011,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":11,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000012,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":12,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000013,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":13,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000014,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":14,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000015,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":15,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000016,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":16,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000017,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":17,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000018,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":18,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000019,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":19,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000020,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":20,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000021,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":21,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000022,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":22,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000023,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":23,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000024,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":24,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000025,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":25,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000026,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":26,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000027,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":27,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000028,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":28,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000029,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":29,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000030,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":30,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000031,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":31,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000032,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":32,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000033,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":33,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000034,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":34,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000035,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":35,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000036,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":36,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000037,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":37,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000038,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":38,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000039,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":39,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000040,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":40,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000041,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":41,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000042,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":42,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000043,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":43,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000044,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":44,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000045,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":45,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000046,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":46,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000047,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":47,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000048,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":48,\"skipped\":0,\"extra\":\"ü \",\"\":null}]"
+   },
+   {
+    "op": "rewinds",
+    "scope": "a"
+   },
+   {
+    "op": "seedSaved",
+    "scope": "a",
+    "count": 50,
+    "at": 1759999999000
+   },
+   {
+    "op": "rewind",
+    "scope": "a",
+    "id": "1760000116000-turn",
+    "now": 1760000130000,
+    "beforeApply": [
+     {
+      "path": "work-a/counter.txt",
+      "write": "meanwhile\n"
+     }
+    ]
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-a/counter.txt",
+      "write": "again\n"
+     }
+    ]
+   },
+   {
+    "op": "rewind",
+    "scope": "a",
+    "id": "1760000104000-turn",
+    "now": 1760000131000,
+    "beforeReplace": {
+     "counter.txt": [
+      {
+       "path": "work-a/counter.txt",
+       "write": "raced again\n"
+      }
+     ]
+    }
+   },
+   {
+    "op": "dump",
+    "scope": "a"
+   },
+   {
+    "op": "rewinds",
+    "scope": "a"
+   },
+   {
+    "op": "seedFile",
+    "scope": "a",
+    "file": "rewinds.json",
+    "text": "{\"not\":\"an array\"}"
+   },
+   {
+    "op": "rewinds",
+    "scope": "a"
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-b/one.txt",
+      "write": "1\n"
+     },
+     {
+      "path": "work-b/two.txt",
+      "write": "2\n"
+     }
+    ]
+   },
+   {
+    "op": "scope",
+    "name": "b",
+    "tab": "tab-b",
+    "cwd": "work-b",
+    "limits": "small"
+   },
+   {
+    "op": "take",
+    "scope": "b",
+    "now": 1760000000000
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "work-b/three.txt",
+      "write": "3\n"
+     },
+     {
+      "path": "work-b/four.txt",
+      "write": "4\n"
+     }
+    ]
+   },
+   {
+    "op": "take",
+    "scope": "b",
+    "now": 1760000010000
+   },
+   {
+    "op": "diff",
+    "scope": "b",
+    "id": "1760000000000-turn"
+   },
+   {
+    "op": "dump",
+    "scope": "b"
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "data/checkpoints/old-0123456789.git",
+      "mkdir": true
+     },
+     {
+      "path": "data/checkpoints/old-0123456789.git",
+      "mtime": 1758704000000
+     },
+     {
+      "path": "data/checkpoints/young-0123456789.git",
+      "mkdir": true
+     },
+     {
+      "path": "data/checkpoints/young-0123456789.git",
+      "mtime": 1759913600000
+     },
+     {
+      "path": "data/checkpoints/notrepo",
+      "mkdir": true
+     },
+     {
+      "path": "data/checkpoints/notrepo",
+      "mtime": 1757408000000
+     },
+     {
+      "path": "work-c/only.txt",
+      "write": "c\n"
+     }
+    ]
+   },
+   {
+    "op": "scope",
+    "name": "c",
+    "tab": "tab-c",
+    "cwd": "work-c"
+   },
+   {
+    "op": "take",
+    "scope": "c",
+    "now": 1760000200000
+   },
+   {
+    "op": "dump",
+    "scope": "c"
+   },
+   {
+    "op": "fs",
+    "actions": [
+     {
+      "path": "link-to-c",
+      "link": "work-c"
+     },
+     {
+      "path": "a-file",
+      "write": "f\n"
+     }
+    ]
+   },
+   {
+    "op": "scope",
+    "tab": "bad id!",
+    "cwd": "work-a"
+   },
+   {
+    "op": "scope",
+    "tab": "tab-x",
+    "cwd": "home"
+   },
+   {
+    "op": "scope",
+    "tab": "tab-x",
+    "cwd": "../../../.."
+   },
+   {
+    "op": "scope",
+    "tab": "tab-x",
+    "cwd": "missing"
+   },
+   {
+    "op": "scope",
+    "tab": "tab-x",
+    "cwd": "a-file"
+   },
+   {
+    "op": "scope",
+    "tab": "tab-c",
+    "cwd": "link-to-c"
+   },
+   {
+    "op": "scope",
+    "tab": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "cwd": "work-c"
+   },
+   {
+    "op": "scope",
+    "tab": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "cwd": "work-c"
+   }
+  ]
+ },
+ "results": [
+  null,
+  null,
+  null,
+  null,
+  null,
+  {
+   "ok": true,
+   "dir": "$ROOT/data/checkpoints/tab-a-#work-a#.git",
+   "root": "$ROOT/work-a"
+  },
+  {
+   "ok": true,
+   "checkpoint": {
+    "id": "1760000000000-turn",
+    "kind": "turn",
+    "at": 1760000000000,
+    "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+    "files": 20
+   }
+  },
+  {
+   "ok": false,
+   "reason": "throttled"
+  },
+  [
+   {
+    "id": "1760000000000-turn",
+    "kind": "turn",
+    "at": 1760000000000,
+    "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+    "files": 20
+   }
+  ],
+  [],
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000000000-turn",
+      "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-a\n",
+     "root": "$ROOT/work-a\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": null,
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": ".GIT",
+     "dir": true
+    },
+    {
+     "path": ".GIT/x",
+     "mode": 384,
+     "sha": "2082e7f715f058acab2398d25d135cf5f4c0ce41"
+    },
+    {
+     "path": ".gitignore",
+     "mode": 384,
+     "sha": "14514fbafb73941061aaad4284a71e72729be246"
+    },
+    {
+     "path": "README.md",
+     "mode": 384,
+     "sha": "c7810ac01f4fc15e67bacf91b889b1e0396e18a4"
+    },
+    {
+     "path": "app.log",
+     "mode": 384,
+     "sha": "4508c1b19b8841345afeed30a6d835cca066d5e5"
+    },
+    {
+     "pathB64": "YmFkLf8tbmFtZS50eHQ=",
+     "mode": 384,
+     "sha": "70726ae345f25f00adc99c363a0adc6ba4ab0daa"
+    },
+    {
+     "path": "big.dat",
+     "mode": 384,
+     "sha": "ad531f67c047ede07bb51cabfc05d9e44b38b62d"
+    },
+    {
+     "path": "bin",
+     "dir": true
+    },
+    {
+     "path": "bin/run.sh",
+     "mode": 493,
+     "sha": "b2b62c101a156f5f12dd7197cf7ae9424164b115"
+    },
+    {
+     "path": "binary.bin",
+     "mode": 384,
+     "sha": "1b3e3a67b7ab396212544addd0038906e82812a7"
+    },
+    {
+     "path": "build",
+     "dir": true
+    },
+    {
+     "path": "build/out.bin",
+     "mode": 384,
+     "sha": "9bc27bdc827962fd4c5ca9fe53dd3f15325655f9"
+    },
+    {
+     "path": "dangling",
+     "link": "bm93aGVyZS9maWxl"
+    },
+    {
+     "path": "deep",
+     "dir": true
+    },
+    {
+     "path": "deep/a",
+     "dir": true
+    },
+    {
+     "path": "deep/a/b",
+     "dir": true
+    },
+    {
+     "path": "deep/a/b/c.txt",
+     "mode": 384,
+     "sha": "698a7985db24f12a6425f6ed97a6ef5df053f3fb"
+    },
+    {
+     "path": "emoji.txt",
+     "mode": 384,
+     "sha": "0aa4f9e67a3177d7a604ad86b98cf7dcb3e3fa50"
+    },
+    {
+     "path": "gen",
+     "dir": true
+    },
+    {
+     "path": "gen/f1.txt",
+     "mode": 384,
+     "sha": "ec10c00fa96b66884991b07aa4d76b81a0670b04"
+    },
+    {
+     "path": "gen/f2.txt",
+     "mode": 384,
+     "sha": "06c1e903deafa923ca1c4dff02ea5a7c71dc01ea"
+    },
+    {
+     "path": "gen/f3.txt",
+     "mode": 384,
+     "sha": "794b19d3674e659a0572427bdd6e65e5e2b12d90"
+    },
+    {
+     "path": "keep",
+     "dir": true
+    },
+    {
+     "path": "keep/dir",
+     "dir": true
+    },
+    {
+     "path": "keep/dir/x.txt",
+     "mode": 384,
+     "sha": "6fcf9dfbd479ed82697fee719b9f8c610a11ff2a"
+    },
+    {
+     "path": "latin1.txt",
+     "mode": 384,
+     "sha": "d50fd83460668c9b5d3f8230f7f9323fd7c45ceb"
+    },
+    {
+     "path": "link-to-readme",
+     "link": "UkVBRE1FLm1k"
+    },
+    {
+     "path": "nested",
+     "dir": true
+    },
+    {
+     "path": "nested/inner.txt",
+     "mode": 384,
+     "sha": "cda38c9a201a1bf6a7b14fed60e59e7504e1283f"
+    },
+    {
+     "path": "node_modules",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg/index.js",
+     "mode": 384,
+     "sha": "db311f33466c97593aa59411fcfd87e8489d8f50"
+    },
+    {
+     "path": "notes",
+     "dir": true
+    },
+    {
+     "path": "notes/todo.txt",
+     "mode": 384,
+     "sha": "b209970d00c2037e901af1ffc00c7570a512297b"
+    },
+    {
+     "path": "src",
+     "dir": true
+    },
+    {
+     "path": "src/main.go",
+     "mode": 384,
+     "sha": "4b3d75fd1c245fc38b6ee05814fe3c5a45d0bb9a"
+    },
+    {
+     "path": "src/util",
+     "dir": true
+    },
+    {
+     "path": "src/util/strings.go",
+     "mode": 384,
+     "sha": "aa227052f299f6cbd5e03fa39560ea28208fd41c"
+    },
+    {
+     "path": "weird",
+     "dir": true
+    },
+    {
+     "path": "weird/back\\slash.txt",
+     "mode": 384,
+     "sha": "ae635e32a6627986e7833f4cdc9d8947fc3a3326"
+    },
+    {
+     "path": "weird/tab\there.txt",
+     "mode": 384,
+     "sha": "095f36f7afa55ba2e84af05a2f02938cb56cb6f1"
+    },
+    {
+     "path": "with space",
+     "dir": true
+    },
+    {
+     "path": "with space/a b.txt",
+     "mode": 384,
+     "sha": "4ecc5ebbeb5ef4a2952c54653a7f0049f184c162"
+    },
+    {
+     "path": "ünïcode",
+     "dir": true
+    },
+    {
+     "path": "ünïcode/файл.txt",
+     "mode": 384,
+     "sha": "84fb04d98180eb917f1d62aa49b431966f680b15"
+    }
+   ],
+   "repos": [
+    "tab-a-#work-a#.git"
+   ]
+  },
+  null,
+  {
+   "ok": true,
+   "checkpoint": {
+    "id": "1760000005000-turn",
+    "kind": "turn",
+    "at": 1760000005000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   }
+  },
+  [
+   {
+    "id": "1760000005000-turn",
+    "kind": "turn",
+    "at": 1760000005000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   },
+   {
+    "id": "1760000000000-turn",
+    "kind": "turn",
+    "at": 1760000000000,
+    "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+    "files": 20
+   }
+  ],
+  {
+   "diff": "diff --git a/.gitignore b/.gitignore\nindex 71afb8d..749504c 100644\n--- a/.gitignore\n+++ b/.gitignore\n@@ -1,3 +1,2 @@\n *.log\n build/\n-notes/\ndiff --git a/README.md b/README.md\nindex d07a2e1..89e4c6a 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,31 +1,30 @@\n-line 0 of 4 xxxx\n-line 1 of 4 xxxxxxxxxxx\n-line 2 of 4 xxxxxxxxxxxxxxxxxx\n-line 3 of 4 xx\n-line 4 of 4 xxxxxxxxx\n-line 5 of 4 xxxxxxxxxxxxxxxx\n-line 6 of 4 \n-line 7 of 4 xxxxxxx\n-line 8 of 4 xxxxxxxxxxxxxx\n-line 9 of 4 xxxxxxxxxxxxxxxxxxxxx\n-line 10 of 4 xxxxx\n-line 11 of 4 xxxxxxxxxxxx\n-line 12 of 4 xxxxxxxxxxxxxxxxxxx\n-line 13 of 4 xxx\n-line 14 of 4 xxxxxxxxxx\n-line 15 of 4 xxxxxxxxxxxxxxxxx\n-line 16 of 4 x\n-line 17 of 4 xxxxxxxx\n-line 18 of 4 xxxxxxxxxxxxxxx\n-line 19 of 4 xxxxxxxxxxxxxxxxxxxxxx\n-line 20 of 4 xxxxxx\n-line 21 of 4 xxxxxxxxxxxxx\n-line 22 of 4 xxxxxxxxxxxxxxxxxxxx\n-line 23 of 4 xxxx\n-line 24 of 4 xxxxxxxxxxx\n-line 25 of 4 xxxxxxxxxxxxxxxxxx\n-line 26 of 4 xx\n-line 27 of 4 xxxxxxxxx\n-line 28 of 4 xxxxxxxxxxxxxxxx\n-line 29 of 4 \n-line 30 of 4 xxxxxxx\n+line 0 of 1 x\n+line 1 of 1 xxxxxxxx\n+line 2 of 1 xxxxxxxxxxxxxxx\n+line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\n+line 4 of 1 xxxxxx\n+line 5 of 1 xxxxxxxxxxxxx\n+line 6 of 1 xxxxxxxxxxxxxxxxxxxx\n+line 7 of 1 xxxx\n+line 8 of 1 xxxxxxxxxxx\n+line 9 of 1 xxxxxxxxxxxxxxxxxx\n+line 10 of 1 xx\n+line 11 of 1 xxxxxxxxx\n+line 12 of 1 xxxxxxxxxxxxxxxx\n+line 13 of 1 \n+line 14 of 1 xxxxxxx\n+line 15 of 1 xxxxxxxxxxxxxx\n+line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\n+line 17 of 1 xxxxx\n+line 18 of 1 xxxxxxxxxxxx\n+line 19 of 1 xxxxxxxxxxxxxxxxxxx\n+line 20 of 1 xxx\n+line 21 of 1 xxxxxxxxxx\n+line 22 of 1 xxxxxxxxxxxxxxxxx\n+line 23 of 1 x\n+line 24 of 1 xxxxxxxx\n+line 25 of 1 xxxxxxxxxxxxxxx\n+line 26 of 1 xxxxxxxxxxxxxxxxxxxxxx\n+line 27 of 1 xxxxxx\n+line 28 of 1 xxxxxxxxxxxxx\n+line 29 of 1 xxxxxxxxxxxxxxxxxxxx\ndiff --git a/big.dat b/big.dat\ndeleted file mode 100644\nindex 8c039de..0000000\n--- a/big.dat\n+++ /dev/null\n@@ -1 +0,0 @@\n-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n\\ No newline at end of file\ndiff --git a/bin/run.sh b/bin/run.sh\nold mode 100644\nnew mode 100755\ndiff --git a/deep/a/b/c.txt b/deep/a/b/c.txt\nnew file mode 100644\nindex 0000000..4cdb226\n--- /dev/null\n+++ b/deep/a/b/c.txt\n@@ -0,0 +1 @@\n+deep\ndiff --git a/emoji.txt b/emoji.txt\nindex e11ad53..675d779 100644\n--- a/emoji.txt\n+++ b/emoji.txt\n@@ -8,5 +8,3 @@\n é€😀 the quick brown fox\n é€😀 the quick brown fox\n é€😀 the quick brown fox\n-é€😀 the quick brown fox\n-é€😀 the quick brown fox\ndiff --git a/gen/f1.txt b/gen/f1.txt\nnew file mode 100644\nindex 0000000..5a22cf0\n--- /dev/null\n+++ b/gen/f1.txt\n@@ -0,0 +1,90 @@\n+line 0 of 11 xxxxxxxxxxx\n+line 1 of 11 xxxxxxxxxxxxxxxxxx\n+line 2 of 11 xx\n+line 3 of 11 xxxxxxxxx\n+line 4 of 11 xxxxxxxxxxxxxxxx\n+line 5 of 11 \n+line 6 of 11 xxxxxxx\n+line 7 of 11 xxxxxxxxxxxxxx\n+line 8 of 11 xxxxxxxxxxxxxxxxxxxxx\n+line 9 of 11 xxxxx\n+line 10 of 11 xxxxxxxxxxxx\n+line 11 of 11 xxxxxxxxxxxxxxxxxxx\n+line 12 of 11 xxx\n+line 13 of 11 xxxxxxxxxx\n+line 14 of 11 xxxxxxxxxxxxxxxxx\n+line 15 of 11 x\n+line 16 of 11 xxxxxxxx\n+line 17 of 11 xxxxxxxxxxxxxxx\n+line 18 of 11 xxxxxxxxxxxxxxxxxxxxxx\n+line 19 of 11 xxxxxx\n+line 20 of 11 xxxxxxxxxxxxx\n+line 21 of 11 xxxxxxxxxxxxxxxxxxxx\n+line 22 of 11 xxxx\n+line 23 of 11 xxxxxxxxxxx\n+line 24 of 11 xxxxxxxxxxxxxxxxxx\n+line 25 of 11 xx\n+line 26 of 11 xxxxxxxxx\n+line 27 of 11 xxxxxxxxxxxxxxxx\n+line 28 of 11 \n+line 29 of 11 xxxxxxx\n+line 30 of 11 xxxxxxxxxxxxxx\n+line 31 of 11 xxxxxxxxxxxxxxxxxxxxx\n+line 32 of 11 xxxxx\n+line 33 of 11 xxxxxxxxxxxx\n+line 34 of 11 xxxxxxxxxxxxxxxxxxx\n+line 35 of 11 xxx\n+line 36 of 11 xxxxxxxxxx\n+line 37 of 11 xxxxxxxxxxxxxxxxx\n+line 38 of 11 x\n+line 39 of 11 xxxxxxxx\n+line 40 of 11 xxxxxxxxxxxxxxx\n+line 41 of 11 xxxxxxxxxxxxxxxxxxxxxx\n+line 42 of 11 xxxxxx\n+line 43 of 11 xxxxxxxxxxxxx\n+line 44 of 11 xxxxxxxxxxxxxxxxxxxx\n+line 45 of 11 xxxx\n+line 46 of 11 xxxxxxxxxxx\n+line 47 of 11 xxxxxxxxxxxxxxxxxx\n+line 48 of 11 xx\n+line 49 of 11 xxxxxxxxx\n+line 50 of 11 xxxxxxxxxxxxxxxx\n+line 51 of 11 \n+line 52 of 11 xxxxxxx\n+line 53 of 11 xxxxxxxxxxxxxx\n+line 54 of 11 xxxxxxxxxxxxxxxxxxxxx\n+line 55 of 11 xxxxx\n+line 56 of 11 xxxxxxxxxxxx\n+line 57 of 11 xxxxxxxxxxxxxxxxxxx\n+line 58 of 11 xxx\n+line 59 of 11 xxxxxxxxxx\n+line 60 of 11 xxxxxxxxxxxxxxxxx\n+line 61 of 11 x\n+line 62 of 11 xxxxxxxx\n+line 63 of 11 xxxxxxxxxxxxxxx\n+line 64 of 11 xxxxxxxxxxxxxxxxxxxxxx\n+line 65 of 11 xxxxxx\n+line 66 of 11 xxxxxxxxxxxxx\n+line 67 of 11 xxxxxxxxxxxxxxxxxxxx\n+line 68 of 11 xxxx\n+line 69 of 11 xxxxxxxxxxx\n+line 70 of 11 xxxxxxxxxxxxxxxxxx\n+line 71 of 11 xx\n+line 72 of 11 xxxxxxxxx\n+line 73 of 11 xxxxxxxxxxxxxxxx\n+line 74 of 11 \n+line 75 of 11 xxxxxxx\n+line 76 of 11 xxxxxxxxxxxxxx\n+line 77 of 11 xxxxxxxxxxxxxxxxxxxxx\n+line 78 of 11 xxxxx\n+line 79 of 11 xxxxxxxxxxxx\n+line 80 of 11 xxxxxxxxxxxxxxxxxxx\n+line 81 of 11 xxx\n+line 82 of 11 xxxxxxxxxx\n+line 83 of 11 xxxxxxxxxxxxxxxxx\n+line 84 of 11 x\n+line 85 of 11 xxxxxxxx\n+line 86 of 11 xxxxxxxxxxxxxxx\n+line 87 of 11 xxxxxxxxxxxxxxxxxxxxxx\n+line 88 of 11 xxxxxx\n+line 89 of 11 xxxxxxxxxxxxx\n",
+   "truncated": true,
+   "files": [
+    {
+     "path": ".gitignore",
+     "status": "M",
+     "additions": 0,
+     "deletions": 1
+    },
+    {
+     "path": "README.md",
+     "status": "M",
+     "additions": 30,
+     "deletions": 31
+    },
+    {
+     "path": "big.dat",
+     "status": "D",
+     "additions": 0,
+     "deletions": 1
+    },
+    {
+     "path": "bin/run.sh",
+     "status": "M",
+     "additions": 0,
+     "deletions": 0
+    },
+    {
+     "path": "deep/a/b/c.txt",
+     "status": "A",
+     "additions": 1,
+     "deletions": 0
+    },
+    {
+     "path": "emoji.txt",
+     "status": "M",
+     "additions": 0,
+     "deletions": 2
+    },
+    {
+     "path": "gen/f1.txt",
+     "status": "A",
+     "additions": 90,
+     "deletions": 0
+    },
+    {
+     "path": "gen/f2.txt",
+     "status": "A",
+     "additions": 90,
+     "deletions": 0
+    },
+    {
+     "path": "gen/f3.txt",
+     "status": "A",
+     "additions": 90,
+     "deletions": 0
+    },
+    {
+     "path": "latin1.txt",
+     "status": "M",
+     "additions": 1,
+     "deletions": 1
+    },
+    {
+     "path": "link-to-readme",
+     "status": "T",
+     "additions": 1,
+     "deletions": 1
+    },
+    {
+     "path": "new/dir/file.txt",
+     "status": "D",
+     "additions": 0,
+     "deletions": 1
+    },
+    {
+     "path": "notes/todo.txt",
+     "status": "A",
+     "additions": 1,
+     "deletions": 0
+    },
+    {
+     "path": "src/util/strings.go",
+     "status": "A",
+     "additions": 12,
+     "deletions": 0
+    }
+   ]
+  },
+  {
+   "diff": "",
+   "truncated": false,
+   "files": []
+  },
+  null,
+  null,
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000000000-turn",
+      "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000005000-turn",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-a\n",
+     "root": "$ROOT/work-a\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": null,
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": ".GIT",
+     "dir": true
+    },
+    {
+     "path": ".GIT/x",
+     "mode": 384,
+     "sha": "2082e7f715f058acab2398d25d135cf5f4c0ce41"
+    },
+    {
+     "path": ".gitignore",
+     "mode": 384,
+     "sha": "157d70bd03746e88116187b9d6a0db8e7b661e2a"
+    },
+    {
+     "path": "README.md",
+     "mode": 384,
+     "sha": "99d79c79a17feeea5a1a5eacefae471abff196f5"
+    },
+    {
+     "path": "app.log",
+     "mode": 384,
+     "sha": "8f298e287d71baa221a391336869467d0e4a3c4d"
+    },
+    {
+     "pathB64": "YmFkLf8tbmFtZS50eHQ=",
+     "mode": 384,
+     "sha": "70726ae345f25f00adc99c363a0adc6ba4ab0daa"
+    },
+    {
+     "path": "big.dat",
+     "mode": 384,
+     "sha": "dd3b750e3862ec12c332c6d7c11150288471d0c9"
+    },
+    {
+     "path": "bin",
+     "dir": true
+    },
+    {
+     "path": "bin/run.sh",
+     "mode": 420,
+     "sha": "b2b62c101a156f5f12dd7197cf7ae9424164b115"
+    },
+    {
+     "path": "binary.bin",
+     "mode": 384,
+     "sha": "1b3e3a67b7ab396212544addd0038906e82812a7"
+    },
+    {
+     "path": "build",
+     "dir": true
+    },
+    {
+     "path": "build/out.bin",
+     "mode": 384,
+     "sha": "9bc27bdc827962fd4c5ca9fe53dd3f15325655f9"
+    },
+    {
+     "path": "dangling",
+     "link": "bm93aGVyZS9maWxl"
+    },
+    {
+     "path": "emoji.txt",
+     "mode": 384,
+     "sha": "8d40693fdc641c9a0e88a285c582da57b11ef300"
+    },
+    {
+     "path": "keep",
+     "dir": true
+    },
+    {
+     "path": "keep/dir",
+     "dir": true
+    },
+    {
+     "path": "keep/dir/x.txt",
+     "mode": 384,
+     "sha": "6fcf9dfbd479ed82697fee719b9f8c610a11ff2a"
+    },
+    {
+     "path": "latin1.txt",
+     "mode": 384,
+     "sha": "6fed7557fb731e8f4dd7bb83352a2c011f54d47e"
+    },
+    {
+     "path": "link-to-readme",
+     "mode": 384,
+     "sha": "3b0d62bc9fc24544906b09720e0689c24e107f88"
+    },
+    {
+     "path": "nested",
+     "dir": true
+    },
+    {
+     "path": "nested/inner.txt",
+     "mode": 384,
+     "sha": "cda38c9a201a1bf6a7b14fed60e59e7504e1283f"
+    },
+    {
+     "path": "new",
+     "dir": true
+    },
+    {
+     "path": "new/dir",
+     "dir": true
+    },
+    {
+     "path": "new/dir/file.txt",
+     "mode": 384,
+     "sha": "389cc6b7ae5a659383eab5dfc253764eccf84732"
+    },
+    {
+     "path": "node_modules",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg/index.js",
+     "mode": 384,
+     "sha": "db311f33466c97593aa59411fcfd87e8489d8f50"
+    },
+    {
+     "path": "notes",
+     "dir": true
+    },
+    {
+     "path": "notes/todo.txt",
+     "mode": 384,
+     "sha": "b209970d00c2037e901af1ffc00c7570a512297b"
+    },
+    {
+     "path": "src",
+     "dir": true
+    },
+    {
+     "path": "src/main.go",
+     "mode": 384,
+     "sha": "4b3d75fd1c245fc38b6ee05814fe3c5a45d0bb9a"
+    },
+    {
+     "path": "src/util",
+     "dir": true
+    },
+    {
+     "path": "weird",
+     "dir": true
+    },
+    {
+     "path": "weird/back\\slash.txt",
+     "mode": 384,
+     "sha": "ae635e32a6627986e7833f4cdc9d8947fc3a3326"
+    },
+    {
+     "path": "weird/tab\there.txt",
+     "mode": 384,
+     "sha": "095f36f7afa55ba2e84af05a2f02938cb56cb6f1"
+    },
+    {
+     "path": "with space",
+     "dir": true
+    },
+    {
+     "path": "with space/a b.txt",
+     "mode": 384,
+     "sha": "4ecc5ebbeb5ef4a2952c54653a7f0049f184c162"
+    },
+    {
+     "path": "ünïcode",
+     "dir": true
+    },
+    {
+     "path": "ünïcode/файл.txt",
+     "mode": 384,
+     "sha": "84fb04d98180eb917f1d62aa49b431966f680b15"
+    }
+   ],
+   "repos": [
+    "tab-a-#work-a#.git"
+   ]
+  },
+  {
+   "ok": true,
+   "before": {
+    "id": "1760000060000-before-rewind",
+    "kind": "before-rewind",
+    "at": 1760000060000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   },
+   "changed": [
+    "big.dat",
+    "new/dir/file.txt",
+    ".gitignore",
+    "README.md",
+    "bin/run.sh",
+    "deep/a/b/c.txt",
+    "emoji.txt",
+    "gen/f1.txt",
+    "gen/f2.txt",
+    "gen/f3.txt",
+    "latin1.txt",
+    "link-to-readme",
+    "src/util/strings.go"
+   ],
+   "skipped": [
+    {
+     "path": "notes/todo.txt",
+     "reason": "changed"
+    }
+   ]
+  },
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000000000-turn",
+      "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000005000-turn",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000060000-before-rewind",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-a\n",
+     "root": "$ROOT/work-a\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": "[{\"at\":1760000060000,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"1760000060000-before-rewind\",\"changed\":13,\"skipped\":1}]",
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": ".GIT",
+     "dir": true
+    },
+    {
+     "path": ".GIT/x",
+     "mode": 384,
+     "sha": "2082e7f715f058acab2398d25d135cf5f4c0ce41"
+    },
+    {
+     "path": ".gitignore",
+     "mode": 384,
+     "sha": "14514fbafb73941061aaad4284a71e72729be246"
+    },
+    {
+     "path": "README.md",
+     "mode": 384,
+     "sha": "c7810ac01f4fc15e67bacf91b889b1e0396e18a4"
+    },
+    {
+     "path": "app.log",
+     "mode": 384,
+     "sha": "8f298e287d71baa221a391336869467d0e4a3c4d"
+    },
+    {
+     "pathB64": "YmFkLf8tbmFtZS50eHQ=",
+     "mode": 384,
+     "sha": "70726ae345f25f00adc99c363a0adc6ba4ab0daa"
+    },
+    {
+     "path": "bin",
+     "dir": true
+    },
+    {
+     "path": "bin/run.sh",
+     "mode": 493,
+     "sha": "b2b62c101a156f5f12dd7197cf7ae9424164b115"
+    },
+    {
+     "path": "binary.bin",
+     "mode": 384,
+     "sha": "1b3e3a67b7ab396212544addd0038906e82812a7"
+    },
+    {
+     "path": "build",
+     "dir": true
+    },
+    {
+     "path": "build/out.bin",
+     "mode": 384,
+     "sha": "9bc27bdc827962fd4c5ca9fe53dd3f15325655f9"
+    },
+    {
+     "path": "dangling",
+     "link": "bm93aGVyZS9maWxl"
+    },
+    {
+     "path": "deep",
+     "dir": true
+    },
+    {
+     "path": "deep/a",
+     "dir": true
+    },
+    {
+     "path": "deep/a/b",
+     "dir": true
+    },
+    {
+     "path": "deep/a/b/c.txt",
+     "mode": 420,
+     "sha": "698a7985db24f12a6425f6ed97a6ef5df053f3fb"
+    },
+    {
+     "path": "emoji.txt",
+     "mode": 384,
+     "sha": "0aa4f9e67a3177d7a604ad86b98cf7dcb3e3fa50"
+    },
+    {
+     "path": "gen",
+     "dir": true
+    },
+    {
+     "path": "gen/f1.txt",
+     "mode": 420,
+     "sha": "ec10c00fa96b66884991b07aa4d76b81a0670b04"
+    },
+    {
+     "path": "gen/f2.txt",
+     "mode": 420,
+     "sha": "06c1e903deafa923ca1c4dff02ea5a7c71dc01ea"
+    },
+    {
+     "path": "gen/f3.txt",
+     "mode": 420,
+     "sha": "794b19d3674e659a0572427bdd6e65e5e2b12d90"
+    },
+    {
+     "path": "keep",
+     "dir": true
+    },
+    {
+     "path": "keep/dir",
+     "dir": true
+    },
+    {
+     "path": "keep/dir/x.txt",
+     "mode": 384,
+     "sha": "6fcf9dfbd479ed82697fee719b9f8c610a11ff2a"
+    },
+    {
+     "path": "latin1.txt",
+     "mode": 384,
+     "sha": "d50fd83460668c9b5d3f8230f7f9323fd7c45ceb"
+    },
+    {
+     "path": "link-to-readme",
+     "link": "UkVBRE1FLm1k"
+    },
+    {
+     "path": "nested",
+     "dir": true
+    },
+    {
+     "path": "nested/inner.txt",
+     "mode": 384,
+     "sha": "cda38c9a201a1bf6a7b14fed60e59e7504e1283f"
+    },
+    {
+     "path": "node_modules",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg/index.js",
+     "mode": 384,
+     "sha": "db311f33466c97593aa59411fcfd87e8489d8f50"
+    },
+    {
+     "path": "notes",
+     "dir": true
+    },
+    {
+     "path": "notes/todo.txt",
+     "mode": 384,
+     "sha": "b209970d00c2037e901af1ffc00c7570a512297b"
+    },
+    {
+     "path": "src",
+     "dir": true
+    },
+    {
+     "path": "src/main.go",
+     "mode": 384,
+     "sha": "4b3d75fd1c245fc38b6ee05814fe3c5a45d0bb9a"
+    },
+    {
+     "path": "src/util",
+     "dir": true
+    },
+    {
+     "path": "src/util/strings.go",
+     "mode": 420,
+     "sha": "aa227052f299f6cbd5e03fa39560ea28208fd41c"
+    },
+    {
+     "path": "weird",
+     "dir": true
+    },
+    {
+     "path": "weird/back\\slash.txt",
+     "mode": 384,
+     "sha": "ae635e32a6627986e7833f4cdc9d8947fc3a3326"
+    },
+    {
+     "path": "weird/tab\there.txt",
+     "mode": 384,
+     "sha": "095f36f7afa55ba2e84af05a2f02938cb56cb6f1"
+    },
+    {
+     "path": "with space",
+     "dir": true
+    },
+    {
+     "path": "with space/a b.txt",
+     "mode": 384,
+     "sha": "4ecc5ebbeb5ef4a2952c54653a7f0049f184c162"
+    },
+    {
+     "path": "ünïcode",
+     "dir": true
+    },
+    {
+     "path": "ünïcode/файл.txt",
+     "mode": 384,
+     "sha": "84fb04d98180eb917f1d62aa49b431966f680b15"
+    }
+   ],
+   "repos": [
+    "tab-a-#work-a#.git"
+   ]
+  },
+  [
+   {
+    "at": 1760000060000,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "1760000060000-before-rewind",
+    "changed": 13,
+    "skipped": 1
+   }
+  ],
+  {
+   "ok": true,
+   "before": {
+    "id": "1760000060000-before-rewind-2",
+    "kind": "before-rewind",
+    "at": 1760000060000,
+    "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+    "files": 20
+   },
+   "changed": [
+    "deep/a/b/c.txt",
+    "gen/f1.txt",
+    "gen/f2.txt",
+    "gen/f3.txt",
+    "notes/todo.txt",
+    "src/util/strings.go",
+    ".gitignore",
+    "README.md",
+    "big.dat",
+    "bin/run.sh",
+    "emoji.txt",
+    "latin1.txt",
+    "link-to-readme",
+    "new/dir/file.txt"
+   ],
+   "skipped": []
+  },
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000000000-turn",
+      "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000005000-turn",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000060000-before-rewind",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000060000-before-rewind-2",
+      "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-a\n",
+     "root": "$ROOT/work-a\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": "[{\"at\":1760000060000,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"1760000060000-before-rewind\",\"changed\":13,\"skipped\":1},{\"at\":1760000060000,\"targetId\":\"1760000060000-before-rewind\",\"targetAt\":1760000060000,\"beforeId\":\"1760000060000-before-rewind-2\",\"changed\":14,\"skipped\":0}]",
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": ".GIT",
+     "dir": true
+    },
+    {
+     "path": ".GIT/x",
+     "mode": 384,
+     "sha": "2082e7f715f058acab2398d25d135cf5f4c0ce41"
+    },
+    {
+     "path": ".gitignore",
+     "mode": 384,
+     "sha": "157d70bd03746e88116187b9d6a0db8e7b661e2a"
+    },
+    {
+     "path": "README.md",
+     "mode": 384,
+     "sha": "99d79c79a17feeea5a1a5eacefae471abff196f5"
+    },
+    {
+     "path": "app.log",
+     "mode": 384,
+     "sha": "8f298e287d71baa221a391336869467d0e4a3c4d"
+    },
+    {
+     "pathB64": "YmFkLf8tbmFtZS50eHQ=",
+     "mode": 384,
+     "sha": "70726ae345f25f00adc99c363a0adc6ba4ab0daa"
+    },
+    {
+     "path": "big.dat",
+     "mode": 420,
+     "sha": "dd3b750e3862ec12c332c6d7c11150288471d0c9"
+    },
+    {
+     "path": "bin",
+     "dir": true
+    },
+    {
+     "path": "bin/run.sh",
+     "mode": 420,
+     "sha": "b2b62c101a156f5f12dd7197cf7ae9424164b115"
+    },
+    {
+     "path": "binary.bin",
+     "mode": 384,
+     "sha": "1b3e3a67b7ab396212544addd0038906e82812a7"
+    },
+    {
+     "path": "build",
+     "dir": true
+    },
+    {
+     "path": "build/out.bin",
+     "mode": 384,
+     "sha": "9bc27bdc827962fd4c5ca9fe53dd3f15325655f9"
+    },
+    {
+     "path": "dangling",
+     "link": "bm93aGVyZS9maWxl"
+    },
+    {
+     "path": "emoji.txt",
+     "mode": 384,
+     "sha": "8d40693fdc641c9a0e88a285c582da57b11ef300"
+    },
+    {
+     "path": "keep",
+     "dir": true
+    },
+    {
+     "path": "keep/dir",
+     "dir": true
+    },
+    {
+     "path": "keep/dir/x.txt",
+     "mode": 384,
+     "sha": "6fcf9dfbd479ed82697fee719b9f8c610a11ff2a"
+    },
+    {
+     "path": "latin1.txt",
+     "mode": 384,
+     "sha": "6fed7557fb731e8f4dd7bb83352a2c011f54d47e"
+    },
+    {
+     "path": "link-to-readme",
+     "mode": 438,
+     "sha": "3b0d62bc9fc24544906b09720e0689c24e107f88"
+    },
+    {
+     "path": "nested",
+     "dir": true
+    },
+    {
+     "path": "nested/inner.txt",
+     "mode": 384,
+     "sha": "cda38c9a201a1bf6a7b14fed60e59e7504e1283f"
+    },
+    {
+     "path": "new",
+     "dir": true
+    },
+    {
+     "path": "new/dir",
+     "dir": true
+    },
+    {
+     "path": "new/dir/file.txt",
+     "mode": 420,
+     "sha": "389cc6b7ae5a659383eab5dfc253764eccf84732"
+    },
+    {
+     "path": "node_modules",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg/index.js",
+     "mode": 384,
+     "sha": "db311f33466c97593aa59411fcfd87e8489d8f50"
+    },
+    {
+     "path": "src",
+     "dir": true
+    },
+    {
+     "path": "src/main.go",
+     "mode": 384,
+     "sha": "4b3d75fd1c245fc38b6ee05814fe3c5a45d0bb9a"
+    },
+    {
+     "path": "weird",
+     "dir": true
+    },
+    {
+     "path": "weird/back\\slash.txt",
+     "mode": 384,
+     "sha": "ae635e32a6627986e7833f4cdc9d8947fc3a3326"
+    },
+    {
+     "path": "weird/tab\there.txt",
+     "mode": 384,
+     "sha": "095f36f7afa55ba2e84af05a2f02938cb56cb6f1"
+    },
+    {
+     "path": "with space",
+     "dir": true
+    },
+    {
+     "path": "with space/a b.txt",
+     "mode": 384,
+     "sha": "4ecc5ebbeb5ef4a2952c54653a7f0049f184c162"
+    },
+    {
+     "path": "ünïcode",
+     "dir": true
+    },
+    {
+     "path": "ünïcode/файл.txt",
+     "mode": 384,
+     "sha": "84fb04d98180eb917f1d62aa49b431966f680b15"
+    }
+   ],
+   "repos": [
+    "tab-a-#work-a#.git"
+   ]
+  },
+  [
+   {
+    "id": "1760000060000-before-rewind-2",
+    "kind": "before-rewind",
+    "at": 1760000060000,
+    "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+    "files": 20
+   },
+   {
+    "id": "1760000060000-before-rewind",
+    "kind": "before-rewind",
+    "at": 1760000060000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   },
+   {
+    "id": "1760000005000-turn",
+    "kind": "turn",
+    "at": 1760000005000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   },
+   {
+    "id": "1760000000000-turn",
+    "kind": "turn",
+    "at": 1760000000000,
+    "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+    "files": 20
+   }
+  ],
+  {
+   "ok": true,
+   "before": {
+    "id": "1760000070000-before-rewind",
+    "kind": "before-rewind",
+    "at": 1760000070000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   },
+   "changed": [
+    "big.dat",
+    ".gitignore",
+    "bin/run.sh",
+    "gen/f2.txt",
+    "gen/f3.txt",
+    "latin1.txt",
+    "notes/todo.txt",
+    "src/util/strings.go"
+   ],
+   "skipped": [
+    {
+     "path": "README.md",
+     "reason": "changed"
+    },
+    {
+     "path": "deep/a/b/c.txt",
+     "reason": "unsafe"
+    },
+    {
+     "path": "emoji.txt",
+     "reason": "changed"
+    },
+    {
+     "path": "gen/f1.txt",
+     "reason": "changed"
+    },
+    {
+     "path": "link-to-readme",
+     "reason": "changed",
+     "blob": "e3b4b5e09616db5899620e601a07174034357533"
+    }
+   ]
+  },
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000000000-turn",
+      "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000005000-turn",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000060000-before-rewind",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000060000-before-rewind-2",
+      "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000070000-before-rewind",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/saved/1760000070000-e3b4b5e0",
+      "type": "blob",
+      "object": "e3b4b5e09616db5899620e601a07174034357533"
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-a\n",
+     "root": "$ROOT/work-a\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": "[{\"at\":1760000060000,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"1760000060000-before-rewind\",\"changed\":13,\"skipped\":1},{\"at\":1760000060000,\"targetId\":\"1760000060000-before-rewind\",\"targetAt\":1760000060000,\"beforeId\":\"1760000060000-before-rewind-2\",\"changed\":14,\"skipped\":0},{\"at\":1760000070000,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"1760000070000-before-rewind\",\"changed\":8,\"skipped\":5}]",
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": ".GIT",
+     "dir": true
+    },
+    {
+     "path": ".GIT/x",
+     "mode": 384,
+     "sha": "2082e7f715f058acab2398d25d135cf5f4c0ce41"
+    },
+    {
+     "path": ".gitignore",
+     "mode": 384,
+     "sha": "14514fbafb73941061aaad4284a71e72729be246"
+    },
+    {
+     "path": "README.md",
+     "mode": 384,
+     "sha": "a0160873ec32baf600ec8ade91fe53e69f8028e9"
+    },
+    {
+     "path": "app.log",
+     "mode": 384,
+     "sha": "8f298e287d71baa221a391336869467d0e4a3c4d"
+    },
+    {
+     "pathB64": "YmFkLf8tbmFtZS50eHQ=",
+     "mode": 384,
+     "sha": "70726ae345f25f00adc99c363a0adc6ba4ab0daa"
+    },
+    {
+     "path": "bin",
+     "dir": true
+    },
+    {
+     "path": "bin/run.sh",
+     "mode": 493,
+     "sha": "b2b62c101a156f5f12dd7197cf7ae9424164b115"
+    },
+    {
+     "path": "binary.bin",
+     "mode": 384,
+     "sha": "1b3e3a67b7ab396212544addd0038906e82812a7"
+    },
+    {
+     "path": "build",
+     "dir": true
+    },
+    {
+     "path": "build/out.bin",
+     "mode": 384,
+     "sha": "9bc27bdc827962fd4c5ca9fe53dd3f15325655f9"
+    },
+    {
+     "path": "dangling",
+     "link": "bm93aGVyZS9maWxl"
+    },
+    {
+     "path": "deep",
+     "mode": 384,
+     "sha": "4f6c084604dd0e90dc65cc24611e43eff47e1c7e"
+    },
+    {
+     "path": "gen",
+     "dir": true
+    },
+    {
+     "path": "gen/f1.txt",
+     "mode": 384,
+     "sha": "c283ce4e2549fe7c76ec7ee7ff771542c15ce3bb"
+    },
+    {
+     "path": "gen/f2.txt",
+     "mode": 420,
+     "sha": "06c1e903deafa923ca1c4dff02ea5a7c71dc01ea"
+    },
+    {
+     "path": "gen/f3.txt",
+     "mode": 420,
+     "sha": "794b19d3674e659a0572427bdd6e65e5e2b12d90"
+    },
+    {
+     "path": "keep",
+     "dir": true
+    },
+    {
+     "path": "keep/dir",
+     "dir": true
+    },
+    {
+     "path": "keep/dir/x.txt",
+     "mode": 384,
+     "sha": "6fcf9dfbd479ed82697fee719b9f8c610a11ff2a"
+    },
+    {
+     "path": "latin1.txt",
+     "mode": 384,
+     "sha": "d50fd83460668c9b5d3f8230f7f9323fd7c45ceb"
+    },
+    {
+     "path": "link-to-readme",
+     "mode": 384,
+     "sha": "fa44a7386ab008547cbafbfa2ab43d3b77b9be80"
+    },
+    {
+     "path": "nested",
+     "dir": true
+    },
+    {
+     "path": "nested/inner.txt",
+     "mode": 384,
+     "sha": "cda38c9a201a1bf6a7b14fed60e59e7504e1283f"
+    },
+    {
+     "path": "new",
+     "dir": true
+    },
+    {
+     "path": "new/dir",
+     "dir": true
+    },
+    {
+     "path": "node_modules",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg/index.js",
+     "mode": 384,
+     "sha": "db311f33466c97593aa59411fcfd87e8489d8f50"
+    },
+    {
+     "path": "notes",
+     "dir": true
+    },
+    {
+     "path": "notes/todo.txt",
+     "mode": 420,
+     "sha": "b209970d00c2037e901af1ffc00c7570a512297b"
+    },
+    {
+     "path": "src",
+     "dir": true
+    },
+    {
+     "path": "src/main.go",
+     "mode": 384,
+     "sha": "4b3d75fd1c245fc38b6ee05814fe3c5a45d0bb9a"
+    },
+    {
+     "path": "src/util",
+     "dir": true
+    },
+    {
+     "path": "src/util/strings.go",
+     "mode": 420,
+     "sha": "aa227052f299f6cbd5e03fa39560ea28208fd41c"
+    },
+    {
+     "path": "weird",
+     "dir": true
+    },
+    {
+     "path": "weird/back\\slash.txt",
+     "mode": 384,
+     "sha": "ae635e32a6627986e7833f4cdc9d8947fc3a3326"
+    },
+    {
+     "path": "weird/tab\there.txt",
+     "mode": 384,
+     "sha": "095f36f7afa55ba2e84af05a2f02938cb56cb6f1"
+    },
+    {
+     "path": "with space",
+     "dir": true
+    },
+    {
+     "path": "with space/a b.txt",
+     "mode": 384,
+     "sha": "4ecc5ebbeb5ef4a2952c54653a7f0049f184c162"
+    },
+    {
+     "path": "ünïcode",
+     "dir": true
+    },
+    {
+     "path": "ünïcode/файл.txt",
+     "mode": 384,
+     "sha": "84fb04d98180eb917f1d62aa49b431966f680b15"
+    }
+   ],
+   "repos": [
+    "tab-a-#work-a#.git"
+   ]
+  },
+  [
+   {
+    "at": 1760000060000,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "1760000060000-before-rewind",
+    "changed": 13,
+    "skipped": 1
+   },
+   {
+    "at": 1760000060000,
+    "targetId": "1760000060000-before-rewind",
+    "targetAt": 1760000060000,
+    "beforeId": "1760000060000-before-rewind-2",
+    "changed": 14,
+    "skipped": 0
+   },
+   {
+    "at": 1760000070000,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "1760000070000-before-rewind",
+    "changed": 8,
+    "skipped": 5
+   }
+  ],
+  {
+   "ok": false,
+   "reason": "busy"
+  },
+  {
+   "ok": false,
+   "reason": "not-found"
+  },
+  {
+   "ok": false,
+   "reason": "not-found"
+  },
+  [
+   {
+    "id": "1760000070000-before-rewind",
+    "kind": "before-rewind",
+    "at": 1760000070000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   },
+   {
+    "id": "1760000060000-before-rewind-2",
+    "kind": "before-rewind",
+    "at": 1760000060000,
+    "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+    "files": 20
+   },
+   {
+    "id": "1760000060000-before-rewind",
+    "kind": "before-rewind",
+    "at": 1760000060000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   },
+   {
+    "id": "1760000005000-turn",
+    "kind": "turn",
+    "at": 1760000005000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   },
+   {
+    "id": "1760000000000-turn",
+    "kind": "turn",
+    "at": 1760000000000,
+    "tree": "bee5ca4503298ad3634aefb18113c6b2184a8525",
+    "files": 20
+   }
+  ],
+  null,
+  {
+   "ok": true,
+   "checkpoint": {
+    "id": "1760000104000-turn",
+    "kind": "turn",
+    "at": 1760000104000,
+    "tree": "a27ed635915bb937e26d4fadfc6a069f55c0f58f",
+    "files": 20
+   }
+  },
+  null,
+  {
+   "ok": true,
+   "checkpoint": {
+    "id": "1760000108000-turn",
+    "kind": "turn",
+    "at": 1760000108000,
+    "tree": "a418c1ab05c0905d05fe5b78d50f293624131de3",
+    "files": 20
+   }
+  },
+  null,
+  {
+   "ok": true,
+   "checkpoint": {
+    "id": "1760000112000-turn",
+    "kind": "turn",
+    "at": 1760000112000,
+    "tree": "c1fe89198e6ee01a2d1002fc4832e3d6f5a728c9",
+    "files": 20
+   }
+  },
+  null,
+  {
+   "ok": true,
+   "checkpoint": {
+    "id": "1760000116000-turn",
+    "kind": "turn",
+    "at": 1760000116000,
+    "tree": "3b8154c43766ea721e7ef78fabb631d7fbd82346",
+    "files": 20
+   }
+  },
+  [
+   {
+    "id": "1760000116000-turn",
+    "kind": "turn",
+    "at": 1760000116000,
+    "tree": "3b8154c43766ea721e7ef78fabb631d7fbd82346",
+    "files": 20
+   },
+   {
+    "id": "1760000112000-turn",
+    "kind": "turn",
+    "at": 1760000112000,
+    "tree": "c1fe89198e6ee01a2d1002fc4832e3d6f5a728c9",
+    "files": 20
+   },
+   {
+    "id": "1760000108000-turn",
+    "kind": "turn",
+    "at": 1760000108000,
+    "tree": "a418c1ab05c0905d05fe5b78d50f293624131de3",
+    "files": 20
+   },
+   {
+    "id": "1760000104000-turn",
+    "kind": "turn",
+    "at": 1760000104000,
+    "tree": "a27ed635915bb937e26d4fadfc6a069f55c0f58f",
+    "files": 20
+   },
+   {
+    "id": "1760000070000-before-rewind",
+    "kind": "before-rewind",
+    "at": 1760000070000,
+    "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+    "files": 16
+   }
+  ],
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000070000-before-rewind",
+      "tree": "6db452f22ada24df6a234be0e74a88b6bfa10872",
+      "subject": "checkpoint files=16",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000104000-turn",
+      "tree": "a27ed635915bb937e26d4fadfc6a069f55c0f58f",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000108000-turn",
+      "tree": "a418c1ab05c0905d05fe5b78d50f293624131de3",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000112000-turn",
+      "tree": "c1fe89198e6ee01a2d1002fc4832e3d6f5a728c9",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000116000-turn",
+      "tree": "3b8154c43766ea721e7ef78fabb631d7fbd82346",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/saved/1760000070000-e3b4b5e0",
+      "type": "blob",
+      "object": "e3b4b5e09616db5899620e601a07174034357533"
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-a\n",
+     "root": "$ROOT/work-a\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": "[{\"at\":1760000060000,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"1760000060000-before-rewind\",\"changed\":13,\"skipped\":1},{\"at\":1760000060000,\"targetId\":\"1760000060000-before-rewind\",\"targetAt\":1760000060000,\"beforeId\":\"1760000060000-before-rewind-2\",\"changed\":14,\"skipped\":0},{\"at\":1760000070000,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"1760000070000-before-rewind\",\"changed\":8,\"skipped\":5}]",
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": ".GIT",
+     "dir": true
+    },
+    {
+     "path": ".GIT/x",
+     "mode": 384,
+     "sha": "2082e7f715f058acab2398d25d135cf5f4c0ce41"
+    },
+    {
+     "path": ".gitignore",
+     "mode": 384,
+     "sha": "14514fbafb73941061aaad4284a71e72729be246"
+    },
+    {
+     "path": "README.md",
+     "mode": 384,
+     "sha": "a0160873ec32baf600ec8ade91fe53e69f8028e9"
+    },
+    {
+     "path": "app.log",
+     "mode": 384,
+     "sha": "8f298e287d71baa221a391336869467d0e4a3c4d"
+    },
+    {
+     "pathB64": "YmFkLf8tbmFtZS50eHQ=",
+     "mode": 384,
+     "sha": "70726ae345f25f00adc99c363a0adc6ba4ab0daa"
+    },
+    {
+     "path": "bin",
+     "dir": true
+    },
+    {
+     "path": "bin/run.sh",
+     "mode": 493,
+     "sha": "b2b62c101a156f5f12dd7197cf7ae9424164b115"
+    },
+    {
+     "path": "binary.bin",
+     "mode": 384,
+     "sha": "1b3e3a67b7ab396212544addd0038906e82812a7"
+    },
+    {
+     "path": "build",
+     "dir": true
+    },
+    {
+     "path": "build/out.bin",
+     "mode": 384,
+     "sha": "9bc27bdc827962fd4c5ca9fe53dd3f15325655f9"
+    },
+    {
+     "path": "counter.txt",
+     "mode": 384,
+     "sha": "9c6b057a2b9d96a4067a749ee3b3b0158d390cf1"
+    },
+    {
+     "path": "dangling",
+     "link": "bm93aGVyZS9maWxl"
+    },
+    {
+     "path": "deep",
+     "mode": 384,
+     "sha": "4f6c084604dd0e90dc65cc24611e43eff47e1c7e"
+    },
+    {
+     "path": "gen",
+     "dir": true
+    },
+    {
+     "path": "gen/f1.txt",
+     "mode": 384,
+     "sha": "c283ce4e2549fe7c76ec7ee7ff771542c15ce3bb"
+    },
+    {
+     "path": "gen/f2.txt",
+     "mode": 420,
+     "sha": "06c1e903deafa923ca1c4dff02ea5a7c71dc01ea"
+    },
+    {
+     "path": "gen/f3.txt",
+     "mode": 420,
+     "sha": "794b19d3674e659a0572427bdd6e65e5e2b12d90"
+    },
+    {
+     "path": "keep",
+     "dir": true
+    },
+    {
+     "path": "keep/dir",
+     "dir": true
+    },
+    {
+     "path": "keep/dir/x.txt",
+     "mode": 384,
+     "sha": "6fcf9dfbd479ed82697fee719b9f8c610a11ff2a"
+    },
+    {
+     "path": "latin1.txt",
+     "mode": 384,
+     "sha": "d50fd83460668c9b5d3f8230f7f9323fd7c45ceb"
+    },
+    {
+     "path": "link-to-readme",
+     "mode": 384,
+     "sha": "fa44a7386ab008547cbafbfa2ab43d3b77b9be80"
+    },
+    {
+     "path": "nested",
+     "dir": true
+    },
+    {
+     "path": "nested/inner.txt",
+     "mode": 384,
+     "sha": "cda38c9a201a1bf6a7b14fed60e59e7504e1283f"
+    },
+    {
+     "path": "new",
+     "dir": true
+    },
+    {
+     "path": "new/dir",
+     "dir": true
+    },
+    {
+     "path": "node_modules",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg/index.js",
+     "mode": 384,
+     "sha": "db311f33466c97593aa59411fcfd87e8489d8f50"
+    },
+    {
+     "path": "notes",
+     "dir": true
+    },
+    {
+     "path": "notes/todo.txt",
+     "mode": 420,
+     "sha": "b209970d00c2037e901af1ffc00c7570a512297b"
+    },
+    {
+     "path": "src",
+     "dir": true
+    },
+    {
+     "path": "src/main.go",
+     "mode": 384,
+     "sha": "4b3d75fd1c245fc38b6ee05814fe3c5a45d0bb9a"
+    },
+    {
+     "path": "src/util",
+     "dir": true
+    },
+    {
+     "path": "src/util/strings.go",
+     "mode": 420,
+     "sha": "aa227052f299f6cbd5e03fa39560ea28208fd41c"
+    },
+    {
+     "path": "weird",
+     "dir": true
+    },
+    {
+     "path": "weird/back\\slash.txt",
+     "mode": 384,
+     "sha": "ae635e32a6627986e7833f4cdc9d8947fc3a3326"
+    },
+    {
+     "path": "weird/tab\there.txt",
+     "mode": 384,
+     "sha": "095f36f7afa55ba2e84af05a2f02938cb56cb6f1"
+    },
+    {
+     "path": "with space",
+     "dir": true
+    },
+    {
+     "path": "with space/a b.txt",
+     "mode": 384,
+     "sha": "4ecc5ebbeb5ef4a2952c54653a7f0049f184c162"
+    },
+    {
+     "path": "ünïcode",
+     "dir": true
+    },
+    {
+     "path": "ünïcode/файл.txt",
+     "mode": 384,
+     "sha": "84fb04d98180eb917f1d62aa49b431966f680b15"
+    }
+   ],
+   "repos": [
+    "tab-a-#work-a#.git"
+   ]
+  },
+  null,
+  [
+   {
+    "at": 1760000000000,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 0,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000001,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 1,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000002,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 2,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000003,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 3,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000004,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 4,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000005,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 5,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000006,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 6,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000007,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 7,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000008,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 8,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000009,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 9,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000010,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 10,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000011,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 11,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000012,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 12,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000013,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 13,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000014,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 14,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000015,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 15,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000016,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 16,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000017,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 17,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000018,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 18,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000019,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 19,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000020,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 20,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000021,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 21,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000022,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 22,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000023,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 23,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000024,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 24,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000025,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 25,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000026,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 26,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000027,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 27,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000028,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 28,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000029,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 29,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000030,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 30,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000031,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 31,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000032,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 32,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000033,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 33,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000034,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 34,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000035,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 35,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000036,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 36,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000037,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 37,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000038,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 38,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000039,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 39,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000040,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 40,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000041,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 41,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000042,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 42,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000043,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 43,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000044,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 44,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000045,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 45,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000046,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 46,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000047,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 47,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000048,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 48,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   }
+  ],
+  null,
+  {
+   "ok": true,
+   "before": {
+    "id": "1760000130000-before-rewind",
+    "kind": "before-rewind",
+    "at": 1760000130000,
+    "tree": "3b8154c43766ea721e7ef78fabb631d7fbd82346",
+    "files": 20
+   },
+   "changed": [],
+   "skipped": []
+  },
+  null,
+  {
+   "ok": true,
+   "before": {
+    "id": "1760000131000-before-rewind",
+    "kind": "before-rewind",
+    "at": 1760000131000,
+    "tree": "fb04deb34ac3f4a5490d1295197e45a8e827563a",
+    "files": 20
+   },
+   "changed": [],
+   "skipped": [
+    {
+     "path": "counter.txt",
+     "reason": "changed",
+     "blob": "c257e10c80293b32e41e6c3d64efbd31dc8902d0"
+    }
+   ]
+  },
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000108000-turn",
+      "tree": "a418c1ab05c0905d05fe5b78d50f293624131de3",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000112000-turn",
+      "tree": "c1fe89198e6ee01a2d1002fc4832e3d6f5a728c9",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000116000-turn",
+      "tree": "3b8154c43766ea721e7ef78fabb631d7fbd82346",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000130000-before-rewind",
+      "tree": "3b8154c43766ea721e7ef78fabb631d7fbd82346",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/checkpoints/1760000131000-before-rewind",
+      "tree": "fb04deb34ac3f4a5490d1295197e45a8e827563a",
+      "subject": "checkpoint files=20",
+      "parents": 0
+     },
+     {
+      "ref": "refs/NS/saved/1759999999002-8f691f15",
+      "type": "blob",
+      "object": "8f691f15004c0279d79a924088422d94be253cc5"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999003-f6d2ef03",
+      "type": "blob",
+      "object": "f6d2ef03a7e2bb26946f34d0b5690207d5e95adc"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999004-57942805",
+      "type": "blob",
+      "object": "579428053945943b1967ee8f5b240a2ece954a05"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999005-58a6e22c",
+      "type": "blob",
+      "object": "58a6e22c56561eb530e1441c59ada40accbb19b5"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999006-e8e03ed3",
+      "type": "blob",
+      "object": "e8e03ed382791ae4d46d1e5bb95ef57af6a0e034"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999007-c31d9153",
+      "type": "blob",
+      "object": "c31d9153a357f0a40a5f872b958beea16bff0c7e"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999008-18919c25",
+      "type": "blob",
+      "object": "18919c25780f410b744bf855c233457b9fd24154"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999009-b6fccaf9",
+      "type": "blob",
+      "object": "b6fccaf97fb400a92e1fcd214df97670b3bada1f"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999010-85d08599",
+      "type": "blob",
+      "object": "85d0859920fc1b3e8f7bb647970581ca114781e7"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999011-f1e6da10",
+      "type": "blob",
+      "object": "f1e6da10bc2c7f285e270748dd84eb43d87fe535"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999012-77b1cd13",
+      "type": "blob",
+      "object": "77b1cd13c130e34db91380a1279162f508a8fee3"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999013-2099695d",
+      "type": "blob",
+      "object": "2099695d90f7f7d7a629f6d1bff11a16b2f1d648"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999014-59227ed8",
+      "type": "blob",
+      "object": "59227ed87c0c19a1a0ea9336516fcb8e041efd1f"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999015-3171cc69",
+      "type": "blob",
+      "object": "3171cc69d5f9006e45fa8e2825f30c6294522260"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999016-860dd2ec",
+      "type": "blob",
+      "object": "860dd2ecd48c89bfc143b8c3376de8094dbac3c6"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999017-8020ec26",
+      "type": "blob",
+      "object": "8020ec268404abddcbe644e73a8d3bcda1ad928b"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999018-ab9ff296",
+      "type": "blob",
+      "object": "ab9ff2961202c1eaf51659c9a53c0448534210c7"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999019-05c7bda7",
+      "type": "blob",
+      "object": "05c7bda73e6fc5d50e87484f16e3fad9bd0cffe6"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999020-903f3a47",
+      "type": "blob",
+      "object": "903f3a478a76f744d07afe6fe0ec8be6edb8d89e"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999021-20f60d8f",
+      "type": "blob",
+      "object": "20f60d8fd76b65e353566654075a225c51e42996"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999022-130277b8",
+      "type": "blob",
+      "object": "130277b86339ee2ace07cffe1d083fd9ac5bc558"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999023-69485b6a",
+      "type": "blob",
+      "object": "69485b6a127631b8a074e9b66e2a94bd67328754"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999024-7934b4cf",
+      "type": "blob",
+      "object": "7934b4cf32efc7ab6063157217d2243536dfe621"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999025-37868354",
+      "type": "blob",
+      "object": "37868354900f1da99484000e81c78d252746d6a1"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999026-fbf20939",
+      "type": "blob",
+      "object": "fbf20939637b02c4502dd7feac418e4532645fae"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999027-8d5f9682",
+      "type": "blob",
+      "object": "8d5f96821a3bf10da2fe9fccfc7fa60f6edfb839"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999028-b28e4b9c",
+      "type": "blob",
+      "object": "b28e4b9c43cc78f3cfc14db5bb0a68b2b8843f72"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999029-bfb91e77",
+      "type": "blob",
+      "object": "bfb91e77e31a958d856e6fc394e9bd05d9bba5df"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999030-f348e6af",
+      "type": "blob",
+      "object": "f348e6af7349c5e553635c8d0815b16592637a86"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999031-c48400b4",
+      "type": "blob",
+      "object": "c48400b49a3cb5831f88a6b47ee30d8fe72ecd03"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999032-f1cfce8d",
+      "type": "blob",
+      "object": "f1cfce8d6a5e7c1e007084dbc50475cfdbbcbd36"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999033-31173b5c",
+      "type": "blob",
+      "object": "31173b5c09a52aeda68cb059ab176ce1792fe86a"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999034-f83ad333",
+      "type": "blob",
+      "object": "f83ad333c58c80b0a39fca2af717e0b56b0cba37"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999035-9d9d848b",
+      "type": "blob",
+      "object": "9d9d848ba8d2709b267663ec651fa7fa4a71626c"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999036-fe15bc1b",
+      "type": "blob",
+      "object": "fe15bc1bc673f21173d1e5c46863fe90f9bed3c3"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999037-455afb5b",
+      "type": "blob",
+      "object": "455afb5b02f9fbc897248dc17331dc0cad9b6632"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999038-8443cdd1",
+      "type": "blob",
+      "object": "8443cdd1dc54b7aed4e6440bca0e18c1457c26eb"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999039-a4965a38",
+      "type": "blob",
+      "object": "a4965a38ecefb42e785ba858d96db8d55271adba"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999040-1723ff2d",
+      "type": "blob",
+      "object": "1723ff2de3e6fd45081dfe3fd7c1e83d9147d909"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999041-283175f1",
+      "type": "blob",
+      "object": "283175f1b1a29d0f75386d6f40e287ff6964d7bc"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999042-ff01a99d",
+      "type": "blob",
+      "object": "ff01a99d54fdbbe4b8754860f8c7882267827413"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999043-19154634",
+      "type": "blob",
+      "object": "19154634658c54865bc620b2fbc68b558d9cf4b9"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999044-5db603a1",
+      "type": "blob",
+      "object": "5db603a1f1de59c3aa34036c3ac459a4b514109e"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999045-d8f4d25d",
+      "type": "blob",
+      "object": "d8f4d25de0e00f6d1e65b3a6527ab554eb80329d"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999046-403ffd58",
+      "type": "blob",
+      "object": "403ffd5842362405a7982845931f5e42c1b33ccb"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999047-83a40047",
+      "type": "blob",
+      "object": "83a400471b42b8e846ff51869467bfcccd2077a7"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999048-0b4c1835",
+      "type": "blob",
+      "object": "0b4c1835109297a5d447b82369167e3b3869855c"
+     },
+     {
+      "ref": "refs/NS/saved/1759999999049-39fc882f",
+      "type": "blob",
+      "object": "39fc882fcb6e2123d0107e643ec02b4816d701a2"
+     },
+     {
+      "ref": "refs/NS/saved/1760000070000-e3b4b5e0",
+      "type": "blob",
+      "object": "e3b4b5e09616db5899620e601a07174034357533"
+     },
+     {
+      "ref": "refs/NS/saved/1760000131000-c257e10c",
+      "type": "blob",
+      "object": "c257e10c80293b32e41e6c3d64efbd31dc8902d0"
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-a\n",
+     "root": "$ROOT/work-a\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": "[{\"at\":1760000000001,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":1,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000002,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":2,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000003,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":3,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000004,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":4,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000005,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":5,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000006,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":6,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000007,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":7,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000008,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":8,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000009,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":9,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000010,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":10,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000011,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":11,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000012,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":12,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000013,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":13,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000014,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":14,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000015,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":15,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000016,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":16,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000017,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":17,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000018,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":18,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000019,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":19,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000020,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":20,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000021,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":21,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000022,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":22,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000023,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":23,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000024,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":24,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000025,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":25,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000026,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":26,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000027,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":27,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000028,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":28,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000029,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":29,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000030,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":30,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000031,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":31,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000032,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":32,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000033,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":33,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000034,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":34,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000035,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":35,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000036,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":36,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000037,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":37,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000038,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":38,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000039,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":39,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000040,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":40,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000041,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":41,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000042,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":42,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000043,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":43,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000044,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":44,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000045,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":45,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000000046,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":46,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000047,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":47,\"skipped\":0,\"extra\":1.5e+21,\"\":null},{\"at\":1760000000048,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"x\",\"changed\":48,\"skipped\":0,\"extra\":\"ü \",\"\":null},{\"at\":1760000130000,\"targetId\":\"1760000116000-turn\",\"targetAt\":1760000116000,\"beforeId\":\"1760000130000-before-rewind\",\"changed\":0,\"skipped\":0},{\"at\":1760000131000,\"targetId\":\"1760000104000-turn\",\"targetAt\":1760000104000,\"beforeId\":\"1760000131000-before-rewind\",\"changed\":0,\"skipped\":1}]",
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": ".GIT",
+     "dir": true
+    },
+    {
+     "path": ".GIT/x",
+     "mode": 384,
+     "sha": "2082e7f715f058acab2398d25d135cf5f4c0ce41"
+    },
+    {
+     "path": ".gitignore",
+     "mode": 384,
+     "sha": "14514fbafb73941061aaad4284a71e72729be246"
+    },
+    {
+     "path": "README.md",
+     "mode": 384,
+     "sha": "a0160873ec32baf600ec8ade91fe53e69f8028e9"
+    },
+    {
+     "path": "app.log",
+     "mode": 384,
+     "sha": "8f298e287d71baa221a391336869467d0e4a3c4d"
+    },
+    {
+     "pathB64": "YmFkLf8tbmFtZS50eHQ=",
+     "mode": 384,
+     "sha": "70726ae345f25f00adc99c363a0adc6ba4ab0daa"
+    },
+    {
+     "path": "bin",
+     "dir": true
+    },
+    {
+     "path": "bin/run.sh",
+     "mode": 493,
+     "sha": "b2b62c101a156f5f12dd7197cf7ae9424164b115"
+    },
+    {
+     "path": "binary.bin",
+     "mode": 384,
+     "sha": "1b3e3a67b7ab396212544addd0038906e82812a7"
+    },
+    {
+     "path": "build",
+     "dir": true
+    },
+    {
+     "path": "build/out.bin",
+     "mode": 384,
+     "sha": "9bc27bdc827962fd4c5ca9fe53dd3f15325655f9"
+    },
+    {
+     "path": "counter.txt",
+     "mode": 384,
+     "sha": "10703737230dccf6d05e2c3deface0edd1eb6b15"
+    },
+    {
+     "path": "dangling",
+     "link": "bm93aGVyZS9maWxl"
+    },
+    {
+     "path": "deep",
+     "mode": 384,
+     "sha": "4f6c084604dd0e90dc65cc24611e43eff47e1c7e"
+    },
+    {
+     "path": "gen",
+     "dir": true
+    },
+    {
+     "path": "gen/f1.txt",
+     "mode": 384,
+     "sha": "c283ce4e2549fe7c76ec7ee7ff771542c15ce3bb"
+    },
+    {
+     "path": "gen/f2.txt",
+     "mode": 420,
+     "sha": "06c1e903deafa923ca1c4dff02ea5a7c71dc01ea"
+    },
+    {
+     "path": "gen/f3.txt",
+     "mode": 420,
+     "sha": "794b19d3674e659a0572427bdd6e65e5e2b12d90"
+    },
+    {
+     "path": "keep",
+     "dir": true
+    },
+    {
+     "path": "keep/dir",
+     "dir": true
+    },
+    {
+     "path": "keep/dir/x.txt",
+     "mode": 384,
+     "sha": "6fcf9dfbd479ed82697fee719b9f8c610a11ff2a"
+    },
+    {
+     "path": "latin1.txt",
+     "mode": 384,
+     "sha": "d50fd83460668c9b5d3f8230f7f9323fd7c45ceb"
+    },
+    {
+     "path": "link-to-readme",
+     "mode": 384,
+     "sha": "fa44a7386ab008547cbafbfa2ab43d3b77b9be80"
+    },
+    {
+     "path": "nested",
+     "dir": true
+    },
+    {
+     "path": "nested/inner.txt",
+     "mode": 384,
+     "sha": "cda38c9a201a1bf6a7b14fed60e59e7504e1283f"
+    },
+    {
+     "path": "new",
+     "dir": true
+    },
+    {
+     "path": "new/dir",
+     "dir": true
+    },
+    {
+     "path": "node_modules",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg",
+     "dir": true
+    },
+    {
+     "path": "node_modules/pkg/index.js",
+     "mode": 384,
+     "sha": "db311f33466c97593aa59411fcfd87e8489d8f50"
+    },
+    {
+     "path": "notes",
+     "dir": true
+    },
+    {
+     "path": "notes/todo.txt",
+     "mode": 420,
+     "sha": "b209970d00c2037e901af1ffc00c7570a512297b"
+    },
+    {
+     "path": "src",
+     "dir": true
+    },
+    {
+     "path": "src/main.go",
+     "mode": 384,
+     "sha": "4b3d75fd1c245fc38b6ee05814fe3c5a45d0bb9a"
+    },
+    {
+     "path": "src/util",
+     "dir": true
+    },
+    {
+     "path": "src/util/strings.go",
+     "mode": 420,
+     "sha": "aa227052f299f6cbd5e03fa39560ea28208fd41c"
+    },
+    {
+     "path": "weird",
+     "dir": true
+    },
+    {
+     "path": "weird/back\\slash.txt",
+     "mode": 384,
+     "sha": "ae635e32a6627986e7833f4cdc9d8947fc3a3326"
+    },
+    {
+     "path": "weird/tab\there.txt",
+     "mode": 384,
+     "sha": "095f36f7afa55ba2e84af05a2f02938cb56cb6f1"
+    },
+    {
+     "path": "with space",
+     "dir": true
+    },
+    {
+     "path": "with space/a b.txt",
+     "mode": 384,
+     "sha": "4ecc5ebbeb5ef4a2952c54653a7f0049f184c162"
+    },
+    {
+     "path": "ünïcode",
+     "dir": true
+    },
+    {
+     "path": "ünïcode/файл.txt",
+     "mode": 384,
+     "sha": "84fb04d98180eb917f1d62aa49b431966f680b15"
+    }
+   ],
+   "repos": [
+    "tab-a-#work-a#.git"
+   ]
+  },
+  [
+   {
+    "at": 1760000000001,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 1,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000002,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 2,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000003,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 3,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000004,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 4,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000005,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 5,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000006,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 6,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000007,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 7,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000008,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 8,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000009,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 9,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000010,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 10,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000011,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 11,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000012,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 12,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000013,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 13,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000014,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 14,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000015,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 15,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000016,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 16,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000017,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 17,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000018,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 18,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000019,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 19,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000020,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 20,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000021,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 21,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000022,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 22,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000023,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 23,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000024,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 24,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000025,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 25,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000026,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 26,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000027,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 27,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000028,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 28,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000029,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 29,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000030,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 30,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000031,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 31,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000032,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 32,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000033,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 33,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000034,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 34,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000035,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 35,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000036,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 36,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000037,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 37,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000038,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 38,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000039,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 39,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000040,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 40,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000041,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 41,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000042,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 42,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000043,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 43,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000044,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 44,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000045,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 45,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000000046,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 46,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000047,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 47,
+    "skipped": 0,
+    "extra": 1.5e+21,
+    "": null
+   },
+   {
+    "at": 1760000000048,
+    "targetId": "1760000000000-turn",
+    "targetAt": 1760000000000,
+    "beforeId": "x",
+    "changed": 48,
+    "skipped": 0,
+    "extra": "ü ",
+    "": null
+   },
+   {
+    "at": 1760000130000,
+    "targetId": "1760000116000-turn",
+    "targetAt": 1760000116000,
+    "beforeId": "1760000130000-before-rewind",
+    "changed": 0,
+    "skipped": 0
+   },
+   {
+    "at": 1760000131000,
+    "targetId": "1760000104000-turn",
+    "targetAt": 1760000104000,
+    "beforeId": "1760000131000-before-rewind",
+    "changed": 0,
+    "skipped": 1
+   }
+  ],
+  null,
+  [],
+  null,
+  {
+   "ok": true,
+   "dir": "$ROOT/data/checkpoints/tab-b-#work-b#.git",
+   "root": "$ROOT/work-b"
+  },
+  {
+   "ok": true,
+   "checkpoint": {
+    "id": "1760000000000-turn",
+    "kind": "turn",
+    "at": 1760000000000,
+    "tree": "6095b7ac5077b916d1053da45df7d49e9e55a064",
+    "files": 2
+   }
+  },
+  null,
+  {
+   "ok": false,
+   "reason": "too-many-files"
+  },
+  {
+   "error": true
+  },
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000000000-turn",
+      "tree": "6095b7ac5077b916d1053da45df7d49e9e55a064",
+      "subject": "checkpoint files=2",
+      "parents": 0
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-b\n",
+     "root": "$ROOT/work-b\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": null,
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": "four.txt",
+     "mode": 384,
+     "sha": "9c6b057a2b9d96a4067a749ee3b3b0158d390cf1"
+    },
+    {
+     "path": "one.txt",
+     "mode": 384,
+     "sha": "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
+    },
+    {
+     "path": "three.txt",
+     "mode": 384,
+     "sha": "a3db5c13ff90a36963278c6a39e4ee3c22e2a436"
+    },
+    {
+     "path": "two.txt",
+     "mode": 384,
+     "sha": "7448d8798a4380162d4b56f9b452e2f6f9e24e7a"
+    }
+   ],
+   "repos": [
+    "tab-a-#work-a#.git",
+    "tab-b-#work-b#.git"
+   ]
+  },
+  null,
+  {
+   "ok": true,
+   "dir": "$ROOT/data/checkpoints/tab-c-#work-c#.git",
+   "root": "$ROOT/work-c"
+  },
+  {
+   "ok": true,
+   "checkpoint": {
+    "id": "1760000200000-turn",
+    "kind": "turn",
+    "at": 1760000200000,
+    "tree": "87c239a3e8260ba5a72285e2867d12a5e68a0e3d",
+    "files": 1
+   }
+  },
+  {
+   "repo": {
+    "refs": [
+     {
+      "ref": "refs/NS/checkpoints/1760000200000-turn",
+      "tree": "87c239a3e8260ba5a72285e2867d12a5e68a0e3d",
+      "subject": "checkpoint files=1",
+      "parents": 0
+     }
+    ],
+    "files": {
+     "HEAD": "ref: refs/heads/master\n",
+     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n\tworktree = $ROOT/work-c\n",
+     "root": "$ROOT/work-c\n",
+     "info/exclude": "node_modules\n.git\n.next\n.nuxt\n.turbo\n.cache\n.venv\n__pycache__\n.gradle\n.parcel-cache\ncoverage\n",
+     "info/attributes": "* -text -eol -filter -ident -working-tree-encoding\n",
+     "rewinds.json": null,
+     "description": null
+    },
+    "leftovers": []
+   },
+   "tree": [
+    {
+     "path": "only.txt",
+     "mode": 384,
+     "sha": "2b66fd261ee5c6cfc8de7fa466bab600bcfe4f69"
+    }
+   ],
+   "repos": [
+    "notrepo",
+    "tab-a-#work-a#.git",
+    "tab-b-#work-b#.git",
+    "tab-c-#work-c#.git",
+    "young-0123456789.git"
+   ]
+  },
+  null,
+  {
+   "ok": false
+  },
+  {
+   "ok": false
+  },
+  {
+   "ok": false
+  },
+  {
+   "ok": false
+  },
+  {
+   "ok": false
+  },
+  {
+   "ok": true,
+   "dir": "$ROOT/data/checkpoints/tab-c-#work-c#.git",
+   "root": "$ROOT/work-c"
+  },
+  {
+   "ok": true,
+   "dir": "$ROOT/data/checkpoints/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-#work-c#.git",
+   "root": "$ROOT/work-c"
+  },
+  {
+   "ok": false
+  }
+ ]
+}

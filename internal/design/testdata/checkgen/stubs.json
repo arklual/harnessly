@@ -1,0 +1,3 @@
+{
+  "lib/${DESIGN_LIB_MODULE}/server": "stub-server.mjs"
+}

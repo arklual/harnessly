@@ -1,0 +1,4 @@
+{"timestamp":"2026-03-01T10:03:35.000Z","type":"event_msg","payload":{"type":"user_message","message":"array command with an object"}}
+{"timestamp":"2026-03-01T10:03:36.250Z","type":"event_msg","payload":{"type":"exec_command_begin","call_id":"e","command":["ok",{"toString":"no"}]}}
+{"timestamp":"2026-03-01T10:03:37.500Z","type":"event_msg","payload":{"type":"exec_command_begin","call_id":"f","command":["ok",{"valueOf":"fine"}]}}
+{"timestamp":"2026-03-01T10:03:38.750Z","type":"event_msg","payload":{"type":"exec_command_end","call_id":"f","exit_code":0}}

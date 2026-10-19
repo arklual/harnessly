@@ -1,0 +1,12 @@
+{
+  "lib/tmux": "stub-tmux.mjs",
+  "lib/sync-server": "stub-sync.mjs",
+  "lib/status-manager": "stub-status.mjs",
+  "lib/auth": "stub-auth.mjs",
+  "lib/logger": "stub-logger.mjs",
+  "lib/agent-availability": "stub-availability.mjs",
+  "lib/${OLD_MODULE_PREFIX}-prompt-editor": "stub-prompt-editor.mjs",
+  "lib/providers/claude/preflight": "stub-preflight.mjs",
+  "lib/providers/codex/preflight": "stub-preflight.mjs",
+  "nanoid": "stub-nanoid.mjs"
+}

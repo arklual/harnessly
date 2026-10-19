@@ -1,0 +1,50 @@
+│                                                      │
+│ model:       gpt-5.6-sol high   /model to change     │
+│ directory:   /tmp/claude-1001/…/scratchpad/pre/cwork │
+│ permissions: YOLO mode                               │
+╰──────────────────────────────────────────────────────╯
+
+  Tip: New Build faster with Codex.
+
+
+› /status
+
+
+⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json
+
+⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some
+  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+
+■ Your access token could not be refreshed. Please log out and sign in again.
+
+/status
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│  >_ OpenAI Codex (v0.152.0)                                                                  │
+│                                                                                              │
+│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │
+│ information on rate limits and credits                                                       │
+│                                                                                              │
+│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │
+│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │
+│  Permissions:          Full Access                                                           │
+│  Agents.md:            ~/.codex/AGENTS.md                                                    │
+│  Thread name:          /status                                                               │
+│  Collaboration mode:   Default                                                               │
+│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │
+│                                                                                              │
+│  Token usage:          0 total  (0 input + 0 output)                                         │
+│  Limits:               data not available yet                                                │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+  Select Model and Effort
+  Access legacy models by running codex -m <model_name> or in your config.toml
+
+› 1. gpt-5.6-sol (current)  Latest frontier agentic coding model.
+  2. gpt-5.6-terra          Balanced agentic coding model for everyday work.
+  3. gpt-5.6-luna           Fast and affordable agentic coding model.
+  4. gpt-5.5                Frontier model for complex coding, research, and real-world work.
+  5. gpt-5.2                Optimized for professional work and long-running agents.
+
+  Press enter to confirm or esc to go back

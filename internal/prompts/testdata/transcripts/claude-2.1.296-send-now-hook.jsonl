@@ -1,0 +1,8 @@
+{"type": "user", "timestamp": "2026-10-12T19:50:07.262Z", "message": {"role": "user", "content": "Run the Bash command: echo hello-hook  then say DONE-HOOK"}}
+{"type": "assistant", "timestamp": "2026-10-12T19:50:08.719Z", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01WbT3yYxzyNST2k1ADfysgW", "name": "Bash", "input": {"command": "echo hello-hook", "description": "Echo hello-hook string"}}]}}
+{"type": "queue-operation", "timestamp": "2026-10-12T19:50:15.716Z", "operation": "enqueue", "content": "hook queued: say Q-HOOK"}
+{"type": "queue-operation", "timestamp": "2026-10-12T19:50:26.415Z", "operation": "dequeue"}
+{"type": "user", "timestamp": "2026-10-12T19:50:26.280Z", "message": {"role": "user", "content": [{"tool_use_id": "toolu_01WbT3yYxzyNST2k1ADfysgW", "type": "tool_result", "content": "hello-hook", "is_error": false}]}}
+{"type": "user", "timestamp": "2026-10-12T19:50:26.515Z", "message": {"role": "user", "content": "hook queued: say Q-HOOK"}}
+{"type": "assistant", "timestamp": "2026-10-12T19:50:27.751Z", "message": {"role": "assistant", "content": [{"type": "thinking", "thinking": ""}]}}
+{"type": "assistant", "timestamp": "2026-10-12T19:50:27.834Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "DONE-HOOK\n\nQ-HOOK"}]}}

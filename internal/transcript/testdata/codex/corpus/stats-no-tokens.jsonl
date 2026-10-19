@@ -1,0 +1,2 @@
+{"timestamp":"2026-03-01T10:35:32.500Z","type":"session_meta","payload":{"id":"0199a000-0000-7000-8000-000000000001","timestamp":"2026-03-01T09:59:59.000Z","cwd":"/home/agent/work","originator":"codex_cli_rs","cli_version":"0.50.0"}}
+{"timestamp":"2026-03-01T10:35:33.750Z","type":"turn_context","payload":{"cwd":"/home/agent/work","model":"gpt-5","effort":"high","approval_policy":"never"}}

@@ -1,0 +1,863 @@
+{
+ "gitlab.example.com /api/v4/projects/group%2Falpha": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"id\":1,\"path_with_namespace\":\"group/alpha\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/repository/branches/main": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"name\":\"main\",\"commit\":{\"id\":\"08ebeef8520a32ecd827ced03e627cc85508c556\",\"title\":\"feat: one\",\"committed_date\":\"2026-10-18T10:30:00.000+00:00\"}}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/pipelines?ref=main&per_page=1": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"status\":\"running\",\"web_url\":\"https://gitlab.example.com/group/alpha/-/pipelines/11\"}]"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests?source_branch=main&state=all&per_page=3&order_by=updated_at": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[]"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/repository/branches/feature%2Fx": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"commit\":{\"id\":\"1cb8a0a44c2e959bfd6168e3ffb5ddd01142385c\",\"title\":\"fix: three\",\"committed_date\":\"2026-10-18T10:50:00.000+00:00\"}}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/pipelines?ref=feature%2Fx&per_page=1": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"status\":\"waiting_for_resource\",\"web_url\":\"https://gitlab.example.com/group/alpha/-/pipelines/12\"}]"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests?source_branch=feature%2Fx&state=all&per_page=3&order_by=updated_at": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"iid\":7,\"title\":\"Feature X (list)\",\"state\":\"opened\",\"web_url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"head_pipeline\":null},{\"iid\":5,\"title\":\"Old <one> & \\\"quoted\\\"\",\"state\":\"merged\",\"draft\":true,\"web_url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/5\"}]"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/7": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"iid\":7,\"title\":\"Feature X\",\"state\":\"opened\",\"draft\":false,\"web_url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"head_pipeline\":{\"status\":\"success\",\"web_url\":\"https://gitlab.example.com/group/alpha/-/pipelines/13\"},\"description\":\"Does X.\\r\\n\\n- one\\n- two\",\"author\":{\"name\":\"Agent Smith\"},\"source_branch\":\"feature/x\",\"target_branch\":\"main\",\"updated_at\":\"2026-10-18T11:00:00.000Z\",\"changes_count\":\"4\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/7/diffs?per_page=100": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"old_path\":\"src/a.txt\",\"new_path\":\"src/a.txt\",\"new_file\":false,\"deleted_file\":false,\"renamed_file\":false,\"diff\":\"@@ -1 +1 @@\\n-a\\n+b\\n\"},{\"old_path\":\"dev/null\",\"new_path\":\"new.txt\",\"new_file\":true,\"deleted_file\":false,\"renamed_file\":false,\"diff\":\"@@ -0,0 +1 @@\\n+new\"},{\"old_path\":\"gone.txt\",\"new_path\":\"gone.txt\",\"new_file\":false,\"deleted_file\":true,\"renamed_file\":false,\"diff\":\"@@ -1 +0,0 @@\\n-old\\n\"},{\"old_path\":\"old/name.txt\",\"new_path\":\"new/name.txt\",\"new_file\":false,\"deleted_file\":false,\"renamed_file\":true,\"diff\":\"\"},{\"old_path\":\"img.png\",\"new_path\":\"img.png\",\"new_file\":false,\"deleted_file\":false,\"renamed_file\":false,\"diff\":\"\",\"too_large\":true},{\"old_path\":\"x.txt\",\"new_path\":\"x.txt\",\"new_file\":false,\"deleted_file\":false,\"renamed_file\":false,\"diff\":\"--- a/x.txt\\n+++ b/x.txt\\n@@ -1 +1 @@\\n-1\\n+2\\n\\n\"}]"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/5": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/404": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/404/diffs?per_page=100": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/8": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"iid\":8,\"title\":\"Huge\",\"state\":\"merged\",\"draft\":true,\"web_url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/8\",\"changes_count\":\"1000+\",\"description\":null}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/8/diffs?per_page=100": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "gen": {
+   "kind": "files",
+   "count": 40,
+   "lines": 900
+  }
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/9": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"iid\":9,\"title\":\"No diffs\",\"state\":\"closed\",\"web_url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/9\",\"head_pipeline\":{\"status\":\"failed\"}}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/9/diffs?per_page=100": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/repository/commits/1cb8a0a4": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"id\":\"1cb8a0a44c2e959bfd6168e3ffb5ddd01142385c\",\"title\":\"fix: three\",\"message\":\"fix: three\\n\\n  Longer body\\nwith lines.  \\n\",\"author_name\":\"Agent\",\"created_at\":\"2026-10-18T10:50:00.000+00:00\",\"web_url\":\"https://gitlab.example.com/group/alpha/-/commit/1cb8a0a44c2e959bfd6168e3ffb5ddd01142385c\",\"last_pipeline\":{\"status\":\"manual\",\"web_url\":\"https://gitlab.example.com/group/alpha/-/pipelines/14\"}}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/repository/commits/1cb8a0a4/diff?per_page=100": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"old_path\":\"src/deep/b.txt\",\"new_path\":\"src/deep/b.txt\",\"new_file\":false,\"deleted_file\":false,\"renamed_file\":false,\"diff\":\"@@ -1 +1,2 @@\\n two\\n+three\\n\"}]"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/repository/commits/abcdef0": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"id\":\"abcdef0123456789\",\"title\":\"Other title\",\"message\":\"Not the title\",\"web_url\":\"https://gitlab.example.com/group/alpha/-/commit/abcdef0\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/repository/commits/abcdef0/diff?per_page=100": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"old_path\":\"f0\",\"new_path\":\"f0\",\"diff\":\"@@ -1 +1 @@\\n+0\\n\"},{\"old_path\":\"f1\",\"new_path\":\"f1\",\"diff\":\"@@ -1 +1 @@\\n+1\\n\"},{\"old_path\":\"f2\",\"new_path\":\"f2\",\"diff\":\"@@ -1 +1 @@\\n+2\\n\"},{\"old_path\":\"f3\",\"new_path\":\"f3\",\"diff\":\"@@ -1 +1 @@\\n+3\\n\"},{\"old_path\":\"f4\",\"new_path\":\"f4\",\"diff\":\"@@ -1 +1 @@\\n+4\\n\"},{\"old_path\":\"f5\",\"new_path\":\"f5\",\"diff\":\"@@ -1 +1 @@\\n+5\\n\"},{\"old_path\":\"f6\",\"new_path\":\"f6\",\"diff\":\"@@ -1 +1 @@\\n+6\\n\"},{\"old_path\":\"f7\",\"new_path\":\"f7\",\"diff\":\"@@ -1 +1 @@\\n+7\\n\"},{\"old_path\":\"f8\",\"new_path\":\"f8\",\"diff\":\"@@ -1 +1 @@\\n+8\\n\"},{\"old_path\":\"f9\",\"new_path\":\"f9\",\"diff\":\"@@ -1 +1 @@\\n+9\\n\"},{\"old_path\":\"f10\",\"new_path\":\"f10\",\"diff\":\"@@ -1 +1 @@\\n+10\\n\"},{\"old_path\":\"f11\",\"new_path\":\"f11\",\"diff\":\"@@ -1 +1 @@\\n+11\\n\"},{\"old_path\":\"f12\",\"new_path\":\"f12\",\"diff\":\"@@ -1 +1 @@\\n+12\\n\"},{\"old_path\":\"f13\",\"new_path\":\"f13\",\"diff\":\"@@ -1 +1 @@\\n+13\\n\"},{\"old_path\":\"f14\",\"new_path\":\"f14\",\"diff\":\"@@ -1 +1 @@\\n+14\\n\"},{\"old_path\":\"f15\",\"new_path\":\"f15\",\"diff\":\"@@ -1 +1 @@\\n+15\\n\"},{\"old_path\":\"f16\",\"new_path\":\"f16\",\"diff\":\"@@ -1 +1 @@\\n+16\\n\"},{\"old_path\":\"f17\",\"new_path\":\"f17\",\"diff\":\"@@ -1 +1 @@\\n+17\\n\"},{\"old_path\":\"f18\",\"new_path\":\"f18\",\"diff\":\"@@ -1 +1 @@\\n+18\\n\"},{\"old_path\":\"f19\",\"new_path\":\"f19\",\"diff\":\"@@ -1 +1 @@\\n+19\\n\"},{\"old_path\":\"f20\",\"new_path\":\"f20\",\"diff\":\"@@ -1 +1 @@\\n+20\\n\"},{\"old_path\":\"f21\",\"new_path\":\"f21\",\"diff\":\"@@ -1 +1 @@\\n+21\\n\"},{\"old_path\":\"f22\",\"new_path\":\"f22\",\"diff\":\"@@ -1 +1 @@\\n+22\\n\"},{\"old_path\":\"f23\",\"new_path\":\"f23\",\"diff\":\"@@ -1 +1 @@\\n+23\\n\"},{\"old_path\":\"f24\",\"new_path\":\"f24\",\"diff\":\"@@ -1 +1 @@\\n+24\\n\"},{\"old_path\":\"f25\",\"new_path\":\"f25\",\"diff\":\"@@ -1 +1 @@\\n+25\\n\"},{\"old_path\":\"f26\",\"new_path\":\"f26\",\"diff\":\"@@ -1 +1 @@\\n+26\\n\"},{\"old_path\":\"f27\",\"new_path\":\"f27\",\"diff\":\"@@ -1 +1 @@\\n+27\\n\"},{\"old_path\":\"f28\",\"new_path\":\"f28\",\"diff\":\"@@ -1 +1 @@\\n+28\\n\"},{\"old_path\":\"f29\",\"new_path\":\"f29\",\"diff\":\"@@ -1 +1 @@\\n+29\\n\"},{\"old_path\":\"f30\",\"new_path\":\"f30\",\"diff\":\"@@ -1 +1 @@\\n+30\\n\"},{\"old_path\":\"f31\",\"new_path\":\"f31\",\"diff\":\"@@ -1 +1 @@\\n+31\\n\"},{\"old_path\":\"f32\",\"new_path\":\"f32\",\"diff\":\"@@ -1 +1 @@\\n+32\\n\"},{\"old_path\":\"f33\",\"new_path\":\"f33\",\"diff\":\"@@ -1 +1 @@\\n+33\\n\"},{\"old_path\":\"f34\",\"new_path\":\"f34\",\"diff\":\"@@ -1 +1 @@\\n+34\\n\"},{\"old_path\":\"f35\",\"new_path\":\"f35\",\"diff\":\"@@ -1 +1 @@\\n+35\\n\"},{\"old_path\":\"f36\",\"new_path\":\"f36\",\"diff\":\"@@ -1 +1 @@\\n+36\\n\"},{\"old_path\":\"f37\",\"new_path\":\"f37\",\"diff\":\"@@ -1 +1 @@\\n+37\\n\"},{\"old_path\":\"f38\",\"new_path\":\"f38\",\"diff\":\"@@ -1 +1 @@\\n+38\\n\"},{\"old_path\":\"f39\",\"new_path\":\"f39\",\"diff\":\"@@ -1 +1 @@\\n+39\\n\"},{\"old_path\":\"f40\",\"new_path\":\"f40\",\"diff\":\"@@ -1 +1 @@\\n+40\\n\"},{\"old_path\":\"f41\",\"new_path\":\"f41\",\"diff\":\"@@ -1 +1 @@\\n+41\\n\"},{\"old_path\":\"f42\",\"new_path\":\"f42\",\"diff\":\"@@ -1 +1 @@\\n+42\\n\"},{\"old_path\":\"f43\",\"new_path\":\"f43\",\"diff\":\"@@ -1 +1 @@\\n+43\\n\"},{\"old_path\":\"f44\",\"new_path\":\"f44\",\"diff\":\"@@ -1 +1 @@\\n+44\\n\"},{\"old_path\":\"f45\",\"new_path\":\"f45\",\"diff\":\"@@ -1 +1 @@\\n+45\\n\"},{\"old_path\":\"f46\",\"new_path\":\"f46\",\"diff\":\"@@ -1 +1 @@\\n+46\\n\"},{\"old_path\":\"f47\",\"new_path\":\"f47\",\"diff\":\"@@ -1 +1 @@\\n+47\\n\"},{\"old_path\":\"f48\",\"new_path\":\"f48\",\"diff\":\"@@ -1 +1 @@\\n+48\\n\"},{\"old_path\":\"f49\",\"new_path\":\"f49\",\"diff\":\"@@ -1 +1 @@\\n+49\\n\"},{\"old_path\":\"f50\",\"new_path\":\"f50\",\"diff\":\"@@ -1 +1 @@\\n+50\\n\"},{\"old_path\":\"f51\",\"new_path\":\"f51\",\"diff\":\"@@ -1 +1 @@\\n+51\\n\"},{\"old_path\":\"f52\",\"new_path\":\"f52\",\"diff\":\"@@ -1 +1 @@\\n+52\\n\"},{\"old_path\":\"f53\",\"new_path\":\"f53\",\"diff\":\"@@ -1 +1 @@\\n+53\\n\"},{\"old_path\":\"f54\",\"new_path\":\"f54\",\"diff\":\"@@ -1 +1 @@\\n+54\\n\"},{\"old_path\":\"f55\",\"new_path\":\"f55\",\"diff\":\"@@ -1 +1 @@\\n+55\\n\"},{\"old_path\":\"f56\",\"new_path\":\"f56\",\"diff\":\"@@ -1 +1 @@\\n+56\\n\"},{\"old_path\":\"f57\",\"new_path\":\"f57\",\"diff\":\"@@ -1 +1 @@\\n+57\\n\"},{\"old_path\":\"f58\",\"new_path\":\"f58\",\"diff\":\"@@ -1 +1 @@\\n+58\\n\"},{\"old_path\":\"f59\",\"new_path\":\"f59\",\"diff\":\"@@ -1 +1 @@\\n+59\\n\"},{\"old_path\":\"f60\",\"new_path\":\"f60\",\"diff\":\"@@ -1 +1 @@\\n+60\\n\"},{\"old_path\":\"f61\",\"new_path\":\"f61\",\"diff\":\"@@ -1 +1 @@\\n+61\\n\"},{\"old_path\":\"f62\",\"new_path\":\"f62\",\"diff\":\"@@ -1 +1 @@\\n+62\\n\"},{\"old_path\":\"f63\",\"new_path\":\"f63\",\"diff\":\"@@ -1 +1 @@\\n+63\\n\"},{\"old_path\":\"f64\",\"new_path\":\"f64\",\"diff\":\"@@ -1 +1 @@\\n+64\\n\"},{\"old_path\":\"f65\",\"new_path\":\"f65\",\"diff\":\"@@ -1 +1 @@\\n+65\\n\"},{\"old_path\":\"f66\",\"new_path\":\"f66\",\"diff\":\"@@ -1 +1 @@\\n+66\\n\"},{\"old_path\":\"f67\",\"new_path\":\"f67\",\"diff\":\"@@ -1 +1 @@\\n+67\\n\"},{\"old_path\":\"f68\",\"new_path\":\"f68\",\"diff\":\"@@ -1 +1 @@\\n+68\\n\"},{\"old_path\":\"f69\",\"new_path\":\"f69\",\"diff\":\"@@ -1 +1 @@\\n+69\\n\"},{\"old_path\":\"f70\",\"new_path\":\"f70\",\"diff\":\"@@ -1 +1 @@\\n+70\\n\"},{\"old_path\":\"f71\",\"new_path\":\"f71\",\"diff\":\"@@ -1 +1 @@\\n+71\\n\"},{\"old_path\":\"f72\",\"new_path\":\"f72\",\"diff\":\"@@ -1 +1 @@\\n+72\\n\"},{\"old_path\":\"f73\",\"new_path\":\"f73\",\"diff\":\"@@ -1 +1 @@\\n+73\\n\"},{\"old_path\":\"f74\",\"new_path\":\"f74\",\"diff\":\"@@ -1 +1 @@\\n+74\\n\"},{\"old_path\":\"f75\",\"new_path\":\"f75\",\"diff\":\"@@ -1 +1 @@\\n+75\\n\"},{\"old_path\":\"f76\",\"new_path\":\"f76\",\"diff\":\"@@ -1 +1 @@\\n+76\\n\"},{\"old_path\":\"f77\",\"new_path\":\"f77\",\"diff\":\"@@ -1 +1 @@\\n+77\\n\"},{\"old_path\":\"f78\",\"new_path\":\"f78\",\"diff\":\"@@ -1 +1 @@\\n+78\\n\"},{\"old_path\":\"f79\",\"new_path\":\"f79\",\"diff\":\"@@ -1 +1 @@\\n+79\\n\"},{\"old_path\":\"f80\",\"new_path\":\"f80\",\"diff\":\"@@ -1 +1 @@\\n+80\\n\"},{\"old_path\":\"f81\",\"new_path\":\"f81\",\"diff\":\"@@ -1 +1 @@\\n+81\\n\"},{\"old_path\":\"f82\",\"new_path\":\"f82\",\"diff\":\"@@ -1 +1 @@\\n+82\\n\"},{\"old_path\":\"f83\",\"new_path\":\"f83\",\"diff\":\"@@ -1 +1 @@\\n+83\\n\"},{\"old_path\":\"f84\",\"new_path\":\"f84\",\"diff\":\"@@ -1 +1 @@\\n+84\\n\"},{\"old_path\":\"f85\",\"new_path\":\"f85\",\"diff\":\"@@ -1 +1 @@\\n+85\\n\"},{\"old_path\":\"f86\",\"new_path\":\"f86\",\"diff\":\"@@ -1 +1 @@\\n+86\\n\"},{\"old_path\":\"f87\",\"new_path\":\"f87\",\"diff\":\"@@ -1 +1 @@\\n+87\\n\"},{\"old_path\":\"f88\",\"new_path\":\"f88\",\"diff\":\"@@ -1 +1 @@\\n+88\\n\"},{\"old_path\":\"f89\",\"new_path\":\"f89\",\"diff\":\"@@ -1 +1 @@\\n+89\\n\"},{\"old_path\":\"f90\",\"new_path\":\"f90\",\"diff\":\"@@ -1 +1 @@\\n+90\\n\"},{\"old_path\":\"f91\",\"new_path\":\"f91\",\"diff\":\"@@ -1 +1 @@\\n+91\\n\"},{\"old_path\":\"f92\",\"new_path\":\"f92\",\"diff\":\"@@ -1 +1 @@\\n+92\\n\"},{\"old_path\":\"f93\",\"new_path\":\"f93\",\"diff\":\"@@ -1 +1 @@\\n+93\\n\"},{\"old_path\":\"f94\",\"new_path\":\"f94\",\"diff\":\"@@ -1 +1 @@\\n+94\\n\"},{\"old_path\":\"f95\",\"new_path\":\"f95\",\"diff\":\"@@ -1 +1 @@\\n+95\\n\"},{\"old_path\":\"f96\",\"new_path\":\"f96\",\"diff\":\"@@ -1 +1 @@\\n+96\\n\"},{\"old_path\":\"f97\",\"new_path\":\"f97\",\"diff\":\"@@ -1 +1 @@\\n+97\\n\"},{\"old_path\":\"f98\",\"new_path\":\"f98\",\"diff\":\"@@ -1 +1 @@\\n+98\\n\"},{\"old_path\":\"f99\",\"new_path\":\"f99\",\"diff\":\"@@ -1 +1 @@\\n+99\\n\"}]"
+ },
+ "gitlab.com /api/v4/projects/team%2Fsub%2Fbeta": {
+  "auth": [
+   "private-token",
+   "pub-file"
+  ],
+  "status": 301,
+  "headers": {
+   "location": "https://gitlab.com/api/v4/projects/42"
+  }
+ },
+ "gitlab.com /api/v4/projects/42": {
+  "auth": [
+   "private-token",
+   "pub-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"id\":42,\"path_with_namespace\":\"team/sub/beta-renamed\"}"
+ },
+ "gitlab.com /api/v4/projects/team%2Fsub%2Fbeta-renamed/repository/branches/trunk": {
+  "auth": [
+   "private-token",
+   "pub-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.com /api/v4/projects/team%2Fsub%2Fbeta-renamed/pipelines?ref=trunk&per_page=1": {
+  "auth": [
+   "private-token",
+   "pub-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[]"
+ },
+ "gitlab.com /api/v4/projects/team%2Fsub%2Fbeta-renamed/merge_requests?source_branch=trunk&state=all&per_page=3&order_by=updated_at": {
+  "auth": [
+   "private-token",
+   "pub-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"iid\":3,\"title\":\"Beta docs (list)\",\"state\":\"opened\",\"web_url\":\"https://gitlab.com/team/sub/beta-renamed/-/merge_requests/3\"}]"
+ },
+ "gitlab.com /api/v4/projects/team%2Fsub%2Fbeta-renamed/merge_requests/3/diffs?per_page=100": {
+  "auth": [
+   "private-token",
+   "pub-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[]"
+ },
+ "gitlab.com /api/v4/projects/team%2Fsub%2Fbeta-renamed/merge_requests/3": {
+  "auth": [
+   "private-token",
+   "pub-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"iid\":3,\"title\":\"Beta docs\",\"state\":\"locked\",\"draft\":1,\"web_url\":\"https://gitlab.com/team/sub/beta-renamed/-/merge_requests/3\",\"head_pipeline\":{\"status\":\"created\",\"web_url\":\"https://gitlab.com/p/1\"}}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Finner": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"path_with_namespace\":\"group/inner\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Finner/repository/branches/main": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"commit\":{\"id\":\"feedface\",\"title\":\"pushed elsewhere\",\"committed_date\":\"2026-10-18T13:00:00.000+00:00\"}}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Finner/pipelines?ref=main&per_page=1": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"0\":{\"status\":\"success\",\"web_url\":\"https://ci.example.com/1\"}}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Finner/merge_requests?source_branch=main&state=all&per_page=3&order_by=updated_at": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[]"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Fepsilon": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"path_with_namespace\":\"group/epsilon\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Fepsilon/repository/branches/local-only": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Fepsilon/pipelines?ref=local-only&per_page=1": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Fepsilon/merge_requests?source_branch=local-only&state=all&per_page=3&order_by=updated_at": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[]"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Fother": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Fother/merge_requests/12": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"iid\":12,\"title\":\"Other\",\"state\":\"merged\",\"web_url\":\"https://gitlab.example.com/group/other/-/merge_requests/12\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Fz": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Fz/merge_requests/2": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"iid\":2,\"title\":\"Zed\",\"state\":\"opened\",\"draft\":true,\"web_url\":\"https://gitlab.example.com/group/z/-/merge_requests/2\"}"
+ },
+ "gitlab.example.com /api/v4/projects/broken%2Fjson": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "not json"
+ },
+ "gitlab.example.com /api/v4/projects/gone%2Fproject": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "drop": true
+ },
+ "gitlab.example.com /api/v4/projects/gone%2Fproject/merge_requests/4": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"iid\":4,\"title\":\"Survived\",\"state\":\"opened\",\"web_url\":\"https://gitlab.example.com/gone/project/-/merge_requests/4\"}"
+ },
+ "gitlab.example.com /api/v4/projects/group%2Falpha/merge_requests/70": {
+  "auth": [
+   "private-token",
+   "self-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"iid\":70,\"title\":\"Preview\",\"state\":\"weird\",\"draft\":0}"
+ },
+ "gitlab.com /api/v4/projects/team%2Fsub%2Fbeta/merge_requests/3": {
+  "auth": [
+   "private-token",
+   "pub-file"
+  ],
+  "status": 301,
+  "headers": {
+   "location": "https://gitlab.com/api/v4/projects/42/merge_requests/3"
+  }
+ },
+ "tracker.example.com /api/issues/ACME-12?fields=idReadable,summary,resolved,customFields(name,value(name,login,fullName,avatarUrl)),parent(issues(idReadable,summary,customFields(name,value(name))))": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"idReadable\":\"ACME-12\",\"summary\":\"Fix the thing\",\"resolved\":null,\"customFields\":[{\"name\":\"State\",\"value\":{\"name\":\"In Progress\"}},{\"name\":\"Assignee\",\"value\":{\"name\":\"jdoe\",\"login\":\"jdoe\",\"fullName\":\"John  Doe\",\"avatarUrl\":\"/hub/api/rest/avatar/abc?dpr=2\"}},{\"name\":\"Type\",\"value\":{\"name\":\"Task\"}},{\"name\":\"Priority\",\"value\":null}],\"parent\":{\"issues\":[{\"idReadable\":\"ACME-1\",\"summary\":\"The epic\",\"customFields\":[{\"name\":\"Type\",\"value\":{\"name\":\"Epic\"}}]}]}}"
+ },
+ "tracker.example.com /api/issues/DEMO-3?fields=idReadable,summary,resolved,customFields(name,value(name,login,fullName,avatarUrl)),parent(issues(idReadable,summary,customFields(name,value(name))))": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"idReadable\":\"DEMO-3\",\"summary\":\"Under an idea\",\"resolved\":1700000000000,\"customFields\":[{\"name\":\"Assignee\",\"value\":{\"login\":\"asmith\",\"name\":\"asmith\"}},{\"name\":\"Type\",\"value\":{\"name\":\"ИДЕЯ\"}}],\"parent\":{\"issues\":[{\"idReadable\":\"DEMO-1\",\"summary\":\"Idea\",\"customFields\":[{\"name\":\"Type\",\"value\":{\"name\":\"Идея\"}}]}]}}"
+ },
+ "tracker.example.com /api/issues/OPS-4?fields=idReadable,summary,resolved,customFields(name,value(name,login,fullName,avatarUrl)),parent(issues(idReadable,summary,customFields(name,value(name))))": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "tracker.example.com /api/issues/OPS-6?fields=idReadable,summary,resolved,customFields(name,value(name,login,fullName,avatarUrl)),parent(issues(idReadable,summary,customFields(name,value(name))))": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"idReadable\":\"OPS-6\",\"summary\":\"Bad fields\",\"customFields\":{\"State\":1}}"
+ },
+ "tracker.example.com /api/issues/OPS-7?fields=idReadable,summary,resolved,customFields(name,value(name,login,fullName,avatarUrl)),parent(issues(idReadable,summary,customFields(name,value(name))))": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"idReadable\":\"OPS-7\",\"summary\":7,\"customFields\":[{\"name\":\"Assignee\",\"value\":\"nobody\"}],\"parent\":{\"issues\":\"x\"}}"
+ },
+ "tracker.example.com /api/admin/projects?fields=shortName,archived&$top=200": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"shortName\":\"ACME\"},{\"shortName\":\"DEMO\",\"archived\":false},{\"shortName\":\"OLD\",\"archived\":true},{\"shortName\":\"OPS\"},{\"shortName\":\"x1\"},{\"shortName\":\"TOOLONGNAME1\"}]"
+ },
+ "tracker.example.com /hub/api/rest/avatar/abc?dpr=2": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "image/png"
+  },
+  "bodyB64": "iVBORw0KGgoABw4VHCMqMTg/Rk1UW2JpcHd+hYyTmqGor7a9xMvS2eDn7vX8AwoR"
+ },
+ "tracker.example.com /api/users?query=asmith&fields=login,avatarUrl&$top=10": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"login\":\"asmith2\",\"avatarUrl\":\"/hub/api/rest/avatar/no\"},{\"login\":\"asmith\",\"avatarUrl\":\"https://tracker.example.com/hub/api/rest/avatar/zzz\"}]"
+ },
+ "tracker.example.com /hub/api/rest/avatar/zzz": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "image/svg+xml"
+  },
+  "body": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>"
+ },
+ "tracker.example.com /api/users?query=nobody&fields=login,avatarUrl&$top=10": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[]"
+ },
+ "tracker.example.com /api/users?query=evil&fields=login,avatarUrl&$top=10": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"login\":\"evil\",\"avatarUrl\":\"https://other.example.com/hub/api/rest/avatar/x\"}]"
+ },
+ "tracker.example.com /api/users?query=weird&fields=login,avatarUrl&$top=10": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"login\":\"weird\",\"avatarUrl\":\"/hub/api/rest/avatar/weird\"}]"
+ },
+ "tracker.example.com /hub/api/rest/avatar/weird": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<p>not an image</p>"
+ },
+ "tracker.example.com /api/users?query=odd&fields=login,avatarUrl&$top=10": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"login\":\"odd\"}"
+ },
+ "tracker.example.com /api/users?query=big&fields=login,avatarUrl&$top=10": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "[{\"login\":\"big\",\"avatarUrl\":\"/hub/api/rest/avatar/big\"}]"
+ },
+ "tracker.example.com /hub/api/rest/avatar/big": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "image/gif"
+  },
+  "gen": {
+   "kind": "bytes",
+   "count": 200001
+  }
+ },
+ "tracker.example.com /api/issues/ACME-12?fields=idReadable%2Csummary%2Cdescription%2Cresolved%2Cupdated%2Cproject(shortName)%2Cparent(issues(idReadable%2Csummary))%2Csubtasks(issues(idReadable%2Csummary%2Cresolved%2CcustomFields(name%2Cvalue(name))))%2CcustomFields(name%2Cvalue(name%2Clogin%2CfullName%2CavatarUrl))%2Ccomments(author(login%2CfullName)%2Ccreated%2Ctext)": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"idReadable\":\"ACME-12\",\"summary\":\"  Fix\\tthe\\n thing  \",\"description\":\"Line one\\r\\nLine two\\rthree \\u001b[31mred\\u001b[0m \\u0007bell\",\"resolved\":null,\"updated\":1792321500123,\"project\":{\"shortName\":\"ACME\"},\"parent\":{\"issues\":[{\"idReadable\":\"ACME-1\",\"summary\":\"The epic\"}]},\"subtasks\":{\"issues\":[{\"idReadable\":\"ACME-13\",\"summary\":\"Child\",\"resolved\":5,\"customFields\":[{\"name\":\"State\",\"value\":{\"name\":\"Done\"}}]},{\"idReadable\":\"OTHER-1\",\"summary\":\"Foreign\"},null,{\"idReadable\":\"OPS-2\",\"summary\":\"\",\"customFields\":[]}]},\"customFields\":[{\"name\":\"Assignee\",\"value\":{\"name\":\"jdoe\",\"login\":\"jdoe\",\"fullName\":\"John  Doe\",\"avatarUrl\":\"/hub/api/rest/avatar/abc?dpr=2\"}},{\"name\":\"Type\",\"value\":{\"name\":\"Bug\"}},{\"name\":\"State\",\"value\":{\"name\":\"Open\"}},{\"name\":\"Priority\",\"value\":{\"name\":\"Major\"}}],\"comments\":[{\"author\":null,\"created\":1792321500000,\"text\":\"comment 0\"},{\"author\":{\"login\":\"u1\",\"fullName\":\"User 1\"},\"created\":1792321500001,\"text\":\"comment 1\"},{\"author\":{\"login\":\"u2\",\"fullName\":\"\"},\"created\":1792321500002,\"text\":\"comment 2\"},{\"author\":null,\"created\":1792321500003,\"text\":\"comment 3\"},{\"author\":{\"login\":\"u4\",\"fullName\":\"\"},\"created\":1792321500004,\"text\":\"comment 4\"},{\"author\":{\"login\":\"u5\",\"fullName\":\"User 5\"},\"created\":1792321500005,\"text\":\"comment 5\"},{\"author\":null,\"created\":1792321500006,\"text\":\"comment 6\"},{\"author\":{\"login\":\"u7\",\"fullName\":\"User 7\"},\"created\":1792321500007,\"text\":\"comment 7\"},{\"author\":{\"login\":\"u8\",\"fullName\":\"\"},\"created\":1792321500008,\"text\":\"comment 8\"},{\"author\":null,\"created\":1792321500009,\"text\":\"comment 9\"},{\"author\":{\"login\":\"u10\",\"fullName\":\"\"},\"created\":1792321500010,\"text\":\"comment 10\"},{\"author\":{\"login\":\"u11\",\"fullName\":\"User 11\"},\"created\":1792321500011,\"text\":\"comment 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}]}"
+ },
+ "tracker.example.com /api/issues/DEMO-404?fields=idReadable%2Csummary%2Cdescription%2Cresolved%2Cupdated%2Cproject(shortName)%2Cparent(issues(idReadable%2Csummary))%2Csubtasks(issues(idReadable%2Csummary%2Cresolved%2CcustomFields(name%2Cvalue(name))))%2CcustomFields(name%2Cvalue(name%2Clogin%2CfullName%2CavatarUrl))%2Ccomments(author(login%2CfullName)%2Ccreated%2Ctext)": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "tracker.example.com /api/issues/OPS-5?fields=idReadable%2Csummary%2Cdescription%2Cresolved%2Cupdated%2Cproject(shortName)%2Cparent(issues(idReadable%2Csummary))%2Csubtasks(issues(idReadable%2Csummary%2Cresolved%2CcustomFields(name%2Cvalue(name))))%2CcustomFields(name%2Cvalue(name%2Clogin%2CfullName%2CavatarUrl))%2Ccomments(author(login%2CfullName)%2Ccreated%2Ctext)": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 500,
+  "body": "oops"
+ },
+ "tracker.example.com /api/issues/OPS-8?fields=idReadable%2Csummary%2Cdescription%2Cresolved%2Cupdated%2Cproject(shortName)%2Cparent(issues(idReadable%2Csummary))%2Csubtasks(issues(idReadable%2Csummary%2Cresolved%2CcustomFields(name%2Cvalue(name))))%2CcustomFields(name%2Cvalue(name%2Clogin%2CfullName%2CavatarUrl))%2Ccomments(author(login%2CfullName)%2Ccreated%2Ctext)": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"idReadable\":\"OTHER-8\",\"summary\":\"Wrong space\"}"
+ },
+ "tracker.example.com /api/issues/OPS-9?fields=idReadable%2Csummary%2Cdescription%2Cresolved%2Cupdated%2Cproject(shortName)%2Cparent(issues(idReadable%2Csummary))%2Csubtasks(issues(idReadable%2Csummary%2Cresolved%2CcustomFields(name%2Cvalue(name))))%2CcustomFields(name%2Cvalue(name%2Clogin%2CfullName%2CavatarUrl))%2Ccomments(author(login%2CfullName)%2Ccreated%2Ctext)": {
+  "auth": [
+   "authorization",
+   "Bearer yt-file"
+  ],
+  "status": 200,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"idReadable\":\"OPS-9\",\"summary\":\"Minimal\"}"
+ },
+ "docs.example.com /a/report-1": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<html><head><TITLE lang=\"en\">  Report &amp; notes &#x41;&#66; &laquo;q&raquo; &bogus; \n</title>\n<meta property=\"og:description\" content=\"A &quot;report&quot;&nbsp;about &#0; things\"></head><body>x</body></html>"
+ },
+ "docs.example.com /b/board-2/?k=key_1": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<title>Board two</title><meta name=\"description\" content='single quoted'>"
+ },
+ "docs.example.com /a/plain": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/plain"
+  },
+  "body": "<title>no</title>"
+ },
+ "docs.example.com /a/notitle": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<p>no title</p>"
+ },
+ "docs.example.com /a/moved": {
+  "status": 302,
+  "headers": {
+   "location": "/a/report-1"
+  }
+ },
+ "icons.example.org /": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<head><link rel=\"icon\" href=\"/favicon-32.png\" sizes=\"16x16 32x32\"><LINK REL=\"apple-touch-icon\" href=\"https://cdn.example.org/touch.png\">\n<link rel=\"icon\" type=\"image/svg+xml\" href=\"icon.svg#x\"><link rel=\"stylesheet\" href=\"/s.css\"><link rel=\"icon\" href=\"http://insecure.example.org/i.png\">\n<link rel=\"shortcut icon\" href=\"data:image/png;base64,AAAA\"></head>"
+ },
+ "icons.example.org /icon.svg": {
+  "status": 200,
+  "headers": {
+   "content-type": "image/svg+xml"
+  },
+  "body": "<svg xmlns=\"http://www.w3.org/2000/svg\"><circle r=\"4\"/></svg>"
+ },
+ "cdn.example.org /touch.png": {
+  "status": 200,
+  "headers": {
+   "content-type": "image/png"
+  },
+  "bodyB64": "iVBORw0KGgoABw4VHCMqMTg/"
+ },
+ "icons.example.org /favicon-32.png": {
+  "status": 200,
+  "headers": {
+   "content-type": "image/png"
+  },
+  "bodyB64": "iVBORw0KGgoABw4VHCMqMTg/Rk1UW2JpcHd+hQ=="
+ },
+ "sub.blank.example.org /": {
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "sub.blank.example.org /favicon.ico": {
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "blank.example.org /": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<link rel=\"icon\" href=\"/notimage.png\"><link rel=\"icon\" href=\"//cdn.example.org/huge.png\" sizes=\"64x64\">"
+ },
+ "blank.example.org /notimage.png": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<p>html</p>"
+ },
+ "cdn.example.org /huge.png": {
+  "status": 200,
+  "headers": {
+   "content-type": "image/png"
+  },
+  "gen": {
+   "kind": "bytes",
+   "count": 200001
+  }
+ },
+ "blank.example.org /favicon.ico": {
+  "status": 200,
+  "headers": {
+   "content-type": "image/x-icon"
+  },
+  "bodyB64": "iVBORw0KGgoABw4VHA=="
+ },
+ "none.example.org /": {
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "none.example.org /favicon.ico": {
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "example.org /": {
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "example.org /favicon.ico": {
+  "status": 404,
+  "headers": {
+   "content-type": "application/json"
+  },
+  "body": "{\"message\":\"404 Not Found\"}"
+ },
+ "moved.example.net /": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<link rel=\"apple-touch-icon\" href=\"/old-touch.png\">"
+ },
+ "moved.example.net /old-touch.png": {
+  "status": 301,
+  "headers": {
+   "location": "https://cdn.example.org/touch.png"
+  }
+ }
+}

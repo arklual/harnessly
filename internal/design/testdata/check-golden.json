@@ -1,0 +1,609 @@
+{
+  "dom": [
+    {
+      "dom": {
+        "nodeType": 9,
+        "nodeName": "#document",
+        "children": [
+          {
+            "nodeType": 1,
+            "nodeName": "HTML",
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "HEAD",
+                "children": [
+                  {
+                    "nodeType": 3,
+                    "nodeName": "#text",
+                    "nodeValue": "title text"
+                  }
+                ]
+              },
+              {
+                "nodeType": 1,
+                "nodeName": "BODY",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      "content": {
+        "text": 0,
+        "media": 0
+      }
+    },
+    {
+      "dom": {
+        "nodeType": 9,
+        "nodeName": "#document",
+        "children": [
+          {
+            "nodeType": 1,
+            "nodeName": "BODY",
+            "children": [
+              {
+                "nodeType": 3,
+                "nodeName": "#text",
+                "nodeValue": "  Привет 👋  "
+              },
+              {
+                "nodeType": 1,
+                "nodeName": "SCRIPT",
+                "children": [
+                  {
+                    "nodeType": 3,
+                    "nodeName": "#text",
+                    "nodeValue": "var x = 1;"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "content": {
+        "text": 9,
+        "media": 0
+      }
+    },
+    {
+      "dom": {
+        "nodeType": 9,
+        "nodeName": "#document",
+        "children": [
+          {
+            "nodeType": 1,
+            "nodeName": "X-DC",
+            "shadowRoots": [
+              {
+                "nodeType": 11,
+                "nodeName": "#document-fragment",
+                "children": [
+                  {
+                    "nodeType": 1,
+                    "nodeName": "svg"
+                  },
+                  {
+                    "nodeType": 1,
+                    "nodeName": "IMG"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "content": {
+        "text": 0,
+        "media": 2
+      }
+    },
+    {
+      "dom": {
+        "nodeType": 9,
+        "nodeName": "#document",
+        "children": [
+          {
+            "nodeType": 1,
+            "nodeName": "IFRAME",
+            "contentDocument": {
+              "nodeType": 9,
+              "nodeName": "#document",
+              "children": [
+                {
+                  "nodeType": 3,
+                  "nodeName": "#text",
+                  "nodeValue": "inside frame"
+                },
+                {
+                  "nodeType": 1,
+                  "nodeName": "CANVAS"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "content": {
+        "text": 12,
+        "media": 1
+      }
+    },
+    {
+      "dom": {
+        "nodeType": 9,
+        "nodeName": "#document",
+        "children": [
+          {
+            "nodeType": 1,
+            "nodeName": "TEMPLATE",
+            "children": [
+              {
+                "nodeType": 1,
+                "nodeName": "VIDEO"
+              }
+            ]
+          },
+          {
+            "nodeType": 3,
+            "nodeName": "#text"
+          },
+          {
+            "nodeType": 3,
+            "nodeName": "#text",
+            "nodeValue": " ab "
+          }
+        ]
+      },
+      "content": {
+        "text": 2,
+        "media": 0
+      }
+    }
+  ],
+  "statuses": [
+    {
+      "errors": [],
+      "failed": [],
+      "blank": false,
+      "status": "ok"
+    },
+    {
+      "errors": [],
+      "failed": [],
+      "blank": true,
+      "status": "blank"
+    },
+    {
+      "errors": [],
+      "failed": [
+        "f"
+      ],
+      "blank": false,
+      "status": "warning"
+    },
+    {
+      "errors": [],
+      "failed": [
+        "f"
+      ],
+      "blank": true,
+      "status": "blank"
+    },
+    {
+      "errors": [
+        "e"
+      ],
+      "failed": [],
+      "blank": false,
+      "status": "error"
+    },
+    {
+      "errors": [
+        "e"
+      ],
+      "failed": [],
+      "blank": true,
+      "status": "error"
+    },
+    {
+      "errors": [
+        "e"
+      ],
+      "failed": [
+        "f"
+      ],
+      "blank": false,
+      "status": "error"
+    },
+    {
+      "errors": [
+        "e"
+      ],
+      "failed": [
+        "f"
+      ],
+      "blank": true,
+      "status": "error"
+    }
+  ],
+  "worst": [
+    {
+      "in": [],
+      "out": "ok"
+    },
+    {
+      "in": [
+        "ok"
+      ],
+      "out": "ok"
+    },
+    {
+      "in": [
+        "ok",
+        "warning"
+      ],
+      "out": "warning"
+    },
+    {
+      "in": [
+        "warning",
+        "blank"
+      ],
+      "out": "blank"
+    },
+    {
+      "in": [
+        "blank",
+        "error",
+        "ok"
+      ],
+      "out": "error"
+    },
+    {
+      "in": [
+        "ok",
+        "ok"
+      ],
+      "out": "ok"
+    }
+  ],
+  "boards": [
+    {
+      "board": {
+        "path": "Main.dc.html",
+        "w": null,
+        "h": null
+      },
+      "view": {
+        "width": 1440,
+        "height": 900,
+        "mobile": false
+      },
+      "name": "7dc51f02ab4e5967-lx3k-1f.jpg"
+    },
+    {
+      "board": {
+        "path": "lib/page.html?id=a&v=Desktop&theme=dark&m=1",
+        "w": null,
+        "h": null
+      },
+      "view": {
+        "width": 390,
+        "height": 844,
+        "mobile": true
+      },
+      "name": "75ac9a7265266bd4-lx3k-1f.jpg"
+    },
+    {
+      "board": {
+        "path": "lib/page.html?m=10",
+        "w": null,
+        "h": null
+      },
+      "view": {
+        "width": 1440,
+        "height": 900,
+        "mobile": false
+      },
+      "name": "1435c02bbca0902f-lx3k-1f.jpg"
+    },
+    {
+      "board": {
+        "path": "B.dc.html",
+        "w": 100,
+        "h": 5000
+      },
+      "view": {
+        "width": 320,
+        "height": 2400,
+        "mobile": false
+      },
+      "name": "465076a3e9d64f07-lx3k-1f.jpg"
+    },
+    {
+      "board": {
+        "path": "C.dc.html",
+        "w": 1920,
+        "h": null
+      },
+      "view": {
+        "width": 1440,
+        "height": 900,
+        "mobile": false
+      },
+      "name": "4fb2b41673a77c98-lx3k-1f.jpg"
+    },
+    {
+      "board": {
+        "path": "Доска 1.dc.html",
+        "w": 1440,
+        "h": 1024
+      },
+      "view": {
+        "width": 1440,
+        "height": 1024,
+        "mobile": false
+      },
+      "name": "cb6748afce863c9c-lx3k-1f.jpg"
+    }
+  ],
+  "shots": [
+    {
+      "ref": "a",
+      "file": "001-desktop.jpg",
+      "path": "<root>/a/.check/001-desktop.jpg"
+    },
+    {
+      "ref": "a",
+      "file": "999-phone.jpg",
+      "path": "<root>/a/.check/999-phone.jpg"
+    },
+    {
+      "ref": "a",
+      "file": "01-desktop.jpg",
+      "path": null
+    },
+    {
+      "ref": "A",
+      "file": "001-desktop.jpg",
+      "path": null
+    },
+    {
+      "ref": "a",
+      "file": "001-tablet.jpg",
+      "path": null
+    },
+    {
+      "ref": "a",
+      "file": "../001-desktop.jpg",
+      "path": null
+    },
+    {
+      "ref": "ok-id",
+      "file": "123-phone.jpg",
+      "path": "<root>/ok-id/.check/123-phone.jpg"
+    }
+  ],
+  "files": [
+    {
+      "name": "alpha/project/Main.dc.html",
+      "content": "<html>main</html>",
+      "mtime": 1790848800.123
+    },
+    {
+      "name": "alpha/project/Second.dc.html",
+      "content": "<html>second</html>",
+      "mtime": 1790848860.123
+    },
+    {
+      "name": "alpha/.check/report.json",
+      "content": "{\n  \"artifact\": \"alpha\",\n  \"startedAt\": 1760000000123,\n  \"finishedAt\": 1760000060000,\n  \"done\": 4,\n  \"total\": 4,\n  \"boards\": [\n    {\n      \"title\": \"Main\",\n      \"path\": \"Main.dc.html\",\n      \"status\": \"error\",\n      \"shots\": [\n        {\n          \"view\": \"desktop\",\n          \"status\": \"error\",\n          \"screenshot\": \"001-desktop.jpg\",\n          \"errors\": [\n            \"TypeError: x is <undefined> & more\"\n          ],\n          \"failedRequests\": [],\n          \"ms\": 1234\n        },\n        {\n          \"view\": \"phone\",\n          \"status\": \"ok\",\n          \"screenshot\": null,\n          \"errors\": [],\n          \"failedRequests\": [\n            \"404 http://127.0.0.1:1/a/b.png\"\n          ],\n          \"ms\": 99\n        }\n      ]\n    },\n    {\n      \"title\": \"Second\",\n      \"path\": \"Second.dc.html\",\n      \"status\": \"warning\",\n      \"shots\": [\n        {\n          \"view\": \"desktop\",\n          \"status\": \"warning\",\n          \"screenshot\": \"001-desktop.jpg\",\n          \"errors\": [],\n          \"failedRequests\": [],\n          \"ms\": 1234\n        },\n        {\n          \"view\": \"phone\",\n          \"status\": \"ok\",\n          \"screenshot\": null,\n          \"errors\": [],\n          \"failedRequests\": [\n            \"404 http://127.0.0.1:1/a/b.png\"\n          ],\n          \"ms\": 99\n        }\n      ]\n    },\n    {\n      \"title\": \"Third\",\n      \"path\": \"Third.dc.html\",\n      \"status\": \"blank\",\n      \"shots\": [\n        {\n          \"view\": \"desktop\",\n          \"status\": \"blank\",\n          \"screenshot\": \"001-desktop.jpg\",\n          \"errors\": [],\n          \"failedRequests\": [],\n          \"ms\": 1234\n        },\n        {\n          \"view\": \"phone\",\n          \"status\": \"ok\",\n          \"screenshot\": null,\n          \"errors\": [],\n          \"failedRequests\": [\n            \"404 http://127.0.0.1:1/a/b.png\"\n          ],\n          \"ms\": 99\n        }\n      ]\n    },\n    {\n      \"title\": \"Fourth\",\n      \"path\": \"Fourth.dc.html\",\n      \"status\": \"ok\",\n      \"shots\": [\n        {\n          \"view\": \"desktop\",\n          \"status\": \"ok\",\n          \"screenshot\": \"001-desktop.jpg\",\n          \"errors\": [],\n          \"failedRequests\": [],\n          \"ms\": 1234\n        },\n        {\n          \"view\": \"phone\",\n          \"status\": \"ok\",\n          \"screenshot\": null,\n          \"errors\": [],\n          \"failedRequests\": [\n            \"404 http://127.0.0.1:1/a/b.png\"\n          ],\n          \"ms\": 99\n        }\n      ]\n    }\n  ],\n  \"cover\": \"001-desktop.jpg\",\n  \"failure\": null\n}",
+      "mtime": 1790848800.123
+    },
+    {
+      "name": "beta/project/Only.dc.html",
+      "content": "<b>x</b>",
+      "mtime": 1790848800.123
+    },
+    {
+      "name": "beta/.check/report.json",
+      "content": "{\n  \"artifact\": \"beta\",\n  \"startedAt\": 1760000000123,\n  \"finishedAt\": null,\n  \"done\": 0,\n  \"total\": 2,\n  \"boards\": [],\n  \"cover\": null,\n  \"failure\": \"На машине нет Chrome\",\n  \"extra\": {\n    \"kept\": true\n  }\n}",
+      "mtime": 1790848800.123
+    },
+    {
+      "name": "gamma/project/One.dc.html",
+      "content": "one",
+      "mtime": 1790848800.123
+    },
+    {
+      "name": "gamma/.check/report.json",
+      "content": "{\n  \"artifact\": \"gamma\",\n  \"startedAt\": 7,\n  \"finishedAt\": 1760000060000,\n  \"done\": 4,\n  \"total\": 4,\n  \"boards\": [],\n  \"cover\": \"\",\n  \"failure\": null\n}",
+      "mtime": 1790848800.123
+    },
+    {
+      "name": "delta/project/A.dc.html",
+      "content": "a",
+      "mtime": 1790848800.123
+    },
+    {
+      "name": "delta/.check/report.json",
+      "content": "{broken",
+      "mtime": 1790848800.123
+    },
+    {
+      "name": "eps/project/lib/page.html",
+      "content": "<page>",
+      "mtime": 1790848810.123
+    },
+    {
+      "name": "eps/project/lib/pages.js",
+      "content": "js",
+      "mtime": 1790849300.123
+    },
+    {
+      "name": "eps/project/lib/nested/deep.js",
+      "content": "deep",
+      "mtime": 1790849700.123
+    },
+    {
+      "name": "eps/project/Wrap.dc.html",
+      "content": "wrapper",
+      "mtime": 1790848820.123
+    },
+    {
+      "name": "eps/artifact.json",
+      "content": "{\"title\":\"Eps\",\"boards\":[{\"title\":\"Page\",\"path\":\"lib/page.html?id=p&v=Desktop\"},{\"title\":\"Wrap\",\"path\":\"Wrap.dc.html\"}]}",
+      "mtime": 1790848800.123
+    }
+  ],
+  "attached": [
+    {
+      "id": "alpha",
+      "cover": "<api>/design/library/shot?artifact=alpha&file=001-desktop.jpg&v=1760000000123",
+      "check": {
+        "finishedAt": 1760000060000,
+        "done": 4,
+        "total": 4,
+        "broken": 2,
+        "warnings": 1,
+        "failure": null
+      }
+    },
+    {
+      "id": "beta",
+      "cover": null,
+      "check": {
+        "finishedAt": null,
+        "done": 0,
+        "total": 2,
+        "broken": 0,
+        "warnings": 0,
+        "failure": "На машине нет Chrome"
+      }
+    },
+    {
+      "id": "gamma",
+      "cover": null,
+      "check": {
+        "finishedAt": 1760000060000,
+        "done": 4,
+        "total": 4,
+        "broken": 0,
+        "warnings": 0,
+        "failure": null
+      }
+    },
+    {
+      "id": "delta",
+      "cover": null,
+      "check": null
+    },
+    {
+      "id": "eps",
+      "cover": null,
+      "check": null
+    }
+  ],
+  "reports": [
+    {
+      "id": "alpha",
+      "json": "{\"report\":{\"artifact\":\"alpha\",\"startedAt\":1760000000123,\"finishedAt\":1760000060000,\"done\":4,\"total\":4,\"boards\":[{\"title\":\"Main\",\"path\":\"Main.dc.html\",\"status\":\"error\",\"shots\":[{\"view\":\"desktop\",\"status\":\"error\",\"screenshot\":\"001-desktop.jpg\",\"errors\":[\"TypeError: x is <undefined> & more\"],\"failedRequests\":[],\"ms\":1234},{\"view\":\"phone\",\"status\":\"ok\",\"screenshot\":null,\"errors\":[],\"failedRequests\":[\"404 http://127.0.0.1:1/a/b.png\"],\"ms\":99}]},{\"title\":\"Second\",\"path\":\"Second.dc.html\",\"status\":\"warning\",\"shots\":[{\"view\":\"desktop\",\"status\":\"warning\",\"screenshot\":\"001-desktop.jpg\",\"errors\":[],\"failedRequests\":[],\"ms\":1234},{\"view\":\"phone\",\"status\":\"ok\",\"screenshot\":null,\"errors\":[],\"failedRequests\":[\"404 http://127.0.0.1:1/a/b.png\"],\"ms\":99}]},{\"title\":\"Third\",\"path\":\"Third.dc.html\",\"status\":\"blank\",\"shots\":[{\"view\":\"desktop\",\"status\":\"blank\",\"screenshot\":\"001-desktop.jpg\",\"errors\":[],\"failedRequests\":[],\"ms\":1234},{\"view\":\"phone\",\"status\":\"ok\",\"screenshot\":null,\"errors\":[],\"failedRequests\":[\"404 http://127.0.0.1:1/a/b.png\"],\"ms\":99}]},{\"title\":\"Fourth\",\"path\":\"Fourth.dc.html\",\"status\":\"ok\",\"shots\":[{\"view\":\"desktop\",\"status\":\"ok\",\"screenshot\":\"001-desktop.jpg\",\"errors\":[],\"failedRequests\":[],\"ms\":1234},{\"view\":\"phone\",\"status\":\"ok\",\"screenshot\":null,\"errors\":[],\"failedRequests\":[\"404 http://127.0.0.1:1/a/b.png\"],\"ms\":99}]}],\"cover\":\"001-desktop.jpg\",\"failure\":null}}"
+    },
+    {
+      "id": "beta",
+      "json": "{\"report\":{\"artifact\":\"beta\",\"startedAt\":1760000000123,\"finishedAt\":null,\"done\":0,\"total\":2,\"boards\":[],\"cover\":null,\"failure\":\"На машине нет Chrome\",\"extra\":{\"kept\":true}}}"
+    },
+    {
+      "id": "gamma",
+      "json": "{\"report\":{\"artifact\":\"gamma\",\"startedAt\":7,\"finishedAt\":1760000060000,\"done\":4,\"total\":4,\"boards\":[],\"cover\":\"\",\"failure\":null}}"
+    },
+    {
+      "id": "delta",
+      "json": "{\"report\":null}"
+    },
+    {
+      "id": "nope",
+      "json": "{\"report\":null}"
+    }
+  ],
+  "versions": [
+    {
+      "id": "alpha",
+      "board": "Main.dc.html",
+      "version": "mupd4xvf-h"
+    },
+    {
+      "id": "alpha",
+      "board": "Second.dc.html",
+      "version": "mupd6863-j"
+    },
+    {
+      "id": "eps",
+      "board": "lib/page.html?id=p&v=Desktop",
+      "version": "mupdfnob-6"
+    },
+    {
+      "id": "eps",
+      "board": "Wrap.dc.html",
+      "version": "mupd5daz-7"
+    },
+    {
+      "id": "eps",
+      "board": "Missing.dc.html",
+      "version": null
+    },
+    {
+      "id": "Bad",
+      "board": "x.html",
+      "version": null
+    }
+  ],
+  "sample": {
+    "artifact": "alpha",
+    "startedAt": 1,
+    "finishedAt": null,
+    "done": 1,
+    "total": 2,
+    "boards": [
+      {
+        "title": "Main",
+        "path": "Main.dc.html",
+        "status": "error",
+        "shots": [
+          {
+            "view": "desktop",
+            "status": "error",
+            "screenshot": "001-desktop.jpg",
+            "errors": [
+              "TypeError: x is <undefined> & more"
+            ],
+            "failedRequests": [],
+            "ms": 1234
+          },
+          {
+            "view": "phone",
+            "status": "ok",
+            "screenshot": null,
+            "errors": [],
+            "failedRequests": [
+              "404 http://127.0.0.1:1/a/b.png"
+            ],
+            "ms": 99
+          }
+        ]
+      },
+      {
+        "title": "Line sep",
+        "path": "L.dc.html",
+        "status": "ok",
+        "shots": []
+      }
+    ],
+    "cover": null,
+    "failure": null
+  },
+  "saved": "{\n  \"artifact\": \"alpha\",\n  \"startedAt\": 1,\n  \"finishedAt\": null,\n  \"done\": 1,\n  \"total\": 2,\n  \"boards\": [\n    {\n      \"title\": \"Main\",\n      \"path\": \"Main.dc.html\",\n      \"status\": \"error\",\n      \"shots\": [\n        {\n          \"view\": \"desktop\",\n          \"status\": \"error\",\n          \"screenshot\": \"001-desktop.jpg\",\n          \"errors\": [\n            \"TypeError: x is <undefined> & more\"\n          ],\n          \"failedRequests\": [],\n          \"ms\": 1234\n        },\n        {\n          \"view\": \"phone\",\n          \"status\": \"ok\",\n          \"screenshot\": null,\n          \"errors\": [],\n          \"failedRequests\": [\n            \"404 http://127.0.0.1:1/a/b.png\"\n          ],\n          \"ms\": 99\n        }\n      ]\n    },\n    {\n      \"title\": \"Line sep\",\n      \"path\": \"L.dc.html\",\n      \"status\": \"ok\",\n      \"shots\": []\n    }\n  ],\n  \"cover\": null,\n  \"failure\": null\n}"
+}

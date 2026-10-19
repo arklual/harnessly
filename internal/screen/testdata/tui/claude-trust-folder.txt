@@ -1,0 +1,50 @@
+bash-5.3$ /opt/example-ai-profile/bin/claude-3afe8535c0cc33f0 --settings /tmp/claude-1001/-home-agent-workspace-example/
+52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/pre-settings.json --model haiku --session-id 117db2c6-8f75-4222-9eac
+-69041b169bb9 -- '/context'
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,2 @@
+{oops
+{"timestamp":"2026-03-01T10:36:10.000Z","type":"session_meta","payload":{"id":"bad-first","timestamp":"2026-03-01T09:59:59.000Z","cwd":"/home/agent/work","originator":"codex_cli_rs","cli_version":"0.50.0"}}

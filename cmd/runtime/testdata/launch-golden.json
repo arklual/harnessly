@@ -1,0 +1,81 @@
+[
+ {
+  "name": "claude resume",
+  "skip": false,
+  "input": {
+   "provider": "claude",
+   "resume": "425055ec-bbc8-4e3c-87d0-36fa74c1cccb",
+   "workspaceId": "ws-a"
+  },
+  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md",
+  "error": null
+ },
+ {
+  "name": "claude resume with launch and skip",
+  "skip": true,
+  "input": {
+   "provider": "claude",
+   "resume": "425055ec-bbc8-4e3c-87d0-36fa74c1cccb",
+   "workspaceId": "ws-a",
+   "model": "opus",
+   "effort": "high"
+  },
+  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --dangerously-skip-permissions --model 'opus' --effort high",
+  "error": null
+ },
+ {
+  "name": "claude launch with launcher",
+  "skip": false,
+  "input": {
+   "provider": "claude",
+   "workspaceId": "ws-b",
+   "model": "sonnet",
+   "launcher": "/opt/agents/claude launcher"
+  },
+  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 '/opt/agents/claude launcher' --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-b/claude-prompt.md --model 'sonnet'",
+  "error": null
+ },
+ {
+  "name": "claude launch no workspace",
+  "skip": false,
+  "input": {
+   "provider": "claude"
+  },
+  "line": "$EDITOR_VAR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/$EDITOR_NAME' EDITOR='$DATA/bin/$EDITOR_NAME' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json",
+  "error": null
+ },
+ {
+  "name": "codex launch",
+  "skip": false,
+  "input": {
+   "provider": "codex",
+   "workspaceId": "ws-a"
+  },
+  "line": "node '$DATA/codex-launcher.js' --workspace-id 'ws-a'",
+  "error": null
+ },
+ {
+  "name": "codex resume with launch",
+  "skip": true,
+  "input": {
+   "provider": "codex",
+   "resume": "425055ec-bbc8-4e3c-87d0-36fa74c1cccb",
+   "workspaceId": "ws-a",
+   "model": "gpt-5.4",
+   "effort": "xhigh"
+  },
+  "line": "node '$DATA/codex-launcher.js' --workspace-id 'ws-a' --resume-session-id '425055ec-bbc8-4e3c-87d0-36fa74c1cccb' --model 'gpt-5.4' --effort 'xhigh'",
+  "error": null
+ },
+ {
+  "name": "claude resume bad id",
+  "skip": false,
+  "input": {
+   "provider": "claude",
+   "resume": "nope",
+   "workspaceId": "ws-a"
+  },
+  "line": null,
+  "error": "Invalid session ID format: nope"
+ }
+]

@@ -1,0 +1,40 @@
+
+  [1mUpdated to latest. Got 9 features, 66 bugfixes, and 31 other changes.[0m
+  [38;5;246m]8;id=1rmwg0m;https://code.claude.com/docs/en/changelog\code.claude.com/docs/en/changelog]8;;\ for details[39m
+
+[38;5;220m⚠[39m [38;5;220mYour login expires in 3 days[38;5;246m · run /login to renew[39m
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with [38;5;153m/model[39m.
+  [38;5;246m1 more notice hidden[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mRun the shell command [38;5;153msleep 600[38;5;231m with the Bash tool (no timeout override, not in background). Do nothing else.[39m
+
+[49m  [38;5;246mRan [1m1[0m[38;5;246m shell command [39m
+
+[38;5;231m●[39m The Bash tool is blocking the [38;5;153msleep 600[39m command. The tool prevents long blocking operations to maintain
+  responsiveness.
+
+  If you need to wait for something, you can:
+  - Use [38;5;153mrun_in_background: true[39m to sleep in the background
+  - Use [38;5;153mMonitor[39m with an until-loop to wait for a specific condition
+  - Run the sleep as part of a larger command that has a purpose
+
+  What are you trying to accomplish? That would help determine the best approach.
+
+[38;5;246m✻[39m [38;5;246mBaked for 5s · done 11:16 PM[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mThis is a test of interrupt handling. Run exactly this with the Bash tool in the foreground: python3 -c 'import time;[39m
+  [38;5;231mtime.sleep(600)'[39m
+
+[38;5;246m[49m [39m Running [1m1[0m shell command[38;5;246m · 21s[39m…
+[38;5;246m  ⎿  $ python3 -c 'import time; time.sleep(600)' (21s)[39m
+
+[38;5;246m[48;5;237m❯ Queued note: reply with the single word PINEAPPLE.[39m
+
+[38;5;174m[49m✽[39m [38;5;174mInferring… [38;5;246m(0s · ↓[39m [38;5;246m228 tokens)[39m
+[38;5;246m  ⎿  Tip: Get pinged on your phone when long tasks finish · enable push notifications in [38;5;153m/config[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵ bypass permissions on[38;5;246m (shift+tab to cycle) · esc to interrupt · ← for agents[39m

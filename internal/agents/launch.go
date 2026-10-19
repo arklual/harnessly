@@ -1,0 +1,266 @@
+package agents
+
+import (
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+
+	"harnessly/internal/jscompat"
+)
+
+// Launch is the model and reasoning effort a conversation starts with; nil means the CLI's own default («Авто»). Same
+// shape as catalog.Choice, so either converts to the other.
+type Launch struct {
+	Model  *string `json:"model"`
+	Effort *string `json:"effort"`
+}
+
+// Efforts are every reasoning level the CLIs know, weakest first.
+var Efforts = []string{"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"}
+
+// ModelIDRe: a model id is typed into a shell, so it stays this strict (aliases, full ids, the [1m] suffix).
+var ModelIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}(\[1m\])?$`)
+
+// IsKnownEffort is a level of Efforts.
+func IsKnownEffort(e string) bool { return slices.Contains(Efforts, e) }
+
+var (
+	ErrLaunchModel  = errors.New("Invalid launch model")
+	ErrLaunchEffort = errors.New("Invalid launch effort")
+)
+
+// CheckLaunch re-checks a stored choice right before it becomes shell text: a bad value stops the launch.
+func CheckLaunch(l *Launch) error {
+	if l == nil {
+		return nil
+	}
+	if l.Model != nil && !ModelIDRe.MatchString(*l.Model) {
+		return ErrLaunchModel
+	}
+	if l.Effort != nil && !IsKnownEffort(*l.Effort) {
+		return ErrLaunchEffort
+	}
+	return nil
+}
+
+// ReadLaunchShape reads a choice from request or stored values by shape only (model, effort as decoded from JSON).
+// nil, true when both are absent; false when one is malformed.
+func ReadLaunchShape(model, effort any) (*Launch, bool) {
+	if model == nil && effort == nil {
+		return nil, true
+	}
+	l := &Launch{}
+	if model != nil {
+		s, ok := model.(string)
+		if !ok || !ModelIDRe.MatchString(s) {
+			return nil, false
+		}
+		l.Model = &s
+	}
+	if effort != nil {
+		s, ok := effort.(string)
+		if !ok || !IsKnownEffort(s) {
+			return nil, false
+		}
+		l.Effort = &s
+	}
+	return l, true
+}
+
+// ShellQuote single-quotes s for sh.
+func ShellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+
+// ANSICQuote quotes s as $'…' so a multi-line prompt stays on one typed line (bash and zsh read it).
+func ANSICQuote(s string) string {
+	var b strings.Builder
+	b.WriteString("$'")
+	for _, r := range s {
+		switch {
+		case r == '\\':
+			b.WriteString(`\\`)
+		case r == '\'':
+			b.WriteString(`\'`)
+		case r == '\n':
+			b.WriteString(`\n`)
+		case r == '\r':
+			b.WriteString(`\r`)
+		case r == '\t':
+			b.WriteString(`\t`)
+		case r < 0x20 || r == 0x7f:
+			fmt.Fprintf(&b, `\x%02x`, r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteString("'")
+	return b.String()
+}
+
+const (
+	// MaxInitialPrompt caps an initial prompt, in UTF-16 units.
+	MaxInitialPrompt = 20_000
+	// InlinePromptMax: a longer prompt is not typed into the shell (a 16 KB typed line stalled zsh) but read from a file.
+	InlinePromptMax = 2_000
+)
+
+// InitialPromptText is the prompt as it is passed: trimmed and capped.
+func InitialPromptText(prompt string) string {
+	return jscompat.Slice(jscompat.Trim(prompt), MaxInitialPrompt)
+}
+
+// PromptFromFile is the shell argument that reads a prompt file once and deletes it.
+func PromptFromFile(file string) string {
+	q := ShellQuote(file)
+	return `"$(cat -- ` + q + ` && rm -f -- ` + q + `)"`
+}
+
+// WithInitialPrompt appends the initial prompt to a launch line: `-- <arg>` for Claude, `--prompt <arg>` for the Codex
+// launcher. promptFile, when set, is where WriteLongPrompt put a long prompt.
+func WithInitialPrompt(provider, command, prompt, promptFile string) string {
+	text := InitialPromptText(prompt)
+	if text == "" {
+		return command
+	}
+	arg := ANSICQuote(text)
+	if promptFile != "" {
+		arg = PromptFromFile(promptFile)
+	}
+	switch provider {
+	case Claude:
+		return command + " -- " + arg
+	case Codex:
+		return command + " --prompt " + arg
+	}
+	return command
+}
+
+func randomUUID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// WriteLongPrompt writes a prompt too long to type (over InlinePromptMax units of the text InitialPromptText gives) to
+// a private file initial-<uuid>.txt in dir; "" when the prompt goes inline.
+func WriteLongPrompt(dir, text string) (string, error) {
+	if jscompat.Len(text) <= InlinePromptMax {
+		return "", nil
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	file := filepath.Join(dir, "initial-"+randomUUID()+".txt")
+	if err := os.WriteFile(file, []byte(text), 0o600); err != nil {
+		return "", err
+	}
+	return file, nil
+}
+
+// EnvVar is one entry of a launch's environment prefix.
+type EnvVar struct{ Key, Value string }
+
+// StartEnvLimit is the most entries a launch's environment prefix may have.
+const StartEnvLimit = 8
+
+var startEnvValue = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,80}$`)
+
+// FormatStartEnv renders `KEY='value' ` per entry, in order. Keys must be keyPrefix followed by 1-40 of [A-Z_]; values
+// need no quoting. The error is the message for the caller (a 400).
+func FormatStartEnv(env []EnvVar, keyPrefix string) (string, error) {
+	if len(env) > StartEnvLimit {
+		return "", errors.New("Слишком много переменных окружения")
+	}
+	keyRe := regexp.MustCompile(`^` + regexp.QuoteMeta(keyPrefix) + `[A-Z_]{1,40}$`)
+	var b strings.Builder
+	for _, e := range env {
+		if !keyRe.MatchString(e.Key) {
+			return "", errors.New("Недопустимая переменная окружения " + jscompat.Slice(e.Key, 48))
+		}
+		// The value is not echoed back: it may be a session id.
+		if !startEnvValue.MatchString(e.Value) {
+			return "", errors.New("Недопустимое значение переменной " + e.Key)
+		}
+		b.WriteString(e.Key + "='" + e.Value + "' ")
+	}
+	return b.String(), nil
+}
+
+// StartPromptFilesLimit is the most instruction files a launch may add.
+const StartPromptFilesLimit = 4
+
+func isInside(child, root string) bool {
+	if child == root {
+		return true
+	}
+	if !strings.HasSuffix(root, "/") {
+		root += "/"
+	}
+	return strings.HasPrefix(child, root)
+}
+
+// ResolvePromptFiles checks instruction files for a launch: Claude only, at most StartPromptFilesLimit, each an
+// absolute path that resolves (symlinks followed) to a regular file inside dataDir. dataDirDisplay names dataDir in
+// the messages (`~/.<name>`). The error is the message for the caller (a 400).
+func ResolvePromptFiles(provider string, files []string, dataDir, dataDirDisplay string) ([]string, error) {
+	if len(files) == 0 {
+		return []string{}, nil
+	}
+	if provider != Claude {
+		return nil, errors.New("Файлы инструкций поддерживает только Claude")
+	}
+	if len(files) > StartPromptFilesLimit {
+		return nil, errors.New("Слишком много файлов инструкций")
+	}
+	root, err := filepath.EvalSymlinks(dataDir)
+	if err != nil {
+		return nil, errors.New("Каталог " + dataDirDisplay + " недоступен")
+	}
+	out := make([]string, 0, len(files))
+	for _, f := range files {
+		var real string
+		if filepath.IsAbs(f) {
+			real, _ = filepath.EvalSymlinks(f)
+			if real != "" {
+				real, _ = filepath.Abs(real)
+			}
+		}
+		ok := false
+		if real != "" && isInside(real, root) {
+			st, err := os.Stat(real)
+			ok = err == nil && st.Mode().IsRegular()
+		}
+		if !ok {
+			return nil, errors.New("Файл инструкций не найден в " + dataDirDisplay)
+		}
+		out = append(out, real)
+	}
+	return out, nil
+}
+
+// notSpace is JavaScript's \S.
+var notSpace = "[^" + jscompat.SpaceClass[1:]
+
+var bareCommand = regexp.MustCompile(`^` + jscompat.SpaceClass + `*(` + notSpace + `+)(` + jscompat.SpaceClass + `(?s:.*))?$`)
+var trailingNewlines = regexp.MustCompile(`[\r\n]+$`)
+
+// BareAgentArgs: text sent to an agent tab that is a bare `claude …` (`codex …`) for the tab's own agent is replaced
+// by the platform's launch line plus these arguments. False when the text is not such a command.
+func BareAgentArgs(content, panelType string) (string, bool) {
+	binary := ProviderOfPanel(panelType)
+	if binary == "" {
+		return "", false
+	}
+	line := trailingNewlines.ReplaceAllString(content, "")
+	m := bareCommand.FindStringSubmatch(line)
+	if m == nil || m[1] != binary {
+		return "", false
+	}
+	return strings.TrimRightFunc(m[2], jscompat.IsSpace), true
+}

@@ -1,0 +1,539 @@
+{
+ "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+ "fixtures": {
+  "cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "workspaces.json": "{\n  \"workspaces\": [\n    {\n      \"id\": \"ws-a\",\n      \"name\": \"Alpha\",\n      \"directories\": [\n        \"$ROOT/proj-a\"\n      ]\n    },\n    {\n      \"id\": \"ws-b\",\n      \"name\": \"Beta\",\n      \"directories\": [\n        \"$ROOT/proj-b\"\n      ]\n    }\n  ],\n  \"groups\": [],\n  \"sidebarCollapsed\": false,\n  \"sidebarWidth\": 240,\n  \"updatedAt\": \"2026-01-01T00:00:00.000Z\"\n}",
+  "workspaces/ws-a/layout.json": "{\n  \"root\": {\n    \"type\": \"pane\",\n    \"id\": \"pane-a\",\n    \"activeTabId\": \"tab-1\",\n    \"tabs\": [\n      {\n        \"id\": \"tab-1\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-1\",\n        \"name\": \"\",\n        \"order\": 0,\n        \"cwd\": \"$ROOT/proj-a\"\n      },\n      {\n        \"id\": \"tab-2\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-2\",\n        \"name\": \"Claude\",\n        \"order\": 1,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"idle\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"claudeSessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\"\n      }\n    ]\n  },\n  \"activePaneId\": \"pane-a\",\n  \"updatedAt\": \"2026-01-01T00:00:00.000Z\"\n}"
+ },
+ "requests": [
+  {
+   "method": "GET",
+   "url": "/api/workspace",
+   "headers": {},
+   "body": null,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/workspaces",
+   "headers": {},
+   "body": null,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/workspaces",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"DtF_AACNoK4QS1e7qL7pMUa_7Uc\"",
+    "content-length": "169"
+   },
+   "answer": "{\"workspaces\":[{\"id\":\"ws-a\",\"name\":\"Alpha\",\"directories\":[\"$ROOT/proj-a\"]},{\"id\":\"ws-b\",\"name\":\"Beta\",\"directories\":[\"$ROOT/proj-b\"]}]}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/workspaces",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "if-none-match": "ETAG"
+   },
+   "body": null,
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"DtF_AACNoK4QS1e7qL7pMUa_7Uc\""
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/workspaces",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/workspace",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"frNuCmird0-7K57OrLvsFlhPs6w\"",
+    "content-length": "225"
+   },
+   "answer": "{\"workspaces\":[{\"id\":\"ws-a\",\"name\":\"Alpha\",\"directories\":[\"$ROOT/proj-a\"]},{\"id\":\"ws-b\",\"name\":\"Beta\",\"directories\":[\"$ROOT/proj-b\"]}],\"groups\":[],\"sidebarCollapsed\":false,\"sidebarWidth\":240}"
+  },
+  {
+   "method": "GET",
+   "url": "/agents/api/workspace/",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"frNuCmird0-7K57OrLvsFlhPs6w\"",
+    "content-length": "225"
+   },
+   "answer": "{\"workspaces\":[{\"id\":\"ws-a\",\"name\":\"Alpha\",\"directories\":[\"$ROOT/proj-a\"]},{\"id\":\"ws-b\",\"name\":\"Beta\",\"directories\":[\"$ROOT/proj-b\"]}],\"groups\":[],\"sidebarCollapsed\":false,\"sidebarWidth\":240}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"VoYXYIl58FL6qsjQsALO9GzFjuc\"",
+    "content-length": "342"
+   },
+   "answer": "{\"tabs\":[{\"tabId\":\"tab-1\",\"workspaceId\":\"ws-a\",\"name\":\"\",\"sessionName\":\"tk-ws-a-pane-a-tab-1\",\"agentProviderId\":null,\"agentSessionId\":null},{\"tabId\":\"tab-2\",\"workspaceId\":\"ws-a\",\"name\":\"Claude\",\"sessionName\":\"tk-ws-a-pane-a-tab-2\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\"}]}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"XQ2VVRvnlYeuBYWahy9nCRpDzYE\"",
+    "content-length": "488"
+   },
+   "answer": "{\"tabs\":[{\"tabId\":\"tab-1\",\"workspaceId\":\"ws-a\",\"name\":\"\",\"sessionName\":\"tk-ws-a-pane-a-tab-1\",\"agentProviderId\":null,\"agentSessionId\":null},{\"tabId\":\"tab-2\",\"workspaceId\":\"ws-a\",\"name\":\"Claude\",\"sessionName\":\"tk-ws-a-pane-a-tab-2\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\"},{\"tabId\":\"tab-id0002\",\"workspaceId\":\"ws-b\",\"name\":\"\",\"sessionName\":\"tk-ws-b-pane-id0001-tab-id0002\",\"agentProviderId\":null,\"agentSessionId\":null}]}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs/tab-2?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"zyPHTxzh8c53NsQ814T5OZrNPLI\"",
+    "content-length": "218"
+   },
+   "answer": "{\"tabId\":\"tab-2\",\"workspaceId\":\"ws-a\",\"paneId\":\"pane-a\",\"name\":\"Claude\",\"sessionName\":\"tk-ws-a-pane-a-tab-2\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs/tab-x?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0NlSRQD4asgAxT71KXTNGJ3timU\"",
+    "content-length": "25"
+   },
+   "answer": "{\"error\":\"Tab not found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs/tab-2",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"5TbocMfJyUN1GwUgnjl67VG8cVM\"",
+    "content-length": "35"
+   },
+   "answer": "{\"error\":\"workspaceId is required\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs/tab-2/status?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"45ZC02v4gGgUl_JxCJdpGAuGR9s\"",
+    "content-length": "247"
+   },
+   "answer": "{\"tabId\":\"tab-2\",\"workspaceId\":\"ws-a\",\"alive\":true,\"command\":\"bash\",\"cliState\":\"idle\",\"agentProviderId\":\"claude\",\"agentSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\"claudeSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\"hooksMissing\":false}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs/tab-1/status?workspaceId=ws-b",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0NlSRQD4asgAxT71KXTNGJ3timU\"",
+    "content-length": "25"
+   },
+   "answer": "{\"error\":\"Tab not found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs/tab-1/result?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"liT2DGYVGa2pZ5bQdAYXB30Kq68\"",
+    "content-length": "20"
+   },
+   "answer": "{\"content\":\"line\\n\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs/tab-1/send?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/tabs/tab-1/send?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"BMnk-JM_mkGIdBwUQBBru5CtTYI\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"content is required\"}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/tabs/tab-1/send?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"echo \\\"hi\\\"\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"c3_oTbFITeku5EKHNUssvLGQHjw\"",
+    "content-length": "17"
+   },
+   "answer": "{\"status\":\"sent\"}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/tabs",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"workspaceId\":\"ws-a\",\"panelType\":\"x\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"RAn_blXLpwM8nlr2Aybxx5byZJE\"",
+    "content-length": "124"
+   },
+   "answer": "{\"error\":\"Invalid panelType\",\"validPanelTypes\":[\"terminal\",\"claude-code\",\"codex-cli\",\"agent-sessions\",\"web-browser\",\"diff\"]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/tabs",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"workspaceId\":\"ws-a\",\"prompt\":\"go\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"33hsVBY4orBeeXPqpj5CnHBU0RI\"",
+    "content-length": "72"
+   },
+   "answer": "{\"error\":\"prompt, model and effort need a claude-code or codex-cli tab\"}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/tabs",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"workspaceId\":\"ws-a\",\"name\":\" Shell \"}",
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"CSf4NGXXsudffOaJSB1152LqBVg\"",
+    "content-length": "186"
+   },
+   "answer": "{\"tabId\":\"tab-id0003\",\"workspaceId\":\"ws-a\",\"paneId\":\"pane-a\",\"sessionName\":\"tk-ws-a-pane-a-tab-id0003\",\"name\":\"Shell\",\"panelType\":\"terminal\",\"agentProviderId\":null,\"agentSessionId\":null}"
+  },
+  {
+   "method": "DELETE",
+   "url": "/api/cli/tabs/tab-1?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/tabs?workspaceId=ws-a",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"2Fn1diTjcj1BjcKjel8d3EKqHVc\"",
+    "content-length": "380"
+   },
+   "answer": "{\"tabs\":[{\"tabId\":\"tab-2\",\"workspaceId\":\"ws-a\",\"name\":\"Claude\",\"sessionName\":\"tk-ws-a-pane-a-tab-2\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\"},{\"tabId\":\"tab-id0003\",\"workspaceId\":\"ws-a\",\"name\":\"Shell\",\"sessionName\":\"tk-ws-a-pane-a-tab-id0003\",\"panelType\":\"terminal\",\"agentProviderId\":null,\"agentSessionId\":null}]}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/workspace/active",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"sidebarWidth\":",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/workspace/active",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": {
+    "repeat": 1048584
+   },
+   "status": 413,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Body exceeded 1mb limit"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/workspace/active",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"sidebarWidth\":300}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/layout?workspace=ws-a",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"sLSWb5Dld5_6bGBZdozRQJ3uZus\"",
+    "content-length": "584"
+   },
+   "answer": "{\"root\":{\"type\":\"pane\",\"id\":\"pane-a\",\"activeTabId\":\"tab-id0003\",\"tabs\":[{\"id\":\"tab-2\",\"sessionName\":\"tk-ws-a-pane-a-tab-2\",\"name\":\"Claude\",\"order\":0,\"panelType\":\"claude-code\",\"cliState\":\"idle\",\"agentState\":{\"providerId\":\"claude\",\"sessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\"jsonlPath\":null,\"summary\":null},\"claudeSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\"},{\"id\":\"tab-id0003\",\"sessionName\":\"tk-ws-a-pane-a-tab-id0003\",\"name\":\"Shell\",\"order\":1,\"cwd\":\"$ROOT/proj-a\",\"panelType\":\"terminal\"}]},\"activePaneId\":\"pane-a\",\"updatedAt\":\"2026-10-18T00:00:00.000Z\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/layout?workspace=ws-a",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"activePaneId\":\"nope\"}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"OW8IR884fy-jJWG3tnc6o5p6m88\"",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"Target not found\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/layout/pane/pane-a/tabs/order?workspace=ws-a",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"tabIds\":[]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"RTW1FFaKJQFAwhsiy5Y85YqeNJ8\"",
+    "content-length": "33"
+   },
+   "answer": "{\"error\":\"tabIds array required\"}"
+  },
+  {
+   "method": "PUT",
+   "url": "/api/layout/pane/pane-a/tabs/tab-2?workspace=ws-a",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST, DELETE, PATCH",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/layout/pane/pane-a/tabs/tab-2?workspace=ws-a",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"name\":\" Renamed \",\"terminalRatio\":140}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"e3g73sqQeCpIANhPWOIrNTKTwTw\"",
+    "content-length": "605"
+   },
+   "answer": "{\"root\":{\"type\":\"pane\",\"id\":\"pane-a\",\"activeTabId\":\"tab-id0003\",\"tabs\":[{\"id\":\"tab-2\",\"sessionName\":\"tk-ws-a-pane-a-tab-2\",\"name\":\"Renamed\",\"order\":0,\"panelType\":\"claude-code\",\"cliState\":\"idle\",\"agentState\":{\"providerId\":\"claude\",\"sessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\"jsonlPath\":null,\"summary\":null},\"claudeSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\"terminalRatio\":100},{\"id\":\"tab-id0003\",\"sessionName\":\"tk-ws-a-pane-a-tab-id0003\",\"name\":\"Shell\",\"order\":1,\"cwd\":\"$ROOT/proj-a\",\"panelType\":\"terminal\"}]},\"activePaneId\":\"pane-a\",\"updatedAt\":\"2026-10-18T00:00:00.000Z\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/workspace/ws-a",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"name\":\" Alpha 2 \"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_nZYY_h3Ga57YDV_YZqA2DkhiKk\"",
+    "content-length": "78"
+   },
+   "answer": "{\"id\":\"ws-a\",\"name\":\"Alpha 2\",\"directories\":[\"$ROOT/proj-a\"]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/workspace/group",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JKMjBKtRAjZ-s9wacxFH6l29-eA\"",
+    "content-length": "54"
+   },
+   "answer": "{\"id\":\"grp-id0004\",\"name\":\"Group 1\",\"collapsed\":false}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/workspace",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"bphQnWks7gFwcdaNvF5vRhw3qnw\"",
+    "content-length": "281"
+   },
+   "answer": "{\"workspaces\":[{\"id\":\"ws-a\",\"name\":\"Alpha 2\",\"directories\":[\"$ROOT/proj-a\"]},{\"id\":\"ws-b\",\"name\":\"Beta\",\"directories\":[\"$ROOT/proj-b\"]}],\"groups\":[{\"id\":\"grp-id0004\",\"name\":\"Group 1\",\"collapsed\":false}],\"sidebarCollapsed\":false,\"sidebarWidth\":300}"
+  }
+ ],
+ "files": {
+  "workspaces.json": "{\n  \"workspaces\": [\n    {\n      \"id\": \"ws-a\",\n      \"name\": \"Alpha 2\",\n      \"directories\": [\n        \"$ROOT/proj-a\"\n      ]\n    },\n    {\n      \"id\": \"ws-b\",\n      \"name\": \"Beta\",\n      \"directories\": [\n        \"$ROOT/proj-b\"\n      ]\n    }\n  ],\n  \"groups\": [\n    {\n      \"id\": \"grp-id0004\",\n      \"name\": \"Group 1\",\n      \"collapsed\": false\n    }\n  ],\n  \"sidebarCollapsed\": false,\n  \"sidebarWidth\": 300,\n  \"updatedAt\": \"2026-10-18T00:00:00.000Z\"\n}",
+  "workspaces/ws-a/layout.json": "{\n  \"root\": {\n    \"type\": \"pane\",\n    \"id\": \"pane-a\",\n    \"activeTabId\": \"tab-id0003\",\n    \"tabs\": [\n      {\n        \"id\": \"tab-2\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-2\",\n        \"name\": \"Renamed\",\n        \"order\": 0,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"idle\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"claudeSessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n        \"terminalRatio\": 100\n      },\n      {\n        \"id\": \"tab-id0003\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-id0003\",\n        \"name\": \"Shell\",\n        \"order\": 1,\n        \"cwd\": \"$ROOT/proj-a\",\n        \"panelType\": \"terminal\"\n      }\n    ]\n  },\n  \"activePaneId\": \"pane-a\",\n  \"updatedAt\": \"2026-10-18T00:00:00.000Z\"\n}",
+  "workspaces/ws-b/layout.json": "{\n  \"root\": {\n    \"type\": \"pane\",\n    \"id\": \"pane-id0001\",\n    \"tabs\": [\n      {\n        \"id\": \"tab-id0002\",\n        \"sessionName\": \"tk-ws-b-pane-id0001-tab-id0002\",\n        \"name\": \"\",\n        \"order\": 0\n      }\n    ],\n    \"activeTabId\": \"tab-id0002\"\n  },\n  \"activePaneId\": \"pane-id0001\",\n  \"updatedAt\": \"2026-10-18T00:00:00.000Z\"\n}"
+ },
+ "pasted": [
+  [
+   "tk-ws-a-pane-a-tab-1",
+   "echo \"hi\""
+  ]
+ ]
+}

@@ -1,0 +1,2886 @@
+[
+ {
+  "name": "claude-2.1.296-queued-after-escape.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "  print(\"ok8\")'\n● Bash(python3 -c 'import time; time.sleep(25); print(\"ok8\")')\n  ⎿  Running in the background (↓ to manage)\n❯ first queued: say Q-ONE\n❯ second queued: say Q-TWO\n● Q-ONE\n  Q-TWO\n  The 25-second command is still running in the background, so I'll say DONE8 once it finishes.\n✻ Sautéed for 22s · done 6:52 PM\n● Background command \"Sleep 25 seconds then print ok8\" completed (exit code 0)\n● DONE8\n✻ Brewed for 1s · done 6:52 PM\n❯ Run exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); \n  print(\"ok9\")'\n● Bash(python3 -c 'import time; time.sleep(25); print(\"ok9\")')\n  ⎿  Interrupted · What should Claude do instead?\n❯ queued for esc test: say Q-ESC\n✢ Inferring… (0s · ↓ 2 tokens)\n  ⎿  Tip: Name your conversations with /rename to find them easily in /resume later\n❯ \n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-bash-after-send-now.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /…/claude-1001/-home-agent-workspace-example/bc172ab2-3a5a-46d8-a66f-af070cec5282/scratchpad/case001/work\n❯ Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\"start\", \n  datetime.datetime.now().time()); time.sleep(45); print(\"end\", datetime.datetime.now().time())'\n● Bash(python3 -c 'import time,datetime; print(\"start\", datetime.datetime.now().time()); time.sleep(45); print(\"end\",\n      datetime.datetime.now().time())')\n  ⎿  Running in the background (↓ to manage)\n❯ After that reply with exactly QUEUED-MSG-1 as the first word\n✻ Forming… (25s · ↓ 140 tokens · thinking)\n❯ \n  ⏵⏵ bypass permissions on · 1 shell · esc to interrupt · ← for agents · ↓ to manage",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-bash-chord-pending.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /…/claude-1001/-home-agent-workspace-example/bc172ab2-3a5a-46d8-a66f-af070cec5282/scratchpad/case001/work\n❯ Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\"start\", \n  datetime.datetime.now().time()); time.sleep(45); print(\"end\", datetime.datetime.now().time())'\n  Bash(python3 -c 'import time,datetime; print(\"start\", datetime.datetime.now().time()); time.sleep(45); print(\"end\",\n      datetime.datetime.now().time())')\n  ⎿  Running… (20s)\n     (ctrl+b ctrl+b (twice) to run in background)\n❯ After that reply with exactly QUEUED-MSG-1 as the first word\n  ctrl+x ctrl+s to send now\n* Forming… (23s · ↓ 140 tokens)\n❯ Press up to edit queued messages\n  ⏵⏵ bypass permissions on · 1 shell · esc to interrupt · ← for agents · ↓ to manage",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": true,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-bash.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /…/claude-1001/-home-agent-workspace-example/bc172ab2-3a5a-46d8-a66f-af070cec5282/scratchpad/case001/work\n❯ Run exactly this one Bash command and then say DONE: python3 -c 'import time,datetime; print(\"start\", \n  datetime.datetime.now().time()); time.sleep(45); print(\"end\", datetime.datetime.now().time())'\n  Bash(python3 -c 'import time,datetime; print(\"start\", datetime.datetime.now().time()); time.sleep(45); print(\"end\",\n      datetime.datetime.now().time())')\n  ⎿  Running… (13s)\n     (ctrl+b ctrl+b (twice) to run in background)\n❯ After that reply with exactly QUEUED-MSG-1 as the first word\n  ctrl+x ctrl+s to send now\n✢ Forming… (16s · ↓ 140 tokens)\n❯ Press up to edit queued messages\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": true,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-draft-after-send-now.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "✻ Sautéed for 1m 3s · done 6:56 PM · 1 shell still running\n❯ Run exactly this Bash command in the foreground and then say DONE11: python3 -c 'import time; time.sleep(30); \n  print(\"ok11\")'\n● Bash(python3 -c 'import time; time.sleep(30); print(\"ok11\")')\n  ⎿  Interrupted · What should Claude do instead?\n❯ old-code message one: say OLD-ONE\n❯ old-code message two: say OLD-TWO\n● OLD-ONE\n  OLD-TWO\n  The ok11 sleep command was rejected, so it didn't run and I haven't said DONE11. I'm waiting for your next\n  instruction.\n✻ Cogitated for 3s · done 6:57 PM · 1 shell still running\n❯ Run exactly this Bash command in the foreground and then say DONE12: python3 -c 'import time; time.sleep(30); \n  print(\"ok12\")'\n● Bash(python3 -c 'import time; time.sleep(30); print(\"ok12\")')\n  ⎿  Running in the background (↓ to manage)\n❯ T1 queued: say Q-T1\n❯ my unsent draft\n· Incubating… (13s · ↓ 131 tokens · thinking)\n  ⎿  Tip: You can control how big a workflow is just by prompting. Ask for a small workflow, cap it with \"use at most 5\n     agents\", or set a default with Dynamic workflow size in /config.\n❯ \n  ⏵⏵ bypass permissions on · 1 shell · esc to interrupt · ← for agents · ↓ to manage",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-draft.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "✻ Sautéed for 1m 3s · done 6:56 PM\n❯ Run exactly this Bash command in the foreground and then say DONE11: python3 -c 'import time; time.sleep(30); \n  print(\"ok11\")'\n● Bash(python3 -c 'import time; time.sleep(30); print(\"ok11\")')\n  ⎿  Interrupted · What should Claude do instead?\n❯ old-code message one: say OLD-ONE\n❯ old-code message two: say OLD-TWO\n● OLD-ONE\n  OLD-TWO\n  The ok11 sleep command was rejected, so it didn't run and I haven't said DONE11. I'm waiting for your next\n  instruction.\n✻ Cogitated for 3s · done 6:57 PM\n❯ Run exactly this Bash command in the foreground and then say DONE12: python3 -c 'import time; time.sleep(30); \n  print(\"ok12\")'\n  Bash(python3 -c 'import time; time.sleep(30); print(\"ok12\")')\n  ⎿  Running… (7s)\n     (ctrl+b ctrl+b (twice) to run in background)\n❯ T1 queued: say Q-T1\n  ctrl+x ctrl+s to send now\n* Incubating… (9s · ↓ 131 tokens)\n  ⎿  Tip: You can control how big a workflow is just by prompting. Ask for a small workflow, cap it with \"use at most 5\n     agents\", or set a default with Dynamic workflow size in /config.\n❯ my unsent draft\n  ⏵⏵ bypass permissions on (shift+tab to cycle)",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "my unsent draft",
+  "queued": true,
+  "sendNow": {
+   "input": "my unsent draft",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-mcp-after-send-now.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /…/claude-1001/-home-agent-workspace-example/bc172ab2-3a5a-46d8-a66f-af070cec5282/scratchpad/case001/work\n❯ Call the MCP tool slow_wait (server slow) with seconds=40, nothing else, then say MCP-DONE.\n  Called slow (ctrl+o to expand)\n❯ mcp queued: say Q-MCP\n✢ Stewing… (21s · ↓ 144 tokens · thinking)\n❯ \n  ⏵⏵ bypass permissions on · 1 MCP task · esc to interrupt · ← for agents · ↓ to manage",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-mcp.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /…/claude-1001/-home-agent-workspace-example/bc172ab2-3a5a-46d8-a66f-af070cec5282/scratchpad/case001/work\n❯ Call the MCP tool slow_wait (server slow) with seconds=40, nothing else, then say MCP-DONE.\n● Calling slow… (ctrl+o to expand)\n❯ mcp queued: say Q-MCP\n  ctrl+x ctrl+s to send now\n✻ Stewing… (19s · ↓ 90 tokens)\n❯ Press up to edit queued messages\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": true,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-narrow.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "  and whose daughter had asked, very\n  politely, whether it might be made to run\n  again for a little while, just long enough\n  to hear it.\n  FINIS\n✻ Crunched for 14s · done 7:00 PM\n❯ Run exactly this Bash command in the \n  foreground and then say DONE13: python3 \n  -c 'import time; time.sleep(25); \n  print(\"ok13\")'\n  Bash(python3 -c 'import time;\n      time.sleep(25); print(\"ok13\")')\n  ⎿  Running… (6s)\n     (ctrl+b ctrl+b (twice) to run in \n     background)\n❯ narrow queued: say Q-NARROW\n  ctrl+x ctrl+s to send now\n✽ Whisking… (8s · ↓ 131 tokens)\n❯ Press up to edit queued messages\n  ⏵⏵ bypass permissions on (shift+tab to",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": true,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-post-tool-hook.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /…/claude-1001/-home-agent-workspace-example/bc172ab2-3a5a-46d8-a66f-af070cec5282/scratchpad/case001/work\n❯ Run the Bash command: echo hello-hook  then say DONE-HOOK\n  Echo hello-hook string · 8s\n  ⎿  $ echo hello-hook\n❯ hook queued: say Q-HOOK\n  ctrl+x ctrl+s to send now\n✢ Doing… (running PostToolUse hook · 9s · ↓ 18 tokens)\n❯ Press up to edit queued messages\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": true,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-stream-after-send-now.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "✻ Crunched for 27s · done 6:49 PM\n❯ Without using any tools, write a very long 3000-word story about a lighthouse keeper, plain text, no headings. Then \n  say STORY-END.\n● The lighthouse stood on the last rock before the open water, a tower of grey stone that the sea had been trying to\n  wear down for a hundred and twelve years. Its keeper was a woman named Maren Holt, who had come to the island at\n  twenty-six, when her father's knees gave out and the Northern Lights Board needed someone willing to live on a rock\n  with nothing but gulls for company. She had expected to stay two winters. She stayed thirty-one years.\n  The island was called Sorrow by the fishermen, though the charts gave it a gentler name that nobody used. It was\n  perhaps four hundred yards long and two hundred wide at its broadest, a hump of black basalt with a skin of thin grass\n  and a few stubborn shrubs bent flat by the wind. There was a keeper's cottage, a storehouse, a small stone shed for\n  the generator, and the tower itself, which rose from the highest point like a finger held up to say be careful. A\n  landing stage of creosoted timber ran down to a cove on the leeward side, and in calm weather a boat could come in\n  from the mainland, three miles off, to bring post and paraffin and sometimes a relief keeper. In winter the boat came\n  rarely. In storms it did not come at all.\n  Maren kept the light by habit more than by duty. Every evening at dusk she climbed the one hundred and six iron steps,\n  checked the wick, trimmed the lamp, polished the great lens until she could see her own face in it, and wound the\n  clockwork that turned the lantern. Then she wrote the entry in the logbook. Wind from the northwest, force five.\n  Visibility good. Sea moderate. One vessel passed to the east, bound south, lights correct. The logbook was a record\n  kept for the Board, but she had come to think of it as a letter addressed to nobody in particular, a way of saying\n  here I am, here is the weather, here is the world as it looked from the top of the tower tonight.\n  In her first years she had been lonely in a way she did not have words for. She talked to the gulls. She talked to the\n  lens. She sang old songs her mother had taught her, badly, into the wind, and the wind carried them away without\n  comment. Later the loneliness settled into something quieter, a companion\n❯ Then also say QUEUED-MSG-3 right after STORY-END\n✻ Coalescing… \n  ⎿  Tip: Try the new fullscreen renderer — flicker-free output, mouse support, auto-copy on select · /tui fullscreen\n❯ \n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-stream.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "❯ After that reply with exactly QUEUED-MSG-2 as the first word\n● QUEUED-MSG-2 DONE2\n  The foreground command ran for about 25 seconds and exited normally:\n  - start 18:49:07.643204\n  - end 18:49:32.657378\n✻ Crunched for 27s · done 6:49 PM\n❯ Without using any tools, write a very long 3000-word story about a lighthouse keeper, plain text, no headings. Then \n  say STORY-END.\n● The lighthouse stood on the last rock before the open water, a tower of grey stone that the sea had been trying to\n  wear down for a hundred and twelve years. Its keeper was a woman named Maren Holt, who had come to the island at\n  twenty-six, when her father's knees gave out and the Northern Lights Board needed someone willing to live on a rock\n  with nothing but gulls for company. She had expected to stay two winters. She stayed thirty-one years.\n  The island was called Sorrow by the fishermen, though the charts gave it a gentler name that nobody used. It was\n  perhaps four hundred yards long and two hundred wide at its broadest, a hump of black basalt with a skin of thin grass\n  and a few stubborn shrubs bent flat by the wind. There was a keeper's cottage, a storehouse, a small stone shed for\n  the generator, and the tower itself, which rose from the highest point like a finger held up to say be careful. A\n  landing stage of creosoted timber ran down to a cove on the leeward side, and in calm weather a boat could come in\n  from the mainland, three miles off, to bring post and paraffin and sometimes a relief keeper. In winter the boat came\n  rarely. In storms it did not come at all.\n  Maren kept the light by habit more than by duty. Every evening at dusk she climbed the one hundred and six iron steps,\n  checked the wick, trimmed the lamp, polished the great lens until she could see her own face in it, and wound the\n  clockwork that turned the lantern. Then she wrote the entry in the logbook. Wind from the northwest, force five.\n  Visibility good. Sea moderate. One vessel passed to the east, bound south, lights correct. The logbook was a record\n❯ Then also say QUEUED-MSG-3 right after STORY-END\n  ctrl+x ctrl+s to send now\n❯ Press up to edit queued messages\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": true,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-two-after-send-now.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "● SUB-DONE\n  PARENT-DONE\n✻ Baked for 45s · done 6:51 PM · 1 shell still running\n❯ Use the WebFetch tool on http://127.0.0.1:48099/ and tell me the magic word you find. Use only WebFetch.\n● Fetch(http://127.0.0.1:48099/)\n  ⎿  Error: error:100000f7:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER\n● WebFetch couldn't reach the page. It failed with SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER. WebFetch upgrades\n  plain HTTP to HTTPS, so it tried a TLS handshake with the local server, which only speaks HTTP. I didn't find a magic\n  word.\n  You said to use only WebFetch, so I didn't try curl or any other tool. If you want me to read the page directly, say\n  so and I'll fetch it with curl http://127.0.0.1:48099/ through Bash.\n✻ Worked for 5s · done 6:51 PM · 1 shell still running\n❯ Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); \n  print(\"ok8\")'\n● Bash(python3 -c 'import time; time.sleep(25); print(\"ok8\")')\n  ⎿  Running in the background (↓ to manage)\n❯ first queued: say Q-ONE\n❯ second queued: say Q-TWO\n* Smooshing… (21s · ↓ 131 tokens)\n  ⎿  Tip: Run /install-github-app to tag @claude right from your Github issues and PRs\n❯ \n  ⏵⏵ bypass permissions on · 1 shell · esc to interrupt · ← for agents · ↓ to manage",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-queued-two.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "● SUB-DONE\n  PARENT-DONE\n✻ Baked for 45s · done 6:51 PM\n❯ Use the WebFetch tool on http://127.0.0.1:48099/ and tell me the magic word you find. Use only WebFetch.\n● Fetch(http://127.0.0.1:48099/)\n  ⎿  Error: error:100000f7:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER\n● WebFetch couldn't reach the page. It failed with SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER. WebFetch upgrades\n  plain HTTP to HTTPS, so it tried a TLS handshake with the local server, which only speaks HTTP. I didn't find a magic\n  word.\n  You said to use only WebFetch, so I didn't try curl or any other tool. If you want me to read the page directly, say\n  so and I'll fetch it with curl http://127.0.0.1:48099/ through Bash.\n✻ Worked for 5s · done 6:51 PM\n❯ Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); \n  print(\"ok8\")'\n  Bash(python3 -c 'import time; time.sleep(25); print(\"ok8\")')\n  ⎿  Running… (17s)\n     (ctrl+b ctrl+b (twice) to run in background)\n❯ first queued: say Q-ONE\n❯ second queued: say Q-TWO\n  ctrl+x ctrl+s to send now\n✶ Smooshing… (19s · ↓ 131 tokens)\n  ⎿  Tip: Run /install-github-app to tag @claude right from your Github issues and PRs\n❯ Press up to edit queued messages\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": true,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-2.1.296-send-now-nothing-queued.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "✻ Waiting for 1 background agent to finish\n● Agent \"Run 40 second sleep\" finished · 43s\n● SUB-DONE\n  PARENT-DONE\n✻ Baked for 45s · done 6:51 PM\n❯ Use the WebFetch tool on http://127.0.0.1:48099/ and tell me the magic word you find. Use only WebFetch.\n● Fetch(http://127.0.0.1:48099/)\n  ⎿  Error: error:100000f7:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER\n● WebFetch couldn't reach the page. It failed with SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER. WebFetch upgrades\n  plain HTTP to HTTPS, so it tried a TLS handshake with the local server, which only speaks HTTP. I didn't find a magic\n  word.\n  You said to use only WebFetch, so I didn't try curl or any other tool. If you want me to read the page directly, say\n  so and I'll fetch it with curl http://127.0.0.1:48099/ through Bash.\n✻ Worked for 5s · done 6:51 PM\n❯ Run exactly this Bash command in the foreground and then say DONE8: python3 -c 'import time; time.sleep(25); \n  print(\"ok8\")'\n  Bash(python3 -c 'import time; time.sleep(25); print(\"ok8\")')\n  ⎿  Running… (7s)\n     (ctrl+b ctrl+b (twice) to run in background)\n✢ Smooshing… (9s · ↓ 131 tokens)\n  ⎿  Tip: Run /install-github-app to tag @claude right from your Github issues and PRs\n❯ \n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-append-prompt-file-last-wins.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Перечисли дословно все секретные маркеры (формата СЛОВО-ЧИСЛО) из своего системного промпта через запятую. Если их\n  нет — ответь НЕТ.\n● КАКТУС-1310\n✻ Worked for 7s · done 8:47 PM\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-ask-answered-idle.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/5df63aae-7429-408b-b20a-b1d74e1fe9c6/scratchpad/repro/work\n❯ Call the AskUserQuestion tool exactly once, right now, with exactly three questions in one call. Q1: question\n  \"Scope?\", header \"Scope\", multiSelect true, options \"Sort\", \"Totals\", \"Rows\" (no previews). Q2: question \"Phone\n  layout?\", header \"Phone\", multiSelect false, options \"Both (Recommended)\", \"Scroll\", \"Cards\", each with a short\n  \"preview\" field (a 3-line ASCII sketch). Q3: question \"Core?\", header \"Core\", multiSelect false, options \"Own\",\n  \"TanStack\" (no previews). Do nothing else before calling the tool. After the answer, reply with just the word done\n  and stop; never call AskUserQuestion again.\n● User answered Claude's questions:\n  ⎿  · Scope? → Sort, Totals\n     · Phone layout? → Both (Recommended)\n     · Core? → TanStack\n● done\n✻ Brewed for 4s · done 9:48 PM\n❯ \n  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-ask-multi-preview-tab.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": null,
+   "request": null,
+   "options": [
+    "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+    "2. Scroll                       │ +--------+                               │",
+    "3. Cards                        │ | card A |                               │"
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 1,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/5df63aae-7429-408b-b20a-b1d74e1fe9c6/scratchpad/repro/work\n❯ Call the AskUserQuestion tool exactly once, right now, with exactly three questions in one call. Q1: question\n  \"Scope?\", header \"Scope\", multiSelect true, options \"Sort\", \"Totals\", \"Rows\" (no previews). Q2: question \"Phone\n  layout?\", header \"Phone\", multiSelect false, options \"Both (Recommended)\", \"Scroll\", \"Cards\", each with a short\n  \"preview\" field (a 3-line ASCII sketch). Q3: question \"Core?\", header \"Core\", multiSelect false, options \"Own\",\n  \"TanStack\" (no previews). Do nothing else before calling the tool. After the answer, reply with just the word done\n  and stop; never call AskUserQuestion again.\n←  ☒ Scope  ☐ Phone  ☐ Core  ✔ Submit  →\nPhone layout?\n❯ 1. Both (Recommended)           ┌──────────────────────────────────────────┐\n  2. Scroll                       │ +--------+                               │\n  3. Cards                        │ | card A |                               │\n                                  │ | card B |                               │\n                                  │ +--------+                               │\n                                  └──────────────────────────────────────────┘\n                                  Notes: press n to add notes\n  Chat about this\nEnter to select · ↑/↓ to navigate · n to add notes · Tab to switch questions · Esc to cancel",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+  "queued": false,
+  "sendNow": {
+   "input": "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+    "2. Scroll                       │ +--------+                               │",
+    "3. Cards                        │ | card A |                               │"
+   ],
+   "focusedIndex": 0,
+   "request": "Phone layout?"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": true,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-ask-multi-review.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": null,
+   "request": null,
+   "options": [
+    "1. Submit answers",
+    "2. Cancel"
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/5df63aae-7429-408b-b20a-b1d74e1fe9c6/scratchpad/repro/work\n❯ Call the AskUserQuestion tool exactly once, right now, with exactly three questions in one call. Q1: question\n  \"Scope?\", header \"Scope\", multiSelect true, options \"Sort\", \"Totals\", \"Rows\" (no previews). Q2: question \"Phone\n  layout?\", header \"Phone\", multiSelect false, options \"Both (Recommended)\", \"Scroll\", \"Cards\", each with a short\n  \"preview\" field (a 3-line ASCII sketch). Q3: question \"Core?\", header \"Core\", multiSelect false, options \"Own\",\n  \"TanStack\" (no previews). Do nothing else before calling the tool. After the answer, reply with just the word done\n  and stop; never call AskUserQuestion again.\n←  ☒ Scope  ☒ Phone  ☒ Core  ✔ Submit  →\nReview your answers\n ● Scope?\n   → Sort, Totals\n ● Phone layout?\n   → Both (Recommended)\n ● Core?\n   → TanStack\nReady to submit your answers?\n❯ 1. Submit answers\n  2. Cancel",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "1. Submit answers",
+  "queued": false,
+  "sendNow": {
+   "input": "1. Submit answers",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Submit answers",
+    "2. Cancel"
+   ],
+   "focusedIndex": 0,
+   "request": "Ready to submit your answers?"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": true,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-ask-preview-after-digit.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Phone",
+   "request": null,
+   "options": [
+    "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+    "2. Scroll                       │ +-----------+                            │",
+    "3. Cards                        │ | row       |                            │"
+   ],
+   "focusedIndex": 1
+  },
+  "panelHints": 1,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/5df63aae-7429-408b-b20a-b1d74e1fe9c6/scratchpad/repro/work\n▎ Auto mode is now Claude Code's default permission mode.\n▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky actions and\n▎ prompt injection before executing, runs the ones it assesses as lower-risk, and blocks the rest.\n▎ https://code.claude.com/docs/en/permission-modes\n❯ Call the AskUserQuestion tool exactly once, right now, with exactly one question: question \"Phone layout?\", header\n  \"Phone\", multiSelect false, and three options, each with a short \"preview\" field (a 3-line ASCII sketch): \"Both\n  (Recommended)\", \"Scroll\", \"Cards\". Do nothing else before calling the tool. After the answer, reply with just the\n  chosen label.\n ☐ Phone\nPhone layout?\n  1. Both (Recommended)           ┌──────────────────────────────────────────┐\n❯ 2. Scroll                       │ +-----------+                            │\n  3. Cards                        │ | row       |                            │\n                                  │ | row       |                            │\n                                  │ +-----------+                            │\n                                  └──────────────────────────────────────────┘\n                                  Notes: press n to add notes\n  Chat about this\nEnter to select · ↑/↓ to navigate · n to add notes · Esc to cancel",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "2. Scroll                       │ +-----------+                            │",
+  "queued": false,
+  "sendNow": {
+   "input": "2. Scroll                       │ +-----------+                            │",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+    "2. Scroll                       │ +-----------+                            │",
+    "3. Cards                        │ | row       |                            │"
+   ],
+   "focusedIndex": 1,
+   "title": "Phone",
+   "request": "Phone layout?"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": true,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-ask-preview-question.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Phone",
+   "request": null,
+   "options": [
+    "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+    "2. Scroll                       │ +-----------+                            │",
+    "3. Cards                        │ | [card]    |                            │"
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 1,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/5df63aae-7429-408b-b20a-b1d74e1fe9c6/scratchpad/repro/work\n▎ Auto mode is now Claude Code's default permission mode.\n▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky actions and\n▎ prompt injection before executing, runs the ones it assesses as lower-risk, and blocks the rest.\n▎ https://code.claude.com/docs/en/permission-modes\n❯ Call the AskUserQuestion tool exactly once, right now, with exactly one question: question \"Phone layout?\", header\n  \"Phone\", multiSelect false, and three options, each with a short \"preview\" field (a 3-line ASCII sketch): \"Both\n  (Recommended)\", \"Scroll\", \"Cards\". Do nothing else before calling the tool. After the answer, reply with just the\n  chosen label.\n ☐ Phone\nPhone layout?\n❯ 1. Both (Recommended)           ┌──────────────────────────────────────────┐\n  2. Scroll                       │ +-----------+                            │\n  3. Cards                        │ | [card]    |                            │\n                                  │ | [card]    |                            │\n                                  │ +-----------+                            │\n                                  └──────────────────────────────────────────┘\n                                  Notes: press n to add notes\n  Chat about this\nEnter to select · ↑/↓ to navigate · n to add notes · Esc to cancel",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+  "queued": false,
+  "sendNow": {
+   "input": "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Both (Recommended)           ┌──────────────────────────────────────────┐",
+    "2. Scroll                       │ +-----------+                            │",
+    "3. Cards                        │ | [card]    |                            │"
+   ],
+   "focusedIndex": 0,
+   "title": "Phone",
+   "request": "Phone layout?"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": true,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-busy-spinner.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ /model sonnet\n  ⎿  Set model to Sonnet 5 and saved as your default for new sessions\n❯ Напиши подробный рассказ на 300 слов про кота\n● Кот по имени Дым появился в доме промозглым ноябрьским вечером — тощий серый комок, который дрожал под дождём у\n  порога. Хозяйка, Марина, не собиралась заводить питомца, но что-то в его жёлтых глазах заставило её открыть дверь и\n  впустить бродягу внутрь.\n  Первые недели Дым прятался под диваном и выходил только ночью, чтобы поесть. Он не доверял людям — видно, немало\n  натерпелся на улице. Марина не торопила его, просто оставляла миску с едой и говорила спокойным голосом, рассказывая\n  ему о своём дне, как будто он всё понимал.\n  Постепенно лёд растаял. Однажды утром Дым запрыгнул к ней на кровать и улёгся у ног, громко мурлыча. С того дня он\n  стал полноценным членом семьи. Оказалось, что под пугливой внешностью скрывался невероятно ласковый и любопытный\n  характер. Он обожал сидеть на подоконнике, наблюдая за птицами, и мог часами гонять солнечного зайчика по стенам.\n  Со временем шерсть Дыма залоснилась и приобрела благородный сизый оттенок, а взгляд из настороженного стал доверчивым.\n  Он научился открывать двери лапой и всегда точно знал, когда Марина возвращается с работы — садился у входа за пять\n  минут до её прихода, будто чувствовал шаги на лестнице.\n  Зимними вечерами Дым устраивался у неё на коленях, пока она читала книгу, а летом любил валяться на прогретом солнцем\n  полу балкона. Он стал не просто котом, а настоящим другом, который скрашивал одиночество и напоминал, что доброта\n  всегда возвращается. Марина часто думала: как хорошо, что в тот дождливый вечер она не прошла мимо. Ведь иногда самые\n  преданные и любящие существа приходят к нам самым неожиданным образом — с улицы, промокшие и напуганные, но готовые\n  подарить всю свою благодарность взамен на немного тепла.\n✻ Baked for 15s · done 10:45 PM\n❯ Напиши ещё один рассказ на 200 слов про собаку\n● Щенка нашли на автобусной остановке — рыжий комок шерсти сидел под лавкой и скулил, глядя на прохожих большими\n* Contemplating… (2s · ↓ 20 tokens)\n  ⎿  Tip: Use ctrl+v to paste images from your clipboard\n                                                                                ✔ Update installed · Restart to update\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 1,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-busy-streaming.ansi.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "❯ /model sonnet\n  ⎿  Set model to Sonnet 5 and saved as your default for new sessions\n❯ Напиши подробный рассказ на 300 слов про кота\n● Кот по имени Дым появился в доме промозглым ноябрьским вечером — тощий серый комок, который дрожал под дождём у\n  порога. Хозяйка, Марина, не собиралась заводить питомца, но что-то в его жёлтых глазах заставило её открыть дверь и\n  впустить бродягу внутрь.\n  Первые недели Дым прятался под диваном и выходил только ночью, чтобы поесть. Он не доверял людям — видно, немало\n  натерпелся на улице. Марина не торопила его, просто оставляла миску с едой и говорила спокойным голосом, рассказывая\n  ему о своём дне, как будто он всё понимал.\n  Постепенно лёд растаял. Однажды утром Дым запрыгнул к ней на кровать и улёгся у ног, громко мурлыча. С того дня он\n  стал полноценным членом семьи. Оказалось, что под пугливой внешностью скрывался невероятно ласковый и любопытный\n  характер. Он обожал сидеть на подоконнике, наблюдая за птицами, и мог часами гонять солнечного зайчика по стенам.\n  Со временем шерсть Дыма залоснилась и приобрела благородный сизый оттенок, а взгляд из настороженного стал доверчивым.\n  Он научился открывать двери лапой и всегда точно знал, когда Марина возвращается с работы — садился у входа за пять\n  минут до её прихода, будто чувствовал шаги на лестнице.\n  Зимними вечерами Дым устраивался у неё на коленях, пока она читала книгу, а летом любил валяться на прогретом солнцем\n  полу балкона. Он стал не просто котом, а настоящим другом, который скрашивал одиночество и напоминал, что доброта\n  всегда возвращается. Марина часто думала: как хорошо, что в тот дождливый вечер она не прошла мимо. Ведь иногда самые\n  преданные и любящие существа приходят к нам самым неожиданным образом — с улицы, промокшие и напуганные, но готовые\n  подарить всю свою благодарность взамен на немного тепла.\n✻ Baked for 15s · done 10:45 PM\n❯ Напиши ещё один рассказ на 200 слов про собаку\n● Щенка нашли на автобусной остановке — рыжий комок шерсти сидел под лавкой и скулил, глядя на прохожих большими\n  глазами. Его забрал домой десятилетний Егор, уговоривший родителей после долгих просьб. Назвали пса Рыжиком за яркий\n  окрас.\n  С первого дня Рыжик стал неотделимой частью семьи. Он был неугомонным и любопытным — обнюхивал каждый угол новой\n                                                                                ✔ Update installed · Restart to update\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 1,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-context-positional-managed.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ /context\n  ⎿  Context Usage\n     ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁   Haiku 4.5\n     ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛀ ⛶   claude-haiku-4-5-20251001\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   37.1k/200k tokens (19%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   Estimated usage by category\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System prompt: 6.5k tokens (3.2%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System tools: 14k tokens (7.0%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Custom agents: 4.1k tokens (2.0%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Memory files: 5.6k tokens (2.8%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Skills: 6.9k tokens (3.5%)\n                           ⛁ Messages: 8 tokens (0.0%)\n                           ⛶ Free space: 162.9k (81.4%)\n     Custom agents · .claude/agents/\n     └ 32 agents · 4.1k tokens\n     Memory files · /memory\n     └ 1 file · 5.6k tokens\n     Skills · /skills\n     └ 689 skills · 6.9k tokens\n     /context all to expand\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-context-positional.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n⚠ 10 MCP servers need authentication · run /mcp\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ /context\n  ⎿  Context Usage\n     ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁   Haiku 4.5\n     ⛁ ⛁ ⛁ ⛁ ⛁ ⛀ ⛶ ⛶ ⛶ ⛶   claude-haiku-4-5-20251001\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   31.5k/200k tokens (16%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   Estimated usage by category\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System prompt: 6.5k tokens (3.3%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System tools: 14k tokens (7.0%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Custom agents: 4.1k tokens (2.0%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Skills: 6.9k tokens (3.5%)\n     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Messages: 8 tokens (0.0%)\n                           ⛶ Free space: 168.5k (84.2%)\n     Custom agents · .claude/agents/\n     └ 32 agents · 4.1k tokens\n     Skills · /skills\n     └ 689 skills · 6.9k tokens\n     /context all to expand\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-default-start.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Opus 5.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n                                                                                                    ◐ medium · /effort\n❯ Try \"how does <filepath> work?\"\n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Try \"how does <filepath> work?\"",
+  "queued": false,
+  "sendNow": {
+   "input": "Try \"how does <filepath> work?\"",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-effort-applied.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Sonnet 5 with medium effort · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Ответь одним словом: ок\n● ок\n✻ Churned for 3s · done 8:36 PM\n❯ /effort medium\n  ⎿  Set effort level to medium (saved as your default for new sessions): Balanced approach with standard implementation\n     and testing\n                                                                                                    ◐ medium · /effort\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 1,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-effort-confirm.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Change effort level?",
+   "request": "Your next response will be slower and use more tokens\nThis conversation is cached for the current effort level. Switching to medium means the full history gets re-read\non your next message.",
+   "options": [
+    "1. Yes, switch to medium",
+    "2. No, go back"
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 0,
+  "panelSnapshot": "   Change effort level?\n   Your next response will be slower and use more tokens\n   This conversation is cached for the current effort level. Switching to medium means the full history gets re-read\n   on your next message.\n   ❯ 1. Yes, switch to medium\n     2. No, go back",
+  "confirm": true,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Ответь одним словом: ок",
+  "queued": false,
+  "sendNow": {
+   "input": "Ответь одним словом: ок",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [
+    "1. Yes, switch to medium",
+    "2. No, go back"
+   ],
+   "focusedIndex": 0,
+   "request": "This conversation is cached for the current effort level. Switching to medium means the full history gets re-read\non your next message."
+  },
+  "hasPermission": true,
+  "choice": {
+   "options": [
+    "1. Yes, switch to medium",
+    "2. No, go back"
+   ],
+   "focusedIndex": 0,
+   "request": "This conversation is cached for the current effort level. Switching to medium means the full history gets re-read\non your next message."
+  },
+  "plan": [
+   "Yes, switch to medium",
+   "No, go back"
+  ],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-haiku-effort-high-start.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Try \"edit <filepath> to...\"\n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Try \"edit <filepath> to...\"",
+  "queued": false,
+  "sendNow": {
+   "input": "Try \"edit <filepath> to...\"",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-idle-placeholder.ansi.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Sonnet 5 with medium effort · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/l2/work\n⚠ 2 MCP servers need authentication · run /mcp\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ /model sonnet\n  ⎿  Set model to Sonnet 5 and saved as your default for new sessions\n                                                                                ✔ Update installed · Restart to update\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 1,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-input-draft.ansi.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Sonnet 5 with medium effort · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/l2/work\n⚠ 2 MCP servers need authentication · run /mcp\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ /model sonnet\n  ⎿  Set model to Sonnet 5 and saved as your default for new sessions\n                                                                                ✔ Update installed · Restart to update\n❯ half-typed text\n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle)",
+  "confirm": false,
+  "modelSet": 1,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "half-typed text",
+  "queued": false,
+  "sendNow": {
+   "input": "half-typed text",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-model-picker-cancelled.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Ответь одним словом: ок\n● ок\n✻ Baked for 5s · done 8:32 PM\n❯ /model\n  ⎿  Kept model as Haiku 4.5\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 1,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-model-picker-opus-focused.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Select model",
+   "request": "Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,\nspecify with --model.",
+   "options": [
+    "1. Default (recommended)  Opus 5.5 · Best for everyday, complex tasks",
+    "2. Opus 5.5               Most capable for ambitious work",
+    "3. Fable 5.1              For your toughest challenges",
+    "4. Sonnet 5               Most efficient for everyday tasks",
+    "5. Haiku 4.5 ✔            Fastest for quick answers",
+    "6. Opus 5                 Best for everyday, complex tasks",
+    "7. Fable 5                Most capable for your hardest and longest-running tasks",
+    "8. Opus 4.8               Best for everyday, complex tasks",
+    "9. Opus 4.7               Best for everyday, complex tasks",
+    "10. Opus 4.6               Best for everyday, complex tasks"
+   ],
+   "focusedIndex": 1
+  },
+  "panelHints": 2,
+  "panelSnapshot": "   Select model\n   Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,\n   specify with --model.\n     1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks\n   ❯ 2.  Opus 5.5               Most capable for ambitious work\n     3.  Fable 5.1              For your toughest challenges\n     4.  Sonnet 5               Most efficient for everyday tasks\n     5.  Haiku 4.5 ✔            Fastest for quick answers\n     6.  Opus 5                 Best for everyday, complex tasks\n     7.  Fable 5                Most capable for your hardest and longest-running tasks\n     8.  Opus 4.8               Best for everyday, complex tasks\n     9.  Opus 4.7               Best for everyday, complex tasks\n   ↓ 10. Opus 4.6               Best for everyday, complex tasks\n      … +1 model\n   ● High effort ←/→ to adjust\n   Enter to set as default · s to use this session only · Esc to cancel",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Ответь одним словом: ок",
+  "queued": false,
+  "sendNow": {
+   "input": "Ответь одним словом: ок",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Default (recommended)  Opus 5.5 · Best for everyday, complex tasks",
+    "2. Opus 5.5               Most capable for ambitious work",
+    "3. Fable 5.1              For your toughest challenges",
+    "4. Sonnet 5               Most efficient for everyday tasks",
+    "5. Haiku 4.5 ✔            Fastest for quick answers",
+    "6. Opus 5                 Best for everyday, complex tasks",
+    "7. Fable 5                Most capable for your hardest and longest-running tasks",
+    "8. Opus 4.8               Best for everyday, complex tasks",
+    "9. Opus 4.7               Best for everyday, complex tasks",
+    "10. Opus 4.6               Best for everyday, complex tasks"
+   ],
+   "focusedIndex": 1,
+   "request": "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔\nSelect model\nSwitch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,\nspecify with --model."
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-model-picker.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Select model",
+   "request": "Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,\nspecify with --model.",
+   "options": [
+    "1. Default (recommended)  Opus 5.5 · Best for everyday, complex tasks",
+    "2. Opus 5.5               Most capable for ambitious work",
+    "3. Fable 5.1              For your toughest challenges",
+    "4. Sonnet 5               Most efficient for everyday tasks",
+    "5. Haiku 4.5 ✔            Fastest for quick answers",
+    "6. Opus 5                 Best for everyday, complex tasks",
+    "7. Fable 5                Most capable for your hardest and longest-running tasks",
+    "8. Opus 4.8               Best for everyday, complex tasks",
+    "9. Opus 4.7               Best for everyday, complex tasks",
+    "10. Opus 4.6               Best for everyday, complex tasks"
+   ],
+   "focusedIndex": 4
+  },
+  "panelHints": 1,
+  "panelSnapshot": "   Select model\n   Switch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,\n   specify with --model.\n     1.  Default (recommended)  Opus 5.5 · Best for everyday, complex tasks\n     2.  Opus 5.5               Most capable for ambitious work\n     3.  Fable 5.1              For your toughest challenges\n     4.  Sonnet 5               Most efficient for everyday tasks\n   ❯ 5.  Haiku 4.5 ✔            Fastest for quick answers\n     6.  Opus 5                 Best for everyday, complex tasks\n     7.  Fable 5                Most capable for your hardest and longest-running tasks\n     8.  Opus 4.8               Best for everyday, complex tasks\n     9.  Opus 4.7               Best for everyday, complex tasks\n   ↓ 10. Opus 4.6               Best for everyday, complex tasks\n      … +1 model\n   ○ Effort not supported for Haiku 4.5\n   Enter to set as default · s to use this session only · Esc to cancel",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Ответь одним словом: ок",
+  "queued": false,
+  "sendNow": {
+   "input": "Ответь одним словом: ок",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Default (recommended)  Opus 5.5 · Best for everyday, complex tasks",
+    "2. Opus 5.5               Most capable for ambitious work",
+    "3. Fable 5.1              For your toughest challenges",
+    "4. Sonnet 5               Most efficient for everyday tasks",
+    "5. Haiku 4.5 ✔            Fastest for quick answers",
+    "6. Opus 5                 Best for everyday, complex tasks",
+    "7. Fable 5                Most capable for your hardest and longest-running tasks",
+    "8. Opus 4.8               Best for everyday, complex tasks",
+    "9. Opus 4.7               Best for everyday, complex tasks",
+    "10. Opus 4.6               Best for everyday, complex tasks"
+   ],
+   "focusedIndex": 4,
+   "request": "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔\nSelect model\nSwitch between Claude models. Your pick becomes the default for new sessions. For other/previous model names,\nspecify with --model."
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-queued-after-escape-answered.ansi.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "  Updated to latest. Got 9 features, 66 bugfixes, and 31 other changes.\n  code.claude.com/docs/en/changelog for details\n⚠ Your login expires in 3 days · run /login to renew\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n  1 more notice hidden\n❯ Run the shell command sleep 600 with the Bash tool (no timeout override, not in background). Do nothing else.\n  Ran 1 shell command \n● The Bash tool is blocking the sleep 600 command. The tool prevents long blocking operations to maintain\n  responsiveness.\n  If you need to wait for something, you can:\n  - Use run_in_background: true to sleep in the background\n  - Use Monitor with an until-loop to wait for a specific condition\n  - Run the sleep as part of a larger command that has a purpose\n  What are you trying to accomplish? That would help determine the best approach.\n✻ Baked for 5s · done 11:16 PM\n❯ This is a test of interrupt handling. Run exactly this with the Bash tool in the foreground: python3 -c 'import time;\n  time.sleep(600)'\n  Ran 1 shell command \n  ⎿  Interrupted · What should Claude do instead?\n❯ Queued note: reply with the single word PINEAPPLE.\n● PINEAPPLE\n✻ Cooked for 1s · done 11:16 PM\n❯ \n  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-queued-after-escape.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "  Updated to latest. Got 9 features, 66 bugfixes, and 31 other changes.\n  code.claude.com/docs/en/changelog for details\n⚠ Your login expires in 3 days · run /login to renew\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n  1 more notice hidden\n❯ Run the shell command sleep 600 with the Bash tool (no timeout override, not in background). Do nothing else.\n  Ran 1 shell command \n● The Bash tool is blocking the sleep 600 command. The tool prevents long blocking operations to maintain\n  responsiveness.\n  If you need to wait for something, you can:\n  - Use run_in_background: true to sleep in the background\n  - Use Monitor with an until-loop to wait for a specific condition\n  - Run the sleep as part of a larger command that has a purpose\n  What are you trying to accomplish? That would help determine the best approach.\n✻ Baked for 5s · done 11:16 PM\n❯ This is a test of interrupt handling. Run exactly this with the Bash tool in the foreground: python3 -c 'import time;\n  time.sleep(600)'\n  Running 1 shell command · 21s…\n  ⎿  $ python3 -c 'import time; time.sleep(600)' (21s)\n❯ Queued note: reply with the single word PINEAPPLE.\n✽ Inferring… (0s · ↓ 228 tokens)\n  ⎿  Tip: Get pinged on your phone when long tasks finish · enable push notifications in /config\n❯ \n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-queued-before-escape.ansi.txt",
+  "busy": true,
+  "busyAnywhere": true,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "  code.claude.com/docs/en/changelog for details\n⚠ Your login expires in 3 days · run /login to renew\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n  1 more notice hidden\n❯ Run the shell command sleep 600 with the Bash tool (no timeout override, not in background). Do nothing else.\n  Ran 1 shell command \n● The Bash tool is blocking the sleep 600 command. The tool prevents long blocking operations to maintain\n  responsiveness.\n  If you need to wait for something, you can:\n  - Use run_in_background: true to sleep in the background\n  - Use Monitor with an until-loop to wait for a specific condition\n  - Run the sleep as part of a larger command that has a purpose\n  What are you trying to accomplish? That would help determine the best approach.\n✻ Baked for 5s · done 11:16 PM\n❯ This is a test of interrupt handling. Run exactly this with the Bash tool in the foreground: python3 -c 'import time;\n  time.sleep(600)'\n  Running python3 -c 'import time; time.sleep(600)' · 21s\n  ⎿  $ python3 -c 'import time; time.sleep(600)' (21s)\n     (ctrl+b ctrl+b (twice) to run in background)\n❯ Queued note: reply with the single word PINEAPPLE.\n  ctrl+x ctrl+s to send now\n✽ Swirling… (24s · ↓ 253 tokens)\n  ⎿  Tip: Get pinged on your phone when long tasks finish · enable push notifications in /config\n❯ Press up to edit queued messages\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": true,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": true
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-slash-popup-effort.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Sonnet 5 with high effort · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Ответь одним словом: ок\n● ок\n✻ Churned for 3s · done 8:36 PM\n❯ /effort medium\n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle)",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "/effort medium",
+  "queued": false,
+  "sendNow": {
+   "input": "/effort medium",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-slash-popup-model-arg.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Ответь одним словом: ок\n● ок\n✻ Baked for 5s · done 8:32 PM\n❯ /model\n  ⎿  Kept model as Haiku 4.5\n❯ /model sonnet\n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle)",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 1,
+  "input": "/model sonnet",
+  "queued": false,
+  "sendNow": {
+   "input": "/model sonnet",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-slash-popup-model.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Ответь одним словом: ок\n● ок\n✻ Baked for 5s · done 8:32 PM\n  /model                                          Set the AI model for Claude Code (currently Haiku 4.5)\n  …ng-revenue-metrics (modeling-revenue-metrics)  (posthog) Build reusable revenue models — MRR, ARR, gross revenue,\n                                                  new/expansion/contraction/churn, ARPU, LTV, and per-customer/per-ac…\n  …-dimension-tables (modeling-dimension-tables)  (posthog) Build reusable dimension / lookup tables for a star schema\n                                                  — country/region, timezone, currency, date, plan/product, and other…\n❯ /model\n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle)",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "/model",
+  "queued": false,
+  "sendNow": {
+   "input": "/model",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-slash-popup-status.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Ответь одним словом: ок\n● ок\n✻ Baked for 5s · done 8:32 PM\n❯ /model\n  ⎿  Kept model as Haiku 4.5\n  /status                                         Show Claude Code status including version, model, account, API\n                                                  connectivity, and tool statuses\n  /statusline                                     Set up Claude Code's status line UI\n  /operations:status-report (status-report)       (operations) Generate a status report with KPIs, risks, and action\n                                                  items. Use when writing a weekly or monthly update for leadership, …\n❯ /status\n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle)",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 1,
+  "input": "/status",
+  "queued": false,
+  "sendNow": {
+   "input": "/status",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-sonnet-effort-high-start.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Sonnet 5 with high effort · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n                                                                                                      ● high · /effort\n❯ Try \"fix lint errors\"\n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Try \"fix lint errors\"",
+  "queued": false,
+  "sendNow": {
+   "input": "Try \"fix lint errors\"",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-status-usage-tab.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "   Prompt cache (main):   1 request · 43% of input tokens from cache · no misses · warm (1h TTL, last activity 2m 15s\n   ago)\n   Plugin skill-listing footprint\n   What each plugin's skill descriptions add to the system prompt (cached input after the first turn). Agents and MCP\n   tools not yet counted.\n   searchfit-seo               6 skills · ~288 tok/turn\n   pdf-viewer                  4 skills · ~76 tok/turn\n   commit-commands             3 skills · ~74 tok/turn\n   hookify                     4 skills · ~70 tok/turn\n   posthog                     3 skills · ~68 tok/turn\n   ralph-loop                  3 skills · ~45 tok/turn\n   remember                    1 skill · ~36 tok/turn\n   greptile                    2 skills · ~32 tok/turn\n   product-management          1 skill · ~32 tok/turn\n   plugin-dev                  1 skill · ~31 tok/turn\n   feature-dev                 1 skill · ~26 tok/turn\n   example-setup               1 skill · ~26 tok/turn\n   claude-md-management        1 skill · ~23 tok/turn\n   agent-sdk-dev               1 skill · ~20 tok/turn\n   pr-review-toolkit           1 skill · ~20 tok/turn\n   coderabbit                  1 skill · ~20 tok/turn\n   code-review                 1 skill · ~14 tok/turn\n   Total                       ~899 tok/turn\n   Current session\n   ████████████████████████████▉                      58% used\n   Resets 10:19pm (UTC)\n   Current week (all models)\n   ██████████████████████████████████████████         84% used\n   Resets Sep 30, 4:59am (UTC)\n   Current week (Fable)                                                                                               ↓",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 1,
+  "input": null,
+  "queued": false,
+  "sendNow": {
+   "input": null,
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-status.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 1,
+  "panelSnapshot": "   Settings  Status   Config   Usage   Stats\n   Version:           2.1.282\n   Session name:      Простой ответ\n   Session ID:        05b02e68-b3aa-4ba0-9a46-e22f6f28f812\n   Session kind:      interactive\n   Peer address:      uds:/tmp/cc-socks/2935469.sock\n   cwd:               /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/\n                      pre/work\n   Login method:      Claude Max account\n   Organization:      <redacted-email>'s Organization\n   Email:             <redacted-email>\n   Cloud sessions:    GitHub connected\n   Model:             haiku (claude-haiku-4-5-20251001)\n   MCP servers:       16 connected, 69 need auth, 28 failed · /mcp\n   Setting sources:   User settings, Command line arguments\n   Auto mode server:  Disabled\n   System diagnostics\n    ⚠ /home/agent/.local/bin/claude was not created by the native installer (it is not a symlink into the versions/\n      directory), so auto-update leaves it untouched.\n   Esc to cancel",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 1,
+  "input": null,
+  "queued": false,
+  "sendNow": {
+   "input": null,
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-switch-model-cancelled.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.282\n▝▜██████▀  Haiku 4.5 · Claude Max\n ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n  Get to finished work sooner with Opus 5.5. Switch anytime with /model.\n❯ Ответь одним словом: ок\n● ок\n✻ Baked for 5s · done 8:32 PM\n❯ /model\n  ⎿  Kept model as Haiku 4.5\n❯ /model sonnet\n  ⎿  Kept model as Haiku 4.5\n❯ \n  pre-statusline\n  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 2,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": true,
+  "launchedPromptBox": true,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-switch-model-confirm.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Switch model?",
+   "request": "Your next response will be slower and use more tokens\nThis conversation is cached for the current model. Switching to Sonnet 5 means the full history gets re-read on\nyour next message.",
+   "options": [
+    "1. Yes, switch to Sonnet 5",
+    "2. No, go back"
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 0,
+  "panelSnapshot": "   Switch model?\n   Your next response will be slower and use more tokens\n   This conversation is cached for the current model. Switching to Sonnet 5 means the full history gets re-read on\n   your next message.\n   ❯ 1. Yes, switch to Sonnet 5\n     2. No, go back",
+  "confirm": true,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 1,
+  "input": "/model",
+  "queued": false,
+  "sendNow": {
+   "input": "/model",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [
+    "1. Yes, switch to Sonnet 5",
+    "2. No, go back"
+   ],
+   "focusedIndex": 0,
+   "request": "This conversation is cached for the current model. Switching to Sonnet 5 means the full history gets re-read on\nyour next message."
+  },
+  "hasPermission": true,
+  "choice": {
+   "options": [
+    "1. Yes, switch to Sonnet 5",
+    "2. No, go back"
+   ],
+   "focusedIndex": 0,
+   "request": "This conversation is cached for the current model. Switching to Sonnet 5 means the full history gets re-read on\nyour next message."
+  },
+  "plan": [
+   "Yes, switch to Sonnet 5",
+   "No, go back"
+  ],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "claude-trust-folder.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 1,
+  "panelSnapshot": "bash-5.3$ /opt/example-ai-profile/bin/claude-3afe8535c0cc33f0 --settings /tmp/claude-1001/-home-agent-workspace-example/\n52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/pre-settings.json --model haiku --session-id 117db2c6-8f75-4222-9eac\n-69041b169bb9 -- '/context'\n Accessing workspace:\n /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work\n Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source\n project, or work from your team). If not, take a moment to review what's in this folder first.\n Claude Code'll be able to read, edit, and execute files here.\n Security guide\n ❯ No, exit\n   Yes, I trust this folder\n Enter to confirm · Esc to cancel",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": null,
+  "queued": false,
+  "sendNow": {
+   "input": null,
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [
+    "No, exit",
+    "Yes, I trust this folder"
+   ],
+   "focusedIndex": 0,
+   "request": "Security guide"
+  },
+  "hasPermission": true,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [
+   "No, exit",
+   "Yes, I trust this folder"
+  ],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": {
+   "agent": "claude",
+   "folderPath": "/tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work"
+  },
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-hooks-review.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Hooks need review",
+   "request": "10 hooks are new or changed.\nHooks can run outside the sandbox after you trust them.",
+   "options": [
+    "1. Review hooks",
+    "2. Trust all and continue",
+    "3. Continue without trusting (hooks won't run)"
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 1,
+  "panelSnapshot": "  Hooks need review\n  10 hooks are new or changed.\n  Hooks can run outside the sandbox after you trust them.\n› 1. Review hooks\n  2. Trust all and continue\n  3. Continue without trusting (hooks won't run)\n  Press enter to confirm or esc to go back",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "1. Review hooks",
+  "queued": false,
+  "sendNow": {
+   "input": "1. Review hooks",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Review hooks",
+    "2. Trust all and continue",
+    "3. Continue without trusting (hooks won't run)"
+   ],
+   "focusedIndex": 0,
+   "request": "Hooks need review\n10 hooks are new or changed.\nHooks can run outside the sandbox after you trust them."
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-idle-placeholder.ansi.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "╭─────────────────────────────────────────────────────────────────────────────────────────────────────╮\n│ ✨ Update available! 0.147.0 -> 0.157.0                                                             │\n│ Run sh -c 'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh' to update. │\n│                                                                                                     │\n│ See full release notes:                                                                             │\n│ https://github.com/openai/codex/releases/latest                                                     │\n╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯\n╭─────────────────────────────────────────────────────╮\n│ >_ OpenAI Codex (v0.147.0)                          │\n│                                                     │\n│ model:       gpt-5.6-sol high   /model to change    │\n│ directory:   /tmp/claude-1001/…/scratchpad/l2/cwork │\n│ permissions: YOLO mode                              │\n╰─────────────────────────────────────────────────────╯\n  Tip: Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished\n  documents, and take on your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower,\n  then turn it up for harder jobs.\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n› Run /review on my current changes\n  gpt-5.6-sol high · /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/l2/…",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "",
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-input-draft.ansi.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "╭─────────────────────────────────────────────────────────────────────────────────────────────────────╮\n│ ✨ Update available! 0.147.0 -> 0.157.0                                                             │\n│ Run sh -c 'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh' to update. │\n│                                                                                                     │\n│ See full release notes:                                                                             │\n│ https://github.com/openai/codex/releases/latest                                                     │\n╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯\n╭─────────────────────────────────────────────────────╮\n│ >_ OpenAI Codex (v0.147.0)                          │\n│                                                     │\n│ model:       gpt-5.6-sol high   /model to change    │\n│ directory:   /tmp/claude-1001/…/scratchpad/l2/cwork │\n│ permissions: YOLO mode                              │\n╰─────────────────────────────────────────────────────╯\n  Tip: Our most capable model yet. GPT-5.6 Sol can tackle complex code changes, dig into research, produce polished\n  documents, and take on your most ambitious work. Sol is highly capable at lower reasoning efforts—try starting lower,\n  then turn it up for harder jobs.\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n› half-typed\n  gpt-5.6-sol high · /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/l2/…",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "half-typed",
+  "queued": false,
+  "sendNow": {
+   "input": "half-typed",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-model-esc-closed.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "│ model:       gpt-5.6-sol high   /model to change     │\n│ directory:   /tmp/claude-1001/…/scratchpad/pre/cwork │\n│ permissions: YOLO mode                               │\n╰──────────────────────────────────────────────────────╯\n  Tip: New Build faster with Codex.\n› /status\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n/status\n╭──────────────────────────────────────────────────────────────────────────────────────────────╮\n│  >_ OpenAI Codex (v0.152.0)                                                                  │\n│                                                                                              │\n│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │\n│ information on rate limits and credits                                                       │\n│                                                                                              │\n│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │\n│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │\n│  Permissions:          Full Access                                                           │\n│  Agents.md:            ~/.codex/AGENTS.md                                                    │\n│  Thread name:          /status                                                               │\n│  Collaboration mode:   Default                                                               │\n│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │\n│                                                                                              │\n│  Token usage:          0 total  (0 input + 0 output)                                         │\n│  Limits:               data not available yet                                                │\n╰──────────────────────────────────────────────────────────────────────────────────────────────╯\n› Ask Codex to do anything\n  gpt-5.6-sol high · /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre…",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Ask Codex to do anything",
+  "queued": false,
+  "sendNow": {
+   "input": "Ask Codex to do anything",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": true,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-model-esc-from-step2.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Select Model and Effort",
+   "request": "Access legacy models by running codex -m <model_name> or in your config.toml",
+   "options": [
+    "1. gpt-5.6-sol (current)  Latest frontier agentic coding model.",
+    "2. gpt-5.6-terra          Balanced agentic coding model for everyday work.",
+    "3. gpt-5.6-luna           Fast and affordable agentic coding model.",
+    "4. gpt-5.5                Frontier model for complex coding, research, and real-world work.",
+    "5. gpt-5.2                Optimized for professional work and long-running agents."
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 1,
+  "panelSnapshot": "⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n/status\n╭──────────────────────────────────────────────────────────────────────────────────────────────╮\n│  >_ OpenAI Codex (v0.152.0)                                                                  │\n│                                                                                              │\n│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │\n│ information on rate limits and credits                                                       │\n│                                                                                              │\n│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │\n│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │\n│  Permissions:          Full Access                                                           │\n│  Agents.md:            ~/.codex/AGENTS.md                                                    │\n│  Thread name:          /status                                                               │\n│  Collaboration mode:   Default                                                               │\n│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │\n│                                                                                              │\n│  Token usage:          0 total  (0 input + 0 output)                                         │\n│  Limits:               data not available yet                                                │\n╰──────────────────────────────────────────────────────────────────────────────────────────────╯\n  Select Model and Effort\n  Access legacy models by running codex -m <model_name> or in your config.toml\n› 1. gpt-5.6-sol (current)  Latest frontier agentic coding model.\n  2. gpt-5.6-terra          Balanced agentic coding model for everyday work.\n  3. gpt-5.6-luna           Fast and affordable agentic coding model.\n  4. gpt-5.5                Frontier model for complex coding, research, and real-world work.\n  5. gpt-5.2                Optimized for professional work and long-running agents.\n  Press enter to confirm or esc to go back",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "1. gpt-5.6-sol (current)  Latest frontier agentic coding model.",
+  "queued": false,
+  "sendNow": {
+   "input": "1. gpt-5.6-sol (current)  Latest frontier agentic coding model.",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. gpt-5.6-sol (current)  Latest frontier agentic coding model.",
+    "2. gpt-5.6-terra          Balanced agentic coding model for everyday work.",
+    "3. gpt-5.6-luna           Fast and affordable agentic coding model.",
+    "4. gpt-5.5                Frontier model for complex coding, research, and real-world work.",
+    "5. gpt-5.2                Optimized for professional work and long-running agents."
+   ],
+   "focusedIndex": 0,
+   "request": "Select Model and Effort\nAccess legacy models by running codex -m <model_name> or in your config.toml"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-model-esc-from-step3.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Select Reasoning Level for gpt-5.6-sol",
+   "request": null,
+   "options": [
+    "1. Low (default)    Fast responses with lighter reasoning",
+    "2. Medium           Balances speed and reasoning depth for everyday tasks",
+    "3. High (current)   Greater reasoning depth for complex problems",
+    "4. Extra high       Extra high reasoning depth for complex problems",
+    "5. More reasoning…  Max and Ultra consume usage limits faster"
+   ],
+   "focusedIndex": 4
+  },
+  "panelHints": 1,
+  "panelSnapshot": "› /status\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n/status\n╭──────────────────────────────────────────────────────────────────────────────────────────────╮\n│  >_ OpenAI Codex (v0.152.0)                                                                  │\n│                                                                                              │\n│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │\n│ information on rate limits and credits                                                       │\n│                                                                                              │\n│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │\n│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │\n│  Permissions:          Full Access                                                           │\n│  Agents.md:            ~/.codex/AGENTS.md                                                    │\n│  Thread name:          /status                                                               │\n│  Collaboration mode:   Default                                                               │\n│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │\n│                                                                                              │\n│  Token usage:          0 total  (0 input + 0 output)                                         │\n│  Limits:               data not available yet                                                │\n╰──────────────────────────────────────────────────────────────────────────────────────────────╯\n  Select Reasoning Level for gpt-5.6-sol\n  1. Low (default)    Fast responses with lighter reasoning\n  2. Medium           Balances speed and reasoning depth for everyday tasks\n  3. High (current)   Greater reasoning depth for complex problems\n  4. Extra high       Extra high reasoning depth for complex problems\n› 5. More reasoning…  Max and Ultra consume usage limits faster\n  Press enter to confirm or esc to go back",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "5. More reasoning…  Max and Ultra consume usage limits faster",
+  "queued": false,
+  "sendNow": {
+   "input": "5. More reasoning…  Max and Ultra consume usage limits faster",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Low (default)    Fast responses with lighter reasoning",
+    "2. Medium           Balances speed and reasoning depth for everyday tasks",
+    "3. High (current)   Greater reasoning depth for complex problems",
+    "4. Extra high       Extra high reasoning depth for complex problems",
+    "5. More reasoning…  Max and Ultra consume usage limits faster"
+   ],
+   "focusedIndex": 4,
+   "request": "Select Reasoning Level for gpt-5.6-sol"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-model-flags-start.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "╭─────────────────────────────────────────────────╮\n│ ✨ Update available! 0.152.0 -> 0.157.0         │\n│ Run npm install -g @openai/codex to update.     │\n│                                                 │\n│ See full release notes:                         │\n│ https://github.com/openai/codex/releases/latest │\n╰─────────────────────────────────────────────────╯\n• Model changed to gpt-5.6-terra medium\n╭──────────────────────────────────────────────────────╮\n│ >_ OpenAI Codex (v0.152.0)                           │\n│                                                      │\n│ model:       gpt-5.6-terra medium   /model to change │\n│ directory:   /tmp/claude-1001/…/scratchpad/pre/cwork │\n│ permissions: YOLO mode                               │\n╰──────────────────────────────────────────────────────╯\n  Tip: Use /personality to customize how Codex communicates.\n› ping\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n› Ask Codex to do anything\n  gpt-5.6-terra medium · /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad…",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Ask Codex to do anything",
+  "queued": false,
+  "sendNow": {
+   "input": "Ask Codex to do anything",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": true,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-model-step1.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Select Model and Effort",
+   "request": "Access legacy models by running codex -m <model_name> or in your config.toml",
+   "options": [
+    "1. gpt-5.6-sol (current)  Latest frontier agentic coding model.",
+    "2. gpt-5.6-terra          Balanced agentic coding model for everyday work.",
+    "3. gpt-5.6-luna           Fast and affordable agentic coding model.",
+    "4. gpt-5.5                Frontier model for complex coding, research, and real-world work.",
+    "5. gpt-5.2                Optimized for professional work and long-running agents."
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 1,
+  "panelSnapshot": "⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n/status\n╭──────────────────────────────────────────────────────────────────────────────────────────────╮\n│  >_ OpenAI Codex (v0.152.0)                                                                  │\n│                                                                                              │\n│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │\n│ information on rate limits and credits                                                       │\n│                                                                                              │\n│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │\n│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │\n│  Permissions:          Full Access                                                           │\n│  Agents.md:            ~/.codex/AGENTS.md                                                    │\n│  Thread name:          /status                                                               │\n│  Collaboration mode:   Default                                                               │\n│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │\n│                                                                                              │\n│  Token usage:          0 total  (0 input + 0 output)                                         │\n│  Limits:               data not available yet                                                │\n╰──────────────────────────────────────────────────────────────────────────────────────────────╯\n  Select Model and Effort\n  Access legacy models by running codex -m <model_name> or in your config.toml\n› 1. gpt-5.6-sol (current)  Latest frontier agentic coding model.\n  2. gpt-5.6-terra          Balanced agentic coding model for everyday work.\n  3. gpt-5.6-luna           Fast and affordable agentic coding model.\n  4. gpt-5.5                Frontier model for complex coding, research, and real-world work.\n  5. gpt-5.2                Optimized for professional work and long-running agents.\n  Press enter to confirm or esc to go back",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "1. gpt-5.6-sol (current)  Latest frontier agentic coding model.",
+  "queued": false,
+  "sendNow": {
+   "input": "1. gpt-5.6-sol (current)  Latest frontier agentic coding model.",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. gpt-5.6-sol (current)  Latest frontier agentic coding model.",
+    "2. gpt-5.6-terra          Balanced agentic coding model for everyday work.",
+    "3. gpt-5.6-luna           Fast and affordable agentic coding model.",
+    "4. gpt-5.5                Frontier model for complex coding, research, and real-world work.",
+    "5. gpt-5.2                Optimized for professional work and long-running agents."
+   ],
+   "focusedIndex": 0,
+   "request": "Select Model and Effort\nAccess legacy models by running codex -m <model_name> or in your config.toml"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-model-step2.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Select Reasoning Level for gpt-5.6-sol",
+   "request": null,
+   "options": [
+    "1. Low (default)    Fast responses with lighter reasoning",
+    "2. Medium           Balances speed and reasoning depth for everyday tasks",
+    "3. High (current)   Greater reasoning depth for complex problems",
+    "4. Extra high       Extra high reasoning depth for complex problems",
+    "5. More reasoning…  Max and Ultra consume usage limits faster"
+   ],
+   "focusedIndex": 2
+  },
+  "panelHints": 1,
+  "panelSnapshot": "› /status\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n/status\n╭──────────────────────────────────────────────────────────────────────────────────────────────╮\n│  >_ OpenAI Codex (v0.152.0)                                                                  │\n│                                                                                              │\n│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │\n│ information on rate limits and credits                                                       │\n│                                                                                              │\n│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │\n│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │\n│  Permissions:          Full Access                                                           │\n│  Agents.md:            ~/.codex/AGENTS.md                                                    │\n│  Thread name:          /status                                                               │\n│  Collaboration mode:   Default                                                               │\n│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │\n│                                                                                              │\n│  Token usage:          0 total  (0 input + 0 output)                                         │\n│  Limits:               data not available yet                                                │\n╰──────────────────────────────────────────────────────────────────────────────────────────────╯\n  Select Reasoning Level for gpt-5.6-sol\n  1. Low (default)    Fast responses with lighter reasoning\n  2. Medium           Balances speed and reasoning depth for everyday tasks\n› 3. High (current)   Greater reasoning depth for complex problems\n  4. Extra high       Extra high reasoning depth for complex problems\n  5. More reasoning…  Max and Ultra consume usage limits faster\n  Press enter to confirm or esc to go back",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "3. High (current)   Greater reasoning depth for complex problems",
+  "queued": false,
+  "sendNow": {
+   "input": "3. High (current)   Greater reasoning depth for complex problems",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Low (default)    Fast responses with lighter reasoning",
+    "2. Medium           Balances speed and reasoning depth for everyday tasks",
+    "3. High (current)   Greater reasoning depth for complex problems",
+    "4. Extra high       Extra high reasoning depth for complex problems",
+    "5. More reasoning…  Max and Ultra consume usage limits faster"
+   ],
+   "focusedIndex": 2,
+   "request": "Select Reasoning Level for gpt-5.6-sol"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-model-step3-more.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Advanced Reasoning",
+   "request": "⚠ Consumes usage limits faster",
+   "options": [
+    "1. Max    For difficult problems when quality matters more than speed · higher usage",
+    "2. Ultra  For demanding work using multiple agents · highest usage"
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 1,
+  "panelSnapshot": "╰──────────────────────────────────────────────────────╯\n  Tip: New Build faster with Codex.\n› /status\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n/status\n╭──────────────────────────────────────────────────────────────────────────────────────────────╮\n│  >_ OpenAI Codex (v0.152.0)                                                                  │\n│                                                                                              │\n│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │\n│ information on rate limits and credits                                                       │\n│                                                                                              │\n│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │\n│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │\n│  Permissions:          Full Access                                                           │\n│  Agents.md:            ~/.codex/AGENTS.md                                                    │\n│  Thread name:          /status                                                               │\n│  Collaboration mode:   Default                                                               │\n│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │\n│                                                                                              │\n│  Token usage:          0 total  (0 input + 0 output)                                         │\n│  Limits:               data not available yet                                                │\n╰──────────────────────────────────────────────────────────────────────────────────────────────╯\n  Advanced Reasoning\n  ⚠ Consumes usage limits faster\n› 1. Max    For difficult problems when quality matters more than speed · higher usage\n  2. Ultra  For demanding work using multiple agents · highest usage\n  Press enter to confirm or esc to go back",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "1. Max    For difficult problems when quality matters more than speed · higher usage",
+  "queued": false,
+  "sendNow": {
+   "input": "1. Max    For difficult problems when quality matters more than speed · higher usage",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [
+    "1. Max    For difficult problems when quality matters more than speed · higher usage",
+    "2. Ultra  For demanding work using multiple agents · highest usage"
+   ],
+   "focusedIndex": 0,
+   "request": "Advanced Reasoning\n⚠ Consumes usage limits faster"
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-slash-popup-model.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "│ model:       gpt-5.6-sol high   /model to change     │\n│ directory:   /tmp/claude-1001/…/scratchpad/pre/cwork │\n│ permissions: YOLO mode                               │\n╰──────────────────────────────────────────────────────╯\n  Tip: New Build faster with Codex.\n› /status\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n/status\n╭──────────────────────────────────────────────────────────────────────────────────────────────╮\n│  >_ OpenAI Codex (v0.152.0)                                                                  │\n│                                                                                              │\n│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │\n│ information on rate limits and credits                                                       │\n│                                                                                              │\n│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │\n│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │\n│  Permissions:          Full Access                                                           │\n│  Agents.md:            ~/.codex/AGENTS.md                                                    │\n│  Thread name:          /status                                                               │\n│  Collaboration mode:   Default                                                               │\n│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │\n│                                                                                              │\n│  Token usage:          0 total  (0 input + 0 output)                                         │\n│  Limits:               data not available yet                                                │\n╰──────────────────────────────────────────────────────────────────────────────────────────────╯\n› /model\n  /model  choose what model and reasoning effort to use",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "/model",
+  "queued": false,
+  "sendNow": {
+   "input": "/model",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": true,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": true,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-slash-popup-status.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "╭──────────────────────────────────────────────────────╮\n│ >_ OpenAI Codex (v0.152.0)                           │\n│                                                      │\n│ model:       gpt-5.6-sol high   /model to change     │\n│ directory:   /tmp/claude-1001/…/scratchpad/pre/cwork │\n│ permissions: YOLO mode                               │\n╰──────────────────────────────────────────────────────╯\n  Tip: New Build faster with Codex.\n› /status\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n› /status\n  /status      show current session configuration and token usage\n  /statusline  configure which items appear in the status line",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "/status",
+  "queued": false,
+  "sendNow": {
+   "input": "/status",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": true,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-status-positional.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "╭──────────────────────────────────────────────────────╮\n│ >_ OpenAI Codex (v0.152.0)                           │\n│                                                      │\n│ model:       gpt-5.6-sol high   /model to change     │\n│ directory:   /tmp/claude-1001/…/scratchpad/pre/cwork │\n│ permissions: YOLO mode                               │\n╰──────────────────────────────────────────────────────╯\n  Tip: New Build faster with Codex.\n› /status\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n› Ask Codex to do anything\n  gpt-5.6-sol high · /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre…",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Ask Codex to do anything",
+  "queued": false,
+  "sendNow": {
+   "input": "Ask Codex to do anything",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": true,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-status.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": null,
+  "panelHints": 0,
+  "panelSnapshot": "│ model:       gpt-5.6-sol high   /model to change     │\n│ directory:   /tmp/claude-1001/…/scratchpad/pre/cwork │\n│ permissions: YOLO mode                               │\n╰──────────────────────────────────────────────────────╯\n  Tip: New Build faster with Codex.\n› /status\n⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json\n⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some\n  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.\n■ Your access token could not be refreshed. Please log out and sign in again.\n/status\n╭──────────────────────────────────────────────────────────────────────────────────────────────╮\n│  >_ OpenAI Codex (v0.152.0)                                                                  │\n│                                                                                              │\n│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                                │\n│ information on rate limits and credits                                                       │\n│                                                                                              │\n│  Model:                gpt-5.6-sol (reasoning high, summaries auto)                          │\n│  Directory:            /tmp/claude-1001/-home-agent-workspace-example/…/scratchpad/pre/cwork │\n│  Permissions:          Full Access                                                           │\n│  Agents.md:            ~/.codex/AGENTS.md                                                    │\n│  Thread name:          /status                                                               │\n│  Collaboration mode:   Default                                                               │\n│  Session:              01a0da42-aec8-7172-ba68-441a9920e51f                                  │\n│                                                                                              │\n│  Token usage:          0 total  (0 input + 0 output)                                         │\n│  Limits:               data not available yet                                                │\n╰──────────────────────────────────────────────────────────────────────────────────────────────╯\n› Ask Codex to do anything\n  gpt-5.6-sol high · /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre…",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "Ask Codex to do anything",
+  "queued": false,
+  "sendNow": {
+   "input": "Ask Codex to do anything",
+   "menu": false,
+   "queued": false
+  },
+  "permission": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "hasPermission": false,
+  "choice": {
+   "options": [],
+   "focusedIndex": 0
+  },
+  "plan": [],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": true,
+  "codexUpdate": null,
+  "trust": null,
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ },
+ {
+  "name": "codex-trust-directory.txt",
+  "busy": false,
+  "busyAnywhere": false,
+  "menu": {
+   "title": "Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt",
+   "request": "injection. Trusting the directory allows project-local config, hooks, and exec policies to load.",
+   "options": [
+    "1. Yes, continue",
+    "2. No, quit"
+   ],
+   "focusedIndex": 0
+  },
+  "panelHints": 1,
+  "panelSnapshot": ">─You are in /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/cwork\n  Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt\n  injection. Trusting the directory allows project-local config, hooks, and exec policies to load.\n› 1. Yes, continue\n  2. No, quit\n  Press enter to continue",
+  "confirm": false,
+  "modelSet": 0,
+  "effortSet": 0,
+  "kept": 0,
+  "input": "1. Yes, continue",
+  "queued": false,
+  "sendNow": {
+   "input": "1. Yes, continue",
+   "menu": true,
+   "queued": false
+  },
+  "permission": {
+   "options": [
+    "1. Yes, continue",
+    "2. No, quit"
+   ],
+   "focusedIndex": 0,
+   "request": "Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt\ninjection. Trusting the directory allows project-local config, hooks, and exec policies to load."
+  },
+  "hasPermission": true,
+  "choice": {
+   "options": [
+    "1. Yes, continue",
+    "2. No, quit"
+   ],
+   "focusedIndex": 0,
+   "request": "Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt\ninjection. Trusting the directory allows project-local config, hooks, and exec policies to load."
+  },
+  "plan": [
+   "Yes, continue",
+   "No, quit"
+  ],
+  "promptBox": false,
+  "launchedPromptBox": false,
+  "codexComposer": false,
+  "codexUpdate": null,
+  "trust": {
+   "agent": "codex",
+   "folderPath": "/tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/cwork"
+  },
+  "question": false,
+  "stillInBox": {
+   "half-typed": false,
+   "Also add the word DELTA.": false,
+   "my unsent draft": false,
+   "/model": false,
+   "Explain this codebase": false
+  }
+ }
+]

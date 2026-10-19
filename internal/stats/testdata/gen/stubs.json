@@ -1,0 +1,6 @@
+{
+ "stubs": {
+  "lib/auth": "stub-auth.mjs", "lib/logger": "stub-logger.mjs", "lib/preflight": "stub-preflight.mjs", "lib/sync-server": "stub-inert.mjs"
+ },
+ "real": ["dayjs"]
+}

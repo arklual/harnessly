@@ -1,0 +1,1182 @@
+{
+ "uid": 1000,
+ "releaseRoot": "/opt/acme-ai/",
+ "tree": {
+  "900/stat": "900 (systemd) S 1 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 1900 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "900/status": "Name:\tsystemd\nUid:\t0\t0\t0\t0\n",
+  "900/cmdline": "systemd\u0000",
+  "900/cgroup": "0::/system.slice/runtime.service",
+  "900/cwd": {
+   "link": "/home/agent"
+  },
+  "900/exe": {
+   "link": "/usr/bin/x"
+  },
+  "950/stat": "950 (bash) S 900 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 1950 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "950/status": "Name:\tbash\nUid:\t1000\t1000\t1000\t1000\n",
+  "950/cmdline": "-bash\u0000",
+  "950/cgroup": "0::/system.slice/runtime.service",
+  "950/cwd": {
+   "link": "/home/agent"
+  },
+  "950/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1000/stat": "1000 (node) S 950 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2000 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1000/status": "Name:\tnode\nUid:\t1000\t1000\t1000\t1000\n",
+  "1000/cmdline": "node\u0000/opt/acme-ai/current/server.js\u0000",
+  "1000/cgroup": "0::/system.slice/runtime.service",
+  "1000/cwd": {
+   "link": "/home/agent"
+  },
+  "1000/exe": {
+   "link": "/usr/bin/node"
+  },
+  "1100/stat": "1100 (chrome) S 1000 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2100 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1100/status": "Name:\tchrome\nUid:\t1000\t1000\t1000\t1000\n",
+  "1100/cmdline": "chrome\u0000--headless\u0000",
+  "1100/cgroup": "0::/system.slice/runtime.service",
+  "1100/cwd": {
+   "link": "/home/agent"
+  },
+  "1100/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1500/stat": "1500 (tmux: server) S 1 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2500 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1500/status": "Name:\ttmux: server\nUid:\t1000\t1000\t1000\t1000\n",
+  "1500/cmdline": "tmux\u0000-L\u0000runtime\u0000new-session\u0000",
+  "1500/cgroup": "0::/system.slice/runtime.service",
+  "1500/cwd": {
+   "link": "/home/agent"
+  },
+  "1500/exe": {
+   "link": "/opt/acme-ai/bin/tmux"
+  },
+  "1501/stat": "1501 (bash) S 1500 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2501 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1501/status": "Name:\tbash\nUid:\t1000\t1000\t1000\t1000\n",
+  "1501/cmdline": "-bash\u0000",
+  "1501/cgroup": "0::/system.slice/runtime.service",
+  "1501/cwd": {
+   "link": "/home/agent"
+  },
+  "1501/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1502/stat": "1502 (zsh) S 1500 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2502 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1502/status": "Name:\tzsh\nUid:\t1000\t1000\t1000\t1000\n",
+  "1502/cmdline": "zsh\u0000",
+  "1502/cgroup": "0::/system.slice/runtime.service",
+  "1502/cwd": {
+   "link": "/home/agent"
+  },
+  "1502/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1600/stat": "1600 (claude) S 1501 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2600 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1600/status": "Name:\tclaude\nUid:\t1000\t1000\t1000\t1000\n",
+  "1600/cmdline": "claude\u0000--dangerously-skip-permissions\u0000",
+  "1600/cgroup": "0::/system.slice/runtime.service",
+  "1600/cwd": {
+   "link": "/home/agent"
+  },
+  "1600/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1601/stat": "1601 (node) S 1600 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2601 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1601/status": "Name:\tnode\nUid:\t1000\t1000\t1000\t1000\n",
+  "1601/cmdline": "node\u0000/home/agent/mcp/server.js\u0000",
+  "1601/cgroup": "0::/system.slice/runtime.service",
+  "1601/cwd": {
+   "link": "/home/agent"
+  },
+  "1601/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1602/stat": "1602 (bash) S 1600 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2602 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1602/status": "Name:\tbash\nUid:\t1000\t1000\t1000\t1000\n",
+  "1602/cmdline": "bash\u0000-c\u0000npm\u0000test\u0000",
+  "1602/cgroup": "0::/system.slice/runtime.service",
+  "1602/cwd": {
+   "link": "/home/agent"
+  },
+  "1602/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1603/stat": "1603 (node) S 1602 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2603 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1603/status": "Name:\tnode\nUid:\t1000\t1000\t1000\t1000\n",
+  "1603/cmdline": "node\u0000vite\u0000--port\u00005173\u0000",
+  "1603/cgroup": "0::/system.slice/runtime.service",
+  "1603/cwd": {
+   "link": "/home/agent/app"
+  },
+  "1603/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1604/stat": "1604 (node) S 1600 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2604 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1604/status": "Name:\tnode\nUid:\t1000\t1000\t1000\t1000\n",
+  "1604/cmdline": "node\u0000vite\u0000",
+  "1604/cgroup": "0::/system.slice/runtime.service",
+  "1604/cwd": {
+   "link": "/home/agent/app"
+  },
+  "1604/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1700/stat": "1700 (node) S 1502 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2700 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1700/status": "Name:\tnode\nUid:\t1000\t1000\t1000\t1000\n",
+  "1700/cmdline": "node\u0000next\u0000dev\u0000",
+  "1700/cgroup": "0::/system.slice/runtime.service",
+  "1700/cwd": {
+   "link": "/home/agent/site"
+  },
+  "1700/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1701/stat": "1701 (python3) S 1502 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2701 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1701/status": "Name:\tpython3\nUid:\t1000\t1000\t1000\t1000\n",
+  "1701/cmdline": "python3\u0000-m\u0000http.server\u00008000\u0000",
+  "1701/cgroup": "0::/system.slice/runtime.service",
+  "1701/cwd": {
+   "link": "/home/agent"
+  },
+  "1701/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1702/stat": "1702 (go) S 1502 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 99 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1702/status": "Name:\tgo\nUid:\t1000\t1000\t1000\t1000\n",
+  "1702/cmdline": "go\u0000run\u0000.\u0000",
+  "1702/cgroup": "0::/system.slice/runtime.service",
+  "1702/cwd": {
+   "link": "/home/agent"
+  },
+  "1702/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1800/stat": "1800 (sudo) S 1502 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2800 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1800/status": "Name:\tsudo\nUid:\t1000\t0\t0\t0\n",
+  "1800/cmdline": "sudo\u0000ls\u0000",
+  "1800/cgroup": "0::/system.slice/runtime.service",
+  "1800/cwd": {
+   "link": "/home/agent"
+  },
+  "1800/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1801/stat": "1801 (ls) S 1800 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2801 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1801/status": "Name:\tls\nUid:\t1000\t1000\t1000\t1000\n",
+  "1801/cmdline": "ls\u0000-R\u0000/\u0000",
+  "1801/cgroup": "0::/system.slice/runtime.service",
+  "1801/cwd": {
+   "link": "/home/agent"
+  },
+  "1801/exe": {
+   "link": "/usr/bin/x"
+  },
+  "1900/stat": "1900 (other) S 1 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 2900 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "1900/status": "Name:\tother\nUid:\t1001\t1001\t1001\t1001\n",
+  "1900/cmdline": "other\u0000",
+  "1900/cgroup": "0::/system.slice/runtime.service",
+  "1900/cwd": {
+   "link": "/home/agent"
+  },
+  "1900/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2000/stat": "2000 (netbird) S 900 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3000 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2000/status": "Name:\tnetbird\nUid:\t1000\t1000\t1000\t1000\n",
+  "2000/cmdline": "netbird\u0000",
+  "2000/cgroup": "0::/system.slice/netbird.service",
+  "2000/cwd": {
+   "link": "/home/agent"
+  },
+  "2000/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2100/stat": "2100 (agent) S 900 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3100 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2100/status": "Name:\tagent\nUid:\t1000\t1000\t1000\t1000\n",
+  "2100/cmdline": "/opt/x/agent\u0000",
+  "2100/cgroup": "0::/system.slice/other-agent.service",
+  "2100/cwd": {
+   "link": "/home/agent"
+  },
+  "2100/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2101/stat": "2101 (helper) S 2100 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3101 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2101/status": "Name:\thelper\nUid:\t1000\t1000\t1000\t1000\n",
+  "2101/cmdline": "helper\u0000",
+  "2101/cgroup": "0::/user.slice/u.scope",
+  "2101/cwd": {
+   "link": "/home/agent"
+  },
+  "2101/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2102/stat": "2102 (helper2) S 2101 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3102 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2102/status": "Name:\thelper2\nUid:\t1000\t1000\t1000\t1000\n",
+  "2102/cmdline": "helper2\u0000",
+  "2102/cgroup": "0::/user.slice/u.scope",
+  "2102/cwd": {
+   "link": "/home/agent"
+  },
+  "2102/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2200/stat": "2200 (zombie) Z 1502 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3200 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2200/status": "Name:\tzombie\nUid:\t1000\t1000\t1000\t1000\n",
+  "2200/cmdline": "zombie\u0000",
+  "2200/cgroup": "0::/system.slice/runtime.service",
+  "2200/cwd": {
+   "link": "/home/agent"
+  },
+  "2200/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2300/stat": "2300 (we(ird) (name) S 1502 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3300 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2300/status": "Name:\twe(ird) (name\nUid:\t1000\t1000\t1000\t1000\n",
+  "2300/cmdline": "\u0000",
+  "2300/cgroup": "0::/system.slice/runtime.service",
+  "2300/cwd": {
+   "link": "/home/agent"
+  },
+  "2300/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2400/stat": "2400 (node) S 1 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3400 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2400/status": "Name:\tnode\nUid:\t1000\t1000\t1000\t1000\n",
+  "2400/cmdline": "node\u0000/srv/app.js\u0000",
+  "2400/cgroup": "0::/system.slice/runtime.service",
+  "2400/cwd": {
+   "link": "/opt/acme-ai/current/.next/standalone"
+  },
+  "2400/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2500/stat": "2500 (nginx) S 1502 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3500 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2500/status": "Name:\tnginx\nUid:\t1000\t1000\t1000\t1000\n",
+  "2500/cmdline": "nginx\u0000-g\u0000daemon\u0000off;\u0000",
+  "2500/cgroup": "0::/system.slice/runtime.service",
+  "2500/cwd": {
+   "link": "/home/agent"
+  },
+  "2500/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2600/stat": "2600 (tmux: server) S 1 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3600 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2600/status": "Name:\ttmux: server\nUid:\t1000\t1000\t1000\t1000\n",
+  "2600/cmdline": "tmux\u0000",
+  "2600/cgroup": "0::/system.slice/tmux-host.service",
+  "2600/cwd": {
+   "link": "/home/agent"
+  },
+  "2600/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2601/stat": "2601 (node) S 2600 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3601 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2601/status": "Name:\tnode\nUid:\t1000\t1000\t1000\t1000\n",
+  "2601/cmdline": "node\u0000worker.js\u0000",
+  "2601/cgroup": "0::/user.slice/u.scope",
+  "2601/cwd": {
+   "link": "/home/agent"
+  },
+  "2601/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2700/stat": "2700 (node) S 1502 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3700 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2700/status": "Name:\tnode\nUid:\t1000\t1000\t1000\t1000\n",
+  "2700/cmdline": "node\u0000tool.js\u0000",
+  "2700/cgroup": "0::/system.slice/runtime.service",
+  "2700/cwd": {
+   "link": "/home/agent"
+  },
+  "2700/exe": {
+   "link": "/usr/bin/x"
+  },
+  "2701/stat": "2701 (bash) S 2700 1 1 0 -1 4194560 100 0 0 0 5 5 0 0 20 0 1 0 3701 100000 50 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0\n",
+  "2701/status": "Name:\tbash\nUid:\t1000\t1000\t1000\t1000\n",
+  "2701/cmdline": "bash\u0000",
+  "2701/cgroup": "0::/system.slice/runtime.service",
+  "2701/cwd": {
+   "link": "/home/agent"
+  },
+  "2701/exe": {
+   "link": "/usr/bin/x"
+  }
+ },
+ "listed": [
+  {
+   "pid": 1603,
+   "starttime": 2603,
+   "port": 6603
+  },
+  {
+   "pid": 1604,
+   "starttime": 2604,
+   "port": 6604
+  },
+  {
+   "pid": 1700,
+   "starttime": 2700,
+   "port": 6700
+  },
+  {
+   "pid": 1701,
+   "starttime": 2701
+  },
+  {
+   "pid": 1702,
+   "starttime": 2702
+  },
+  {
+   "pid": 1801,
+   "starttime": 2801
+  },
+  {
+   "pid": 2101,
+   "starttime": 3101
+  },
+  {
+   "pid": 2102,
+   "starttime": 3102
+  },
+  {
+   "pid": 2300,
+   "starttime": 3300
+  },
+  {
+   "pid": 2400,
+   "starttime": 3400
+  },
+  {
+   "pid": 2500,
+   "starttime": 3500
+  },
+  {
+   "pid": 2601,
+   "starttime": 3601
+  },
+  {
+   "pid": 2701,
+   "starttime": 3701
+  },
+  {
+   "pid": 1100,
+   "starttime": 2100
+  },
+  {
+   "pid": 1600,
+   "starttime": 2600
+  },
+  {
+   "pid": 1702,
+   "starttime": 1
+  }
+ ],
+ "bodies": [
+  [
+   "{\"pid\":1603,\"starttime\":\"2603\"}",
+   {
+    "pid": 1603,
+    "starttime": "2603"
+   }
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":2603}",
+   {
+    "pid": 1603,
+    "starttime": "2603"
+   }
+  ],
+  [
+   "{\"pid\":1603.5,\"starttime\":\"1\"}",
+   null
+  ],
+  [
+   "{\"pid\":1,\"starttime\":\"1\"}",
+   null
+  ],
+  [
+   "{\"pid\":2,\"starttime\":\"0\"}",
+   {
+    "pid": 2,
+    "starttime": "0"
+   }
+  ],
+  [
+   "{\"pid\":4194304,\"starttime\":\"0\"}",
+   {
+    "pid": 4194304,
+    "starttime": "0"
+   }
+  ],
+  [
+   "{\"pid\":4194305,\"starttime\":\"0\"}",
+   null
+  ],
+  [
+   "{\"pid\":\"1603\",\"starttime\":\"1\"}",
+   null
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":\"01\"}",
+   null
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":\"-1\"}",
+   null
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":-0}",
+   {
+    "pid": 1603,
+    "starttime": "0"
+   }
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":1.5}",
+   null
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":9007199254740991}",
+   {
+    "pid": 1603,
+    "starttime": "9007199254740991"
+   }
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":9007199254740992}",
+   null
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":1e3}",
+   {
+    "pid": 1603,
+    "starttime": "1000"
+   }
+  ],
+  [
+   "{\"pid\":1603}",
+   null
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":null}",
+   null
+  ],
+  [
+   "[]",
+   null
+  ],
+  [
+   "null",
+   null
+  ],
+  [
+   "\"x\"",
+   null
+  ],
+  [
+   "5",
+   null
+  ],
+  [
+   "{}",
+   null
+  ],
+  [
+   "{\"pid\":-5,\"starttime\":\"1\"}",
+   null
+  ],
+  [
+   "{\"pid\":1e3,\"starttime\":\" 1\"}",
+   null
+  ],
+  [
+   "{\"pid\":3000,\"starttime\":\"123456789012345678901234567890\"}",
+   {
+    "pid": 3000,
+    "starttime": "123456789012345678901234567890"
+   }
+  ],
+  [
+   "{\"pid\":2.0,\"starttime\":\"7\"}",
+   {
+    "pid": 2,
+    "starttime": "7"
+   }
+  ],
+  [
+   "{\"pid\":1603,\"starttime\":true}",
+   null
+  ]
+ ],
+ "cases": [
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2603"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 3,
+    "end": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 3,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2603"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 1,
+    "end": "zombie"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 1,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2603"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 7,
+    "end": "reused"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 7,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2603"
+   },
+   "plan": {
+    "term": "sent",
+    "after": null,
+    "kill": "sent"
+   },
+   "calls": [
+    "SIGTERM",
+    "SIGKILL"
+   ],
+   "polls": 50,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGKILL"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2603"
+   },
+   "plan": {
+    "term": "sent",
+    "after": null,
+    "kill": "gone"
+   },
+   "calls": [
+    "SIGTERM",
+    "SIGKILL"
+   ],
+   "polls": 50,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2603"
+   },
+   "plan": {
+    "term": "sent",
+    "after": null,
+    "kill": "denied"
+   },
+   "calls": [
+    "SIGTERM",
+    "SIGKILL"
+   ],
+   "polls": 50,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "foreign"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2603"
+   },
+   "plan": {
+    "term": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 0,
+   "result": {
+    "status": 404,
+    "body": {
+     "error": "gone"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2603"
+   },
+   "plan": {
+    "term": "denied"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "foreign"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1603,
+    "starttime": "2604"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 409,
+    "body": {
+     "error": "changed"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 4000,
+    "starttime": "1"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 404,
+    "body": {
+     "error": "gone"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2200,
+    "starttime": "3200"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 404,
+    "body": {
+     "error": "gone"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1900,
+    "starttime": "2900"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "foreign"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1800,
+    "starttime": "2800"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "foreign"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1801,
+    "starttime": "2801"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 0,
+    "end": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 1,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1000,
+    "starttime": "2000"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "protected"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 950,
+    "starttime": "1950"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "protected"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 900,
+    "starttime": "1900"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "foreign"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1100,
+    "starttime": "2100"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "protected"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2000,
+    "starttime": "3000"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "protected"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2101,
+    "starttime": "3101"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "protected"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2102,
+    "starttime": "3102"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "protected"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2400,
+    "starttime": "3400"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "protected"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1500,
+    "starttime": "2500"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "protected"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1501,
+    "starttime": "2501"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "not-stoppable"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1600,
+    "starttime": "2600"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "not-stoppable"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1601,
+    "starttime": "2601"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "not-stoppable"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1602,
+    "starttime": "2602"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "not-stoppable"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1604,
+    "starttime": "2604"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 2,
+    "end": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 2,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1700,
+    "starttime": "2700"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 49,
+    "end": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 49,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1700,
+    "starttime": "2700"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 50,
+    "end": "gone",
+    "kill": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 50,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1701,
+    "starttime": "2701"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 0,
+    "end": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 1,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 1702,
+    "starttime": "1099"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 409,
+    "body": {
+     "error": "changed"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2300,
+    "starttime": "3300"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 0,
+    "end": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 1,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2500,
+    "starttime": "3500"
+   },
+   "plan": {},
+   "calls": [
+    "SIGTERM",
+    "SIGKILL"
+   ],
+   "polls": 50,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGKILL"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2601,
+    "starttime": "3601"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 0,
+    "end": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 1,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2700,
+    "starttime": "3700"
+   },
+   "plan": {},
+   "calls": [],
+   "polls": 0,
+   "result": {
+    "status": 403,
+    "body": {
+     "error": "not-listed"
+    }
+   }
+  },
+  {
+   "request": {
+    "pid": 2701,
+    "starttime": "3701"
+   },
+   "plan": {
+    "term": "sent",
+    "after": 0,
+    "end": "gone"
+   },
+   "calls": [
+    "SIGTERM"
+   ],
+   "polls": 1,
+   "result": {
+    "status": 200,
+    "body": {
+     "stopped": true,
+     "signal": "SIGTERM"
+    }
+   }
+  }
+ ]
+}

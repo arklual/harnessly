@@ -1,0 +1,4078 @@
+{
+ "now": 1792314000000,
+ "token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+ "gitVersion": "git version 2.43.0",
+ "gitSetup": "set -e\nexport GIT_AUTHOR_NAME=A GIT_AUTHOR_EMAIL=a@example.com GIT_COMMITTER_NAME=A GIT_COMMITTER_EMAIL=a@example.com\nexport GIT_AUTHOR_DATE=2026-10-18T09:00:00Z GIT_COMMITTER_DATE=2026-10-18T09:00:00Z\ng() { git -c init.defaultBranch=main -c advice.detachedHead=false \"$@\"; }\ncd \"$ROOT\"\ng init -q --bare remote.git\ng clone -q remote.git seed 2>/dev/null\n(cd seed && echo one > f && g add f && g commit -qm one && g push -q origin main)\nfor n in uptodate behind ahead diverged local fetchfail; do g clone -q remote.git $n; done\ng init -q noup\n(cd noup && echo x > f && g add f && g commit -qm x)\nmkdir norepo\n(cd seed && echo two >> f && g commit -qam two && g push -q origin main)\n(cd uptodate && g pull -q --ff-only)\n(cd ahead && g pull -q --ff-only && echo three > g && g add g && g commit -qm three)\n(cd diverged && echo local > h && g add h && g commit -qm local)\n(cd local && echo dirty > f)\n(cd fetchfail && g remote set-url origin \"$ROOT/missing.git\")\n",
+ "fixtures": [
+  {
+   "path": "proj/a.txt",
+   "text": "hello\n"
+  },
+  {
+   "path": "proj/b.txt",
+   "text": "second\n"
+  },
+  {
+   "path": "proj/c.txt",
+   "text": "third\n"
+  },
+  {
+   "path": "proj/bin.dat",
+   "base64": "YQBi"
+  },
+  {
+   "path": "proj/latin.txt",
+   "base64": "Y2Fm6Qo="
+  },
+  {
+   "path": "proj/big.txt",
+   "repeat": "x",
+   "count": 1000001
+  },
+  {
+   "path": "proj/sub/d.txt",
+   "text": "deep\n"
+  },
+  {
+   "path": "proj/link-in",
+   "link": "a.txt"
+  },
+  {
+   "path": "proj/link-out",
+   "link": "../outside/secret.txt"
+  },
+  {
+   "path": "outside/secret.txt",
+   "text": "secret\n"
+  },
+  {
+   "path": "data/uploads/ws1/tab1/old.png",
+   "text": "old",
+   "age": 90000
+  },
+  {
+   "path": "data/uploads/ws1/tab1/new.png",
+   "text": "new",
+   "age": 60
+  },
+  {
+   "path": "data/uploads/ws1/tab1/old-empty.png",
+   "text": "",
+   "age": 90000
+  },
+  {
+   "path": "data/uploads/ws1/tab2/old.pdf",
+   "text": "pdf-old",
+   "age": 86401
+  },
+  {
+   "path": "data/uploads/ws1/tab2/edge.pdf",
+   "text": "edge",
+   "age": 86399
+  },
+  {
+   "path": "data/uploads/ws1/stray.txt",
+   "text": "stray",
+   "age": 90000
+  },
+  {
+   "path": "data/uploads/ws2/tab/sub/deep.png",
+   "text": "deep",
+   "age": 90000
+  },
+  {
+   "path": "data/uploads/ws3/tab/x.png",
+   "text": "x",
+   "age": 90000
+  },
+  {
+   "path": "data/uploads/top.txt",
+   "text": "top",
+   "age": 90000
+  }
+ ],
+ "requests": [
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "x-acme-filename": "notes.txt",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-1"
+   },
+   "body": "file body",
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "x-acme-filename": "notes.txt",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-1"
+   },
+   "body": "file body",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"x71J2nAIVTUENKIMBjH5QaE_d90\"",
+    "content-length": "140"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-1/1792314000000-00000001-notes.txt\",\"filename\":\"1792314000000-00000001-notes.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "notes.txt",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-1"
+   },
+   "body": "file body",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"zyZigOcg4D0wQ5zGDFolR-65Rko\"",
+    "content-length": "140"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-1/1792314000000-00000002-notes.txt\",\"filename\":\"1792314000000-00000002-notes.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "notes.txt",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-1"
+   },
+   "body": "",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"kHvZPtpZf4GmTjlQl0BBaBFyI_A\"",
+    "content-length": "22"
+   },
+   "answer": "{\"error\":\"Empty body\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "archive.tar.gz",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-0"
+   },
+   "body": "body 0",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"mcmDamToWtpoC4Xlrl28lk_Sgwk\"",
+    "content-length": "150"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-0/1792314000000-00000003-archive_tar.gz\",\"filename\":\"1792314000000-00000003-archive_tar.gz\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": ".bashrc",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-1"
+   },
+   "body": "body 1",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pia3BWTVSeCQgglQreyeErvHDLc\"",
+    "content-length": "136"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-1/1792314000000-00000004-_bashrc\",\"filename\":\"1792314000000-00000004-_bashrc\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "a.",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-2"
+   },
+   "body": "body 2",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"FyFbwep-u07sqfLlZlgzXb28uio\"",
+    "content-length": "126"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-2/1792314000000-00000005-a.\",\"filename\":\"1792314000000-00000005-a.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "..",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-3"
+   },
+   "body": "body 3",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TEChs8Is3UEydNbeAq9Gc8ODm4w\"",
+    "content-length": "126"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-3/1792314000000-00000006-__\",\"filename\":\"1792314000000-00000006-__\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "...",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-4"
+   },
+   "body": "body 4",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pMXEgEttEdbA88y5u0bS7fXnDXI\"",
+    "content-length": "128"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-4/1792314000000-00000007-__.\",\"filename\":\"1792314000000-00000007-__.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "dir%2Fsub%2Fname.md",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-5"
+   },
+   "body": "body 5",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"W8fp8kmnWG1h7rIq73i9d9a_ysU\"",
+    "content-length": "136"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-5/1792314000000-00000008-name.md\",\"filename\":\"1792314000000-00000008-name.md\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "with space %26 (1).PNG",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-6"
+   },
+   "body": "body 6",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"UpGdqWvBJvaX2dImkIuUtWFhRdg\"",
+    "content-length": "162"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-6/1792314000000-00000009-with_space____1_.PNG\",\"filename\":\"1792314000000-00000009-with_space____1_.PNG\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "%D0%9E%D1%82%D1%87%D1%91%D1%82.pdf",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-7"
+   },
+   "body": "body 7",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ldwwNxXllQU5VbXKIm7ylbXfbS0\"",
+    "content-length": "140"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-7/1792314000000-0000000a-_____.pdf\",\"filename\":\"1792314000000-0000000a-_____.pdf\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "%F0%9F%98%80smile.txt",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-8"
+   },
+   "body": "body 8",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"HPugUg7xkdVDxFdUZBpC6ERMUtQ\"",
+    "content-length": "144"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-8/1792314000000-0000000b-__smile.txt\",\"filename\":\"1792314000000-0000000b-__smile.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "café.txt",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-9"
+   },
+   "body": "body 9",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ZkMEYPnmLOUmYx-GSu-LChrokrg\"",
+    "content-length": "138"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-9/1792314000000-0000000c-caf_.txt\",\"filename\":\"1792314000000-0000000c-caf_.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.verylongextension_with-chars",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-10"
+   },
+   "body": "body 10",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Sim4tX_wkk5HvFCTLm4ndZvTXaI\"",
+    "content-length": "235"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-10/1792314000000-0000000d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.verylongextensi\",\"filename\":\"1792314000000-0000000d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.verylongextensi\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "name.e-x_t",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-11"
+   },
+   "body": "body 11",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"2fs64mCe64NxoyVEDDMKT5UC6J4\"",
+    "content-length": "139"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-11/1792314000000-0000000e-name.ext\",\"filename\":\"1792314000000-0000000e-name.ext\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "%E0%A4%A",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-12"
+   },
+   "body": "body 12",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"4poDfSAd9Hvb65rVftbrJ46zOWA\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"Failed to save file\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "%ZZ",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-13"
+   },
+   "body": "body 13",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"4poDfSAd9Hvb65rVftbrJ46zOWA\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"Failed to save file\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "%C0%80",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-14"
+   },
+   "body": "body 14",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"4poDfSAd9Hvb65rVftbrJ46zOWA\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"Failed to save file\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "%ED%A0%80",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-15"
+   },
+   "body": "body 15",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"4poDfSAd9Hvb65rVftbrJ46zOWA\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"Failed to save file\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-16"
+   },
+   "body": "body 16",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"qC2pC6NFzM4_oboMgtXwK08dhg8\"",
+    "content-length": "131"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-16/1792314000000-0000000f-file\",\"filename\":\"1792314000000-0000000f-file\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "noext",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-17"
+   },
+   "body": "body 17",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Rw7aPmPYROw7OzbMOihfOyRRKz4\"",
+    "content-length": "133"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-17/1792314000000-00000010-noext\",\"filename\":\"1792314000000-00000010-noext\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "a/b/",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-18"
+   },
+   "body": "body 18",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wvGnofQRj7pPDp6j7Q18h_nTtYo\"",
+    "content-length": "125"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-18/1792314000000-00000011-b\",\"filename\":\"1792314000000-00000011-b\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "/abs/file.js",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-19"
+   },
+   "body": "body 19",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ORNxCv0xrLTHyBQbY5SIOBaIqRs\"",
+    "content-length": "137"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-19/1792314000000-00000012-file.js\",\"filename\":\"1792314000000-00000012-file.js\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "%2E%2E%2Fescape",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-20"
+   },
+   "body": "body 20",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"SxPj0DwhMjMY5QIpPIeynPfYoC0\"",
+    "content-length": "135"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-20/1792314000000-00000013-escape\",\"filename\":\"1792314000000-00000013-escape\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "tab\tname.txt",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-21"
+   },
+   "body": "body 21",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"9c47FeE6q7C6bpTsBtBUt_vBmVA\"",
+    "content-length": "147"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-21/1792314000000-00000014-tab_name.txt\",\"filename\":\"1792314000000-00000014-tab_name.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "f.txt",
+    "x-acme-ws-id": "../../etc",
+    "x-acme-tab-id": "ta b/.."
+   },
+   "body": "x",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"-DZ2S6Y64f0qjzj514AX9K8Nboc\"",
+    "content-length": "129"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/etc/tab/1792314000000-00000015-f.txt\",\"filename\":\"1792314000000-00000015-f.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "f.txt",
+    "x-acme-ws-id": "",
+    "x-acme-tab-id": ""
+   },
+   "body": "x",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pdt44QIKOXUaGHSIwe34WG3zCl0\"",
+    "content-length": "137"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/unknown/unknown/1792314000000-00000016-f.txt\",\"filename\":\"1792314000000-00000016-f.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "f.txt",
+    "x-acme-ws-id": "ÿwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"
+   },
+   "body": "x",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6miolsjXcMmz76ajP3azBDPx_y8\"",
+    "content-length": "194"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown/1792314000000-00000017-f.txt\",\"filename\":\"1792314000000-00000017-f.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-old-filename": "old.txt",
+    "x-old-ws-id": "old-ws",
+    "x-old-tab-id": "old-tab"
+   },
+   "body": "x",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"g57sr4JnnCuUAkak22iHocumH74\"",
+    "content-length": "140"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/old-ws/old-tab/1792314000000-00000018-old.txt\",\"filename\":\"1792314000000-00000018-old.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "new.txt",
+    "x-acme-ws-id": "new-ws",
+    "x-old-filename": "old.txt",
+    "x-old-ws-id": "old-ws",
+    "x-old-tab-id": "old-tab"
+   },
+   "body": "x",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"rKXxfrOrBh9FD_2-ratpJpVTlH0\"",
+    "content-length": "140"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/new-ws/old-tab/1792314000000-00000019-new.txt\",\"filename\":\"1792314000000-00000019-new.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/agents/api/upload-file/",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "agents.txt",
+    "x-acme-ws-id": "ws-b",
+    "x-acme-tab-id": "tab-b"
+   },
+   "body": "x",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"yO-bLCAdizRlUAC-aLgefvwyHa8\"",
+    "content-length": "142"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-b/tab-b/1792314000000-0000001a-agents.txt\",\"filename\":\"1792314000000-0000001a-agents.txt\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "image/png",
+    "x-acme-filename": "shot.png",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-1"
+   },
+   "body": "png-bytes",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"z9u4BrQLgQiK2NyJvwRhKHGeGiA\"",
+    "content-length": "138"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-1/1792314000000-0000001b-shot.png\",\"filename\":\"1792314000000-0000001b-shot.png\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "image/jpeg; charset=binary",
+    "x-acme-filename": "photo.HEIC",
+    "x-acme-ws-id": "ws-a",
+    "x-acme-tab-id": "tab-1"
+   },
+   "body": "jpg",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"EDmOO_PE3TlK_U6FS0Y9PmFcLXc\"",
+    "content-length": "140"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/tab-1/1792314000000-0000001c-photo.jpg\",\"filename\":\"1792314000000-0000001c-photo.jpg\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "image/webp",
+    "x-acme-filename": "",
+    "x-acme-ws-id": "ws-a"
+   },
+   "body": "webp",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"W2mEU_QcpTi-f1nKNoRuFq_IAt4\"",
+    "content-length": "144"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/ws-a/unknown/1792314000000-0000001d-image.webp\",\"filename\":\"1792314000000-0000001d-image.webp\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "image/gif",
+    "x-acme-filename": "%F0%9F%98%80"
+   },
+   "body": "gif",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"v2N2_EFhk1scNLWH2stqfI147yM\"",
+    "content-length": "139"
+   },
+   "answer": "{\"path\":\"$ROOT/data/uploads/unknown/unknown/1792314000000-0000001e-__.gif\",\"filename\":\"1792314000000-0000001e-__.gif\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "image/PNG",
+    "x-acme-filename": "x.png"
+   },
+   "body": "x",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TwB3T69DJdZnHTVaBA8zCpRmIQE\"",
+    "content-length": "34"
+   },
+   "answer": "{\"error\":\"Unsupported image type\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "image/svg+xml",
+    "x-acme-filename": "x.svg"
+   },
+   "body": "x",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TwB3T69DJdZnHTVaBA8zCpRmIQE\"",
+    "content-length": "34"
+   },
+   "answer": "{\"error\":\"Unsupported image type\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "x-acme-filename": "x.png"
+   },
+   "body": "x",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TwB3T69DJdZnHTVaBA8zCpRmIQE\"",
+    "content-length": "34"
+   },
+   "answer": "{\"error\":\"Unsupported image type\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "image/png",
+    "x-acme-filename": "x.png"
+   },
+   "body": "",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"kHvZPtpZf4GmTjlQl0BBaBFyI_A\"",
+    "content-length": "22"
+   },
+   "answer": "{\"error\":\"Empty body\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "image/png",
+    "x-acme-filename": "%E0%A4%A"
+   },
+   "body": "x",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"sgF9crWnQ-_RW_HGGbLFJfVjaGQ\"",
+    "content-length": "32"
+   },
+   "answer": "{\"error\":\"Failed to save image\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "content-type": "image/png",
+    "x-acme-filename": "x.png"
+   },
+   "body": "x",
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{bad",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": {
+    "head": "",
+    "repeat": "x",
+    "count": 1048577,
+    "tail": ""
+   },
+   "status": 413,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Body exceeded 1mb limit"
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"mode\":\"expired\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0e6t2MwvGS4XZUohPdLjEQYj8YE\"",
+    "content-length": "46"
+   },
+   "answer": "{\"mode\":\"expired\",\"deleted\":3,\"freedBytes\":11}",
+   "uploads": [
+    {
+     "path": "data/uploads/etc",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/etc/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/etc/tab/1792314000000-00000015-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/new-ws",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/new-ws/old-tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/new-ws/old-tab/1792314000000-00000019-new.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/old-ws",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/old-ws/old-tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/old-ws/old-tab/1792314000000-00000018-old.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/top.txt",
+     "mode": "600",
+     "base64": "dG9w",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/unknown/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/unknown/unknown/1792314000000-00000016-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/unknown/unknown/1792314000000-0000001e-__.gif",
+     "mode": "600",
+     "base64": "Z2lm",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws-a",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-0",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-0/1792314000000-00000003-archive_tar.gz",
+     "mode": "600",
+     "base64": "Ym9keSAw",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000001-notes.txt",
+     "mode": "600",
+     "base64": "ZmlsZSBib2R5",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000002-notes.txt",
+     "mode": "600",
+     "base64": "ZmlsZSBib2R5",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000004-_bashrc",
+     "mode": "600",
+     "base64": "Ym9keSAx",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-0000001b-shot.png",
+     "mode": "600",
+     "base64": "cG5nLWJ5dGVz",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-0000001c-photo.jpg",
+     "mode": "600",
+     "base64": "anBn",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws-a/tab-10",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-10/1792314000000-0000000d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.verylongextensi",
+     "mode": "600",
+     "base64": "Ym9keSAxMA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-11",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-11/1792314000000-0000000e-name.ext",
+     "mode": "600",
+     "base64": "Ym9keSAxMQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-16",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-16/1792314000000-0000000f-file",
+     "mode": "600",
+     "base64": "Ym9keSAxNg==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-17",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-17/1792314000000-00000010-noext",
+     "mode": "600",
+     "base64": "Ym9keSAxNw==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-18",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-18/1792314000000-00000011-b",
+     "mode": "600",
+     "base64": "Ym9keSAxOA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-19",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-19/1792314000000-00000012-file.js",
+     "mode": "600",
+     "base64": "Ym9keSAxOQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-2/1792314000000-00000005-a.",
+     "mode": "600",
+     "base64": "Ym9keSAy",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-20",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-20/1792314000000-00000013-escape",
+     "mode": "600",
+     "base64": "Ym9keSAyMA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-21",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-21/1792314000000-00000014-tab_name.txt",
+     "mode": "600",
+     "base64": "Ym9keSAyMQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-3",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-3/1792314000000-00000006-__",
+     "mode": "600",
+     "base64": "Ym9keSAz",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-4",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-4/1792314000000-00000007-__.",
+     "mode": "600",
+     "base64": "Ym9keSA0",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-5",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-5/1792314000000-00000008-name.md",
+     "mode": "600",
+     "base64": "Ym9keSA1",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-6",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-6/1792314000000-00000009-with_space____1_.PNG",
+     "mode": "600",
+     "base64": "Ym9keSA2",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-7",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-7/1792314000000-0000000a-_____.pdf",
+     "mode": "600",
+     "base64": "Ym9keSA3",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-8",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-8/1792314000000-0000000b-__smile.txt",
+     "mode": "600",
+     "base64": "Ym9keSA4",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-9",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-9/1792314000000-0000000c-caf_.txt",
+     "mode": "600",
+     "base64": "Ym9keSA5",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/unknown/1792314000000-0000001d-image.webp",
+     "mode": "600",
+     "base64": "d2VicA==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/ws-b",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-b/tab-b",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-b/tab-b/1792314000000-0000001a-agents.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/ws1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/stray.txt",
+     "mode": "600",
+     "base64": "c3RyYXk=",
+     "size": 5
+    },
+    {
+     "path": "data/uploads/ws1/tab1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/tab1/new.png",
+     "mode": "600",
+     "base64": "bmV3",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws1/tab2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/tab2/edge.pdf",
+     "mode": "600",
+     "base64": "ZWRnZQ==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/ws2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub/deep.png",
+     "mode": "600",
+     "base64": "ZGVlcA==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown/1792314000000-00000017-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "null",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"E5gSKvpK-AwNEXbPqeV4vm3h_uE\"",
+    "content-length": "45"
+   },
+   "answer": "{\"mode\":\"expired\",\"deleted\":0,\"freedBytes\":0}",
+   "uploads": [
+    {
+     "path": "data/uploads/etc",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/etc/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/etc/tab/1792314000000-00000015-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/new-ws",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/new-ws/old-tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/new-ws/old-tab/1792314000000-00000019-new.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/old-ws",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/old-ws/old-tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/old-ws/old-tab/1792314000000-00000018-old.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/top.txt",
+     "mode": "600",
+     "base64": "dG9w",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/unknown/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/unknown/unknown/1792314000000-00000016-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/unknown/unknown/1792314000000-0000001e-__.gif",
+     "mode": "600",
+     "base64": "Z2lm",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws-a",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-0",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-0/1792314000000-00000003-archive_tar.gz",
+     "mode": "600",
+     "base64": "Ym9keSAw",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000001-notes.txt",
+     "mode": "600",
+     "base64": "ZmlsZSBib2R5",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000002-notes.txt",
+     "mode": "600",
+     "base64": "ZmlsZSBib2R5",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000004-_bashrc",
+     "mode": "600",
+     "base64": "Ym9keSAx",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-0000001b-shot.png",
+     "mode": "600",
+     "base64": "cG5nLWJ5dGVz",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-0000001c-photo.jpg",
+     "mode": "600",
+     "base64": "anBn",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws-a/tab-10",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-10/1792314000000-0000000d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.verylongextensi",
+     "mode": "600",
+     "base64": "Ym9keSAxMA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-11",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-11/1792314000000-0000000e-name.ext",
+     "mode": "600",
+     "base64": "Ym9keSAxMQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-16",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-16/1792314000000-0000000f-file",
+     "mode": "600",
+     "base64": "Ym9keSAxNg==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-17",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-17/1792314000000-00000010-noext",
+     "mode": "600",
+     "base64": "Ym9keSAxNw==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-18",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-18/1792314000000-00000011-b",
+     "mode": "600",
+     "base64": "Ym9keSAxOA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-19",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-19/1792314000000-00000012-file.js",
+     "mode": "600",
+     "base64": "Ym9keSAxOQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-2/1792314000000-00000005-a.",
+     "mode": "600",
+     "base64": "Ym9keSAy",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-20",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-20/1792314000000-00000013-escape",
+     "mode": "600",
+     "base64": "Ym9keSAyMA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-21",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-21/1792314000000-00000014-tab_name.txt",
+     "mode": "600",
+     "base64": "Ym9keSAyMQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-3",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-3/1792314000000-00000006-__",
+     "mode": "600",
+     "base64": "Ym9keSAz",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-4",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-4/1792314000000-00000007-__.",
+     "mode": "600",
+     "base64": "Ym9keSA0",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-5",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-5/1792314000000-00000008-name.md",
+     "mode": "600",
+     "base64": "Ym9keSA1",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-6",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-6/1792314000000-00000009-with_space____1_.PNG",
+     "mode": "600",
+     "base64": "Ym9keSA2",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-7",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-7/1792314000000-0000000a-_____.pdf",
+     "mode": "600",
+     "base64": "Ym9keSA3",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-8",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-8/1792314000000-0000000b-__smile.txt",
+     "mode": "600",
+     "base64": "Ym9keSA4",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-9",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-9/1792314000000-0000000c-caf_.txt",
+     "mode": "600",
+     "base64": "Ym9keSA5",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/unknown/1792314000000-0000001d-image.webp",
+     "mode": "600",
+     "base64": "d2VicA==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/ws-b",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-b/tab-b",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-b/tab-b/1792314000000-0000001a-agents.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/ws1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/stray.txt",
+     "mode": "600",
+     "base64": "c3RyYXk=",
+     "size": 5
+    },
+    {
+     "path": "data/uploads/ws1/tab1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/tab1/new.png",
+     "mode": "600",
+     "base64": "bmV3",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws1/tab2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/tab2/edge.pdf",
+     "mode": "600",
+     "base64": "ZWRnZQ==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/ws2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub/deep.png",
+     "mode": "600",
+     "base64": "ZGVlcA==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown/1792314000000-00000017-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/x-www-form-urlencoded"
+   },
+   "body": "mode=all&mode=all",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"E5gSKvpK-AwNEXbPqeV4vm3h_uE\"",
+    "content-length": "45"
+   },
+   "answer": "{\"mode\":\"expired\",\"deleted\":0,\"freedBytes\":0}",
+   "uploads": [
+    {
+     "path": "data/uploads/etc",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/etc/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/etc/tab/1792314000000-00000015-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/new-ws",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/new-ws/old-tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/new-ws/old-tab/1792314000000-00000019-new.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/old-ws",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/old-ws/old-tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/old-ws/old-tab/1792314000000-00000018-old.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/top.txt",
+     "mode": "600",
+     "base64": "dG9w",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/unknown/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/unknown/unknown/1792314000000-00000016-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/unknown/unknown/1792314000000-0000001e-__.gif",
+     "mode": "600",
+     "base64": "Z2lm",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws-a",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-0",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-0/1792314000000-00000003-archive_tar.gz",
+     "mode": "600",
+     "base64": "Ym9keSAw",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000001-notes.txt",
+     "mode": "600",
+     "base64": "ZmlsZSBib2R5",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000002-notes.txt",
+     "mode": "600",
+     "base64": "ZmlsZSBib2R5",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000004-_bashrc",
+     "mode": "600",
+     "base64": "Ym9keSAx",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-0000001b-shot.png",
+     "mode": "600",
+     "base64": "cG5nLWJ5dGVz",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-0000001c-photo.jpg",
+     "mode": "600",
+     "base64": "anBn",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws-a/tab-10",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-10/1792314000000-0000000d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.verylongextensi",
+     "mode": "600",
+     "base64": "Ym9keSAxMA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-11",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-11/1792314000000-0000000e-name.ext",
+     "mode": "600",
+     "base64": "Ym9keSAxMQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-16",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-16/1792314000000-0000000f-file",
+     "mode": "600",
+     "base64": "Ym9keSAxNg==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-17",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-17/1792314000000-00000010-noext",
+     "mode": "600",
+     "base64": "Ym9keSAxNw==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-18",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-18/1792314000000-00000011-b",
+     "mode": "600",
+     "base64": "Ym9keSAxOA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-19",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-19/1792314000000-00000012-file.js",
+     "mode": "600",
+     "base64": "Ym9keSAxOQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-2/1792314000000-00000005-a.",
+     "mode": "600",
+     "base64": "Ym9keSAy",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-20",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-20/1792314000000-00000013-escape",
+     "mode": "600",
+     "base64": "Ym9keSAyMA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-21",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-21/1792314000000-00000014-tab_name.txt",
+     "mode": "600",
+     "base64": "Ym9keSAyMQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-3",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-3/1792314000000-00000006-__",
+     "mode": "600",
+     "base64": "Ym9keSAz",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-4",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-4/1792314000000-00000007-__.",
+     "mode": "600",
+     "base64": "Ym9keSA0",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-5",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-5/1792314000000-00000008-name.md",
+     "mode": "600",
+     "base64": "Ym9keSA1",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-6",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-6/1792314000000-00000009-with_space____1_.PNG",
+     "mode": "600",
+     "base64": "Ym9keSA2",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-7",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-7/1792314000000-0000000a-_____.pdf",
+     "mode": "600",
+     "base64": "Ym9keSA3",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-8",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-8/1792314000000-0000000b-__smile.txt",
+     "mode": "600",
+     "base64": "Ym9keSA4",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-9",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-9/1792314000000-0000000c-caf_.txt",
+     "mode": "600",
+     "base64": "Ym9keSA5",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/unknown/1792314000000-0000001d-image.webp",
+     "mode": "600",
+     "base64": "d2VicA==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/ws-b",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-b/tab-b",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-b/tab-b/1792314000000-0000001a-agents.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/ws1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/stray.txt",
+     "mode": "600",
+     "base64": "c3RyYXk=",
+     "size": 5
+    },
+    {
+     "path": "data/uploads/ws1/tab1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/tab1/new.png",
+     "mode": "600",
+     "base64": "bmV3",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws1/tab2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/tab2/edge.pdf",
+     "mode": "600",
+     "base64": "ZWRnZQ==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/ws2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub/deep.png",
+     "mode": "600",
+     "base64": "ZGVlcA==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown/1792314000000-00000017-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "{\"mode\":\"all\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"E5gSKvpK-AwNEXbPqeV4vm3h_uE\"",
+    "content-length": "45"
+   },
+   "answer": "{\"mode\":\"expired\",\"deleted\":0,\"freedBytes\":0}",
+   "uploads": [
+    {
+     "path": "data/uploads/etc",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/etc/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/etc/tab/1792314000000-00000015-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/new-ws",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/new-ws/old-tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/new-ws/old-tab/1792314000000-00000019-new.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/old-ws",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/old-ws/old-tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/old-ws/old-tab/1792314000000-00000018-old.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/top.txt",
+     "mode": "600",
+     "base64": "dG9w",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/unknown/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/unknown/unknown/1792314000000-00000016-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/unknown/unknown/1792314000000-0000001e-__.gif",
+     "mode": "600",
+     "base64": "Z2lm",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws-a",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-0",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-0/1792314000000-00000003-archive_tar.gz",
+     "mode": "600",
+     "base64": "Ym9keSAw",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000001-notes.txt",
+     "mode": "600",
+     "base64": "ZmlsZSBib2R5",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000002-notes.txt",
+     "mode": "600",
+     "base64": "ZmlsZSBib2R5",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-00000004-_bashrc",
+     "mode": "600",
+     "base64": "Ym9keSAx",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-0000001b-shot.png",
+     "mode": "600",
+     "base64": "cG5nLWJ5dGVz",
+     "size": 9
+    },
+    {
+     "path": "data/uploads/ws-a/tab-1/1792314000000-0000001c-photo.jpg",
+     "mode": "600",
+     "base64": "anBn",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws-a/tab-10",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-10/1792314000000-0000000d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.verylongextensi",
+     "mode": "600",
+     "base64": "Ym9keSAxMA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-11",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-11/1792314000000-0000000e-name.ext",
+     "mode": "600",
+     "base64": "Ym9keSAxMQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-16",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-16/1792314000000-0000000f-file",
+     "mode": "600",
+     "base64": "Ym9keSAxNg==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-17",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-17/1792314000000-00000010-noext",
+     "mode": "600",
+     "base64": "Ym9keSAxNw==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-18",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-18/1792314000000-00000011-b",
+     "mode": "600",
+     "base64": "Ym9keSAxOA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-19",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-19/1792314000000-00000012-file.js",
+     "mode": "600",
+     "base64": "Ym9keSAxOQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-2/1792314000000-00000005-a.",
+     "mode": "600",
+     "base64": "Ym9keSAy",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-20",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-20/1792314000000-00000013-escape",
+     "mode": "600",
+     "base64": "Ym9keSAyMA==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-21",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-21/1792314000000-00000014-tab_name.txt",
+     "mode": "600",
+     "base64": "Ym9keSAyMQ==",
+     "size": 7
+    },
+    {
+     "path": "data/uploads/ws-a/tab-3",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-3/1792314000000-00000006-__",
+     "mode": "600",
+     "base64": "Ym9keSAz",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-4",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-4/1792314000000-00000007-__.",
+     "mode": "600",
+     "base64": "Ym9keSA0",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-5",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-5/1792314000000-00000008-name.md",
+     "mode": "600",
+     "base64": "Ym9keSA1",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-6",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-6/1792314000000-00000009-with_space____1_.PNG",
+     "mode": "600",
+     "base64": "Ym9keSA2",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-7",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-7/1792314000000-0000000a-_____.pdf",
+     "mode": "600",
+     "base64": "Ym9keSA3",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-8",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-8/1792314000000-0000000b-__smile.txt",
+     "mode": "600",
+     "base64": "Ym9keSA4",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/tab-9",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/tab-9/1792314000000-0000000c-caf_.txt",
+     "mode": "600",
+     "base64": "Ym9keSA5",
+     "size": 6
+    },
+    {
+     "path": "data/uploads/ws-a/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-a/unknown/1792314000000-0000001d-image.webp",
+     "mode": "600",
+     "base64": "d2VicA==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/ws-b",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-b/tab-b",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws-b/tab-b/1792314000000-0000001a-agents.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    },
+    {
+     "path": "data/uploads/ws1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/stray.txt",
+     "mode": "600",
+     "base64": "c3RyYXk=",
+     "size": 5
+    },
+    {
+     "path": "data/uploads/ws1/tab1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/tab1/new.png",
+     "mode": "600",
+     "base64": "bmV3",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws1/tab2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/tab2/edge.pdf",
+     "mode": "600",
+     "base64": "ZWRnZQ==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/ws2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub/deep.png",
+     "mode": "600",
+     "base64": "ZGVlcA==",
+     "size": 4
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww/unknown/1792314000000-00000017-f.txt",
+     "mode": "600",
+     "base64": "eA==",
+     "size": 1
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/x-www-form-urlencoded"
+   },
+   "body": "mode=all",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"-4rYvxLfEzJNE3TPjO3FXL0WoSM\"",
+    "content-length": "44"
+   },
+   "answer": "{\"mode\":\"all\",\"deleted\":32,\"freedBytes\":166}",
+   "uploads": [
+    {
+     "path": "data/uploads/top.txt",
+     "mode": "600",
+     "base64": "dG9w",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/stray.txt",
+     "mode": "600",
+     "base64": "c3RyYXk=",
+     "size": 5
+    },
+    {
+     "path": "data/uploads/ws2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub/deep.png",
+     "mode": "600",
+     "base64": "ZGVlcA==",
+     "size": 4
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"mode\":\"all\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"C34X6eQgj8nWnvr0juGxZcERcUc\"",
+    "content-length": "41"
+   },
+   "answer": "{\"mode\":\"all\",\"deleted\":0,\"freedBytes\":0}",
+   "uploads": [
+    {
+     "path": "data/uploads/top.txt",
+     "mode": "600",
+     "base64": "dG9w",
+     "size": 3
+    },
+    {
+     "path": "data/uploads/ws1",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws1/stray.txt",
+     "mode": "600",
+     "base64": "c3RyYXk=",
+     "size": 5
+    },
+    {
+     "path": "data/uploads/ws2",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub",
+     "dir": true
+    },
+    {
+     "path": "data/uploads/ws2/tab/sub/deep.png",
+     "mode": "600",
+     "base64": "ZGVlcA==",
+     "size": 4
+    }
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"95dsStZr-foGxY-16FZP_9lUUYs\"",
+    "cache-control": "no-store",
+    "content-length": "70"
+   },
+   "answer": "{\"error\":\"Войдите в рабочее пространство.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json",
+    "sec-fetch-site": "cross-site"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"YA6KdcaiuNpMApTScCcbM1IwQEI\"",
+    "cache-control": "no-store",
+    "content-length": "110"
+   },
+   "answer": "{\"error\":\"Сохранение доступно только из рабочего пространства.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{bad",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": {
+    "head": "",
+    "repeat": "x",
+    "count": 6291457,
+    "tail": ""
+   },
+   "status": 413,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Body exceeded 6mb limit"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "bad name"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"eJ-zDIv6OsgmG3WTz-XmZXHAce0\"",
+    "cache-control": "no-store",
+    "content-length": "62"
+   },
+   "answer": "{\"error\":\"Не выбрана активная сессия.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"eJ-zDIv6OsgmG3WTz-XmZXHAce0\"",
+    "cache-control": "no-store",
+    "content-length": "62"
+   },
+   "answer": "{\"error\":\"Не выбрана активная сессия.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "missing"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TaozXeZgTf13lrAx2L-hcYLjWgE\"",
+    "cache-control": "no-store",
+    "content-length": "64"
+   },
+   "answer": "{\"error\":\"Сессия больше не существует.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Hzows7rhgmJFuQRugqhggcNaN_g\"",
+    "cache-control": "no-store",
+    "content-length": "39"
+   },
+   "answer": "{\"error\":\"Не выбран файл.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     ""
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Hzows7rhgmJFuQRugqhggcNaN_g\"",
+    "cache-control": "no-store",
+    "content-length": "39"
+   },
+   "answer": "{\"error\":\"Не выбран файл.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"MDFlkOPx6NYNgY-OREqnqNbwh8s\"",
+    "cache-control": "no-store",
+    "content-length": "61"
+   },
+   "answer": "{\"error\":\"Ожидается текст файла в JSON.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "Application/JSON"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"MDFlkOPx6NYNgY-OREqnqNbwh8s\"",
+    "cache-control": "no-store",
+    "content-length": "61"
+   },
+   "answer": "{\"error\":\"Ожидается текст файла в JSON.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/jsonish"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_Gn8bcz_m7Q8R4C69DcNsg49FTk\"",
+    "cache-control": "no-store",
+    "content-length": "82"
+   },
+   "answer": "{\"error\":\"Не переданы содержимое и версия файла.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_Gn8bcz_m7Q8R4C69DcNsg49FTk\"",
+    "cache-control": "no-store",
+    "content-length": "82"
+   },
+   "answer": "{\"error\":\"Не переданы содержимое и версия файла.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"448BEB99DCD6FAAB2AE8DFF2CA05B2F933D9A7EBCA43526D7FF2C6AA3FA8BBDE\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_Gn8bcz_m7Q8R4C69DcNsg49FTk\"",
+    "cache-control": "no-store",
+    "content-length": "82"
+   },
+   "answer": "{\"error\":\"Не переданы содержимое и версия файла.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"Content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_Gn8bcz_m7Q8R4C69DcNsg49FTk\"",
+    "cache-control": "no-store",
+    "content-length": "82"
+   },
+   "answer": "{\"error\":\"Не переданы содержимое и версия файла.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "[1]",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_Gn8bcz_m7Q8R4C69DcNsg49FTk\"",
+    "cache-control": "no-store",
+    "content-length": "82"
+   },
+   "answer": "{\"error\":\"Не переданы содержимое и версия файла.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"}",
+   "status": 409,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_J1tKKQVcH95CFAqTt4qFAXGprU\"",
+    "cache-control": "no-store",
+    "content-length": "168"
+   },
+   "answer": "{\"error\":\"Файл изменился после открытия. Скопируйте свои правки и загрузите актуальную версию.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "/etc/hostname"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Vgi5hIGmEp8ILKic94WLdvA2p-w\"",
+    "cache-control": "no-store",
+    "content-length": "98"
+   },
+   "answer": "{\"error\":\"Можно открывать только файлы текущего проекта.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "../outside/secret.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"5VU8tdQcKulqWWOyWWBlqOTGl_Y\"",
+    "cache-control": "no-store",
+    "content-length": "79"
+   },
+   "answer": "{\"error\":\"Путь находится за пределами проекта.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "link-out"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"OlJlf7fp1GbF1VNHHpzNYezyGIU\"",
+    "cache-control": "no-store",
+    "content-length": "71"
+   },
+   "answer": "{\"error\":\"Ссылка ведёт за пределы проекта.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "missing.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"zP0gx8BGC3lmLEiCXbNP32-HgKA\"",
+    "cache-control": "no-store",
+    "content-length": "78"
+   },
+   "answer": "{\"error\":\"Файл или папка больше не существуют.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "sub"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ZWFwiJYImrCbnQMAOHGqW7-enGo\"",
+    "cache-control": "no-store",
+    "content-length": "86"
+   },
+   "answer": "{\"error\":\"Не удалось прочитать или сохранить файл.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "bin.dat"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"S8zOB51bzizuh_4RLr6KOwVnsBs\"",
+    "cache-control": "no-store",
+    "content-length": "71"
+   },
+   "answer": "{\"error\":\"Этот файл не является текстовым.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "latin.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"tkoThj-kU_TzrefwIHyTwWspOzY\"",
+    "cache-control": "no-store",
+    "content-length": "87"
+   },
+   "answer": "{\"error\":\"Редактор поддерживает только текст в UTF-8.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "big.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"S9FPmN2nq6RyG8SC3RdqDZDFcGs\"",
+    "cache-control": "no-store",
+    "content-length": "77"
+   },
+   "answer": "{\"error\":\"Редактор поддерживает файлы до 1 МБ.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"nul\\u0000here\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"S8zOB51bzizuh_4RLr6KOwVnsBs\"",
+    "cache-control": "no-store",
+    "content-length": "71"
+   },
+   "answer": "{\"error\":\"Этот файл не является текстовым.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"lone \\ud800 here\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"lDU5Ic7-EUJffu6wU4ECnE9x0UA\"",
+    "cache-control": "no-store",
+    "content-length": "88"
+   },
+   "answer": "{\"error\":\"Текст содержит неподдерживаемые символы.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"pair \\ud83d\\ude00 and \\u00e9\",\"revision\":\"{{rev:a.txt}}\",\"x\":\"\\udc00\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"7Vrs-6B2kOlv2S_ZUmPpcvKTOlA\"",
+    "cache-control": "no-store",
+    "content-length": "134"
+   },
+   "answer": "{\"path\":\"a.txt\",\"content\":\"pair 😀 and é\",\"revision\":\"{{rev}}\",\"bytes\":16}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "b.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": {
+    "head": "{\"content\":\"",
+    "repeat": "y",
+    "count": 1000001,
+    "tail": "\",\"revision\":\"{{rev:b.txt}}\"}"
+   },
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"S9FPmN2nq6RyG8SC3RdqDZDFcGs\"",
+    "cache-control": "no-store",
+    "content-length": "77"
+   },
+   "answer": "{\"error\":\"Редактор поддерживает файлы до 1 МБ.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "b.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"first\",\"content\":\"second\\n\",\"revision\":\"{{rev:b.txt}}\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"uofgZYjELdQsy_uyS5pAj-x-oFM\"",
+    "cache-control": "no-store",
+    "content-length": "125"
+   },
+   "answer": "{\"path\":\"b.txt\",\"content\":\"second\\n\",\"revision\":\"{{rev}}\",\"bytes\":7}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "b.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"stale\",\"revision\":\"{{rev:b.txt}}\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"k3K1QXBFhAAp69zYiz4T4TG2rBM\"",
+    "cache-control": "no-store",
+    "content-length": "122"
+   },
+   "answer": "{\"path\":\"b.txt\",\"content\":\"stale\",\"revision\":\"{{rev}}\",\"bytes\":5}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "c.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json",
+    "sec-fetch-site": "same-site"
+   },
+   "body": "﻿{\"content\":\"Привет\\r\\n\",\"revision\":\"{{rev:c.txt}}\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ArhbgyJhrUsdl_IS9z0DJl3QodA\"",
+    "cache-control": "no-store",
+    "content-length": "134"
+   },
+   "answer": "{\"path\":\"c.txt\",\"content\":\"Привет\\r\\n\",\"revision\":\"{{rev}}\",\"bytes\":14}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "sub/d.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "body": "{\"content\":\"\",\"revision\":\"{{rev:sub/d.txt}}\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"l0Hj_-B7QzrY7lYuN6XKcaC7z3c\"",
+    "cache-control": "no-store",
+    "content-length": "121"
+   },
+   "answer": "{\"path\":\"sub/d.txt\",\"content\":\"\",\"revision\":\"{{rev}}\",\"bytes\":0}"
+  },
+  {
+   "method": "PUT",
+   "path": "/agents/api/editor/file/",
+   "query": [
+    [
+     "session",
+     "edit-1"
+    ],
+    [
+     "path",
+     "link-in"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"via link\\n\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 409,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_J1tKKQVcH95CFAqTt4qFAXGprU\"",
+    "cache-control": "no-store",
+    "content-length": "168"
+   },
+   "answer": "{\"error\":\"Файл изменился после открытия. Скопируйте свои правки и загрузите актуальную версию.\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [
+    [
+     "session",
+     "edit-gone"
+    ],
+    [
+     "path",
+     "a.txt"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"content\":\"x\",\"revision\":\"{{rev:a.txt}}\"}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"zP0gx8BGC3lmLEiCXbNP32-HgKA\"",
+    "cache-control": "no-store",
+    "content-length": "78"
+   },
+   "answer": "{\"error\":\"Файл или папка больше не существуют.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-behind"
+    ]
+   ],
+   "headers": {},
+   "body": "",
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Uduuj98FwmlXKTpYJe0c2njQa3c\"",
+    "content-length": "38"
+   },
+   "answer": "{\"error\":\"session parameter required\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     ""
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Uduuj98FwmlXKTpYJe0c2njQa3c\"",
+    "content-length": "38"
+   },
+   "answer": "{\"error\":\"session parameter required\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "missing"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"SFg1yB5C4mPMRmz91HR7SP18WdM\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Session not found\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-behind"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{bad",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-norepo"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TgozImO2UKZI6gs4Nqtl5cGUpFw\"",
+    "content-length": "32"
+   },
+   "answer": "{\"error\":\"Not a git repository\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-noup"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"FdFi0fWW7ubrB4f0vkotBdAolfM\"",
+    "content-length": "115"
+   },
+   "answer": "{\"ok\":false,\"steps\":[],\"summary\":{\"pulled\":0,\"pushed\":0},\"upstream\":null,\"branch\":\"main\",\"errorKind\":\"no-upstream\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-uptodate"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JqLANYxr904smmxdlosG9zmjI_E\"",
+    "content-length": "279"
+   },
+   "answer": "{\"ok\":true,\"steps\":[{\"name\":\"fetch\",\"ok\":true,\"skipped\":false,\"stdout\":\"\",\"stderr\":\"\"},{\"name\":\"pull\",\"ok\":false,\"skipped\":true,\"stdout\":\"\",\"stderr\":\"\"},{\"name\":\"push\",\"ok\":false,\"skipped\":true,\"stdout\":\"\",\"stderr\":\"\"}],\"summary\":{\"pulled\":0,\"pushed\":0},\"upstream\":\"origin/main\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-behind"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"LNL4pNwSCy_A95z5s3i5pcyJF1I\"",
+    "content-length": "451"
+   },
+   "answer": "{\"ok\":true,\"steps\":[{\"name\":\"fetch\",\"ok\":true,\"skipped\":false,\"stdout\":\"\",\"stderr\":\"From $ROOT/remote\\n   e339053..9131230  main       -> origin/main\\n\"},{\"name\":\"pull\",\"ok\":true,\"skipped\":false,\"stdout\":\"Updating e339053..9131230\\nFast-forward\\n f | 1 +\\n 1 file changed, 1 insertion(+)\\n\",\"stderr\":\"\"},{\"name\":\"push\",\"ok\":false,\"skipped\":true,\"stdout\":\"\",\"stderr\":\"\"}],\"summary\":{\"pulled\":1,\"pushed\":0},\"upstream\":\"origin/main\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-ahead"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"E-Sy2HMovvnfc1ogiWYwSs_mBcY\"",
+    "content-length": "356"
+   },
+   "answer": "{\"ok\":true,\"steps\":[{\"name\":\"fetch\",\"ok\":true,\"skipped\":false,\"stdout\":\"\",\"stderr\":\"\"},{\"name\":\"pull\",\"ok\":false,\"skipped\":true,\"stdout\":\"\",\"stderr\":\"\"},{\"name\":\"push\",\"ok\":true,\"skipped\":false,\"stdout\":\"\",\"stderr\":\"To $ROOT/remote.git\\n   9131230..ac048b6  main -> main\\n\"}],\"summary\":{\"pulled\":0,\"pushed\":1},\"upstream\":\"origin/main\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-diverged"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wRzOSDL237hqu_Kedrqpg8QI-6w\"",
+    "content-length": "672"
+   },
+   "answer": "{\"ok\":false,\"steps\":[{\"name\":\"fetch\",\"ok\":true,\"skipped\":false,\"stdout\":\"\",\"stderr\":\"From $ROOT/remote\\n   e339053..ac048b6  main       -> origin/main\\n\"},{\"name\":\"pull\",\"ok\":false,\"skipped\":false,\"stdout\":\"\",\"stderr\":\"hint: Diverging branches can't be fast-forwarded, you need to either:\\nhint: \\nhint: \\tgit merge --no-ff\\nhint: \\nhint: or:\\nhint: \\nhint: \\tgit rebase\\nhint: \\nhint: Disable this message with \\\"git config advice.diverging false\\\"\\nfatal: Not possible to fast-forward, aborting.\\n\"},{\"name\":\"push\",\"ok\":false,\"skipped\":true,\"stdout\":\"\",\"stderr\":\"\"}],\"summary\":{\"pulled\":0,\"pushed\":0},\"upstream\":\"origin/main\",\"errorKind\":\"diverged\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-local"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ASifps4JJ6v4u9hZzv6ihRgDV3U\"",
+    "content-length": "580"
+   },
+   "answer": "{\"ok\":false,\"steps\":[{\"name\":\"fetch\",\"ok\":true,\"skipped\":false,\"stdout\":\"\",\"stderr\":\"From $ROOT/remote\\n   e339053..ac048b6  main       -> origin/main\\n\"},{\"name\":\"pull\",\"ok\":false,\"skipped\":false,\"stdout\":\"Updating e339053..ac048b6\\n\",\"stderr\":\"error: Your local changes to the following files would be overwritten by merge:\\n\\tf\\nPlease commit your changes or stash them before you merge.\\nAborting\\n\"},{\"name\":\"push\",\"ok\":false,\"skipped\":true,\"stdout\":\"\",\"stderr\":\"\"}],\"summary\":{\"pulled\":0,\"pushed\":0},\"upstream\":\"origin/main\",\"errorKind\":\"local-changes\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "sync-fetchfail"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"j5yO-4UdFHYII5V6XgA-F8C2OTY\"",
+    "content-length": "518"
+   },
+   "answer": "{\"ok\":false,\"steps\":[{\"name\":\"fetch\",\"ok\":false,\"skipped\":false,\"stdout\":\"\",\"stderr\":\"fatal: '$ROOT/missing.git' does not appear to be a git repository\\nfatal: Could not read from remote repository.\\n\\nPlease make sure you have the correct access rights\\nand the repository exists.\\n\"},{\"name\":\"pull\",\"ok\":false,\"skipped\":true,\"stdout\":\"\",\"stderr\":\"\"},{\"name\":\"push\",\"ok\":false,\"skipped\":true,\"stdout\":\"\",\"stderr\":\"\"}],\"summary\":{\"pulled\":0,\"pushed\":0},\"upstream\":\"origin/main\",\"errorKind\":\"auth\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/json"
+   },
+   "body": "{\"pid\":4194301,\"starttime\":\"1\"}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"gH7_fIZxPCVRh6TuPVNAgHt_40I\"",
+    "content-length": "24"
+   },
+   "answer": "{\"error\":\"unauthorized\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json",
+    "sec-fetch-site": "same-site"
+   },
+   "body": "{\"pid\":4194301,\"starttime\":\"1\"}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"9sETvVcrxdXeeXnQ6xD_Bxv0tI0\"",
+    "content-length": "22"
+   },
+   "answer": "{\"error\":\"cross-site\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json",
+    "sec-fetch-site": "cross-site"
+   },
+   "body": "{\"pid\":4194301,\"starttime\":\"1\"}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"9sETvVcrxdXeeXnQ6xD_Bxv0tI0\"",
+    "content-length": "22"
+   },
+   "answer": "{\"error\":\"cross-site\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "{\"pid\":4194301,\"starttime\":\"1\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"xE8SKo7inwQzwhKCi8V7utTi4eM\"",
+    "cache-control": "no-store",
+    "content-length": "23"
+   },
+   "answer": "{\"error\":\"bad-request\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{bad",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "[]",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"xE8SKo7inwQzwhKCi8V7utTi4eM\"",
+    "cache-control": "no-store",
+    "content-length": "23"
+   },
+   "answer": "{\"error\":\"bad-request\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"pid\":1,\"starttime\":\"1\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"xE8SKo7inwQzwhKCi8V7utTi4eM\"",
+    "cache-control": "no-store",
+    "content-length": "23"
+   },
+   "answer": "{\"error\":\"bad-request\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json",
+    "sec-fetch-site": "none"
+   },
+   "body": "{\"pid\":4194301,\"starttime\":\"1\"}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TYVTgU9Kfe8nBFa5GvrdZWFjOmM\"",
+    "cache-control": "no-store",
+    "content-length": "16"
+   },
+   "answer": "{\"error\":\"gone\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "Application/JSON; charset=utf-8"
+   },
+   "body": "{\"pid\":4194301,\"starttime\":4}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TYVTgU9Kfe8nBFa5GvrdZWFjOmM\"",
+    "cache-control": "no-store",
+    "content-length": "16"
+   },
+   "answer": "{\"error\":\"gone\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": {
+    "head": "",
+    "repeat": "x",
+    "count": 1048577,
+    "tail": ""
+   },
+   "status": 413,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Body exceeded 1mb limit"
+  }
+ ],
+ "trees": {
+  "uploads": [
+   {
+    "path": "data/uploads/top.txt",
+    "mode": "600",
+    "base64": "dG9w",
+    "size": 3
+   },
+   {
+    "path": "data/uploads/ws1",
+    "dir": true
+   },
+   {
+    "path": "data/uploads/ws1/stray.txt",
+    "mode": "600",
+    "base64": "c3RyYXk=",
+    "size": 5
+   },
+   {
+    "path": "data/uploads/ws2",
+    "dir": true
+   },
+   {
+    "path": "data/uploads/ws2/tab",
+    "dir": true
+   },
+   {
+    "path": "data/uploads/ws2/tab/sub",
+    "dir": true
+   },
+   {
+    "path": "data/uploads/ws2/tab/sub/deep.png",
+    "mode": "600",
+    "base64": "ZGVlcA==",
+    "size": 4
+   }
+  ],
+  "proj": [
+   {
+    "path": "proj/a.txt",
+    "mode": "600",
+    "base64": "cGFpciDwn5iAIGFuZCDDqQ==",
+    "size": 16
+   },
+   {
+    "path": "proj/b.txt",
+    "mode": "600",
+    "base64": "c3RhbGU=",
+    "size": 5
+   },
+   {
+    "path": "proj/big.txt",
+    "mode": "600",
+    "base64": null,
+    "size": 1000001
+   },
+   {
+    "path": "proj/bin.dat",
+    "mode": "600",
+    "base64": "YQBi",
+    "size": 3
+   },
+   {
+    "path": "proj/c.txt",
+    "mode": "600",
+    "base64": "0J/RgNC40LLQtdGCDQo=",
+    "size": 14
+   },
+   {
+    "path": "proj/latin.txt",
+    "mode": "600",
+    "base64": "Y2Fm6Qo=",
+    "size": 5
+   },
+   {
+    "path": "proj/link-in",
+    "link": "a.txt"
+   },
+   {
+    "path": "proj/link-out",
+    "link": "../outside/secret.txt"
+   },
+   {
+    "path": "proj/sub",
+    "dir": true
+   },
+   {
+    "path": "proj/sub/d.txt",
+    "mode": "600",
+    "base64": "",
+    "size": 0
+   }
+  ],
+  "noup": "0818c4be9b98875f0c9b0b71cd77889559853f28 HEAD -> main\n",
+  "uptodate": "91312308b19f0b4c6e4c521eb73f481e50ea0c24 HEAD -> main, origin/main, origin/HEAD\ne3390534876f5fb0e2a1072435e723a3f284ffee \n",
+  "behind": "91312308b19f0b4c6e4c521eb73f481e50ea0c24 HEAD -> main, origin/main, origin/HEAD\ne3390534876f5fb0e2a1072435e723a3f284ffee \n",
+  "ahead": "ac048b6003e33f49580fb0c6c68d8f529fba5ad9 HEAD -> main, origin/main, origin/HEAD\n91312308b19f0b4c6e4c521eb73f481e50ea0c24 \ne3390534876f5fb0e2a1072435e723a3f284ffee \n",
+  "diverged": "59557a9b1f3f0e6b382256af8f4bb6ab86a50199 HEAD -> main\nac048b6003e33f49580fb0c6c68d8f529fba5ad9 origin/main, origin/HEAD\ne3390534876f5fb0e2a1072435e723a3f284ffee \n91312308b19f0b4c6e4c521eb73f481e50ea0c24 \n",
+  "local": "e3390534876f5fb0e2a1072435e723a3f284ffee HEAD -> main\nac048b6003e33f49580fb0c6c68d8f529fba5ad9 origin/main, origin/HEAD\n91312308b19f0b4c6e4c521eb73f481e50ea0c24 \n",
+  "fetchfail": "e3390534876f5fb0e2a1072435e723a3f284ffee HEAD -> main, origin/main, origin/HEAD\n"
+ }
+}

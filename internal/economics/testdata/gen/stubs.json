@@ -1,0 +1,7 @@
+{
+ "stubs": {
+  "lib/auth": "stub-auth.mjs", "lib/logger": "stub-logger.mjs", "lib/{M}machines": "stub-machines.mjs",
+  "lib/tmux": "stub-inert.mjs", "lib/sync-server": "stub-inert.mjs", "lib/status-manager": "stub-inert.mjs"
+ },
+ "real": ["diff"]
+}

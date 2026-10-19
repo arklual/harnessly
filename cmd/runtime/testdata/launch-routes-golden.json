@@ -1,0 +1,1480 @@
+{
+ "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+ "port": 18123,
+ "sid": "425055ec-bbc8-4e3c-87d0-36fa74c1cccb",
+ "fixtures": {
+  "cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "config.json": "{\"dangerouslySkipPermissions\":false}",
+  "workspaces.json": "{\n  \"workspaces\": [\n    {\n      \"id\": \"ws-a\",\n      \"name\": \"Alpha\",\n      \"directories\": [\n        \"$ROOT/projects/proj-a\"\n      ]\n    },\n    {\n      \"id\": \"ws-b\",\n      \"name\": \"Beta\",\n      \"directories\": [\n        \"$ROOT/projects/proj-b\"\n      ]\n    }\n  ],\n  \"groups\": [],\n  \"sidebarCollapsed\": false,\n  \"sidebarWidth\": 240,\n  \"updatedAt\": \"2026-01-01T00:00:00.000Z\"\n}",
+  "workspaces/ws-a/codex-prompt.md": "Work \"carefully\".\nSecond line",
+  "workspaces/ws-a/layout.json": "{\n  \"root\": {\n    \"type\": \"pane\",\n    \"id\": \"pane-a\",\n    \"activeTabId\": \"tab-1\",\n    \"tabs\": [\n      {\n        \"id\": \"tab-1\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-1\",\n        \"name\": \"\",\n        \"order\": 0,\n        \"cwd\": \"$ROOT/projects/proj-a\"\n      },\n      {\n        \"id\": \"tab-2\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-2\",\n        \"name\": \"Claude\",\n        \"order\": 1,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"idle\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n          \"jsonlPath\": \"$ROOT/home/.claude/projects/$FLATROOT-projects-proj-a/425055ec-bbc8-4e3c-87d0-36fa74c1cccb.jsonl\",\n          \"summary\": \"Old summary\"\n        },\n        \"claudeSessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"opus\",\n            \"effort\": null\n          }\n        }\n      },\n      {\n        \"id\": \"tab-3\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-3\",\n        \"name\": \"Codex\",\n        \"order\": 2,\n        \"panelType\": \"codex-cli\",\n        \"cliState\": \"busy\",\n        \"agentState\": {\n          \"providerId\": \"codex\",\n          \"sessionId\": \"019a0c11-2222-7333-8444-555555555555\",\n          \"jsonlPath\": \"$ROOT/home/.codex/sessions/2026/10/18/rollout-2026-10-18T08-00-00-019a0c11-2222-7333-8444-555555555555.jsonl\",\n          \"summary\": null\n        },\n        \"meta\": {\n          \"mode\": \"automation\",\n          \"launch\": {\n            \"model\": \"gpt-5\",\n            \"effort\": \"high\"\n          }\n        }\n      },\n      {\n        \"id\": \"tab-4\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-4\",\n        \"name\": \"Gone\",\n        \"order\": 3,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"busy\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"7a1c2d3e-4f50-4617-8899-aabbccddeeff\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"lastUserMessage\": \"last words\"\n      },\n      {\n        \"id\": \"tab-5\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-5\",\n        \"name\": \"Running\",\n        \"order\": 4,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"needs-input\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        }\n      },\n      {\n        \"id\": \"tab-6\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-6\",\n        \"name\": \"Editor\",\n        \"order\": 5,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"busy\",\n        \"claudeSessionId\": \"7a1c2d3e-4f50-4617-8899-aabbccddeeff\",\n        \"title\": \"vim title\"\n      }\n    ]\n  },\n  \"activePaneId\": \"pane-a\",\n  \"updatedAt\": \"2026-01-01T00:00:00.000Z\"\n}",
+  "eval/runs/22222222-2222-4333-8444-555555555555/state.json": "{\"state\":\"running\"}",
+  "eval/runs/33333333-2222-4333-8444-555555555555/state.json": "{\"state\":\"skipped\"}"
+ },
+ "outside": {
+  "$ROOT/home/.claude/projects/$FLATROOT-projects-proj-a/425055ec-bbc8-4e3c-87d0-36fa74c1cccb.jsonl": "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"first prompt\"},\"timestamp\":\"2026-10-17T10:00:00.000Z\"}\n{\"type\":\"ai-title\",\"aiTitle\":\"Fix the \\\"login\\\" bug\"}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]},\"timestamp\":\"2026-10-17T10:00:05.000Z\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"second prompt\"}]},\"timestamp\":\"2026-10-17T11:00:00.000Z\"}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"<command-name>/clear</command-name>\"},\"timestamp\":\"2026-10-17T12:00:00.000Z\"}\n",
+  "$ROOT/home/.codex/sessions/2026/10/18/rollout-2026-10-18T08-00-00-019a0c11-2222-7333-8444-555555555555.jsonl": "{\"timestamp\":\"2026-10-18T08:00:00.000Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"019a0c11-2222-7333-8444-555555555555\",\"cwd\":\"$ROOT/projects/proj-b\",\"timestamp\":\"2026-10-18T08:00:00.000Z\"}}\n{\"timestamp\":\"2026-10-18T08:01:00.000Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"user_message\",\"message\":\"codex prompt\"}}\n",
+  "$ROOT/bin/fake-claude": "#!/bin/sh\ncat >/dev/null\necho '{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}}'\necho 'not json'\necho '{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}}'\nprintf '{\"type\":\"result\",\"result\":\"Hello\",\"is_error\":false,\"total_cost_usd\":0.25}'\n",
+  "$ROOT/home/.config/acme/runtime.json": "{\"claude_binary\":\"$ROOT/bin/fake-claude\"}"
+ },
+ "requests": [
+  {
+   "method": "GET",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wCvuU7DOXO-PE2xArDB1Je4vytE\"",
+    "content-length": "1323"
+   },
+   "answer": "{\"conversations\":[{\"id\":\"tab-1\",\"title\":\"\",\"provider\":\"terminal\",\"workspaceId\":\"ws-a\",\"workspaceName\":\"Alpha\",\"updatedAt\":1790000000000},{\"id\":\"tab-2\",\"title\":\"Fix the \\\"login\\\" bug\",\"provider\":\"claude\",\"workspaceId\":\"ws-a\",\"workspaceName\":\"Alpha\",\"updatedAt\":1792234800000,\"jsonlPath\":\"$ROOT/home/.claude/projects/$FLATROOT-projects-proj-a/425055ec-bbc8-4e3c-87d0-36fa74c1cccb.jsonl\",\"launch\":{\"model\":\"opus\",\"effort\":null}},{\"id\":\"tab-3\",\"title\":\"Codex\",\"provider\":\"codex\",\"workspaceId\":\"ws-a\",\"workspaceName\":\"Alpha\",\"updatedAt\":1792310460000,\"jsonlPath\":\"$ROOT/home/.codex/sessions/2026/10/18/rollout-2026-10-18T08-00-00-019a0c11-2222-7333-8444-555555555555.jsonl\",\"launch\":{\"model\":\"gpt-5\",\"effort\":\"high\"},\"mode\":\"automation\"},{\"id\":\"tab-4\",\"title\":\"last words\",\"provider\":\"claude\",\"workspaceId\":\"ws-a\",\"workspaceName\":\"Alpha\",\"updatedAt\":0},{\"id\":\"tab-5\",\"title\":\"Running\",\"provider\":\"claude\",\"workspaceId\":\"ws-a\",\"workspaceName\":\"Alpha\",\"updatedAt\":0},{\"id\":\"tab-6\",\"title\":\"vim title\",\"provider\":\"claude\",\"workspaceId\":\"ws-a\",\"workspaceName\":\"Alpha\",\"updatedAt\":0}],\"workspaces\":[{\"id\":\"ws-a\",\"name\":\"Alpha\",\"directories\":[\"$ROOT/projects/proj-a\"]},{\"id\":\"ws-b\",\"name\":\"Beta\",\"directories\":[\"$ROOT/projects/proj-b\"]}]}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "GET",
+   "url": "/agents/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "body": null,
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wCvuU7DOXO-PE2xArDB1Je4vytE\""
+   },
+   "answer": "",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "PUT",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET, POST",
+    "content-length": "0"
+   },
+   "answer": "",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"grok\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"kb7IJg4ju03_PZ3W9rI8ORL3MdA\"",
+    "content-length": "45"
+   },
+   "answer": "{\"error\":\"Неизвестный агент\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"claude\",\"workspaceId\":5}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"59GiP91AoiZwMjfkt9IBAnT6SR4\"",
+    "content-length": "41"
+   },
+   "answer": "{\"error\":\"Неверный проект\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"claude\",\"model\":\"Bad Model\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"t3rVF-pS85ya7j_yP5wkh0Cv_Rg\"",
+    "content-length": "56"
+   },
+   "answer": "{\"error\":\"Недопустимое имя модели\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"claude\",\"effort\":\"turbo\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"HQuA7j-6gOYqZwuINeZG1LRV0x4\"",
+    "content-length": "74"
+   },
+   "answer": "{\"error\":\"Недопустимая глубина рассуждения\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"claude\",\"model\":\"no-such-model\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"crMFbzXQmthe9_TsTKwCDGMVtdA\"",
+    "content-length": "104"
+   },
+   "answer": "{\"error\":\"Модель «no-such-model» недоступна для Claude на этой машине\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"claude\",\"workspaceId\":\"ws-x\"}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"2lrw93MV3WaL363V92kEShTv1Kg\"",
+    "content-length": "42"
+   },
+   "answer": "{\"error\":\"Проект не найден\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "setup": {
+    "missing": [
+     "claude-code"
+    ]
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"claude\",\"prompt\":\"hi\"}",
+   "status": 409,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"dKHy05jDQsnciXBG-9KBrvGtAQI\"",
+    "content-length": "143"
+   },
+   "answer": "{\"error\":\"agent-not-installed\",\"providerId\":\"claude\",\"providerDisplayName\":\"Claude Code\",\"panelType\":\"claude-code\",\"suggestedCommand\":\"claude\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "setup": {
+    "missing": []
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"claude\",\"workspaceId\":\"ws-a\",\"prompt\":\"  Fix the build\\nnow 'quoted'  \",\"model\":\"opus\",\"effort\":\"high\"}",
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"kgsG_-enPatP20OsgZfq0mt2kSQ\"",
+    "content-length": "190"
+   },
+   "answer": "{\"id\":\"tab-id0001\",\"title\":\"Fix the build\\nnow 'quoted'\",\"provider\":\"claude\",\"workspaceId\":\"ws-a\",\"workspaceName\":\"Alpha\",\"updatedAt\":1792314000000,\"launch\":{\"model\":\"opus\",\"effort\":\"high\"}}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "create",
+     "tk-ws-a-pane-a-tab-id0001",
+     "80",
+     "24",
+     "$ROOT/projects"
+    ],
+    [
+     "send",
+     "tk-ws-a-pane-a-tab-id0001",
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --model 'opus' --effort high -- $'Fix the build\\nnow \\'quoted\\''"
+    ],
+    [
+     "register",
+     "tab-id0001",
+     "{\"workspaceId\":\"ws-a\",\"tabName\":\"Claude Code\",\"tmuxSession\":\"tk-ws-a-pane-a-tab-id0001\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":null,\"cliState\":\"busy\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "launch",
+     "tab-id0001",
+     ""
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"codex\",\"workspaceId\":\"ws-b\"}",
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6nOfZ4npQfgHCZiJDDiGbSooMEA\"",
+    "content-length": "124"
+   },
+   "answer": "{\"id\":\"tab-id0004\",\"title\":\"Codex\",\"provider\":\"codex\",\"workspaceId\":\"ws-b\",\"workspaceName\":\"Beta\",\"updatedAt\":1792314000000}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "create",
+     "tk-ws-b-pane-id0002-tab-id0003",
+     "80",
+     "24",
+     "$ROOT/projects"
+    ],
+    [
+     "create",
+     "tk-ws-b-pane-id0002-tab-id0004",
+     "80",
+     "24",
+     "$ROOT/projects"
+    ],
+    [
+     "send",
+     "tk-ws-b-pane-id0002-tab-id0004",
+     "node '$DATA/codex-launcher.js' --workspace-id 'ws-b'"
+    ],
+    [
+     "register",
+     "tab-id0004",
+     "{\"workspaceId\":\"ws-b\",\"tabName\":\"Codex\",\"tmuxSession\":\"tk-ws-b-pane-id0002-tab-id0004\",\"panelType\":\"codex-cli\",\"agentProviderId\":\"codex\",\"agentSessionId\":null,\"cliState\":\"busy\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "launch",
+     "tab-id0004",
+     ""
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"provider\":\"claude\",\"prompt\":\"Long task xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"model\":null}",
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"I393mbtK46V4ErBWNz_PYjmTPeo\"",
+    "content-length": "241"
+   },
+   "answer": "{\"id\":\"tab-id0005\",\"title\":\"Long task xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"provider\":\"claude\",\"workspaceId\":\"ws-a\",\"workspaceName\":\"Alpha\",\"updatedAt\":1792314000000}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "create",
+     "tk-ws-a-pane-a-tab-id0005",
+     "80",
+     "24",
+     "$ROOT/projects"
+    ],
+    [
+     "send",
+     "tk-ws-a-pane-a-tab-id0005",
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md -- \"$(cat -- '$DATA/launch-prompts/initial-UUID.txt' && rm -f -- '$DATA/launch-prompts/initial-UUID.txt')\""
+    ],
+    [
+     "register",
+     "tab-id0005",
+     "{\"workspaceId\":\"ws-a\",\"tabName\":\"Claude Code\",\"tmuxSession\":\"tk-ws-a-pane-a-tab-id0005\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":null,\"cliState\":\"busy\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "launch",
+     "tab-id0005",
+     ""
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/conversations",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "provider=claude",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"kb7IJg4ju03_PZ3W9rI8ORL3MdA\"",
+    "content-length": "45"
+   },
+   "answer": "{\"error\":\"Неизвестный агент\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"x\"}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "allow": "POST",
+    "content-length": "0"
+   },
+   "answer": "",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"   \"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iffuPQ8xb26oGFdQqc5elaim-pg\"",
+    "content-length": "64"
+   },
+   "answer": "{\"error\":\"Пустой промпт автоматизации\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"run\",\"model\":\"Bad Model\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"t3rVF-pS85ya7j_yP5wkh0Cv_Rg\"",
+    "content-length": "56"
+   },
+   "answer": "{\"error\":\"Недопустимое имя модели\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"run\",\"env\":{\"PATH\":\"/bin\"}}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"M-JnQ3TiikSQC6qtzQ0IkNX9aVM\"",
+    "content-length": "81"
+   },
+   "answer": "{\"error\":\"Недопустимая переменная окружения PATH\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"run\",\"env\":{\"ACME_RUN\":5}}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"asCikeIFeP-GnlWskXbwMMvIQrY\"",
+    "content-length": "86"
+   },
+   "answer": "{\"error\":\"Недопустимое значение переменной ACME_RUN\"}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"run\",\"env\":[\"x\"]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"8Q3w4_eImbJj6Mn-I2XgHxaVnE8\"",
+    "content-length": "78"
+   },
+   "answer": "{\"error\":\"Недопустимая переменная окружения 0\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"run\",\"cwd\":\"$ROOT/outside\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"T2VCEkI8AaJPK2mhSywzPlPnZuU\"",
+    "content-length": "101"
+   },
+   "answer": "{\"error\":\"Каталог запуска вне корневого каталога проектов\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"run\",\"cwd\":\"relative/dir\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"LS9Qz0DDEJaSIElOLwEosdFxbKs\"",
+    "content-length": "95"
+   },
+   "answer": "{\"error\":\"Каталог запуска должен быть абсолютным путём\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"run\",\"cwd\":\"$ROOT/projects/missing\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"T2VCEkI8AaJPK2mhSywzPlPnZuU\"",
+    "content-length": "101"
+   },
+   "answer": "{\"error\":\"Каталог запуска вне корневого каталога проектов\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/automations/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"prompt\":\"Nightly check\",\"workspaceId\":\"ws-a\",\"cwd\":\"$ROOT/projects/proj-c\",\"env\":{\"ACME_RUN_ID\":\"r-1\",\"ACME_RESULT_TOKEN\":\"abc.DEF_9\"}}",
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JgbEtaju9Ucj-Wg0mLs3eYrgf90\"",
+    "content-length": "31"
+   },
+   "answer": "{\"conversationId\":\"tab-id0006\"}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "create",
+     "tk-ws-a-pane-a-tab-id0006",
+     "80",
+     "24",
+     "$ROOT/projects/proj-c"
+    ],
+    [
+     "send",
+     "tk-ws-a-pane-a-tab-id0006",
+     "ACME_RUN_ID='r-1' ACME_RESULT_TOKEN='abc.DEF_9' ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md --model 'sonnet' -- $'Nightly check'"
+    ],
+    [
+     "register",
+     "tab-id0006",
+     "{\"workspaceId\":\"ws-a\",\"tabName\":\"Claude Code\",\"tmuxSession\":\"tk-ws-a-pane-a-tab-id0006\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":null,\"cliState\":\"busy\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "launch",
+     "tab-id0006",
+     ""
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/resolve-pane",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"H9x1Focx-v2DAvyE_twc9N0o-II\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"Нужен tmuxPane\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/resolve-pane",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"tmuxPane\":\"%3\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cw7J0qKHVLrCCN-p08POLhXAXcQ\"",
+    "content-length": "180"
+   },
+   "answer": "{\"tabId\":\"tab-2\",\"sessionName\":\"tk-ws-a-pane-a-tab-2\",\"agentSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\"provider\":\"claude\",\"cwd\":\"$ROOT/projects/proj-a\"}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/resolve-pane",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"tmuxPane\":\"%4\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"WDtXgW7y3c-73C-_qQkz7yg1104\"",
+    "content-length": "179"
+   },
+   "answer": "{\"tabId\":\"tab-3\",\"sessionName\":\"tk-ws-a-pane-a-tab-3\",\"agentSessionId\":\"019a0c11-2222-7333-8444-555555555555\",\"provider\":\"codex\",\"cwd\":\"$ROOT/projects/proj-b\"}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/resolve-pane",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"tmuxPane\":\"%4\",\"tmuxSocket\":\"old\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"WDtXgW7y3c-73C-_qQkz7yg1104\"",
+    "content-length": "179"
+   },
+   "answer": "{\"tabId\":\"tab-3\",\"sessionName\":\"tk-ws-a-pane-a-tab-3\",\"agentSessionId\":\"019a0c11-2222-7333-8444-555555555555\",\"provider\":\"codex\",\"cwd\":\"$ROOT/projects/proj-b\"}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/resolve-pane",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"tmuxPane\":\"%9\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"veD0UUfsesD42GgN424etvcKE2U\"",
+    "content-length": "86"
+   },
+   "answer": "{\"tabId\":null,\"sessionName\":null,\"agentSessionId\":null,\"provider\":\"claude\",\"cwd\":null}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/deliver",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"message\":\"\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"-xlPGgnCEU20tUivZ6BPyjF-ASk\"",
+    "content-length": "43"
+   },
+   "answer": "{\"error\":\"Пустое сообщение\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/deliver",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"message\":\"Please fix the heading\",\"tabId\":\"tab-2\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"SrQybDR0vL6rMhqqQORYs6qEX6E\"",
+    "content-length": "33"
+   },
+   "answer": "{\"mode\":\"pasted\",\"tabId\":\"tab-2\"}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "submit",
+     "tk-ws-a-pane-a-tab-2",
+     "Please fix the heading"
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/deliver",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"message\":\"And the footer\",\"agentSessionId\":\"019a0c11-2222-7333-8444-555555555555\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JJb_pB2evRzQF-7uw-8V3nH-xgs\"",
+    "content-length": "33"
+   },
+   "answer": "{\"mode\":\"queued\",\"tabId\":\"tab-3\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/deliver",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"message\":\"Reopen\",\"agentSessionId\":\"7a1c2d3e-4f50-4617-8899-aabbccddeeff\",\"cwd\":\"$ROOT/projects/proj-a\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"vxHmfwGTAzriNAjdlogQgevXsWo\"",
+    "content-length": "39"
+   },
+   "answer": "{\"mode\":\"resumed\",\"tabId\":\"tab-id0007\"}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "create",
+     "tk-ws-a-pane-a-tab-id0007",
+     "80",
+     "24",
+     "$ROOT/projects/proj-a"
+    ],
+    [
+     "send",
+     "tk-ws-a-pane-a-tab-id0007",
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --resume 7a1c2d3e-4f50-4617-8899-aabbccddeeff --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md"
+    ],
+    [
+     "register",
+     "tab-id0007",
+     "{\"workspaceId\":\"ws-a\",\"tabName\":\"Claude Code\",\"tmuxSession\":\"tk-ws-a-pane-a-tab-id0007\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":\"7a1c2d3e-4f50-4617-8899-aabbccddeeff\",\"cliState\":\"busy\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "launch",
+     "tab-id0007",
+     ""
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/docs/deliver",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"message\":\"From outside\",\"cwd\":\"$ROOT/outside\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"lOI01Jg8UE82Ks4CaoLNFrqQ3A4\"",
+    "content-length": "39"
+   },
+   "answer": "{\"mode\":\"resumed\",\"tabId\":\"tab-id0008\"}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "create",
+     "tk-ws-a-pane-a-tab-id0008",
+     "80",
+     "24",
+     "$ROOT/projects"
+    ],
+    [
+     "send",
+     "tk-ws-a-pane-a-tab-id0008",
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md -- $'From outside'"
+    ],
+    [
+     "register",
+     "tab-id0008",
+     "{\"workspaceId\":\"ws-a\",\"tabName\":\"Claude Code\",\"tmuxSession\":\"tk-ws-a-pane-a-tab-id0008\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":null,\"cliState\":\"busy\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "launch",
+     "tab-id0008",
+     ""
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/eval/start",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/eval/start?stop=nope",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ZSD39jNWiCxrhseDLajOq6WVrUk\"",
+    "content-length": "41"
+   },
+   "answer": "{\"error\":\"Неверный прогон\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/eval/start?stop=11111111-2222-4333-8444-555555555555",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 202,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/eval/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"runId\":\"x\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"eledBXGwuVrmlKZsR-Sb2wvoS4k\"",
+    "content-length": "56"
+   },
+   "answer": "{\"error\":\"Неполный запрос прогона\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/eval/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"runId\":\"22222222-2222-4333-8444-555555555555\",\"task\":{\"prompt\":\"p\",\"base\":\"main\",\"checks\":[]},\"arm\":{\"model\":\"opus\",\"harness\":\"repo\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"fHzniJHvg5hO_TP-CfAtTEFzgNE\"",
+    "content-length": "32"
+   },
+   "answer": "{\"accepted\":true,\"already\":true}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/eval/start",
+   "headers": {
+    "cookie": "session-token=agent",
+    "content-type": "application/json"
+   },
+   "body": "{\"runId\":\"33333333-2222-4333-8444-555555555555\",\"task\":{\"prompt\":\"p\",\"base\":\"main\",\"checks\":[{\"run\":\"true\"}]},\"arm\":{\"model\":\"opus\",\"harness\":\"personal\"}}",
+   "status": 202,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"vsukLBYdcrS5DPrpyB_JceaAOHA\"",
+    "content-length": "17"
+   },
+   "answer": "{\"accepted\":true}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "cache-control": "no-store",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "{\"tabId\":\"tab-2\"}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"gFPFczv67g-GiY0x_caDTvodqQY\"",
+    "cache-control": "no-store",
+    "content-length": "39"
+   },
+   "answer": "{\"error\":\"Нужен application/json\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"question\":\"why?\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"rnn5neRN1zAGHvzoGSpCYaX8X2o\"",
+    "cache-control": "no-store",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"Нужен tabId\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"tabId\":\"tab-9\",\"question\":\"why?\"}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"GiOIFCOEQXrtfiBvoieutol69xc\"",
+    "cache-control": "no-store",
+    "content-length": "63"
+   },
+   "answer": "{\"error\":\"Вкладка не найдена\",\"code\":\"unknown\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"tabId\":\"tab-3\",\"question\":\"why?\"}",
+   "status": 422,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"M5RbuOPVeZ_XNG13F7RUxMCyOkM\"",
+    "cache-control": "no-store",
+    "content-length": "78"
+   },
+   "answer": "{\"error\":\"Side chat пока только для Claude\",\"code\":\"unsupported\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"tabId\":\"tab-2\",\"question\":\"why?\",\"excerpts\":[{\"quote\":\"   \"}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ZuHu2_0abpVCaOoTu8FJ0C9goUY\"",
+    "cache-control": "no-store",
+    "content-length": "41"
+   },
+   "answer": "{\"error\":\"Фрагмент пустой\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"tabId\":\"tab-2\",\"question\":\"why?\",\"model\":\"Bad\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ZvQt6ok95HVkocqoN5YqjHAFYJ4\"",
+    "cache-control": "no-store",
+    "content-length": "47"
+   },
+   "answer": "{\"error\":\"Неизвестная модель\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/side-chat",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"tabId\":\"tab-2\",\"question\":\"why <question>?\",\"excerpts\":[{\"quote\":\"a\",\"source\":{\"entryId\":\"e1\",\"role\":\"agent\"}}],\"history\":[{\"question\":\"q\",\"answer\":\"a\"}],\"model\":\"haiku\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-store, no-transform",
+    "x-accel-buffering": "no"
+   },
+   "answer": "data: {\"type\":\"delta\",\"text\":\"Hel\"}\n\ndata: {\"type\":\"delta\",\"text\":\"lo\"}\n\ndata: {\"type\":\"done\",\"text\":\"Hello\",\"costUsd\":0.25}\n\n",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "GET",
+   "url": "/api/codex/launch-args",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-args",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ToIK53-oMW5GV5XdlSK8z732X_Q\"",
+    "content-length": "1187"
+   },
+   "answer": "{\"args\":[\"-c\",\"hooks.SessionStart=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.UserPromptSubmit=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.PreToolUse=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.PostToolUse=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.Stop=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.PermissionRequest=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"mcp_servers.acme-preview.url=\\\"http://127.0.0.1:18123/api/cli/preview/mcp\\\"\",\"-c\",\"mcp_servers.acme-preview.env_http_headers={\\\"x-cli-token\\\"=\\\"ACME_PREVIEW_TOKEN\\\"}\",\"--dangerously-bypass-hook-trust\",\"-c\",\"check_for_update_on_startup=false\",\"-c\",\"developer_instructions=\\\"Work \\\\\\\"carefully\\\\\\\".\\\\nSecond line\\\"\"]}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-args",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"workspaceId\":\" ws-a \",\"resumeSessionId\":\"019a0c11-2222-7333-8444-555555555555\",\"model\":\"gpt-5\",\"effort\":\"high\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"75zyzOwQzecv7BcN2_puzCrZR0A\"",
+    "content-length": "1287"
+   },
+   "answer": "{\"args\":[\"resume\",\"019a0c11-2222-7333-8444-555555555555\",\"-c\",\"hooks.SessionStart=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.UserPromptSubmit=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.PreToolUse=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.PostToolUse=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.Stop=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"hooks.PermissionRequest=[{matcher=\\\".*\\\",hooks=[{type=\\\"command\\\",command=\\\"$DATA/codex-hook.sh\\\"}]}]\",\"-c\",\"mcp_servers.acme-preview.url=\\\"http://127.0.0.1:18123/api/cli/preview/mcp\\\"\",\"-c\",\"mcp_servers.acme-preview.env_http_headers={\\\"x-cli-token\\\"=\\\"ACME_PREVIEW_TOKEN\\\"}\",\"--dangerously-bypass-hook-trust\",\"-c\",\"check_for_update_on_startup=false\",\"-c\",\"developer_instructions=\\\"Work \\\\\\\"carefully\\\\\\\".\\\\nSecond line\\\"\",\"-m\",\"gpt-5\",\"-c\",\"model_reasoning_effort=\\\"high\\\"\"]}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-args",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"model\":\"Bad Model\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"quXZRpSLoA15Q2tI9FemXnUvXG8\"",
+    "content-length": "35"
+   },
+   "answer": "{\"error\":\"Invalid model or effort\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-args",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"resumeSessionId\":\"not-a-session\"}",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"sxU6YuPqEDneEDcLfKgssRN9xVA\"",
+    "content-length": "45"
+   },
+   "answer": "{\"error\":\"Failed to build Codex launch args\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-command",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6ykD3ZxSOi4k953IenuH9XPCHCA\"",
+    "content-length": "103"
+   },
+   "answer": "{\"command\":\"node '$DATA/codex-launcher.js' --workspace-id 'ws-a'\"}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-command",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"workspaceId\":\"ws-b\",\"resumeSessionId\":\"019a0c11-2222-7333-8444-555555555555\",\"effort\":\"low\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"dg6Ww-FTEOWFdyXBvyD3RpNDNts\"",
+    "content-length": "177"
+   },
+   "answer": "{\"command\":\"node '$DATA/codex-launcher.js' --workspace-id 'ws-b' --resume-session-id '019a0c11-2222-7333-8444-555555555555' --effort 'low'\"}",
+   "scrubbed": true,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-command",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"effort\":\"turbo\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Cc8ZmMmC_37MntB3inpW8rU5gfs\"",
+    "content-length": "94"
+   },
+   "answer": "{\"error\":\"Недопустимая модель или глубина рассуждения\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-command",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"resumeSessionId\":\"bad\"}",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0RASGo2Ov7Z-QK4PRCoFaMvFw6Y\"",
+    "content-length": "48"
+   },
+   "answer": "{\"error\":\"Failed to build Codex launch command\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "setup": {
+    "missing": [
+     "codex-cli"
+    ]
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/codex/launch-command",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 409,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0N2HswLTar4E7JT9Fv8KzerG97Q\"",
+    "content-length": "130"
+   },
+   "answer": "{\"error\":\"agent-not-installed\",\"providerId\":\"codex\",\"providerDisplayName\":\"Codex\",\"panelType\":\"codex-cli\",\"suggestedCommand\":null}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "setup": {
+    "missing": []
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/tabs",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"workspaceId\":\"ws-b\",\"panelType\":\"claude-code\",\"prompt\":\"From the CLI\",\"name\":\" Helper \",\"model\":\"sonnet\"}",
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wK2S7UKrTQHpLL_WdPpVPc7RD0I\"",
+    "content-length": "220"
+   },
+   "answer": "{\"tabId\":\"tab-id0009\",\"workspaceId\":\"ws-b\",\"paneId\":\"pane-id0002\",\"sessionName\":\"tk-ws-b-pane-id0002-tab-id0009\",\"name\":\"Helper\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":null,\"launched\":true}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "create",
+     "tk-ws-b-pane-id0002-tab-id0009",
+     "80",
+     "24",
+     "$ROOT/projects"
+    ],
+    [
+     "send",
+     "tk-ws-b-pane-id0002-tab-id0009",
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-b/claude-prompt.md --model 'sonnet' -- $'From the CLI'"
+    ],
+    [
+     "register",
+     "tab-id0009",
+     "{\"workspaceId\":\"ws-b\",\"tabName\":\"Helper\",\"tmuxSession\":\"tk-ws-b-pane-id0002-tab-id0009\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":null,\"cliState\":\"busy\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "launch",
+     "tab-id0009",
+     ""
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/tabs",
+   "headers": {
+    "x-cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content-type": "application/json"
+   },
+   "body": "{\"workspaceId\":\"ws-b\",\"panelType\":\"codex-cli\",\"effort\":\"turbo\"}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"HQuA7j-6gOYqZwuINeZG1LRV0x4\"",
+    "content-length": "74"
+   },
+   "answer": "{\"error\":\"Недопустимая глубина рассуждения\"}",
+   "scrubbed": false,
+   "calls": []
+  },
+  {
+   "method": "POST",
+   "url": "/api/workspace",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"directory\":\"$ROOT/projects/proj-c\",\"name\":\"Gamma\",\"resumeSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"svK62WVSqATei6uR7wSUePRtqt0\"",
+    "content-length": "93"
+   },
+   "answer": "{\"id\":\"ws-id000a\",\"name\":\"Gamma\",\"directories\":[\"$ROOT/projects/proj-c\"]}",
+   "scrubbed": true,
+   "calls": [
+    [
+     "create",
+     "tk-ws-id000a-pane-id000b-tab-id000c",
+     "80",
+     "24",
+     "$ROOT/projects/proj-c"
+    ],
+    [
+     "register",
+     "tab-id000c",
+     "{\"cliState\":\"inactive\",\"workspaceId\":\"ws-id000a\",\"tabName\":\"\",\"tmuxSession\":\"tk-ws-id000a-pane-id000b-tab-id000c\",\"panelType\":\"claude-code\",\"agentProviderId\":\"claude\",\"agentSessionId\":\"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "send",
+     "tk-ws-id000a-pane-id000b-tab-id000c",
+     "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --resume 425055ec-bbc8-4e3c-87d0-36fa74c1cccb --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-id000a/claude-prompt.md --model 'opus'"
+    ],
+    [
+     "launch",
+     "tab-id000c",
+     ""
+    ]
+   ]
+  },
+  {
+   "method": "POST",
+   "url": "/api/layout/pane/pane-a/tabs?workspace=ws-a",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"panelType\":\"codex-cli\",\"resumeSessionId\":\"019a0c11-2222-7333-8444-555555555555\",\"name\":\"Again\"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"uI-fZY5d7BM9m_YjKFRSkn3IJWw\"",
+    "content-length": "230"
+   },
+   "answer": "{\"id\":\"tab-id000d\",\"sessionName\":\"tk-ws-a-pane-a-tab-id000d\",\"name\":\"Again\",\"order\":11,\"panelType\":\"codex-cli\",\"agentState\":{\"providerId\":\"codex\",\"sessionId\":\"019a0c11-2222-7333-8444-555555555555\",\"jsonlPath\":null,\"summary\":null}}",
+   "scrubbed": false,
+   "calls": [
+    [
+     "create",
+     "tk-ws-a-pane-a-tab-id000d",
+     "80",
+     "24",
+     ""
+    ],
+    [
+     "register",
+     "tab-id000d",
+     "{\"cliState\":\"inactive\",\"workspaceId\":\"ws-a\",\"tabName\":\"Again\",\"tmuxSession\":\"tk-ws-a-pane-a-tab-id000d\",\"panelType\":\"codex-cli\",\"agentProviderId\":\"codex\",\"agentSessionId\":\"019a0c11-2222-7333-8444-555555555555\",\"lastEvent\":null,\"eventSeq\":0}"
+    ],
+    [
+     "send",
+     "tk-ws-a-pane-a-tab-id000d",
+     "node '$DATA/codex-launcher.js' --workspace-id 'ws-a' --resume-session-id '019a0c11-2222-7333-8444-555555555555' --model 'gpt-5' --effort 'high'"
+    ],
+    [
+     "launch",
+     "tab-id000d",
+     ""
+    ]
+   ]
+  }
+ ],
+ "resume": {
+  "resumed": 4,
+  "calls": [
+   [
+    "create",
+    "tk-ws-a-pane-a-tab-4",
+    "80",
+    "24",
+    ""
+   ],
+   [
+    "sendSeparated",
+    "tk-ws-a-pane-a-tab-4",
+    "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='$DATA/bin/prompt-editor' EDITOR='$DATA/bin/prompt-editor' DISABLE_AUTOUPDATER=1 claude --resume 7a1c2d3e-4f50-4617-8899-aabbccddeeff --settings $DATA/hooks.json --mcp-config $DATA/preview-mcp.json --append-system-prompt-file $DATA/workspaces/ws-a/claude-prompt.md"
+   ],
+   [
+    "launch",
+    "tab-4",
+    ""
+   ],
+   [
+    "sendSeparated",
+    "tk-ws-a-pane-a-tab-3",
+    "node '$DATA/codex-launcher.js' --workspace-id 'ws-a' --resume-session-id '019a0c11-2222-7333-8444-555555555555' --model 'gpt-5' --effort 'high'"
+   ],
+   [
+    "launch",
+    "tab-3",
+    ""
+   ]
+  ]
+ },
+ "files": {
+  "bin/prompt-editor": "",
+  "cli-token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "codex-launcher.js": "",
+  "config.json": "{\"dangerouslySkipPermissions\":false}",
+  "eval/runs/11111111-2222-4333-8444-555555555555/stop": "",
+  "eval/runs/22222222-2222-4333-8444-555555555555/state.json": "{\"state\":\"running\"}",
+  "eval/runs/33333333-2222-4333-8444-555555555555/request.json": "{\"runId\":\"33333333-2222-4333-8444-555555555555\",\"task\":{\"prompt\":\"p\",\"base\":\"main\",\"checks\":[{\"run\":\"true\"}]},\"arm\":{\"model\":\"opus\",\"harness\":\"personal\"}}",
+  "launch-prompts/initial-UUID.txt": "Long task xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "workspaces/ws-a/codex-prompt.md": "Work \"carefully\".\nSecond line",
+  "workspaces/ws-a/layout.json": "{\n  \"root\": {\n    \"type\": \"pane\",\n    \"id\": \"pane-a\",\n    \"activeTabId\": \"tab-id000d\",\n    \"tabs\": [\n      {\n        \"id\": \"tab-1\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-1\",\n        \"name\": \"\",\n        \"order\": 0,\n        \"cwd\": \"$ROOT/projects/proj-a\"\n      },\n      {\n        \"id\": \"tab-2\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-2\",\n        \"name\": \"Claude\",\n        \"order\": 1,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"idle\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n          \"jsonlPath\": \"$ROOT/home/.claude/projects/$FLATROOT-projects-proj-a/425055ec-bbc8-4e3c-87d0-36fa74c1cccb.jsonl\",\n          \"summary\": \"Old summary\"\n        },\n        \"claudeSessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"opus\",\n            \"effort\": null\n          }\n        }\n      },\n      {\n        \"id\": \"tab-3\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-3\",\n        \"name\": \"Codex\",\n        \"order\": 2,\n        \"panelType\": \"codex-cli\",\n        \"cliState\": \"busy\",\n        \"agentState\": {\n          \"providerId\": \"codex\",\n          \"sessionId\": \"019a0c11-2222-7333-8444-555555555555\",\n          \"jsonlPath\": \"$ROOT/home/.codex/sessions/2026/10/18/rollout-2026-10-18T08-00-00-019a0c11-2222-7333-8444-555555555555.jsonl\",\n          \"summary\": null\n        },\n        \"meta\": {\n          \"mode\": \"automation\",\n          \"launch\": {\n            \"model\": \"gpt-5\",\n            \"effort\": \"high\"\n          }\n        }\n      },\n      {\n        \"id\": \"tab-4\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-4\",\n        \"name\": \"Gone\",\n        \"order\": 3,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"busy\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"7a1c2d3e-4f50-4617-8899-aabbccddeeff\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"lastUserMessage\": \"last words\"\n      },\n      {\n        \"id\": \"tab-5\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-5\",\n        \"name\": \"Running\",\n        \"order\": 4,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"needs-input\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        }\n      },\n      {\n        \"id\": \"tab-6\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-6\",\n        \"name\": \"Editor\",\n        \"order\": 5,\n        \"panelType\": \"claude-code\",\n        \"cliState\": \"busy\",\n        \"claudeSessionId\": \"7a1c2d3e-4f50-4617-8899-aabbccddeeff\",\n        \"title\": \"vim title\"\n      },\n      {\n        \"id\": \"tab-id0001\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-id0001\",\n        \"name\": \"Claude Code\",\n        \"order\": 6,\n        \"cwd\": \"$ROOT/projects\",\n        \"panelType\": \"claude-code\",\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"opus\",\n            \"effort\": \"high\"\n          }\n        },\n        \"lastUserMessage\": \"Fix the build\\nnow 'quoted'\"\n      },\n      {\n        \"id\": \"tab-id0005\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-id0005\",\n        \"name\": \"Claude Code\",\n        \"order\": 7,\n        \"cwd\": \"$ROOT/projects\",\n        \"panelType\": \"claude-code\",\n        \"lastUserMessage\": \"Long task xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n      },\n      {\n        \"id\": \"tab-id0006\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-id0006\",\n        \"name\": \"Claude Code\",\n        \"order\": 8,\n        \"cwd\": \"$ROOT/projects/proj-c\",\n        \"panelType\": \"claude-code\",\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"sonnet\",\n            \"effort\": null\n          },\n          \"mode\": \"automation\"\n        },\n        \"lastUserMessage\": \"Nightly check\"\n      },\n      {\n        \"id\": \"tab-id0007\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-id0007\",\n        \"name\": \"Claude Code\",\n        \"order\": 9,\n        \"cwd\": \"$ROOT/projects/proj-a\",\n        \"panelType\": \"claude-code\"\n      },\n      {\n        \"id\": \"tab-id0008\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-id0008\",\n        \"name\": \"Claude Code\",\n        \"order\": 10,\n        \"cwd\": \"$ROOT/projects\",\n        \"panelType\": \"claude-code\",\n        \"lastUserMessage\": \"From outside\"\n      },\n      {\n        \"id\": \"tab-id000d\",\n        \"sessionName\": \"tk-ws-a-pane-a-tab-id000d\",\n        \"name\": \"Again\",\n        \"order\": 11,\n        \"panelType\": \"codex-cli\",\n        \"agentState\": {\n          \"providerId\": \"codex\",\n          \"sessionId\": \"019a0c11-2222-7333-8444-555555555555\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"gpt-5\",\n            \"effort\": \"high\"\n          }\n        }\n      }\n    ]\n  },\n  \"activePaneId\": \"pane-a\",\n  \"updatedAt\": \"2026-10-18T09:00:00.000Z\"\n}",
+  "workspaces/ws-b/layout.json": "{\n  \"root\": {\n    \"type\": \"pane\",\n    \"id\": \"pane-id0002\",\n    \"tabs\": [\n      {\n        \"id\": \"tab-id0003\",\n        \"sessionName\": \"tk-ws-b-pane-id0002-tab-id0003\",\n        \"name\": \"\",\n        \"order\": 0,\n        \"cwd\": \"$ROOT/projects\"\n      },\n      {\n        \"id\": \"tab-id0004\",\n        \"sessionName\": \"tk-ws-b-pane-id0002-tab-id0004\",\n        \"name\": \"Codex\",\n        \"order\": 1,\n        \"cwd\": \"$ROOT/projects\",\n        \"panelType\": \"codex-cli\"\n      },\n      {\n        \"id\": \"tab-id0009\",\n        \"sessionName\": \"tk-ws-b-pane-id0002-tab-id0009\",\n        \"name\": \"Helper\",\n        \"order\": 2,\n        \"cwd\": \"$ROOT/projects\",\n        \"panelType\": \"claude-code\",\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"sonnet\",\n            \"effort\": null\n          }\n        },\n        \"lastUserMessage\": \"From the CLI\"\n      }\n    ],\n    \"activeTabId\": \"tab-id0009\"\n  },\n  \"activePaneId\": \"pane-id0002\",\n  \"updatedAt\": \"2026-10-18T09:00:00.000Z\"\n}",
+  "workspaces/ws-id000a/layout.json": "{\n  \"root\": {\n    \"type\": \"pane\",\n    \"id\": \"pane-id000b\",\n    \"tabs\": [\n      {\n        \"id\": \"tab-id000c\",\n        \"sessionName\": \"tk-ws-id000a-pane-id000b-tab-id000c\",\n        \"name\": \"\",\n        \"order\": 0,\n        \"cwd\": \"$ROOT/projects/proj-c\",\n        \"panelType\": \"claude-code\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"claudeSessionId\": \"425055ec-bbc8-4e3c-87d0-36fa74c1cccb\",\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"opus\",\n            \"effort\": null\n          }\n        }\n      }\n    ],\n    \"activeTabId\": \"tab-id000c\"\n  },\n  \"activePaneId\": \"pane-id000b\",\n  \"updatedAt\": \"2026-10-18T09:00:00.000Z\"\n}",
+  "workspaces.json": "{\n  \"workspaces\": [\n    {\n      \"id\": \"ws-a\",\n      \"name\": \"Alpha\",\n      \"directories\": [\n        \"$ROOT/projects/proj-a\",\n        \"$ROOT/projects\",\n        \"$ROOT/projects/proj-c\"\n      ]\n    },\n    {\n      \"id\": \"ws-b\",\n      \"name\": \"Beta\",\n      \"directories\": [\n        \"$ROOT/projects\"\n      ]\n    },\n    {\n      \"id\": \"ws-id000a\",\n      \"name\": \"Gamma\",\n      \"directories\": [\n        \"$ROOT/projects/proj-c\"\n      ]\n    }\n  ],\n  \"groups\": [],\n  \"sidebarCollapsed\": false,\n  \"sidebarWidth\": 240,\n  \"updatedAt\": \"2026-10-18T09:00:00.000Z\"\n}"
+ }
+}

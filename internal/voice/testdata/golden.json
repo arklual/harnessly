@@ -1,0 +1,668 @@
+{
+ "ffmpegVersion": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+ "failingFfmpeg": "#!/bin/sh\necho \"first line\" >&2\necho \"  pipe:0: Invalid data found when processing input  \" >&2\nexit 1\n",
+ "scenarios": [
+  {
+   "name": "normal ru",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 ru\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 48000 ru 1464e546bcc49f87adf2a861ab9f967a46daa4380bf1cd5fd7a35392b1c5da12\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "lang en",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"en\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 en\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 en\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 en\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 48000 en 1464e546bcc49f87adf2a861ab9f967a46daa4380bf1cd5fd7a35392b1c5da12\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "lang auto",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"auto\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 auto\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 auto\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 auto\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 48000 auto 1464e546bcc49f87adf2a861ab9f967a46daa4380bf1cd5fd7a35392b1c5da12\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "lang unknown",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"xx\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 ru\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 48000 ru 1464e546bcc49f87adf2a861ab9f967a46daa4380bf1cd5fd7a35392b1c5da12\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "lang number",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":5}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 ru\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 48000 ru 1464e546bcc49f87adf2a861ab9f967a46daa4380bf1cd5fd7a35392b1c5da12\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "lang none",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 ru\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 48000 ru 1464e546bcc49f87adf2a861ab9f967a46daa4380bf1cd5fd7a35392b1c5da12\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "noise before start",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "binary",
+     500
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "text",
+     "not json"
+    ],
+    [
+     "text",
+     "[1]"
+    ],
+    [
+     "text",
+     "{\"type\":\"other\"}"
+    ],
+    [
+     "wait",
+     200
+    ],
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"en\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     300
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 en\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 en\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 en\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 48000 en 1464e546bcc49f87adf2a861ab9f967a46daa4380bf1cd5fd7a35392b1c5da12\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "abort",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"abort\"}"
+    ],
+    [
+     "wait",
+     500
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     300
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "close mid-way",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "close"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "stop without audio",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 0 ru e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "garbage then stop",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "binary",
+     3000
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 0 ru e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "ffmpeg fails",
+   "mode": "silent",
+   "ffmpeg": "failing",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"error\",\"message\":\"Не удалось разобрать звук: ffmpeg exited (1):   pipe:0: Invalid data found when processing input\",\"code\":\"failed\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "no ffmpeg",
+   "mode": "normal",
+   "ffmpeg": "missing",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ],
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     300
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"error\",\"message\":\"На этой машине не найден ffmpeg — серверная расшифровка недоступна.\",\"code\":\"unavailable\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "relative ffmpeg",
+   "mode": "normal",
+   "ffmpeg": "relative",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"error\",\"message\":\"На этой машине не найден ffmpeg — серверная расшифровка недоступна.\",\"code\":\"unavailable\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "no service",
+   "mode": "down",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"error\",\"message\":\"Серверное распознавание речи на этой машине не запущено\",\"code\":\"unavailable\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "error before ready",
+   "mode": "error-before-ready",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"error\",\"message\":\"Модель не загружена\",\"code\":\"unavailable\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "error after ready",
+   "mode": "error-after-ready",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"error\",\"message\":42,\"code\":\"failed\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "service closes",
+   "mode": "close-after-ready",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"error\",\"message\":\"Сервис распознавания перезапустился, попробуйте ещё раз\",\"code\":\"failed\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "no text",
+   "mode": "no-text",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 ru\"}",
+    "{\"type\":\"final\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "malformed lines",
+   "mode": "malformed",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "wait",
+     300
+    ],
+    [
+     "audio"
+    ],
+    [
+     "text",
+     "{\"type\":\"stop\"}"
+    ],
+    [
+     "wait",
+     "end"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}",
+    "{\"type\":\"partial\",\"text\":\"a\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 16000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 32000 ru\"}",
+    "{\"type\":\"partial\",\"text\":\"pcm 48000 ru\"}",
+    "{\"type\":\"final\",\"text\":\"pcm 48000 ru 1464e546bcc49f87adf2a861ab9f967a46daa4380bf1cd5fd7a35392b1c5da12\"}"
+   ],
+   "closeCode": null
+  },
+  {
+   "name": "message too big",
+   "mode": "normal",
+   "ffmpeg": "real",
+   "steps": [
+    [
+     "text",
+     "{\"type\":\"start\",\"lang\":\"ru\"}"
+    ],
+    [
+     "wait",
+     "ready"
+    ],
+    [
+     "binary",
+     262145
+    ],
+    [
+     "wait",
+     "closed"
+    ]
+   ],
+   "messages": [
+    "{\"type\":\"ready\"}"
+   ],
+   "closeCode": 1009
+  }
+ ]
+}

@@ -1,0 +1,2 @@
+{"parentUuid": null, "isSidechain": false, "type": "user", "uuid": "00000000-0000-4000-8000-000000000140", "timestamp": "2026-03-01T10:02:20.140Z", "userType": "external", "cwd": "/home/agent/project", "sessionId": "11111111-2222-4333-8444-555555555555", "version": "2.1.300", "gitBranch": "main", "message": {"role": "user", "content": "complete line Ð–"}}
+{"type":"user","message":{"content":"partial Ð

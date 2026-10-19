@@ -1,0 +1,40 @@
+
+[38;5;246m✻[39m [38;5;246mCrunched for 27s · done 6:49 PM[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mWithout using any tools, write a very long 3000-word story about a lighthouse keeper, plain text, no headings. Then [39m
+  [38;5;231msay STORY-END.[39m
+[49m
+[38;5;231m●[39m The lighthouse stood on the last rock before the open water, a tower of grey stone that the sea had been trying to
+  wear down for a hundred and twelve years. Its keeper was a woman named Maren Holt, who had come to the island at
+  twenty-six, when her father's knees gave out and the Northern Lights Board needed someone willing to live on a rock
+  with nothing but gulls for company. She had expected to stay two winters. She stayed thirty-one years.
+
+  The island was called Sorrow by the fishermen, though the charts gave it a gentler name that nobody used. It was
+  perhaps four hundred yards long and two hundred wide at its broadest, a hump of black basalt with a skin of thin grass
+  and a few stubborn shrubs bent flat by the wind. There was a keeper's cottage, a storehouse, a small stone shed for
+  the generator, and the tower itself, which rose from the highest point like a finger held up to say be careful. A
+  landing stage of creosoted timber ran down to a cove on the leeward side, and in calm weather a boat could come in
+  from the mainland, three miles off, to bring post and paraffin and sometimes a relief keeper. In winter the boat came
+  rarely. In storms it did not come at all.
+
+  Maren kept the light by habit more than by duty. Every evening at dusk she climbed the one hundred and six iron steps,
+  checked the wick, trimmed the lamp, polished the great lens until she could see her own face in it, and wound the
+  clockwork that turned the lantern. Then she wrote the entry in the logbook. Wind from the northwest, force five.
+  Visibility good. Sea moderate. One vessel passed to the east, bound south, lights correct. The logbook was a record
+  kept for the Board, but she had come to think of it as a letter addressed to nobody in particular, a way of saying
+  here I am, here is the weather, here is the world as it looked from the top of the tower tonight.
+
+  In her first years she had been lonely in a way she did not have words for. She talked to the gulls. She talked to the
+  lens. She sang old songs her mother had taught her, badly, into the wind, and the wind carried them away without
+  comment. Later the loneliness settled into something quieter, a companion
+
+[38;5;246m[48;5;237m❯ Then also say QUEUED-MSG-3 right after STORY-END[39m
+
+[38;5;174m[49m✻[39m [38;5;174mCoalescing[38;5;216m…[38;5;174m [39m
+[38;5;246m  ⎿  Tip: Try the new fullscreen renderer — flicker-free output, mouse support, auto-copy on select · /tui fullscreen[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵[39m [38;5;211mbypass[39m [38;5;211mpermissions[39m [38;5;211mon[38;5;246m (shift+tab[39m [38;5;246mto[39m [38;5;246mcycle)[39m [38;5;246m·[39m [38;5;246mesc[39m [38;5;246mto[39m [38;5;246minterrupt[39m [38;5;246m·[39m [38;5;246m←[39m [38;5;246mfor[39m [38;5;246magents[39m
+

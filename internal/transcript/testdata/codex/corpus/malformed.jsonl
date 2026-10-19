@@ -1,0 +1,37 @@
+
+   
+	
+not json
+{"type": "event_msg", "payload": {"type": "task_complete"}
+[1,2,3]
+42
+null
+"string"
+{}
+{"type": 5}
+{"type": "event_msg", "timestamp": 5, "payload": {"type": "task_complete"}}
+{"type": "event_msg", "timestamp": null, "payload": {"type": "task_complete"}}
+{"type": "event_msg", "payload": null}
+{"type": "event_msg", "payload": [1]}
+{"type": "event_msg", "payload": "str"}
+{"type":"event_msg","payload":{"__proto__":{"type":"task_complete"},"type":"turn_aborted"}}
+{"type":"event_msg","payload":{"type":"task_complete"},"type":"response_item"}
+  {"type":"event_msg","payload":{"type":"task_complete"}}  
+﻿{"type":"event_msg","payload":{"type":"task_complete"}}
+ 
+{"timestamp":"2026-03-01T10:03:15.000Z","type":"event_msg","payload":{"type":"user_message","message":"Привет, мир! Это проверка многобайтового текста Привет, мир! Это проверка многобайтового текста Привет, мир! Это проверка многобайтового текста "}}
+{"timestamp":"2026-03-01T10:03:16.250Z","type":"event_msg","payload":{"type":"agent_message","message":"日本語のテキスト 行区切り nbsp"}}
+{"timestamp":"2026-03-01T10:03:17.500Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀 tail"}]}}
+{"timestamp":"2026-03-01T10:03:18.750Z","type":"event_msg","payload":{"type":"user_message","message":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀 tail"}}
+{"timestamp":"2026-03-01T10:03:20.000Z","type":"response_item","payload":{"type":"function_call","name":"emoji","arguments":"{\"q\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀😀😀\"}","call_id":"c_emoji"}}
+{"timestamp":"2026-03-01T10:03:21.250Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c_emoji","output":"yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy😀z"}}
+{"timestamp":"2026-03-01T10:03:22.500Z","type":"event_msg","payload":{"type":"mcp_tool_call_begin","call_id":"m_emoji","server":"s","tool":"t","arguments":{"k":"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé😀"}}}
+{"timestamp":"2026-03-01T10:03:23.750Z","type":"event_msg","payload":{"type":"mcp_tool_call_end","call_id":"m_emoji","result":"\u0001\u001f \"quoted\" \\ back"}}
+{"timestamp":"2026-03-01T10:00:00Z","type":"event_msg","payload":{"type":"agent_message","message":"lone \ud83d high, pair \ud83d\ude00"}}
+{"timestamp":"2026-03-01T10:03:25.000Z","type":"event_msg","payload":{"type":"agent_message","message":"crlf line"}}
+{"timestamp":"2026-03-01T10:03:26.250Z","type":"event_msg","payload":{"type":"turn_aborted"}}
+{"type":"event_msg","payload":{"type":"agent_msg","message":"bad � ����� ok"}}
+é
+{"timestamp":"2026-03-01T10:03:27.500Z","type":"event_msg","payload":{"type":"user_message","message":"after the invalid bytes — ещё"}}
+{"timestamp":"2026-03-01T10:03:28.750Z","type":"event_msg","payload":{"type":"task_complete"}}
+{"timestamp":"2026-03-01T10:03:30.000Z","type":"event_msg","payload":{

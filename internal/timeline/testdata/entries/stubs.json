@@ -1,0 +1,1 @@
+{ "stubs": { "lib/auth": "stub-auth.mjs", "lib/logger": "stub-logger.mjs", "nanoid": "stub-nanoid.mjs" }, "real": ["diff", "zod"] }

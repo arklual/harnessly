@@ -1,0 +1,1065 @@
+{
+ "now": 1792281600000,
+ "token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+ "files": [
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl",
+   "content": "{\"type\":\"user\",\"message\":{\"content\":\"hi\"}}\n",
+   "mtime": 1792281595
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/empty-session.jsonl",
+   "content": "",
+   "mtime": 1792281595
+  },
+  {
+   "path": "home/.codex/sessions/2026/10/17/rollout-1.jsonl",
+   "content": "{}\n",
+   "mtime": 1792281595
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-a1.jsonl",
+   "mtime": 1792277999.25,
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T22:00:00.000Z\",\"message\":{\"content\":\"Find the bug\\nin the parser\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T22:00:05.000Z\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Looking\"},{\"type\":\"tool_use\",\"id\":\"toolu_a\",\"name\":\"Read\",\"input\":{\"file_path\":\"/srv/app/parser.go\"}}],\"stop_reason\":\"tool_use\"}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_a\",\"content\":\"ok\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"  Fixed: the loop ran one past the end.  \"}],\"stop_reason\":\"end_turn\"}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-a1.meta.json",
+   "mtime": 1792278000,
+   "content": "{\"agentType\":\"Explore\",\"description\":\"Look for the bug\",\"toolUseId\":\"toolu_parent\"}"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-b2.jsonl",
+   "mtime": 1792281589.75,
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T23:59:00Z\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Write tests\"},{\"type\":\"image\"},{\"type\":\"text\",\"text\":\"for the cache\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"command\":\"go test ./...\\necho done\"}}],\"stop_reason\":\"tool_use\"}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-b2.meta.json",
+   "mtime": 1792281590,
+   "content": "{\"requestShape\":\"background\",\"agentType\":\"general-purpose\"}"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-c3.jsonl",
+   "mtime": 1792281000,
+   "content": "not json\n\n{\"type\":\"user\",\"timestamp\":\"yesterday\",\"message\":{\"content\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T21:00:00Z\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"partial answer\"}],\"stop_reason\":null}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-d4.jsonl",
+   "mtime": 1792281000,
+   "content": "{\"type\":\"user\",\"message\":{\"content\":\"x\"}}\nnull\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-e5.jsonl",
+   "mtime": 1792281000,
+   "content": "{\"type\":\"user\",\"message\":{\"content\":\"meta is null\"}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-e5.meta.json",
+   "mtime": 1792281000,
+   "content": "null"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-f6.jsonl",
+   "mtime": 1792280700,
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T20:00:00.000Z\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Edit\",\"input\":{\"file_path\":\"/srv/app/a.ts\",\"old_string\":\"one\\ntwo\\n\",\"new_string\":\"one\\n2\\nthree\\n\"}}],\"stop_reason\":\"end_turn\"}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"WebFetch\",\"input\":{\"url\":\"https://example.com/pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp\",\"prompt\":\"x\"}},{\"type\":\"tool_use\",\"input\":{\"q\":1}}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"All done\"}],\"stop_reason\":\"end_turn\"}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-f6.meta.json",
+   "mtime": 1792280700,
+   "content": "{not json"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-g7.jsonl",
+   "mtime": 1792274400,
+   "content": ""
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-h8.jsonl",
+   "mtime": 1792281570,
+   "content": "﻿{\"type\":\"user\",\"timestamp\":\"2026-10-17T20:00:00.000Z\",\"message\":{\"content\":\"bom first line\"}}\r\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T20:00:00.000Z\",\"message\":{\"content\":\"second prompt\"}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"stop_reason\":\"end_turn\"}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-i9.jsonl",
+   "mtime": 1792281570,
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T20:00:00.000Z\",\"message\":{\"content\":\"same start as h8\"}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-i9.meta.json",
+   "mtime": 1792281570,
+   "content": "{\"description\":42,\"agentType\":[\"x\",null],\"toolUseId\":{\"id\":1}}"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-j10.jsonl",
+   "mtime": 1792281570,
+   "content": "{\"type\":\"user\",\"isSidechain\":true,\"uuid\":\"u1\",\"parentUuid\":null,\"sessionId\":\"s\",\"timestamp\":\"2026-10-17T20:00:00.000Z\",\"message\":{\"role\":\"user\",\"content\":\"Count the files\"}}\n{\"type\":\"assistant\",\"isSidechain\":true,\"uuid\":\"u2\",\"parentUuid\":\"u1\",\"timestamp\":\"2026-10-17T20:00:01.000Z\",\"message\":{\"id\":\"m1\",\"role\":\"assistant\",\"model\":\"claude-x\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"hm\"},{\"type\":\"text\",\"text\":\"Counting\"},{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"Bash\",\"input\":{\"command\":\"ls | wc -l\",\"description\":\"count\"}}],\"stop_reason\":\"tool_use\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5}}}\n{\"type\":\"user\",\"isSidechain\":true,\"uuid\":\"u3\",\"parentUuid\":\"u2\",\"timestamp\":\"2026-10-17T20:00:02.000Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_1\",\"content\":\"12\",\"is_error\":false}]},\"toolUseResult\":{\"stdout\":\"12\",\"stderr\":\"\"}}\n{\"type\":\"assistant\",\"isSidechain\":true,\"uuid\":\"u4\",\"parentUuid\":\"u3\",\"timestamp\":\"2026-10-17T20:00:03.000Z\",\"message\":{\"id\":\"m2\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_2\",\"name\":\"Read\",\"input\":{\"file_path\":\"/srv/app/a.go\"}}],\"stop_reason\":\"tool_use\"}}\n{\"type\":\"user\",\"isSidechain\":true,\"uuid\":\"u5\",\"parentUuid\":\"u4\",\"timestamp\":\"2026-10-17T20:00:04.000Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_2\",\"content\":[{\"type\":\"text\",\"text\":\"package a\"}]}]}}\n{\"type\":\"assistant\",\"isSidechain\":true,\"uuid\":\"u6\",\"parentUuid\":\"u5\",\"timestamp\":\"2026-10-17T20:00:05.000Z\",\"message\":{\"id\":\"m3\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"There are 12 files.\"}],\"stop_reason\":\"end_turn\"}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-k11.jsonl",
+   "mtime": 1792281570,
+   "content": "{\"type\":\"user\",\"uuid\":\"v1\",\"timestamp\":\"2026-10-17T20:00:00.000Z\",\"message\":{\"role\":\"user\",\"content\":\"not a sidechain\"}}\n{\"type\":\"assistant\",\"uuid\":\"v2\",\"timestamp\":\"2026-10-17T20:00:01.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"plain\"}]}}\n{\"type\":\"user\",\"isSidechain\":true,\"uuid\":\"v3\",\"timestamp\":\"2026-10-17T20:00:02.000Z\",\"message\":{\"role\":\"user\",\"content\":\"then a sidechain\"}}\nbroken {\n{\"type\":\"summary\",\"summary\":\"A summary\"}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/not-an-agent.jsonl",
+   "mtime": 1792281570,
+   "content": "{\"type\":\"user\",\"message\":{\"content\":\"ignored\"}}\n"
+  },
+  {
+   "path": "home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d/subagents/agent-bad name.jsonl",
+   "mtime": 1792281570,
+   "content": "{\"type\":\"user\",\"message\":{\"content\":\"ignored\"}}\n"
+  }
+ ],
+ "requests": [
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {},
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "wrong",
+    "x-old-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "x-old-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ybM0UAh2aH3IIEvUQyJpmxZDANA\"",
+    "cache-control": "no-store",
+    "content-length": "8426"
+   },
+   "answer": "{\"subagents\":[{\"id\":\"b2\",\"agentType\":\"general-purpose\",\"description\":\"Write tests\",\"toolUseId\":null,\"background\":true,\"status\":\"running\",\"startedAt\":1792281540000,\"updatedAt\":1792281589750,\"toolUses\":1,\"lastAction\":\"$ go test ./...\",\"prompt\":\"Write tests\\nfor the cache\",\"result\":null},{\"id\":\"a1\",\"agentType\":\"Explore\",\"description\":\"Look for the bug\",\"toolUseId\":\"toolu_parent\",\"background\":false,\"status\":\"done\",\"startedAt\":1792274400000,\"updatedAt\":1792277999250,\"toolUses\":1,\"lastAction\":\"Read /srv/app/parser.go\",\"prompt\":\"Find the bug\\nin the parser\",\"result\":\"Fixed: the loop ran one past the end.\"},{\"id\":\"g7\",\"agentType\":\"general-purpose\",\"description\":\"Субагент\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":null,\"updatedAt\":1792274400000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"\",\"result\":null},{\"id\":\"c3\",\"agentType\":\"general-purpose\",\"description\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":1792270800000,\"updatedAt\":1792281000000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"result\":null},{\"id\":\"f6\",\"agentType\":\"general-purpose\",\"description\":\"Субагент\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":1792267200000,\"updatedAt\":1792280700000,\"toolUses\":3,\"lastAction\":\"undefined 1\",\"prompt\":\"\",\"result\":null},{\"id\":\"h8\",\"agentType\":\"general-purpose\",\"description\":\"second prompt\",\"toolUseId\":null,\"background\":false,\"status\":\"done\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"second prompt\",\"result\":\"ok\"},{\"id\":\"i9\",\"agentType\":[\"x\",null],\"description\":42,\"toolUseId\":{\"id\":1},\"background\":false,\"status\":\"running\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"same start as h8\",\"result\":null},{\"id\":\"j10\",\"agentType\":\"general-purpose\",\"description\":\"Count the files\",\"toolUseId\":null,\"background\":false,\"status\":\"done\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":2,\"lastAction\":\"Read /srv/app/a.go\",\"prompt\":\"Count the files\",\"result\":\"There are 12 files.\"},{\"id\":\"k11\",\"agentType\":\"general-purpose\",\"description\":\"not a sidechain\",\"toolUseId\":null,\"background\":false,\"status\":\"running\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"not a sidechain\",\"result\":null}],\"supported\":true}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/platform/subagents",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     ""
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ],
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/elsewhere/s.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.json"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/../../etc/s.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.codex/sessions/2026/10/17/rollout-1.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"P2fWH4VWSxCRj9DzZ9OZHl3rBXU\"",
+    "content-length": "34"
+   },
+   "answer": "{\"subagents\":[],\"supported\":false}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/empty-session.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"x_fqe2NRYtqNM3OHw-XmplcTUZ0\"",
+    "cache-control": "no-store",
+    "content-length": "33"
+   },
+   "answer": "{\"subagents\":[],\"supported\":true}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/missing.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"x_fqe2NRYtqNM3OHw-XmplcTUZ0\"",
+    "cache-control": "no-store",
+    "content-length": "33"
+   },
+   "answer": "{\"subagents\":[],\"supported\":true}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ybM0UAh2aH3IIEvUQyJpmxZDANA\"",
+    "cache-control": "no-store",
+    "content-length": "8426"
+   },
+   "answer": "{\"subagents\":[{\"id\":\"b2\",\"agentType\":\"general-purpose\",\"description\":\"Write tests\",\"toolUseId\":null,\"background\":true,\"status\":\"running\",\"startedAt\":1792281540000,\"updatedAt\":1792281589750,\"toolUses\":1,\"lastAction\":\"$ go test ./...\",\"prompt\":\"Write tests\\nfor the cache\",\"result\":null},{\"id\":\"a1\",\"agentType\":\"Explore\",\"description\":\"Look for the bug\",\"toolUseId\":\"toolu_parent\",\"background\":false,\"status\":\"done\",\"startedAt\":1792274400000,\"updatedAt\":1792277999250,\"toolUses\":1,\"lastAction\":\"Read /srv/app/parser.go\",\"prompt\":\"Find the bug\\nin the parser\",\"result\":\"Fixed: the loop ran one past the end.\"},{\"id\":\"g7\",\"agentType\":\"general-purpose\",\"description\":\"Субагент\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":null,\"updatedAt\":1792274400000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"\",\"result\":null},{\"id\":\"c3\",\"agentType\":\"general-purpose\",\"description\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":1792270800000,\"updatedAt\":1792281000000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"result\":null},{\"id\":\"f6\",\"agentType\":\"general-purpose\",\"description\":\"Субагент\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":1792267200000,\"updatedAt\":1792280700000,\"toolUses\":3,\"lastAction\":\"undefined 1\",\"prompt\":\"\",\"result\":null},{\"id\":\"h8\",\"agentType\":\"general-purpose\",\"description\":\"second prompt\",\"toolUseId\":null,\"background\":false,\"status\":\"done\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"second prompt\",\"result\":\"ok\"},{\"id\":\"i9\",\"agentType\":[\"x\",null],\"description\":42,\"toolUseId\":{\"id\":1},\"background\":false,\"status\":\"running\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"same start as h8\",\"result\":null},{\"id\":\"j10\",\"agentType\":\"general-purpose\",\"description\":\"Count the files\",\"toolUseId\":null,\"background\":false,\"status\":\"done\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":2,\"lastAction\":\"Read /srv/app/a.go\",\"prompt\":\"Count the files\",\"result\":\"There are 12 files.\"},{\"id\":\"k11\",\"agentType\":\"general-purpose\",\"description\":\"not a sidechain\",\"toolUseId\":null,\"background\":false,\"status\":\"running\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"not a sidechain\",\"result\":null}],\"supported\":true}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ybM0UAh2aH3IIEvUQyJpmxZDANA\"",
+    "cache-control": "no-store"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/agents/api/platform/subagents/",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/../projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ybM0UAh2aH3IIEvUQyJpmxZDANA\"",
+    "cache-control": "no-store",
+    "content-length": "8426"
+   },
+   "answer": "{\"subagents\":[{\"id\":\"b2\",\"agentType\":\"general-purpose\",\"description\":\"Write tests\",\"toolUseId\":null,\"background\":true,\"status\":\"running\",\"startedAt\":1792281540000,\"updatedAt\":1792281589750,\"toolUses\":1,\"lastAction\":\"$ go test ./...\",\"prompt\":\"Write tests\\nfor the cache\",\"result\":null},{\"id\":\"a1\",\"agentType\":\"Explore\",\"description\":\"Look for the bug\",\"toolUseId\":\"toolu_parent\",\"background\":false,\"status\":\"done\",\"startedAt\":1792274400000,\"updatedAt\":1792277999250,\"toolUses\":1,\"lastAction\":\"Read /srv/app/parser.go\",\"prompt\":\"Find the bug\\nin the parser\",\"result\":\"Fixed: the loop ran one past the end.\"},{\"id\":\"g7\",\"agentType\":\"general-purpose\",\"description\":\"Субагент\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":null,\"updatedAt\":1792274400000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"\",\"result\":null},{\"id\":\"c3\",\"agentType\":\"general-purpose\",\"description\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":1792270800000,\"updatedAt\":1792281000000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"result\":null},{\"id\":\"f6\",\"agentType\":\"general-purpose\",\"description\":\"Субагент\",\"toolUseId\":null,\"background\":false,\"status\":\"stalled\",\"startedAt\":1792267200000,\"updatedAt\":1792280700000,\"toolUses\":3,\"lastAction\":\"undefined 1\",\"prompt\":\"\",\"result\":null},{\"id\":\"h8\",\"agentType\":\"general-purpose\",\"description\":\"second prompt\",\"toolUseId\":null,\"background\":false,\"status\":\"done\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"second prompt\",\"result\":\"ok\"},{\"id\":\"i9\",\"agentType\":[\"x\",null],\"description\":42,\"toolUseId\":{\"id\":1},\"background\":false,\"status\":\"running\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"same start as h8\",\"result\":null},{\"id\":\"j10\",\"agentType\":\"general-purpose\",\"description\":\"Count the files\",\"toolUseId\":null,\"background\":false,\"status\":\"done\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":2,\"lastAction\":\"Read /srv/app/a.go\",\"prompt\":\"Count the files\",\"result\":\"There are 12 files.\"},{\"id\":\"k11\",\"agentType\":\"general-purpose\",\"description\":\"not a sidechain\",\"toolUseId\":null,\"background\":false,\"status\":\"running\",\"startedAt\":1792267200000,\"updatedAt\":1792281570000,\"toolUses\":0,\"lastAction\":null,\"prompt\":\"not a sidechain\",\"result\":null}],\"supported\":true}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {},
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"3kzOKp-6hxWIp331eUgJJwRiDDg\"",
+    "cache-control": "no-store",
+    "content-length": "680"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id0001\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"id0002\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"id0003\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"id0004\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"id0005\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ],
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/elsewhere/s.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.codex/sessions/2026/10/17/rollout-1.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"chcSLU_HKJaOuea3P_zYKGNgnAs\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Invalid session\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/bad%20name",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0X4ijkSsM4YAJ0QQANT8KMNUTTY\"",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"Invalid subagent\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1.meta",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0X4ijkSsM4YAJ0QQANT8KMNUTTY\"",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"Invalid subagent\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/..%2Fx",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0X4ijkSsM4YAJ0QQANT8KMNUTTY\"",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"Invalid subagent\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/missing",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pM1FCu-WqT6RYp1tfTkmHLufuTE\"",
+    "cache-control": "no-store",
+    "content-length": "14"
+   },
+   "answer": "{\"entries\":[]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/b2",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/missing.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pM1FCu-WqT6RYp1tfTkmHLufuTE\"",
+    "cache-control": "no-store",
+    "content-length": "14"
+   },
+   "answer": "{\"entries\":[]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"aXrfQethvT9_xiNloHCrK6OxUCQ\"",
+    "cache-control": "no-store",
+    "content-length": "680"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id0006\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"id0007\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"id0008\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"id0009\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"id000a\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/b2",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"m96aHnF0BhS6erEyNO1lUz1owys\"",
+    "cache-control": "no-store",
+    "content-length": "113"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000b\",\"type\":\"user-message\",\"timestamp\":1792281540000,\"text\":\"Write tests\\nfor the cache\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/c3",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"KjEipPXKgJ16PjDy9jkm9IbRP7E\"",
+    "cache-control": "no-store",
+    "content-length": "7204"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000c\",\"type\":\"user-message\",\"timestamp\":null,\"text\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"},{\"id\":\"id000d\",\"type\":\"assistant-message\",\"timestamp\":1792270800000,\"markdown\":\"partial answer\",\"stopReason\":null}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/d4",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ynHWnH6cJi0-Myjce_fvqnYjUA4\"",
+    "cache-control": "no-store",
+    "content-length": "88"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000e\",\"type\":\"user-message\",\"timestamp\":1792281600000,\"text\":\"x\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/e5",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"7BAR2Fq-F3z5U_wMU4RMLAhP8WQ\"",
+    "cache-control": "no-store",
+    "content-length": "99"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000f\",\"type\":\"user-message\",\"timestamp\":1792281600000,\"text\":\"meta is null\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/f6",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"5bUhOEDxcEkID51VsNwp5eevobc\"",
+    "cache-control": "no-store",
+    "content-length": "128"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000g\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"All done\",\"stopReason\":\"end_turn\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/g7",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pM1FCu-WqT6RYp1tfTkmHLufuTE\"",
+    "cache-control": "no-store",
+    "content-length": "14"
+   },
+   "answer": "{\"entries\":[]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/h8",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Mlu-jS7pZWfuli9mRymfaVS4QD4\"",
+    "cache-control": "no-store",
+    "content-length": "209"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000h\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"second prompt\"},{\"id\":\"id000i\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"ok\",\"stopReason\":\"end_turn\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/i9",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"PcRvwkhqpEgpncQpHHzx5I5rMFg\"",
+    "cache-control": "no-store",
+    "content-length": "103"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000j\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"same start as h8\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/j10",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"EeIcj-sJ-AV5ZfQM_hh9Q6oYZLE\"",
+    "cache-control": "no-store",
+    "content-length": "1045"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000k\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"id000l\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"id000m\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"id000n\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"id000o\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"id000p\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"id000q\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"id000r\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/k11",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6SAJcA2dnSCADtIFS2HZVbPE1TM\"",
+    "cache-control": "no-store",
+    "content-length": "280"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000t\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"not a sidechain\"},{\"id\":\"id000u\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"plain\"},{\"id\":\"id000v\",\"type\":\"user-message\",\"timestamp\":1792267202000,\"text\":\"then a sidechain\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/j10",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"EBuHh2eaBDVpgi4Qs90D4vro8i4\"",
+    "cache-control": "no-store",
+    "content-length": "1045"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id000x\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"id000y\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"id000z\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"id0010\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"id0011\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"id0012\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"id0013\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"id0014\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/subagents/a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ],
+    [
+     "id",
+     "b2"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"fHEwGKPdRLKRvZkgrMqrswFkxOg\"",
+    "cache-control": "no-store",
+    "content-length": "680"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id0016\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"id0017\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"id0018\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"id0019\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"id001a\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/agents/api/platform/subagents/j10/",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ymXbqJpAubKf6HOdiSD3hgUB9Bo\"",
+    "cache-control": "no-store",
+    "content-length": "1045"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id001b\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"id001c\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"id001d\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"id001e\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"id001f\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"id001g\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"id001h\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"id001i\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform//subagents//a1",
+   "query": [
+    [
+     "jsonlPath",
+     "$ROOT/home/.claude/projects/-srv-app/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.jsonl"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"gwBysfIr7yAzLt1PikWZdYt5CGk\"",
+    "cache-control": "no-store",
+    "content-length": "680"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id001k\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"id001l\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"id001m\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"id001n\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"id001o\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+  }
+ ]
+}

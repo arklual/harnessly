@@ -1,0 +1,41 @@
+# gitleaks: the default rules, plus allowlists for test fixtures only. Every entry is limited to the rule it silences
+# and to test files, and names the exact values it lets through, so a real secret anywhere else is still reported.
+# Provider-shaped fake credentials (GitHub, Anthropic, OpenAI, AWS, Slack, GitLab, private keys...) are never committed
+# literally: tests build them at run time and goldens store placeholders, because hosting push protection ignores this file.
+
+title = "harnessly"
+
+[extend]
+useDefault = true
+
+# The preview and share golden tests mint and verify JWTs signed with fixture secrets the generators set
+# (testdata/gen: "s3cret-for-golden" and friends); the goldens record those tokens. They grant nothing anywhere.
+# generic-api-key is listed too because it also fires on such a JWT (or its first characters) under a "token" key.
+[[allowlists]]
+description = "JWT fixtures in the preview and share goldens"
+targetRules = ["jwt", "generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)internal/(?:preview|share)/testdata/[^/]+\.json$''']
+regexes = ['''^eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]*)?$''']
+
+# Fixture values the generic-api-key heuristic flags in tests, each matched exactly:
+# - dGhlIHNhbXBsZSBub25jZQ== is the sample Sec-WebSocket-Key of RFC 6455 section 1.3 ("the sample nonce");
+# - BTBZMqHH6r4Tts7J_aSIgg and kyrL1jIIOHEzg3sM2ZWRHDRB62YACZhhSlknJ672kSs are the auth secret and shared secret of the
+#   published Web Push encryption example in RFC 8291 section 5;
+# - 0123456789abcdef x4 is the hook token of the hooksetup tests;
+# - s3cret-for-golden and k3y-Fixture-7781 are the fixture secrets the golden generators feed the old runtime;
+# - 13b2048f...71ff55 is the asset cache key the preview golden derives from fixture inputs (a hash, not a secret).
+[[allowlists]]
+description = "Known fixture values in tests and golden test data"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(?:^|/)(?:[^/]+_test\.go|testdata/.+)$''']
+regexes = [
+  '''^dGhlIHNhbXBsZSBub25jZQ==$''',
+  '''^BTBZMqHH6r4Tts7J_aSIgg$''',
+  '''^kyrL1jIIOHEzg3sM2ZWRHDRB62YACZhhSlknJ672kSs$''',
+  '''^(?:0123456789abcdef){4}$''',
+  '''^s3cret-for-golden$''',
+  '''^k3y-Fixture-7781$''',
+  '''^13b2048f7d6b0de7660fa170f8f2cdde48a57ff7a3447cf88eeeef942671ff55$''',
+]

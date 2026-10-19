@@ -1,0 +1,2 @@
+{"type": "user", "timestamp": "2026-10-18T11:00:00.000Z", "sessionId": "22222222-2222-4222-8222-222222222222", "cwd": "/work/acme", "uuid": "u1", "message": {"role": "user", "content": "Start a new task"}}
+{"type": "assistant", "timestamp": "2026-10-18T11:00:01.000Z", "sessionId": "22222222-2222-4222-8222-222222222222", "cwd": "/work/acme", "uuid": "a1", "message": {"role": "assistant", "model": "model-a", "content": [{"type": "text", "text": "Sure."}], "usage": {"input_tokens": 10, "output_tokens": 5}}}

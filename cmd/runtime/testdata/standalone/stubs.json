@@ -1,0 +1,5 @@
+{
+  "lib/logger": "stub-logger.mjs",
+  "lib/sync-server": "stub-sync.mjs",
+  "lib/layout-store": "stub-layout-store.mjs"
+}

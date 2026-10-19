@@ -1,0 +1,8 @@
+{"type": "user", "timestamp": "2026-10-12T18:49:50.311Z", "message": {"role": "user", "content": "Without using any tools, write a very long 3000-word story about a lighthouse keeper, plain text, no headings. Then say STORY-END."}}
+{"type": "queue-operation", "timestamp": "2026-10-12T18:49:54.088Z", "operation": "enqueue", "content": "Then also say QUEUED-MSG-3 right after STORY-END"}
+{"type": "queue-operation", "timestamp": "2026-10-12T18:49:56.257Z", "operation": "dequeue"}
+{"type": "assistant", "timestamp": "2026-10-12T18:49:51.347Z", "message": {"role": "assistant", "content": [{"type": "thinking", "thinking": ""}]}}
+{"type": "assistant", "timestamp": "2026-10-12T18:49:56.198Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "The lighthouse stood on the last rock before the open water, a tower of grey stone that the sea had been trying to wear down for a hundred and twelve years. Its keeper was a woman named Maren Holt, who had come to the island at twenty-six, …"}]}}
+{"type": "user", "timestamp": "2026-10-12T18:49:56.297Z", "message": {"role": "user", "content": "Then also say QUEUED-MSG-3 right after STORY-END"}}
+{"type": "assistant", "timestamp": "2026-10-12T18:49:58.547Z", "message": {"role": "assistant", "content": [{"type": "thinking", "thinking": ""}]}}
+{"type": "assistant", "timestamp": "2026-10-12T18:50:19.459Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "I should correct my last reply first. The story I wrote before was cut off mid-sentence after about 900 words, well short of 3000, and I didn't add STORY-END. Here is the complete story from the beginning.\n\nThe lighthouse stood on the last …"}]}}

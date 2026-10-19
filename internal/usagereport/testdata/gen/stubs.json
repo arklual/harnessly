@@ -1,0 +1,6 @@
+{
+ "stubs": {
+  "lib/auth": "stub-auth.mjs", "lib/logger": "stub-logger.mjs"
+ },
+ "real": []
+}

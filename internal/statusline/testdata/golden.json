@@ -1,0 +1,606 @@
+{
+ "now": 1792281600000,
+ "token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+ "data": {
+  "cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "workspaces.json": "{\n  \"workspaces\": [\n    {\n      \"id\": \"ws-a\",\n      \"name\": \"A\",\n      \"directories\": [\n        \"/srv/app\"\n      ]\n    }\n  ],\n  \"groups\": []\n}",
+  "workspaces/ws-a/layout.json": "{\n  \"root\": {\n    \"type\": \"pane\",\n    \"id\": \"pane-a\",\n    \"tabs\": [\n      {\n        \"id\": \"tab-1\",\n        \"sessionName\": \"hs-ws-a-pane-a-tab-1\",\n        \"name\": \"tab-1\",\n        \"order\": 0,\n        \"cwd\": \"/srv/app\",\n        \"panelType\": \"claude-code\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"opus\",\n            \"effort\": \"high\"\n          }\n        }\n      },\n      {\n        \"id\": \"tab-2\",\n        \"sessionName\": \"hs-ws-a-pane-a-tab-2\",\n        \"name\": \"tab-2\",\n        \"order\": 0,\n        \"cwd\": \"/srv/app\",\n        \"panelType\": \"claude-code\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": \"7c6b5a49-3827-4615-a4b3-c2d1e0f9a8b7\",\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"opus\",\n            \"effort\": \"ultracode\"\n          }\n        }\n      },\n      {\n        \"id\": \"tab-3\",\n        \"sessionName\": \"hs-ws-a-pane-a-tab-3\",\n        \"name\": \"tab-3\",\n        \"order\": 0,\n        \"cwd\": \"/srv/app\",\n        \"panelType\": \"claude-code\",\n        \"agentState\": {\n          \"providerId\": \"claude\",\n          \"sessionId\": null,\n          \"jsonlPath\": null,\n          \"summary\": null\n        },\n        \"meta\": {\n          \"launch\": {\n            \"model\": \"opus\",\n            \"effort\": \"ultracode\"\n          }\n        }\n      }\n    ]\n  }\n}",
+  "session-stats/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.json": "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcriptPath\":\"/srv/old.jsonl\",\"model\":\"Old\"}",
+  "rate-limits.json": "{\"ts\":1792280000,\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"}}"
+ },
+ "steps": [
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "GET",
+   "path": "/api/status/statusline",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "GET",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": null,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json",
+    "x-cli-token": "wrong",
+    "x-old-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+   },
+   "body": "{}",
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": {
+    "repeat": 1048586
+   },
+   "status": 413,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Body exceeded 1mb limit",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "status": 204,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8"
+   },
+   "answer": "",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "write": "home/.claude/settings.json",
+   "content": "{\"model\":\"opus\",\"statusLine\":{\"type\":\"command\",\"command\":\"cat\"}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"vyGp6PvFo4RvsFtPoIWeCReyIC8\"",
+    "content-length": "2"
+   },
+   "answer": "{}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "text/plain"
+   },
+   "body": "hello \"there\"",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"1MuFxToxBXTNiv36KQsGxpxyWaE\"",
+    "content-length": "17"
+   },
+   "answer": "\"hello \\\"there\\\"\"",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/x-www-form-urlencoded"
+   },
+   "body": "a=1&b=x%20y&a=3&c",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"fgfAoDiaFpiyTQbXlLBl4Zomaiw\"",
+    "content-length": "32"
+   },
+   "answer": "{\"a\":[\"1\",\"3\"],\"b\":\"x y\",\"c\":\"\"}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-old-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "body": "null",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"vyGp6PvFo4RvsFtPoIWeCReyIC8\"",
+    "content-length": "2"
+   },
+   "answer": "{}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"rrZCcxmX5R4znnUaj4z2bR-Yd-I\"",
+    "content-length": "857"
+   },
+   "answer": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "broadcasts": [
+    "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcriptPath\":\"/srv/app/.claude/s.jsonl\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000}"
+   ],
+   "changed": {
+    "session-stats/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.json": "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcriptPath\":\"/srv/app/.claude/s.jsonl\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000}",
+    "rate-limits.json": "{\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600,\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000,\"at\":1792281600}}}"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"cwd\":\"/srv/app\",\"model\":{\"display_name\":\"Opus 4.6 (1M)\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":null,\"seven_day\":{\"used_percentage\":12,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"z5L-CWNOaOTVABQ7Srrv-E85RkM\"",
+    "content-length": "671"
+   },
+   "answer": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"cwd\":\"/srv/app\",\"model\":{\"display_name\":\"Opus 4.6 (1M)\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":null,\"seven_day\":{\"used_percentage\":12,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "broadcasts": [
+    "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6 (1M)\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":null,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000}"
+   ],
+   "changed": {
+    "session-stats/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.json": "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6 (1M)\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":null,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000}",
+    "rate-limits.json": "{\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":12,\"resets_at\":1792800000,\"at\":1792281600}},\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600}"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"7c6b5a49-3827-4615-a4b3-c2d1e0f9a8b7\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":null,\"seven_day\":null},\"effort\":{\"level\":\"xhigh\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"RFfjmSjTBdmbvirg5hckR490an4\"",
+    "content-length": "774"
+   },
+   "answer": "{\"session_id\":\"7c6b5a49-3827-4615-a4b3-c2d1e0f9a8b7\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":null,\"seven_day\":null},\"effort\":{\"level\":\"xhigh\"}}",
+   "broadcasts": [
+    "{\"sessionId\":\"7c6b5a49-3827-4615-a4b3-c2d1e0f9a8b7\",\"transcriptPath\":\"/srv/app/.claude/s.jsonl\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"model\":\"Opus 4.6\",\"effort\":\"ultracode\",\"exceeds200k\":false,\"receivedAt\":1792281600000}"
+   ],
+   "changed": {
+    "session-stats/7c6b5a49-3827-4615-a4b3-c2d1e0f9a8b7.json": "{\"sessionId\":\"7c6b5a49-3827-4615-a4b3-c2d1e0f9a8b7\",\"transcriptPath\":\"/srv/app/.claude/s.jsonl\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"model\":\"Opus 4.6\",\"effort\":\"ultracode\",\"exceeds200k\":false,\"receivedAt\":1792281600000}"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"11111111-2222-4333-8444-555555555555\",\"transcript_path\":null,\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"effort\":{\"level\":\"xhigh\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"-P76Vfl-jqYWRes9oL9M2IvjopM\"",
+    "content-length": "702"
+   },
+   "answer": "{\"session_id\":\"11111111-2222-4333-8444-555555555555\",\"transcript_path\":null,\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"effort\":{\"level\":\"xhigh\"}}",
+   "broadcasts": [
+    "{\"sessionId\":\"11111111-2222-4333-8444-555555555555\",\"transcriptPath\":null,\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"model\":\"Opus 4.6\",\"effort\":\"xhigh\",\"exceeds200k\":false,\"receivedAt\":1792281600000}"
+   ],
+   "changed": {
+    "session-stats/11111111-2222-4333-8444-555555555555.json": "{\"sessionId\":\"11111111-2222-4333-8444-555555555555\",\"transcriptPath\":null,\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"model\":\"Opus 4.6\",\"effort\":\"xhigh\",\"exceeds200k\":false,\"receivedAt\":1792281600000}"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"not-a-uuid\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":true,\"context_window\":{\"current_usage\":{\"input_tokens\":\"5\",\"cache_read_input_tokens\":2}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"ztJYES6O8LqAbE-CknV0Gp4Uvvs\"",
+    "content-length": "641"
+   },
+   "answer": "{\"session_id\":\"not-a-uuid\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":true,\"context_window\":{\"current_usage\":{\"input_tokens\":\"5\",\"cache_read_input_tokens\":2}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "broadcasts": [
+    "{\"sessionId\":\"not-a-uuid\",\"transcriptPath\":\"/srv/app/.claude/s.jsonl\",\"inputTokens\":0,\"outputTokens\":0,\"cost\":1.2345,\"currentContextTokens\":\"502\",\"contextWindowSize\":0,\"usedPercentage\":null,\"model\":\"Opus 4.6\",\"effort\":\"high\",\"exceeds200k\":true,\"receivedAt\":1792281600000}"
+   ],
+   "changed": {
+    "rate-limits.json": "{\"claude\":{\"ts\":1792281600,\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000,\"at\":1792281600},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000,\"at\":1792281600}},\"codex\":{\"ts\":1792280000,\"five_hour\":{\"used_percentage\":3,\"resets_at\":1792290000,\"at\":1792280000,\"source\":\"codex-usage\"},\"seven_day\":null,\"source\":\"codex-usage\"},\"ts\":1792281600}"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":42,\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":\"flat\",\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":\"flat\",\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":7}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"jYS6o2nHrOmH4gNrsdMjwW2370A\"",
+    "content-length": "523"
+   },
+   "answer": "{\"session_id\":42,\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":\"flat\",\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":\"flat\",\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":7}}",
+   "broadcasts": [
+    "{\"sessionId\":42,\"transcriptPath\":\"/srv/app/.claude/s.jsonl\",\"inputTokens\":0,\"outputTokens\":0,\"cost\":1.2345,\"currentContextTokens\":0,\"contextWindowSize\":0,\"usedPercentage\":null,\"model\":null,\"effort\":null,\"exceeds200k\":false,\"receivedAt\":1792281600000}"
+   ],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"10\":\"ten\",\"b\":1,\"a\":{\"1\":\"one\",\"2\":\"two\",\"z\":1,\"big\":1e+21,\"small\":1e-7},\"s\":\"tab\\there \"}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"wOiAgoPXmOmDn3LtUcJlbWZ7xyQ\"",
+    "content-length": "94"
+   },
+   "answer": "{\"10\":\"ten\",\"b\":1,\"a\":{\"1\":\"one\",\"2\":\"two\",\"z\":1,\"big\":1e+21,\"small\":1e-7},\"s\":\"tab\\there \"}",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "write": "proj/.claude/settings.local.json",
+   "content": "{\"statusLine\":{\"command\":\"printf 'from local'\"}}"
+  },
+  {
+   "write": "proj/.claude/settings.json",
+   "content": "{\"statusLine\":{\"command\":\"echo from project; echo oops >&2; exit 3\"}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"8em4idHe7hu1FyMOgA2BFdP578E\"",
+    "content-length": "10"
+   },
+   "answer": "from local",
+   "broadcasts": [
+    "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000,\"transcriptPath\":\"/srv/app/.claude/s.jsonl\"}"
+   ],
+   "changed": {
+    "session-stats/3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d.json": "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000,\"transcriptPath\":\"/srv/app/.claude/s.jsonl\"}"
+   }
+  },
+  {
+   "remove": "proj/.claude/settings.local.json"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"ItAOg410cmXNcU1RWFlrt43eZh8\"",
+    "content-length": "13"
+   },
+   "answer": "from project\n",
+   "broadcasts": [
+    "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000,\"transcriptPath\":\"/srv/app/.claude/s.jsonl\"}"
+   ],
+   "changed": {}
+  },
+  {
+   "write": "proj/.claude/settings.json",
+   "content": "{\"statusLine\":{\"command\":\"   \"}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"rrZCcxmX5R4znnUaj4z2bR-Yd-I\"",
+    "content-length": "857"
+   },
+   "answer": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "broadcasts": [
+    "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000,\"transcriptPath\":\"/srv/app/.claude/s.jsonl\"}"
+   ],
+   "changed": {}
+  },
+  {
+   "write": "proj/.claude/settings.json",
+   "content": "{\"statusLine\":{\"command\":"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"rrZCcxmX5R4znnUaj4z2bR-Yd-I\"",
+    "content-length": "857"
+   },
+   "answer": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "broadcasts": [
+    "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000,\"transcriptPath\":\"/srv/app/.claude/s.jsonl\"}"
+   ],
+   "changed": {}
+  },
+  {
+   "write": "proj/.claude/settings.json",
+   "content": "{\"statusLine\":{\"command\":5}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"project_dir\":7},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 204,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8"
+   },
+   "answer": "",
+   "broadcasts": [
+    "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000,\"transcriptPath\":\"/srv/app/.claude/s.jsonl\"}"
+   ],
+   "changed": {}
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"project_dir\":\"\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"RqQnnV36VkREE35gw8yav5pWsw0\"",
+    "content-length": "798"
+   },
+   "answer": "{\"session_id\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"project_dir\":\"\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "broadcasts": [
+    "{\"7\":\"seven\",\"custom\":1,\"sessionId\":\"3f0c9a52-6d1e-4b7a-9c2d-0e1f2a3b4c5d\",\"model\":\"Opus 4.6\",\"inputTokens\":15000,\"outputTokens\":1200,\"cost\":1.2345,\"currentContextTokens\":11010,\"contextWindowSize\":200000,\"usedPercentage\":12.5,\"effort\":\"high\",\"exceeds200k\":false,\"receivedAt\":1792281600000,\"transcriptPath\":\"/srv/app/.claude/s.jsonl\"}"
+   ],
+   "changed": {}
+  },
+  {
+   "write": "home/.claude/settings.json",
+   "content": "{\"statusLine\":{\"command\":\"printf 'caf\\\\303\\\\251 \\\\377 end'\"}}"
+  },
+  {
+   "method": "POST",
+   "path": "/agents/api/status/statusline/",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{\"transcript_path\":\"/srv/app/.claude/s.jsonl\",\"cwd\":\"/srv/app\",\"model\":{\"id\":\"claude-opus-4-6\",\"display_name\":\"Opus 4.6\"},\"workspace\":{\"current_dir\":\"/srv/app\",\"project_dir\":\"$ROOT/proj\"},\"version\":\"2.1.0\",\"output_style\":{\"name\":\"default\"},\"cost\":{\"total_cost_usd\":1.2345,\"total_duration_ms\":1000,\"total_lines_added\":3},\"exceeds_200k_tokens\":false,\"context_window\":{\"total_input_tokens\":15000,\"total_output_tokens\":1200,\"context_window_size\":200000,\"used_percentage\":12.5,\"remaining_percentage\":87.5,\"current_usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_creation_input_tokens\":2000,\"cache_read_input_tokens\":9000}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":42,\"resets_at\":1792290000},\"seven_day\":{\"used_percentage\":11.5,\"resets_at\":1792800000}},\"effort\":{\"level\":\"high\"}}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"x0PJO13czQxgE-A5aZFHS_TV_AE\"",
+    "content-length": "13"
+   },
+   "answer": "café � end",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "write": "home/.claude/settings.json",
+   "content": "{\"statusLine\":{\"command\":\"echo only-err >&2\"}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8",
+    "etag": "\"2jmj7l5rSw0yVb_vlWAYkK_YBwk\"",
+    "content-length": "0"
+   },
+   "answer": "",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "write": "home/.claude/settings.json",
+   "content": "﻿{\"statusLine\":{\"command\":\"cat\"}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 204,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8"
+   },
+   "answer": "",
+   "broadcasts": [],
+   "changed": {}
+  },
+  {
+   "remove": "home/.claude/settings.json"
+  },
+  {
+   "method": "POST",
+   "path": "/api/status/statusline",
+   "headers": {
+    "x-cli-token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "content-type": "application/json"
+   },
+   "body": "﻿{\"session_id\":null}",
+   "status": 204,
+   "answerHeaders": {
+    "content-type": "text/plain; charset=utf-8"
+   },
+   "answer": "",
+   "broadcasts": [],
+   "changed": {}
+  }
+ ]
+}

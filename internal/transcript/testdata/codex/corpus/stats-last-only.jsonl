@@ -1,0 +1,4 @@
+{"timestamp":"2026-03-01T10:35:53.750Z","type":"session_meta","payload":{"id":"last","timestamp":"2026-03-01T09:59:59.000Z","cwd":"/home/agent/work","originator":"codex_cli_rs","cli_version":"0.50.0"}}
+{"timestamp":"2026-03-01T10:35:55.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":null,"last_token_usage":{"input_tokens":900,"cached_input_tokens":100,"output_tokens":50,"reasoning_output_tokens":5,"total_tokens":950},"model_context_window":200000}}}
+{"timestamp":"2026-03-01T10:35:56.250Z","type":"turn_context","payload":{"cwd":"/home/agent/work","model":"","effort":"high","approval_policy":"never"}}
+{"timestamp":"2026-03-01T10:35:57.500Z","type":"turn_context","payload":{"cwd":"/home/agent/work","model":"gpt-5.2-codex","effort":"high","approval_policy":"never"}}

@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.282
+▝▜██████▀  Haiku 4.5 · Claude Max
+ ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work
+
+⚠ 10 MCP servers need authentication · run /mcp
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ /context
+  ⎿  Context Usage
+     ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁ ⛁   Haiku 4.5
+     ⛁ ⛁ ⛁ ⛁ ⛁ ⛀ ⛶ ⛶ ⛶ ⛶   claude-haiku-4-5-20251001
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   31.5k/200k tokens (16%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   Estimated usage by category
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System prompt: 6.5k tokens (3.3%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System tools: 14k tokens (7.0%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Custom agents: 4.1k tokens (2.0%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Skills: 6.9k tokens (3.5%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ Messages: 8 tokens (0.0%)
+                           ⛶ Free space: 168.5k (84.2%)
+
+     Custom agents · .claude/agents/
+     └ 32 agents · 4.1k tokens
+
+     Skills · /skills
+     └ 689 skills · 6.9k tokens
+
+     /context all to expand
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  pre-statusline
+  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents

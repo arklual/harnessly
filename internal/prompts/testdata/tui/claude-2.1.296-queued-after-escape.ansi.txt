@@ -1,0 +1,40 @@
+[48;5;237m  [38;5;231mprint("ok8")'[39m
+[49m
+[38;5;114m●[39m [1mBash[0m(python3 -c 'import time; time.sleep(25); print("ok8")')
+[38;5;246m  ⎿  Running in the background (↓ to manage)[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mfirst queued: say Q-ONE[39m
+
+[38;5;246m❯ [38;5;231msecond queued: say Q-TWO[39m
+[49m
+[38;5;231m●[39m Q-ONE
+  Q-TWO
+
+  The 25-second command is still running in the background, so I'll say DONE8 once it finishes.
+
+[38;5;246m✻[39m [38;5;246mSautéed for 22s · done 6:52 PM[39m
+
+[38;5;114m●[39m Background command "Sleep 25 seconds then print ok8" completed (exit code 0)
+
+[38;5;231m●[39m DONE8
+
+[38;5;246m✻[39m [38;5;246mBrewed for 1s · done 6:52 PM
+
+[48;5;237m❯ [38;5;231mRun exactly this Bash command in the foreground and then say DONE9: python3 -c 'import time; time.sleep(25); [39m
+  [38;5;231mprint("ok9")'[39m
+[49m
+[38;5;211m●[39m [1mBash[0m(python3 -c 'import time; time.sleep(25); print("ok9")')
+[38;5;246m  ⎿  Interrupted · What should Claude do instead?[39m
+
+[38;5;246m[48;5;237m❯ queued for esc test: say Q-ESC[39m
+
+[38;5;174m[49m✢[39m [38;5;174mInferring… [38;5;246m(0s · ↓[39m [38;5;246m2 tokens)[39m
+[38;5;246m  ⎿  Tip: Name your conversations with /rename to find them easily in /resume later[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵ bypass permissions on[38;5;246m (shift+tab to cycle) · esc to interrupt · ← for agents[39m
+
+
+

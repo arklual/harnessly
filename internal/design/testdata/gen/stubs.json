@@ -1,0 +1,11 @@
+{
+ "stubs": {
+  "lib/auth": "stub-auth.mjs", "lib/logger": "stub-logger.mjs", "lib/status-manager": "stub-status.mjs",
+  "lib/tmux": "stub-tmux.mjs", "lib/{M}-prompt-editor": "stub-editor.mjs", "lib/push-subscriptions": "stub-push.mjs",
+  "lib/vapid-keys": "stub-push.mjs", "lib/{M}-tab-lookup": "stub-tabs.mjs", "lib/{M}-agent-start": "stub-start.mjs",
+  "lib/{M}-launch-options-server": "stub-start.mjs", "lib/workspace-store": "stub-workspaces.mjs",
+  "lib/{M}-automation-identity": "stub-identity.mjs", "lib/{M}-design-library/design-background": "stub-background.mjs",
+  "lib/sync-server": "stub-inert.mjs"
+ },
+ "real": ["diff", "zod", "nanoid"]
+}

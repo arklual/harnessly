@@ -1,0 +1,1082 @@
+{
+ "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+ "steps": [
+  {
+   "actions": [
+    {
+     "path": "repos/alpha",
+     "mkdir": true
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/alpha/one.txt",
+     "write": "line 0 of 1 x\nline 1 of 1 xxxxxxxx\nline 2 of 1 xxxxxxxxxxxxxxx\nline 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\nline 4 of 1 xxxxxx\nline 5 of 1 xxxxxxxxxxxxx\nline 6 of 1 xxxxxxxxxxxxxxxxxxxx\nline 7 of 1 xxxx\nline 8 of 1 xxxxxxxxxxx\nline 9 of 1 xxxxxxxxxxxxxxxxxx\nline 10 of 1 xx\nline 11 of 1 xxxxxxxxx\nline 12 of 1 xxxxxxxxxxxxxxxx\nline 13 of 1 \nline 14 of 1 xxxxxxx\nline 15 of 1 xxxxxxxxxxxxxx\nline 16 of 1 xxxxxxxxxxxxxxxxxxxxx\nline 17 of 1 xxxxx\nline 18 of 1 xxxxxxxxxxxx\nline 19 of 1 xxxxxxxxxxxxxxxxxxx\n"
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "first"
+     ],
+     "date": "2025-10-09T08:00:00"
+    },
+    {
+     "path": "repos/alpha/two.txt",
+     "write": "line 0 of 2 xx\nline 1 of 2 xxxxxxxxx\nline 2 of 2 xxxxxxxxxxxxxxxx\nline 3 of 2 \nline 4 of 2 xxxxxxx\nline 5 of 2 xxxxxxxxxxxxxx\nline 6 of 2 xxxxxxxxxxxxxxxxxxxxx\nline 7 of 2 xxxxx\nline 8 of 2 xxxxxxxxxxxx\nline 9 of 2 xxxxxxxxxxxxxxxxxxx\nline 10 of 2 xxx\nline 11 of 2 xxxxxxxxxx\nline 12 of 2 xxxxxxxxxxxxxxxxx\nline 13 of 2 x\nline 14 of 2 xxxxxxxx\nline 15 of 2 xxxxxxxxxxxxxxx\nline 16 of 2 xxxxxxxxxxxxxxxxxxxxxx\nline 17 of 2 xxxxxx\nline 18 of 2 xxxxxxxxxxxxx\nline 19 of 2 xxxxxxxxxxxxxxxxxxxx\n"
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "second\n\nbody line"
+     ],
+     "date": "2025-10-09T10:30:00"
+    },
+    {
+     "path": "repos/alpha/two.txt",
+     "write": "line 0 of 2 xx\nline 1 of 2 xxxxxxxxx\nline 2 of 2 xxxxxxxxxxxxxxxx\nline 3 of 2 \nline 4 of 2 xxxxxxx\nline 5 of 2 xxxxxxxxxxxxxx\nline 6 of 2 xxxxxxxxxxxxxxxxxxxxx\nline 7 of 2 xxxxx\nline 8 of 2 xxxxxxxxxxxx\nline 9 of 2 xxxxxxxxxxxxxxxxxxx\nline 10 of 2 xxx\nline 11 of 2 xxxxxxxxxx\nline 12 of 2 xxxxxxxxxxxxxxxxx\nline 13 of 2 x\nline 14 of 2 xxxxxxxx\nline 15 of 2 xxxxxxxxxxxxxxx\nline 16 of 2 xxxxxxxxxxxxxxxxxxxxxx\nline 17 of 2 xxxxxx\nline 18 of 2 xxxxxxxxxxxxx\nline 19 of 2 xxxxxxxxxxxxxxxxxxxx\nline 20 of 2 xxxx\n"
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "second, amended",
+      "--amend"
+     ],
+     "date": "2025-10-09T10:31:00"
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "checkout",
+      "-q",
+      "-b",
+      "side"
+     ]
+    },
+    {
+     "path": "repos/alpha/side.txt",
+     "write": "side\n"
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "on a side branch"
+     ],
+     "date": "2025-10-09T10:40:00"
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "checkout",
+      "-q",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "merge",
+      "-q",
+      "--no-ff",
+      "-m",
+      "merge side",
+      "side"
+     ],
+     "date": "2025-10-09T10:45:00"
+    },
+    {
+     "path": "repos/alpha/three.txt",
+     "write": "é\n"
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/alpha",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "third — ünïcode"
+     ],
+     "date": "2025-10-09T11:00:00"
+    },
+    {
+     "path": "repos/alpha/one.txt",
+     "write": "line 0 of 3 xxx\nline 1 of 3 xxxxxxxxxx\nline 2 of 3 xxxxxxxxxxxxxxxxx\nline 3 of 3 x\nline 4 of 3 xxxxxxxx\nline 5 of 3 xxxxxxxxxxxxxxx\nline 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\nline 7 of 3 xxxxxx\nline 8 of 3 xxxxxxxxxxxxx\nline 9 of 3 xxxxxxxxxxxxxxxxxxxx\nline 10 of 3 xxxx\nline 11 of 3 xxxxxxxxxxx\nline 12 of 3 xxxxxxxxxxxxxxxxxx\nline 13 of 3 xx\nline 14 of 3 xxxxxxxxx\nline 15 of 3 xxxxxxxxxxxxxxxx\nline 16 of 3 \nline 17 of 3 xxxxxxx\nline 18 of 3 xxxxxxxxxxxxxx\nline 19 of 3 xxxxxxxxxxxxxxxxxxxxx\nline 20 of 3 xxxxx\nline 21 of 3 xxxxxxxxxxxx\n"
+    },
+    {
+     "path": "repos/alpha/new file.txt",
+     "write": "untracked\n"
+    },
+    {
+     "path": "repos/alpha/ünï.txt",
+     "write": "quoted name\n"
+    },
+    {
+     "path": "repos/alpha/dir/n.txt",
+     "write": "n\n"
+    },
+    {
+     "path": "repos/Beta",
+     "mkdir": true
+    },
+    {
+     "path": "repos/Beta",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/Beta/huge.txt",
+     "write": "start\n"
+    },
+    {
+     "path": "repos/Beta",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/Beta",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "huge"
+     ],
+     "date": "2025-10-09T09:00:00"
+    },
+    {
+     "path": "repos/Beta/huge.txt",
+     "write": "",
+     "repeat": "é€😀 the quick brown fox\n",
+     "count": 30000
+    },
+    {
+     "path": "repos/Beta/u/f00.txt",
+     "write": "0\n"
+    },
+    {
+     "path": "repos/Beta/u/f01.txt",
+     "write": "1\n"
+    },
+    {
+     "path": "repos/Beta/u/f02.txt",
+     "write": "2\n"
+    },
+    {
+     "path": "repos/Beta/u/f03.txt",
+     "write": "3\n"
+    },
+    {
+     "path": "repos/Beta/u/f04.txt",
+     "write": "4\n"
+    },
+    {
+     "path": "repos/Beta/u/f05.txt",
+     "write": "5\n"
+    },
+    {
+     "path": "repos/Beta/u/f06.txt",
+     "write": "6\n"
+    },
+    {
+     "path": "repos/Beta/u/f07.txt",
+     "write": "7\n"
+    },
+    {
+     "path": "repos/Beta/u/f08.txt",
+     "write": "8\n"
+    },
+    {
+     "path": "repos/Beta/u/f09.txt",
+     "write": "9\n"
+    },
+    {
+     "path": "repos/Beta/u/f10.txt",
+     "write": "10\n"
+    },
+    {
+     "path": "repos/Beta/u/f11.txt",
+     "write": "11\n"
+    },
+    {
+     "path": "repos/Beta/u/f12.txt",
+     "write": "12\n"
+    },
+    {
+     "path": "repos/Beta/u/f13.txt",
+     "write": "13\n"
+    },
+    {
+     "path": "repos/Beta/u/f14.txt",
+     "write": "14\n"
+    },
+    {
+     "path": "repos/Beta/u/f15.txt",
+     "write": "15\n"
+    },
+    {
+     "path": "repos/Beta/u/f16.txt",
+     "write": "16\n"
+    },
+    {
+     "path": "repos/Beta/u/f17.txt",
+     "write": "17\n"
+    },
+    {
+     "path": "repos/Beta/u/f18.txt",
+     "write": "18\n"
+    },
+    {
+     "path": "repos/Beta/u/f19.txt",
+     "write": "19\n"
+    },
+    {
+     "path": "repos/Beta/u/f20.txt",
+     "write": "20\n"
+    },
+    {
+     "path": "repos/Beta/u/f21.txt",
+     "write": "21\n"
+    },
+    {
+     "path": "repos/Beta/u/f22.txt",
+     "write": "22\n"
+    },
+    {
+     "path": "repos/Beta/u/f23.txt",
+     "write": "23\n"
+    },
+    {
+     "path": "repos/Beta/u/f24.txt",
+     "write": "24\n"
+    },
+    {
+     "path": "repos/Beta/u/f25.txt",
+     "write": "25\n"
+    },
+    {
+     "path": "repos/Beta/u/f26.txt",
+     "write": "26\n"
+    },
+    {
+     "path": "repos/Beta/u/f27.txt",
+     "write": "27\n"
+    },
+    {
+     "path": "repos/Beta/u/f28.txt",
+     "write": "28\n"
+    },
+    {
+     "path": "repos/Beta/u/f29.txt",
+     "write": "29\n"
+    },
+    {
+     "path": "repos/Beta/u/f30.txt",
+     "write": "30\n"
+    },
+    {
+     "path": "repos/Beta/u/f31.txt",
+     "write": "31\n"
+    },
+    {
+     "path": "repos/Beta/u/f32.txt",
+     "write": "32\n"
+    },
+    {
+     "path": "repos/Beta/u/f33.txt",
+     "write": "33\n"
+    },
+    {
+     "path": "repos/Beta/u/f34.txt",
+     "write": "34\n"
+    },
+    {
+     "path": "repos/Beta/u/f35.txt",
+     "write": "35\n"
+    },
+    {
+     "path": "repos/Beta/u/f36.txt",
+     "write": "36\n"
+    },
+    {
+     "path": "repos/Beta/u/f37.txt",
+     "write": "37\n"
+    },
+    {
+     "path": "repos/Beta/u/f38.txt",
+     "write": "38\n"
+    },
+    {
+     "path": "repos/Beta/u/f39.txt",
+     "write": "39\n"
+    },
+    {
+     "path": "repos/Beta/u/f40.txt",
+     "write": "40\n"
+    },
+    {
+     "path": "repos/Beta/u/f41.txt",
+     "write": "41\n"
+    },
+    {
+     "path": "repos/Beta/u/f42.txt",
+     "write": "42\n"
+    },
+    {
+     "path": "repos/Beta/u/f43.txt",
+     "write": "43\n"
+    },
+    {
+     "path": "repos/Beta/u/f44.txt",
+     "write": "44\n"
+    },
+    {
+     "path": "repos/gamma",
+     "mkdir": true
+    },
+    {
+     "path": "repos/gamma",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/gamma/loose.txt",
+     "write": "loose\n"
+    },
+    {
+     "path": "repos/delta",
+     "mkdir": true
+    },
+    {
+     "path": "repos/delta",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/delta/old.txt",
+     "write": "old\n"
+    },
+    {
+     "path": "repos/delta",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/delta",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "old"
+     ],
+     "date": "2025-10-09T01:00:00"
+    },
+    {
+     "path": "repos/r1",
+     "mkdir": true
+    },
+    {
+     "path": "repos/r1",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/r1/f.txt",
+     "write": "r1\n"
+    },
+    {
+     "path": "repos/r1",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/r1",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "r1"
+     ],
+     "date": "2025-10-09T02:00:00"
+    },
+    {
+     "path": "repos/r2",
+     "mkdir": true
+    },
+    {
+     "path": "repos/r2",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/r2/f.txt",
+     "write": "r2\n"
+    },
+    {
+     "path": "repos/r2",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/r2",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "r2"
+     ],
+     "date": "2025-10-09T02:00:00"
+    },
+    {
+     "path": "repos/r3",
+     "mkdir": true
+    },
+    {
+     "path": "repos/r3",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/r3/f.txt",
+     "write": "r3\n"
+    },
+    {
+     "path": "repos/r3",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/r3",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "r3"
+     ],
+     "date": "2025-10-09T02:00:00"
+    },
+    {
+     "path": "repos/r4",
+     "mkdir": true
+    },
+    {
+     "path": "repos/r4",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/r4/f.txt",
+     "write": "r4\n"
+    },
+    {
+     "path": "repos/r4",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/r4",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "r4"
+     ],
+     "date": "2025-10-09T02:00:00"
+    },
+    {
+     "path": "repos/r5",
+     "mkdir": true
+    },
+    {
+     "path": "repos/r5",
+     "git": [
+      "init",
+      "-q",
+      "-b",
+      "main"
+     ]
+    },
+    {
+     "path": "repos/r5/f.txt",
+     "write": "r5\n"
+    },
+    {
+     "path": "repos/r5",
+     "git": [
+      "add",
+      "-A"
+     ]
+    },
+    {
+     "path": "repos/r5",
+     "git": [
+      "commit",
+      "-q",
+      "-m",
+      "r5"
+     ],
+     "date": "2025-10-09T02:00:00"
+    },
+    {
+     "path": "plain/file.txt",
+     "write": "not in a repo\n"
+    },
+    {
+     "path": "home/.claude/projects/p/s1.jsonl",
+     "write": "not json\n{\"type\":\"x\"}\n\n{\"timestamp\":\"2025-10-09T10:00:00.000Z\"}\n{\"timestamp\":\"2025-10-09T12:00:00.000Z\"}\n"
+    },
+    {
+     "path": "home/.claude/projects/p/s2.jsonl",
+     "write": "{\"timestamp\":1760006100000}\n"
+    },
+    {
+     "path": "home/.claude/projects/p/none.jsonl",
+     "write": "{\"timestamp\":\"never\"}\nnull\n[1]\n{\"timestamp\":-5}\n"
+    },
+    {
+     "path": "home/.claude/projects/p/long.jsonl",
+     "write": "",
+     "repeat": "y",
+     "count": 300000
+    },
+    {
+     "path": "home/.claude/projects/p/dir.jsonl",
+     "mkdir": true
+    },
+    {
+     "path": "home/.codex/sessions/2025/c.jsonl",
+     "write": "{\"timestamp\":\"2025-10-09T10:44:00Z\"}\n"
+    },
+    {
+     "path": "outside.jsonl",
+     "write": "{\"timestamp\":\"2025-10-09T10:00:00Z\"}\n"
+    }
+   ],
+   "answer": null
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":null}"
+   },
+   "answer": {
+    "status": 401,
+    "answerHeaders": {
+     "content-type": "application/json"
+    },
+    "answer": "{\"error\":\"Unauthorized\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "x-cli-token": "TOKEN",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":null}"
+   },
+   "answer": {
+    "status": 403,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\""
+    },
+    "answer": "{\"error\":\"Forbidden\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "x-cli-token": "TOKEN",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "text/plain"
+    },
+    "answer": "Invalid JSON"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/s1.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"yzAHWvMl4GUDtJ-ivSJDJk1a8rU\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":1760004000000,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[{\"sha\":\"22e95b359f2ba43d52d815a7dec81f5ae46d0e01\",\"short\":\"22e95b3\",\"subject\":\"third — ünïcode\",\"author\":\"Ann Example\",\"date\":1760007600000,\"additions\":1,\"deletions\":0,\"files\":1},{\"sha\":\"8f52f44d3c041ec24a024fb9c716b4a2765a7831\",\"short\":\"8f52f44\",\"subject\":\"on a side branch\",\"author\":\"Ann Example\",\"date\":1760006400000,\"additions\":1,\"deletions\":0,\"files\":1},{\"sha\":\"1c4df7600a1c4aa5ca1945f4c41af8eced345022\",\"short\":\"1c4df76\",\"subject\":\"second, amended\",\"author\":\"Ann Example\",\"date\":1760005800000,\"additions\":21,\"deletions\":0,\"files\":1}],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/s2.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"vnNQo9A8BKwEP7JF833gwA6bNlw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":1760006100000,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[{\"sha\":\"22e95b359f2ba43d52d815a7dec81f5ae46d0e01\",\"short\":\"22e95b3\",\"subject\":\"third — ünïcode\",\"author\":\"Ann Example\",\"date\":1760007600000,\"additions\":1,\"deletions\":0,\"files\":1},{\"sha\":\"8f52f44d3c041ec24a024fb9c716b4a2765a7831\",\"short\":\"8f52f44\",\"subject\":\"on a side branch\",\"author\":\"Ann Example\",\"date\":1760006400000,\"additions\":1,\"deletions\":0,\"files\":1}],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/agents/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/home/.codex/sessions/2025/c.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"XUOo1Hhs9jr-Z6vmHvfjCAkTfDs\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":1760006640000,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[{\"sha\":\"22e95b359f2ba43d52d815a7dec81f5ae46d0e01\",\"short\":\"22e95b3\",\"subject\":\"third — ünïcode\",\"author\":\"Ann Example\",\"date\":1760007600000,\"additions\":1,\"deletions\":0,\"files\":1}],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/none.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"P8suUcvC34XtFM3M6A80xuN-qNY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/long.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"P8suUcvC34XtFM3M6A80xuN-qNY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/dir.jsonl\"}"
+   },
+   "answer": {
+    "status": 500,
+    "answerHeaders": {
+     "content-type": "text/plain",
+     "cache-control": "no-store"
+    },
+    "answer": "Internal Server Error"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/outside.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"P8suUcvC34XtFM3M6A80xuN-qNY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/../../../../outside.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"P8suUcvC34XtFM3M6A80xuN-qNY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/missing.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"P8suUcvC34XtFM3M6A80xuN-qNY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/Beta/huge.txt\",\"$ROOT/repos/gamma\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/s1.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"mK8kLheljAxJbIKgUXmHfEU-X3Y\"",
+     "cache-control": "no-store"
+    },
+    "answerSha1": "5363c3ac05a2d32716a2b9f5b84b048eb72535ff",
+    "answerLength": 738860
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/r1/f.txt\",\"$ROOT/repos/r2\",\"$ROOT/repos/r3/\",\"$ROOT/repos/r4/f.txt\",\"$ROOT/repos/r5/f.txt\",\"$ROOT/repos/delta/old.txt\",\"$ROOT/repos/gamma/loose.txt\",\"$ROOT/repos/alpha/three.txt\",\"$ROOT/repos/gamma/x\"],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/s1.jsonl\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"Ogh_C90Q34zxdaRIq1OCU4auOF4\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":1760004000000,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[{\"sha\":\"22e95b359f2ba43d52d815a7dec81f5ae46d0e01\",\"short\":\"22e95b3\",\"subject\":\"third — ünïcode\",\"author\":\"Ann Example\",\"date\":1760007600000,\"additions\":1,\"deletions\":0,\"files\":1},{\"sha\":\"8f52f44d3c041ec24a024fb9c716b4a2765a7831\",\"short\":\"8f52f44\",\"subject\":\"on a side branch\",\"author\":\"Ann Example\",\"date\":1760006400000,\"additions\":1,\"deletions\":0,\"files\":1},{\"sha\":\"1c4df7600a1c4aa5ca1945f4c41af8eced345022\",\"short\":\"1c4df76\",\"subject\":\"second, amended\",\"author\":\"Ann Example\",\"date\":1760005800000,\"additions\":21,\"deletions\":0,\"files\":1}],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/r1\",\"name\":\"r1\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/r2\",\"name\":\"r2\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/r3\",\"name\":\"r3\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/r4\",\"name\":\"r4\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/r5\",\"name\":\"r5\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":\"$ROOT/repos/alpha\",\"jsonlPath\":7}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"kftw3XqE3XnoeBD44mRCS8MFey8\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha\",5,null,\"$ROOT/repos/alpha\\u0000x\"]}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"xxsC9G6V0SvYyJ4iFZNJjwRTago\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": ""
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"kftw3XqE3XnoeBD44mRCS8MFey8\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "text/plain"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":null}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"kftw3XqE3XnoeBD44mRCS8MFey8\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/x-www-form-urlencoded"
+    },
+    "body": "paths=$ROOT/repos/alpha&paths=$ROOT/repos/gamma&jsonlPath=$ROOT/home/.claude/projects/p/s1.jsonl"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"y00DrpMhT16fh5VtR4kqpOZJmmw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":1760004000000,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[{\"sha\":\"22e95b359f2ba43d52d815a7dec81f5ae46d0e01\",\"short\":\"22e95b3\",\"subject\":\"third — ünïcode\",\"author\":\"Ann Example\",\"date\":1760007600000,\"additions\":1,\"deletions\":0,\"files\":1},{\"sha\":\"8f52f44d3c041ec24a024fb9c716b4a2765a7831\",\"short\":\"8f52f44\",\"subject\":\"on a side branch\",\"author\":\"Ann Example\",\"date\":1760006400000,\"additions\":1,\"deletions\":0,\"files\":1},{\"sha\":\"1c4df7600a1c4aa5ca1945f4c41af8eced345022\",\"short\":\"1c4df76\",\"subject\":\"second, amended\",\"author\":\"Ann Example\",\"date\":1760005800000,\"additions\":21,\"deletions\":0,\"files\":1}],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/x-www-form-urlencoded"
+    },
+    "body": "paths=$ROOT/repos/alpha"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"kftw3XqE3XnoeBD44mRCS8MFey8\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/changes",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json",
+     "if-none-match": "ETAG"
+    },
+    "body": "{\"paths\":[\"$ROOT/repos/alpha/one.txt\",\"$ROOT/repos/alpha/missing/x.txt\",\"$ROOT/plain/file.txt\",\"relative/x\",\"$ROOT/repos/gamma/\",\"$ROOT/repos/delta\",\"$ROOT/repos/alpha/one.txt\",\"$ROOT/nowhere/at/all\"],\"jsonlPath\":null}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"P8suUcvC34XtFM3M6A80xuN-qNY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"since\":null,\"repos\":[{\"root\":\"$ROOT/repos/alpha\",\"name\":\"alpha\",\"branch\":\"main\",\"diff\":\"diff --git a/one.txt b/one.txt\\nindex 506fa76..4db9cb3 100644\\n--- a/one.txt\\n+++ b/one.txt\\n@@ -1,20 +1,22 @@\\n-line 0 of 1 x\\n-line 1 of 1 xxxxxxxx\\n-line 2 of 1 xxxxxxxxxxxxxxx\\n-line 3 of 1 xxxxxxxxxxxxxxxxxxxxxx\\n-line 4 of 1 xxxxxx\\n-line 5 of 1 xxxxxxxxxxxxx\\n-line 6 of 1 xxxxxxxxxxxxxxxxxxxx\\n-line 7 of 1 xxxx\\n-line 8 of 1 xxxxxxxxxxx\\n-line 9 of 1 xxxxxxxxxxxxxxxxxx\\n-line 10 of 1 xx\\n-line 11 of 1 xxxxxxxxx\\n-line 12 of 1 xxxxxxxxxxxxxxxx\\n-line 13 of 1 \\n-line 14 of 1 xxxxxxx\\n-line 15 of 1 xxxxxxxxxxxxxx\\n-line 16 of 1 xxxxxxxxxxxxxxxxxxxxx\\n-line 17 of 1 xxxxx\\n-line 18 of 1 xxxxxxxxxxxx\\n-line 19 of 1 xxxxxxxxxxxxxxxxxxx\\n+line 0 of 3 xxx\\n+line 1 of 3 xxxxxxxxxx\\n+line 2 of 3 xxxxxxxxxxxxxxxxx\\n+line 3 of 3 x\\n+line 4 of 3 xxxxxxxx\\n+line 5 of 3 xxxxxxxxxxxxxxx\\n+line 6 of 3 xxxxxxxxxxxxxxxxxxxxxx\\n+line 7 of 3 xxxxxx\\n+line 8 of 3 xxxxxxxxxxxxx\\n+line 9 of 3 xxxxxxxxxxxxxxxxxxxx\\n+line 10 of 3 xxxx\\n+line 11 of 3 xxxxxxxxxxx\\n+line 12 of 3 xxxxxxxxxxxxxxxxxx\\n+line 13 of 3 xx\\n+line 14 of 3 xxxxxxxxx\\n+line 15 of 3 xxxxxxxxxxxxxxxx\\n+line 16 of 3 \\n+line 17 of 3 xxxxxxx\\n+line 18 of 3 xxxxxxxxxxxxxx\\n+line 19 of 3 xxxxxxxxxxxxxxxxxxxxx\\n+line 20 of 3 xxxxx\\n+line 21 of 3 xxxxxxxxxxxx\\ndiff --git a/dir/n.txt b/dir/n.txt\\nnew file mode 100644\\nindex 0000000..8ba3a16\\n--- /dev/null\\n+++ b/dir/n.txt\\n@@ -0,0 +1 @@\\n+n\\ndiff --git a/new file.txt b/new file.txt\\nnew file mode 100644\\nindex 0000000..5a72eb2\\n--- /dev/null\\n+++ b/new file.txt\\t\\n@@ -0,0 +1 @@\\n+untracked\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/gamma\",\"name\":\"gamma\",\"branch\":null,\"diff\":\"diff --git a/loose.txt b/loose.txt\\nnew file mode 100644\\nindex 0000000..b658666\\n--- /dev/null\\n+++ b/loose.txt\\n@@ -0,0 +1 @@\\n+loose\\n\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false},{\"root\":\"$ROOT/repos/delta\",\"name\":\"delta\",\"branch\":\"main\",\"diff\":\"\",\"truncated\":false,\"commits\":[],\"commitsTruncated\":false}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/changes?root=$ROOT/repos/alpha&sha=22e95b359f2ba43d52d815a7dec81f5ae46d0e01",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"n9bb9OfHBXARrhWoGqmeytyPA-I\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"diff\":\"diff --git a/three.txt b/three.txt\\nnew file mode 100644\\nindex 0000000..c600332\\n--- /dev/null\\n+++ b/three.txt\\n@@ -0,0 +1 @@\\n+é\\n\",\"truncated\":false}"
+   }
+  }
+ ]
+}

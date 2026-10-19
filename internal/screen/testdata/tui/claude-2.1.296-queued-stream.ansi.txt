@@ -1,0 +1,40 @@
+
+[38;5;246m[48;5;237m❯ [38;5;231mAfter that reply with exactly QUEUED-MSG-2 as the first word[39m
+
+[38;5;231m[49m●[39m QUEUED-MSG-2 DONE2
+
+  The foreground command ran for about 25 seconds and exited normally:
+  - start 18:49:07.643204
+  - end 18:49:32.657378
+
+[38;5;246m✻[39m [38;5;246mCrunched for 27s · done 6:49 PM[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mWithout using any tools, write a very long 3000-word story about a lighthouse keeper, plain text, no headings. Then [39m
+  [38;5;231msay STORY-END.[39m
+[49m
+[38;5;231m●[39m The lighthouse stood on the last rock before the open water, a tower of grey stone that the sea had been trying to
+  wear down for a hundred and twelve years. Its keeper was a woman named Maren Holt, who had come to the island at
+  twenty-six, when her father's knees gave out and the Northern Lights Board needed someone willing to live on a rock
+  with nothing but gulls for company. She had expected to stay two winters. She stayed thirty-one years.
+
+  The island was called Sorrow by the fishermen, though the charts gave it a gentler name that nobody used. It was
+  perhaps four hundred yards long and two hundred wide at its broadest, a hump of black basalt with a skin of thin grass
+  and a few stubborn shrubs bent flat by the wind. There was a keeper's cottage, a storehouse, a small stone shed for
+  the generator, and the tower itself, which rose from the highest point like a finger held up to say be careful. A
+  landing stage of creosoted timber ran down to a cove on the leeward side, and in calm weather a boat could come in
+  from the mainland, three miles off, to bring post and paraffin and sometimes a relief keeper. In winter the boat came
+  rarely. In storms it did not come at all.
+
+  Maren kept the light by habit more than by duty. Every evening at dusk she climbed the one hundred and six iron steps,
+  checked the wick, trimmed the lamp, polished the great lens until she could see her own face in it, and wound the
+  clockwork that turned the lantern. Then she wrote the entry in the logbook. Wind from the northwest, force five.
+  Visibility good. Sea moderate. One vessel passed to the east, bound south, lights correct. The logbook was a record
+
+[38;5;246m[48;5;237m❯ Then also say QUEUED-MSG-3 right after STORY-END[39m
+[49m  [38;5;246mctrl+x ctrl+s to send now[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [2m[39mPress up to edit queued messages[0m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵[39m [38;5;211mbypass[39m [38;5;211mpermissions[39m [38;5;211mon[38;5;246m (shift+tab[39m [38;5;246mto[39m [38;5;246mcycle)[39m [38;5;246m·[39m [38;5;246mesc[39m [38;5;246mto[39m [38;5;246minterrupt[39m [38;5;246m·[39m [38;5;246m←[39m [38;5;246mfor[39m [38;5;246magents[39m
+

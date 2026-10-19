@@ -1,0 +1,2 @@
+{"type":"session_meta","payload":{"id":"a","timestamp":["2026-02-03T04:05:06Z"]}}
+{"timestamp":"2026-03-01T10:36:12.500Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1,"cached_input_tokens":0,"output_tokens":1,"reasoning_output_tokens":0,"total_tokens":2},"last_token_usage":{"input_tokens":1,"cached_input_tokens":0,"output_tokens":1,"reasoning_output_tokens":0,"total_tokens":2},"model_context_window":3},"rate_limits":{"primary":{"used_percent":12,"window_minutes":300,"resets_at":1772360000}}}}

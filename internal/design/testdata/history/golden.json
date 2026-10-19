@@ -1,0 +1,490 @@
+{
+  "snapshotMessage": [
+    {
+      "paths": [
+        "p1/project/A.dc.html",
+        "p1/project/B.dc.html"
+      ],
+      "editors": [],
+      "runtime": "rt",
+      "subject": null,
+      "out": {
+        "subject": "Правки: «A», «B»",
+        "body": "Runtime: rt"
+      }
+    },
+    {
+      "paths": [
+        "p1/project/A.dc.html",
+        "p1/project/B.dc.html",
+        "p1/project/C.dc.html",
+        "p2/project/D.dc.html",
+        "p1/project/A.dc.html"
+      ],
+      "editors": [
+        "Ann · чат «x» (rt)"
+      ],
+      "runtime": "rt",
+      "subject": null,
+      "out": {
+        "subject": "Правки: «A», «B», «C» и ещё 1",
+        "body": "Runtime: rt\nEditor: Ann · чат «x» (rt)"
+      }
+    },
+    {
+      "paths": [
+        "p1/project/lib/x.js"
+      ],
+      "editors": [],
+      "runtime": "rt",
+      "subject": null,
+      "out": {
+        "subject": "Правки общих файлов проекта p1",
+        "body": "Runtime: rt"
+      }
+    },
+    {
+      "paths": [
+        "p1/artifact.json",
+        "p2/project/x.css"
+      ],
+      "editors": [],
+      "runtime": "rt",
+      "subject": null,
+      "out": {
+        "subject": "Правки в проектах: 2",
+        "body": "Runtime: rt"
+      }
+    },
+    {
+      "paths": [
+        "CLAUDE.md"
+      ],
+      "editors": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f"
+      ],
+      "runtime": "rt",
+      "subject": null,
+      "out": {
+        "subject": "Правки в библиотеке",
+        "body": "Runtime: rt\nEditor: a\nEditor: b\nEditor: c\nEditor: d\nEditor: e"
+      }
+    },
+    {
+      "paths": [
+        "p1/project/A.dc.html"
+      ],
+      "editors": [],
+      "runtime": "rt",
+      "subject": "Вернул «A»\u0007 к версии abc",
+      "out": {
+        "subject": "Вернул «A» к версии abc",
+        "body": "Runtime: rt"
+      }
+    },
+    {
+      "paths": [
+        "p1/project/sub/A.dc.html",
+        "P1/project/A.dc.html"
+      ],
+      "editors": [],
+      "runtime": "rt",
+      "subject": "",
+      "out": {
+        "subject": "Правки общих файлов проекта p1",
+        "body": "Runtime: rt"
+      }
+    }
+  ],
+  "parseLog": [
+    {
+      "input": "",
+      "out": []
+    },
+    {
+      "input": "\u001eaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001f1700000000\u001fПравки: «A»\u001fAnn · чат «x» (rt)\u001dBob\u001frt\n",
+      "out": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "at": 1700000000000,
+          "subject": "Правки: «A»",
+          "editors": [
+            "Ann · чат «x» (rt)",
+            "Bob"
+          ],
+          "runtime": "rt"
+        }
+      ]
+    },
+    {
+      "input": "\u001eaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001f1700000000\u001fsubj\u001f\u001f\n\n\u001ebbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\u001f 17 \u001f‮subj2\u001f\u001d\u001f\u001drt2\n",
+      "out": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "at": 1700000000000,
+          "subject": "subj",
+          "editors": [],
+          "runtime": null
+        },
+        {
+          "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "at": 17000,
+          "subject": "subj2",
+          "editors": [],
+          "runtime": null
+        }
+      ]
+    },
+    {
+      "input": "\u001eaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001fx\u001fs\u001f\u001frt\n\u001eshort\u001f1\u001fs\u001f\u001frt\n\u001eaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+      "out": []
+    },
+    {
+      "input": "\u001eaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001f\u001fempty at\u001f\u001f\n",
+      "out": [
+        {
+          "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "at": 0,
+          "subject": "empty at",
+          "editors": [],
+          "runtime": null
+        }
+      ]
+    }
+  ],
+  "scopePath": [
+    {
+      "project": "p1",
+      "file": null,
+      "out": {
+        "ok": "p1"
+      }
+    },
+    {
+      "project": "p1",
+      "file": "A.dc.html",
+      "out": {
+        "ok": "p1/project/A.dc.html"
+      }
+    },
+    {
+      "project": "P1",
+      "file": null,
+      "out": {
+        "error": "Нет такого проекта"
+      }
+    },
+    {
+      "project": "p1",
+      "file": "a/b.dc.html",
+      "out": {
+        "error": "История есть у досок-файлов (*.dc.html)"
+      }
+    },
+    {
+      "project": "p1",
+      "file": ".x.dc.html",
+      "out": {
+        "error": "История есть у досок-файлов (*.dc.html)"
+      }
+    },
+    {
+      "project": "p1",
+      "file": "x.html",
+      "out": {
+        "error": "История есть у досок-файлов (*.dc.html)"
+      }
+    },
+    {
+      "project": "p1",
+      "file": "a\nb.dc.html",
+      "out": {
+        "error": "История есть у досок-файлов (*.dc.html)"
+      }
+    }
+  ],
+  "restoreTarget": [
+    {
+      "input": "30m",
+      "out": {
+        "kind": "ago",
+        "ms": 1800000
+      }
+    },
+    {
+      "input": " 2H ",
+      "out": {
+        "kind": "ago",
+        "ms": 7200000
+      }
+    },
+    {
+      "input": "1d",
+      "out": {
+        "kind": "ago",
+        "ms": 86400000
+      }
+    },
+    {
+      "input": "1000m",
+      "out": null
+    },
+    {
+      "input": "abc1234",
+      "out": {
+        "kind": "revision",
+        "revision": "abc1234"
+      }
+    },
+    {
+      "input": "ABCDEF0",
+      "out": {
+        "kind": "revision",
+        "revision": "abcdef0"
+      }
+    },
+    {
+      "input": "abc12",
+      "out": null
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "out": {
+        "kind": "revision",
+        "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "out": null
+    },
+    {
+      "input": "",
+      "out": null
+    },
+    {
+      "input": "0m",
+      "out": {
+        "kind": "ago",
+        "ms": 0
+      }
+    }
+  ],
+  "isHistoryPath": [
+    {
+      "input": "p1/project/A.dc.html",
+      "out": true
+    },
+    {
+      "input": ".claims/p1/x.json",
+      "out": false
+    },
+    {
+      "input": "p1/node_modules/a",
+      "out": false
+    },
+    {
+      "input": "a.tmp",
+      "out": false
+    },
+    {
+      "input": ".importing-x/a",
+      "out": false
+    },
+    {
+      "input": "x/.git/y",
+      "out": false
+    },
+    {
+      "input": "",
+      "out": false
+    },
+    {
+      "input": "p1\\.check\\a",
+      "out": false
+    }
+  ],
+  "slugify": [
+    {
+      "name": "Мой Сайт.zip",
+      "taken": [],
+      "out": "moy-sayt"
+    },
+    {
+      "name": "Мой Сайт.zip",
+      "taken": [
+        "moy-sayt",
+        "moy-sayt-2"
+      ],
+      "out": "moy-sayt-3"
+    },
+    {
+      "name": "  ---  ",
+      "taken": [],
+      "out": "design"
+    },
+    {
+      "name": "ЙОЖ ёлка.ZIP",
+      "taken": [],
+      "out": "yozh-elka"
+    },
+    {
+      "name": "Йx",
+      "taken": [],
+      "out": "yx"
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bcd",
+      "taken": [],
+      "out": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "Ünïcödé — test",
+      "taken": [],
+      "out": "n-c-d-test"
+    },
+    {
+      "name": "Щука ъ ь",
+      "taken": [],
+      "out": "schuka"
+    },
+    {
+      "name": "x.zip.zip",
+      "taken": [],
+      "out": "x-zip"
+    }
+  ],
+  "unzipListing": [
+    {
+      "input": "",
+      "out": null
+    },
+    {
+      "input": "Archive: x\n  Length Date\n---------  -------\n      388  14 files\n",
+      "out": {
+        "bytes": 388,
+        "entries": 14
+      }
+    },
+    {
+      "input": "   5 1 file",
+      "out": {
+        "bytes": 5,
+        "entries": 1
+      }
+    },
+    {
+      "input": "garbage",
+      "out": null
+    }
+  ],
+  "cleanBrief": [
+    {
+      "input": "",
+      "out": {
+        "error": "Опишите, что нарисовать"
+      }
+    },
+    {
+      "input": "  \u0001 \t",
+      "out": {
+        "error": "Опишите, что нарисовать"
+      }
+    },
+    {
+      "input": "нарисуй\u0007 экран\nвторой",
+      "out": {
+        "ok": "нарисуй  экран\nвторой"
+      }
+    },
+    {
+      "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "out": {
+        "error": "Описание длиннее 4000 знаков"
+      }
+    }
+  ],
+  "newProjectPrompt": "Новый проект «Мой проект» создан из шаблона библиотеки. Задача от человека:\n\nбриф\n\nДоски делай рядом с `project/_board-template.html`: копия шаблона под нужным именем с расширением `.dc.html`,\nразметка внутри `<main class=\"board\">`. Собирай их из компонентов UI-кита (`window.AcmeKit`, README в `project/_ds/*/`);\nкак это выглядит в живых досках — смотри соседние проекты библиотеки. Каждая новая `*.dc.html` в `project/` появляется\nв библиотеке сама. Когда доски готовы, проверь их: `acme-cli design check <id> --board \"<файл доски>\"`.",
+  "import": {
+    "result": {
+      "id": "moy-sayt",
+      "title": "Мой Сайт",
+      "boards": 5,
+      "dropped": [
+        "uploads"
+      ]
+    },
+    "tree": [
+      "f 644 artifact.json \"{\\n  \\\"v\\\": 1,\\n  \\\"title\\\": \\\"Мой Сайт\\\",\\n  \\\"source\\\": \\\"Мой Сайт.zip\\\",\\n  \\\"importedAt\\\": \\\"<now>\\\",\\n  \\\"boards\\\": [\\n    {\\n      \\\"title\\\": \\\"Все страницы\\\",\\n      \\\"path\\\": \\\"lib/page.html?id=home&v=Mobile&theme=dark&m=1\\\",\\n      \\\"w\\\": null,\\n      \\\"h\\\": null\\n    },\\n    {\\n      \\\"title\\\": \\\"Акция\\\",\\n      \\\"path\\\": \\\"Акция.dc.html\\\",\\n      \\\"w\\\": null,\\n      \\\"h\\\": null\\n    },\\n    {\\n      \\\"title\\\": \\\"Главная\\\",\\n      \\\"path\\\": \\\"Главная.dc.html\\\",\\n      \\\"w\\\": null,\\n      \\\"h\\\": null\\n    },\\n    {\\n      \\\"title\\\": \\\"Board 2\\\",\\n      \\\"path\\\": \\\"Board 2.dc.html\\\",\\n      \\\"w\\\": null,\\n      \\\"h\\\": null\\n    },\\n    {\\n      \\\"title\\\": \\\"Board 10\\\",\\n      \\\"path\\\": \\\"Board 10.dc.html\\\",\\n      \\\"w\\\": null,\\n      \\\"h\\\": null\\n    }\\n  ]\\n}\\n\"",
+      "d 755 project",
+      "f 600 project/Board 10.dc.html 8ad826465b7467d3d7579dff0de763c505bd1f6a",
+      "f 600 project/Board 2.dc.html 9a9c094df0a0829d7e1626b7325b29f12918b338",
+      "d 755 project/lib",
+      "f 600 project/lib/page.html ec2daf6a782747ad7d983aefafd954cc7e661cf7",
+      "d 755 project/screenshots",
+      "f 600 project/screenshots/s.png 1bc0ea9bcde3a1d7bddbf91a92c5089353669d39",
+      "f 600 project/support.js 0b6f00c3e60d2dccc2caf123683e27e8c4f31617",
+      "f 600 project/Акция.dc.html 51a30e314187a236b79f657eaeebadd8b6261356",
+      "f 600 project/Все страницы.dc.html 405b6997acf7e6cf77ebe63b6e7850b09d77cc91",
+      "f 600 project/Главная.dc.html 8dd8a8beebb1ddf7e907feeb951ceaf3e8bdf5dc"
+    ]
+  },
+  "importAgain": "Макет «moy-sayt» уже есть",
+  "importBroken": "Это не zip-архив проекта",
+  "createMissing": "В библиотеке нет шаблона нового проекта: положите его в <library>/.template",
+  "create": {
+    "id": "novyy-proekt",
+    "title": "Новый проект",
+    "tree": [
+      "f 644 artifact.json \"{\\n  \\\"title\\\": \\\"Новый проект\\\",\\n  \\\"foo\\\": 1,\\n  \\\"boards\\\": [],\\n  \\\"v\\\": 1,\\n  \\\"importedAt\\\": \\\"<now>\\\"\\n}\\n\"",
+      "d 755 project",
+      "f 644 project/_board-template.html 466c3047dcc2ea8cb387439a44a38428ff7ac8da",
+      "d 755 project/_ds",
+      "d 755 project/_ds/kit",
+      "f 644 project/_ds/kit/README.md 1ca4f7c39f620f453d8deb8cee32e93e00c71a3e",
+      "d 750 project/sub",
+      "f 640 project/sub/x.css c113e66fff265af9a131ef2894f82c8cbc65b403",
+      "f 644 project/support.js 72d7d9598cd0c7f3bd6b01309ecb0daf0798734d"
+    ]
+  },
+  "create2": "novyy-proekt-2",
+  "createBad": "Назовите проект",
+  "history": {
+    "kinds": [
+      "committed",
+      "committed",
+      "clean",
+      "committed"
+    ],
+    "listed": {
+      "unsaved": false,
+      "entries": [
+        {
+          "subject": "Правки: «Board 2»",
+          "editors": [
+            "Ann · чат «Чат» (rt)"
+          ],
+          "runtime": "rt"
+        },
+        {
+          "subject": "Начальный снимок библиотеки",
+          "editors": [],
+          "runtime": "rt"
+        }
+      ]
+    },
+    "refused": "Доску «Board 2» сейчас правит Ann (чат «Чат»): вернуть версию можно, когда он закончит",
+    "missing": "В этой версии такой доски ещё не было",
+    "tooEarly": "Раньше этого времени у доски не было сохранённых версий",
+    "restoredSame": true,
+    "boardAfter": true,
+    "log": "Вернул «Board 2» к версии db127bd\nRuntime: rt\nEditor: Ann · чат «Чат» (rt)\n\nacme-design <design@example.local>\n--\nПравки: «Board 2»\nRuntime: rt\nEditor: Ann · чат «Чат» (rt)\n\nacme-design <design@example.local>\n--\nНачальный снимок библиотеки\nRuntime: rt\n\nacme-design <design@example.local>\n--\n",
+    "exclude": "# acme-design-library-history v2\n.git\n.claims/\n.check/\n.thumbs/\n.trash/\n.claude/\n.playwright-mcp/\n.remember/\nnode_modules/\n.importing-*/\n.creating-*/\n*.tmp\n",
+    "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = false\n\tbare = false\n\tlogallrefupdates = true\n[gc]\n\tautoDetach = false\n"
+  }
+}

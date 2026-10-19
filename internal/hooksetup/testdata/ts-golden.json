@@ -1,0 +1,36 @@
+{
+ "result": {
+  "codexHookInstallFailed": false
+ },
+ "files": {
+  "port": {
+   "content": "8022",
+   "mode": "600"
+  },
+  "status-hook.sh": {
+   "content": "#!/bin/sh\nEVENT=\"${1:-poll}\"\nPORT_FILE=\"$HOME/.acme-ai/port\"\nTOKEN_FILE=\"$HOME/.acme-ai/cli-token\"\n[ -f \"$PORT_FILE\" ] || exit 0\n[ -f \"$TOKEN_FILE\" ] || exit 0\nPORT=$(cat \"$PORT_FILE\")\nTOKEN=$(cat \"$TOKEN_FILE\")\nAT=$(date +%s%3N 2>/dev/null)\ncase \"$AT\" in ''|*[!0-9]*) AT=\"\" ;; esac\n\nNOTIFICATION_TYPE=\"\"\nif [ \"$EVENT\" = \"notification\" ]; then\n  NOTIFICATION_TYPE=$(sed -n 's/.*\"notification_type\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p')\nfi\n\n(\n  SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null) || SESSION=\"\"\n  PAYLOAD=\"{\\\"event\\\":\\\"${EVENT}\\\",\\\"session\\\":\\\"${SESSION}\\\"\"\n  if [ -n \"$NOTIFICATION_TYPE\" ]; then\n    PAYLOAD=\"${PAYLOAD},\\\"notificationType\\\":\\\"${NOTIFICATION_TYPE}\\\"\"\n  fi\n  if [ -n \"$AT\" ]; then\n    PAYLOAD=\"${PAYLOAD},\\\"at\\\":${AT}\"\n  fi\n  PAYLOAD=\"${PAYLOAD}}\"\n  curl -s --max-time 30 -X POST -o /dev/null -H 'Content-Type: application/json' -H \"x-acme-token: ${TOKEN}\" -H \"x-omux-token: ${TOKEN}\" -d \"$PAYLOAD\" \"http://localhost:${PORT}/api/status/hook\" 2>/dev/null\n) </dev/null >/dev/null 2>&1 &\nexit 0\n",
+   "mode": "700"
+  },
+  "statusline.sh": {
+   "content": "#!/bin/sh\nPORT_FILE=\"$HOME/.acme-ai/port\"\nTOKEN_FILE=\"$HOME/.acme-ai/cli-token\"\n[ -f \"$PORT_FILE\" ] || exit 0\n[ -f \"$TOKEN_FILE\" ] || exit 0\nPORT=$(cat \"$PORT_FILE\")\nTOKEN=$(cat \"$TOKEN_FILE\")\ncurl -sf --max-time 2 -X POST \\\n  -H 'Content-Type: application/json' \\\n  -H \"x-acme-token: ${TOKEN}\" \\\n  -H \"x-omux-token: ${TOKEN}\" \\\n  --data-binary @- \\\n  \"http://localhost:${PORT}/api/status/statusline\" 2>/dev/null || exit 0\n",
+   "mode": "700"
+  },
+  "codex-hook.sh": {
+   "content": "#!/usr/bin/env bash\nset -u\nPORT_FILE=\"$HOME/.acme-ai/port\"\nTOKEN_FILE=\"$HOME/.acme-ai/cli-token\"\n[ -f \"$PORT_FILE\" ] || exit 0\n[ -f \"$TOKEN_FILE\" ] || exit 0\nPORT=$(cat \"$PORT_FILE\")\nTOKEN=$(cat \"$TOKEN_FILE\")\nSESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null) || SESSION=\"\"\n\ncurl -sS -X POST -o /dev/null \\\n  -H \"x-acme-token: ${TOKEN}\" \\\n  -H \"x-omux-token: ${TOKEN}\" \\\n  -H \"Content-Type: application/json\" \\\n  --data-binary @- \\\n  \"http://localhost:${PORT}/api/status/hook?provider=codex&tmuxSession=${SESSION}\" 2>/dev/null || true\nexit 0\n",
+   "mode": "700"
+  },
+  "preview-mcp.json": {
+   "content": "{\n  \"mcpServers\": {\n    \"acme-preview\": {\n      \"type\": \"http\",\n      \"url\": \"http://127.0.0.1:8022/api/cli/preview/mcp\",\n      \"headers\": {\n        \"x-acme-token\": \"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"\n      }\n    }\n  }\n}\n",
+   "mode": "600"
+  },
+  "hooks.json": {
+   "content": "{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"sh \\\"@DATA@/status-hook.sh\\\" session-start\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ],\n    \"UserPromptSubmit\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"sh \\\"@DATA@/status-hook.sh\\\" prompt-submit\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ],\n    \"Notification\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"sh \\\"@DATA@/status-hook.sh\\\" notification\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"sh \\\"@DATA@/status-hook.sh\\\" stop\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ],\n    \"StopFailure\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"sh \\\"@DATA@/status-hook.sh\\\" stop-failure\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ],\n    \"PreCompact\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"sh \\\"@DATA@/status-hook.sh\\\" pre-compact\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ],\n    \"PostCompact\": [\n      {\n        \"matcher\": \"\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"sh \\\"@DATA@/status-hook.sh\\\" post-compact\",\n            \"timeout\": 3\n          }\n        ]\n      }\n    ]\n  },\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"sh \\\"@DATA@/statusline.sh\\\"\"\n  },\n  \"permissions\": {\n    \"allow\": [\n      \"mcp__acme-preview\",\n      \"mcp__oldmux-preview\"\n    ]\n  },\n  \"crossSessionInbound\": \"accept\"\n}\n",
+   "mode": "600"
+  }
+ },
+ "promptEditor": {
+  "path": "@DATA@/bin/acme-prompt-editor",
+  "content": "#!/bin/sh\n# Acme prompt editor (TCK-3010): Claude Code runs it for Ctrl+G. A hand-off file the runtime left for this pane is\n# appended to the prompt, so the text arrives as typed and not as a paste; without one the person's editor opens.\n# Pane ids repeat across tmux servers, so a pane off the old violet server is keyed by its server too.\ndir='@DATA@/prompt-handoff'\nkey=${TMUX_PANE#%}\nsocket=${TMUX%%,*}\nsocket=${socket##*/}\n[ -n \"$key\" ] && [ -n \"$socket\" ] && [ \"$socket\" != violet ] && key=\"$socket-$key\"\nif [ -n \"$key\" ] && mv \"$dir/$key.txt\" \"$dir/$key.$$.taking\" 2>/dev/null; then\n  cat \"$dir/$key.$$.taking\" >> \"$1\"\n  rm -f \"$dir/$key.$$.taking\"\n  exit 0\nfi\neditor=${ACME_HUMAN_EDITOR:-vi}\n[ \"$editor\" = \"$0\" ] && editor=vi\nexec sh -c \"$editor \\\"\\$@\\\"\" sh \"$@\"\n"
+ },
+ "editorEnv": "ACME_HUMAN_EDITOR=\"${VISUAL:-$EDITOR}\" VISUAL='@DATA@/bin/acme-prompt-editor' EDITOR='@DATA@/bin/acme-prompt-editor'"
+}

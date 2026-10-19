@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.282
+▝▜██████▀  Haiku 4.5 · Claude Max
+ ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/pre/work
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ Ответь одним словом: ок
+
+● ок
+
+✻ Baked for 5s · done 8:32 PM
+
+❯ /model
+  ⎿  Kept model as Haiku 4.5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  pre-statusline
+  ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents

@@ -1,0 +1,1510 @@
+[
+ {
+  "kind": "live",
+  "screen": "  ⎿ tokens end. **bold**\n  - x x the end.\n● Read(src/x.go)\n● Read(src/x.go)\n\r  the ёжик\n❯ the **bold** end.\n* **bold** the\n  ## данные reads\n  the `code` parser the **bold** **bold** x `code` x **bold** the ёжик parser — ёжик lines `code` lines x tokens reads данные tokens ёжик lines x — ёжик **bold** — ёжик tokens reads parser — tokens данные lines данные the `code` reads parser x — — end. reads данные ёжик — **bold** reads reads — the lines `code` `code` данные ёжик tokens lines lines x lines — the x **bold** данные reads `code` lines reads данные `code` ёжик the данные parser end. lines tokens — x **bold** end. lines reads данные ёжик `code` tokens end. `code` tokens x ёжик — x данные ёжик **bold** x x reads reads ёжик the parser — `code` reads tokens lines reads — — end. x reads **bold** parser `code` ёжик lines **bold** parser x ёжик lines — данные tokens end. данные end. the — — parser — `code` — the x данные данные `code` `code` parser x lines parser reads the `code` `code` tokens the ёжик `code` данные reads reads parser — tokens lines — parser x parser end. parser lines parser **bold** данные **bold** the the the parser данные the end. lines parser reads lines данные tokens end. **bold** — parser lines `code`\n\u001b[1m● данные parser **bold** **bold**\u001b[0m\n❯ \n● lines reads lines — tokens x\n  - x tokens parser —\n  - tokens `code` end. —\n  x lines end.          right side\n───────────────────────────────────────────\n\r  end. x\n  1. the **bold** the —",
+  "text": "lines reads lines — tokens x\n- x tokens parser —\n- tokens `code` end. — x lines end. end. x\n1. the **bold** the —"
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760785983179
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760782108860
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760785832418
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760790854060
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760782876723
+   }
+  ],
+  "fileSize": 573941,
+  "createdAt": null,
+  "customTitle": "lines the",
+  "meta": {
+   "createdAt": "2025-10-18T11:13:03.179Z",
+   "updatedAt": "2025-10-18T10:21:16.723Z",
+   "lastTimestamp": 1760790854060,
+   "fileSize": 573941,
+   "userCount": 2,
+   "assistantCount": 2,
+   "customTitle": "lines the"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ⎿ lines tokens end.\n  - tokens x end. end.\n  1. **bold** parser parser данные\n● — the reads\n\u001b[1m● `code` **bold** `code` ёжик\u001b[0m\n❯ reads **bold** **bold**",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760781732094
+   },
+   {
+    "id": "x",
+    "type": "thinking"
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760784934360
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 0
+   }
+  ],
+  "fileSize": 113890,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": "**bold** lines",
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "\r  reads **bold**\r\n\r  end. —\r\n  tokens x —          right side\r\n  1. `code` tokens parser lines\r\n\r  x end.\r\n                              Update installed · Restart\r\n● Bash(— lines)\r\n\r  — reads\r\n● tokens reads `code`\r\n❯ the ёжик **bold**\r\n* parser tokens\r\n  ## tokens parser\r\n──────────────────────\r\n● Bash(— lines)\r\n● Bash(parser x)\r\n  - x x end. reads",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760787535089
+   }
+  ],
+  "fileSize": 98121,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": "2025-10-18T11:38:55.089Z",
+   "lastTimestamp": 1760787535089,
+   "fileSize": 98121,
+   "userCount": 0,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "\r  — **bold**\r\n❯ \r\n  ## данные reads\r\n● — the — x — tokens\r\n● reads parser parser the the tokens\r\n● данные the x parser ёжик parser",
+  "text": "— the — x — tokens\n\nreads parser parser the the tokens\n\nданные the x parser ёжик parser"
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760789944109
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760790854662
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760789183980
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760785188829
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760785252859
+   }
+  ],
+  "fileSize": 981803,
+  "createdAt": null,
+  "customTitle": "parser lines",
+  "meta": {
+   "createdAt": "2025-10-18T12:19:04.109Z",
+   "updatedAt": "2025-10-18T11:00:52.859Z",
+   "lastTimestamp": 1760790854662,
+   "fileSize": 981803,
+   "userCount": 2,
+   "assistantCount": 0,
+   "customTitle": "parser lines"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ёжик **bold** x          right side\n  ## x **bold**\n─────────────\n  ёжик lines parser lines `code` x — — `code` lines x tokens ёжик the reads tokens ёжик **bold** end. lines the ёжик the lines the parser **bold** parser parser — parser — end. end. **bold** ёжик — **bold** — **bold** **bold** the the the ёжик lines end. lines x x ёжик — reads lines x **bold** tokens — tokens ёжик lines ёжик end. the ёжик `code` the end. **bold** **bold** ёжик the — данные parser данные parser lines x end. lines parser reads the **bold** — **bold** ёжик tokens the данные tokens ёжик the **bold** ёжик parser ёжик данные lines reads ёжик ёжик **bold** x — данные lines end. parser parser `code` tokens **bold** the reads **bold** lines `code` — `code` reads tokens ёжик end. `code` **bold** end. ёжик — данные the parser the ёжик **bold** — lines end. `code` `code` lines ёжик — — the `code` данные lines tokens lines parser the lines данные ёжик reads parser данные parser lines ёжик ёжик ёжик **bold** ёжик reads **bold** end. `code` reads tokens ёжик x — `code` the reads the parser данные — `code` `code` ёжик tokens данные — the reads the parser `code` данные `code` **bold** tokens reads the `code`\n  ⎿ ёжик reads данные\n   \n                              Update installed · Restart\n\n   \n❯ the данные reads\n  - tokens ёжик **bold** —\n   \n·  tokens parser\n  ## reads tokens\n● tokens ёжик —\n  ## ёжик tokens\n  ## parser x",
+  "text": "tokens ёжик —\n## ёжик tokens\n## parser x"
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760788757160
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760785333416
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760785936017
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760790628701
+   },
+   {
+    "id": "x",
+    "type": "thinking"
+   },
+   {
+    "id": "x",
+    "type": "tool-call"
+   }
+  ],
+  "fileSize": 206838,
+  "createdAt": null,
+  "customTitle": "`code` `code`",
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "·  **bold** reads\r\n   \r\n·  — ёжик\r\n● — parser reads\r\n                              Update installed · Restart\r\n───────────────\r\n* lines parser\r\n* **bold** parser\r\n\r\n  ⎿ x lines lines\r\n● parser parser **bold** **bold** ёжик —\r\n  данные `code` parser the the lines the end. x reads lines ёжик `code` x — parser ёжик `code` tokens reads reads end. `code` x x x parser lines **bold** ёжик the x `code` — tokens `code` **bold** x **bold** reads the reads **bold** x ёжик parser x данные reads — tokens **bold** lines данные данные reads the `code` **bold** the lines the ёжик parser the `code` reads end. reads **bold** ёжик данные `code` tokens lines ёжик `code` x the end. parser end. — **bold** **bold** данные — x reads — reads **bold** — **bold** ёжик lines the данные **bold** ёжик parser `code` **bold** tokens end. x `code` данные данные reads tokens ёжик `code` tokens reads x tokens tokens данные данные **bold** end. lines `code` reads — **bold** x данные ёжик reads данные end. reads lines x **bold** reads lines данные — end. the end. данные ёжик ёжик lines lines x данные tokens the данные `code` x **bold** данные parser данные `code` x parser — parser ёжик ёжик x данные — **bold** parser parser tokens end. lines lines ёжик **bold** — **bold** данные parser parser reads parser ёжик tokens the the the parser x reads x the ёжик the parser reads\r\n\u001b[1m● end. tokens parser **bold**\u001b[0m\r\n  - `code` end. ёжик данные\r\n  x `code` parser          right side\r\n                              Update installed · Restart\r\n\u001b[1m● `code` `code` `code` ёжик\u001b[0m\r\n● — — end.",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760782525095
+   },
+   {
+    "id": "x",
+    "type": "tool-call"
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760786838724
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760787339828
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760784206536
+   }
+  ],
+  "fileSize": 814509,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "                              Update installed · Restart\n  1. the end. lines end.\n──────────\n● reads the данные\n\r  ёжик `code`\n  - reads reads x reads\n● the **bold** end. tokens the данные\n  - reads данные tokens parser\n❯ \n                              Update installed · Restart\n● end. parser ёжик\n❯ данные end. tokens\n\n❯ ",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760786823708
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760783188562
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760787049564
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760789331300
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760790864184
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760785752647
+   }
+  ],
+  "fileSize": 504278,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": "2025-10-18T11:09:12.647Z",
+   "lastTimestamp": 1760790864184,
+   "fileSize": 504278,
+   "userCount": 1,
+   "assistantCount": 1
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  parser reads данные the tokens `code` lines the reads данные — lines данные reads x данные reads the `code` lines данные lines `code` end. ёжик ёжик **bold** `code` данные parser reads tokens — `code` reads `code` lines the **bold** tokens **bold** ёжик reads tokens lines данные ёжик lines end. данные данные tokens данные **bold** x reads parser the parser tokens lines parser lines the reads `code` **bold** lines reads parser tokens tokens данные данные lines **bold** tokens lines x lines данные **bold** данные **bold** **bold** the **bold** x lines ёжик end. parser end. `code` `code` reads end. данные tokens reads **bold** x parser `code` `code` parser lines the tokens **bold** `code` reads данные данные данные end. the tokens `code` end. reads `code` данные **bold** ёжик `code` the **bold** the **bold** — reads x end. end. `code` `code` parser reads `code` **bold** данные lines **bold** — — tokens the **bold** — reads the **bold** `code` данные tokens reads end. end. lines x — — ёжик lines lines end. x end. ёжик lines the данные end. ёжик tokens end. — lines ёжик reads **bold** tokens данные reads reads `code` the `code` the ёжик lines tokens — end. `code` ёжик parser reads x\n* tokens the\n● lines x **bold**\n  end. — `code`          right side\n\u001b[1m● reads lines `code` lines\u001b[0m\n   \n────────────────────────────────\n● tokens **bold** the",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760784603031
+   }
+  ],
+  "fileSize": 669750,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T10:50:03.031Z",
+   "updatedAt": "2025-10-18T10:50:03.031Z",
+   "lastTimestamp": 1760784603031,
+   "fileSize": 669750,
+   "userCount": 0,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "\n  - the ёжик x **bold**",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760783896152
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 0
+   }
+  ],
+  "fileSize": 65092,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T10:38:16.152Z",
+   "updatedAt": "1970-01-01T00:00:00.000Z",
+   "lastTimestamp": 1760783896152,
+   "fileSize": 65092,
+   "userCount": 0,
+   "assistantCount": 1
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "   \n● Bash(**bold** **bold**)\n\u001b[1m● **bold** reads the end.\u001b[0m\n  — **bold** —          right side\n● end. tokens x\n·  x end.\n                              Update installed · Restart\n\u001b[1m● ёжик `code` lines x\u001b[0m\n  ## данные lines\n❯ \n● ёжик lines `code`\n● Bash(the parser)\n                              Update installed · Restart\n   \n* `code` **bold**\n                              Update installed · Restart\n",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760782920255
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760786669639
+   }
+  ],
+  "fileSize": 659346,
+  "createdAt": null,
+  "customTitle": "x end.",
+  "meta": {
+   "createdAt": "2025-10-18T10:22:00.255Z",
+   "updatedAt": "2025-10-18T11:24:29.639Z",
+   "lastTimestamp": 1760786669639,
+   "fileSize": 659346,
+   "userCount": 0,
+   "assistantCount": 1,
+   "customTitle": "x end."
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ## the данные\r\n·  parser lines\r\n❯ reads `code` `code`\r\n  end. данные x — lines tokens **bold** tokens",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [],
+  "fileSize": 431977,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": null,
+   "lastTimestamp": 0,
+   "fileSize": 431977,
+   "userCount": 0,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ## ёжик **bold**\r\n  - parser parser ёжик tokens\r\n\r  reads end.\r\n✻ Thinking… (12s)\r\n  ⎿ данные данные the\r\n● данные **bold** parser end. reads **bold**\r\n  lines lines x          right side\r\n  ## the parser\r\n  - — lines tokens **bold**\r\n                              Update installed · Restart\r\n● Bash(данные **bold**)\r\n  - tokens tokens lines данные\r\n  - данные reads end. parser",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760784968158
+   },
+   {
+    "id": "x",
+    "type": "tool-call"
+   },
+   {
+    "id": "x",
+    "type": "thinking"
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760788079305
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760790554256
+   }
+  ],
+  "fileSize": 664453,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "   \n❯ \n  end. `code` lines reads lines **bold** **bold** parser\n● Bash(end. `code`)\n  — end. — ёжик x the reads tokens\n❯ \n   \n● Read(src/x.go)\n● данные **bold** end.\n* end. **bold**\n  - the the tokens the\n* данные x\n  ёжик parser lines          right side\n  **bold** **bold** **bold**          right side\n  - tokens parser end. end.",
+  "text": "данные **bold** end.\n- the the tokens the ёжик parser lines **bold** **bold** **bold**\n- tokens parser end. end."
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760781955407
+   }
+  ],
+  "fileSize": 109830,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": "reads x",
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": "2025-10-18T10:05:55.407Z",
+   "lastTimestamp": 1760781955407,
+   "fileSize": 109830,
+   "userCount": 0,
+   "assistantCount": 1,
+   "customTitle": "reads x"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "✻ Thinking… (29s)\n* данные **bold**\n  - tokens **bold** end. reads\n  `code` tokens x ёжик — lines — parser\n·  x `code`\n* x the\n● Read(src/x.go)\n  ## tokens **bold**\n─────────────────────────\n● Read(src/x.go)\n● Bash(reads x)\n\u001b[1m● the the x `code`\u001b[0m\n─────────────────────────────────\n  — данные `code`          right side\n·  x tokens\n✻ Thinking… (26s)\n  ёжик данные —          right side\n·  lines the\n✻ Thinking… (12s)\n\n❯ \n● x — ёжик `code` the end.\n\r  parser **bold**\n❯ end. parser lines\n● — x данные the the parser\n● Read(src/x.go)\n  - parser reads parser ёжик\n  ⎿ parser tokens **bold**\n✻ Thinking… (16s)\n\u001b[1m● — данные данные **bold**\u001b[0m",
+  "text": "— данные данные **bold**"
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760783627459
+   }
+  ],
+  "fileSize": 467230,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T10:33:47.459Z",
+   "updatedAt": "2025-10-18T10:33:47.459Z",
+   "lastTimestamp": 1760783627459,
+   "fileSize": 467230,
+   "userCount": 1,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  — lines **bold** **bold** x reads x `code`\n● tokens lines parser lines `code` ёжик\n  ёжик tokens данные          right side\n   \n  ## данные parser\n  - lines данные `code` x\n────────────────────────────────────────\n❯ end. reads end.\n·  lines данные\n·  `code` lines\n✻ Thinking… (35s)\n\n  - tokens end. x —\n  - reads ёжик reads tokens\n                              Update installed · Restart",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760783583551
+   }
+  ],
+  "fileSize": 814814,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T10:33:03.551Z",
+   "updatedAt": "2025-10-18T10:33:03.551Z",
+   "lastTimestamp": 1760783583551,
+   "fileSize": 814814,
+   "userCount": 0,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ⎿ — `code` —\n● Bash(— lines)\n✻ Thinking… (24s)\n·  end. —\n\r  lines tokens",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760783297578
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760790129795
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760784161452
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760783056109
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760786464544
+   }
+  ],
+  "fileSize": 234238,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T10:28:17.578Z",
+   "updatedAt": "2025-10-18T11:21:04.544Z",
+   "lastTimestamp": 1760790129795,
+   "fileSize": 234238,
+   "userCount": 1,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "✻ Thinking… (21s)\n·  lines the",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760781727570
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760783488606
+   }
+  ],
+  "fileSize": 563025,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T10:02:07.570Z",
+   "updatedAt": "2025-10-18T10:31:28.606Z",
+   "lastTimestamp": 1760783488606,
+   "fileSize": 563025,
+   "userCount": 0,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "                              Update installed · Restart\n  parser ёжик **bold** данные tokens parser the parser ёжик **bold** ёжик x x `code` end. **bold** x parser the **bold** end. данные lines x parser `code` parser ёжик lines tokens данные lines `code` **bold** `code` — lines ёжик parser end. ёжик tokens — ёжик end. **bold** end. x данные **bold** tokens **bold** `code` tokens данные end. `code` данные **bold** tokens ёжик **bold** **bold** **bold** reads — tokens `code` данные parser tokens данные данные `code` tokens — the reads данные x `code` x parser parser the tokens lines the reads данные parser `code` ёжик **bold** parser — `code` parser **bold** `code` **bold** `code` parser — данные — parser tokens ёжик **bold** x parser `code` — данные **bold** `code` x lines `code` reads the reads the `code` — x x — tokens `code` **bold** данные tokens — **bold** parser данные the lines **bold** `code` `code` x reads данные parser **bold** reads — reads — end. x the tokens reads — — reads parser **bold** — x ёжик the reads `code` **bold** parser reads tokens ёжик end. parser parser x end. **bold** lines `code` tokens parser the x the parser the lines lines reads parser tokens **bold** — `code` данные reads — **bold**\n                              Update installed · Restart\n  tokens lines reads          right side\n·  ёжик **bold**\n·  **bold** данные\n✻ Thinking… (30s)\n  **bold** данные reads parser parser x tokens x",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking"
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760785626712
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760787621279
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760784621953
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760790540215
+   }
+  ],
+  "fileSize": 607017,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ёжик **bold** the          right side\n\n\n\u001b[1m● данные ёжик данные parser\u001b[0m",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760791494151
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760784192949
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760783138376
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760787317479
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760789137173
+   }
+  ],
+  "fileSize": 472745,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T12:44:54.151Z",
+   "updatedAt": "2025-10-18T12:05:37.173Z",
+   "lastTimestamp": 1760791494151,
+   "fileSize": 472745,
+   "userCount": 1,
+   "assistantCount": 2
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ## `code` reads\r\n·  tokens end.\r\n● — lines tokens\r\n● Bash(данные **bold**)\r\n\r\n────────────────────\r\n\u001b[1m● reads lines ёжик reads\u001b[0m\r\n* lines reads\r\n● Bash(**bold** данные)\r\n\r\n● Read(src/x.go)\r\n  - lines the **bold** tokens\r\n❯ \r\n● Read(src/x.go)\r\n  1. end. — reads reads\r\n● **bold** `code` end.\r\n✻ Thinking… (11s)\r\n✻ Thinking… (18s)\r\n● — end. данные",
+  "text": "**bold** `code` end.\n\n— end. данные"
+ },
+ {
+  "kind": "meta",
+  "entries": [],
+  "fileSize": 816784,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": "x reads",
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": null,
+   "lastTimestamp": 0,
+   "fileSize": 816784,
+   "userCount": 0,
+   "assistantCount": 0,
+   "customTitle": "x reads"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "·  tokens x\n  1. ёжик данные the ёжик\n  ## tokens the\n  1. parser reads x the\n● x lines lines\n● ёжик end. end. reads lines reads\n* tokens reads\n* parser parser\n  ## reads end.\n──────────────────────\n·  данные tokens\n❯ `code` x **bold**",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-result"
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 0
+   }
+  ],
+  "fileSize": 477670,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "   \n● tokens end. — данные — данные\n  **bold** ёжик x          right side\n·  x **bold**\n   \n   \n\n✻ Thinking… (53s)",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760788743138
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760783972477
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760782414008
+   }
+  ],
+  "fileSize": 410298,
+  "createdAt": null,
+  "customTitle": "данные —",
+  "meta": {
+   "createdAt": "2025-10-18T11:59:03.138Z",
+   "updatedAt": "2025-10-18T10:13:34.008Z",
+   "lastTimestamp": 1760788743138,
+   "fileSize": 410298,
+   "userCount": 0,
+   "assistantCount": 1,
+   "customTitle": "данные —"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  - end. lines `code` parser\r\n\r  parser —\r\n\r  end. x\r\n● Read(src/x.go)",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760785808379
+   },
+   {
+    "id": "x",
+    "type": "thinking"
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760786644622
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760782550289
+   }
+  ],
+  "fileSize": 657091,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "✻ Thinking… (4s)\n● the the **bold**\n✻ Thinking… (55s)\n  ⎿ данные end. данные\n\u001b[1m● — — parser `code`\u001b[0m\n\u001b[1m● данные **bold** ёжик reads\u001b[0m\n● Bash(end. tokens)\n  reads **bold** reads ёжик reads ёжик x tokens\n● the parser the\n  x x **bold** reads the **bold** ёжик lines tokens lines reads parser lines lines данные — lines the lines — the reads ёжик reads — lines ёжик данные данные end. parser tokens end. — **bold** reads lines x ёжик ёжик — x lines lines x parser ёжик **bold** данные данные данные данные end. `code` ёжик tokens reads `code` **bold** lines reads lines — ёжик reads parser the ёжик reads — reads **bold** the tokens x `code` reads reads the end. end. lines lines tokens `code` parser **bold** ёжик lines end. — x **bold** the **bold** tokens the — x — tokens parser — parser **bold** end. **bold** x данные tokens lines end. x tokens lines ёжик `code` `code` ёжик the ёжик данные parser parser x ёжик end. **bold** lines end. lines parser данные the parser ёжик parser `code` lines ёжик ёжик **bold** данные x tokens lines данные lines x reads the reads `code` tokens reads `code` ёжик — parser — данные ёжик reads end. — lines `code` ёжик x ёжик lines lines lines end. данные ёжик **bold** **bold** x parser tokens tokens end. the данные `code` parser **bold** tokens данные lines reads the — x `code` tokens **bold** lines lines\n* — the\n                              Update installed · Restart\n  x lines — end. **bold** данные — end.\n❯ x parser lines",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760784222332
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760784585676
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760782167459
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760785932888
+   }
+  ],
+  "fileSize": 233247,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T10:43:42.332Z",
+   "updatedAt": "2025-10-18T11:12:12.888Z",
+   "lastTimestamp": 1760785932888,
+   "fileSize": 233247,
+   "userCount": 2,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "● Read(src/x.go)\n  reads end. parser          right side\n\r  **bold** `code`\n──────────────────────────────────────────\n  `code` — **bold** the **bold** — the **bold** x the x **bold** **bold** parser parser x — tokens parser `code` lines reads parser — ёжик x parser ёжик — lines lines **bold** end. **bold** parser ёжик — `code` tokens — x end. **bold** x x end. lines `code` x x the x the ёжик parser parser tokens reads parser ёжик ёжик **bold** **bold** ёжик tokens ёжик `code` `code` ёжик the x parser ёжик the `code` reads the **bold** — lines **bold** lines reads reads данные ёжик the x x lines the tokens the ёжик x lines **bold** lines `code` lines ёжик ёжик — ёжик lines reads — end. reads ёжик x parser the x ёжик parser reads tokens — **bold** `code` parser ёжик `code` the x x — end. x lines end. **bold** **bold** tokens tokens — lines reads tokens reads ёжик lines данные **bold** x end. **bold** tokens parser ёжик **bold** reads данные lines the **bold** tokens данные the x end. tokens lines ёжик tokens x — the данные ёжик `code` lines parser `code` `code` ёжик end. reads lines end. end. **bold** данные **bold** x reads x end. **bold** — — ёжик ёжик tokens `code` — ёжик the ёжик\n❯ \n\r  **bold** parser\n❯ — `code` end.\n   \n✻ Thinking… (22s)\n  ⎿ `code` ёжик lines\n* `code` `code`\n\r  `code` parser\n·  end. parser\n* x x",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760791114391
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760789150379
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 0
+   }
+  ],
+  "fileSize": 974980,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": "1970-01-01T00:00:00.000Z",
+   "lastTimestamp": 1760791114391,
+   "fileSize": 974980,
+   "userCount": 1,
+   "assistantCount": 1
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "❯ **bold** reads tokens\r\n  1. the ёжик reads —\r\n  ⎿ the ёжик lines\r\n  - tokens `code` x tokens\r\n                              Update installed · Restart\r\n● ёжик данные lines\r\n   \r\n  1. parser x **bold** x\r\n────────────────────────────────────\r\n───────────────",
+  "text": "ёжик данные lines\n\n1. parser x **bold** x"
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760789103272
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760786512624
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760787730905
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760787187657
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760790962963
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760785048973
+   }
+  ],
+  "fileSize": 176767,
+  "createdAt": null,
+  "customTitle": "lines данные",
+  "meta": {
+   "createdAt": "2025-10-18T12:05:03.272Z",
+   "updatedAt": "2025-10-18T10:57:28.973Z",
+   "lastTimestamp": 1760790962963,
+   "fileSize": 176767,
+   "userCount": 1,
+   "assistantCount": 2,
+   "customTitle": "lines данные"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ⎿ reads — tokens\n❯ \n● `code` parser lines ёжик `code` lines\n* reads reads\n* parser ёжик\n  ## `code` end.\n─────────────────────────────────────\n● Read(src/x.go)\n● reads end. the\n  **bold** данные the **bold** the parser tokens данные\n\n  - end. данные **bold** reads\n● x reads ёжик данные end. ёжик\n\r  **bold** reads\n  tokens данные x **bold** end. the parser `code`\n\n● Read(src/x.go)\n● Bash(the lines)",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [],
+  "fileSize": 459673,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": null,
+   "updatedAt": null,
+   "lastTimestamp": 0,
+   "fileSize": 459673,
+   "userCount": 0,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "● данные lines lines parser ёжик lines\r\n* tokens reads\r\n✻ Thinking… (39s)\r\n❯ \r\n\u001b[1m● the **bold** reads `code`\u001b[0m\r\n  данные данные tokens — tokens end. `code` tokens the **bold** ёжик `code` **bold** reads — lines — the end. tokens **bold** x the end. the the — x reads parser parser reads — **bold** данные lines the `code` the x the данные **bold** — end. **bold** tokens x `code` — the the reads tokens `code` the — `code` данные x данные end. данные lines x x end. end. lines **bold** end. — `code` `code` reads ёжик end. the **bold** — parser данные lines **bold** reads ёжик x reads данные reads end. the lines tokens the the end. `code` ёжик x end. end. reads lines lines x x the `code` **bold** lines tokens x данные parser parser `code` — end. end. reads — данные lines **bold** the **bold** lines lines tokens the ёжик **bold** ёжик — lines the tokens данные `code` reads tokens **bold** данные данные **bold** — данные tokens reads the reads end. `code` end. — — reads the the reads **bold** ёжик reads tokens parser x reads parser reads reads tokens **bold** end. lines end. tokens reads — — reads end. — the end. x parser ёжик end. данные x lines tokens x данные end. the parser end. —\r\n● tokens данные parser\r\n  1. the x **bold** end.",
+  "text": "the **bold** reads `code` данные данные tokens — tokens end. `code` tokens the **bold** ёжик `code` **bold** reads — lines — the end. tokens **bold** x the end. the the — x reads parser parser reads — **bold** данные lines the `code` the x the данные **bold** — end. **bold** tokens x `code` — the the reads tokens `code` the — `code` данные x данные end. данные lines x x end. end. lines **bold** end. — `code` `code` reads ёжик end. the **bold** — parser данные lines **bold** reads ёжик x reads данные reads end. the lines tokens the the end. `code` ёжик x end. end. reads lines lines x x the `code` **bold** lines tokens x данные parser parser `code` — end. end. reads — данные lines **bold** the **bold** lines lines tokens the ёжик **bold** ёжик — lines the tokens данные `code` reads tokens **bold** данные данные **bold** — данные tokens reads the reads end. `code` end. — — reads the the reads **bold** ёжик reads tokens parser x reads parser reads reads tokens **bold** end. lines end. tokens reads — — reads end. — the end. x parser ёжик end. данные x lines tokens x данные end. the parser end. —\n\ntokens данные parser\n1. the x **bold** end."
+ },
+ {
+  "kind": "meta",
+  "entries": [],
+  "fileSize": 719226,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": null,
+   "lastTimestamp": 0,
+   "fileSize": 719226,
+   "userCount": 0,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  tokens parser `code`          right side\r\n                              Update installed · Restart\r\n  end. данные end. lines lines ёжик end. the\r\n  lines данные lines          right side\r\n  x ёжик **bold** `code` x the end. данные\r\n\r\n   \r\n────────────────\r\n* lines lines\r\n\r\n  данные x **bold** **bold** ёжик данные the ёжик lines ёжик parser the x данные `code` ёжик `code` `code` ёжик parser end. ёжик lines reads данные the данные tokens x parser lines x reads parser end. parser the reads — **bold** tokens tokens end. the lines parser reads reads tokens reads end. reads данные tokens `code` reads tokens x the the — **bold** **bold** **bold** **bold** the the end. reads ёжик ёжик ёжик **bold** — lines tokens reads `code` tokens lines ёжик данные данные `code` данные `code` tokens end. ёжик ёжик reads `code` **bold** `code` — lines lines the parser ёжик end. the lines lines — end. lines lines **bold** parser **bold** x x parser tokens `code` the x parser tokens reads — x ёжик данные parser parser данные parser lines the ёжик ёжик ёжик parser — `code` end. ёжик ёжик the parser `code` `code` reads parser the — tokens x `code` end. tokens — lines lines reads end. данные ёжик lines x lines `code` end. x end. parser tokens ёжик end. данные x x the parser x — x parser tokens ёжик данные end. ёжик **bold** tokens tokens **bold** the reads — данные — parser `code` end. данные tokens lines\r\n❯ reads x **bold**\r\n● Bash(— данные)\r\n\u001b[1m● parser — lines tokens\u001b[0m\r\n✻ Thinking… (49s)\r\n✻ Thinking… (5s)\r\n  — end. lines          right side\r\n  `code` end. lines parser **bold** `code` end. parser\r\n   ",
+  "text": "parser — lines tokens — end. lines `code` end. lines parser **bold** `code` end. parser"
+ },
+ {
+  "kind": "meta",
+  "entries": [],
+  "fileSize": 194,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": null,
+   "updatedAt": null,
+   "lastTimestamp": 0,
+   "fileSize": 194,
+   "userCount": 0,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "\u001b[1m● ёжик tokens tokens **bold**\u001b[0m\r\n❯ \r\n* `code` reads\r\n  parser the parser lines parser **bold** `code` the the tokens tokens данные reads reads ёжик lines `code` end. данные tokens parser **bold** end. **bold** **bold** — ёжик lines **bold** reads lines parser tokens the the данные — ёжик x tokens ёжик — the `code` — tokens parser parser parser **bold** ёжик reads tokens the lines x ёжик ёжик reads the `code` end. parser end. tokens tokens tokens данные parser reads end. x данные lines ёжик `code` ёжик lines reads — **bold** end. lines — reads parser end. `code` **bold** ёжик x parser parser — end. данные end. данные данные end. — данные reads the x the `code` lines — the — parser reads lines reads parser the end. x ёжик the end. tokens x данные tokens the lines lines lines lines данные данные ёжик parser ёжик the lines **bold** end. ёжик ёжик reads tokens данные parser lines данные **bold** the end. end. — end. the ёжик reads the tokens x reads reads tokens the end. lines x ёжик reads данные lines the lines end. данные reads the parser `code` ёжик ёжик the lines end. the **bold** end. parser the reads x ёжик данные lines данные end. reads end. reads —\r\n❯ \r\n\r\n● end. x —\r\n\r\n❯ \r\n  lines данные данные — the lines end. `code`\r\n·  — reads\r\n\u001b[1m● reads x `code` end.\u001b[0m\r\n  - `code` **bold** the the\r\n  reads x reads **bold** end. — данные reads\r\n  ⎿ данные `code` ёжик\r\n  - данные — reads `code`\r\n● Read(src/x.go)",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760785714426
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760789693837
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760785876554
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760784006437
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760784085438
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760786953981
+   }
+  ],
+  "fileSize": 797549,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": "2025-10-18T11:29:13.981Z",
+   "lastTimestamp": 1760789693837,
+   "fileSize": 797549,
+   "userCount": 2,
+   "assistantCount": 1
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  1. ёжик `code` tokens parser\n  reads `code` ёжик          right side\n  ## **bold** reads\n\n  the **bold** reads reads parser reads x the\n  `code` — x данные end. lines **bold** данные `code` ёжик reads tokens the ёжик tokens the the the end. `code` `code` lines tokens x lines end. parser — tokens **bold** ёжик данные — the **bold** parser the tokens — reads the **bold** **bold** reads the `code` x reads `code` end. данные — lines — tokens **bold** end. данные lines **bold** lines `code` reads parser данные end. tokens parser **bold** данные the the — tokens lines x ёжик данные tokens — данные the parser `code` tokens — the `code` `code` ёжик reads reads tokens tokens x x the parser tokens x x — `code` ёжик parser данные `code` данные x ёжик end. the end. `code` `code` parser **bold** **bold** данные the **bold** parser ёжик reads **bold** x ёжик parser tokens данные end. x end. the x x ёжик the данные `code` **bold** parser lines reads the reads — `code` the end. `code` parser **bold** ёжик **bold** parser tokens — данные `code` ёжик x reads lines tokens — tokens parser tokens lines ёжик — parser данные данные tokens tokens — ёжик tokens `code` данные — ёжик the lines **bold** reads x x данные lines lines x the — данные the x tokens\n  ⎿ tokens end. end.\n\u001b[1m● x `code` x end.\u001b[0m\n● x reads reads\n❯ \n● Read(src/x.go)\n\u001b[1m● ёжик **bold** **bold** **bold**\u001b[0m\n  данные ёжик **bold** — **bold** `code` the **bold**\n  ## the tokens",
+  "text": "ёжик **bold** **bold** **bold** данные ёжик **bold** — **bold** `code` the **bold**\n## the tokens"
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760789862606
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760788676126
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760782551081
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760788458546
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760789388655
+   }
+  ],
+  "fileSize": 690420,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": "2025-10-18T12:09:48.655Z",
+   "lastTimestamp": 1760789862606,
+   "fileSize": 690420,
+   "userCount": 1,
+   "assistantCount": 1
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "● Bash(**bold** x)\n● Bash(x reads)\n  end. lines parser ёжик parser **bold** the ёжик\n                              Update installed · Restart\n                              Update installed · Restart\n───────────────────────────────\n✻ Thinking… (43s)\n❯ — x lines\n\u001b[1m● ёжик lines reads ёжик\u001b[0m\n   \n  the the parser `code` reads x ёжик данные `code` — tokens lines — данные parser lines **bold** parser — `code` данные x данные parser lines — данные lines tokens **bold** данные lines x the — tokens tokens lines the the данные the tokens tokens the x tokens **bold** end. данные tokens `code` lines x — x end. the `code` the the x **bold** the **bold** **bold** reads end. parser **bold** parser ёжик lines ёжик tokens lines **bold** — данные reads lines ёжик **bold** lines ёжик **bold** x **bold** the ёжик **bold** the **bold** `code` данные the reads reads lines — the parser — **bold** lines **bold** reads ёжик ёжик x данные parser end. parser the **bold** reads **bold** the end. ёжик **bold** tokens parser tokens x x — lines parser parser данные ёжик `code` — reads `code` x — end. **bold** the x x `code` lines tokens the x tokens lines the данные tokens parser the `code` x ёжик `code` parser **bold** **bold** `code` x данные end. the ёжик parser **bold** x — **bold** end. **bold** tokens end. **bold** lines **bold** x parser ёжик данные x the reads — — end. the parser x — parser **bold** — parser **bold**\n* tokens parser\n  — the lines **bold** данные parser ёжик parser tokens `code` ёжик end. **bold** данные parser reads x tokens end. ёжик данные — parser `code` `code` `code` данные the reads lines tokens the **bold** reads tokens ёжик reads `code` — lines ёжик ёжик — reads parser — **bold** — **bold** the — **bold** ёжик — x the ёжик `code` данные lines the the **bold** ёжик the end. x end. the reads x parser `code` tokens — the the reads ёжик reads **bold** reads **bold** x **bold** — — ёжик tokens end. lines **bold** `code` the ёжик — lines данные x parser — tokens `code` parser the parser lines данные — данные `code` `code` tokens `code` — parser **bold** x tokens reads reads данные lines x ёжик ёжик `code` end. данные end. x `code` **bold** x lines reads ёжик x parser tokens tokens данные reads — reads tokens данные end. tokens tokens end. **bold** the **bold** end. end. данные — reads reads данные the parser parser end. lines end. данные reads reads **bold** **bold** ёжик данные lines данные — parser — данные tokens end. x ёжик x x ёжик lines **bold** tokens `code` данные `code` end. x lines lines ёжик lines данные\n  1. end. tokens x **bold**\n● parser parser ёжик the parser end.\n✻ Thinking… (17s)",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760787871837
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760787171376
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760790547397
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760783066397
+   }
+  ],
+  "fileSize": 663482,
+  "createdAt": null,
+  "customTitle": "tokens данные",
+  "meta": {
+   "createdAt": "2025-10-18T11:44:31.837Z",
+   "updatedAt": "2025-10-18T10:24:26.397Z",
+   "lastTimestamp": 1760790547397,
+   "fileSize": 663482,
+   "userCount": 1,
+   "assistantCount": 1,
+   "customTitle": "tokens данные"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "● Read(src/x.go)\n  - **bold** lines lines parser\n────────────────────────\n● end. данные reads `code` данные tokens\n\r  данные lines\n● x lines the — reads —\n  ⎿ lines lines ёжик",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760785530528
+   }
+  ],
+  "fileSize": 977650,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": "— x",
+  "meta": {
+   "createdAt": "2026-10-18T00:00:00.000Z",
+   "updatedAt": "2025-10-18T11:05:30.528Z",
+   "lastTimestamp": 1760785530528,
+   "fileSize": 977650,
+   "userCount": 0,
+   "assistantCount": 0,
+   "customTitle": "— x"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "                              Update installed · Restart\n❯ \n  ## — tokens\n● reads reads данные\n● Bash(the данные)\n● данные **bold** —\n\u001b[1m● `code` parser reads tokens\u001b[0m\n                              Update installed · Restart\n* parser ёжик\n  — x parser          right side\n  ## reads —\n* данные —\n❯ \n\n   \n  ёжик **bold** **bold** — lines tokens the the x данные lines the данные tokens данные reads x lines ёжик end. the end. parser tokens reads `code` lines end. данные parser ёжик tokens x the — x **bold** — lines x — **bold** reads lines lines ёжик **bold** reads `code` данные lines end. tokens tokens — lines `code` данные **bold** end. end. lines — x x данные данные lines x end. lines lines `code` tokens ёжик `code` lines lines tokens end. данные ёжик ёжик ёжик данные — ёжик tokens ёжик — tokens данные end. parser parser `code` ёжик данные lines x parser tokens **bold** `code` end. the — reads — lines данные — `code` x ёжик tokens **bold** end. the **bold** — **bold** parser данные reads — reads tokens tokens x end. parser lines x parser x lines данные the parser tokens end. the tokens lines the — the end. `code` end. reads the parser tokens ёжик reads reads the parser **bold** parser ёжик **bold** the x reads tokens reads ёжик **bold** parser ёжик x x x tokens the the x x `code` tokens данные end. `code` данные the the данные lines ёжик parser end. reads parser lines данные tokens parser\n❯ — — tokens",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760788673568
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760782520641
+   },
+   {
+    "id": "x",
+    "type": "tool-call"
+   }
+  ],
+  "fileSize": 751112,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "❯ \r\n❯ ",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760788830681
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760783213951
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760783633250
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760790322445
+   }
+  ],
+  "fileSize": 924067,
+  "createdAt": null,
+  "customTitle": "end. `code`",
+  "meta": {
+   "createdAt": "2025-10-18T12:00:30.681Z",
+   "updatedAt": "2025-10-18T12:25:22.445Z",
+   "lastTimestamp": 1760790322445,
+   "fileSize": 924067,
+   "userCount": 2,
+   "assistantCount": 0,
+   "customTitle": "end. `code`"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "─────────────────────\n  1. ёжик tokens lines tokens\n❯ \n────────\n\r  reads данные\n● Read(src/x.go)\n* parser end.\n\n● reads the **bold**\n● the parser ёжик\n  ## ёжик end.\n✻ Thinking… (10s)\n   \n   ",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760784557035
+   },
+   {
+    "id": "x",
+    "type": "tool-result"
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760790105812
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760791465947
+   }
+  ],
+  "fileSize": 223103,
+  "createdAt": "2026-10-18T00:00:00.000Z",
+  "customTitle": null,
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "❯ end. x end.\n\n● the tokens tokens x ёжик —\n  ёжик — x tokens end. end. the parser\n❯ \n❯ \n✻ Thinking… (55s)\n* **bold** lines\n                              Update installed · Restart\n❯ \n✻ Thinking… (14s)\n  ⎿ the **bold** данные\n  parser ёжик tokens          right side\n                              Update installed · Restart\n\r  end. **bold**\n  - — the lines данные",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760790139113
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760782943889
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760783659374
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760791343753
+   }
+  ],
+  "fileSize": 18627,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T12:22:19.113Z",
+   "updatedAt": "2025-10-18T12:42:23.753Z",
+   "lastTimestamp": 1760791343753,
+   "fileSize": 18627,
+   "userCount": 2,
+   "assistantCount": 0
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "● данные ёжик end.\r\n  end. `code` lines parser tokens end. reads the lines reads parser parser end. parser the reads end. tokens **bold** end. **bold** `code` данные — — `code` — reads **bold** tokens lines parser end. `code` ёжик end. tokens данные the **bold** lines parser end. tokens tokens end. ёжик x parser `code` `code` ёжик tokens tokens the parser `code` `code` ёжик end. reads данные — ёжик lines `code` **bold** данные **bold** ёжик reads ёжик reads `code` — tokens — `code` x **bold** ёжик the lines parser данные reads данные lines — ёжик **bold** the the `code` — x reads `code` end. the parser lines lines x lines ёжик lines end. the — **bold** данные the end. x **bold** x **bold** **bold** `code` `code` данные данные reads tokens parser end. reads данные lines tokens данные parser tokens x lines данные lines — ёжик `code` reads the lines reads данные reads parser **bold** ёжик end. **bold** tokens ёжик lines lines lines **bold** reads reads reads reads x **bold** the ёжик tokens ёжик `code` `code` — lines tokens — данные reads lines lines lines lines — reads lines **bold** `code` parser ёжик x tokens end. end. **bold** reads lines `code` the end. ёжик end. данные\r\n\r  parser the\r\n\r  `code` tokens\r\n·  `code` **bold**\r\n❯ ёжик parser reads\r\n\u001b[1m● parser reads **bold** —\u001b[0m\r\n\r  данные данные\r\n● Read(src/x.go)\r\n   \r\n   \r\n   \r\n  parser ёжик данные x `code` **bold** x `code` данные the ёжик `code` end. tokens parser end. parser **bold** reads end. **bold** **bold** ёжик parser `code` tokens end. parser end. — x the данные reads **bold** **bold** данные **bold** the end. parser tokens parser lines reads `code` x x `code` x ёжик x данные ёжик x end. tokens данные reads the tokens x parser **bold** — — the данные lines the данные the ёжик tokens **bold** tokens parser end. tokens reads reads end. parser end. the `code` end. tokens ёжик ёжик **bold** the x `code` ёжик `code` данные x the x `code` `code` lines данные — **bold** the the the — the `code` tokens **bold** ёжик lines the the x — — reads the `code` end. x the the x lines x end. — tokens lines x данные tokens — **bold** **bold** parser `code` **bold** **bold** ёжик lines tokens **bold** x lines lines ёжик данные — lines данные the reads `code` the end. `code` — x lines lines parser `code` lines x lines reads — the — lines end. данные the данные `code` `code` — tokens end. x — `code` tokens ёжик — **bold** **bold** the **bold** x reads parser данные\r\n✻ Thinking… (24s)\r\n  ⎿ данные end. `code`\r\n✻ Thinking… (9s)\r\n  — ёжик данные parser x **bold** lines reads данные — данные `code` **bold** end. данные end. `code` parser данные the tokens `code` reads x lines tokens **bold** x tokens ёжик tokens **bold** end. tokens `code` tokens — данные reads lines **bold** the x ёжик reads end. the parser — данные tokens — tokens tokens x x **bold** the данные the x `code` данные ёжик lines parser данные — x x **bold** reads the tokens **bold** the parser — the reads end. x tokens — — parser the x lines x **bold** данные lines reads the parser данные lines the x the parser reads **bold** **bold** tokens x tokens x ёжик ёжик **bold** `code` reads `code` `code` данные lines x `code` parser the **bold** the the — данные `code` ёжик parser данные end. lines данные — reads x reads end. parser `code` ёжик lines x lines ёжик **bold** `code` the end. **bold** parser end. lines данные — the x **bold** x — tokens tokens `code` the `code` — `code` x данные x lines x parser `code` reads — reads ёжик — x ёжик reads tokens **bold** **bold** данные **bold** — **bold** ёжик `code` tokens ёжик reads end. end. the — the\r\n❯ `code` **bold** the\r\n❯ lines tokens lines\r\n·  данные lines",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760786017575
+   },
+   {
+    "id": "x",
+    "type": "thinking",
+    "timestamp": 1760782967167
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760789779714
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 1760781887182
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760787669402
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760790244056
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 0
+   }
+  ],
+  "fileSize": 850251,
+  "createdAt": null,
+  "customTitle": "end. tokens",
+  "meta": {
+   "createdAt": "2025-10-18T11:13:37.575Z",
+   "updatedAt": "1970-01-01T00:00:00.000Z",
+   "lastTimestamp": 1760790244056,
+   "fileSize": 850251,
+   "userCount": 2,
+   "assistantCount": 1,
+   "customTitle": "end. tokens"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "  ## ёжик lines\r\n● parser reads данные\r\n● parser `code` tokens\r\n* `code` end.",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "thinking"
+   },
+   {
+    "id": "x",
+    "type": "user-message",
+    "timestamp": 1760790946742
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760782425452
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760785487947
+   },
+   {
+    "id": "x",
+    "type": "tool-result",
+    "timestamp": 0
+   },
+   {
+    "id": "x",
+    "type": "tool-call"
+   }
+  ],
+  "fileSize": 715182,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "error": "RangeError"
+  }
+ },
+ {
+  "kind": "live",
+  "screen": "─────────\r\n✻ Thinking… (55s)\r\n  ⎿ reads reads reads\r\n  данные ёжик — end. lines parser parser `code` reads `code` tokens lines tokens reads данные ёжик the tokens the the the x the tokens reads x tokens x end. `code` the reads x parser reads данные ёжик reads **bold** **bold** — `code` **bold** — `code` tokens reads **bold** end. reads **bold** reads x reads end. `code` the ёжик the end. данные parser `code` parser end. the parser parser — tokens `code` x ёжик x end. x end. lines lines parser — x данные tokens `code` ёжик parser `code` the reads reads **bold** **bold** данные tokens ёжик parser end. parser parser ёжик end. x данные end. данные — `code` ёжик ёжик end. x lines `code` — parser the reads tokens x lines ёжик parser end. **bold** reads данные ёжик — `code` **bold** x данные parser ёжик the x the the tokens — `code` lines **bold** ёжик reads **bold** `code` данные tokens the end. reads parser — end. lines x lines данные tokens — ёжик **bold** данные **bold** данные end. lines end. lines данные the `code` the **bold** данные — **bold** `code` x — данные данные tokens `code` ёжик **bold** the данные the — — x `code` end. данные tokens данные lines\r\n  данные ёжик данные lines the tokens the данные\r\n✻ Thinking… (20s)\r\n● the tokens `code`\r\n·  данные ёжик\r\n  1. end. the reads lines\r\n  ## lines the\r\n❯ reads — parser\r\n● Bash(reads lines)\r\n● Bash(end. reads)\r\n   \r\n  ## parser reads",
+  "text": ""
+ },
+ {
+  "kind": "meta",
+  "entries": [
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760782900756
+   },
+   {
+    "id": "x",
+    "type": "assistant-message",
+    "timestamp": 1760788361256
+   },
+   {
+    "id": "x",
+    "type": "tool-call",
+    "timestamp": 1760787439515
+   }
+  ],
+  "fileSize": 605502,
+  "createdAt": null,
+  "customTitle": null,
+  "meta": {
+   "createdAt": "2025-10-18T10:21:40.756Z",
+   "updatedAt": "2025-10-18T11:37:19.515Z",
+   "lastTimestamp": 1760788361256,
+   "fileSize": 605502,
+   "userCount": 0,
+   "assistantCount": 1
+  }
+ }
+]

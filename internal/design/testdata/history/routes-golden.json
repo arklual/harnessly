@@ -1,0 +1,569 @@
+{
+ "token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+ "requests": [
+  {
+   "method": "GET",
+   "url": "/api/platform/design/library/history?artifact=p1&board=A.dc.html",
+   "headers": {},
+   "body": null,
+   "answer": {
+    "status": 401,
+    "headers": {
+     "content-type": "application/json"
+    },
+    "body": "{\"error\":\"Unauthorized\"}"
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/design/library/history?artifact=p1&board=A.dc.html",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "body": null,
+   "answer": {
+    "status": 403,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\""
+    },
+    "body": "{\"error\":\"Forbidden\"}"
+   }
+  },
+  {
+   "method": "PUT",
+   "url": "/api/platform/design/library/history",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "answer": {
+    "status": 405,
+    "headers": {
+     "cache-control": "no-store",
+     "allow": "GET, POST"
+    },
+    "body": ""
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/history",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "x",
+   "answer": {
+    "status": 415,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"KubuGMkn4lW-jLpHT0OxCNknoy8\""
+    },
+    "body": "{\"error\":\"Ожидается application/json\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/history",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{",
+   "answer": {
+    "status": 400,
+    "headers": {
+     "content-type": "text/plain"
+    },
+    "body": "Invalid JSON"
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/design/library/history?artifact=nope&board=A.dc.html",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"owES1VUUmcHHk58GReY4BBaY1YA\""
+    },
+    "body": "{\"error\":\"Нет такого проекта: смотрите acme-cli design list\"}"
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/design/library/history?artifact=p1&board=lib/page.html",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"Nm2UcPRCwCUuoTIjfeCsKteenJ8\""
+    },
+    "body": "{\"error\":\"История есть у досок-файлов; экран, собранный из общего бандла, версий не имеет\"}"
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/design/library/history?artifact=p1&artifact=p1&board=A.dc.html",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"owES1VUUmcHHk58GReY4BBaY1YA\""
+    },
+    "body": "{\"error\":\"Нет такого проекта: смотрите acme-cli design list\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/history",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"artifact\":\"p1\",\"board\":\"A.dc.html\",\"revision\":\"zz\"}",
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"uAK2EBIYacdD9J8nY4-zV1q-ljg\""
+    },
+    "body": "{\"error\":\"Не удалось понять, какую версию вернуть\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/history",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"artifact\":\"p1\",\"board\":\"A.dc.html\",\"revision\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"AEvQDi9MAqHvs5k-ZwnFvhN1voA\""
+    },
+    "body": "{\"error\":\"Такой версии нет в истории\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/history",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"artifact\":\"p1\",\"board\":\"Main\",\"revision\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"Nm2UcPRCwCUuoTIjfeCsKteenJ8\""
+    },
+    "body": "{\"error\":\"История есть у досок-файлов; экран, собранный из общего бандла, версий не имеет\"}"
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/design/history",
+   "headers": {},
+   "body": null,
+   "answer": {
+    "status": 403,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\""
+    },
+    "body": "{\"error\":\"Forbidden\"}"
+   }
+  },
+  {
+   "method": "DELETE",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "body": null,
+   "answer": {
+    "status": 405,
+    "headers": {
+     "cache-control": "no-store",
+     "allow": "GET, POST"
+    },
+    "body": ""
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/design/history?project=nope",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "body": null,
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"owES1VUUmcHHk58GReY4BBaY1YA\""
+    },
+    "body": "{\"error\":\"Нет такого проекта: смотрите acme-cli design list\"}"
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/design/history?project=p1&board=Nope&n=abc",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "body": null,
+   "answer": {
+    "status": 200,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"VJw_FueYbkiTv3B43SG4etdBgeM\""
+    },
+    "body": "{\"unsaved\":false,\"lines\":[]}"
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/cli/design/history?project=p1&project=p2",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   },
+   "body": null,
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"owES1VUUmcHHk58GReY4BBaY1YA\""
+    },
+    "body": "{\"error\":\"Нет такого проекта: смотрите acme-cli design list\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content-type": "text/plain"
+   },
+   "body": "x",
+   "answer": {
+    "status": 415,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"gFPFczv67g-GiY0x_caDTvodqQY\""
+    },
+    "body": "{\"error\":\"Нужен application/json\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content-type": "application/json"
+   },
+   "body": "{\"action\":\"x\"}",
+   "answer": {
+    "status": 400,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"ixs7OVlElL79W9qepG55U4STr1k\""
+    },
+    "body": "{\"error\":\"Неизвестное действие: restore\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content-type": "application/json"
+   },
+   "body": "{\"action\":\"restore\",\"session\":\"bad session!\"}",
+   "answer": {
+    "status": 400,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"zsG-xHfsDUIvtBIKnYKZRHXvTwY\""
+    },
+    "body": "{\"error\":\"Непонятная сессия вкладки агента\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content-type": "application/json"
+   },
+   "body": "{\"action\":\"restore\",\"session\":null}",
+   "answer": {
+    "status": 400,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"zsG-xHfsDUIvtBIKnYKZRHXvTwY\""
+    },
+    "body": "{\"error\":\"Непонятная сессия вкладки агента\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content-type": "application/json"
+   },
+   "body": "{\"action\":\"restore\",\"project\":\"p1\",\"board\":\"A\",\"at\":\"zz\"}",
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"bT1vNUtxCqcdfKKVyj_Ze85c4RE\""
+    },
+    "body": "{\"error\":\"Версию задают так: --at <sha | 30m | 2h | 1d>\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content-type": "application/json"
+   },
+   "body": "{\"action\":\"restore\",\"project\":\"p1\",\"board\":\"A\",\"at\":5}",
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"bT1vNUtxCqcdfKKVyj_Ze85c4RE\""
+    },
+    "body": "{\"error\":\"Версию задают так: --at <sha | 30m | 2h | 1d>\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content-type": "application/json"
+   },
+   "body": "{\"action\":\"restore\",\"project\":\"p1\",\"board\":\"A/b\",\"at\":\"1d\"}",
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"KeDnkwIG6abGQSPHZSDqegLuX0A\""
+    },
+    "body": "{\"error\":\"Назовите доску её именем, без пути\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/cli/design/history",
+   "headers": {
+    "x-cli-token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "content-type": "application/json"
+   },
+   "body": "{\"action\":\"restore\",\"project\":\"p1\",\"board\":\"A\",\"at\":\"1d\"}",
+   "answer": {
+    "status": 409,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"IWnFRsdDF5S8ibbpJuIglK2JGOs\""
+    },
+    "body": "{\"error\":\"Раньше этого времени у доски не было сохранённых версий\"}"
+   }
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/design/library/import",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": null,
+   "answer": {
+    "status": 405,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "allow": "POST",
+     "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\""
+    },
+    "body": "{\"error\":\"Method not allowed\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/import",
+   "headers": {
+    "content-type": "application/zip"
+   },
+   "body": "@project.zip",
+   "answer": {
+    "status": 403,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\""
+    },
+    "body": "{\"error\":\"Forbidden\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/import",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "x",
+   "answer": {
+    "status": 415,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"9MQhWEoaHdRnrVRppz1q0ZbjPMk\""
+    },
+    "body": "{\"error\":\"Ожидается zip-архив\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/import",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/zip"
+   },
+   "body": "",
+   "answer": {
+    "status": 400,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"wcGOqVZmZOQRCvZBkT1utd877Qo\""
+    },
+    "body": "{\"error\":\"Пустой файл\"}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/import",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/zip",
+    "x-design-filename": "%D0%9C%D0%BE%D0%B9%20%D0%A1%D0%B0%D0%B9%D1%82.zip"
+   },
+   "body": "@project.zip",
+   "answer": {
+    "status": 201,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"2sYnA4SN56cER9aXnVbFWRXopS8\""
+    },
+    "body": "{\"id\":\"moy-sayt\",\"title\":\"Мой Сайт\",\"boards\":5}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/import",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/zip",
+    "x-design-filename": "dir%2F%D0%9C%D0%BE%D0%B9%20%D0%A1%D0%B0%D0%B9%D1%82.zip"
+   },
+   "body": "@project.zip",
+   "answer": {
+    "status": 201,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"5ubPvJZDk9KUSu_qJofO0W6kapU\""
+    },
+    "body": "{\"id\":\"moy-sayt-2\",\"title\":\"Мой Сайт\",\"boards\":5}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/import",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/zip",
+    "x-design-filename": "%E0%A4%A"
+   },
+   "body": "@project.zip",
+   "answer": {
+    "status": 201,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"7lJuooO00pnYzRiQilnbdlvEhQ4\""
+    },
+    "body": "{\"id\":\"design\",\"title\":\"design\",\"boards\":5}"
+   }
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/design/library/import",
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/zip"
+   },
+   "body": "notzip",
+   "answer": {
+    "status": 422,
+    "headers": {
+     "content-type": "application/json; charset=utf-8",
+     "cache-control": "no-store",
+     "etag": "\"oWHhd5VRYUkUvUMEqddBzbE64rg\""
+    },
+    "body": "{\"error\":\"Это не zip-архив проекта\"}"
+   }
+  }
+ ],
+ "library": [
+  ".uploads",
+  "design",
+  "moy-sayt",
+  "moy-sayt-2",
+  "p1"
+ ]
+}

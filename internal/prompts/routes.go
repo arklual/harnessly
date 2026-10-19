@@ -1,0 +1,500 @@
+package prompts
+
+import (
+	"encoding/json"
+	"math"
+	"regexp"
+	"slices"
+	"time"
+
+	"harnessly/internal/jscompat"
+	"harnessly/internal/screen"
+)
+
+// The operations behind the routes: each takes the request body (JSON) or query value and answers a Response. The HTTP
+// layer checks the session cookie (403), the method (405, with Allow), the JSON content type where a route needs it
+// (415) and Cache-Control, then writes the Response.
+
+// Response is a route's answer: the status and the JSON body (nil: no body).
+type Response struct {
+	Status int
+	Body   any
+}
+
+// ErrorBody is a refusal; Code carries the command runner's error on switch-model, Waits says the agent reads the
+// message at its next step by itself.
+type ErrorBody struct {
+	Error string `json:"error"`
+	Code  string `json:"code,omitempty"`
+	Waits bool   `json:"waits,omitempty"`
+}
+
+func fail(status int, message string) Response { return Response{status, ErrorBody{Error: message}} }
+
+func ok(body any) Response { return Response{200, body} }
+
+// fields is a request body as an object; anything else reads as an empty one.
+type fields map[string]json.RawMessage
+
+func decodeFields(body []byte) fields {
+	var f fields
+	if json.Unmarshal(body, &f) != nil || f == nil {
+		return fields{}
+	}
+	return f
+}
+
+// str is the field when it is a JSON string.
+func (f fields) str(key string) (string, bool) {
+	raw, present := f[key]
+	if !present {
+		return "", false
+	}
+	return jsonString(raw)
+}
+
+func (f fields) text(key string) string { s, _ := f.str(key); return s }
+
+func (f fields) isFalse(key string) bool { return string(f[key]) == "false" }
+
+var tabIDRE = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// --- POST /prompt-queue -------------------------------------------------------------------------------------------
+
+// QueueAdded is the answer to add.
+type QueueAdded struct {
+	Item     Item   `json:"item"`
+	Delivery string `json:"delivery"`
+}
+
+// QueueTaken is the answer to remove and take.
+type QueueTaken struct {
+	Item Item `json:"item"`
+}
+
+// OKBody is {ok: true}.
+type OKBody struct {
+	OK bool `json:"ok"`
+}
+
+// PromptQueue is `{tabId, action, …}` on a tab's queue: add {text, images} queues a message and hands it to the agent
+// (into the running turn when it works), remove/take {id} take a message out (to drop it or edit it back), steer {id}
+// sends it now. A tab the runtime does not know is refused for add, instead of keeping a message nothing delivers.
+func (s *Service) PromptQueue(body []byte) Response {
+	f := decodeFields(body)
+	tabID, action := f.text("tabId"), f.text("action")
+	if !tabIDRE.MatchString(tabID) || !slices.Contains([]string{"add", "remove", "take", "steer"}, action) {
+		return fail(400, "Нужны tabId и action")
+	}
+	if action == "add" {
+		var raw []json.RawMessage
+		_ = json.Unmarshal(f["images"], &raw)
+		images := []string{}
+		for _, r := range raw {
+			if im, isString := jsonString(r); isString {
+				images = append(images, im)
+			}
+		}
+		for _, im := range images {
+			if !s.cfg.IsUploadImage(im) {
+				return fail(400, "Картинка не из загрузок")
+			}
+		}
+		if _, known := s.cfg.Tabs.Tab(tabID); !known {
+			return fail(404, msgNoTab)
+		}
+		item, err := s.queue.Add(tabID, f.text("text"), images)
+		if err != nil {
+			return fail(409, err.Error())
+		}
+		return ok(QueueAdded{Item: item, Delivery: s.TakeNewPrompt(tabID, item.ID)})
+	}
+	id := f.text("id")
+	if id == "" {
+		return fail(400, "Нужен id")
+	}
+	if action == "steer" {
+		if r := s.Steer(tabID, id); !r.OK {
+			return fail(r.Status, r.Message)
+		}
+		return ok(OKBody{true})
+	}
+	item, found := s.queue.Take(tabID, id)
+	if !found {
+		return fail(404, "Сообщения уже нет в очереди")
+	}
+	return ok(QueueTaken{item})
+}
+
+// --- POST /prompt-text --------------------------------------------------------------------------------------------
+
+// PromptTextMax is the longest composer text, in UTF-16 units.
+const PromptTextMax = 512 * 1024
+
+// PromptTyped is the answer to prompt-text: how the text went in and when each step of it ended.
+type PromptTyped struct {
+	Via   string `json:"via"`
+	Steps *Steps `json:"steps"`
+}
+
+// PromptText is `{tabId, text, submit?, messageId?}`, the composer's text for a tab. A 404 tells the page to type the
+// text itself; a duplicate counts as sent.
+func (s *Service) PromptText(body []byte) Response {
+	steps := NewSteps(s.clock)
+	f := decodeFields(body)
+	tabID, text := f.text("tabId"), f.text("text")
+	if tabID == "" || text == "" {
+		return fail(400, "Нужны tabId и text")
+	}
+	if jscompat.Len(text) > PromptTextMax {
+		return fail(413, "Сообщение слишком длинное")
+	}
+	messageID := f.text("messageId")
+	via, err := s.TypePrompt(tabID, text, !f.isFalse("submit"), messageID, steps)
+	s.info("prompt typed", "tabId", tabID, "via", via, "messageId", nullable(messageID), "chars", jscompat.Len(text), "steps", steps)
+	switch {
+	case err == ErrNoTab:
+		return fail(404, msgNoTab)
+	case err == ErrCodexNeedsSubmit:
+		return fail(400, "Codex принимает сообщение только с отправкой")
+	case err != nil:
+		return fail(500, "Не удалось передать сообщение агенту")
+	case via == ViaFailed:
+		return fail(500, "Агент не принял сообщение — оно осталось в его поле ввода")
+	}
+	return ok(PromptTyped{Via: via, Steps: steps})
+}
+
+// --- POST /send-now -----------------------------------------------------------------------------------------------
+
+// SendNowBody is a 200 answer of send-now: delivered or sent.
+type SendNowBody struct {
+	Outcome string `json:"outcome"`
+}
+
+// SendNowRoute is `{tabId, text}`: the agent reads the queued message now without its current step being cancelled.
+func (s *Service) SendNowRoute(body []byte) Response {
+	f := decodeFields(body)
+	tabID, text := f.text("tabId"), f.text("text")
+	if tabID == "" || blank(text) {
+		return fail(400, "Нужны tabId и text")
+	}
+	r, found := s.SendNow(tabID, text)
+	switch {
+	case !found:
+		return fail(404, msgNoTab)
+	case r.OK:
+		return ok(SendNowBody{r.Outcome})
+	}
+	return Response{r.Status, ErrorBody{Error: r.Message, Waits: r.Waits}}
+}
+
+// --- POST /interrupt ----------------------------------------------------------------------------------------------
+
+// InterruptRoute is `{tabId}`: Stop. 204 without a body.
+func (s *Service) InterruptRoute(body []byte) Response {
+	tabID := decodeFields(body).text("tabId")
+	if tabID == "" {
+		return fail(400, "Нужен tabId")
+	}
+	if !s.Interrupt(tabID) {
+		return fail(404, msgNoTab)
+	}
+	return Response{Status: 204}
+}
+
+// --- POST /switch-model -------------------------------------------------------------------------------------------
+
+// SwitchModelBody is the frozen 200 answer of switch-model.
+type SwitchModelBody struct {
+	OK bool `json:"ok"`
+	// Confirmed: Claude asked "Switch model?" and the web accepted it.
+	Confirmed bool `json:"confirmed"`
+}
+
+// SwitchModel is `{session, model}` (a frozen contract): /model <model> through the command runner. 200, or 400 | 404 |
+// 409 with {error} (and the runner's code); a menu the command left open is handed to the page as needs-input.
+func (s *Service) SwitchModel(body []byte) Response {
+	f := decodeFields(body)
+	session, model := f.text("session"), f.text("model")
+	if session == "" || !ModelIDRE.MatchString(model) {
+		return fail(400, "Неизвестная модель")
+	}
+	r := s.RunCommand(RunInput{Session: session, Provider: ProviderClaude, Line: "/model " + model, ExpectModel: true})
+	if r.Status != 200 {
+		status := r.Status
+		if status == 422 || status == 500 {
+			status = 409
+		}
+		e, _ := r.Body.(*RunError)
+		if e == nil {
+			e = &RunError{}
+		}
+		return Response{status, ErrorBody{Error: e.Message, Code: e.Error}}
+	}
+	b, _ := r.Body.(*RunBody)
+	if b != nil && b.Outcome == "menu" {
+		tab, known := s.cfg.Tabs.TabOfSession(session)
+		if known && s.MarkNeedsInputFromScreen(tab.ID) {
+			return fail(409, msgMenu)
+		}
+		return fail(409, "Агент показал меню — ответьте в терминале")
+	}
+	return ok(SwitchModelBody{OK: true, Confirmed: b != nil && b.Outcome == "confirmed" && b.Asked != nil && *b.Asked})
+}
+
+// --- POST /commands/run -------------------------------------------------------------------------------------------
+
+// RunCommandRoute is `{session, provider, line}`: the command runner's status and body.
+func (s *Service) RunCommandRoute(body []byte) Response {
+	f := decodeFields(body)
+	session, hasSession := f.str("session")
+	if !hasSession || session == "" {
+		return Response{400, &RunError{Error: RunInvalid, Message: "Нужна сессия"}}
+	}
+	provider := f.text("provider")
+	if provider != ProviderClaude && provider != ProviderCodex {
+		return Response{400, &RunError{Error: RunInvalid, Message: "Неизвестный агент"}}
+	}
+	line, isString := f.str("line")
+	if !isString {
+		return Response{400, &RunError{Error: RunInvalid, Message: "Нужна строка команды"}}
+	}
+	r := s.RunCommand(RunInput{Session: session, Provider: provider, Line: line})
+	return Response{r.Status, r.Body}
+}
+
+// --- GET|POST /commands/screen ------------------------------------------------------------------------------------
+
+// MirrorKeys are the keys the menu mirror may press: navigation, never text; digits pick a numbered option.
+var MirrorKeys = []string{"Up", "Down", "Left", "Right", "Tab", "BTab", "Enter", "Escape", "Space", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
+
+// MirrorScreen is what the menu mirror shows: the menu, whether a panel or busy, and the panel's lines.
+type MirrorScreen struct {
+	Menu   *screen.Menu `json:"menu"`
+	Panel  bool         `json:"panel"`
+	Busy   bool         `json:"busy"`
+	Screen string       `json:"screen"`
+}
+
+func (s *Service) mirrorSession(session string) (Response, bool) {
+	if !SessionNameRE.MatchString(session) {
+		return fail(400, "Неверная сессия"), false
+	}
+	if !s.cfg.Panes.HasSession(session) {
+		return fail(404, "Сессия не найдена"), false
+	}
+	return Response{}, true
+}
+
+func (s *Service) readMirror(session string) Response {
+	styled, captured := s.cfg.Panes.CaptureStyled(session)
+	if !captured {
+		return fail(500, "Не получилось прочитать экран агента")
+	}
+	st := screen.Read(styled)
+	return ok(MirrorScreen{Menu: st.Menu, Panel: st.Panel, Busy: st.Busy, Screen: screen.PanelSnapshot(st.Plain)})
+}
+
+// CommandScreen is GET ?session=: the agent's screen for the menu mirror.
+func (s *Service) CommandScreen(session string) Response {
+	if r, valid := s.mirrorSession(session); !valid {
+		return r
+	}
+	return s.readMirror(session)
+}
+
+// CommandScreenKey is POST `{session, key}`: presses one mirror key in a pane where the agent runs, waits 250 ms for the
+// redraw and answers the screen.
+func (s *Service) CommandScreenKey(body []byte) Response {
+	f := decodeFields(body)
+	session := f.text("session")
+	if r, valid := s.mirrorSession(session); !valid {
+		return r
+	}
+	key := f.text("key")
+	if !slices.Contains(MirrorKeys, key) {
+		return fail(400, "Эту клавишу из веба нажать нельзя")
+	}
+	if cmd := s.cfg.Panes.PaneCurrentCommand(session); cmd == "" || s.cfg.IsShell(cmd) {
+		return fail(409, "Агент в этом диалоге не запущен")
+	}
+	if s.cfg.Panes.SendRawKeys(session, key) != nil {
+		return fail(500, "Не получилось нажать клавишу")
+	}
+	s.clock.Sleep(mirrorKeySettle)
+	return s.readMirror(session)
+}
+
+// --- raw tmux routes ----------------------------------------------------------------------------------------------
+
+// rawSession checks a raw route's session: given, one of the runtime's own (by name), and existing.
+func (s *Service) rawSession(session, missing string) (Response, bool) {
+	if session == "" {
+		return fail(400, missing), false
+	}
+	if !SessionNameRE.MatchString(session) || !s.cfg.Panes.IsAppSession(session) || !s.cfg.Panes.HasSession(session) {
+		return fail(404, "Session not found"), false
+	}
+	return Response{}, true
+}
+
+// SendInput is `{session, input}`: keys as tmux reads them (a key name or a string), not literal text.
+func (s *Service) SendInput(body []byte) Response {
+	f := decodeFields(body)
+	session, input := f.text("session"), f.text("input")
+	if input == "" {
+		session = ""
+	}
+	if r, valid := s.rawSession(session, "session and input parameters required"); !valid {
+		return r
+	}
+	if s.cfg.Panes.SendRawKeys(session, input) != nil {
+		return fail(500, "Failed to send input")
+	}
+	return ok(OKBody{true})
+}
+
+// CaptureBody is the visible screen ("" when the capture failed).
+type CaptureBody struct {
+	Content string `json:"content"`
+}
+
+// Capture is GET ?session=: the plain visible screen.
+func (s *Service) Capture(session string) Response {
+	if r, valid := s.rawSession(session, "session parameter required"); !valid {
+		return r
+	}
+	content, _ := s.cfg.Panes.Capture(session)
+	return ok(CaptureBody{content})
+}
+
+// OptionsBody is an empty options answer.
+type OptionsBody struct {
+	Options []string `json:"options"`
+}
+
+// PermissionOptions is GET ?session=: the permission prompt (else any choice menu) on a capture at least 120×50.
+func (s *Service) PermissionOptions(session string) Response {
+	if r, valid := s.rawSession(session, "session parameter required"); !valid {
+		return r
+	}
+	content, captured := s.cfg.Panes.CaptureAtWidth(session, 120, 50)
+	if !captured || content == "" {
+		return ok(OptionsBody{[]string{}})
+	}
+	return ok(screen.ReadPromptOptions(content))
+}
+
+// PlanOptions is GET ?session=: the plan approval options on a capture at least 120×50.
+func (s *Service) PlanOptions(session string) Response {
+	if r, valid := s.rawSession(session, "session parameter required"); !valid {
+		return r
+	}
+	content, captured := s.cfg.Panes.CaptureAtWidth(session, 120, 50)
+	if !captured || content == "" {
+		return ok(OptionsBody{[]string{}})
+	}
+	return ok(OptionsBody{screen.ParsePlanOptions(content)})
+}
+
+// answerRequest is the decoded body of answer-question; preview nil means an older page sent none.
+type answerRequest struct {
+	shapes   []screen.QuestionShape
+	previews []*bool
+	choices  []screen.QuestionChoice
+}
+
+func intOr(f float64, fallback int) int {
+	if f != math.Trunc(f) || math.IsInf(f, 0) || math.Abs(f) > 1e9 {
+		return fallback
+	}
+	return int(f)
+}
+
+func decodeAnswer(f fields) (answerRequest, bool) {
+	var qs []map[string]json.RawMessage
+	var cs []map[string]json.RawMessage
+	if json.Unmarshal(f["questions"], &qs) != nil || json.Unmarshal(f["choices"], &cs) != nil || qs == nil || cs == nil {
+		return answerRequest{}, false
+	}
+	var r answerRequest
+	for _, q := range qs {
+		var count float64
+		var multi bool
+		if q == nil || json.Unmarshal(q["optionCount"], &count) != nil || json.Unmarshal(q["multiSelect"], &multi) != nil {
+			return answerRequest{}, false
+		}
+		var preview *bool
+		if raw, present := q["preview"]; present {
+			var p bool
+			if json.Unmarshal(raw, &p) != nil || string(raw) == "null" {
+				return answerRequest{}, false
+			}
+			preview = &p
+		}
+		// A count that is not a whole number reads as 0: refused as a bad option count, as before.
+		r.shapes = append(r.shapes, screen.QuestionShape{OptionCount: intOr(count, 0), MultiSelect: multi})
+		r.previews = append(r.previews, preview)
+	}
+	for _, c := range cs {
+		var picked []float64
+		var other string
+		if c == nil || json.Unmarshal(c["picked"], &picked) != nil || picked == nil || json.Unmarshal(c["other"], &other) != nil || string(c["other"]) == "null" {
+			return answerRequest{}, false
+		}
+		ch := screen.QuestionChoice{Picked: make([]int, len(picked)), Other: other}
+		for i, p := range picked {
+			ch.Picked[i] = intOr(p, -1) // a pick that is not a whole number is out of range
+		}
+		r.choices = append(r.choices, ch)
+	}
+	return r, true
+}
+
+type keyIO struct {
+	s       *Service
+	session string
+}
+
+func (k keyIO) Key(name string) error  { return k.s.cfg.Panes.SendRawKeys(k.session, name) }
+func (k keyIO) Text(text string) error { return k.s.cfg.Panes.SendLiteral(k.session, text) }
+func (k keyIO) Sleep(d time.Duration)  { k.s.clock.Sleep(d) }
+
+// AnswerQuestion is `{session, questions, choices}`: answers Claude's AskUserQuestion dialog with keys. Nothing is typed
+// unless the dialog is on screen; the answer counts once the dialog left it.
+func (s *Service) AnswerQuestion(body []byte) Response {
+	f := decodeFields(body)
+	session := f.text("session")
+	req, valid := decodeAnswer(f)
+	if session == "" || !valid {
+		return fail(400, "session, questions and choices parameters required")
+	}
+	if r, valid := s.rawSession(session, "session, questions and choices parameters required"); !valid {
+		return r
+	}
+	before, captured := s.cfg.Panes.Capture(session)
+	if !captured || !screen.IsQuestionOnScreen(before) {
+		s.warn("answer-question: no question on the screen, nothing sent", "session", session)
+		return fail(409, "No question on the agent screen")
+	}
+	for i, p := range req.previews {
+		if p != nil {
+			req.shapes[i].Preview = *p
+		} else {
+			req.shapes[i].Preview = screen.PreviewFromScreen(len(req.shapes), before)
+		}
+	}
+	if err := screen.ValidateAnswerRequest(req.shapes, req.choices); err != nil {
+		return fail(400, err.Error())
+	}
+	if screen.PlayAnswerSteps(screen.BuildAnswerSteps(req.shapes, req.choices), keyIO{s, session}) != nil {
+		return fail(500, "Failed to send answers")
+	}
+	read := func() (string, bool) { return s.cfg.Panes.Capture(session) }
+	if !screen.WaitForQuestionGone(read, s.clock.Sleep) {
+		s.warn("answer-question: the question is still on the screen after the keys", "session", session)
+		return fail(409, "The agent did not take the answer")
+	}
+	return ok(OKBody{true})
+}

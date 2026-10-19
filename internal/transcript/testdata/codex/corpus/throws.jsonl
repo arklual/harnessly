@@ -1,0 +1,4 @@
+{"timestamp":"2026-03-01T10:03:31.250Z","type":"session_meta","payload":{"id":"0199a000-0000-7000-8000-000000000001","timestamp":"2026-03-01T09:59:59.000Z","cwd":"/home/agent/work","originator":"codex_cli_rs","cli_version":"0.50.0"}}
+{"timestamp":"2026-03-01T10:03:32.500Z","type":"event_msg","payload":{"type":"user_message","message":"before the throw"}}
+{"timestamp":"2026-03-01T10:00:00Z","type":"event_msg","payload":{"type":{"toString":1}}}
+{"timestamp":"2026-03-01T10:03:33.750Z","type":"event_msg","payload":{"type":"task_complete"}}

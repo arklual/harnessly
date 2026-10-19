@@ -1,0 +1,5 @@
+{
+  "lib/tmux": "stub-tmux.mjs",
+  "lib/auth": "stub-auth.mjs",
+  "lib/logger": "stub-logger.mjs"
+}

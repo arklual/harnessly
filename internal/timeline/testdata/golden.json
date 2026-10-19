@@ -1,0 +1,1269 @@
+{
+ "sockets": {
+  "a": [
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "11111111-1111-4111-8111-111111111111",
+    "reason": "session-waiting"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-1",
+      "type": "user-message",
+      "timestamp": 1792317600000,
+      "text": "Fix the parser in the acme project"
+     },
+     {
+      "id": "entry-2",
+      "type": "assistant-message",
+      "timestamp": 1792317602000,
+      "markdown": "Looking at the parser now.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     },
+     {
+      "id": "entry-3",
+      "type": "tool-call",
+      "timestamp": 1792317603000,
+      "toolUseId": "toolu_1",
+      "toolName": "Bash",
+      "summary": "$ ls -la → 2 lines",
+      "status": "success"
+     },
+     {
+      "id": "entry-4",
+      "type": "tool-result",
+      "timestamp": 1792317604000,
+      "toolUseId": "toolu_1",
+      "isError": false,
+      "summary": "2 lines"
+     },
+     {
+      "id": "entry-5",
+      "type": "assistant-message",
+      "timestamp": 1792317605000,
+      "markdown": "Found parser.go — editing it.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     }
+    ],
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "totalEntries": 5,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+    "summary": "Fix the parser in the acme project",
+    "meta": {
+     "createdAt": "2026-10-18T10:00:00.000Z",
+     "updatedAt": "2026-10-18T10:00:05.000Z",
+     "lastTimestamp": 1792317605000,
+     "fileSize": 1555,
+     "userCount": 1,
+     "assistantCount": 2
+    },
+    "sessionStats": null
+   },
+   {
+    "type": "timeline:append",
+    "entries": [
+     {
+      "id": "entry-6",
+      "type": "tool-call",
+      "timestamp": 1792317606000,
+      "toolUseId": "toolu_2",
+      "toolName": "Edit",
+      "summary": "Update /work/acme/parser.go (+2, -1)",
+      "filePath": "/work/acme/parser.go",
+      "diff": {
+       "filePath": "/work/acme/parser.go",
+       "oldString": "a\nb\n",
+       "newString": "a\nc\nd\n"
+      },
+      "status": "success"
+     },
+     {
+      "id": "entry-7",
+      "type": "tool-result",
+      "timestamp": 1792317607000,
+      "toolUseId": "toolu_2",
+      "isError": false,
+      "summary": "The file was updated."
+     }
+    ]
+   },
+   {
+    "type": "timeline:append",
+    "entries": [
+     {
+      "id": "entry-8",
+      "type": "user-message",
+      "timestamp": 1792317630000,
+      "text": "A line written in two parts"
+     }
+    ]
+   },
+   {
+    "type": "timeline:stats-update",
+    "sessionStats": {
+     "sessionId": "11111111-1111-4111-8111-111111111111",
+     "transcriptPath": "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+     "inputTokens": 1000,
+     "outputTokens": 50,
+     "cost": 0.12,
+     "currentContextTokens": 900,
+     "contextWindowSize": 200000,
+     "usedPercentage": 0.45,
+     "model": "Model A",
+     "effort": "high",
+     "exceeds200k": false,
+     "receivedAt": 1760781700000
+    }
+   },
+   {
+    "type": "timeline:append",
+    "entries": [
+     {
+      "id": "entry-9",
+      "type": "user-message",
+      "timestamp": 1792317660000,
+      "text": "Now run the tests, please — все тесты"
+     }
+    ]
+   },
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "22222222-2222-4222-8222-222222222222",
+    "reason": "new-session-started"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-10",
+      "type": "user-message",
+      "timestamp": 1792321200000,
+      "text": "Start a new task"
+     },
+     {
+      "id": "entry-11",
+      "type": "assistant-message",
+      "timestamp": 1792321201000,
+      "markdown": "Sure.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     }
+    ],
+    "sessionId": "22222222-2222-4222-8222-222222222222",
+    "totalEntries": 2,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/22222222-2222-4222-8222-222222222222.jsonl",
+    "summary": "Start a new task",
+    "meta": {
+     "createdAt": "2026-10-18T11:00:00.000Z",
+     "updatedAt": "2026-10-18T11:00:01.000Z",
+     "lastTimestamp": 1792321201000,
+     "fileSize": 510,
+     "userCount": 1,
+     "assistantCount": 1
+    },
+    "sessionStats": null
+   },
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "22222222-2222-4222-8222-222222222222",
+    "reason": "agent-exited"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-12",
+      "type": "user-message",
+      "timestamp": 1792317600000,
+      "text": "Fix the parser in the acme project"
+     },
+     {
+      "id": "entry-13",
+      "type": "assistant-message",
+      "timestamp": 1792317602000,
+      "markdown": "Looking at the parser now.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     },
+     {
+      "id": "entry-14",
+      "type": "tool-call",
+      "timestamp": 1792317603000,
+      "toolUseId": "toolu_1",
+      "toolName": "Bash",
+      "summary": "$ ls -la → 2 lines",
+      "status": "success"
+     },
+     {
+      "id": "entry-15",
+      "type": "tool-result",
+      "timestamp": 1792317604000,
+      "toolUseId": "toolu_1",
+      "isError": false,
+      "summary": "2 lines"
+     },
+     {
+      "id": "entry-16",
+      "type": "assistant-message",
+      "timestamp": 1792317605000,
+      "markdown": "Found parser.go — editing it.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     },
+     {
+      "id": "entry-17",
+      "type": "tool-call",
+      "timestamp": 1792317606000,
+      "toolUseId": "toolu_2",
+      "toolName": "Edit",
+      "summary": "Update /work/acme/parser.go (+2, -1)",
+      "filePath": "/work/acme/parser.go",
+      "diff": {
+       "filePath": "/work/acme/parser.go",
+       "oldString": "a\nb\n",
+       "newString": "a\nc\nd\n"
+      },
+      "status": "success"
+     },
+     {
+      "id": "entry-18",
+      "type": "tool-result",
+      "timestamp": 1792317607000,
+      "toolUseId": "toolu_2",
+      "isError": false,
+      "summary": "The file was updated."
+     },
+     {
+      "id": "entry-19",
+      "type": "user-message",
+      "timestamp": 1792317630000,
+      "text": "A line written in two parts"
+     },
+     {
+      "id": "entry-20",
+      "type": "user-message",
+      "timestamp": 1792317660000,
+      "text": "Now run the tests, please — все тесты"
+     }
+    ],
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "totalEntries": 9,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+    "summary": "Fix the parser in the acme project",
+    "meta": {
+     "createdAt": "2026-10-18T10:00:00.000Z",
+     "updatedAt": "2026-10-18T10:01:00.000Z",
+     "lastTimestamp": 1792317660000,
+     "fileSize": 2630,
+     "userCount": 3,
+     "assistantCount": 2
+    },
+    "sessionStats": null
+   },
+   {
+    "type": "timeline:error",
+    "code": "forbidden-path",
+    "message": "Not allowed path"
+   },
+   {
+    "type": "timeline:error",
+    "code": "forbidden-path",
+    "message": "Not allowed path"
+   },
+   {
+    "type": "timeline:resume-error",
+    "message": "Invalid session ID format"
+   },
+   {
+    "type": "timeline:resume-blocked",
+    "reason": "process-running",
+    "processName": "node"
+   },
+   {
+    "type": "timeline:resume-started",
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "jsonlPath": "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-21",
+      "type": "user-message",
+      "timestamp": 1792317600000,
+      "text": "Fix the parser in the acme project"
+     },
+     {
+      "id": "entry-22",
+      "type": "assistant-message",
+      "timestamp": 1792317602000,
+      "markdown": "Looking at the parser now.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     },
+     {
+      "id": "entry-23",
+      "type": "tool-call",
+      "timestamp": 1792317603000,
+      "toolUseId": "toolu_1",
+      "toolName": "Bash",
+      "summary": "$ ls -la → 2 lines",
+      "status": "success"
+     },
+     {
+      "id": "entry-24",
+      "type": "tool-result",
+      "timestamp": 1792317604000,
+      "toolUseId": "toolu_1",
+      "isError": false,
+      "summary": "2 lines"
+     },
+     {
+      "id": "entry-25",
+      "type": "assistant-message",
+      "timestamp": 1792317605000,
+      "markdown": "Found parser.go — editing it.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     },
+     {
+      "id": "entry-26",
+      "type": "tool-call",
+      "timestamp": 1792317606000,
+      "toolUseId": "toolu_2",
+      "toolName": "Edit",
+      "summary": "Update /work/acme/parser.go (+2, -1)",
+      "filePath": "/work/acme/parser.go",
+      "diff": {
+       "filePath": "/work/acme/parser.go",
+       "oldString": "a\nb\n",
+       "newString": "a\nc\nd\n"
+      },
+      "status": "success"
+     },
+     {
+      "id": "entry-27",
+      "type": "tool-result",
+      "timestamp": 1792317607000,
+      "toolUseId": "toolu_2",
+      "isError": false,
+      "summary": "The file was updated."
+     },
+     {
+      "id": "entry-28",
+      "type": "user-message",
+      "timestamp": 1792317630000,
+      "text": "A line written in two parts"
+     },
+     {
+      "id": "entry-29",
+      "type": "user-message",
+      "timestamp": 1792317660000,
+      "text": "Now run the tests, please — все тесты"
+     }
+    ],
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "totalEntries": 9,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+    "summary": "Fix the parser in the acme project",
+    "meta": {
+     "createdAt": "2026-10-18T10:00:00.000Z",
+     "updatedAt": "2026-10-18T10:01:00.000Z",
+     "lastTimestamp": 1792317660000,
+     "fileSize": 2630,
+     "userCount": 3,
+     "assistantCount": 2
+    },
+    "sessionStats": null
+   },
+   {
+    "type": "timeline:resume-started",
+    "sessionId": "77777777-7777-4777-8777-777777777777",
+    "jsonlPath": null
+   },
+   {
+    "type": "timeline:init",
+    "entries": [],
+    "sessionId": "77777777-7777-4777-8777-777777777777",
+    "totalEntries": 0,
+    "startByteOffset": 0,
+    "hasMore": false
+   },
+   {
+    "type": "pong"
+   },
+   {
+    "type": "timeline:live-text",
+    "text": "The parser has two bugs: the first is in the tokenizer, the second in the reader."
+   },
+   {
+    "type": "timeline:live-text",
+    "text": ""
+   },
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "11111111-1111-4111-8111-111111111111",
+    "reason": "agent-exited"
+   },
+   {
+    "close": 1005,
+    "reason": ""
+   }
+  ],
+  "a2": [
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "11111111-1111-4111-8111-111111111111",
+    "reason": "session-waiting"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-30",
+      "type": "user-message",
+      "timestamp": 1792317600000,
+      "text": "Fix the parser in the acme project"
+     },
+     {
+      "id": "entry-31",
+      "type": "assistant-message",
+      "timestamp": 1792317602000,
+      "markdown": "Looking at the parser now.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     },
+     {
+      "id": "entry-32",
+      "type": "tool-call",
+      "timestamp": 1792317603000,
+      "toolUseId": "toolu_1",
+      "toolName": "Bash",
+      "summary": "$ ls -la → 2 lines",
+      "status": "success"
+     },
+     {
+      "id": "entry-33",
+      "type": "tool-result",
+      "timestamp": 1792317604000,
+      "toolUseId": "toolu_1",
+      "isError": false,
+      "summary": "2 lines"
+     },
+     {
+      "id": "entry-34",
+      "type": "assistant-message",
+      "timestamp": 1792317605000,
+      "markdown": "Found parser.go — editing it.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     },
+     {
+      "id": "entry-35",
+      "type": "tool-call",
+      "timestamp": 1792317606000,
+      "toolUseId": "toolu_2",
+      "toolName": "Edit",
+      "summary": "Update /work/acme/parser.go (+2, -1)",
+      "filePath": "/work/acme/parser.go",
+      "diff": {
+       "filePath": "/work/acme/parser.go",
+       "oldString": "a\nb\n",
+       "newString": "a\nc\nd\n"
+      },
+      "status": "success"
+     },
+     {
+      "id": "entry-36",
+      "type": "tool-result",
+      "timestamp": 1792317607000,
+      "toolUseId": "toolu_2",
+      "isError": false,
+      "summary": "The file was updated."
+     },
+     {
+      "id": "entry-37",
+      "type": "user-message",
+      "timestamp": 1792317630000,
+      "text": "A line written in two parts"
+     }
+    ],
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "totalEntries": 8,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+    "summary": "Fix the parser in the acme project",
+    "meta": {
+     "createdAt": "2026-10-18T10:00:00.000Z",
+     "updatedAt": "2026-10-18T10:00:30.000Z",
+     "lastTimestamp": 1792317630000,
+     "fileSize": 2393,
+     "userCount": 2,
+     "assistantCount": 2
+    },
+    "sessionStats": null
+   },
+   {
+    "type": "timeline:append",
+    "entries": [
+     {
+      "id": "entry-9",
+      "type": "user-message",
+      "timestamp": 1792317660000,
+      "text": "Now run the tests, please — все тесты"
+     }
+    ]
+   },
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "22222222-2222-4222-8222-222222222222",
+    "reason": "new-session-started"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-38",
+      "type": "user-message",
+      "timestamp": 1792321200000,
+      "text": "Start a new task"
+     },
+     {
+      "id": "entry-39",
+      "type": "assistant-message",
+      "timestamp": 1792321201000,
+      "markdown": "Sure.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     }
+    ],
+    "sessionId": "22222222-2222-4222-8222-222222222222",
+    "totalEntries": 2,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/22222222-2222-4222-8222-222222222222.jsonl",
+    "summary": "Start a new task",
+    "meta": {
+     "createdAt": "2026-10-18T11:00:00.000Z",
+     "updatedAt": "2026-10-18T11:00:01.000Z",
+     "lastTimestamp": 1792321201000,
+     "fileSize": 510,
+     "userCount": 1,
+     "assistantCount": 1
+    },
+    "sessionStats": null
+   },
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "22222222-2222-4222-8222-222222222222",
+    "reason": "agent-exited"
+   },
+   {
+    "type": "timeline:live-text",
+    "text": "The parser has two bugs: the first is in the tokenizer, the second in the reader."
+   },
+   {
+    "type": "timeline:live-text",
+    "text": ""
+   },
+   {
+    "close": 1005,
+    "reason": ""
+   }
+  ],
+  "c": [
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "55555555-5555-4555-8555-555555555555",
+    "reason": "session-waiting"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-40",
+      "type": "user-message",
+      "timestamp": 1792317601500,
+      "text": "List the files"
+     },
+     {
+      "id": "entry-41",
+      "type": "assistant-message",
+      "timestamp": 1792317604000,
+      "markdown": "There is one file."
+     }
+    ],
+    "sessionId": "55555555-5555-4555-8555-555555555555",
+    "totalEntries": 2,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.codex/sessions/2026/10/18/rollout-2026-10-18T10-00-00-55555555-5555-4555-8555-555555555555.jsonl",
+    "summary": "List the files",
+    "meta": {
+     "createdAt": "2026-10-18T10:00:01.500Z",
+     "updatedAt": "2026-10-18T10:00:04.000Z",
+     "lastTimestamp": 1792317604000,
+     "fileSize": 1003,
+     "userCount": 1,
+     "assistantCount": 1
+    },
+    "sessionStats": {
+     "sessionId": "55555555-5555-4555-8555-555555555555",
+     "transcriptPath": "{home}/.codex/sessions/2026/10/18/rollout-2026-10-18T10-00-00-55555555-5555-4555-8555-555555555555.jsonl",
+     "inputTokens": 0,
+     "cachedInputTokens": 0,
+     "outputTokens": 0,
+     "reasoningOutputTokens": 0,
+     "cost": null,
+     "currentContextTokens": 0,
+     "contextWindowSize": 0,
+     "usedPercentage": null,
+     "model": "model-x",
+     "effort": "medium",
+     "exceeds200k": false,
+     "receivedAt": 1792324800000
+    }
+   },
+   {
+    "type": "timeline:append",
+    "entries": [
+     {
+      "id": "entry-42",
+      "type": "user-message",
+      "timestamp": 1792317660000,
+      "text": "Thanks"
+     },
+     {
+      "id": "entry-43",
+      "type": "assistant-message",
+      "timestamp": 1792317661000,
+      "markdown": "You are welcome."
+     }
+    ]
+   },
+   {
+    "type": "timeline:stats-update",
+    "sessionStats": {
+     "sessionId": "55555555-5555-4555-8555-555555555555",
+     "transcriptPath": "{home}/.codex/sessions/2026/10/18/rollout-2026-10-18T10-00-00-55555555-5555-4555-8555-555555555555.jsonl",
+     "inputTokens": 1200,
+     "cachedInputTokens": 200,
+     "outputTokens": 80,
+     "reasoningOutputTokens": 10,
+     "cost": null,
+     "currentContextTokens": 640,
+     "contextWindowSize": 200000,
+     "usedPercentage": 0,
+     "model": "model-x",
+     "effort": "medium",
+     "exceeds200k": false,
+     "receivedAt": 1792324800000
+    }
+   },
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "66666666-6666-4666-8666-666666666666",
+    "reason": "new-session-started"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-44",
+      "type": "user-message",
+      "timestamp": 1792321201000,
+      "text": "A second Codex session"
+     }
+    ],
+    "sessionId": "66666666-6666-4666-8666-666666666666",
+    "totalEntries": 1,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.codex/sessions/2026/10/18/rollout-2026-10-18T11-00-00-66666666-6666-4666-8666-666666666666.jsonl",
+    "summary": "A second Codex session",
+    "meta": {
+     "createdAt": "2026-10-18T11:00:01.000Z",
+     "updatedAt": "2026-10-18T11:00:01.000Z",
+     "lastTimestamp": 1792321201000,
+     "fileSize": 324,
+     "userCount": 1,
+     "assistantCount": 0
+    },
+    "sessionStats": {
+     "sessionId": "66666666-6666-4666-8666-666666666666",
+     "transcriptPath": "{home}/.codex/sessions/2026/10/18/rollout-2026-10-18T11-00-00-66666666-6666-4666-8666-666666666666.jsonl",
+     "inputTokens": 0,
+     "cachedInputTokens": 0,
+     "outputTokens": 0,
+     "reasoningOutputTokens": 0,
+     "cost": null,
+     "currentContextTokens": 0,
+     "contextWindowSize": 0,
+     "usedPercentage": null,
+     "model": null,
+     "effort": null,
+     "exceeds200k": false,
+     "receivedAt": 1792324800000
+    }
+   },
+   {
+    "close": 1005,
+    "reason": ""
+   }
+  ],
+  "h": [
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-45",
+      "type": "user-message",
+      "timestamp": 1792321200000,
+      "text": "Start a new task"
+     },
+     {
+      "id": "entry-46",
+      "type": "assistant-message",
+      "timestamp": 1792321201000,
+      "markdown": "Sure.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     }
+    ],
+    "sessionId": "22222222-2222-4222-8222-222222222222",
+    "totalEntries": 2,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/22222222-2222-4222-8222-222222222222.jsonl",
+    "summary": "Start a new task",
+    "meta": {
+     "createdAt": "2026-10-18T11:00:00.000Z",
+     "updatedAt": "2026-10-18T11:00:01.000Z",
+     "lastTimestamp": 1792321201000,
+     "fileSize": 510,
+     "userCount": 1,
+     "assistantCount": 1
+    },
+    "sessionStats": null
+   },
+   {
+    "close": 1005,
+    "reason": ""
+   }
+  ],
+  "h2": [
+   {
+    "type": "timeline:init",
+    "entries": [],
+    "sessionId": "77777777-7777-4777-8777-777777777777",
+    "totalEntries": 0,
+    "startByteOffset": 0,
+    "hasMore": false
+   },
+   {
+    "close": 1005,
+    "reason": ""
+   }
+  ],
+  "h3": [
+   {
+    "type": "timeline:init",
+    "entries": [],
+    "sessionId": "",
+    "totalEntries": 0,
+    "startByteOffset": 0,
+    "hasMore": false
+   },
+   {
+    "close": 1005,
+    "reason": ""
+   }
+  ],
+  "m": [
+   {
+    "close": 1008,
+    "reason": "Missing session parameter"
+   }
+  ],
+  "n": [
+   {
+    "type": "timeline:init",
+    "entries": [],
+    "sessionId": "",
+    "totalEntries": 0,
+    "startByteOffset": 0,
+    "hasMore": false
+   },
+   {
+    "close": 1000,
+    "reason": "Cannot resolve pane pid"
+   }
+  ],
+  "r": [
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-47",
+      "type": "user-message",
+      "timestamp": 1792314000000,
+      "text": "An old conversation"
+     },
+     {
+      "id": "entry-48",
+      "type": "assistant-message",
+      "timestamp": 1792314001000,
+      "markdown": "Still on disk.",
+      "usage": {
+       "input_tokens": 10,
+       "output_tokens": 5
+      },
+      "model": "model-a"
+     }
+    ],
+    "sessionId": "44444444-4444-4444-8444-444444444444",
+    "totalEntries": 2,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/44444444-4444-4444-8444-444444444444.jsonl",
+    "summary": "An old conversation",
+    "meta": {
+     "createdAt": "2026-10-18T09:00:00.000Z",
+     "updatedAt": "2026-10-18T09:00:01.000Z",
+     "lastTimestamp": 1792314001000,
+     "fileSize": 522,
+     "userCount": 1,
+     "assistantCount": 1
+    },
+    "sessionStats": null
+   },
+   {
+    "close": 1005,
+    "reason": ""
+   }
+  ],
+  "s": [
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "",
+    "reason": "session-waiting"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [],
+    "sessionId": "",
+    "totalEntries": 0,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "isClaudeStarting": true
+   },
+   {
+    "type": "timeline:session-changed",
+    "newSessionId": "33333333-3333-4333-8333-333333333333",
+    "reason": "session-waiting"
+   },
+   {
+    "type": "timeline:init",
+    "entries": [
+     {
+      "id": "entry-49",
+      "type": "user-message",
+      "timestamp": 1792324800000,
+      "text": "Hello from a starting agent"
+     }
+    ],
+    "sessionId": "33333333-3333-4333-8333-333333333333",
+    "totalEntries": 1,
+    "startByteOffset": 0,
+    "hasMore": false,
+    "jsonlPath": "{home}/.claude/projects/-work-acme/33333333-3333-4333-8333-333333333333.jsonl",
+    "summary": "Hello from a starting agent",
+    "meta": {
+     "createdAt": "2026-10-18T12:00:00.000Z",
+     "updatedAt": "2026-10-18T12:00:00.000Z",
+     "lastTimestamp": 1792324800000,
+     "fileSize": 217,
+     "userCount": 1,
+     "assistantCount": 0
+    },
+    "sessionStats": null
+   },
+   {
+    "close": 1005,
+    "reason": ""
+   }
+  ],
+  "u": [
+   {
+    "close": 1008,
+    "reason": "Unknown panel type"
+   }
+  ]
+ },
+ "effects": [
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t1",
+   "claude",
+   "11111111-1111-4111-8111-111111111111"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t1",
+   "Fix the parser in the acme project"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t1",
+   "Fix the parser in the acme project"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t1",
+   "claude",
+   "11111111-1111-4111-8111-111111111111",
+   "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+   "Fixing the parser"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t1",
+   "A line written in two parts"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t1",
+   "A line written in two parts"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t1",
+   "claude",
+   "11111111-1111-4111-8111-111111111111"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t1",
+   "A line written in two parts"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t1",
+   "A line written in two parts"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t1",
+   "claude",
+   "11111111-1111-4111-8111-111111111111",
+   "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+   "Fixing the parser"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t1",
+   "Now run the tests, please — все тесты"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t1",
+   "Now run the tests, please — все тесты"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t1",
+   "claude",
+   "22222222-2222-4222-8222-222222222222"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t1",
+   "Start a new task"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t1",
+   "Start a new task"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t1",
+   "claude",
+   "22222222-2222-4222-8222-222222222222",
+   "{home}/.claude/projects/-work-acme/22222222-2222-4222-8222-222222222222.jsonl",
+   "Fixing the parser"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t1",
+   "claude",
+   "22222222-2222-4222-8222-222222222222"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t1",
+   "Start a new task"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t1",
+   "Start a new task"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t1",
+   "claude",
+   "22222222-2222-4222-8222-222222222222",
+   "{home}/.claude/projects/-work-acme/22222222-2222-4222-8222-222222222222.jsonl",
+   "Fixing the parser"
+  ],
+  [
+   "markAgentGone",
+   "t1"
+  ],
+  [
+   "markAgentGone",
+   "t1"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t1",
+   "Now run the tests, please — все тесты"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t1",
+   "Now run the tests, please — все тесты"
+  ],
+  [
+   "sendKeys",
+   "hs-ws1-p1-t1",
+   "claude --resume 11111111-1111-4111-8111-111111111111 --workspace ws1"
+  ],
+  [
+   "markAgentLaunch",
+   "t1"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t1",
+   "claude",
+   "11111111-1111-4111-8111-111111111111"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t1",
+   "Now run the tests, please — все тесты"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t1",
+   "Now run the tests, please — все тесты"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t1",
+   "claude",
+   "11111111-1111-4111-8111-111111111111",
+   "{home}/.claude/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+   "Fixing the parser"
+  ],
+  [
+   "sendKeys",
+   "hs-ws1-p1-t1",
+   "claude --resume 77777777-7777-4777-8777-777777777777 --workspace ws1"
+  ],
+  [
+   "markAgentLaunch",
+   "t1"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t1",
+   "claude",
+   "77777777-7777-4777-8777-777777777777"
+  ],
+  [
+   "markAgentGone",
+   "t1"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t2",
+   "codex",
+   "55555555-5555-4555-8555-555555555555"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t2",
+   "List the files"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t2",
+   "List the files"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t2",
+   "codex",
+   "55555555-5555-4555-8555-555555555555",
+   "{home}/.codex/sessions/2026/10/18/rollout-2026-10-18T10-00-00-55555555-5555-4555-8555-555555555555.jsonl",
+   "List the files"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t2",
+   "Thanks"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t2",
+   "Thanks"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t2",
+   "codex",
+   "66666666-6666-4666-8666-666666666666"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t2",
+   "A second Codex session"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t2",
+   "A second Codex session"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t2",
+   "codex",
+   "66666666-6666-4666-8666-666666666666",
+   "{home}/.codex/sessions/2026/10/18/rollout-2026-10-18T11-00-00-66666666-6666-4666-8666-666666666666.jsonl",
+   "A second Codex session"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t3",
+   "claude",
+   "33333333-3333-4333-8333-333333333333"
+  ],
+  [
+   "agentSessionId",
+   "hs-ws1-p1-t3",
+   "claude",
+   "33333333-3333-4333-8333-333333333333"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t3",
+   "Hello from a starting agent"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t3",
+   "Hello from a starting agent"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t3",
+   "claude",
+   "33333333-3333-4333-8333-333333333333",
+   "{home}/.claude/projects/-work-acme/33333333-3333-4333-8333-333333333333.jsonl",
+   "Hello from a starting agent"
+  ],
+  [
+   "recover",
+   "hs-ws1-p1-t4"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t4",
+   "An old conversation"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t4",
+   "An old conversation"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t4",
+   "claude",
+   "44444444-4444-4444-8444-444444444444",
+   "{home}/.claude/projects/-work-acme/44444444-4444-4444-8444-444444444444.jsonl",
+   "An old conversation"
+  ],
+  [
+   "lastUserMessage",
+   "hs-ws1-p1-t6",
+   "Start a new task"
+  ],
+  [
+   "notifyLastUserMessage",
+   "hs-ws1-p1-t6",
+   "Start a new task"
+  ],
+  [
+   "agentState",
+   "hs-ws1-p1-t6",
+   "claude",
+   "22222222-2222-4222-8222-222222222222",
+   "{home}/.claude/projects/-work-acme/22222222-2222-4222-8222-222222222222.jsonl",
+   "Start a new task"
+  ],
+  [
+   "recover",
+   "hs-ws1-p1-t6"
+  ]
+ ]
+}

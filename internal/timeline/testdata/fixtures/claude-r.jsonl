@@ -1,0 +1,2 @@
+{"type": "user", "timestamp": "2026-10-18T09:00:00.000Z", "sessionId": "44444444-4444-4444-8444-444444444444", "cwd": "/work/acme", "uuid": "u1", "message": {"role": "user", "content": "An old conversation"}}
+{"type": "assistant", "timestamp": "2026-10-18T09:00:01.000Z", "sessionId": "44444444-4444-4444-8444-444444444444", "cwd": "/work/acme", "uuid": "a1", "message": {"role": "assistant", "model": "model-a", "content": [{"type": "text", "text": "Still on disk."}], "usage": {"input_tokens": 10, "output_tokens": 5}}}

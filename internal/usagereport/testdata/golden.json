@@ -1,0 +1,253 @@
+{
+ "now": 1792281600000,
+ "files": [
+  {
+   "path": "home/.claude/projects/-w-app/5d3c1e0a-1111-4a2b-9c3d-000000000001.jsonl",
+   "content": "{\"type\":\"summary\",\"summary\":\"x\"}\n{\"type\":\"file-history-snapshot\",\"snapshot\":{\"type\":\"user\"}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T09:00:00.000Z\",\"uuid\":\"p1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":\"Start on {P1}-101 please\"},\"gitBranch\":\"feature/{P2}-7\"}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T09:00:05.000Z\",\"requestId\":\"r1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"id\":\"m1\",\"model\":\"claude-opus-4-6\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_read_input_tokens\":1000,\"cache_creation_input_tokens\":400}}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T09:00:06.000Z\",\"requestId\":\"r1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"id\":\"m1\",\"model\":\"claude-opus-4-6\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":10,\"output_tokens\":250,\"cache_read_input_tokens\":1000,\"cache_creation_input_tokens\":400,\"cache_creation\":{\"ephemeral_5m_input_tokens\":100,\"ephemeral_1h_input_tokens\":300}}}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T09:00:07.000Z\",\"requestId\":\"r2\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"id\":\"m2\",\"model\":\"<synthetic>\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":9}}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T09:00:08.000Z\",\"requestId\":\"r3\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"id\":\"m3\",\"model\":\"claude-opus-4-6\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":9}},\"isApiErrorMessage\":true}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T09:01:00.000Z\",\"uuid\":\"tr1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"tool-1\",\"content\":\"ok\"},{\"type\":\"tool_result\",\"tool_use_id\":\"tool-2\",\"is_error\":true,\"content\":[{\"type\":\"text\",\"text\":\"The user doesn't want to proceed with this tool use.\"}]}]}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T09:02:00.000Z\",\"uuid\":\"p2\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":\"<system-reminder>harness</system-reminder>\"}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T09:03:00.000Z\",\"uuid\":\"p3\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":\"[Request interrupted by user]\"}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T09:04:00.000Z\",\"uuid\":\"p4\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"second prompt about {P3}-5\"},{\"type\":\"image\"}]}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T09:04:30.000Z\",\"uuid\":\"p5\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":\"meta prompt\"},\"isMeta\":true}\n{\"type\":\"attachment\",\"timestamp\":\"2026-10-17T09:05:00.000Z\",\"uuid\":\"q1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"attachment\":{\"type\":\"queued_command\",\"prompt\":\"queued {P1}-202\"}}\n{\"type\":\"system\",\"subtype\":\"turn_duration\",\"durationMs\":65000,\"timestamp\":\"2026-10-17T09:06:00.000Z\",\"uuid\":\"turn1\"}\n{\"type\":\"system\",\"subtype\":\"compact_boundary\",\"timestamp\":\"2026-10-17T09:07:00.000Z\",\"uuid\":\"cb1\"}\n{\"type\":\"ai-title\",\"aiTitle\":\"Fix   the\\nlogin  flow \"}\n{\"type\":\"pr-link\",\"prUrl\":\"https://git.example/acme/app/-/merge_requests/9\"}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T21:30:00.000Z\",\"requestId\":\"r4\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"id\":\"m4\",\"model\":\"claude-sonnet-4-5-20250929\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":3000,\"output_tokens\":700,\"cache_read_input_tokens\":20000}}}\n{\"type\":\"assistant\",\"timestamp\":\"2025-01-01T00:00:00.000Z\",\"requestId\":\"r5\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"id\":\"m5\",\"model\":\"claude-opus-4-6\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":5}}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T22:10:00.000Z\",\"uuid\":\"p6\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":\"mentions \\\"type\\\":\\\"progress\\\" so it is skipped\"}}\n{\"type\":\"user\",\"broken\":\n",
+   "mtime": 1792279800
+  },
+  {
+   "path": "home/.claude/projects/-w-app/5d3c1e0a-1111-4a2b-9c3d-000000000001/subagents/agent-a1.jsonl",
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T09:10:00.000Z\",\"uuid\":\"sp1\",\"isSidechain\":true,\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"message\":{\"content\":\"subagent task\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T09:10:05.000Z\",\"requestId\":\"rs1\",\"isSidechain\":true,\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"message\":{\"id\":\"ms1\",\"model\":\"claude-haiku-4-5-20251001\",\"usage\":{\"input_tokens\":800,\"output_tokens\":90}}}\n{\"type\":\"system\",\"subtype\":\"turn_duration\",\"durationMs\":5000,\"timestamp\":\"2026-10-17T09:10:06.000Z\",\"uuid\":\"turn-s\"}\n",
+   "mtime": 1792279740
+  },
+  {
+   "path": "home/.claude/projects/-w-app/5d3c1e0a-2222-4a2b-9c3d-000000000002.jsonl",
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T09:00:00.000Z\",\"uuid\":\"p1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"message\":{\"role\":\"user\",\"content\":\"Start on {P1}-101 please\"},\"gitBranch\":\"feature/{P2}-7\"}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T09:00:05.000Z\",\"requestId\":\"r1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"message\":{\"id\":\"m1\",\"model\":\"claude-opus-4-6\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"cache_read_input_tokens\":1000,\"cache_creation_input_tokens\":400}}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T09:00:06.000Z\",\"requestId\":\"r1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"message\":{\"id\":\"m1\",\"model\":\"claude-opus-4-6\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":10,\"output_tokens\":250,\"cache_read_input_tokens\":1000,\"cache_creation_input_tokens\":400,\"cache_creation\":{\"ephemeral_5m_input_tokens\":100,\"ephemeral_1h_input_tokens\":300}}}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T23:00:00.000Z\",\"uuid\":\"p20\",\"cwd\":\"$ROOT/ws/{ROOT}/.worktrees/app-{p1}-55\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"message\":{\"role\":\"user\",\"content\":\"continue on {P1}-101\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T23:00:10.000Z\",\"requestId\":\"r20\",\"cwd\":\"$ROOT/ws/lib-wt\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"message\":{\"id\":\"m20\",\"model\":\"claude-haiku-4-5\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":50,\"output_tokens\":60}}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T23:01:00.000Z\",\"uuid\":\"p21\",\"cwd\":\"/nonexistent-golden/elsewhere\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"message\":{\"role\":\"user\",\"content\":\"in another place\"}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T23:02:00.000Z\",\"uuid\":\"p22\",\"cwd\":\"/nonexistent-golden/{ROOT}\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"message\":{\"role\":\"user\",\"content\":\"at the root\"}}\n{\"type\":\"user\",\"timestamp\":\"2026-10-17T23:03:00.000Z\",\"uuid\":\"p23\",\"cwd\":\"/nonexistent-golden/{ROOT}/.claude/feat-0a1b2c3d\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"message\":{\"role\":\"user\",\"content\":\"in a hashed worktree\"}}\n",
+   "mtime": 1792279680
+  },
+  {
+   "path": "home/.claude/projects/-w-app/old.jsonl",
+   "content": "{\"type\":\"user\",\"timestamp\":\"2025-06-01T00:00:00.000Z\",\"uuid\":\"o1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":\"ancient prompt\"}}\n",
+   "mtime": 1748736000
+  },
+  {
+   "path": "home/.claude/projects/-w-app/broken.jsonl",
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T08:00:00.000Z\",\"uuid\":\"b1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":\"lost prompt\"}}\nnull\n",
+   "mtime": 1792279620
+  },
+  {
+   "path": "home/.claude/projects/-w-app/notes.json",
+   "content": "{}",
+   "mtime": 1792279800
+  },
+  {
+   "path": "home/.claude/projects/a/b/c/d/deep.jsonl",
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T08:30:00.000Z\",\"uuid\":\"d1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"message\":{\"role\":\"user\",\"content\":\"too deep\"}}\n",
+   "mtime": 1792279800
+  },
+  {
+   "path": "home/.codex/sessions/2026/10/17/rollout-a.jsonl",
+   "content": "{\"type\":\"session_meta\",\"timestamp\":\"2026-10-17T12:00:00.000Z\",\"payload\":{\"id\":\"cx-1\",\"cwd\":\"$ROOT/ws/{ROOT}/app\"}}\n{\"type\":\"turn_context\",\"payload\":{\"model\":\"gpt-5.4\",\"cwd\":\"$ROOT/ws/{ROOT}/app\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:00:01.000Z\",\"payload\":{\"type\":\"task_started\",\"turn_id\":\"T1\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:00:02.000Z\",\"payload\":{\"type\":\"user_message\",\"message\":\"codex prompt for {P2}-3\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:00:03.000Z\",\"payload\":{\"type\":\"token_count\",\"info\":null}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:00:04.000Z\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10000,\"cached_input_tokens\":6000,\"output_tokens\":500}}}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:00:05.000Z\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":10000,\"cached_input_tokens\":6000,\"output_tokens\":500}}}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:01:00.000Z\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":25000,\"cached_input_tokens\":20000,\"output_tokens\":900,\"cache_write_input_tokens\":40}}}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:02:00.000Z\",\"payload\":{\"type\":\"task_complete\",\"turn_id\":\"T1\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:03:00.000Z\",\"payload\":{\"type\":\"item_completed\",\"item\":{\"type\":\"UserMessage\",\"id\":\"it-1\",\"content\":[{\"type\":\"text\",\"text\":\"second codex prompt\"}]}}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:04:00.000Z\",\"payload\":{\"type\":\"turn_aborted\",\"turn_id\":\"T2\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:05:00.000Z\",\"payload\":{\"type\":\"context_compacted\"}}\n{\"type\":\"turn_context\",\"payload\":{\"model\":\"gpt-5.4-mini\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T12:06:00.000Z\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":3000,\"cached_input_tokens\":1000,\"output_tokens\":100}}}}\n",
+   "mtime": 1792279560
+  },
+  {
+   "path": "home/.codex/sessions/2026/10/17/rollout-sub.jsonl",
+   "content": "{\"type\":\"session_meta\",\"timestamp\":\"2026-10-17T13:00:00.000Z\",\"payload\":{\"id\":\"cx-1\",\"thread_source\":\"subagent\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T13:00:01.000Z\",\"payload\":{\"type\":\"user_message\",\"message\":\"replayed prompt\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T13:00:02.000Z\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":400,\"output_tokens\":20}}}}\n",
+   "mtime": 1792279500
+  }
+ ],
+ "steps": [
+  {
+   "method": "GET",
+   "path": "/api/platform/stats",
+   "query": [],
+   "headers": {},
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "etag": false,
+   "answer": "{\"error\":\"Unauthorized\"}",
+   "cacheWritten": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/stats",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8"
+   },
+   "etag": true,
+   "answer": "{\"error\":\"Forbidden\"}",
+   "cacheWritten": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/stats",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=sub:dev@example.com"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+   },
+   "etag": true,
+   "answer": "{\"viewer\":\"dev@example.com\",\"runtimes\":[{\"person\":\"dev@example.com\",\"machineId\":\"local\",\"machineName\":\"box\",\"report\":{\"version\":1,\"person\":\"dev@example.com\",\"machine\":\"box\",\"generatedAt\":\"2026-10-18T00:00:00.000Z\",\"timezone\":\"Europe/Moscow\",\"days\":{\"2026-10-17\":{\"prompts\":5,\"sessions\":2,\"turnMs\":184000,\"tools\":2,\"toolErrors\":1,\"interrupts\":2,\"denials\":1,\"compactions\":2,\"prs\":0,\"hours\":[0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,2,0,0,0,0,0,0,0,0]},\"2026-10-18\":{\"prompts\":5,\"sessions\":2,\"turnMs\":0,\"tools\":0,\"toolErrors\":0,\"interrupts\":0,\"denials\":0,\"compactions\":0,\"prs\":1,\"hours\":[0,1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},\"usage\":[[\"2026-10-17\",\"claude\",\"claude-opus-4-6\",\"app\",10,250,1000,700,0.0123,1],[\"2026-10-18\",\"claude\",\"claude-sonnet-4-5-20250929\",\"app\",3000,700,20000,0,0.0255,1],[\"2026-10-18\",\"claude\",\"claude-haiku-4-5\",\"lib\",50,60,0,0,0.0004,1],[\"2026-10-17\",\"claude\",\"claude-haiku-4-5-20251001\",\"app\",800,90,0,0,0.0013,1],[\"2026-10-17\",\"codex\",\"gpt-5.4\",\"app\",5000,900,20000,40,0.031,2],[\"2026-10-17\",\"codex\",\"gpt-5.4-mini\",\"app\",0,0,0,0,0,1],[\"2026-10-17\",\"codex\",\"gpt-5\",\"без проекта\",400,20,0,0,0.0007,1]],\"sessions\":[{\"id\":\"claude:5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"provider\":\"claude\",\"title\":\"Fix the login flow\",\"project\":\"app\",\"start\":1735689600,\"end\":1792275000,\"prompts\":4,\"turnMs\":65000,\"input\":3810,\"output\":1040,\"cacheRead\":21000,\"cacheWrite\":700,\"cost\":0.03905,\"subagentCost\":0.00125,\"model\":\"claude-sonnet-4-5-20250929\",\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"]},{\"id\":\"codex:cx-1\",\"provider\":\"codex\",\"title\":\"codex prompt for {P2}-3\",\"project\":\"app\",\"start\":1792238402,\"end\":1792242002,\"prompts\":2,\"turnMs\":119000,\"input\":5400,\"output\":920,\"cacheRead\":20000,\"cacheWrite\":40,\"cost\":0.0317,\"subagentCost\":0.0007,\"model\":\"gpt-5.4\",\"tasks\":[\"{P2}-3\"],\"prs\":[]},{\"id\":\"claude:5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"provider\":\"claude\",\"title\":\"Start on {P1}-101 please\",\"project\":\"app\",\"start\":1792227600,\"end\":1792278180,\"prompts\":4,\"turnMs\":0,\"input\":50,\"output\":60,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":0.00035000000000000005,\"subagentCost\":0,\"model\":\"claude-haiku-4-5\",\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[]}],\"collecting\":null}}]}",
+   "cacheWritten": "{\"version\":2,\"files\":{\"$ROOT/home/.claude/projects/-w-app/5d3c1e0a-1111-4a2b-9c3d-000000000001.jsonl\":{\"size\":4522,\"mtimeMs\":1792279800000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"sidechain\":false,\"title\":\"Fix   the\\nlogin  flow \",\"firstPrompt\":\"Start on {P1}-101 please\",\"models\":[\"claude-opus-4-6\",\"claude-sonnet-4-5-20250929\"],\"projects\":[\"без проекта\",\"app\"],\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"],\"firstTs\":1735689600,\"lastTs\":1792275000,\"messages\":[[\"r1:m1\",1792227605,0,1,10,250,1000,400,300],[\"r4:m4\",1792272600,1,1,3000,700,20000,0,0],[\"r5:m5\",1735689600,0,1,5,0,0,0,0]],\"prompts\":[[\"p1\",1792227600,1],[\"p4\",1792227840,1],[\"q1\",1792227900,1],[\"p6\",1792275000,1]],\"turns\":[[\"turn1\",1792227960,65000]],\"tools\":[[\"tool-1\",1792227660,0],[\"tool-2\",1792227660,1]],\"interrupts\":[[\"p3\",1792227780]],\"denials\":[[\"tool-2\",1792227660]],\"compactions\":[[\"cb1\",1792228020]]}},\"$ROOT/home/.claude/projects/-w-app/5d3c1e0a-2222-4a2b-9c3d-000000000002.jsonl\":{\"size\":2233,\"mtimeMs\":1792279680000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"sidechain\":false,\"title\":null,\"firstPrompt\":\"Start on {P1}-101 please\",\"models\":[\"claude-opus-4-6\",\"claude-haiku-4-5\"],\"projects\":[\"app\",\"lib\",\"вне репозиториев\",\"{ROOT}\",\"feat\"],\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[],\"firstTs\":1792227600,\"lastTs\":1792278180,\"messages\":[[\"r1:m1\",1792227605,0,0,10,250,1000,400,300],[\"r20:m20\",1792278010,1,1,50,60,0,0,0]],\"prompts\":[[\"p1\",1792227600,0],[\"p20\",1792278000,0],[\"p21\",1792278060,2],[\"p22\",1792278120,3],[\"p23\",1792278180,4]],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}},\"$ROOT/home/.claude/projects/-w-app/5d3c1e0a-1111-4a2b-9c3d-000000000001/subagents/agent-a1.jsonl\":{\"size\":644,\"mtimeMs\":1792279740000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"sidechain\":true,\"title\":null,\"firstPrompt\":null,\"models\":[\"claude-haiku-4-5-20251001\"],\"projects\":[\"app\",\"без проекта\"],\"tasks\":[],\"prs\":[],\"firstTs\":1792228205,\"lastTs\":1792228205,\"messages\":[[\"rs1:ms1\",1792228205,0,0,800,90,0,0,0]],\"prompts\":[],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}},\"$ROOT/home/.codex/sessions/2026/10/17/rollout-a.jsonl\":{\"size\":1950,\"mtimeMs\":1792279560000,\"facts\":{\"provider\":\"codex\",\"sessionId\":\"cx-1\",\"sidechain\":false,\"title\":null,\"firstPrompt\":\"codex prompt for {P2}-3\",\"models\":[\"gpt-5.4\",\"gpt-5.4-mini\"],\"projects\":[\"без проекта\",\"app\"],\"tasks\":[\"{P2}-3\"],\"prs\":[],\"firstTs\":1792238402,\"lastTs\":1792238760,\"messages\":[[\"2026-10-17T12:00:04.000Z:10000:500\",1792238404,0,1,4000,500,6000,0,0],[\"2026-10-17T12:01:00.000Z:25000:900\",1792238460,0,1,1000,400,14000,40,0],[\"2026-10-17T12:06:00.000Z:3000:100\",1792238760,1,1,0,0,0,0,0]],\"prompts\":[[\"1792238402:codex prompt for {P2}-3\",1792238402,1],[\"it-1\",1792238580,1]],\"turns\":[[\"T1\",1792238520,119000]],\"tools\":[],\"interrupts\":[[\"1792238640:T2\",1792238640]],\"denials\":[],\"compactions\":[[\"1792238700\",1792238700]]}},\"$ROOT/home/.codex/sessions/2026/10/17/rollout-sub.jsonl\":{\"size\":398,\"mtimeMs\":1792279500000,\"facts\":{\"provider\":\"codex\",\"sessionId\":\"cx-1\",\"sidechain\":true,\"title\":null,\"firstPrompt\":null,\"models\":[\"gpt-5\"],\"projects\":[\"без проекта\"],\"tasks\":[],\"prs\":[],\"firstTs\":1792242002,\"lastTs\":1792242002,\"messages\":[[\"2026-10-17T13:00:02.000Z:400:20\",1792242002,0,0,400,20,0,0,0]],\"prompts\":[],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}}}}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/stats",
+   "query": [
+    [
+     "shape",
+     "report"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+   },
+   "etag": true,
+   "answer": "{\"version\":1,\"person\":\"agent@box\",\"machine\":\"box\",\"generatedAt\":\"2026-10-18T00:00:00.000Z\",\"timezone\":\"Europe/Moscow\",\"days\":{\"2026-10-17\":{\"prompts\":5,\"sessions\":2,\"turnMs\":184000,\"tools\":2,\"toolErrors\":1,\"interrupts\":2,\"denials\":1,\"compactions\":2,\"prs\":0,\"hours\":[0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,2,0,0,0,0,0,0,0,0]},\"2026-10-18\":{\"prompts\":5,\"sessions\":2,\"turnMs\":0,\"tools\":0,\"toolErrors\":0,\"interrupts\":0,\"denials\":0,\"compactions\":0,\"prs\":1,\"hours\":[0,1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},\"usage\":[[\"2026-10-17\",\"claude\",\"claude-opus-4-6\",\"app\",10,250,1000,700,0.0123,1],[\"2026-10-18\",\"claude\",\"claude-sonnet-4-5-20250929\",\"app\",3000,700,20000,0,0.0255,1],[\"2026-10-18\",\"claude\",\"claude-haiku-4-5\",\"lib\",50,60,0,0,0.0004,1],[\"2026-10-17\",\"claude\",\"claude-haiku-4-5-20251001\",\"app\",800,90,0,0,0.0013,1],[\"2026-10-17\",\"codex\",\"gpt-5.4\",\"app\",5000,900,20000,40,0.031,2],[\"2026-10-17\",\"codex\",\"gpt-5.4-mini\",\"app\",0,0,0,0,0,1],[\"2026-10-17\",\"codex\",\"gpt-5\",\"без проекта\",400,20,0,0,0.0007,1]],\"sessions\":[{\"id\":\"claude:5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"provider\":\"claude\",\"title\":\"Fix the login flow\",\"project\":\"app\",\"start\":1735689600,\"end\":1792275000,\"prompts\":4,\"turnMs\":65000,\"input\":3810,\"output\":1040,\"cacheRead\":21000,\"cacheWrite\":700,\"cost\":0.03905,\"subagentCost\":0.00125,\"model\":\"claude-sonnet-4-5-20250929\",\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"]},{\"id\":\"codex:cx-1\",\"provider\":\"codex\",\"title\":\"codex prompt for {P2}-3\",\"project\":\"app\",\"start\":1792238402,\"end\":1792242002,\"prompts\":2,\"turnMs\":119000,\"input\":5400,\"output\":920,\"cacheRead\":20000,\"cacheWrite\":40,\"cost\":0.0317,\"subagentCost\":0.0007,\"model\":\"gpt-5.4\",\"tasks\":[\"{P2}-3\"],\"prs\":[]},{\"id\":\"claude:5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"provider\":\"claude\",\"title\":\"Start on {P1}-101 please\",\"project\":\"app\",\"start\":1792227600,\"end\":1792278180,\"prompts\":4,\"turnMs\":0,\"input\":50,\"output\":60,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":0.00035000000000000005,\"subagentCost\":0,\"model\":\"claude-haiku-4-5\",\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[]}],\"collecting\":null}",
+   "cacheWritten": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/stats",
+   "query": [
+    [
+     "shape",
+     "report"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+   },
+   "etag": true,
+   "answer": "",
+   "cacheWritten": ""
+  },
+  {
+   "append": "home/.codex/sessions/2026/10/17/rollout-a.jsonl",
+   "content": "{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T23:40:00.000Z\",\"payload\":{\"type\":\"user_message\",\"message\":\"late codex prompt\"}}\n{\"type\":\"event_msg\",\"timestamp\":\"2026-10-17T23:40:05.000Z\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":9000,\"cached_input_tokens\":1000,\"output_tokens\":300}}}}\n",
+   "mtime": 1792280400
+  },
+  {
+   "clock": 30
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/stats",
+   "query": [
+    [
+     "wait",
+     "0"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=sub:dev@example.com"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+   },
+   "etag": true,
+   "answer": "{\"viewer\":\"dev@example.com\",\"runtimes\":[{\"person\":\"dev@example.com\",\"machineId\":\"local\",\"machineName\":\"box\",\"report\":{\"version\":1,\"person\":\"dev@example.com\",\"machine\":\"box\",\"generatedAt\":\"2026-10-18T00:00:00.000Z\",\"timezone\":\"Europe/Moscow\",\"days\":{\"2026-10-17\":{\"prompts\":5,\"sessions\":2,\"turnMs\":184000,\"tools\":2,\"toolErrors\":1,\"interrupts\":2,\"denials\":1,\"compactions\":2,\"prs\":0,\"hours\":[0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,2,0,0,0,0,0,0,0,0]},\"2026-10-18\":{\"prompts\":5,\"sessions\":2,\"turnMs\":0,\"tools\":0,\"toolErrors\":0,\"interrupts\":0,\"denials\":0,\"compactions\":0,\"prs\":1,\"hours\":[0,1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},\"usage\":[[\"2026-10-17\",\"claude\",\"claude-opus-4-6\",\"app\",10,250,1000,700,0.0123,1],[\"2026-10-18\",\"claude\",\"claude-sonnet-4-5-20250929\",\"app\",3000,700,20000,0,0.0255,1],[\"2026-10-18\",\"claude\",\"claude-haiku-4-5\",\"lib\",50,60,0,0,0.0004,1],[\"2026-10-17\",\"claude\",\"claude-haiku-4-5-20251001\",\"app\",800,90,0,0,0.0013,1],[\"2026-10-17\",\"codex\",\"gpt-5.4\",\"app\",5000,900,20000,40,0.031,2],[\"2026-10-17\",\"codex\",\"gpt-5.4-mini\",\"app\",0,0,0,0,0,1],[\"2026-10-17\",\"codex\",\"gpt-5\",\"без проекта\",400,20,0,0,0.0007,1]],\"sessions\":[{\"id\":\"claude:5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"provider\":\"claude\",\"title\":\"Fix the login flow\",\"project\":\"app\",\"start\":1735689600,\"end\":1792275000,\"prompts\":4,\"turnMs\":65000,\"input\":3810,\"output\":1040,\"cacheRead\":21000,\"cacheWrite\":700,\"cost\":0.03905,\"subagentCost\":0.00125,\"model\":\"claude-sonnet-4-5-20250929\",\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"]},{\"id\":\"codex:cx-1\",\"provider\":\"codex\",\"title\":\"codex prompt for {P2}-3\",\"project\":\"app\",\"start\":1792238402,\"end\":1792242002,\"prompts\":2,\"turnMs\":119000,\"input\":5400,\"output\":920,\"cacheRead\":20000,\"cacheWrite\":40,\"cost\":0.0317,\"subagentCost\":0.0007,\"model\":\"gpt-5.4\",\"tasks\":[\"{P2}-3\"],\"prs\":[]},{\"id\":\"claude:5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"provider\":\"claude\",\"title\":\"Start on {P1}-101 please\",\"project\":\"app\",\"start\":1792227600,\"end\":1792278180,\"prompts\":4,\"turnMs\":0,\"input\":50,\"output\":60,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":0.00035000000000000005,\"subagentCost\":0,\"model\":\"claude-haiku-4-5\",\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[]}],\"collecting\":null}}]}",
+   "cacheWritten": ""
+  },
+  {
+   "clock": 31
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/stats",
+   "query": [
+    [
+     "shape",
+     "report"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=sub:dev@example.com"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+   },
+   "etag": true,
+   "answer": "{\"version\":1,\"person\":\"dev@example.com\",\"machine\":\"box\",\"generatedAt\":\"2026-10-18T00:01:01.000Z\",\"timezone\":\"Europe/Moscow\",\"days\":{\"2026-10-17\":{\"prompts\":5,\"sessions\":2,\"turnMs\":184000,\"tools\":2,\"toolErrors\":1,\"interrupts\":2,\"denials\":1,\"compactions\":2,\"prs\":0,\"hours\":[0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,2,0,0,0,0,0,0,0,0]},\"2026-10-18\":{\"prompts\":6,\"sessions\":3,\"turnMs\":0,\"tools\":0,\"toolErrors\":0,\"interrupts\":0,\"denials\":0,\"compactions\":0,\"prs\":1,\"hours\":[0,1,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},\"usage\":[[\"2026-10-17\",\"claude\",\"claude-opus-4-6\",\"app\",10,250,1000,700,0.0123,1],[\"2026-10-18\",\"claude\",\"claude-sonnet-4-5-20250929\",\"app\",3000,700,20000,0,0.0255,1],[\"2026-10-18\",\"claude\",\"claude-haiku-4-5\",\"lib\",50,60,0,0,0.0004,1],[\"2026-10-17\",\"claude\",\"claude-haiku-4-5-20251001\",\"app\",800,90,0,0,0.0013,1],[\"2026-10-17\",\"codex\",\"gpt-5.4\",\"app\",5000,900,20000,40,0.031,2],[\"2026-10-17\",\"codex\",\"gpt-5.4-mini\",\"app\",0,0,0,0,0,1],[\"2026-10-18\",\"codex\",\"gpt-5.4-mini\",\"app\",6000,200,0,0,0.0054,1],[\"2026-10-17\",\"codex\",\"gpt-5\",\"без проекта\",400,20,0,0,0.0007,1]],\"sessions\":[{\"id\":\"claude:5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"provider\":\"claude\",\"title\":\"Fix the login flow\",\"project\":\"app\",\"start\":1735689600,\"end\":1792275000,\"prompts\":4,\"turnMs\":65000,\"input\":3810,\"output\":1040,\"cacheRead\":21000,\"cacheWrite\":700,\"cost\":0.03905,\"subagentCost\":0.00125,\"model\":\"claude-sonnet-4-5-20250929\",\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"]},{\"id\":\"codex:cx-1\",\"provider\":\"codex\",\"title\":\"codex prompt for {P2}-3\",\"project\":\"app\",\"start\":1792238402,\"end\":1792280405,\"prompts\":3,\"turnMs\":119000,\"input\":11400,\"output\":1120,\"cacheRead\":20000,\"cacheWrite\":40,\"cost\":0.0371,\"subagentCost\":0.0007,\"model\":\"gpt-5.4\",\"tasks\":[\"{P2}-3\"],\"prs\":[]},{\"id\":\"claude:5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"provider\":\"claude\",\"title\":\"Start on {P1}-101 please\",\"project\":\"app\",\"start\":1792227600,\"end\":1792278180,\"prompts\":4,\"turnMs\":0,\"input\":50,\"output\":60,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":0.00035000000000000005,\"subagentCost\":0,\"model\":\"claude-haiku-4-5\",\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[]}],\"collecting\":null}",
+   "cacheWritten": "{\"version\":2,\"files\":{\"$ROOT/home/.claude/projects/-w-app/5d3c1e0a-1111-4a2b-9c3d-000000000001.jsonl\":{\"size\":4522,\"mtimeMs\":1792279800000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"sidechain\":false,\"title\":\"Fix   the\\nlogin  flow \",\"firstPrompt\":\"Start on {P1}-101 please\",\"models\":[\"claude-opus-4-6\",\"claude-sonnet-4-5-20250929\"],\"projects\":[\"без проекта\",\"app\"],\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"],\"firstTs\":1735689600,\"lastTs\":1792275000,\"messages\":[[\"r1:m1\",1792227605,0,1,10,250,1000,400,300],[\"r4:m4\",1792272600,1,1,3000,700,20000,0,0],[\"r5:m5\",1735689600,0,1,5,0,0,0,0]],\"prompts\":[[\"p1\",1792227600,1],[\"p4\",1792227840,1],[\"q1\",1792227900,1],[\"p6\",1792275000,1]],\"turns\":[[\"turn1\",1792227960,65000]],\"tools\":[[\"tool-1\",1792227660,0],[\"tool-2\",1792227660,1]],\"interrupts\":[[\"p3\",1792227780]],\"denials\":[[\"tool-2\",1792227660]],\"compactions\":[[\"cb1\",1792228020]]}},\"$ROOT/home/.claude/projects/-w-app/5d3c1e0a-2222-4a2b-9c3d-000000000002.jsonl\":{\"size\":2233,\"mtimeMs\":1792279680000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"sidechain\":false,\"title\":null,\"firstPrompt\":\"Start on {P1}-101 please\",\"models\":[\"claude-opus-4-6\",\"claude-haiku-4-5\"],\"projects\":[\"app\",\"lib\",\"вне репозиториев\",\"{ROOT}\",\"feat\"],\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[],\"firstTs\":1792227600,\"lastTs\":1792278180,\"messages\":[[\"r1:m1\",1792227605,0,0,10,250,1000,400,300],[\"r20:m20\",1792278010,1,1,50,60,0,0,0]],\"prompts\":[[\"p1\",1792227600,0],[\"p20\",1792278000,0],[\"p21\",1792278060,2],[\"p22\",1792278120,3],[\"p23\",1792278180,4]],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}},\"$ROOT/home/.claude/projects/-w-app/5d3c1e0a-1111-4a2b-9c3d-000000000001/subagents/agent-a1.jsonl\":{\"size\":644,\"mtimeMs\":1792279740000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"sidechain\":true,\"title\":null,\"firstPrompt\":null,\"models\":[\"claude-haiku-4-5-20251001\"],\"projects\":[\"app\",\"без проекта\"],\"tasks\":[],\"prs\":[],\"firstTs\":1792228205,\"lastTs\":1792228205,\"messages\":[[\"rs1:ms1\",1792228205,0,0,800,90,0,0,0]],\"prompts\":[],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}},\"$ROOT/home/.codex/sessions/2026/10/17/rollout-a.jsonl\":{\"size\":2265,\"mtimeMs\":1792280400000,\"facts\":{\"provider\":\"codex\",\"sessionId\":\"cx-1\",\"sidechain\":false,\"title\":null,\"firstPrompt\":\"codex prompt for {P2}-3\",\"models\":[\"gpt-5.4\",\"gpt-5.4-mini\"],\"projects\":[\"без проекта\",\"app\"],\"tasks\":[\"{P2}-3\"],\"prs\":[],\"firstTs\":1792238402,\"lastTs\":1792280405,\"messages\":[[\"2026-10-17T12:00:04.000Z:10000:500\",1792238404,0,1,4000,500,6000,0,0],[\"2026-10-17T12:01:00.000Z:25000:900\",1792238460,0,1,1000,400,14000,40,0],[\"2026-10-17T12:06:00.000Z:3000:100\",1792238760,1,1,0,0,0,0,0],[\"2026-10-17T23:40:05.000Z:9000:300\",1792280405,1,1,6000,200,0,0,0]],\"prompts\":[[\"1792238402:codex prompt for {P2}-3\",1792238402,1],[\"it-1\",1792238580,1],[\"1792280400:late codex prompt\",1792280400,1]],\"turns\":[[\"T1\",1792238520,119000]],\"tools\":[],\"interrupts\":[[\"1792238640:T2\",1792238640]],\"denials\":[],\"compactions\":[[\"1792238700\",1792238700]]}},\"$ROOT/home/.codex/sessions/2026/10/17/rollout-sub.jsonl\":{\"size\":398,\"mtimeMs\":1792279500000,\"facts\":{\"provider\":\"codex\",\"sessionId\":\"cx-1\",\"sidechain\":true,\"title\":null,\"firstPrompt\":null,\"models\":[\"gpt-5\"],\"projects\":[\"без проекта\"],\"tasks\":[],\"prs\":[],\"firstTs\":1792242002,\"lastTs\":1792242002,\"messages\":[[\"2026-10-17T13:00:02.000Z:400:20\",1792242002,0,0,400,20,0,0,0]],\"prompts\":[],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}}}}"
+  },
+  {
+   "remove": "home/.claude/projects/-w-app/5d3c1e0a-1111-4a2b-9c3d-000000000001/subagents/agent-a1.jsonl"
+  },
+  {
+   "add": "home/.claude/projects/-w-app/fresh.jsonl",
+   "content": "{\"type\":\"user\",\"timestamp\":\"2026-10-17T23:50:00.000Z\",\"uuid\":\"f1\",\"cwd\":\"$ROOT/ws/{ROOT}/app/sub\",\"sessionId\":\"fresh-1\",\"message\":{\"role\":\"user\",\"content\":\"a new conversation\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-10-17T23:50:02.000Z\",\"requestId\":\"rf\",\"cwd\":\"$ROOT/ws/{ROOT}/app\",\"sessionId\":\"fresh-1\",\"message\":{\"id\":\"mf\",\"model\":\"claude-opus-4-6\",\"role\":\"assistant\",\"usage\":{\"input_tokens\":1,\"output_tokens\":2}}}\n",
+   "mtime": 1792281000
+  },
+  {
+   "clock": 61
+  },
+  {
+   "method": "POST",
+   "path": "/agents/api/platform/stats/",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=sub:nobody"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+   },
+   "etag": true,
+   "answer": "{\"viewer\":\"agent@box\",\"runtimes\":[{\"person\":\"agent@box\",\"machineId\":\"local\",\"machineName\":\"box\",\"report\":{\"version\":1,\"person\":\"agent@box\",\"machine\":\"box\",\"generatedAt\":\"2026-10-18T00:02:02.000Z\",\"timezone\":\"Europe/Moscow\",\"days\":{\"2026-10-17\":{\"prompts\":5,\"sessions\":2,\"turnMs\":184000,\"tools\":2,\"toolErrors\":1,\"interrupts\":2,\"denials\":1,\"compactions\":2,\"prs\":0,\"hours\":[0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,2,0,0,0,0,0,0,0,0]},\"2026-10-18\":{\"prompts\":7,\"sessions\":4,\"turnMs\":0,\"tools\":0,\"toolErrors\":0,\"interrupts\":0,\"denials\":0,\"compactions\":0,\"prs\":1,\"hours\":[0,1,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},\"usage\":[[\"2026-10-17\",\"claude\",\"claude-opus-4-6\",\"app\",10,250,1000,700,0.0123,1],[\"2026-10-18\",\"claude\",\"claude-sonnet-4-5-20250929\",\"app\",3000,700,20000,0,0.0255,1],[\"2026-10-18\",\"claude\",\"claude-haiku-4-5\",\"lib\",50,60,0,0,0.0004,1],[\"2026-10-17\",\"codex\",\"gpt-5.4\",\"app\",5000,900,20000,40,0.031,2],[\"2026-10-17\",\"codex\",\"gpt-5.4-mini\",\"app\",0,0,0,0,0,1],[\"2026-10-18\",\"codex\",\"gpt-5.4-mini\",\"app\",6000,200,0,0,0.0054,1],[\"2026-10-17\",\"codex\",\"gpt-5\",\"без проекта\",400,20,0,0,0.0007,1],[\"2026-10-18\",\"claude\",\"claude-opus-4-6\",\"app\",1,2,0,0,0.0001,1]],\"sessions\":[{\"id\":\"claude:5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"provider\":\"claude\",\"title\":\"Fix the login flow\",\"project\":\"app\",\"start\":1735689600,\"end\":1792275000,\"prompts\":4,\"turnMs\":65000,\"input\":3010,\"output\":950,\"cacheRead\":21000,\"cacheWrite\":700,\"cost\":0.0378,\"subagentCost\":0,\"model\":\"claude-sonnet-4-5-20250929\",\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"]},{\"id\":\"codex:cx-1\",\"provider\":\"codex\",\"title\":\"codex prompt for {P2}-3\",\"project\":\"app\",\"start\":1792238402,\"end\":1792280405,\"prompts\":3,\"turnMs\":119000,\"input\":11400,\"output\":1120,\"cacheRead\":20000,\"cacheWrite\":40,\"cost\":0.0371,\"subagentCost\":0.0007,\"model\":\"gpt-5.4\",\"tasks\":[\"{P2}-3\"],\"prs\":[]},{\"id\":\"claude:5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"provider\":\"claude\",\"title\":\"Start on {P1}-101 please\",\"project\":\"app\",\"start\":1792227600,\"end\":1792278180,\"prompts\":4,\"turnMs\":0,\"input\":50,\"output\":60,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":0.00035000000000000005,\"subagentCost\":0,\"model\":\"claude-haiku-4-5\",\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[]},{\"id\":\"claude:fresh-1\",\"provider\":\"claude\",\"title\":\"a new conversation\",\"project\":\"app\",\"start\":1792281000,\"end\":1792281002,\"prompts\":1,\"turnMs\":0,\"input\":1,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":0.000054999999999999995,\"subagentCost\":0,\"model\":\"claude-opus-4-6\",\"tasks\":[],\"prs\":[]}],\"collecting\":null}}]}",
+   "cacheWritten": "{\"version\":2,\"files\":{\"$ROOT/home/.claude/projects/-w-app/5d3c1e0a-1111-4a2b-9c3d-000000000001.jsonl\":{\"size\":4522,\"mtimeMs\":1792279800000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"sidechain\":false,\"title\":\"Fix   the\\nlogin  flow \",\"firstPrompt\":\"Start on {P1}-101 please\",\"models\":[\"claude-opus-4-6\",\"claude-sonnet-4-5-20250929\"],\"projects\":[\"без проекта\",\"app\"],\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"],\"firstTs\":1735689600,\"lastTs\":1792275000,\"messages\":[[\"r1:m1\",1792227605,0,1,10,250,1000,400,300],[\"r4:m4\",1792272600,1,1,3000,700,20000,0,0],[\"r5:m5\",1735689600,0,1,5,0,0,0,0]],\"prompts\":[[\"p1\",1792227600,1],[\"p4\",1792227840,1],[\"q1\",1792227900,1],[\"p6\",1792275000,1]],\"turns\":[[\"turn1\",1792227960,65000]],\"tools\":[[\"tool-1\",1792227660,0],[\"tool-2\",1792227660,1]],\"interrupts\":[[\"p3\",1792227780]],\"denials\":[[\"tool-2\",1792227660]],\"compactions\":[[\"cb1\",1792228020]]}},\"$ROOT/home/.claude/projects/-w-app/5d3c1e0a-2222-4a2b-9c3d-000000000002.jsonl\":{\"size\":2233,\"mtimeMs\":1792279680000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"sidechain\":false,\"title\":null,\"firstPrompt\":\"Start on {P1}-101 please\",\"models\":[\"claude-opus-4-6\",\"claude-haiku-4-5\"],\"projects\":[\"app\",\"lib\",\"вне репозиториев\",\"{ROOT}\",\"feat\"],\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[],\"firstTs\":1792227600,\"lastTs\":1792278180,\"messages\":[[\"r1:m1\",1792227605,0,0,10,250,1000,400,300],[\"r20:m20\",1792278010,1,1,50,60,0,0,0]],\"prompts\":[[\"p1\",1792227600,0],[\"p20\",1792278000,0],[\"p21\",1792278060,2],[\"p22\",1792278120,3],[\"p23\",1792278180,4]],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}},\"$ROOT/home/.codex/sessions/2026/10/17/rollout-a.jsonl\":{\"size\":2265,\"mtimeMs\":1792280400000,\"facts\":{\"provider\":\"codex\",\"sessionId\":\"cx-1\",\"sidechain\":false,\"title\":null,\"firstPrompt\":\"codex prompt for {P2}-3\",\"models\":[\"gpt-5.4\",\"gpt-5.4-mini\"],\"projects\":[\"без проекта\",\"app\"],\"tasks\":[\"{P2}-3\"],\"prs\":[],\"firstTs\":1792238402,\"lastTs\":1792280405,\"messages\":[[\"2026-10-17T12:00:04.000Z:10000:500\",1792238404,0,1,4000,500,6000,0,0],[\"2026-10-17T12:01:00.000Z:25000:900\",1792238460,0,1,1000,400,14000,40,0],[\"2026-10-17T12:06:00.000Z:3000:100\",1792238760,1,1,0,0,0,0,0],[\"2026-10-17T23:40:05.000Z:9000:300\",1792280405,1,1,6000,200,0,0,0]],\"prompts\":[[\"1792238402:codex prompt for {P2}-3\",1792238402,1],[\"it-1\",1792238580,1],[\"1792280400:late codex prompt\",1792280400,1]],\"turns\":[[\"T1\",1792238520,119000]],\"tools\":[],\"interrupts\":[[\"1792238640:T2\",1792238640]],\"denials\":[],\"compactions\":[[\"1792238700\",1792238700]]}},\"$ROOT/home/.codex/sessions/2026/10/17/rollout-sub.jsonl\":{\"size\":398,\"mtimeMs\":1792279500000,\"facts\":{\"provider\":\"codex\",\"sessionId\":\"cx-1\",\"sidechain\":true,\"title\":null,\"firstPrompt\":null,\"models\":[\"gpt-5\"],\"projects\":[\"без проекта\"],\"tasks\":[],\"prs\":[],\"firstTs\":1792242002,\"lastTs\":1792242002,\"messages\":[[\"2026-10-17T13:00:02.000Z:400:20\",1792242002,0,0,400,20,0,0,0]],\"prompts\":[],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}},\"$ROOT/home/.claude/projects/-w-app/fresh.jsonl\":{\"size\":457,\"mtimeMs\":1792281000000,\"facts\":{\"provider\":\"claude\",\"sessionId\":\"fresh-1\",\"sidechain\":false,\"title\":null,\"firstPrompt\":\"a new conversation\",\"models\":[\"claude-opus-4-6\"],\"projects\":[\"app\"],\"tasks\":[],\"prs\":[],\"firstTs\":1792281000,\"lastTs\":1792281002,\"messages\":[[\"rf:mf\",1792281002,0,0,1,2,0,0,0]],\"prompts\":[[\"f1\",1792281000,0]],\"turns\":[],\"tools\":[],\"interrupts\":[],\"denials\":[],\"compactions\":[]}}}}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/stats",
+   "query": [
+    [
+     "shape",
+     "report"
+    ],
+    [
+     "shape",
+     "report"
+    ],
+    [
+     "wait",
+     "0"
+    ],
+    [
+     "wait",
+     "0"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=sub:dev@example.com",
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+   },
+   "etag": true,
+   "answer": "{\"viewer\":\"dev@example.com\",\"runtimes\":[{\"person\":\"dev@example.com\",\"machineId\":\"local\",\"machineName\":\"box\",\"report\":{\"version\":1,\"person\":\"dev@example.com\",\"machine\":\"box\",\"generatedAt\":\"2026-10-18T00:02:02.000Z\",\"timezone\":\"Europe/Moscow\",\"days\":{\"2026-10-17\":{\"prompts\":5,\"sessions\":2,\"turnMs\":184000,\"tools\":2,\"toolErrors\":1,\"interrupts\":2,\"denials\":1,\"compactions\":2,\"prs\":0,\"hours\":[0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,2,0,0,0,0,0,0,0,0]},\"2026-10-18\":{\"prompts\":7,\"sessions\":4,\"turnMs\":0,\"tools\":0,\"toolErrors\":0,\"interrupts\":0,\"denials\":0,\"compactions\":0,\"prs\":1,\"hours\":[0,1,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}},\"usage\":[[\"2026-10-17\",\"claude\",\"claude-opus-4-6\",\"app\",10,250,1000,700,0.0123,1],[\"2026-10-18\",\"claude\",\"claude-sonnet-4-5-20250929\",\"app\",3000,700,20000,0,0.0255,1],[\"2026-10-18\",\"claude\",\"claude-haiku-4-5\",\"lib\",50,60,0,0,0.0004,1],[\"2026-10-17\",\"codex\",\"gpt-5.4\",\"app\",5000,900,20000,40,0.031,2],[\"2026-10-17\",\"codex\",\"gpt-5.4-mini\",\"app\",0,0,0,0,0,1],[\"2026-10-18\",\"codex\",\"gpt-5.4-mini\",\"app\",6000,200,0,0,0.0054,1],[\"2026-10-17\",\"codex\",\"gpt-5\",\"без проекта\",400,20,0,0,0.0007,1],[\"2026-10-18\",\"claude\",\"claude-opus-4-6\",\"app\",1,2,0,0,0.0001,1]],\"sessions\":[{\"id\":\"claude:5d3c1e0a-1111-4a2b-9c3d-000000000001\",\"provider\":\"claude\",\"title\":\"Fix the login flow\",\"project\":\"app\",\"start\":1735689600,\"end\":1792275000,\"prompts\":4,\"turnMs\":65000,\"input\":3010,\"output\":950,\"cacheRead\":21000,\"cacheWrite\":700,\"cost\":0.0378,\"subagentCost\":0,\"model\":\"claude-sonnet-4-5-20250929\",\"tasks\":[\"{P2}-7\",\"{P1}-101\",\"{P3}-5\",\"{P1}-202\"],\"prs\":[\"https://git.example/acme/app/-/merge_requests/9\"]},{\"id\":\"codex:cx-1\",\"provider\":\"codex\",\"title\":\"codex prompt for {P2}-3\",\"project\":\"app\",\"start\":1792238402,\"end\":1792280405,\"prompts\":3,\"turnMs\":119000,\"input\":11400,\"output\":1120,\"cacheRead\":20000,\"cacheWrite\":40,\"cost\":0.0371,\"subagentCost\":0.0007,\"model\":\"gpt-5.4\",\"tasks\":[\"{P2}-3\"],\"prs\":[]},{\"id\":\"claude:5d3c1e0a-2222-4a2b-9c3d-000000000002\",\"provider\":\"claude\",\"title\":\"Start on {P1}-101 please\",\"project\":\"app\",\"start\":1792227600,\"end\":1792278180,\"prompts\":4,\"turnMs\":0,\"input\":50,\"output\":60,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":0.00035000000000000005,\"subagentCost\":0,\"model\":\"claude-haiku-4-5\",\"tasks\":[\"{P2}-7\",\"{P1}-101\"],\"prs\":[]},{\"id\":\"claude:fresh-1\",\"provider\":\"claude\",\"title\":\"a new conversation\",\"project\":\"app\",\"start\":1792281000,\"end\":1792281002,\"prompts\":1,\"turnMs\":0,\"input\":1,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"cost\":0.000054999999999999995,\"subagentCost\":0,\"model\":\"claude-opus-4-6\",\"tasks\":[],\"prs\":[]}],\"collecting\":null}}]}",
+   "cacheWritten": ""
+  }
+ ]
+}

@@ -1,0 +1,50 @@
+ ▐▛███▛█   Claude Code v2.1.296
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/5df63aae-7429-408b-b20a-b1d74e1fe9c6/scratchpad/repro/work
+
+
+❯ Call the AskUserQuestion tool exactly once, right now, with exactly three questions in one call. Q1: question
+  "Scope?", header "Scope", multiSelect true, options "Sort", "Totals", "Rows" (no previews). Q2: question "Phone
+  layout?", header "Phone", multiSelect false, options "Both (Recommended)", "Scroll", "Cards", each with a short
+  "preview" field (a 3-line ASCII sketch). Q3: question "Core?", header "Core", multiSelect false, options "Own",
+  "TanStack" (no previews). Do nothing else before calling the tool. After the answer, reply with just the word done
+  and stop; never call AskUserQuestion again.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+←  ☒ Scope  ☐ Phone  ☐ Core  ✔ Submit  →
+
+Phone layout?
+
+❯ 1. Both (Recommended)           ┌──────────────────────────────────────────┐
+  2. Scroll                       │ +--------+                               │
+  3. Cards                        │ | card A |                               │
+                                  │ | card B |                               │
+                                  │ +--------+                               │
+                                  └──────────────────────────────────────────┘
+
+                                  Notes: press n to add notes
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Chat about this
+
+Enter to select · ↑/↓ to navigate · n to add notes · Tab to switch questions · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

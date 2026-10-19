@@ -1,0 +1,50 @@
+ ▐▛███▛█   Claude Code v2.1.296
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   /tmp/claude-1001/-home-agent-workspace-example/5df63aae-7429-408b-b20a-b1d74e1fe9c6/scratchpad/repro/work
+
+▎ Auto mode is now Claude Code's default permission mode.
+▎ Auto mode lets Claude handle permission prompts automatically. Claude checks each tool call for risky actions and
+▎ prompt injection before executing, runs the ones it assesses as lower-risk, and blocks the rest.
+▎ https://code.claude.com/docs/en/permission-modes
+
+❯ Call the AskUserQuestion tool exactly once, right now, with exactly one question: question "Phone layout?", header
+  "Phone", multiSelect false, and three options, each with a short "preview" field (a 3-line ASCII sketch): "Both
+  (Recommended)", "Scroll", "Cards". Do nothing else before calling the tool. After the answer, reply with just the
+  chosen label.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☐ Phone
+
+Phone layout?
+
+  1. Both (Recommended)           ┌──────────────────────────────────────────┐
+❯ 2. Scroll                       │ +-----------+                            │
+  3. Cards                        │ | row       |                            │
+                                  │ | row       |                            │
+                                  │ +-----------+                            │
+                                  └──────────────────────────────────────────┘
+
+                                  Notes: press n to add notes
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Chat about this
+
+Enter to select · ↑/↓ to navigate · n to add notes · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

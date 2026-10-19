@@ -1,0 +1,867 @@
+{
+ "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+ "steps": [
+  {
+   "tabs": [
+    {
+     "tabId": "tab-h",
+     "session": "sess-h",
+     "state": "idle"
+    },
+    {
+     "tabId": "tab-busy",
+     "session": "sess-h",
+     "state": "busy"
+    },
+    {
+     "tabId": "tab-wait",
+     "session": "sess-h",
+     "state": "needs-input"
+    },
+    {
+     "tabId": "tab-nocwd",
+     "session": "sess-none",
+     "state": "idle"
+    },
+    {
+     "tabId": "tab-home",
+     "session": "sess-home",
+     "state": "idle"
+    },
+    {
+     "tabId": "tab-flip",
+     "session": "sess-h",
+     "state": "idle",
+     "flips": true
+    }
+   ],
+   "cwds": {
+    "sess-h": "api-h",
+    "sess-home": "home"
+   },
+   "actions": [
+    {
+     "path": "api-h/a.txt",
+     "write": "one\n"
+    },
+    {
+     "path": "api-h/sub/b.txt",
+     "write": "two\n"
+    }
+   ],
+   "answer": null
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h",
+    "headers": {}
+   },
+   "answer": {
+    "status": 401,
+    "answerHeaders": {
+     "content-type": "application/json"
+    },
+    "answer": "{\"error\":\"Unauthorized\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h",
+    "headers": {
+     "x-cli-token": "TOKEN"
+    }
+   },
+   "answer": {
+    "status": 403,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\""
+    },
+    "answer": "{\"error\":\"Forbidden\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"rnn5neRN1zAGHvzoGSpCYaX8X2o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен tabId\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=bad%20id",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"rnn5neRN1zAGHvzoGSpCYaX8X2o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен tabId\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h&id=bad",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"jiOko4iEzuNh9jJg8pGpSO9hGBw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Неверная точка отката\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h&id=",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"jiOko4iEzuNh9jJg8pGpSO9hGBw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Неверная точка отката\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h&tabId=tab-h",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"rnn5neRN1zAGHvzoGSpCYaX8X2o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен tabId\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h&id=1-turn&id=2-turn",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"jiOko4iEzuNh9jJg8pGpSO9hGBw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Неверная точка отката\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=nobody",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 404,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"SI_1PhOPKIuwFcW-D2_USYX9DcQ\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Вкладка не найдена\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-nocwd",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 404,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"SI_1PhOPKIuwFcW-D2_USYX9DcQ\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Вкладка не найдена\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-home",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 404,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"SI_1PhOPKIuwFcW-D2_USYX9DcQ\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Вкладка не найдена\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"RtB3J9GeeL7tqZZgoolOZvsb0qA\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"checkpoints\":[],\"rewinds\":[],\"busy\":false}"
+   }
+  },
+  {
+   "now": 1760000000000,
+   "snapshot": {
+    "tab": "tab-h",
+    "cwd": "api-h"
+   },
+   "answer": null
+  },
+  {
+   "now": 1760000000000,
+   "snapshot": {
+    "tab": "tab-flip",
+    "cwd": "api-h"
+   },
+   "answer": null
+  },
+  {
+   "now": 1760000001000,
+   "snapshot": {
+    "tab": "tab-h",
+    "cwd": "api-h"
+   },
+   "answer": null
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"iCacbse7VVbgwiBAxrfBtpHJ-Iw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"checkpoints\":[{\"id\":\"1760000000000-turn\",\"kind\":\"turn\",\"at\":1760000000000,\"files\":2}],\"rewinds\":[],\"busy\":false}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h",
+    "headers": {
+     "cookie": "session-token=good",
+     "if-none-match": "ETAG"
+    }
+   },
+   "answer": {
+    "status": 304,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"iCacbse7VVbgwiBAxrfBtpHJ-Iw\"",
+     "cache-control": "no-store"
+    },
+    "answer": ""
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/agents/api/platform/checkpoints?tabId=tab-busy",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"kVsxM93aaTSxoJT5KQEPhl0edrM\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"checkpoints\":[],\"rewinds\":[],\"busy\":true}"
+   }
+  },
+  {
+   "actions": [
+    {
+     "path": "api-h/a.txt",
+     "write": "one changed\n"
+    },
+    {
+     "path": "api-h/c.txt",
+     "write": "three\n"
+    },
+    {
+     "path": "api-h/sub/b.txt",
+     "rm": true
+    }
+   ],
+   "answer": null
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h&id=1760000000000-turn",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"3p6o1LOx-926aJZqAse3ouTGkw0\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"diff\":\"diff --git a/a.txt b/a.txt\\nindex a93aab0..5626abf 100644\\n--- a/a.txt\\n+++ b/a.txt\\n@@ -1 +1 @@\\n-one changed\\n+one\\ndiff --git a/c.txt b/c.txt\\ndeleted file mode 100644\\nindex 2bdf67a..0000000\\n--- a/c.txt\\n+++ /dev/null\\n@@ -1 +0,0 @@\\n-three\\ndiff --git a/sub/b.txt b/sub/b.txt\\nnew file mode 100644\\nindex 0000000..f719efd\\n--- /dev/null\\n+++ b/sub/b.txt\\n@@ -0,0 +1 @@\\n+two\\n\",\"truncated\":false,\"files\":[{\"path\":\"a.txt\",\"status\":\"M\",\"additions\":1,\"deletions\":1},{\"path\":\"c.txt\",\"status\":\"D\",\"additions\":0,\"deletions\":1},{\"path\":\"sub/b.txt\",\"status\":\"A\",\"additions\":1,\"deletions\":0}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h&id=1760000000001-turn",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 404,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"0j6nXnx8ys55WMs-hOVc7GiVP9o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Точка отката не найдена\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h&id=1760000000000-turn&x=1",
+    "headers": {
+     "cookie": "session-token=good",
+     "if-none-match": "ETAG"
+    }
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"3p6o1LOx-926aJZqAse3ouTGkw0\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"diff\":\"diff --git a/a.txt b/a.txt\\nindex a93aab0..5626abf 100644\\n--- a/a.txt\\n+++ b/a.txt\\n@@ -1 +1 @@\\n-one changed\\n+one\\ndiff --git a/c.txt b/c.txt\\ndeleted file mode 100644\\nindex 2bdf67a..0000000\\n--- a/c.txt\\n+++ /dev/null\\n@@ -1 +0,0 @@\\n-three\\ndiff --git a/sub/b.txt b/sub/b.txt\\nnew file mode 100644\\nindex 0000000..f719efd\\n--- /dev/null\\n+++ b/sub/b.txt\\n@@ -0,0 +1 @@\\n+two\\n\",\"truncated\":false,\"files\":[{\"path\":\"a.txt\",\"status\":\"M\",\"additions\":1,\"deletions\":1},{\"path\":\"c.txt\",\"status\":\"D\",\"additions\":0,\"deletions\":1},{\"path\":\"sub/b.txt\",\"status\":\"A\",\"additions\":1,\"deletions\":0}]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":\"1760000000000-turn\"}"
+   },
+   "answer": {
+    "status": 415,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"gFPFczv67g-GiY0x_caDTvodqQY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен application/json\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "text/plain"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":\"1760000000000-turn\"}"
+   },
+   "answer": {
+    "status": 415,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"gFPFczv67g-GiY0x_caDTvodqQY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен application/json\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "APPLICATION/JSON"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":\"1760000000000-turn\"}"
+   },
+   "answer": {
+    "status": 415,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"gFPFczv67g-GiY0x_caDTvodqQY\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен application/json\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "text/plain"
+    },
+    "answer": "Invalid JSON"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "x-cli-token": "TOKEN",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "text/plain"
+    },
+    "answer": "Invalid JSON"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "x-cli-token": "TOKEN",
+     "content-type": "application/json"
+    },
+    "body": "{}"
+   },
+   "answer": {
+    "status": 403,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\""
+    },
+    "answer": "{\"error\":\"Forbidden\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": ""
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"rnn5neRN1zAGHvzoGSpCYaX8X2o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен tabId\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "null"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"rnn5neRN1zAGHvzoGSpCYaX8X2o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен tabId\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "[\"tab-h\"]"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"rnn5neRN1zAGHvzoGSpCYaX8X2o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен tabId\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":\"tab-h\"}"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"jiOko4iEzuNh9jJg8pGpSO9hGBw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Неверная точка отката\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":null}"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"jiOko4iEzuNh9jJg8pGpSO9hGBw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Неверная точка отката\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":\"x\"}"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"jiOko4iEzuNh9jJg8pGpSO9hGBw\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Неверная точка отката\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/jsonx"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":\"1760000000000-turn\"}"
+   },
+   "answer": {
+    "status": 400,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"rnn5neRN1zAGHvzoGSpCYaX8X2o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Нужен tabId\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":\"tab-busy\",\"id\":\"1760000000000-turn\"}"
+   },
+   "answer": {
+    "status": 409,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"lfTYSvut1-cjpAOlzIZdiFNVOf0\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Агент работает: дождитесь конца хода\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":\"tab-wait\",\"id\":\"1760000000000-turn\"}"
+   },
+   "answer": {
+    "status": 409,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"lfTYSvut1-cjpAOlzIZdiFNVOf0\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Агент работает: дождитесь конца хода\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":\"1760000000007-turn\"}"
+   },
+   "answer": {
+    "status": 404,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"0j6nXnx8ys55WMs-hOVc7GiVP9o\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Точка отката не найдена\"}"
+   }
+  },
+  {
+   "now": 1760000050000,
+   "answer": null
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints?tabId=ignored",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json; charset=utf-8"
+    },
+    "body": "{\"tabId\":\"tab-flip\",\"id\":\"1760000000000-turn\",\"tabId\":\"tab-flip\"}"
+   },
+   "answer": {
+    "status": 409,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"lfTYSvut1-cjpAOlzIZdiFNVOf0\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"error\":\"Агент работает: дождитесь конца хода\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":\"1760000000000-turn\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"u0U4obhvlpK5yO_hq55P6Lu8Cy4\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"before\":{\"id\":\"1760000050000-before-rewind\",\"kind\":\"before-rewind\",\"at\":1760000050000,\"files\":2},\"changed\":[\"c.txt\",\"a.txt\",\"sub/b.txt\"],\"skipped\":[]}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/agents/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": "{\"tabId\":\"tab-h\",\"id\":\"1760000050000-before-rewind\"}"
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"8frxqT1WO837ZCR8YfrCXgrjXVk\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"before\":{\"id\":\"1760000050000-before-rewind-2\",\"kind\":\"before-rewind\",\"at\":1760000050000,\"files\":2},\"changed\":[\"sub/b.txt\",\"a.txt\",\"c.txt\"],\"skipped\":[]}"
+   }
+  },
+  {
+   "request": {
+    "method": "GET",
+    "url": "/api/platform/checkpoints?tabId=tab-h",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 200,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"1FMtbPCoibbCY62viLM2vjNI79E\"",
+     "cache-control": "no-store"
+    },
+    "answer": "{\"checkpoints\":[{\"id\":\"1760000050000-before-rewind-2\",\"kind\":\"before-rewind\",\"at\":1760000050000,\"files\":2},{\"id\":\"1760000050000-before-rewind\",\"kind\":\"before-rewind\",\"at\":1760000050000,\"files\":2},{\"id\":\"1760000000000-turn\",\"kind\":\"turn\",\"at\":1760000000000,\"files\":2}],\"rewinds\":[{\"at\":1760000050000,\"targetId\":\"1760000000000-turn\",\"targetAt\":1760000000000,\"beforeId\":\"1760000050000-before-rewind\",\"changed\":3,\"skipped\":0},{\"at\":1760000050000,\"targetId\":\"1760000050000-before-rewind\",\"targetAt\":1760000050000,\"beforeId\":\"1760000050000-before-rewind-2\",\"changed\":3,\"skipped\":0}],\"busy\":false}"
+   }
+  },
+  {
+   "request": {
+    "method": "PUT",
+    "url": "/api/platform/checkpoints?tabId=tab-h",
+    "headers": {
+     "cookie": "session-token=good"
+    }
+   },
+   "answer": {
+    "status": 405,
+    "answerHeaders": {
+     "allow": "GET, POST",
+     "cache-control": "no-store"
+    },
+    "answer": ""
+   }
+  },
+  {
+   "request": {
+    "method": "DELETE",
+    "url": "/api/platform/checkpoints?tabId=tab-h",
+    "headers": {
+     "x-cli-token": "TOKEN"
+    }
+   },
+   "answer": {
+    "status": 403,
+    "answerHeaders": {
+     "content-type": "application/json; charset=utf-8",
+     "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\""
+    },
+    "answer": "{\"error\":\"Forbidden\"}"
+   }
+  },
+  {
+   "request": {
+    "method": "POST",
+    "url": "/api/platform/checkpoints",
+    "headers": {
+     "cookie": "session-token=good",
+     "content-type": "application/json"
+    },
+    "body": {
+     "padding": 1048576
+    }
+   },
+   "answer": {
+    "status": 413,
+    "answerHeaders": {
+     "content-type": "text/plain"
+    },
+    "answer": "Body exceeded 1mb limit"
+   }
+  }
+ ]
+}

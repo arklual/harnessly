@@ -1,0 +1,7 @@
+{
+ "stubs": {
+  "lib/auth": "stub-auth.mjs", "lib/logger": "stub-logger.mjs", "lib/cli-token": "stub-cli-token.mjs",
+  "lib/{M}tab-lookup": "stub-tab-lookup.mjs", "lib/uploads-store": "stub-uploads.mjs", "nanoid": "stub-nanoid.mjs"
+ },
+ "real": ["react", "react-dom", "react-markdown", "remark-gfm", "jose", "zod", "diff"]
+}

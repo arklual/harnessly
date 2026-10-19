@@ -1,0 +1,50 @@
+╭─────────────────────────────────────────────────╮
+│ ✨ Update available! 0.152.0 -> 0.157.0         │
+│ Run npm install -g @openai/codex to update.     │
+│                                                 │
+│ See full release notes:                         │
+│ https://github.com/openai/codex/releases/latest │
+╰─────────────────────────────────────────────────╯
+
+• Model changed to gpt-5.6-terra medium
+
+╭──────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.152.0)                           │
+│                                                      │
+│ model:       gpt-5.6-terra medium   /model to change │
+│ directory:   /tmp/claude-1001/…/scratchpad/pre/cwork │
+│ permissions: YOLO mode                               │
+╰──────────────────────────────────────────────────────╯
+
+  Tip: Use /personality to customize how Codex communicates.
+
+
+› ping
+
+
+⚠ clamping SessionEnd hook timeout to 3s in /home/agent/.codex/hooks.json
+
+⚠ Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some
+  descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+
+■ Your access token could not be refreshed. Please log out and sign in again.
+
+
+› Ask Codex to do anything
+
+  gpt-5.6-terra medium · /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad…
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

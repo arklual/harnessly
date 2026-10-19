@@ -1,0 +1,1 @@
+{ "stubs": { "lib/logger": "stub-logger.mjs", "lib/auth": "stub-auth.mjs" }, "real": ["ws"] }

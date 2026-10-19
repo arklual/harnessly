@@ -1,0 +1,2129 @@
+{
+ "cases": [
+  {
+   "setup": {
+    "files": {
+     "home/.acme-data/workspaces.json": "{\n  \"workspaces\": [\n    {\n      \"id\": \"ws-a\",\n      \"name\": \"Alpha\",\n      \"directory\": \"/home/agent/a\",\n      \"order\": 2,\n      \"groupId\": \"g-gone\"\n    },\n    {\n      \"id\": \"ws-b\",\n      \"name\": \"Beta\",\n      \"directories\": [\n        \"/home/agent/b\"\n      ],\n      \"groupId\": \"g-1\",\n      \"extra\": {\n        \"kept\": true\n      }\n    }\n  ],\n  \"groups\": [\n    {\n      \"id\": \"g-1\",\n      \"name\": \"One\",\n      \"order\": 1\n    }\n  ],\n  \"activeWorkspaceId\": \"ws-b\",\n  \"sidebarCollapsed\": true,\n  \"updatedAt\": \"2026-01-01T00:00:00.000Z\"\n}",
+     "home/.acme-data/config.json": "{\"2\":\"two\",\"authPassword\":\"scrypt:x\",\"authSecret\":\"s\",\"appTheme\":\"dark\",\"hasAuthPassword\":\"kept place\",\"updatedAt\":\"2026-01-01T00:00:00.000Z\"}",
+     "home/.acme-data/quick-prompts.json": "{\"custom\":[{\"id\":\"c1\",\"name\":\"Mine\",\"prompt\":\"do it\",\"enabled\":false},null,\"ab\"],\"disabledBuiltinIds\":[\"builtin-simplify\",3],\"order\":[\"c1\",\"builtin-commit\"]}",
+     "home/.acme-data/sidebar-items.json": "[{\"id\":\"x\"}]"
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/bootstrap",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"a7YrlTjpge6ZNPm0NK2dANakd9w\"",
+    "cache-control": "no-store",
+    "content-length": "1066"
+   },
+   "answer": "{\"owner\":\"person@example.com\",\"preflightOk\":true,\"initialWorkspace\":{\"workspaces\":[{\"id\":\"ws-a\",\"name\":\"Alpha\",\"groupId\":null,\"directories\":[\"/home/agent/a\"]},{\"id\":\"ws-b\",\"name\":\"Beta\",\"directories\":[\"/home/agent/b\"],\"groupId\":\"g-1\",\"extra\":{\"kept\":true}}],\"groups\":[{\"id\":\"g-1\",\"name\":\"One\"}],\"activeWorkspaceId\":\"ws-b\",\"sidebarCollapsed\":true},\"initialConfig\":{\"2\":\"two\",\"appTheme\":\"dark\",\"hasAuthPassword\":true,\"updatedAt\":\"2026-01-01T00:00:00.000Z\",\"hostEnvLocked\":false,\"bindHostIsLocal\":true},\"initialQuickPrompts\":{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":false}],\"custom\":[{\"id\":\"c1\",\"name\":\"Mine\",\"prompt\":\"do it\",\"enabled\":false},{},{\"0\":\"a\",\"1\":\"b\"}],\"order\":[\"c1\",\"builtin-commit\"]},\"initialSidebarItems\":{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}}"
+  },
+  {
+   "method": "GET",
+   "url": "/agents/api/platform/bootstrap/",
+   "headers": {
+    "x-cli-token": "cli-secret",
+    "if-none-match": "ETAG"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ZdejsogcZZ1tNMpt6nINBOWq0dg\"",
+    "cache-control": "no-store",
+    "content-length": "1057"
+   },
+   "answer": "{\"owner\":\"Workspace\",\"preflightOk\":true,\"initialWorkspace\":{\"workspaces\":[{\"id\":\"ws-a\",\"name\":\"Alpha\",\"groupId\":null,\"directories\":[\"/home/agent/a\"]},{\"id\":\"ws-b\",\"name\":\"Beta\",\"directories\":[\"/home/agent/b\"],\"groupId\":\"g-1\",\"extra\":{\"kept\":true}}],\"groups\":[{\"id\":\"g-1\",\"name\":\"One\"}],\"activeWorkspaceId\":\"ws-b\",\"sidebarCollapsed\":true},\"initialConfig\":{\"2\":\"two\",\"appTheme\":\"dark\",\"hasAuthPassword\":true,\"updatedAt\":\"2026-01-01T00:00:00.000Z\",\"hostEnvLocked\":false,\"bindHostIsLocal\":true},\"initialQuickPrompts\":{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":false}],\"custom\":[{\"id\":\"c1\",\"name\":\"Mine\",\"prompt\":\"do it\",\"enabled\":false},{},{\"0\":\"a\",\"1\":\"b\"}],\"order\":[\"c1\",\"builtin-commit\"]},\"initialSidebarItems\":{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/bootstrap",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/bootstrap",
+   "headers": {},
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "setup": {
+    "files": {
+     "home/.acme-data/config.json": "{\"broken\"",
+     "home/.acme-data/quick-prompts.json": "{\"disabledBuiltinIds\":\"builtin-commit\",\"custom\":null,\"order\":5}",
+     "home/.acme-data/sidebar-items.json": "{\"disabledBuiltinIds\":[\"builtin-stats\"],\"custom\":[{\"id\":\"s1\",\"name\":\"Site\",\"icon\":\"Globe\",\"url\":\"https://example.com\",\"enabled\":true}],\"order\":[\"s1\"]}",
+     "home/.acme-data/workspaces.json": "{\"workspaces\":[{\"id\":\"ws-c\",\"name\":\"C\",\"directories\":[]},5],\"groups\":\"none\"}"
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/bootstrap",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"KycVXaizPOguvt6EOQvwEW4KiuM\"",
+    "cache-control": "no-store",
+    "content-length": "819"
+   },
+   "answer": "{\"owner\":\"person@example.com\",\"preflightOk\":true,\"initialWorkspace\":{\"workspaces\":[{\"id\":\"ws-c\",\"name\":\"C\",\"directories\":[]},5],\"groups\":[]},\"initialConfig\":{\"updatedAt\":\"2026-10-18T15:00:00.000Z\",\"hasAuthPassword\":false,\"hostEnvLocked\":false,\"bindHostIsLocal\":true},\"initialQuickPrompts\":{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[],\"order\":5},\"initialSidebarItems\":{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":false}],\"custom\":[{\"id\":\"s1\",\"name\":\"Site\",\"icon\":\"Globe\",\"url\":\"https://example.com\",\"enabled\":true}],\"order\":[\"s1\"]}}"
+  },
+  {
+   "setup": {
+    "files": {
+     "home/.acme-data/config.json": "[1,2]",
+     "home/.acme-data/quick-prompts.json": "{\"disabledBuiltinIds\":{\"a\":1}}",
+     "home/.acme-data/sidebar-items.json": "{\"custom\":\"x\"}"
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/bootstrap",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"VUNmItL2hXLRftOBjiW3nE-Ez80\"",
+    "cache-control": "no-store",
+    "content-length": "705"
+   },
+   "answer": "{\"owner\":\"person@example.com\",\"preflightOk\":true,\"initialWorkspace\":{\"workspaces\":[{\"id\":\"ws-c\",\"name\":\"C\",\"directories\":[]},5],\"groups\":[]},\"initialConfig\":{\"0\":1,\"1\":2,\"hasAuthPassword\":false,\"hostEnvLocked\":false,\"bindHostIsLocal\":true},\"initialQuickPrompts\":{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[],\"order\":[]},\"initialSidebarItems\":{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}}"
+  },
+  {
+   "setup": {
+    "files": {
+     "home/.acme-data/config.json": "false",
+     "home/.acme-data/quick-prompts.json": "[{\"id\":\"builtin-commit\",\"enabled\":false},{\"id\":\"mine\",\"name\":\"M\",\"prompt\":\"p\",\"enabled\":true}]",
+     "home/.acme-data/sidebar-items.json": null
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/bootstrap",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JhRxumvDQO5Otx2JCbLClkPzrZI\"",
+    "cache-control": "no-store",
+    "content-length": "746"
+   },
+   "answer": "{\"owner\":\"person@example.com\",\"preflightOk\":true,\"initialWorkspace\":{\"workspaces\":[{\"id\":\"ws-c\",\"name\":\"C\",\"directories\":[]},5],\"groups\":[]},\"initialConfig\":{\"hasAuthPassword\":false,\"hostEnvLocked\":false,\"bindHostIsLocal\":true},\"initialQuickPrompts\":{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":false},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[{\"id\":\"mine\",\"name\":\"M\",\"prompt\":\"p\",\"enabled\":true}],\"order\":[]},\"initialSidebarItems\":{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}}"
+  },
+  {
+   "setup": {
+    "files": {
+     "home/.config/acme/youtrack-token": "yt-file\n",
+     "home/.config/acme/gitlab-self-token": "  self-file  \n",
+     "home/.config/acme/gitlab-token": "",
+     "home/.config/acme/glab-token": "pub-file",
+     "home/.claude/projects/p/session.jsonl": "{\"type\":\"summary\"}\nnot json\nnull\n{\"timestamp\":\"bad\"}\n{\"timestamp\":\"2026-10-18T10:00:00.000Z\"}\n",
+     "home/.claude/projects/p/late.jsonl": "\n  \n{\"timestamp\":\"2026-10-18T12:15:00Z\",\"x\":1}\n",
+     "home/.codex/sessions/2026/x.jsonl": "{\"timestamp\":1792317600000.9}\n",
+     "home/.claude/projects/p/far.jsonl": "{\"timestamp\":1e20}\n",
+     "home/outside.jsonl": "{\"timestamp\":\"2026-10-18T10:00:00.000Z\"}\n"
+    }
+   },
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/alpha/src/a.txt\",\"$ROOT/work/alpha\",\"relative/path\",\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/beta/notes.md\",\"$ROOT/work/gamma/w.txt\",\"$ROOT/work/delta/d.txt\",\"$ROOT/work/delta/vendor/inner/i.txt\",\"$ROOT/work/epsilon/e.txt\",\"$ROOT/work/missing/file.txt\",7,null],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/session.jsonl\",\"mrs\":[\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"https://gitlab.example.com/group/other/-/merge_requests/12#note_1\",\"https://gitlab.com/team/sub/beta/-/merge_requests/3\",\"https://evil.example.com/x/-/merge_requests/1\",\"not a url\",\"https://gitlab.example.com:8443/group/alpha/-/merge_requests/9\",\"https://GITLAB.example.com/group/z/-/merge_requests/2/diffs\",42,\"https://gitlab.example.com/gone/project/-/merge_requests/4\"]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wUi6QCK6Q3ttwAHTA9Q1b6u0nlI\"",
+    "cache-control": "no-store",
+    "content-length": "2313"
+   },
+   "answer": "{\"pushes\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/inner\",\"branch\":\"main\",\"commitTitle\":\"pushed elsewhere\",\"pushedAt\":\"2026-10-18T13:00:00.000+00:00\",\"unpushed\":0,\"pipeline\":{\"status\":\"success\",\"url\":\"https://ci.example.com/1\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"branch\":\"feature/x\",\"commitTitle\":\"fix: three\",\"pushedAt\":\"2026-10-18T10:50:00.000+00:00\",\"unpushed\":0,\"pipeline\":{\"status\":\"other\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/12\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"branch\":\"main\",\"commitTitle\":\"feat: one\",\"pushedAt\":\"2026-10-18T10:30:00.000+00:00\",\"unpushed\":1,\"pipeline\":{\"status\":\"running\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/11\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/epsilon\",\"branch\":\"local-only\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null},{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"branch\":\"trunk\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null}],\"mrs\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/other\",\"iid\":12,\"title\":\"Other\",\"state\":\"merged\",\"draft\":false,\"url\":\"https://gitlab.example.com/group/other/-/merge_requests/12\",\"pipeline\":null},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"iid\":7,\"title\":\"Feature X\",\"state\":\"opened\",\"draft\":false,\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"pipeline\":{\"status\":\"success\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/13\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"iid\":5,\"title\":\"Old <one> & \\\"quoted\\\"\",\"state\":\"merged\",\"draft\":true,\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/5\",\"pipeline\":null},{\"host\":\"gitlab.example.com\",\"project\":\"gone/project\",\"iid\":4,\"title\":\"Survived\",\"state\":\"opened\",\"draft\":false,\"url\":\"https://gitlab.example.com/gone/project/-/merge_requests/4\",\"pipeline\":null},{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"iid\":3,\"title\":\"Beta docs\",\"state\":\"locked\",\"draft\":true,\"url\":\"https://gitlab.com/team/sub/beta-renamed/-/merge_requests/3\",\"pipeline\":{\"status\":\"created\",\"url\":\"https://gitlab.com/p/1\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/z\",\"iid\":2,\"title\":\"Zed\",\"state\":\"opened\",\"draft\":true,\"url\":\"https://gitlab.example.com/group/z/-/merge_requests/2\",\"pipeline\":null}]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/alpha/src/a.txt\",\"$ROOT/work/alpha\",\"relative/path\",\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/beta/notes.md\",\"$ROOT/work/gamma/w.txt\",\"$ROOT/work/delta/d.txt\",\"$ROOT/work/delta/vendor/inner/i.txt\",\"$ROOT/work/epsilon/e.txt\",\"$ROOT/work/missing/file.txt\",7,null],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/late.jsonl\",\"mrs\":[]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"3DchIbUIQI7ya0Nsuy37f2Sl37o\"",
+    "cache-control": "no-store",
+    "content-length": "387"
+   },
+   "answer": "{\"pushes\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/inner\",\"branch\":\"main\",\"commitTitle\":\"pushed elsewhere\",\"pushedAt\":\"2026-10-18T13:00:00.000+00:00\",\"unpushed\":0,\"pipeline\":{\"status\":\"success\",\"url\":\"https://ci.example.com/1\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/epsilon\",\"branch\":\"local-only\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null}],\"mrs\":[]}"
+  },
+  {
+   "method": "POST",
+   "url": "/agents/api/platform/gitlab/",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/alpha/src/a.txt\",\"$ROOT/work/alpha\",\"relative/path\",\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/beta/notes.md\",\"$ROOT/work/gamma/w.txt\",\"$ROOT/work/delta/d.txt\",\"$ROOT/work/delta/vendor/inner/i.txt\",\"$ROOT/work/epsilon/e.txt\",\"$ROOT/work/missing/file.txt\",7,null],\"jsonlPath\":\"$ROOT/home/.codex/sessions/2026/x.jsonl\",\"mrs\":[]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"uo2tUImCnM2Zij9vUeKsIMrZ1P0\"",
+    "cache-control": "no-store",
+    "content-length": "1744"
+   },
+   "answer": "{\"pushes\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/inner\",\"branch\":\"main\",\"commitTitle\":\"pushed elsewhere\",\"pushedAt\":\"2026-10-18T13:00:00.000+00:00\",\"unpushed\":0,\"pipeline\":{\"status\":\"success\",\"url\":\"https://ci.example.com/1\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"branch\":\"feature/x\",\"commitTitle\":\"fix: three\",\"pushedAt\":\"2026-10-18T10:50:00.000+00:00\",\"unpushed\":0,\"pipeline\":{\"status\":\"other\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/12\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"branch\":\"main\",\"commitTitle\":\"feat: one\",\"pushedAt\":\"2026-10-18T10:30:00.000+00:00\",\"unpushed\":1,\"pipeline\":{\"status\":\"running\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/11\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/epsilon\",\"branch\":\"local-only\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null},{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"branch\":\"trunk\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null}],\"mrs\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"iid\":7,\"title\":\"Feature X\",\"state\":\"opened\",\"draft\":false,\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"pipeline\":{\"status\":\"success\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/13\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"iid\":5,\"title\":\"Old <one> & \\\"quoted\\\"\",\"state\":\"merged\",\"draft\":true,\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/5\",\"pipeline\":null},{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"iid\":3,\"title\":\"Beta docs\",\"state\":\"locked\",\"draft\":true,\"url\":\"https://gitlab.com/team/sub/beta-renamed/-/merge_requests/3\",\"pipeline\":{\"status\":\"created\",\"url\":\"https://gitlab.com/p/1\"}}]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/alpha/src/a.txt\",\"$ROOT/work/alpha\",\"relative/path\",\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/beta/notes.md\",\"$ROOT/work/gamma/w.txt\",\"$ROOT/work/delta/d.txt\",\"$ROOT/work/delta/vendor/inner/i.txt\",\"$ROOT/work/epsilon/e.txt\",\"$ROOT/work/missing/file.txt\",7,null],\"jsonlPath\":\"$ROOT/home/outside.jsonl\",\"mrs\":[\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"https://gitlab.example.com/group/other/-/merge_requests/12#note_1\",\"https://gitlab.com/team/sub/beta/-/merge_requests/3\"]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"KdNSlhn-syVKeSuVd6Vpt6uybdA\"",
+    "cache-control": "no-store",
+    "content-length": "732"
+   },
+   "answer": "{\"pushes\":[],\"mrs\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/other\",\"iid\":12,\"title\":\"Other\",\"state\":\"merged\",\"draft\":false,\"url\":\"https://gitlab.example.com/group/other/-/merge_requests/12\",\"pipeline\":null},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"iid\":7,\"title\":\"Feature X\",\"state\":\"opened\",\"draft\":false,\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"pipeline\":{\"status\":\"success\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/13\"}},{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"iid\":3,\"title\":\"Beta docs\",\"state\":\"locked\",\"draft\":true,\"url\":\"https://gitlab.com/team/sub/beta-renamed/-/merge_requests/3\",\"pipeline\":{\"status\":\"created\",\"url\":\"https://gitlab.com/p/1\"}}]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/alpha/src/a.txt\",\"$ROOT/work/alpha\",\"relative/path\",\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/beta/notes.md\",\"$ROOT/work/gamma/w.txt\",\"$ROOT/work/delta/d.txt\",\"$ROOT/work/delta/vendor/inner/i.txt\",\"$ROOT/work/epsilon/e.txt\",\"$ROOT/work/missing/file.txt\",7,null],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/../p/session.jsonl\",\"mrs\":[]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"uo2tUImCnM2Zij9vUeKsIMrZ1P0\"",
+    "cache-control": "no-store",
+    "content-length": "1744"
+   },
+   "answer": "{\"pushes\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/inner\",\"branch\":\"main\",\"commitTitle\":\"pushed elsewhere\",\"pushedAt\":\"2026-10-18T13:00:00.000+00:00\",\"unpushed\":0,\"pipeline\":{\"status\":\"success\",\"url\":\"https://ci.example.com/1\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"branch\":\"feature/x\",\"commitTitle\":\"fix: three\",\"pushedAt\":\"2026-10-18T10:50:00.000+00:00\",\"unpushed\":0,\"pipeline\":{\"status\":\"other\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/12\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"branch\":\"main\",\"commitTitle\":\"feat: one\",\"pushedAt\":\"2026-10-18T10:30:00.000+00:00\",\"unpushed\":1,\"pipeline\":{\"status\":\"running\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/11\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/epsilon\",\"branch\":\"local-only\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null},{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"branch\":\"trunk\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null}],\"mrs\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"iid\":7,\"title\":\"Feature X\",\"state\":\"opened\",\"draft\":false,\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"pipeline\":{\"status\":\"success\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/13\"}},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"iid\":5,\"title\":\"Old <one> & \\\"quoted\\\"\",\"state\":\"merged\",\"draft\":true,\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/5\",\"pipeline\":null},{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"iid\":3,\"title\":\"Beta docs\",\"state\":\"locked\",\"draft\":true,\"url\":\"https://gitlab.com/team/sub/beta-renamed/-/merge_requests/3\",\"pipeline\":{\"status\":\"created\",\"url\":\"https://gitlab.com/p/1\"}}]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/alpha/src/a.txt\",\"$ROOT/work/alpha\",\"relative/path\",\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/beta/notes.md\",\"$ROOT/work/gamma/w.txt\",\"$ROOT/work/delta/d.txt\",\"$ROOT/work/delta/vendor/inner/i.txt\",\"$ROOT/work/epsilon/e.txt\",\"$ROOT/work/missing/file.txt\",7,null],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/far.jsonl\",\"mrs\":[]}",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain",
+    "cache-control": "no-store"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/alpha\"],\"jsonlPath\":null,\"mrs\":[]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d45C1EXHT1nHKtzYEwg68uenlWY\"",
+    "cache-control": "no-store",
+    "content-length": "22"
+   },
+   "answer": "{\"pushes\":[],\"mrs\":[]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"mrs\":[\"https://gitlab.example.com/broken/json/-/merge_requests/1\"]}",
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain",
+    "cache-control": "no-store"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "paths",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d45C1EXHT1nHKtzYEwg68uenlWY\"",
+    "cache-control": "no-store",
+    "content-length": "22"
+   },
+   "answer": "{\"pushes\":[],\"mrs\":[]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d45C1EXHT1nHKtzYEwg68uenlWY\"",
+    "cache-control": "no-store",
+    "content-length": "22"
+   },
+   "answer": "{\"pushes\":[],\"mrs\":[]}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "x-cli-token": "cli-secret",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 403,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "setup": {
+    "env": {
+     "GITLAB_SELF_TOKEN": "self-env"
+    }
+   },
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/alpha/src/a.txt\",\"$ROOT/work/alpha\",\"relative/path\",\"$ROOT/work/alpha/src/deep/b.txt\",\"$ROOT/work/beta/notes.md\",\"$ROOT/work/gamma/w.txt\",\"$ROOT/work/delta/d.txt\",\"$ROOT/work/delta/vendor/inner/i.txt\",\"$ROOT/work/epsilon/e.txt\",\"$ROOT/work/missing/file.txt\",7,null],\"jsonlPath\":\"$ROOT/home/.claude/projects/p/session.jsonl\",\"mrs\":[\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"https://gitlab.example.com/group/other/-/merge_requests/12#note_1\",\"https://gitlab.com/team/sub/beta/-/merge_requests/3\",\"https://evil.example.com/x/-/merge_requests/1\",\"not a url\",\"https://gitlab.example.com:8443/group/alpha/-/merge_requests/9\",\"https://GITLAB.example.com/group/z/-/merge_requests/2/diffs\",42,\"https://gitlab.example.com/gone/project/-/merge_requests/4\"]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"CJhnzIMuq0fBUboDGhJ-AuJjnWg\"",
+    "cache-control": "no-store",
+    "content-length": "951"
+   },
+   "answer": "{\"pushes\":[{\"host\":\"gitlab.example.com\",\"project\":\"group/epsilon\",\"branch\":\"local-only\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"branch\":\"main\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":3,\"pipeline\":null},{\"host\":\"gitlab.example.com\",\"project\":\"group/inner\",\"branch\":\"main\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":1,\"pipeline\":null},{\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"branch\":\"feature/x\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":4,\"pipeline\":null},{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"branch\":\"trunk\",\"commitTitle\":null,\"pushedAt\":null,\"unpushed\":2,\"pipeline\":null}],\"mrs\":[{\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"iid\":3,\"title\":\"Beta docs\",\"state\":\"locked\",\"draft\":true,\"url\":\"https://gitlab.com/team/sub/beta-renamed/-/merge_requests/3\",\"pipeline\":{\"status\":\"created\",\"url\":\"https://gitlab.com/p/1\"}}]}"
+  },
+  {
+   "setup": {
+    "env": {
+     "GITLAB_SELF_TOKEN": null
+    }
+   },
+   "method": "POST",
+   "url": "/api/platform/gitlab",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json",
+    "if-none-match": "ETAG"
+   },
+   "body": "{\"mrs\":[]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d45C1EXHT1nHKtzYEwg68uenlWY\"",
+    "cache-control": "no-store",
+    "content-length": "22"
+   },
+   "answer": "{\"pushes\":[],\"mrs\":[]}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2Falpha%2F-%2Fmerge_requests%2F7",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"RE7MIpzLvYm_tWT9z2LUrXre4Sg\"",
+    "cache-control": "no-store",
+    "content-length": "1014"
+   },
+   "answer": "{\"kind\":\"mr\",\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/7\",\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"ref\":\"!7\",\"title\":\"Feature X\",\"description\":\"Does X.\\r\\n\\n- one\\n- two\",\"author\":\"Agent Smith\",\"at\":\"2026-10-18T11:00:00.000Z\",\"state\":\"opened\",\"draft\":false,\"sourceBranch\":\"feature/x\",\"targetBranch\":\"main\",\"pipeline\":{\"status\":\"success\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/13\"},\"diff\":\"diff --git a/src/a.txt b/src/a.txt\\n--- a/src/a.txt\\n+++ b/src/a.txt\\n@@ -1 +1 @@\\n-a\\n+b\\ndiff --git a/dev/null b/new.txt\\nnew file mode 100644\\n--- /dev/null\\n+++ b/new.txt\\n@@ -0,0 +1 @@\\n+new\\ndiff --git a/gone.txt b/gone.txt\\ndeleted file mode 100644\\n--- a/gone.txt\\n+++ /dev/null\\n@@ -1 +0,0 @@\\n-old\\ndiff --git a/old/name.txt b/new/name.txt\\nrename from old/name.txt\\nrename to new/name.txt\\ndiff --git a/img.png b/img.png\\nBinary files a/img.png and b/img.png differ\\ndiff --git a/x.txt b/x.txt\\n--- a/x.txt\\n+++ b/x.txt\\n@@ -1 +1 @@\\n-1\\n+2\\n\",\"truncated\":false}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2Falpha%2F-%2Fmerge_requests%2F7%2Fdiffs%3Fx%3D1",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"RE7MIpzLvYm_tWT9z2LUrXre4Sg\"",
+    "cache-control": "no-store"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2Falpha%2F-%2Fmerge_requests%2F8",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"fsbW7NHFnq7Nc2IjlvQ_b-Plihg\"",
+    "cache-control": "no-store",
+    "content-length": "624391"
+   },
+   "answerSha256": "d0b0e4198c4c18360d3788642b89a2e096e8222dea115baa0cec33a4cf4e72f2",
+   "answerLength": 624391
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2Falpha%2F-%2Fmerge_requests%2F9",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"17h8k2NyP-TK3IoTy7lDWxXKxq8\"",
+    "cache-control": "no-store",
+    "content-length": "316"
+   },
+   "answer": "{\"kind\":\"mr\",\"url\":\"https://gitlab.example.com/group/alpha/-/merge_requests/9\",\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"ref\":\"!9\",\"title\":\"No diffs\",\"description\":\"\",\"author\":null,\"at\":null,\"state\":\"closed\",\"draft\":false,\"sourceBranch\":null,\"targetBranch\":null,\"pipeline\":null,\"diff\":\"\",\"truncated\":true}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2Falpha%2F-%2Fmerge_requests%2F404",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Teqc8KXJ0kZ6Wo40WOiSx0KzFp8\"",
+    "cache-control": "no-store",
+    "content-length": "56"
+   },
+   "answer": "{\"error\":\"GitLab не отдал этот объект\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2Falpha%2F-%2Fcommit%2F1cb8a0a4",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cAiNHrq5OTGo4j31PnbZw50gV0A\"",
+    "cache-control": "no-store",
+    "content-length": "604"
+   },
+   "answer": "{\"kind\":\"commit\",\"url\":\"https://gitlab.example.com/group/alpha/-/commit/1cb8a0a44c2e959bfd6168e3ffb5ddd01142385c\",\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"ref\":\"1cb8a0a4\",\"title\":\"fix: three\",\"description\":\"Longer body\\nwith lines.\",\"author\":\"Agent\",\"at\":\"2026-10-18T10:50:00.000+00:00\",\"state\":null,\"draft\":false,\"sourceBranch\":null,\"targetBranch\":null,\"pipeline\":{\"status\":\"manual\",\"url\":\"https://gitlab.example.com/group/alpha/-/pipelines/14\"},\"diff\":\"diff --git a/src/deep/b.txt b/src/deep/b.txt\\n--- a/src/deep/b.txt\\n+++ b/src/deep/b.txt\\n@@ -1 +1,2 @@\\n two\\n+three\",\"truncated\":false}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2Falpha%2F-%2Fcommit%2Fabcdef0%2F",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"gSEDVwLqyrKhSSh9Xpdp3KyOPsQ\"",
+    "cache-control": "no-store",
+    "content-length": "6671"
+   },
+   "answer": "{\"kind\":\"commit\",\"url\":\"https://gitlab.example.com/group/alpha/-/commit/abcdef0\",\"host\":\"gitlab.example.com\",\"project\":\"group/alpha\",\"ref\":\"abcdef01\",\"title\":\"Other title\",\"description\":\"\",\"author\":null,\"at\":null,\"state\":null,\"draft\":false,\"sourceBranch\":null,\"targetBranch\":null,\"pipeline\":null,\"diff\":\"diff --git a/f0 b/f0\\n--- a/f0\\n+++ b/f0\\n@@ -1 +1 @@\\n+0\\ndiff --git a/f1 b/f1\\n--- a/f1\\n+++ b/f1\\n@@ -1 +1 @@\\n+1\\ndiff --git a/f2 b/f2\\n--- a/f2\\n+++ b/f2\\n@@ -1 +1 @@\\n+2\\ndiff --git a/f3 b/f3\\n--- a/f3\\n+++ b/f3\\n@@ -1 +1 @@\\n+3\\ndiff --git a/f4 b/f4\\n--- a/f4\\n+++ b/f4\\n@@ -1 +1 @@\\n+4\\ndiff --git a/f5 b/f5\\n--- a/f5\\n+++ b/f5\\n@@ -1 +1 @@\\n+5\\ndiff --git a/f6 b/f6\\n--- a/f6\\n+++ b/f6\\n@@ -1 +1 @@\\n+6\\ndiff --git a/f7 b/f7\\n--- a/f7\\n+++ b/f7\\n@@ -1 +1 @@\\n+7\\ndiff --git a/f8 b/f8\\n--- a/f8\\n+++ b/f8\\n@@ -1 +1 @@\\n+8\\ndiff --git a/f9 b/f9\\n--- a/f9\\n+++ b/f9\\n@@ -1 +1 @@\\n+9\\ndiff --git a/f10 b/f10\\n--- a/f10\\n+++ b/f10\\n@@ -1 +1 @@\\n+10\\ndiff --git a/f11 b/f11\\n--- a/f11\\n+++ b/f11\\n@@ -1 +1 @@\\n+11\\ndiff --git a/f12 b/f12\\n--- a/f12\\n+++ b/f12\\n@@ -1 +1 @@\\n+12\\ndiff --git a/f13 b/f13\\n--- a/f13\\n+++ b/f13\\n@@ -1 +1 @@\\n+13\\ndiff --git a/f14 b/f14\\n--- a/f14\\n+++ b/f14\\n@@ -1 +1 @@\\n+14\\ndiff --git a/f15 b/f15\\n--- a/f15\\n+++ b/f15\\n@@ -1 +1 @@\\n+15\\ndiff --git a/f16 b/f16\\n--- a/f16\\n+++ b/f16\\n@@ -1 +1 @@\\n+16\\ndiff --git a/f17 b/f17\\n--- a/f17\\n+++ b/f17\\n@@ -1 +1 @@\\n+17\\ndiff --git a/f18 b/f18\\n--- a/f18\\n+++ b/f18\\n@@ -1 +1 @@\\n+18\\ndiff --git a/f19 b/f19\\n--- a/f19\\n+++ b/f19\\n@@ -1 +1 @@\\n+19\\ndiff --git a/f20 b/f20\\n--- a/f20\\n+++ b/f20\\n@@ -1 +1 @@\\n+20\\ndiff --git a/f21 b/f21\\n--- a/f21\\n+++ b/f21\\n@@ -1 +1 @@\\n+21\\ndiff --git a/f22 b/f22\\n--- a/f22\\n+++ b/f22\\n@@ -1 +1 @@\\n+22\\ndiff --git a/f23 b/f23\\n--- a/f23\\n+++ b/f23\\n@@ -1 +1 @@\\n+23\\ndiff --git a/f24 b/f24\\n--- a/f24\\n+++ b/f24\\n@@ -1 +1 @@\\n+24\\ndiff --git a/f25 b/f25\\n--- a/f25\\n+++ b/f25\\n@@ -1 +1 @@\\n+25\\ndiff --git a/f26 b/f26\\n--- a/f26\\n+++ b/f26\\n@@ -1 +1 @@\\n+26\\ndiff --git a/f27 b/f27\\n--- a/f27\\n+++ b/f27\\n@@ -1 +1 @@\\n+27\\ndiff --git a/f28 b/f28\\n--- a/f28\\n+++ b/f28\\n@@ -1 +1 @@\\n+28\\ndiff --git a/f29 b/f29\\n--- a/f29\\n+++ b/f29\\n@@ -1 +1 @@\\n+29\\ndiff --git a/f30 b/f30\\n--- a/f30\\n+++ b/f30\\n@@ -1 +1 @@\\n+30\\ndiff --git a/f31 b/f31\\n--- a/f31\\n+++ b/f31\\n@@ -1 +1 @@\\n+31\\ndiff --git a/f32 b/f32\\n--- a/f32\\n+++ b/f32\\n@@ -1 +1 @@\\n+32\\ndiff --git a/f33 b/f33\\n--- a/f33\\n+++ b/f33\\n@@ -1 +1 @@\\n+33\\ndiff --git a/f34 b/f34\\n--- a/f34\\n+++ b/f34\\n@@ -1 +1 @@\\n+34\\ndiff --git a/f35 b/f35\\n--- a/f35\\n+++ b/f35\\n@@ -1 +1 @@\\n+35\\ndiff --git a/f36 b/f36\\n--- a/f36\\n+++ b/f36\\n@@ -1 +1 @@\\n+36\\ndiff --git a/f37 b/f37\\n--- a/f37\\n+++ b/f37\\n@@ -1 +1 @@\\n+37\\ndiff --git a/f38 b/f38\\n--- a/f38\\n+++ b/f38\\n@@ -1 +1 @@\\n+38\\ndiff --git a/f39 b/f39\\n--- a/f39\\n+++ b/f39\\n@@ -1 +1 @@\\n+39\\ndiff --git a/f40 b/f40\\n--- a/f40\\n+++ b/f40\\n@@ -1 +1 @@\\n+40\\ndiff --git a/f41 b/f41\\n--- a/f41\\n+++ b/f41\\n@@ -1 +1 @@\\n+41\\ndiff --git a/f42 b/f42\\n--- a/f42\\n+++ b/f42\\n@@ -1 +1 @@\\n+42\\ndiff --git a/f43 b/f43\\n--- a/f43\\n+++ b/f43\\n@@ -1 +1 @@\\n+43\\ndiff --git a/f44 b/f44\\n--- a/f44\\n+++ b/f44\\n@@ -1 +1 @@\\n+44\\ndiff --git a/f45 b/f45\\n--- a/f45\\n+++ b/f45\\n@@ -1 +1 @@\\n+45\\ndiff --git a/f46 b/f46\\n--- a/f46\\n+++ b/f46\\n@@ -1 +1 @@\\n+46\\ndiff --git a/f47 b/f47\\n--- a/f47\\n+++ b/f47\\n@@ -1 +1 @@\\n+47\\ndiff --git a/f48 b/f48\\n--- a/f48\\n+++ b/f48\\n@@ -1 +1 @@\\n+48\\ndiff --git a/f49 b/f49\\n--- a/f49\\n+++ b/f49\\n@@ -1 +1 @@\\n+49\\ndiff --git a/f50 b/f50\\n--- a/f50\\n+++ b/f50\\n@@ -1 +1 @@\\n+50\\ndiff --git a/f51 b/f51\\n--- a/f51\\n+++ b/f51\\n@@ -1 +1 @@\\n+51\\ndiff --git a/f52 b/f52\\n--- a/f52\\n+++ b/f52\\n@@ -1 +1 @@\\n+52\\ndiff --git a/f53 b/f53\\n--- a/f53\\n+++ b/f53\\n@@ -1 +1 @@\\n+53\\ndiff --git a/f54 b/f54\\n--- a/f54\\n+++ b/f54\\n@@ -1 +1 @@\\n+54\\ndiff --git a/f55 b/f55\\n--- a/f55\\n+++ b/f55\\n@@ -1 +1 @@\\n+55\\ndiff --git a/f56 b/f56\\n--- a/f56\\n+++ b/f56\\n@@ -1 +1 @@\\n+56\\ndiff --git a/f57 b/f57\\n--- a/f57\\n+++ b/f57\\n@@ -1 +1 @@\\n+57\\ndiff --git a/f58 b/f58\\n--- a/f58\\n+++ b/f58\\n@@ -1 +1 @@\\n+58\\ndiff --git a/f59 b/f59\\n--- a/f59\\n+++ b/f59\\n@@ -1 +1 @@\\n+59\\ndiff --git a/f60 b/f60\\n--- a/f60\\n+++ b/f60\\n@@ -1 +1 @@\\n+60\\ndiff --git a/f61 b/f61\\n--- a/f61\\n+++ b/f61\\n@@ -1 +1 @@\\n+61\\ndiff --git a/f62 b/f62\\n--- a/f62\\n+++ b/f62\\n@@ -1 +1 @@\\n+62\\ndiff --git a/f63 b/f63\\n--- a/f63\\n+++ b/f63\\n@@ -1 +1 @@\\n+63\\ndiff --git a/f64 b/f64\\n--- a/f64\\n+++ b/f64\\n@@ -1 +1 @@\\n+64\\ndiff --git a/f65 b/f65\\n--- a/f65\\n+++ b/f65\\n@@ -1 +1 @@\\n+65\\ndiff --git a/f66 b/f66\\n--- a/f66\\n+++ b/f66\\n@@ -1 +1 @@\\n+66\\ndiff --git a/f67 b/f67\\n--- a/f67\\n+++ b/f67\\n@@ -1 +1 @@\\n+67\\ndiff --git a/f68 b/f68\\n--- a/f68\\n+++ b/f68\\n@@ -1 +1 @@\\n+68\\ndiff --git a/f69 b/f69\\n--- a/f69\\n+++ b/f69\\n@@ -1 +1 @@\\n+69\\ndiff --git a/f70 b/f70\\n--- a/f70\\n+++ b/f70\\n@@ -1 +1 @@\\n+70\\ndiff --git a/f71 b/f71\\n--- a/f71\\n+++ b/f71\\n@@ -1 +1 @@\\n+71\\ndiff --git a/f72 b/f72\\n--- a/f72\\n+++ b/f72\\n@@ -1 +1 @@\\n+72\\ndiff --git a/f73 b/f73\\n--- a/f73\\n+++ b/f73\\n@@ -1 +1 @@\\n+73\\ndiff --git a/f74 b/f74\\n--- a/f74\\n+++ b/f74\\n@@ -1 +1 @@\\n+74\\ndiff --git a/f75 b/f75\\n--- a/f75\\n+++ b/f75\\n@@ -1 +1 @@\\n+75\\ndiff --git a/f76 b/f76\\n--- a/f76\\n+++ b/f76\\n@@ -1 +1 @@\\n+76\\ndiff --git a/f77 b/f77\\n--- a/f77\\n+++ b/f77\\n@@ -1 +1 @@\\n+77\\ndiff --git a/f78 b/f78\\n--- a/f78\\n+++ b/f78\\n@@ -1 +1 @@\\n+78\\ndiff --git a/f79 b/f79\\n--- a/f79\\n+++ b/f79\\n@@ -1 +1 @@\\n+79\\ndiff --git a/f80 b/f80\\n--- a/f80\\n+++ b/f80\\n@@ -1 +1 @@\\n+80\\ndiff --git a/f81 b/f81\\n--- a/f81\\n+++ b/f81\\n@@ -1 +1 @@\\n+81\\ndiff --git a/f82 b/f82\\n--- a/f82\\n+++ b/f82\\n@@ -1 +1 @@\\n+82\\ndiff --git a/f83 b/f83\\n--- a/f83\\n+++ b/f83\\n@@ -1 +1 @@\\n+83\\ndiff --git a/f84 b/f84\\n--- a/f84\\n+++ b/f84\\n@@ -1 +1 @@\\n+84\\ndiff --git a/f85 b/f85\\n--- a/f85\\n+++ b/f85\\n@@ -1 +1 @@\\n+85\\ndiff --git a/f86 b/f86\\n--- a/f86\\n+++ b/f86\\n@@ -1 +1 @@\\n+86\\ndiff --git a/f87 b/f87\\n--- a/f87\\n+++ b/f87\\n@@ -1 +1 @@\\n+87\\ndiff --git a/f88 b/f88\\n--- a/f88\\n+++ b/f88\\n@@ -1 +1 @@\\n+88\\ndiff --git a/f89 b/f89\\n--- a/f89\\n+++ b/f89\\n@@ -1 +1 @@\\n+89\\ndiff --git a/f90 b/f90\\n--- a/f90\\n+++ b/f90\\n@@ -1 +1 @@\\n+90\\ndiff --git a/f91 b/f91\\n--- a/f91\\n+++ b/f91\\n@@ -1 +1 @@\\n+91\\ndiff --git a/f92 b/f92\\n--- a/f92\\n+++ b/f92\\n@@ -1 +1 @@\\n+92\\ndiff --git a/f93 b/f93\\n--- a/f93\\n+++ b/f93\\n@@ -1 +1 @@\\n+93\\ndiff --git a/f94 b/f94\\n--- a/f94\\n+++ b/f94\\n@@ -1 +1 @@\\n+94\\ndiff --git a/f95 b/f95\\n--- a/f95\\n+++ b/f95\\n@@ -1 +1 @@\\n+95\\ndiff --git a/f96 b/f96\\n--- a/f96\\n+++ b/f96\\n@@ -1 +1 @@\\n+96\\ndiff --git a/f97 b/f97\\n--- a/f97\\n+++ b/f97\\n@@ -1 +1 @@\\n+97\\ndiff --git a/f98 b/f98\\n--- a/f98\\n+++ b/f98\\n@@ -1 +1 @@\\n+98\\ndiff --git a/f99 b/f99\\n--- a/f99\\n+++ b/f99\\n@@ -1 +1 @@\\n+99\",\"truncated\":true}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.com%2Fteam%2Fsub%2Fbeta%2F-%2Fmerge_requests%2F3",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"KgOfconUtM1iyloC_8csNyUQGwU\"",
+    "cache-control": "no-store",
+    "content-length": "368"
+   },
+   "answer": "{\"kind\":\"mr\",\"url\":\"https://gitlab.com/team/sub/beta-renamed/-/merge_requests/3\",\"host\":\"gitlab.com\",\"project\":\"team/sub/beta-renamed\",\"ref\":\"!3\",\"title\":\"Beta docs\",\"description\":\"\",\"author\":null,\"at\":null,\"state\":\"locked\",\"draft\":true,\"sourceBranch\":null,\"targetBranch\":null,\"pipeline\":{\"status\":\"created\",\"url\":\"https://gitlab.com/p/1\"},\"diff\":\"\",\"truncated\":false}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fexample.com%2Fgroup%2Falpha%2F-%2Fmerge_requests%2F7",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_K0PrIY3waLA2iZnKcJtB7HtckY\"",
+    "cache-control": "no-store",
+    "content-length": "81"
+   },
+   "answer": "{\"error\":\"Нужна ссылка на merge request или коммит GitLab\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=a&url=b",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_K0PrIY3waLA2iZnKcJtB7HtckY\"",
+    "cache-control": "no-store",
+    "content-length": "81"
+   },
+   "answer": "{\"error\":\"Нужна ссылка на merge request или коммит GitLab\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_K0PrIY3waLA2iZnKcJtB7HtckY\"",
+    "cache-control": "no-store",
+    "content-length": "81"
+   },
+   "answer": "{\"error\":\"Нужна ссылка на merge request или коммит GitLab\"}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/gitlab-view",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view",
+   "headers": {
+    "x-cli-token": "cli-secret"
+   },
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/gitlab-view?url=https%3A%2F%2Fgitlab.example.com%2Fbroken%2Fjson%2F-%2Fmerge_requests%2F1",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain",
+    "cache-control": "no-store"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Ftracker.example.com%2Fissue%2FACME-12%2Ffix-the-thing%3Fx%23y",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Lb7sErHbqTIWbPtY3ncyNy5wGzA\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "239"
+   },
+   "answer": "{\"kind\":\"issue\",\"key\":\"ACME-12\",\"title\":\"Fix the thing\",\"state\":\"In Progress\",\"resolved\":false,\"assignee\":{\"name\":\"John  Doe\",\"avatar\":\"/api/platform/link-meta/avatar?login=jdoe\"},\"type\":\"Task\",\"parent\":{\"key\":\"ACME-1\",\"title\":\"The epic\"}}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fyoutrack.example.com%2Fyoutrack%2Fissue%2FDEMO-3",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"YRC3Bfs41gQpyNBcTG24PS-nQTY\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "200"
+   },
+   "answer": "{\"kind\":\"issue\",\"key\":\"DEMO-3\",\"title\":\"Under an idea\",\"state\":null,\"resolved\":true,\"assignee\":{\"name\":\"asmith\",\"avatar\":\"/api/platform/link-meta/avatar?login=asmith\"},\"type\":\"ИДЕЯ\",\"parent\":null}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?key=ACME-12",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Lb7sErHbqTIWbPtY3ncyNy5wGzA\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "239"
+   },
+   "answer": "{\"kind\":\"issue\",\"key\":\"ACME-12\",\"title\":\"Fix the thing\",\"state\":\"In Progress\",\"resolved\":false,\"assignee\":{\"name\":\"John  Doe\",\"avatar\":\"/api/platform/link-meta/avatar?login=jdoe\"},\"type\":\"Task\",\"parent\":{\"key\":\"ACME-1\",\"title\":\"The epic\"}}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?key=ACME-12",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Lb7sErHbqTIWbPtY3ncyNy5wGzA\"",
+    "cache-control": "private, max-age=60"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?key=%20OPS-4%20",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"bm7tJgu8FHlq5QU-Y6gDxOGPfRc\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Not found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?key=ZZZ-1",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"nR8Q4TnQGJMCkBxWWTMcnvLv3M8\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported url\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?key=OLD-1",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"nR8Q4TnQGJMCkBxWWTMcnvLv3M8\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported url\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?key=OPS-6",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"bm7tJgu8FHlq5QU-Y6gDxOGPfRc\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Not found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?key=OPS-7",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Nh891BGahRcNlWMPnfxWEP0SESY\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "131"
+   },
+   "answer": "{\"kind\":\"issue\",\"key\":\"OPS-7\",\"title\":7,\"state\":null,\"resolved\":false,\"assignee\":{\"name\":\"\",\"avatar\":null},\"type\":null,\"parent\":{}}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2Falpha%2F-%2Fmerge_requests%2F70",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"a_VAt5_zCKOdcnnfGnMM1PLd_z4\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "95"
+   },
+   "answer": "{\"kind\":\"mr\",\"iid\":70,\"title\":\"Preview\",\"state\":\"opened\",\"project\":\"group/alpha\",\"draft\":false}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fgitlab.com%2Fteam%2Fsub%2Fbeta%2F-%2Fmerge_requests%2F3%2Fdiffs",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"bm7tJgu8FHlq5QU-Y6gDxOGPfRc\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Not found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fgitlab.example.com%2Fgroup%2F..%2Falpha%2F-%2Fmerge_requests%2F70",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"nR8Q4TnQGJMCkBxWWTMcnvLv3M8\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported url\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fdocs.example.com%2Fa%2Freport-1",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pvTBQjTr9UzIQRswFp0XD8IQUcE\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "108"
+   },
+   "answer": "{\"kind\":\"artifact\",\"title\":\"Report & notes AB «q» &bogus;\",\"description\":\"A \\\"report\\\" about &#0; things\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fdocs.example.com%2Fb%2Fboard-2%2F%3Fx%3D1%26k%3Dkey_1%23f",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ShGOMkL_nDTxOIGYykw2BtP7qgw\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "69"
+   },
+   "answer": "{\"kind\":\"artifact\",\"title\":\"Board two\",\"description\":\"single quoted\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fplatform.example.com%2Fagents%2Fdocs%2Freport-1%2F",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pvTBQjTr9UzIQRswFp0XD8IQUcE\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "108"
+   },
+   "answer": "{\"kind\":\"artifact\",\"title\":\"Report & notes AB «q» &bogus;\",\"description\":\"A \\\"report\\\" about &#0; things\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fdocs.example.com%2Fb%2Fapi",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"nR8Q4TnQGJMCkBxWWTMcnvLv3M8\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported url\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fdocs.example.com%2Fa%2Freport-1%3Fk%3Dbad%20key",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"nR8Q4TnQGJMCkBxWWTMcnvLv3M8\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported url\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fdocs.example.com%2Fa%2Fplain",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"bm7tJgu8FHlq5QU-Y6gDxOGPfRc\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Not found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fdocs.example.com%2Fa%2Fnotitle",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"bm7tJgu8FHlq5QU-Y6gDxOGPfRc\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Not found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=https%3A%2F%2Fdocs.example.com%2Fa%2Fmoved",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"bm7tJgu8FHlq5QU-Y6gDxOGPfRc\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Not found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=http%3A%2F%2Fdocs.example.com%2Fa%2Freport-1",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"nR8Q4TnQGJMCkBxWWTMcnvLv3M8\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported url\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?url=a&url=b&key=ACME-12",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Lb7sErHbqTIWbPtY3ncyNy5wGzA\"",
+    "cache-control": "private, max-age=60",
+    "content-length": "239"
+   },
+   "answer": "{\"kind\":\"issue\",\"key\":\"ACME-12\",\"title\":\"Fix the thing\",\"state\":\"In Progress\",\"resolved\":false,\"assignee\":{\"name\":\"John  Doe\",\"avatar\":\"/api/platform/link-meta/avatar?login=jdoe\"},\"type\":\"Task\",\"parent\":{\"key\":\"ACME-1\",\"title\":\"The epic\"}}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"nR8Q4TnQGJMCkBxWWTMcnvLv3M8\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported url\"}"
+  },
+  {
+   "method": "DELETE",
+   "url": "/api/platform/link-meta",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta?key=ACME-12",
+   "headers": {
+    "x-cli-token": "cli-secret"
+   },
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/projects",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oZ5MOGc6ALJA-PyX17RQis_5AiU\"",
+    "cache-control": "private, max-age=600",
+    "content-length": "30"
+   },
+   "answer": "{\"keys\":[\"ACME\",\"DEMO\",\"OPS\"]}"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/link-meta/projects",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oZ5MOGc6ALJA-PyX17RQis_5AiU\"",
+    "cache-control": "private, max-age=600"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/projects",
+   "headers": {
+    "x-cli-token": "cli-secret"
+   },
+   "status": 403,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=jdoe",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "image/png",
+    "etag": "\"yF9r6BOI9XcRxhpD9XoSL5xZRps\"",
+    "cache-control": "private, max-age=86400",
+    "content-length": "48",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answerB64": "iVBORw0KGgoABw4VHCMqMTg/Rk1UW2JpcHd+hYyTmqGor7a9xMvS2eDn7vX8AwoR"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=jdoe",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "image/png",
+    "etag": "\"yF9r6BOI9XcRxhpD9XoSL5xZRps\"",
+    "cache-control": "private, max-age=86400",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=asmith",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "image/svg+xml",
+    "etag": "\"9w4kQXW-T5aiN6dIV38o853Tx8s\"",
+    "cache-control": "private, max-age=86400",
+    "content-length": "41",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answer": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=nobody",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "cache-control": "private, max-age=300",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=nobody",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "cache-control": "private, max-age=300",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=evil",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "cache-control": "private, max-age=300",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=weird",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "cache-control": "private, max-age=300",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=big",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "cache-control": "private, max-age=300",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=odd",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=bad!",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=a&login=b",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "HEAD",
+   "url": "/api/platform/link-meta/avatar?login=asmith",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "image/svg+xml",
+    "etag": "\"9w4kQXW-T5aiN6dIV38o853Tx8s\"",
+    "cache-control": "private, max-age=86400",
+    "content-length": "41",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=ACME-12",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ATpuw45HK_NXr8cK16cd_yYdIyk\"",
+    "cache-control": "private, no-store",
+    "content-length": "5181"
+   },
+   "answer": "{\"key\":\"ACME-12\",\"title\":\"Fix the thing\",\"project\":\"ACME\",\"type\":\"Bug\",\"state\":\"Open\",\"priority\":\"Major\",\"resolved\":false,\"assignee\":{\"name\":\"John Doe\",\"avatar\":\"/api/platform/link-meta/avatar?login=jdoe\"},\"parent\":{\"key\":\"ACME-1\",\"title\":\"The epic\"},\"children\":[{\"key\":\"ACME-13\",\"title\":\"Child\",\"state\":\"Done\",\"resolved\":true},{\"key\":\"OPS-2\",\"title\":\"OPS-2\",\"state\":null,\"resolved\":false}],\"description\":\"Line one\\nLine two\\nthree ␛[31mred␛[0m bell\",\"comments\":[{\"author\":\"u2\",\"at\":1792321500002,\"text\":\"comment 2\"},{\"author\":\"Без имени\",\"at\":1792321500003,\"text\":\"comment 3\"},{\"author\":\"u4\",\"at\":1792321500004,\"text\":\"comment 4\"},{\"author\":\"User 5\",\"at\":1792321500005,\"text\":\"comment 5\"},{\"author\":\"Без имени\",\"at\":1792321500006,\"text\":\"comment 6\"},{\"author\":\"User 7\",\"at\":1792321500007,\"text\":\"comment 7\"},{\"author\":\"u8\",\"at\":1792321500008,\"text\":\"comment 8\"},{\"author\":\"Без имени\",\"at\":1792321500009,\"text\":\"comment 9\"},{\"author\":\"u10\",\"at\":1792321500010,\"text\":\"comment 10\"},{\"author\":\"User 11\",\"at\":1792321500011,\"text\":\"comment 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…\"}],\"updated\":1792321500123}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=ACME-12",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ATpuw45HK_NXr8cK16cd_yYdIyk\"",
+    "cache-control": "private, no-store"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=DEMO-404",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"HgI-DoBk6ksYbJElsykv2NthUsw\"",
+    "cache-control": "private, no-store",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"not-found\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=OPS-5",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 502,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"EYJbFoslpVTmmoNTX0VfyEJFV_4\"",
+    "cache-control": "private, no-store",
+    "content-length": "19"
+   },
+   "answer": "{\"error\":\"tracker\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=OPS-8",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 502,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"EYJbFoslpVTmmoNTX0VfyEJFV_4\"",
+    "cache-control": "private, no-store",
+    "content-length": "19"
+   },
+   "answer": "{\"error\":\"tracker\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=OPS-9",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"zcvtpzXMtwJiIVE30WhjaUgjtR0\"",
+    "cache-control": "private, no-store",
+    "content-length": "196"
+   },
+   "answer": "{\"key\":\"OPS-9\",\"title\":\"Minimal\",\"project\":null,\"type\":null,\"state\":null,\"priority\":null,\"resolved\":false,\"assignee\":null,\"parent\":null,\"children\":[],\"description\":\"\",\"comments\":[],\"updated\":null}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=NOPE-1",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"fBdMiphnWfWdhd2xlkvFZzKoLSk\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported key\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=ACME-1&key=ACME-2",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"fBdMiphnWfWdhd2xlkvFZzKoLSk\"",
+    "content-length": "27"
+   },
+   "answer": "{\"error\":\"Unsupported key\"}"
+  },
+  {
+   "method": "PUT",
+   "url": "/api/platform/task?key=ACME-12",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "setup": {
+    "env": {
+     "YOUTRACK_TOKEN": " yt-env "
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/task?key=OPS-9",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"zcvtpzXMtwJiIVE30WhjaUgjtR0\"",
+    "cache-control": "private, no-store",
+    "content-length": "196"
+   },
+   "answer": "{\"key\":\"OPS-9\",\"title\":\"Minimal\",\"project\":null,\"type\":null,\"state\":null,\"priority\":null,\"resolved\":false,\"assignee\":null,\"parent\":null,\"children\":[],\"description\":\"\",\"comments\":[],\"updated\":null}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/task?key=ACME-12",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ATpuw45HK_NXr8cK16cd_yYdIyk\"",
+    "cache-control": "private, no-store",
+    "content-length": "5181"
+   },
+   "answer": "{\"key\":\"ACME-12\",\"title\":\"Fix the thing\",\"project\":\"ACME\",\"type\":\"Bug\",\"state\":\"Open\",\"priority\":\"Major\",\"resolved\":false,\"assignee\":{\"name\":\"John Doe\",\"avatar\":\"/api/platform/link-meta/avatar?login=jdoe\"},\"parent\":{\"key\":\"ACME-1\",\"title\":\"The epic\"},\"children\":[{\"key\":\"ACME-13\",\"title\":\"Child\",\"state\":\"Done\",\"resolved\":true},{\"key\":\"OPS-2\",\"title\":\"OPS-2\",\"state\":null,\"resolved\":false}],\"description\":\"Line one\\nLine two\\nthree ␛[31mred␛[0m bell\",\"comments\":[{\"author\":\"u2\",\"at\":1792321500002,\"text\":\"comment 2\"},{\"author\":\"Без имени\",\"at\":1792321500003,\"text\":\"comment 3\"},{\"author\":\"u4\",\"at\":1792321500004,\"text\":\"comment 4\"},{\"author\":\"User 5\",\"at\":1792321500005,\"text\":\"comment 5\"},{\"author\":\"Без имени\",\"at\":1792321500006,\"text\":\"comment 6\"},{\"author\":\"User 7\",\"at\":1792321500007,\"text\":\"comment 7\"},{\"author\":\"u8\",\"at\":1792321500008,\"text\":\"comment 8\"},{\"author\":\"Без имени\",\"at\":1792321500009,\"text\":\"comment 9\"},{\"author\":\"u10\",\"at\":1792321500010,\"text\":\"comment 10\"},{\"author\":\"User 11\",\"at\":1792321500011,\"text\":\"comment 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…\"}],\"updated\":1792321500123}"
+  },
+  {
+   "setup": {
+    "env": {
+     "YOUTRACK_TOKEN": null
+    },
+    "files": {
+     "home/.config/acme/youtrack-token": null
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/task?key=OPS-77",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 503,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"7kdDyme9nYXZ1Hi6suW02p_P5XI\"",
+    "cache-control": "private, no-store",
+    "content-length": "20"
+   },
+   "answer": "{\"error\":\"no-token\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/link-meta/avatar?login=newperson",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "cache-control": "private, max-age=300",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "setup": {
+    "files": {
+     "home/.config/acme/youtrack-token": "yt-file"
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/task?key=OPS-9",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"zcvtpzXMtwJiIVE30WhjaUgjtR0\"",
+    "cache-control": "private, no-store",
+    "content-length": "196"
+   },
+   "answer": "{\"key\":\"OPS-9\",\"title\":\"Minimal\",\"project\":null,\"type\":null,\"state\":null,\"priority\":null,\"resolved\":false,\"assignee\":null,\"parent\":null,\"children\":[],\"description\":\"\",\"comments\":[],\"updated\":null}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=icons.example.org",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "image/svg+xml",
+    "etag": "\"fodewO8iXla6zfpHN-aPY79Tq8s\"",
+    "cache-control": "private, max-age=86400",
+    "content-length": "61",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answer": "<svg xmlns=\"http://www.w3.org/2000/svg\"><circle r=\"4\"/></svg>"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=ICONS.example.org",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "image/svg+xml",
+    "etag": "\"fodewO8iXla6zfpHN-aPY79Tq8s\"",
+    "cache-control": "private, max-age=86400",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=sub.blank.example.org",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "image/x-icon",
+    "etag": "\"H0MtIIljJwfJzvhOcgsadBmpwtE\"",
+    "cache-control": "private, max-age=86400",
+    "content-length": "13",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answerB64": "iVBORw0KGgoABw4VHA=="
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=none.example.org",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 404,
+   "answerHeaders": {
+    "cache-control": "private, max-age=3600",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=moved.example.net",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "image/png",
+    "etag": "\"3jlcZC5phVB3Zms6X_4-QzD_LZQ\"",
+    "cache-control": "private, max-age=86400",
+    "content-length": "18",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answerB64": "iVBORw0KGgoABw4VHCMqMTg/"
+  },
+  {
+   "method": "POST",
+   "url": "/api/platform/favicon?host=moved.example.net",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "image/png",
+    "etag": "\"3jlcZC5phVB3Zms6X_4-QzD_LZQ\"",
+    "cache-control": "private, max-age=86400",
+    "content-length": "18",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'"
+   },
+   "answerB64": "iVBORw0KGgoABw4VHCMqMTg/"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=127.0.0.1",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=printer.local",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=-bad.example.org",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=bad-.example.org",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=localhost",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=a.example.org&host=b.example.org",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=icons.example.org",
+   "headers": {
+    "x-cli-token": "cli-secret"
+   },
+   "status": 403,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/favicon?host=icons.example.org",
+   "headers": {},
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"14rbSOy9SOXkyiWxqyB6XlwqheM\"",
+    "cache-control": "no-store",
+    "content-length": "120"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":0,\"updatedAt\":\"1970-01-01T00:00:00.000Z\",\"projects\":[],\"assignments\":{},\"pins\":[]}}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "{\"ops\":[]}",
+   "status": 415,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"zZd_TYnIDmkhy_p0T3G1GNcrdE4\"",
+    "cache-control": "no-store",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"json-only\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"fEXCfHFgwhsEliMUkL9SfXXi9_k\"",
+    "cache-control": "no-store",
+    "content-length": "74"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":-1,\"reason\":\"ops must be an array of 1..50\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "[1]",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"fEXCfHFgwhsEliMUkL9SfXXi9_k\"",
+    "cache-control": "no-store",
+    "content-length": "74"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":-1,\"reason\":\"ops must be an array of 1..50\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.create\",\"id\":\"prj-short\",\"name\":\"x\",\"color\":\"blue\"}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"uVqkHgB9MzaZxkkfUKn5R2ZM1bE\"",
+    "cache-control": "no-store",
+    "content-length": "58"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"bad project id\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.create\",\"id\":\"prj-abcdef\",\"name\":\"  \",\"color\":\"blue\"}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ZfAEdfhbq8XN_QlpYbfcvSLemMc\"",
+    "cache-control": "no-store",
+    "content-length": "52"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"bad name\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.create\",\"id\":\"prj-abcdef\",\"name\":\"A\",\"color\":\"black\"}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oSB2ejldSspeUMVFIOIZgD19Cd8\"",
+    "cache-control": "no-store",
+    "content-length": "53"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"bad color\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.create\",\"id\":\"prj-abcdef\",\"name\":\"A\",\"color\":\"blue\",\"index\":-1}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"p1XBR7ZXhfTK83vIayV79XuYAKg\"",
+    "cache-control": "no-store",
+    "content-length": "53"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"bad index\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"pin\",\"ref\":\"agent:BAD REF\"}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"VEKM_nfOpWy08sHBVCPP9ft0KJM\"",
+    "cache-control": "no-store",
+    "content-length": "51"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"bad ref\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"nope\"}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"D0ugFOEHuvkFmLRfQebCDLdJwHU\"",
+    "cache-control": "no-store",
+    "content-length": "54"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"unknown op\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.update\",\"id\":\"prj-abcdef\"}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"lW6ppnBkjOfbV2sNQZ5PdB_VzIc\"",
+    "cache-control": "no-store",
+    "content-length": "61"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"nothing to update\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"assign\",\"refs\":[\"chat:abcdefgh\"]}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"uVqkHgB9MzaZxkkfUKn5R2ZM1bE\"",
+    "cache-control": "no-store",
+    "content-length": "58"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"bad project id\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json; charset=utf-8"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.create\",\"id\":\"prj-abcdef\",\"name\":\"  Alpha \\t project \",\"color\":\"blue\"},{\"op\":\"project.create\",\"id\":\"prj-second1\",\"name\":\"Second\",\"color\":\"green\",\"index\":0},{\"op\":\"pin\",\"ref\":\"agent:m1:tab-1\"},{\"op\":\"pin\",\"ref\":\"chat:12345678\",\"index\":0},{\"op\":\"pin\",\"ref\":\"agent:tab-2\",\"index\":99},{\"op\":\"assign\",\"refs\":[\"agent:m1:tab-1\",\"chat:12345678\"],\"projectId\":\"prj-abcdef\"},{\"op\":\"assign\",\"refs\":[\"agent:7\"],\"projectId\":\"prj-second1\"}]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"b_oJb1dLpJsJP9n5Kp7Seb_93MY\"",
+    "cache-control": "no-store",
+    "content-length": "410"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":1,\"updatedAt\":\"2026-10-18T15:00:00.000Z\",\"projects\":[{\"id\":\"prj-second1\",\"name\":\"Second\",\"color\":\"green\",\"createdAt\":1792335600000},{\"id\":\"prj-abcdef\",\"name\":\"Alpha project\",\"color\":\"blue\",\"createdAt\":1792335600000}],\"assignments\":{\"agent:m1:tab-1\":\"prj-abcdef\",\"chat:12345678\":\"prj-abcdef\",\"agent:7\":\"prj-second1\"},\"pins\":[\"chat:12345678\",\"agent:m1:tab-1\",\"agent:tab-2\"]}}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "if-none-match": "ETAG"
+   },
+   "status": 304,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"b_oJb1dLpJsJP9n5Kp7Seb_93MY\"",
+    "cache-control": "no-store"
+   },
+   "answer": ""
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.create\",\"id\":\"prj-abcdef\",\"name\":\"Alpha project\",\"color\":\"teal\"}]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"b_oJb1dLpJsJP9n5Kp7Seb_93MY\"",
+    "cache-control": "no-store",
+    "content-length": "410"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":1,\"updatedAt\":\"2026-10-18T15:00:00.000Z\",\"projects\":[{\"id\":\"prj-second1\",\"name\":\"Second\",\"color\":\"green\",\"createdAt\":1792335600000},{\"id\":\"prj-abcdef\",\"name\":\"Alpha project\",\"color\":\"blue\",\"createdAt\":1792335600000}],\"assignments\":{\"agent:m1:tab-1\":\"prj-abcdef\",\"chat:12345678\":\"prj-abcdef\",\"agent:7\":\"prj-second1\"},\"pins\":[\"chat:12345678\",\"agent:m1:tab-1\",\"agent:tab-2\"]}}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.create\",\"id\":\"prj-abcdef\",\"name\":\"Renamed\",\"color\":\"teal\"}]}",
+   "status": 409,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Mg1pHKZKP4XjlDUWXaRPzjmcr1M\"",
+    "cache-control": "no-store",
+    "content-length": "44"
+   },
+   "answer": "{\"error\":\"project-exists\",\"id\":\"prj-abcdef\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.update\",\"id\":\"prj-zzzzzz\",\"name\":\"x\"}]}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"AJ8U82sfUvkW53rBtFEPFQ_dX_4\"",
+    "cache-control": "no-store",
+    "content-length": "47"
+   },
+   "answer": "{\"error\":\"project-not-found\",\"id\":\"prj-zzzzzz\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.reorder\",\"ids\":[\"prj-abcdef\"]}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6QbaXpTyCxNxaGIIkaEH0jp9PRU\"",
+    "cache-control": "no-store",
+    "content-length": "85"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"ids must be a permutation of all projects\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"project.reorder\",\"ids\":[\"prj-abcdef\",\"prj-second1\"]},{\"op\":\"project.update\",\"id\":\"prj-second1\",\"color\":\"rose\",\"name\":\" Second  2 \"}]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"-AMJlDGHLbqJsMynSqD3kbSWD7Y\"",
+    "cache-control": "no-store",
+    "content-length": "411"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":2,\"updatedAt\":\"2026-10-18T15:00:00.000Z\",\"projects\":[{\"id\":\"prj-abcdef\",\"name\":\"Alpha project\",\"color\":\"blue\",\"createdAt\":1792335600000},{\"id\":\"prj-second1\",\"name\":\"Second 2\",\"color\":\"rose\",\"createdAt\":1792335600000}],\"assignments\":{\"agent:m1:tab-1\":\"prj-abcdef\",\"chat:12345678\":\"prj-abcdef\",\"agent:7\":\"prj-second1\"},\"pins\":[\"chat:12345678\",\"agent:m1:tab-1\",\"agent:tab-2\"]}}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"pins.reorder\",\"refs\":[\"agent:tab-2\"]}]}",
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"N8YA75oqaQXF_-G5cmN307BugZg\"",
+    "cache-control": "no-store",
+    "content-length": "82"
+   },
+   "answer": "{\"error\":\"invalid-op\",\"index\":0,\"reason\":\"refs must be a permutation of all pins\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"pins.reorder\",\"refs\":[\"agent:tab-2\",\"agent:m1:tab-1\",\"chat:12345678\"]},{\"op\":\"unpin\",\"ref\":\"chat:12345678\"}]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"DSU6RwwH_kM4vPDimraSOoWE2gc\"",
+    "cache-control": "no-store",
+    "content-length": "395"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":3,\"updatedAt\":\"2026-10-18T15:00:00.000Z\",\"projects\":[{\"id\":\"prj-abcdef\",\"name\":\"Alpha project\",\"color\":\"blue\",\"createdAt\":1792335600000},{\"id\":\"prj-second1\",\"name\":\"Second 2\",\"color\":\"rose\",\"createdAt\":1792335600000}],\"assignments\":{\"agent:m1:tab-1\":\"prj-abcdef\",\"chat:12345678\":\"prj-abcdef\",\"agent:7\":\"prj-second1\"},\"pins\":[\"agent:tab-2\",\"agent:m1:tab-1\"]}}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"pin\",\"ref\":\"agent:p0\"},{\"op\":\"pin\",\"ref\":\"agent:p1\"},{\"op\":\"pin\",\"ref\":\"agent:p2\"},{\"op\":\"pin\",\"ref\":\"agent:p3\"},{\"op\":\"pin\",\"ref\":\"agent:p4\"},{\"op\":\"pin\",\"ref\":\"agent:p5\"},{\"op\":\"pin\",\"ref\":\"agent:p6\"},{\"op\":\"pin\",\"ref\":\"agent:p7\"},{\"op\":\"pin\",\"ref\":\"agent:p8\"},{\"op\":\"pin\",\"ref\":\"agent:p9\"},{\"op\":\"pin\",\"ref\":\"agent:p10\"},{\"op\":\"pin\",\"ref\":\"agent:p11\"},{\"op\":\"pin\",\"ref\":\"agent:p12\"},{\"op\":\"pin\",\"ref\":\"agent:p13\"},{\"op\":\"pin\",\"ref\":\"agent:p14\"},{\"op\":\"pin\",\"ref\":\"agent:p15\"},{\"op\":\"pin\",\"ref\":\"agent:p16\"},{\"op\":\"pin\",\"ref\":\"agent:p17\"},{\"op\":\"pin\",\"ref\":\"agent:p18\"},{\"op\":\"pin\",\"ref\":\"agent:p19\"}]}",
+   "status": 413,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"PQ9FqFjBlxjiSSPC1TL3ia6GQYI\"",
+    "cache-control": "no-store",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"limit\",\"what\":\"pins\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"assign\",\"refs\":[\"agent:x\"],\"projectId\":\"prj-nothere\"}]}",
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"sCCRxjCnwZtNIp-BZhmJc9QMK7E\"",
+    "cache-control": "no-store",
+    "content-length": "48"
+   },
+   "answer": "{\"error\":\"project-not-found\",\"id\":\"prj-nothere\"}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"forget\",\"refs\":[\"agent:m1:tab-1\",\"agent:7\"]},{\"op\":\"project.delete\",\"id\":\"prj-abcdef\"}]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0y4DgsY11ZNWr0f4ojaoo75_k1c\"",
+    "cache-control": "no-store",
+    "content-length": "212"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":4,\"updatedAt\":\"2026-10-18T15:00:00.000Z\",\"projects\":[{\"id\":\"prj-second1\",\"name\":\"Second 2\",\"color\":\"rose\",\"createdAt\":1792335600000}],\"assignments\":{},\"pins\":[\"agent:tab-2\"]}}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"assign\",\"refs\":[\"agent:tab-2\"],\"projectId\":null}]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0y4DgsY11ZNWr0f4ojaoo75_k1c\"",
+    "cache-control": "no-store",
+    "content-length": "212"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":4,\"updatedAt\":\"2026-10-18T15:00:00.000Z\",\"projects\":[{\"id\":\"prj-second1\",\"name\":\"Second 2\",\"color\":\"rose\",\"createdAt\":1792335600000}],\"assignments\":{},\"pins\":[\"agent:tab-2\"]}}"
+  },
+  {
+   "method": "DELETE",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PATCH",
+    "cache-control": "no-store",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "x-cli-token": "cli-secret"
+   },
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "setup": {
+    "files": {
+     "home/.acme-data/organizer.json": "{\"version\":1,\"revision\":2.5}"
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wu2iR4jieskfJrnA1IObztQel6Y\"",
+    "cache-control": "no-store",
+    "content-length": "32"
+   },
+   "answer": "{\"error\":\"organizer-unreadable\"}"
+  },
+  {
+   "setup": {
+    "files": {
+     "home/.acme-data/organizer.json": "{\"version\":1,\"revision\":3,\"updatedAt\":\"x\",\"extra\":{\"keep\":true},\"projects\":[{\"id\":\"p\",\"name\":\"n\",\"color\":\"amber\",\"createdAt\":1,\"more\":2}],\"assignments\":{\"2\":\"p\",\"agent:a\":\"p\",\"1\":\"p\"},\"pins\":[]}"
+    }
+   },
+   "method": "GET",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good"
+   },
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"IDds2OEkNcjaTplrB5N4N5tpXzw\"",
+    "cache-control": "no-store",
+    "content-length": "208"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":3,\"updatedAt\":\"x\",\"extra\":{\"keep\":true},\"projects\":[{\"id\":\"p\",\"name\":\"n\",\"color\":\"amber\",\"createdAt\":1,\"more\":2}],\"assignments\":{\"1\":\"p\",\"2\":\"p\",\"agent:a\":\"p\"},\"pins\":[]}}"
+  },
+  {
+   "method": "PATCH",
+   "url": "/api/platform/organizer",
+   "headers": {
+    "cookie": "theme=dark; session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"ops\":[{\"op\":\"assign\",\"refs\":[\"agent:b\"],\"projectId\":null},{\"op\":\"pin\",\"ref\":\"agent:a\"}]}",
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"MffuCpgbJ5Ma8OtskzU2HP7Lw9g\"",
+    "cache-control": "no-store",
+    "content-length": "240"
+   },
+   "answer": "{\"organizer\":{\"version\":1,\"revision\":4,\"updatedAt\":\"2026-10-18T15:00:00.000Z\",\"extra\":{\"keep\":true},\"projects\":[{\"id\":\"p\",\"name\":\"n\",\"color\":\"amber\",\"createdAt\":1,\"more\":2}],\"assignments\":{\"1\":\"p\",\"2\":\"p\",\"agent:a\":\"p\"},\"pins\":[\"agent:a\"]}}"
+  }
+ ],
+ "files": {
+  "organizer": "{\n  \"version\": 1,\n  \"revision\": 4,\n  \"updatedAt\": \"2026-10-18T15:00:00.000Z\",\n  \"extra\": {\n    \"keep\": true\n  },\n  \"projects\": [\n    {\n      \"id\": \"p\",\n      \"name\": \"n\",\n      \"color\": \"amber\",\n      \"createdAt\": 1,\n      \"more\": 2\n    }\n  ],\n  \"assignments\": {\n    \"1\": \"p\",\n    \"2\": \"p\",\n    \"agent:a\": \"p\"\n  },\n  \"pins\": [\n    \"agent:a\"\n  ]\n}"
+ }
+}

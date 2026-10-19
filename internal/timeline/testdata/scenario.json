@@ -1,0 +1,892 @@
+{
+ "steps": [
+  {
+   "op": "mkdir",
+   "path": "{claude}/sessions"
+  },
+  {
+   "op": "mkdir",
+   "path": "{claude}/projects/-work-acme"
+  },
+  {
+   "op": "mkdir",
+   "path": "{codex}/sessions/2026/10/18"
+  },
+  {
+   "op": "mkdir",
+   "path": "{data}"
+  },
+  {
+   "op": "copy",
+   "from": "claude-a.jsonl",
+   "path": "{claude}/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl"
+  },
+  {
+   "op": "pane",
+   "session": "hs-ws1-p1-t1",
+   "pane": {
+    "pid": 1000,
+    "title": "✳ Fixing the parser",
+    "cwd": "/work/acme",
+    "command": "claude"
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 1000,
+   "proc": {
+    "children": [
+     1001
+    ]
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 1001,
+   "proc": {
+    "children": [],
+    "args": "claude --settings /tmp/hooks.json",
+    "cwd": "/work/acme"
+   }
+  },
+  {
+   "op": "write",
+   "path": "{claude}/sessions/1001.json",
+   "data": {
+    "pid": 1001,
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "cwd": "/work/acme",
+    "startedAt": 1760781600000
+   }
+  },
+  {
+   "op": "open",
+   "socket": "a",
+   "query": "session=hs-ws1-p1-t1&panelType=claude-code"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "a": [
+     "timeline:session-changed",
+     "timeline:init"
+    ],
+    "effects": [
+     "agentSessionId",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "append",
+   "from": "claude-a-more.jsonl",
+   "path": "{claude}/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl"
+  },
+  {
+   "op": "wait",
+   "ms": 600,
+   "until": {
+    "a": [
+     "timeline:append"
+    ]
+   }
+  },
+  {
+   "op": "appendText",
+   "text": "{\"type\":\"user\",\"timestamp\":\"2026-10-18T10:00:30.000Z\",\"message\":{\"role\":\"user\",",
+   "path": "{claude}/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl"
+  },
+  {
+   "op": "wait",
+   "ms": 600
+  },
+  {
+   "op": "appendText",
+   "text": "\"content\":\"A line written in two parts\"}}\n",
+   "path": "{claude}/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl"
+  },
+  {
+   "op": "wait",
+   "ms": 600,
+   "until": {
+    "a": [
+     "timeline:append"
+    ],
+    "effects": [
+     "lastUserMessage",
+     "notifyLastUserMessage"
+    ]
+   }
+  },
+  {
+   "op": "stats",
+   "data": {
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "transcriptPath": "{claude}/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl",
+    "inputTokens": 1000,
+    "outputTokens": 50,
+    "cost": 0.12,
+    "currentContextTokens": 900,
+    "contextWindowSize": 200000,
+    "usedPercentage": 0.45,
+    "model": "Model A",
+    "effort": "high",
+    "exceeds200k": false,
+    "receivedAt": 1760781700000
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 300,
+   "until": {
+    "a": [
+     "timeline:stats-update"
+    ]
+   }
+  },
+  {
+   "op": "stats",
+   "data": {
+    "sessionId": "22222222-2222-4222-8222-222222222222",
+    "model": "other"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 300
+  },
+  {
+   "op": "open",
+   "socket": "a2",
+   "query": "session=hs-ws1-p1-t1&panelType=claude-code"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "a2": [
+     "timeline:session-changed",
+     "timeline:init"
+    ],
+    "effects": [
+     "agentSessionId",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "append",
+   "from": "claude-a-late.jsonl",
+   "path": "{claude}/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl"
+  },
+  {
+   "op": "wait",
+   "ms": 600,
+   "until": {
+    "a": [
+     "timeline:append"
+    ],
+    "a2": [
+     "timeline:append"
+    ],
+    "effects": [
+     "lastUserMessage",
+     "notifyLastUserMessage"
+    ]
+   }
+  },
+  {
+   "op": "copy",
+   "from": "claude-b.jsonl",
+   "path": "{claude}/projects/-work-acme/22222222-2222-4222-8222-222222222222.jsonl"
+  },
+  {
+   "op": "wait",
+   "ms": 300
+  },
+  {
+   "op": "write",
+   "path": "{claude}/sessions/1001.json",
+   "data": {
+    "pid": 1001,
+    "sessionId": "22222222-2222-4222-8222-222222222222",
+    "cwd": "/work/acme",
+    "startedAt": 1760785200000
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 1000,
+   "until": {
+    "a": [
+     "timeline:session-changed",
+     "timeline:init"
+    ],
+    "a2": [
+     "timeline:session-changed",
+     "timeline:init"
+    ],
+    "effects": [
+     "agentSessionId",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState",
+     "agentSessionId",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 1000,
+   "proc": {
+    "children": []
+   }
+  },
+  {
+   "op": "noproc",
+   "pid": 1001
+  },
+  {
+   "op": "rm",
+   "path": "{claude}/sessions/1001.json"
+  },
+  {
+   "op": "wait",
+   "ms": 1000,
+   "until": {
+    "a": [
+     "timeline:session-changed"
+    ],
+    "a2": [
+     "timeline:session-changed"
+    ],
+    "effects": [
+     "markAgentGone",
+     "markAgentGone"
+    ]
+   }
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "data": {
+    "type": "timeline:subscribe",
+    "jsonlPath": "{claude}/projects/-work-acme/11111111-1111-4111-8111-111111111111.jsonl"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 600,
+   "until": {
+    "a": [
+     "timeline:init"
+    ],
+    "effects": [
+     "lastUserMessage",
+     "notifyLastUserMessage"
+    ]
+   }
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "data": {
+    "type": "timeline:subscribe",
+    "jsonlPath": "/etc/passwd.jsonl"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 300,
+   "until": {
+    "a": [
+     "timeline:error"
+    ]
+   }
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "data": {
+    "type": "timeline:subscribe",
+    "jsonlPath": "{home}/notes.txt"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 300,
+   "until": {
+    "a": [
+     "timeline:error"
+    ]
+   }
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "data": {
+    "type": "timeline:unsubscribe"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 300
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "data": {
+    "type": "timeline:resume",
+    "sessionId": "not-a-uuid",
+    "tmuxSession": "hs-ws1-p1-t1"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 300,
+   "until": {
+    "a": [
+     "timeline:resume-error"
+    ]
+   }
+  },
+  {
+   "op": "pane",
+   "session": "hs-ws1-p1-t1",
+   "pane": {
+    "command": "node"
+   }
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "data": {
+    "type": "timeline:resume",
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "tmuxSession": "hs-ws1-p1-t1"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 300,
+   "until": {
+    "a": [
+     "timeline:resume-blocked"
+    ]
+   }
+  },
+  {
+   "op": "pane",
+   "session": "hs-ws1-p1-t1",
+   "pane": {
+    "command": "zsh"
+   }
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "data": {
+    "type": "timeline:resume",
+    "sessionId": "11111111-1111-4111-8111-111111111111",
+    "tmuxSession": "hs-ws1-p1-t1"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "a": [
+     "timeline:resume-started",
+     "timeline:init"
+    ],
+    "effects": [
+     "sendKeys",
+     "markAgentLaunch",
+     "agentSessionId",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "data": {
+    "type": "timeline:resume",
+    "sessionId": "77777777-7777-4777-8777-777777777777",
+    "tmuxSession": "hs-ws1-p1-t1"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "a": [
+     "timeline:resume-started",
+     "timeline:init"
+    ],
+    "effects": [
+     "sendKeys",
+     "markAgentLaunch",
+     "agentSessionId"
+    ]
+   }
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "raw": "{\"type\":\"ping\"}"
+  },
+  {
+   "op": "send",
+   "socket": "a",
+   "raw": "not json"
+  },
+  {
+   "op": "wait",
+   "ms": 300,
+   "until": {
+    "a": [
+     "pong"
+    ]
+   }
+  },
+  {
+   "op": "pane",
+   "session": "hs-ws1-p1-t1",
+   "pane": {
+    "screen": "❯ Fix the parser\n\n● Looking at the parser now.\n\n● Bash(ls -la)\n  ⎿ total 8\n\n● The parser has two bugs: the first is in the\n  tokenizer, the second in the reader.\n\n✻ Thinking… (12s)\n\n────────────────────────────────\n❯ \n"
+   }
+  },
+  {
+   "op": "busy",
+   "session": "hs-ws1-p1-t1",
+   "on": true
+  },
+  {
+   "op": "wait",
+   "ms": 1600,
+   "until": {
+    "a": [
+     "timeline:live-text"
+    ],
+    "a2": [
+     "timeline:live-text"
+    ]
+   }
+  },
+  {
+   "op": "busy",
+   "session": "hs-ws1-p1-t1",
+   "on": false
+  },
+  {
+   "op": "wait",
+   "ms": 1600,
+   "until": {
+    "a": [
+     "timeline:live-text"
+    ],
+    "a2": [
+     "timeline:live-text"
+    ]
+   }
+  },
+  {
+   "op": "close",
+   "socket": "a2"
+  },
+  {
+   "op": "wait",
+   "ms": 300
+  },
+  {
+   "op": "copy",
+   "from": "codex-a.jsonl",
+   "path": "{codex}/sessions/2026/10/18/rollout-2026-10-18T10-00-00-55555555-5555-4555-8555-555555555555.jsonl"
+  },
+  {
+   "op": "pane",
+   "session": "hs-ws1-p1-t2",
+   "pane": {
+    "pid": 2000,
+    "title": "codex",
+    "cwd": "/work/acme",
+    "command": "node"
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 2000,
+   "proc": {
+    "children": [
+     2001
+    ]
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 2001,
+   "proc": {
+    "children": [],
+    "args": "codex resume 55555555-5555-4555-8555-555555555555",
+    "cwd": "/work/acme"
+   }
+  },
+  {
+   "op": "open",
+   "socket": "c",
+   "query": "session=hs-ws1-p1-t2&panelType=codex-cli"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "c": [
+     "timeline:session-changed",
+     "timeline:init"
+    ],
+    "effects": [
+     "agentSessionId",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "append",
+   "from": "codex-a-more.jsonl",
+   "path": "{codex}/sessions/2026/10/18/rollout-2026-10-18T10-00-00-55555555-5555-4555-8555-555555555555.jsonl"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "c": [
+     "timeline:append",
+     "timeline:stats-update"
+    ],
+    "effects": [
+     "lastUserMessage",
+     "notifyLastUserMessage"
+    ]
+   }
+  },
+  {
+   "op": "copy",
+   "from": "codex-b.jsonl",
+   "path": "{codex}/sessions/2026/10/18/rollout-2026-10-18T11-00-00-66666666-6666-4666-8666-666666666666.jsonl"
+  },
+  {
+   "op": "codexHook",
+   "session": "hs-ws1-p1-t2",
+   "info": {
+    "status": "running",
+    "sessionId": "66666666-6666-4666-8666-666666666666",
+    "jsonlPath": "{codex}/sessions/2026/10/18/rollout-2026-10-18T11-00-00-66666666-6666-4666-8666-666666666666.jsonl",
+    "pid": 2001,
+    "startedAt": null,
+    "cwd": "/work/acme"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "c": [
+     "timeline:session-changed",
+     "timeline:init"
+    ],
+    "effects": [
+     "agentSessionId",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "codexHook",
+   "session": "hs-ws1-p1-t9",
+   "info": {
+    "status": "running",
+    "sessionId": "55555555-5555-4555-8555-555555555555",
+    "jsonlPath": "{codex}/sessions/2026/10/18/rollout-2026-10-18T10-00-00-55555555-5555-4555-8555-555555555555.jsonl",
+    "pid": 2001,
+    "startedAt": null,
+    "cwd": "/work/acme"
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 300
+  },
+  {
+   "op": "close",
+   "socket": "c"
+  },
+  {
+   "op": "wait",
+   "ms": 300
+  },
+  {
+   "op": "pane",
+   "session": "hs-ws1-p1-t3",
+   "pane": {
+    "pid": 3000,
+    "title": "zsh",
+    "cwd": "/work/acme",
+    "command": "claude"
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 3000,
+   "proc": {
+    "children": [
+     3001
+    ]
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 3001,
+   "proc": {
+    "children": [],
+    "args": "claude",
+    "cwd": "/work/acme"
+   }
+  },
+  {
+   "op": "open",
+   "socket": "s",
+   "query": "session=hs-ws1-p1-t3&panelType=claude-code"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "s": [
+     "timeline:session-changed",
+     "timeline:init"
+    ]
+   }
+  },
+  {
+   "op": "write",
+   "path": "{claude}/sessions/3001.json",
+   "data": {
+    "pid": 3001,
+    "sessionId": "33333333-3333-4333-8333-333333333333",
+    "cwd": "/work/acme",
+    "startedAt": 1760788800000
+   }
+  },
+  {
+   "op": "wait",
+   "ms": 1000,
+   "until": {
+    "a": [
+     "timeline:session-changed"
+    ],
+    "s": [
+     "timeline:session-changed"
+    ],
+    "effects": [
+     "agentSessionId",
+     "markAgentGone"
+    ]
+   }
+  },
+  {
+   "op": "copy",
+   "from": "claude-s.jsonl",
+   "path": "{claude}/projects/-work-acme/33333333-3333-4333-8333-333333333333.jsonl"
+  },
+  {
+   "op": "wait",
+   "ms": 1000,
+   "until": {
+    "s": [
+     "timeline:init"
+    ],
+    "effects": [
+     "agentSessionId",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "copy",
+   "from": "claude-r.jsonl",
+   "path": "{claude}/projects/-work-acme/44444444-4444-4444-8444-444444444444.jsonl"
+  },
+  {
+   "op": "pane",
+   "session": "hs-ws1-p1-t4",
+   "pane": {
+    "pid": 4000,
+    "title": "zsh",
+    "cwd": "/work/acme",
+    "command": "zsh"
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 4000,
+   "proc": {
+    "children": []
+   }
+  },
+  {
+   "op": "recover",
+   "session": "hs-ws1-p1-t4",
+   "found": {
+    "sessionId": "44444444-4444-4444-8444-444444444444",
+    "jsonlPath": "{claude}/projects/-work-acme/44444444-4444-4444-8444-444444444444.jsonl"
+   }
+  },
+  {
+   "op": "open",
+   "socket": "r",
+   "query": "session=hs-ws1-p1-t4"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "r": [
+     "timeline:init"
+    ],
+    "effects": [
+     "recover",
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "pane",
+   "session": "hs-ws1-p1-t6",
+   "pane": {
+    "pid": 6000,
+    "title": "zsh",
+    "cwd": "/work/acme",
+    "command": "zsh"
+   }
+  },
+  {
+   "op": "proc",
+   "pid": 6000,
+   "proc": {
+    "children": []
+   }
+  },
+  {
+   "op": "open",
+   "socket": "h",
+   "query": "session=hs-ws1-p1-t6&agentSessionId=22222222-2222-4222-8222-222222222222&panelType=claude-code"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "h": [
+     "timeline:init"
+    ],
+    "effects": [
+     "lastUserMessage",
+     "notifyLastUserMessage",
+     "agentState"
+    ]
+   }
+  },
+  {
+   "op": "open",
+   "socket": "h2",
+   "query": "session=hs-ws1-p1-t6&claudeSessionId=77777777-7777-4777-8777-777777777777"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "h2": [
+     "timeline:init"
+    ]
+   }
+  },
+  {
+   "op": "open",
+   "socket": "h3",
+   "query": "session=hs-ws1-p1-t6&agentSessionId=&claudeSessionId=22222222-2222-4222-8222-222222222222"
+  },
+  {
+   "op": "wait",
+   "ms": 800,
+   "until": {
+    "h3": [
+     "timeline:init"
+    ],
+    "effects": [
+     "recover"
+    ]
+   }
+  },
+  {
+   "op": "open",
+   "socket": "n",
+   "query": "session=hs-ws1-p1-t5"
+  },
+  {
+   "op": "wait",
+   "ms": 500,
+   "until": {
+    "n": [
+     "timeline:init",
+     "close"
+    ]
+   }
+  },
+  {
+   "op": "open",
+   "socket": "m",
+   "query": "panelType=codex-cli"
+  },
+  {
+   "op": "wait",
+   "ms": 500,
+   "until": {
+    "m": [
+     "close"
+    ]
+   }
+  },
+  {
+   "op": "open",
+   "socket": "u",
+   "query": "session=hs-ws1-p1-t1&panelType=weird"
+  },
+  {
+   "op": "wait",
+   "ms": 500,
+   "until": {
+    "u": [
+     "close"
+    ]
+   }
+  }
+ ]
+}

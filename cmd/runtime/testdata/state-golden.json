@@ -1,0 +1,6470 @@
+{
+ "now": 1792400400000,
+ "token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+ "gitSetup": "set -e\nexport GIT_AUTHOR_NAME=A GIT_AUTHOR_EMAIL=a@example.com GIT_COMMITTER_NAME=A GIT_COMMITTER_EMAIL=a@example.com\nexport GIT_AUTHOR_DATE=2026-10-19T09:00:00Z GIT_COMMITTER_DATE=2026-10-19T09:00:00Z\ng() { git -c init.defaultBranch=main -c advice.detachedHead=false \"$@\"; }\ncd \"$ROOT/work\"\ng init -q --bare remote.git\ng clone -q remote.git seed 2>/dev/null\n(cd seed && echo one > f && g add f && g commit -qm one && g push -q origin main)\nrm -rf repo && g clone -q remote.git repo\n(cd seed && echo two >> f && g commit -qam two && g push -q origin main)\ng clone -q remote.git broken && (cd broken && g remote set-url origin \"$ROOT/missing.git\")\n",
+ "fixtures": [
+  {
+   "path": "work/a.png",
+   "text": "png"
+  },
+  {
+   "path": "work/notes.md",
+   "text": "# notes\n"
+  },
+  {
+   "path": "work/data.bin",
+   "text": "bin"
+  },
+  {
+   "path": "home/.claude/projects/p/memory/fact.md",
+   "text": "---\nname: Fact\ndescription: a fact\n---\nbody\n"
+  },
+  {
+   "path": "data/stats/daily-reports/2026-10-01.json",
+   "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+  },
+  {
+   "path": "data/stats/daily-reports/2026-10-02.json",
+   "text": "{\"date\":\"2026-10-02\"}"
+  },
+  {
+   "path": "data/stats/daily-reports/broken.json",
+   "text": "{"
+  },
+  {
+   "path": "data/stats/daily-reports/notes.txt",
+   "text": "x"
+  },
+  {
+   "path": "bin/tailscale",
+   "text": "#!/bin/sh\ncase \"$1 $2\" in\n  \"version \"*) echo \"1.80.2\"; echo \"  go1.24\";;\n  \"status --json\") echo '{\"BackendState\":\"Running\",\"Self\":{\"HostName\":\"box\",\"DNSName\":\"box.tail.ts.net.\",\"TailscaleIPs\":[\"100.64.0.7\",\"fd7a::7\"]}}';;\n  \"serve status\") echo '{\"Web\":{\"box.tail.ts.net:443\":{\"Handlers\":{\"/\":{\"Proxy\":\"http://127.0.0.1:8022\"}}},\"box.tail.ts.net:8443\":{\"Handlers\":{\"/x\":{\"Proxy\":\"y\"}}}}}';;\n  \"serve --bg\") exit 0;;\n  \"serve off\") echo \"no such serve\" >&2; exit 3;;\nesac\n",
+   "mode": 493
+  }
+ ],
+ "steps": [
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400401000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400402000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"QKIGegqUAiUMCAhgkCTPIuVmJCM\"",
+    "content-length": "110"
+   },
+   "answer": "{\"updatedAt\":\"2026-10-19T09:00:02.000Z\",\"hasAuthPassword\":false,\"hostEnvLocked\":false,\"bindHostIsLocal\":false}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"appTheme\":\"dark\"}",
+   "at": 1792400403000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"updatedAt\": \"2026-10-19T09:00:03.000Z\",\n  \"appTheme\": \"dark\"\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400404000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"X4F40mgmx8523qnf1jke5SUBd_M\"",
+    "content-length": "128"
+   },
+   "answer": "{\"updatedAt\":\"2026-10-19T09:00:03.000Z\",\"appTheme\":\"dark\",\"hasAuthPassword\":false,\"hostEnvLocked\":false,\"bindHostIsLocal\":false}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"appTheme\":\"dark\"}",
+   "at": 1792400405000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"appTheme\":\"light\",\"locale\":\"ru\",\"fontSize\":\"lg\",\"unknownField\":1,\"authSecret\":\"x\"}",
+   "at": 1792400406000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"updatedAt\": \"2026-10-19T09:00:06.000Z\",\n  \"appTheme\": \"light\",\n  \"locale\": \"ru\",\n  \"fontSize\": \"lg\"\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "file": "config.json",
+   "content": "{\"authSecret\":\"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\"authPassword\":\"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\"automationApiToken\":\"t\",\"updatedAt\":\"2026-01-01T00:00:00.000Z\",\"locale\":\"en\",\"customCSS\":\"<b>&</b>\",\"hasAuthPassword\":\"kept\",\"voiceSettings\":{\"lang\":\"en\",\"mode\":\"toggle\"}}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400408000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6AR2S1Ow_Bu7w3XzQozbcBqnZlE\"",
+    "content-length": "192"
+   },
+   "answer": "{\"updatedAt\":\"2026-01-01T00:00:00.000Z\",\"locale\":\"en\",\"customCSS\":\"<b>&</b>\",\"hasAuthPassword\":true,\"voiceSettings\":{\"lang\":\"en\",\"mode\":\"toggle\"},\"hostEnvLocked\":false,\"bindHostIsLocal\":false}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "if-none-match": "\"x\""
+   },
+   "body": "",
+   "at": 1792400409000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6AR2S1Ow_Bu7w3XzQozbcBqnZlE\"",
+    "content-length": "192"
+   },
+   "answer": "{\"updatedAt\":\"2026-01-01T00:00:00.000Z\",\"locale\":\"en\",\"customCSS\":\"<b>&</b>\",\"hasAuthPassword\":true,\"voiceSettings\":{\"lang\":\"en\",\"mode\":\"toggle\"},\"hostEnvLocked\":false,\"bindHostIsLocal\":false}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLayout\":{\"left\":100,\"right\":3333.5,\"collapsed\":\"yes\"}}",
+   "at": 1792400410000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:10.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"toggle\"\n  },\n  \"acmeLayout\": {\n    \"left\": 200,\n    \"right\": 3200,\n    \"collapsed\": false\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLayout\":{\"left\":299.5,\"right\":\"x\",\"collapsed\":true}}",
+   "at": 1792400411000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:11.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"toggle\"\n  },\n  \"acmeLayout\": {\n    \"left\": 300,\n    \"collapsed\": true\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLayout\":[]}",
+   "at": 1792400412000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:12.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"toggle\"\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLayout\":null}",
+   "at": 1792400413000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"brXznrtYjeNzzsn64zsiXeO8n0I\"",
+    "content-length": "33"
+   },
+   "answer": "{\"error\":\"Invalid acmeLayout\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLayout\":5}",
+   "at": 1792400414000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"brXznrtYjeNzzsn64zsiXeO8n0I\"",
+    "content-length": "33"
+   },
+   "answer": "{\"error\":\"Invalid acmeLayout\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"voiceSettings\":{\"engine\":\"local\",\"key\":\"AltRight\",\"deviceId\":null}}",
+   "at": 1792400415000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:15.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"toggle\",\n    \"engine\": \"local\",\n    \"key\": \"AltRight\",\n    \"deviceId\": null\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"voiceSettings\":{\"engine\":\"nope\"}}",
+   "at": 1792400416000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"H5WGJcRk4ULbpMR5B0sNerNcr0Y\"",
+    "content-length": "33"
+   },
+   "answer": "{\"error\":\"Invalid voiceSettings\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"voiceSettings\":{\"key\":\"KeyA\"}}",
+   "at": 1792400417000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"H5WGJcRk4ULbpMR5B0sNerNcr0Y\"",
+    "content-length": "33"
+   },
+   "answer": "{\"error\":\"Invalid voiceSettings\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"voiceSettings\":{\"key\":\"F24\",\"autoSend\":true,\"punctuation\":false,\"mode\":\"hold\"}}",
+   "at": 1792400418000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:18.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"voiceSettings\":[]}",
+   "at": 1792400419000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"H5WGJcRk4ULbpMR5B0sNerNcr0Y\"",
+    "content-length": "33"
+   },
+   "answer": "{\"error\":\"Invalid voiceSettings\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLaunchDefaults\":{\"claude\":{\"model\":null,\"effort\":null}}}",
+   "at": 1792400420000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:20.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLaunchDefaults\":{\"codex\":{},\"claude\":[]}}",
+   "at": 1792400421000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:21.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLaunchDefaults\":{\"claude\":{\"model\":\"bad name!\"}}}",
+   "at": 1792400422000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"t3rVF-pS85ya7j_yP5wkh0Cv_Rg\"",
+    "content-length": "56"
+   },
+   "answer": "{\"error\":\"Недопустимое имя модели\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLaunchDefaults\":{\"claude\":{\"effort\":\"galaxy\"}}}",
+   "at": 1792400423000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"HQuA7j-6gOYqZwuINeZG1LRV0x4\"",
+    "content-length": "74"
+   },
+   "answer": "{\"error\":\"Недопустимая глубина рассуждения\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLaunchDefaults\":{\"gemini\":{}}}",
+   "at": 1792400424000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"kb7IJg4ju03_PZ3W9rI8ORL3MdA\"",
+    "content-length": "45"
+   },
+   "answer": "{\"error\":\"Неизвестный агент\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLaunchDefaults\":{\"claude\":5}}",
+   "at": 1792400425000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6xVvSY7kWGBTbbl0eFOMxdGfE68\"",
+    "content-length": "62"
+   },
+   "answer": "{\"error\":\"Неверные умолчания запуска\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLaunchDefaults\":[]}",
+   "at": 1792400426000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"6xVvSY7kWGBTbbl0eFOMxdGfE68\"",
+    "content-length": "62"
+   },
+   "answer": "{\"error\":\"Неверные умолчания запуска\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"acmeLaunchDefaults\":{\"claude\":{}},\"toastDuration\":5}",
+   "at": 1792400427000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"8XSLCihEyuR0ypmVR7kRuY9VdTY\"",
+    "content-length": "66"
+   },
+   "answer": "{\"error\":\"toastDuration must be a number between 1000 and 60000.\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"editorUrl\":5}",
+   "at": 1792400428000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"_WXRQeMW-P6LpciaEmEDBHxHlEU\"",
+    "content-length": "39"
+   },
+   "answer": "{\"error\":\"editorUrl must be a string.\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"editorPreset\":\"vim\"}",
+   "at": 1792400429000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"vLTnm7XZVw6Ih_R6tHoEH6y7YPo\"",
+    "content-length": "36"
+   },
+   "answer": "{\"error\":\"editorPreset is invalid.\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"editorPreset\":\"zed\",\"editorUrl\":\"zed://\"}",
+   "at": 1792400430000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:30.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\"\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"networkAccess\":\"lan\"}",
+   "at": 1792400431000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"BodMxk0YVTy3ggpPxcL2uSBsp_M\"",
+    "content-length": "68"
+   },
+   "answer": "{\"error\":\"networkAccess must be one of: localhost, tailscale, all.\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"networkAccess\":\"localhost\"}",
+   "at": 1792400432000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:32.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\",\n  \"networkAccess\": \"localhost\"\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"gitAskProvider\":\"gpt\"}",
+   "at": 1792400433000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"yrrgOKTH3R2DjsTL2w0BVA-g1xY\"",
+    "content-length": "57"
+   },
+   "answer": "{\"error\":\"gitAskProvider must be one of: claude, codex.\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"noteSummaryProvider\":\"codex\",\"gitAskProvider\":\"claude\"}",
+   "at": 1792400434000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:34.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\",\n  \"networkAccess\": \"localhost\",\n  \"gitAskProvider\": \"claude\",\n  \"noteSummaryProvider\": \"codex\"\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"toastPositionDesktop\":\"middle\"}",
+   "at": 1792400435000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"DHacLCy5Ewp0daApRfk8dMA5WTI\"",
+    "content-length": "44"
+   },
+   "answer": "{\"error\":\"toastPositionDesktop is invalid.\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"toastPositionMobile\":\"top-left\",\"toastPositionDesktop\":\"bottom-right\"}",
+   "at": 1792400436000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:36.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\",\n  \"networkAccess\": \"localhost\",\n  \"gitAskProvider\": \"claude\",\n  \"noteSummaryProvider\": \"codex\",\n  \"toastPositionDesktop\": \"bottom-right\",\n  \"toastPositionMobile\": \"top-left\"\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"toastDuration\":60001}",
+   "at": 1792400437000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"8XSLCihEyuR0ypmVR7kRuY9VdTY\"",
+    "content-length": "66"
+   },
+   "answer": "{\"error\":\"toastDuration must be a number between 1000 and 60000.\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"toastDuration\":1000,\"dangerouslySkipPermissions\":\"sure\",\"authPassword\":\"\"}",
+   "at": 1792400438000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:38.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\",\n  \"networkAccess\": \"localhost\",\n  \"gitAskProvider\": \"claude\",\n  \"noteSummaryProvider\": \"codex\",\n  \"toastPositionDesktop\": \"bottom-right\",\n  \"toastPositionMobile\": \"top-left\",\n  \"dangerouslySkipPermissions\": \"sure\",\n  \"toastDuration\": 1000\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"authPassword\":null,\"lineHeightCustom\":1.5}",
+   "at": 1792400439000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000000:598997e98f4659227a7e76e12e6dd2c8399087265ee249f631c14be51e36b206b3bdc4af99b18331e8c62cbea2cb11bba02f69161c8f47bdbef4a6f39f372cec\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:39.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\",\n  \"networkAccess\": \"localhost\",\n  \"gitAskProvider\": \"claude\",\n  \"noteSummaryProvider\": \"codex\",\n  \"toastPositionDesktop\": \"bottom-right\",\n  \"toastPositionMobile\": \"top-left\",\n  \"dangerouslySkipPermissions\": \"sure\",\n  \"toastDuration\": 1000,\n  \"lineHeightCustom\": 1.5\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"authPassword\":\"secret-pass\"}",
+   "at": 1792400440000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"0000000000000000000000000000000000000000000000000000000000000002\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000001:ebaefaaa2b4f653a63b8177f4c4b48a61fa0d2feee233815e20e7bfbdc64863e86147c8e04a915050a6759bde369e331c13ecacde0090bafa637f050e7c7584d\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:40.000Z\",\n  \"locale\": \"en\",\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\",\n  \"networkAccess\": \"localhost\",\n  \"gitAskProvider\": \"claude\",\n  \"noteSummaryProvider\": \"codex\",\n  \"toastPositionDesktop\": \"bottom-right\",\n  \"toastPositionMobile\": \"top-left\",\n  \"dangerouslySkipPermissions\": \"sure\",\n  \"toastDuration\": 1000,\n  \"lineHeightCustom\": 1.5\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400441000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oE-fCU0Kef7A5QZ1AaxinfrWj3U\"",
+    "content-length": "685"
+   },
+   "answer": "{\"updatedAt\":\"2026-10-19T09:00:40.000Z\",\"locale\":\"en\",\"customCSS\":\"<b>&</b>\",\"hasAuthPassword\":true,\"voiceSettings\":{\"lang\":\"en\",\"mode\":\"hold\",\"engine\":\"local\",\"key\":\"F24\",\"deviceId\":null,\"autoSend\":true,\"punctuation\":false},\"acmeLayout\":{\"collapsed\":false},\"acmeLaunchDefaults\":{\"claude\":{\"model\":null,\"effort\":null},\"codex\":{\"model\":null,\"effort\":null}},\"editorUrl\":\"zed://\",\"editorPreset\":\"zed\",\"networkAccess\":\"localhost\",\"gitAskProvider\":\"claude\",\"noteSummaryProvider\":\"codex\",\"toastPositionDesktop\":\"bottom-right\",\"toastPositionMobile\":\"top-left\",\"dangerouslySkipPermissions\":\"sure\",\"toastDuration\":1000,\"lineHeightCustom\":1.5,\"hostEnvLocked\":false,\"bindHostIsLocal\":false}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "null",
+   "at": 1792400442000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "[1,2]",
+   "at": 1792400443000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "\"text\"",
+   "at": 1792400444000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{",
+   "at": 1792400445000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "appTheme=x",
+   "at": 1792400446000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/x-www-form-urlencoded"
+   },
+   "body": "appTheme=form&locale=a&locale=b",
+   "at": 1792400447000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"0000000000000000000000000000000000000000000000000000000000000002\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000001:ebaefaaa2b4f653a63b8177f4c4b48a61fa0d2feee233815e20e7bfbdc64863e86147c8e04a915050a6759bde369e331c13ecacde0090bafa637f050e7c7584d\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:47.000Z\",\n  \"locale\": [\n    \"a\",\n    \"b\"\n  ],\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\",\n  \"networkAccess\": \"localhost\",\n  \"gitAskProvider\": \"claude\",\n  \"noteSummaryProvider\": \"codex\",\n  \"toastPositionDesktop\": \"bottom-right\",\n  \"toastPositionMobile\": \"top-left\",\n  \"dangerouslySkipPermissions\": \"sure\",\n  \"toastDuration\": 1000,\n  \"lineHeightCustom\": 1.5,\n  \"appTheme\": \"form\"\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400448000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PATCH",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400449000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PATCH",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "HEAD",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400450000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PATCH",
+    "content-length": "30"
+   },
+   "answer": ""
+  },
+  {
+   "method": "PATCH",
+   "path": "/agents/api/config/",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/json"
+   },
+   "body": "{\"terminalKeyBar\":\"never\"}",
+   "at": 1792400451000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"authSecret\": \"0000000000000000000000000000000000000000000000000000000000000002\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000001:ebaefaaa2b4f653a63b8177f4c4b48a61fa0d2feee233815e20e7bfbdc64863e86147c8e04a915050a6759bde369e331c13ecacde0090bafa637f050e7c7584d\",\n  \"automationApiToken\": \"t\",\n  \"updatedAt\": \"2026-10-19T09:00:51.000Z\",\n  \"locale\": [\n    \"a\",\n    \"b\"\n  ],\n  \"customCSS\": \"<b>&</b>\",\n  \"hasAuthPassword\": \"kept\",\n  \"voiceSettings\": {\n    \"lang\": \"en\",\n    \"mode\": \"hold\",\n    \"engine\": \"local\",\n    \"key\": \"F24\",\n    \"deviceId\": null,\n    \"autoSend\": true,\n    \"punctuation\": false\n  },\n  \"acmeLayout\": {\n    \"collapsed\": false\n  },\n  \"acmeLaunchDefaults\": {\n    \"claude\": {\n      \"model\": null,\n      \"effort\": null\n    },\n    \"codex\": {\n      \"model\": null,\n      \"effort\": null\n    }\n  },\n  \"editorUrl\": \"zed://\",\n  \"editorPreset\": \"zed\",\n  \"networkAccess\": \"localhost\",\n  \"gitAskProvider\": \"claude\",\n  \"noteSummaryProvider\": \"codex\",\n  \"toastPositionDesktop\": \"bottom-right\",\n  \"toastPositionMobile\": \"top-left\",\n  \"dangerouslySkipPermissions\": \"sure\",\n  \"toastDuration\": 1000,\n  \"lineHeightCustom\": 1.5,\n  \"appTheme\": \"form\",\n  \"terminalKeyBar\": \"never\"\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "file": "config.json",
+   "content": "[1,\"x\"]"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400453000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"AK2F2U0zFioOgpyqRKrhsSB09G4\"",
+    "content-length": "85"
+   },
+   "answer": "{\"0\":1,\"1\":\"x\",\"hasAuthPassword\":false,\"hostEnvLocked\":false,\"bindHostIsLocal\":false}"
+  },
+  {
+   "file": "config.json",
+   "content": "\"ab\""
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400455000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"PQ9fHDH0sL8ZxG0Q7UgFgBNzA9o\"",
+    "content-length": "87"
+   },
+   "answer": "{\"0\":\"a\",\"1\":\"b\",\"hasAuthPassword\":false,\"hostEnvLocked\":false,\"bindHostIsLocal\":false}"
+  },
+  {
+   "file": "config.json",
+   "content": "null"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400457000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"MJeSUxXCyZJOpA0DIfuyncQykbI\"",
+    "content-length": "110"
+   },
+   "answer": "{\"updatedAt\":\"2026-10-19T09:00:57.000Z\",\"hasAuthPassword\":false,\"hostEnvLocked\":false,\"bindHostIsLocal\":false}"
+  },
+  {
+   "file": "config.json",
+   "content": null
+  },
+  {
+   "method": "GET",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400459000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JHbEPK1_sShSxWd6zjK16SErGwI\"",
+    "content-length": "16"
+   },
+   "answer": "{\"overrides\":{}}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"id\":\"tab.new\",\"key\":\"ctrl+t\"}",
+   "at": 1792400460000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"R14Djn5g2qyI_jiHqJn5O4ZdQHk\"",
+    "content-length": "34"
+   },
+   "answer": "{\"overrides\":{\"tab.new\":\"ctrl+t\"}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {\n    \"tab.new\": \"ctrl+t\"\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"id\":\"tab.close\",\"key\":null}",
+   "at": 1792400461000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"mLZWeoa-aNbHOzFHkvSDMGNUK64\"",
+    "content-length": "51"
+   },
+   "answer": "{\"overrides\":{\"tab.new\":\"ctrl+t\",\"tab.close\":null}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {\n    \"tab.new\": \"ctrl+t\",\n    \"tab.close\": null\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"id\":\"tab.close\"}",
+   "at": 1792400462000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"UEfygLokcWmIIu67B0EJ45WyXWs\"",
+    "content-length": "38"
+   },
+   "answer": "{\"error\":\"key must be string or null\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"id\":\"nope\",\"key\":\"x\"}",
+   "at": 1792400463000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d5Vfq2lbInFMGgm9_xlLuYDq03Y\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"unknown action id\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"id\":\"\",\"key\":\"x\"}",
+   "at": 1792400464000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d5Vfq2lbInFMGgm9_xlLuYDq03Y\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"unknown action id\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"id\":\"tab.new\",\"key\":5}",
+   "at": 1792400465000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"UEfygLokcWmIIu67B0EJ45WyXWs\"",
+    "content-length": "38"
+   },
+   "answer": "{\"error\":\"key must be string or null\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "null",
+   "at": 1792400466000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d5Vfq2lbInFMGgm9_xlLuYDq03Y\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"unknown action id\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "id=tab.new",
+   "at": 1792400467000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d5Vfq2lbInFMGgm9_xlLuYDq03Y\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"unknown action id\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400468000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"mLZWeoa-aNbHOzFHkvSDMGNUK64\"",
+    "content-length": "51"
+   },
+   "answer": "{\"overrides\":{\"tab.new\":\"ctrl+t\",\"tab.close\":null}}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/keybindings",
+   "query": [
+    [
+     "id",
+     "tab.new"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400469000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"3XpqJjoNVGtkOB6Canb0NSaIZmc\"",
+    "content-length": "32"
+   },
+   "answer": "{\"overrides\":{\"tab.close\":null}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {\n    \"tab.close\": null\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/keybindings",
+   "query": [
+    [
+     "id",
+     "unknown"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400470000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"d5Vfq2lbInFMGgm9_xlLuYDq03Y\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"unknown action id\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/keybindings",
+   "query": [
+    [
+     "id",
+     "tab.close"
+    ],
+    [
+     "id",
+     "x"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400471000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JHbEPK1_sShSxWd6zjK16SErGwI\"",
+    "content-length": "16"
+   },
+   "answer": "{\"overrides\":{}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "file": "keybindings.json",
+   "content": "{\"overrides\":[\"a\",null,3,{\"x\":1}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400473000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"gaYnB4xeKpUWvSQ5w6QrpLJkeT4\"",
+    "content-length": "32"
+   },
+   "answer": "{\"overrides\":{\"0\":\"a\",\"1\":null}}"
+  },
+  {
+   "file": "keybindings.json",
+   "content": "{\"overrides\":{\"2\":null,\"10\":\"ten\",\"b\":\"B\",\"a\":1,\"tab.new\":\"n\"}}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400475000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"XATHMO8Swg7p4rhXCh-GdmjOGTg\"",
+    "content-length": "57"
+   },
+   "answer": "{\"overrides\":{\"2\":null,\"10\":\"ten\",\"b\":\"B\",\"tab.new\":\"n\"}}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"id\":\"pane.equalize\",\"key\":\"e\"}",
+   "at": 1792400476000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"skam3PKvRZk3wAiPd_Ol207QrJw\"",
+    "content-length": "77"
+   },
+   "answer": "{\"overrides\":{\"2\":null,\"10\":\"ten\",\"b\":\"B\",\"tab.new\":\"n\",\"pane.equalize\":\"e\"}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {\n    \"2\": null,\n    \"10\": \"ten\",\n    \"b\": \"B\",\n    \"tab.new\": \"n\",\n    \"pane.equalize\": \"e\"\n  }\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "file": "keybindings.json",
+   "content": "[]"
+  },
+  {
+   "method": "GET",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400478000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JHbEPK1_sShSxWd6zjK16SErGwI\"",
+    "content-length": "16"
+   },
+   "answer": "{\"overrides\":{}}"
+  },
+  {
+   "file": "keybindings.json",
+   "content": "nope"
+  },
+  {
+   "method": "GET",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400480000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JHbEPK1_sShSxWd6zjK16SErGwI\"",
+    "content-length": "16"
+   },
+   "answer": "{\"overrides\":{}}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/keybindings",
+   "query": [
+    [
+     "id",
+     ""
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400481000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"JHbEPK1_sShSxWd6zjK16SErGwI\"",
+    "content-length": "16"
+   },
+   "answer": "{\"overrides\":{}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    }
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/api/keybindings",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400482000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PATCH, DELETE",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400483000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"x7btNblYgFzgYo7woyvYqiY9xrg\"",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"wsId is required\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/message-history",
+   "query": [
+    [
+     "wsId",
+     "ws-a"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400484000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pM1FCu-WqT6RYp1tfTkmHLufuTE\"",
+    "content-length": "14"
+   },
+   "answer": "{\"entries\":[]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\",\"message\":\"first\"}",
+   "at": 1792400485000,
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"FdcTiuAcxa96-PkuKFJDMa5oDUQ\"",
+    "content-length": "79"
+   },
+   "answer": "{\"entry\":{\"id\":\"id0001\",\"message\":\"first\",\"sentAt\":\"2026-10-19T09:01:25.000Z\"}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0001\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:25.000Z\"\n    }\n  ]\n}"
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\",\"message\":\"second\"}",
+   "at": 1792400486000,
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Lw3jm63mzhXfdU9lJvgjQrgpocA\"",
+    "content-length": "80"
+   },
+   "answer": "{\"entry\":{\"id\":\"id0002\",\"message\":\"second\",\"sentAt\":\"2026-10-19T09:01:26.000Z\"}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0002\",\n      \"message\": \"second\",\n      \"sentAt\": \"2026-10-19T09:01:26.000Z\"\n    },\n    {\n      \"id\": \"id0001\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:25.000Z\"\n    }\n  ]\n}"
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\",\"message\":\"first\"}",
+   "at": 1792400487000,
+   "status": 201,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"tA961zFDdtD38zifqgZ-qtSuOMA\"",
+    "content-length": "79"
+   },
+   "answer": "{\"entry\":{\"id\":\"id0003\",\"message\":\"first\",\"sentAt\":\"2026-10-19T09:01:27.000Z\"}}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0003\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:27.000Z\"\n    },\n    {\n      \"id\": \"id0002\",\n      \"message\": \"second\",\n      \"sentAt\": \"2026-10-19T09:01:26.000Z\"\n    }\n  ]\n}"
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\",\"message\":\"   \"}",
+   "at": 1792400488000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"KmUHYV9BbYZ9RBzG5YtLfDsNFVk\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"message is required\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\"}",
+   "at": 1792400489000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"KmUHYV9BbYZ9RBzG5YtLfDsNFVk\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"message is required\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"message\":\"x\"}",
+   "at": 1792400490000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"x7btNblYgFzgYo7woyvYqiY9xrg\"",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"wsId is required\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\",\"message\":5}",
+   "at": 1792400491000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":7,\"message\":\"x\"}",
+   "at": 1792400492000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ohCJSN6orOUGBiO2xhWCqOi_4F4\"",
+    "content-length": "26"
+   },
+   "answer": "{\"error\":\"Failed to save\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "null",
+   "at": 1792400493000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "hello",
+   "at": 1792400494000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"x7btNblYgFzgYo7woyvYqiY9xrg\"",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"wsId is required\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/message-history",
+   "query": [
+    [
+     "wsId",
+     "ws-a"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400495000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"luzBzGs6IAvYXK_lh7Khmq1jF18\"",
+    "content-length": "154"
+   },
+   "answer": "{\"entries\":[{\"id\":\"id0003\",\"message\":\"first\",\"sentAt\":\"2026-10-19T09:01:27.000Z\"},{\"id\":\"id0002\",\"message\":\"second\",\"sentAt\":\"2026-10-19T09:01:26.000Z\"}]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/message-history",
+   "query": [
+    [
+     "wsId",
+     "ws-a"
+    ],
+    [
+     "wsId",
+     "ws-b"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400496000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\",\"id\":\"id0002\"}",
+   "at": 1792400497000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oV4hJxRVSENxc_wX8-mA4_Pe4tA\"",
+    "content-length": "16"
+   },
+   "answer": "{\"success\":true}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0003\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:27.000Z\"\n    }\n  ]\n}"
+    }
+   ]
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\",\"id\":5}",
+   "at": 1792400498000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oV4hJxRVSENxc_wX8-mA4_Pe4tA\"",
+    "content-length": "16"
+   },
+   "answer": "{\"success\":true}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-a\"}",
+   "at": 1792400499000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"DsQP_-HU29pEiHuZ2uPQY67a6To\"",
+    "content-length": "26"
+   },
+   "answer": "{\"error\":\"id is required\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "null",
+   "at": 1792400500000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "file": "workspaces/ws-b/message-history.json",
+   "content": "{\"entries\":[{\"id\":\"k\",\"message\":\"m\"},3,\"str\",null]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/message-history",
+   "query": [
+    [
+     "wsId",
+     "ws-b"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400502000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"K0yoaOiV5ka90oKUOVuLpYGml0Q\"",
+    "content-length": "51"
+   },
+   "answer": "{\"entries\":[{\"id\":\"k\",\"message\":\"m\"},3,\"str\",null]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-b\",\"message\":\"m\"}",
+   "at": 1792400503000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ohCJSN6orOUGBiO2xhWCqOi_4F4\"",
+    "content-length": "26"
+   },
+   "answer": "{\"error\":\"Failed to save\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"wsId\":\"ws-b\",\"id\":\"k\"}",
+   "at": 1792400504000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ohCJSN6orOUGBiO2xhWCqOi_4F4\"",
+    "content-length": "26"
+   },
+   "answer": "{\"error\":\"Failed to save\"}"
+  },
+  {
+   "file": "workspaces/ws-c/message-history.json",
+   "content": "{\"entries\":{\"a\":1}}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/message-history",
+   "query": [
+    [
+     "wsId",
+     "ws-c"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400506000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pM1FCu-WqT6RYp1tfTkmHLufuTE\"",
+    "content-length": "14"
+   },
+   "answer": "{\"entries\":[]}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/message-history",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400507000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, POST, DELETE",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400508000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"WAOZZiIi8fPu2A05UKZi7xNmfSk\"",
+    "content-length": "207"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"custom\":[{\"id\":\"c1\",\"name\":\"C\",\"extra\":true}],\"disabledBuiltinIds\":[\"builtin-commit\",\"builtin-stats\"],\"order\":[\"c1\"],\"more\":1}",
+   "at": 1792400509000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oV4hJxRVSENxc_wX8-mA4_Pe4tA\"",
+    "content-length": "16"
+   },
+   "answer": "{\"success\":true}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "quick-prompts.json",
+     "mode": "600",
+     "text": "{\n  \"custom\": [\n    {\n      \"id\": \"c1\",\n      \"name\": \"C\",\n      \"extra\": true\n    }\n  ],\n  \"disabledBuiltinIds\": [\n    \"builtin-commit\",\n    \"builtin-stats\"\n  ],\n  \"order\": [\n    \"c1\"\n  ],\n  \"more\": 1\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0003\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:27.000Z\"\n    }\n  ]\n}"
+    },
+    {
+     "path": "workspaces/ws-b",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-b/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":[{\"id\":\"k\",\"message\":\"m\"},3,\"str\",null]}"
+    },
+    {
+     "path": "workspaces/ws-c",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-c/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":{\"a\":1}}"
+    }
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400510000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"IA8HenEhiaMW5-LEDZvBAcCY7gk\"",
+    "content-length": "247"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":false},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[{\"id\":\"c1\",\"name\":\"C\",\"extra\":true}],\"order\":[\"c1\"]}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"custom\":[],\"disabledBuiltinIds\":[]}",
+   "at": 1792400511000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"srp4gItOq1sN_dDJHq3MFKKERWI\"",
+    "content-length": "26"
+   },
+   "answer": "{\"error\":\"Invalid format\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "null",
+   "at": 1792400512000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "x",
+   "at": 1792400513000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"srp4gItOq1sN_dDJHq3MFKKERWI\"",
+    "content-length": "26"
+   },
+   "answer": "{\"error\":\"Invalid format\"}"
+  },
+  {
+   "file": "quick-prompts.json",
+   "content": "{\"custom\":[\"ab\",3,null,[1]],\"disabledBuiltinIds\":\"builtin-notes\",\"order\":\"o\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400515000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"7y4onuR3FQ_RJBTDS81X_fICgXY\"",
+    "content-length": "239"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[{\"0\":\"a\",\"1\":\"b\"},{},{},{\"0\":1}],\"order\":\"o\"}"
+  },
+  {
+   "file": "quick-prompts.json",
+   "content": "{\"custom\":\"x\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400517000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"WAOZZiIi8fPu2A05UKZi7xNmfSk\"",
+    "content-length": "207"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "quick-prompts.json",
+   "content": "{\"disabledBuiltinIds\":{}}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400519000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"WAOZZiIi8fPu2A05UKZi7xNmfSk\"",
+    "content-length": "207"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "quick-prompts.json",
+   "content": "[{\"id\":\"builtin-simplify\",\"enabled\":false},{\"id\":\"mine\",\"name\":\"M\",\"enabled\":true},4]"
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400521000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"85xjJnFM5JBcJEdA4vtYw5LZWn4\"",
+    "content-length": "250"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":false}],\"custom\":[{\"id\":\"mine\",\"name\":\"M\",\"enabled\":true},{}],\"order\":[]}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "quick-prompts.json",
+     "mode": "600",
+     "text": "{\n  \"custom\": [\n    {\n      \"id\": \"mine\",\n      \"name\": \"M\",\n      \"enabled\": true\n    },\n    4\n  ],\n  \"disabledBuiltinIds\": [\n    \"builtin-simplify\"\n  ],\n  \"order\": []\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0003\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:27.000Z\"\n    }\n  ]\n}"
+    },
+    {
+     "path": "workspaces/ws-b",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-b/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":[{\"id\":\"k\",\"message\":\"m\"},3,\"str\",null]}"
+    },
+    {
+     "path": "workspaces/ws-c",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-c/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":{\"a\":1}}"
+    }
+   ]
+  },
+  {
+   "file": "quick-prompts.json",
+   "content": "[null]"
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400523000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"WAOZZiIi8fPu2A05UKZi7xNmfSk\"",
+    "content-length": "207"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "quick-prompts.json",
+   "content": "null"
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400525000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"WAOZZiIi8fPu2A05UKZi7xNmfSk\"",
+    "content-length": "207"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "quick-prompts.json",
+   "content": "5"
+  },
+  {
+   "method": "GET",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400527000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"WAOZZiIi8fPu2A05UKZi7xNmfSk\"",
+    "content-length": "207"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-commit\",\"name\":\"Commit\",\"prompt\":\"/commit-commands:commit\",\"enabled\":true},{\"id\":\"builtin-simplify\",\"name\":\"Simplify\",\"prompt\":\"/simplify\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/quick-prompts",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400528000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PUT",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400529000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Zvxt95Hf6DfmK41XaLs6L449wCQ\"",
+    "content-length": "212"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"custom\":[{\"id\":\"c1\",\"name\":\"C\",\"extra\":true}],\"disabledBuiltinIds\":[\"builtin-commit\",\"builtin-stats\"],\"order\":[\"c1\"],\"more\":1}",
+   "at": 1792400530000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oV4hJxRVSENxc_wX8-mA4_Pe4tA\"",
+    "content-length": "16"
+   },
+   "answer": "{\"success\":true}",
+   "files": [
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "quick-prompts.json",
+     "mode": "600",
+     "text": "5"
+    },
+    {
+     "path": "sidebar-items.json",
+     "mode": "600",
+     "text": "{\n  \"custom\": [\n    {\n      \"id\": \"c1\",\n      \"name\": \"C\",\n      \"extra\": true\n    }\n  ],\n  \"disabledBuiltinIds\": [\n    \"builtin-commit\",\n    \"builtin-stats\"\n  ],\n  \"order\": [\n    \"c1\"\n  ],\n  \"more\": 1\n}"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0003\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:27.000Z\"\n    }\n  ]\n}"
+    },
+    {
+     "path": "workspaces/ws-b",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-b/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":[{\"id\":\"k\",\"message\":\"m\"},3,\"str\",null]}"
+    },
+    {
+     "path": "workspaces/ws-c",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-c/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":{\"a\":1}}"
+    }
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400531000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"dDS1d8I7SRvScn-3e4YM8gXSvLU\"",
+    "content-length": "252"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":false}],\"custom\":[{\"id\":\"c1\",\"name\":\"C\",\"extra\":true}],\"order\":[\"c1\"]}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"custom\":[],\"disabledBuiltinIds\":[]}",
+   "at": 1792400532000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"srp4gItOq1sN_dDJHq3MFKKERWI\"",
+    "content-length": "26"
+   },
+   "answer": "{\"error\":\"Invalid format\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "null",
+   "at": 1792400533000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "x",
+   "at": 1792400534000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"srp4gItOq1sN_dDJHq3MFKKERWI\"",
+    "content-length": "26"
+   },
+   "answer": "{\"error\":\"Invalid format\"}"
+  },
+  {
+   "file": "sidebar-items.json",
+   "content": "{\"custom\":[\"ab\",3,null,[1]],\"disabledBuiltinIds\":\"builtin-notes\",\"order\":\"o\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400536000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0i7u8dFAN2GvYzMi26VS0GdwTFI\"",
+    "content-length": "244"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[{\"0\":\"a\",\"1\":\"b\"},{},{},{\"0\":1}],\"order\":\"o\"}"
+  },
+  {
+   "file": "sidebar-items.json",
+   "content": "{\"custom\":\"x\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400538000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Zvxt95Hf6DfmK41XaLs6L449wCQ\"",
+    "content-length": "212"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "sidebar-items.json",
+   "content": "{\"disabledBuiltinIds\":{}}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400540000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Zvxt95Hf6DfmK41XaLs6L449wCQ\"",
+    "content-length": "212"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "sidebar-items.json",
+   "content": "[{\"id\":\"builtin-simplify\",\"enabled\":false},{\"id\":\"mine\",\"name\":\"M\",\"enabled\":true},4]"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400542000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Zvxt95Hf6DfmK41XaLs6L449wCQ\"",
+    "content-length": "212"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "sidebar-items.json",
+   "content": "[null]"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400544000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Zvxt95Hf6DfmK41XaLs6L449wCQ\"",
+    "content-length": "212"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "sidebar-items.json",
+   "content": "null"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400546000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Zvxt95Hf6DfmK41XaLs6L449wCQ\"",
+    "content-length": "212"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "file": "sidebar-items.json",
+   "content": "5"
+  },
+  {
+   "method": "GET",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400548000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Zvxt95Hf6DfmK41XaLs6L449wCQ\"",
+    "content-length": "212"
+   },
+   "answer": "{\"builtins\":[{\"id\":\"builtin-notes\",\"name\":\"Notes\",\"icon\":\"FileText\",\"url\":\"/reports\",\"enabled\":true},{\"id\":\"builtin-stats\",\"name\":\"Stats\",\"icon\":\"BarChart3\",\"url\":\"/stats\",\"enabled\":true}],\"custom\":[],\"order\":[]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/sidebar-items",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400549000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PUT",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/rules",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400550000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/rules",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400551000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "file": "config.json",
+   "content": "{\"automationOwnerEmail\":\"\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/rules",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400553000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "file": "config.json",
+   "content": "{\"automationOwnerEmail\":\"owner@example.org\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/rules",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400555000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/automations/rules",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400556000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/rules/r1",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400557000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/runs",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400558000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/platform/automations/runs",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400559000,
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/rules",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "at": 1792400560000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/rules",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "authorization": "Bearer wrong"
+   },
+   "body": "",
+   "at": 1792400561000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"automationOwnerEmail\": \"owner@example.org\",\n  \"automationApiToken\": \"0000000000000000000000000000000000000000000000000000000000000003\",\n  \"updatedAt\": \"2026-10-19T09:02:41.000Z\"\n}"
+    },
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "quick-prompts.json",
+     "mode": "600",
+     "text": "5"
+    },
+    {
+     "path": "sidebar-items.json",
+     "mode": "600",
+     "text": "5"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0003\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:27.000Z\"\n    }\n  ]\n}"
+    },
+    {
+     "path": "workspaces/ws-b",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-b/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":[{\"id\":\"k\",\"message\":\"m\"},3,\"str\",null]}"
+    },
+    {
+     "path": "workspaces/ws-c",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-c/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":{\"a\":1}}"
+    }
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/token",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "at": 1792400562000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/automations/token",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400563000,
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/token",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400564000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ECTk6ZzRmnQduGv7gWHSaDjV6Dk\"",
+    "content-length": "76"
+   },
+   "answer": "{\"token\":\"0000000000000000000000000000000000000000000000000000000000000003\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/token",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400565000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"ECTk6ZzRmnQduGv7gWHSaDjV6Dk\"",
+    "content-length": "76"
+   },
+   "answer": "{\"token\":\"0000000000000000000000000000000000000000000000000000000000000003\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/runs",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "authorization": "Bearer 0000000000000000000000000000000000000000000000000000000000000005"
+   },
+   "body": "",
+   "at": 1792400566000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/platform/automations/runs",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "authorization": "Bearer 0000000000000000000000000000000000000000000000000000000000000005"
+   },
+   "body": "",
+   "at": 1792400567000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/automations/runs",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "authorization": "Bearer éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+   },
+   "body": "",
+   "at": 1792400568000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "file": "config.json",
+   "content": null
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/net-events",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"sockets\":{\"status\":{\"drops\":2,\"dead\":1.5,\"recovered\":-1,\"downMs\":[1,2.5,30000]},\"bad key!\":{},\"x\":5},\"hidden\":true}",
+   "at": 1792400570000,
+   "status": 204,
+   "answerHeaders": {},
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/net-events",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "{\"sockets\":[{\"drops\":1}]}",
+   "at": 1792400571000,
+   "status": 204,
+   "answerHeaders": {},
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/net-events",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "not json",
+   "at": 1792400572000,
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/net-events",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"sockets\":null}",
+   "at": 1792400573000,
+   "status": 400,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/net-events",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/json"
+   },
+   "body": "{\"sockets\":{}}",
+   "at": 1792400574000,
+   "status": 403,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/net-events",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400575000,
+   "status": 405,
+   "answerHeaders": {
+    "allow": "POST",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/gateway-ping",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400576000,
+   "status": 204,
+   "answerHeaders": {
+    "cache-control": "no-store"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/gateway-ping",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400577000,
+   "status": 204,
+   "answerHeaders": {
+    "cache-control": "no-store"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/gateway-ping",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400578000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/stats/daily-report/cache",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400579000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"D42IsNBTjAJUdRgsTJ8MRtAPQNU\"",
+    "content-length": "67"
+   },
+   "answer": "{\"days\":{\"2026-10-01\":{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}}}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/stats/daily-report/cache",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400580000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"xwnbZ1ZT4EgNyeJAfZIChkzyYe0\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"method-not-allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/react-scan",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400581000,
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wvX8iGdfyCiS7HItFSoQXbHZcyA\"",
+    "content-length": "39"
+   },
+   "answer": "{\"error\":\"react-scan is not installed\"}"
+  },
+  {
+   "file": "../node_modules/react-scan/dist/auto.global.js",
+   "content": "window.scan=1;"
+  },
+  {
+   "method": "GET",
+   "path": "/api/react-scan",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400583000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/javascript; charset=utf-8",
+    "etag": "\"UyfGY9El6UQK1VGag87nT6DoPO4\"",
+    "cache-control": "private, max-age=3600",
+    "content-length": "14"
+   },
+   "answer": "window.scan=1;"
+  },
+  {
+   "method": "GET",
+   "path": "/api/react-scan",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "if-none-match": "\"7QhBxo-q1IbcQ36nyqHXjbGKLaQ\""
+   },
+   "body": "",
+   "at": 1792400584000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/javascript; charset=utf-8",
+    "etag": "\"UyfGY9El6UQK1VGag87nT6DoPO4\"",
+    "cache-control": "private, max-age=3600",
+    "content-length": "14"
+   },
+   "answer": "window.scan=1;"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400585000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400586000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "null",
+   "at": 1792400587000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/logout",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400588000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11",
+    "set-cookie": "session-token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0"
+   },
+   "answer": "{\"ok\":true}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/setup",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400589000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"CB2x7fsuAX3x63BmlywbWeMjCZ0\"",
+    "content-length": "62"
+   },
+   "answer": "{\"needsSetup\":true,\"requiresAuth\":false,\"hostEnvLocked\":false}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/preflight",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{",
+   "at": 1792400590000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/preflight",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400591000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/setup",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"authPassword\":\"\"}",
+   "at": 1792400592000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oT4VMNKN8bpDNXPYGAg0mC2PvsI\"",
+    "content-length": "33"
+   },
+   "answer": "{\"error\":\"Password is required.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/setup",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"authPassword\":\"pw-1\",\"terminalTheme\":{\"light\":\"a\",\"dark\":\"b\"},\"networkAccess\":\"tailscale\",\"locale\":\"\",\"dangerouslySkipPermissions\":null}",
+   "at": 1792400593000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}",
+   "files": [
+    {
+     "path": "config.json",
+     "mode": "600",
+     "text": "{\n  \"updatedAt\": \"2026-10-19T09:03:13.000Z\",\n  \"authPassword\": \"scrypt:00000000000000000000000000000004:82d1b7b91236acb56888c0271480f8d6e2714f2a2b5e19d3721c6c1741e1253e2d0b97144654726b89dc6c568d4e5c7da5b1f5a1743a618aaa7dd8aa70d9eeee\",\n  \"authSecret\": \"0000000000000000000000000000000000000000000000000000000000000005\",\n  \"locale\": \"en\",\n  \"appTheme\": \"dark\",\n  \"terminalTheme\": {\n    \"light\": \"a\",\n    \"dark\": \"b\"\n  },\n  \"dangerouslySkipPermissions\": false,\n  \"networkAccess\": \"tailscale\"\n}"
+    },
+    {
+     "path": "keybindings.json",
+     "mode": "600",
+     "text": "{\n  \"overrides\": {}\n}"
+    },
+    {
+     "path": "quick-prompts.json",
+     "mode": "600",
+     "text": "5"
+    },
+    {
+     "path": "sidebar-items.json",
+     "mode": "600",
+     "text": "5"
+    },
+    {
+     "path": "stats",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports",
+     "dir": true
+    },
+    {
+     "path": "stats/daily-reports/2026-10-01.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-01\",\"brief\":\"b1\",\"cost\":1}"
+    },
+    {
+     "path": "stats/daily-reports/2026-10-02.json",
+     "mode": "600",
+     "text": "{\"date\":\"2026-10-02\"}"
+    },
+    {
+     "path": "stats/daily-reports/broken.json",
+     "mode": "600",
+     "text": "{"
+    },
+    {
+     "path": "stats/daily-reports/notes.txt",
+     "mode": "600",
+     "text": "x"
+    },
+    {
+     "path": "workspaces",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-a/message-history.json",
+     "mode": "600",
+     "text": "{\n  \"entries\": [\n    {\n      \"id\": \"id0003\",\n      \"message\": \"first\",\n      \"sentAt\": \"2026-10-19T09:01:27.000Z\"\n    }\n  ]\n}"
+    },
+    {
+     "path": "workspaces/ws-b",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-b/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":[{\"id\":\"k\",\"message\":\"m\"},3,\"str\",null]}"
+    },
+    {
+     "path": "workspaces/ws-c",
+     "dir": true
+    },
+    {
+     "path": "workspaces/ws-c/message-history.json",
+     "mode": "600",
+     "text": "{\"entries\":{\"a\":1}}"
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/setup",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"authPassword\":\"pw-2\"}",
+   "at": 1792400594000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"i_4qRsM6peNVu_BlPtK96L_3pNQ\"",
+    "content-length": "36"
+   },
+   "answer": "{\"error\":\"Setup already completed.\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/setup",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400595000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"gxKrXn5TaYU1FVPgd-H0GMgzpng\"",
+    "content-length": "63"
+   },
+   "answer": "{\"needsSetup\":false,\"requiresAuth\":false,\"hostEnvLocked\":false}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/auth/setup",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400596000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/preflight",
+   "query": [],
+   "headers": {},
+   "body": "",
+   "at": 1792400597000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"XPDV80vbMk4yY1_PADG4jYM4rSI\"",
+    "content-length": "24"
+   },
+   "answer": "{\"error\":\"Unauthorized\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"wrong\"}",
+   "at": 1792400598000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":5}",
+   "at": 1792400599000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json",
+    "x-forwarded-proto": "https"
+   },
+   "body": "{\"password\":\"pw-1\"}",
+   "at": 1792400600000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11",
+    "set-cookie": "session-token=signed; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800; Secure"
+   },
+   "answer": "{\"ok\":true}"
+  },
+  {
+   "file": "config.json",
+   "content": null
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400602000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400603000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400604000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400605000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400606000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400607000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400608000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400609000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400610000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400611000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400612000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400613000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400614000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400615000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400616000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400617000,
+   "status": 401,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"cSQOFsk5Fu0iNajJTqfJLIHoy7A\"",
+    "content-length": "29"
+   },
+   "answer": "{\"error\":\"Invalid password.\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "query": [],
+   "headers": {
+    "content-type": "application/json"
+   },
+   "body": "{\"password\":\"x\"}",
+   "at": 1792400618000,
+   "status": 429,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"UAt6KPz6cMz7YPC7DdEyD1n7gr4\"",
+    "content-length": "60"
+   },
+   "answer": "{\"error\":\"Too many login attempts. Please try again later.\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tailscale/status",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400619000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iOiQ8qRaCADhVZc_eYbIPruxFh4\"",
+    "content-length": "137"
+   },
+   "answer": "{\"installed\":false,\"running\":false,\"version\":null,\"hostname\":null,\"dnsName\":null,\"tailscaleIp\":null,\"serveEntries\":[],\"serverPort\":18099}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/tailscale/serve",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"httpsPort\":443,\"localPort\":8022}",
+   "at": 1792400620000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"7nwPo7Zc53fZlDnOpvI38G-sFbQ\"",
+    "content-length": "34"
+   },
+   "answer": "{\"error\":\"spawn tailscale ENOENT\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/tailscale/serve",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"httpsPort\":\"443\",\"localPort\":0}",
+   "at": 1792400621000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"vZzOlGslMZRV2apv1XSlWMVYYm4\"",
+    "content-length": "48"
+   },
+   "answer": "{\"error\":\"Valid port number required (1-65535)\"}"
+  },
+  {
+   "pathDir": "bin"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tailscale/status",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400623000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"XSFBS7ucwZBYgB8QdZIFvcvHhgY\"",
+    "content-length": "212"
+   },
+   "answer": "{\"installed\":true,\"running\":true,\"version\":\"1.80.2\",\"hostname\":\"box\",\"dnsName\":\"box.tail.ts.net\",\"tailscaleIp\":\"100.64.0.7\",\"serveEntries\":[{\"httpsPort\":\"443\",\"proxy\":\"http://127.0.0.1:8022\"}],\"serverPort\":18099}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/tailscale/serve",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"httpsPort\":\" 8443 \",\"localPort\":true}",
+   "at": 1792400624000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Ai2R8hgEarLmHKwesT1qcY913ys\"",
+    "content-length": "11"
+   },
+   "answer": "{\"ok\":true}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/tailscale/serve",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"httpsPort\":443}",
+   "at": 1792400625000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"1RlxI8BLLr9JJn_td2elQ7DLMMs\"",
+    "content-length": "76"
+   },
+   "answer": "{\"error\":\"Command failed: tailscale serve off --https=443\\nno such serve\\n\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/tailscale/serve",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"httpsPort\":1.5}",
+   "at": 1792400626000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"vZzOlGslMZRV2apv1XSlWMVYYm4\"",
+    "content-length": "48"
+   },
+   "answer": "{\"error\":\"Valid port number required (1-65535)\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tailscale/serve",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400627000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST, DELETE",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/tailscale/status",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400628000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/check-agent",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400629000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "HEAD",
+   "path": "/api/check-agent",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400630000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": ""
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/check-agent",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400631000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/check-claude",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400632000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/codex/sessions",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400633000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"xwnbZ1ZT4EgNyeJAfZIChkzyYe0\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"method-not-allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/editor/files",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400634000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "cache-control": "no-store",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/editor/file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400635000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PUT",
+    "cache-control": "no-store",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/editor/file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400636000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PUT",
+    "cache-control": "no-store",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "HEAD",
+   "path": "/api/editor/file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400637000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, PUT",
+    "cache-control": "no-store",
+    "content-length": "30"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/branch",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400638000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/git/status",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400639000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/layout/commit-diff",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400640000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/layout/diff",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400641000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/layout/file-content",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400642000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/layout/git-log",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400643000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/timeline/sessions",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400644000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/preflight/runtime",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400645000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "HEAD",
+   "path": "/api/preflight/runtime",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400646000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET, POST",
+    "content-length": "30"
+   },
+   "answer": ""
+  },
+  {
+   "method": "PUT",
+   "path": "/api/platform/changes",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400647000,
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET, POST",
+    "cache-control": "no-store",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "HEAD",
+   "path": "/api/platform/changes",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400648000,
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET, POST",
+    "cache-control": "no-store"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/context-files",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400649000,
+   "status": 405,
+   "answerHeaders": {
+    "allow": "GET",
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/uploads/ws/tab/x.png",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400650000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/uploads/ws/tab/x.png",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400651000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/sync",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400652000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "HEAD",
+   "path": "/api/git/sync",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400653000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": ""
+  },
+  {
+   "method": "GET",
+   "path": "/api/uploads/cleanup",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400654000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400655000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/upload-file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400656000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/upload-image",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400657000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "POST",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "",
+   "at": 1792400658000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/platform/machine/stop",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400659000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/voice/assets/models/x.bin",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400660000,
+   "status": 405,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
+    "allow": "GET",
+    "content-length": "30"
+   },
+   "answer": "{\"error\":\"Method not allowed\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/branch",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{",
+   "at": 1792400661000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/platform/changes",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400662000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/context-files",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400663000,
+   "status": 403,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"TLNzmZqKxaTuFdX_dVWWPBu44_c\"",
+    "content-length": "21"
+   },
+   "answer": "{\"error\":\"Forbidden\"}"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/editor/file",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "xxxxxxxxxx",
+   "at": 1792400664000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/file-preview",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/a.png\",\"$ROOT/work/notes.md\",\"$ROOT/work/data.bin\",\"$ROOT/work/missing.png\",5,\"rel.png\"]}",
+   "at": 1792400665000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"RX2rIczkmgeGQm82583l-j73x6M\"",
+    "cache-control": "no-store",
+    "content-length": "94"
+   },
+   "answer": "{\"available\":[\"$ROOT/work/a.png\",\"$ROOT/work/notes.md\"]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/file-preview",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":[\"$ROOT/work/a.png\",\"$ROOT/work/data.bin\",\"$ROOT/work/missing.png\",\"/etc/passwd\",\"rel\"],\"details\":true}",
+   "at": 1792400666000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"44UP5O4xzBf8yGVV2ePthR3a8Ro\"",
+    "cache-control": "no-store",
+    "content-length": "570"
+   },
+   "answer": "{\"files\":[{\"path\":\"$ROOT/work/a.png\",\"size\":3,\"preview\":true,\"download\":true},{\"path\":\"$ROOT/work/data.bin\",\"size\":3,\"preview\":false,\"download\":true},{\"path\":\"$ROOT/work/missing.png\",\"preview\":false,\"download\":false,\"error\":\"Файл не найден\"},{\"path\":\"/etc/passwd\",\"preview\":false,\"download\":false,\"error\":\"Этот файл нельзя открыть из рабочего пространства\"},{\"path\":\"rel\",\"preview\":false,\"download\":false,\"error\":\"Нужен абсолютный путь\"}]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/file-preview",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{\"paths\":\"x\"}",
+   "at": 1792400667000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pbUciFQ5Q454up0fnlkMTZzFwQg\"",
+    "cache-control": "no-store",
+    "content-length": "16"
+   },
+   "answer": "{\"available\":[]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/file-preview",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "text/plain"
+   },
+   "body": "x",
+   "at": 1792400668000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"pbUciFQ5Q454up0fnlkMTZzFwQg\"",
+    "cache-control": "no-store",
+    "content-length": "16"
+   },
+   "answer": "{\"available\":[]}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/file-preview",
+   "query": [],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400669000,
+   "status": 403,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "PUT",
+   "path": "/api/platform/file-preview",
+   "query": [
+    [
+     "path",
+     "$ROOT/work/notes.md"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400670000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "text/markdown; charset=utf-8",
+    "etag": "\"yWYEqaBbg5oGJAhUwM34n7hyiDw\"",
+    "cache-control": "no-store",
+    "content-length": "8",
+    "x-content-type-options": "nosniff"
+   },
+   "answer": "# notes\n"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/platform/file-preview",
+   "query": [
+    [
+     "path",
+     "$ROOT/work/data.bin"
+    ],
+    [
+     "download",
+     "1"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400671000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/octet-stream",
+    "cache-control": "no-store",
+    "content-length": "3",
+    "content-disposition": "attachment; filename=\"data.bin\"; filename*=UTF-8''data.bin",
+    "x-content-type-options": "nosniff"
+   },
+   "answer": "bin"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/file-preview",
+   "query": [],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{",
+   "at": 1792400672000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/memory-note",
+   "query": [
+    [
+     "name",
+     "fact.md"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400673000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"putllmdRFKohfMO_bE6SvJQwHtw\"",
+    "cache-control": "no-store",
+    "content-length": "70"
+   },
+   "answer": "{\"name\":\"fact.md\",\"title\":\"Fact\",\"description\":\"a fact\",\"body\":\"body\"}"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/platform/memory-note",
+   "query": [
+    [
+     "name",
+     "none.md"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400674000,
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"F0_Ec5mSrkdoaWbF4RDkKum1hy0\"",
+    "cache-control": "no-store",
+    "content-length": "69"
+   },
+   "answer": "{\"error\":\"Такой памяти на этой машине нет\"}"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/platform/memory-note",
+   "query": [
+    [
+     "name",
+     "fact.md"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "content-type": "application/json"
+   },
+   "body": "{}",
+   "at": 1792400675000,
+   "status": 403,
+   "answerHeaders": {
+    "content-length": "0"
+   },
+   "answer": ""
+  },
+  {
+   "method": "POST",
+   "path": "/api/platform/memory-note",
+   "query": [
+    [
+     "name",
+     "fact.md"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good",
+    "content-type": "application/json"
+   },
+   "body": "{",
+   "at": 1792400676000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Invalid JSON"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/branch",
+   "query": [
+    [
+     "tmuxSession",
+     "tab-1"
+    ],
+    [
+     "tmuxSession",
+     "tab-1"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400677000,
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Cj48MmtjIT8Rp3HdIaNwTu_C0ok\"",
+    "content-length": "34"
+   },
+   "answer": "{\"error\":\"tmux-session-not-found\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/branch",
+   "query": [
+    [
+     "tmuxSession",
+     ""
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400678000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"yhEck3rI2GQBXjw-sQLzTaj72sQ\"",
+    "content-length": "68"
+   },
+   "answer": "{\"error\":\"missing-param\",\"message\":\"tmuxSession parameter required\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/status",
+   "query": [
+    [
+     "tmuxSession",
+     "a"
+    ],
+    [
+     "tmuxSession",
+     "b"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400679000,
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Cj48MmtjIT8Rp3HdIaNwTu_C0ok\"",
+    "content-length": "34"
+   },
+   "answer": "{\"error\":\"tmux-session-not-found\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/diff",
+   "query": [
+    [
+     "session",
+     "tab-1"
+    ],
+    [
+     "session",
+     "tab-1"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400680000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/diff",
+   "query": [
+    [
+     "session",
+     "tab-plain"
+    ],
+    [
+     "hashOnly",
+     "true"
+    ],
+    [
+     "hashOnly",
+     "true"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400681000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wo0V9Aja_sRreHKztpB53ldPOOI\"",
+    "content-length": "39"
+   },
+   "answer": "{\"isGitRepo\":false,\"diff\":\"\",\"hash\":\"\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/commit-diff",
+   "query": [
+    [
+     "session",
+     "tab-1"
+    ],
+    [
+     "hash",
+     "abcd"
+    ],
+    [
+     "hash",
+     "abcd"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400682000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"DsyxDqt9FLe0jUyn_IkTJ-jgxWk\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"Invalid hash format\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/commit-diff",
+   "query": [
+    [
+     "session",
+     "a"
+    ],
+    [
+     "session",
+     "b"
+    ],
+    [
+     "hash",
+     "abcd"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400683000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/commit-diff",
+   "query": [
+    [
+     "session",
+     "a"
+    ],
+    [
+     "session",
+     "b"
+    ],
+    [
+     "hash",
+     "zz"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400684000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"DsyxDqt9FLe0jUyn_IkTJ-jgxWk\"",
+    "content-length": "31"
+   },
+   "answer": "{\"error\":\"Invalid hash format\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/commit-diff",
+   "query": [
+    [
+     "session",
+     "a"
+    ],
+    [
+     "session",
+     "b"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400685000,
+   "status": 400,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"z20uaziWuKAJICL62Zzq9BPaapE\"",
+    "content-length": "48"
+   },
+   "answer": "{\"error\":\"session and hash parameters required\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/git-log",
+   "query": [
+    [
+     "session",
+     "x"
+    ],
+    [
+     "session",
+     "y"
+    ],
+    [
+     "limit",
+     "5"
+    ],
+    [
+     "limit",
+     "6"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400686000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/git-log",
+   "query": [
+    [
+     "session",
+     "tab-plain"
+    ],
+    [
+     "limit",
+     "5"
+    ],
+    [
+     "limit",
+     "6"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400687000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"3LAhPSnyX7l01LosqY2QS3RIfzk\"",
+    "content-length": "32"
+   },
+   "answer": "{\"isGitRepo\":false,\"commits\":[]}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/git/branch",
+   "query": [],
+   "raw": "tmuxSession=%zz&force=%",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400688000,
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"Cj48MmtjIT8Rp3HdIaNwTu_C0ok\"",
+    "content-length": "34"
+   },
+   "answer": "{\"error\":\"tmux-session-not-found\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/diff",
+   "query": [],
+   "raw": "session=tab-plain&%zz",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400689000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"wo0V9Aja_sRreHKztpB53ldPOOI\"",
+    "content-length": "39"
+   },
+   "answer": "{\"isGitRepo\":false,\"diff\":\"\",\"hash\":\"\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/platform/changes",
+   "query": [],
+   "raw": "root=%E0%A4%A&sha=x&sha=y",
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400690000,
+   "status": 404,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"HWc-LmntXSCRBD_A1TcMLEQQe1s\"",
+    "cache-control": "no-store",
+    "content-length": "28"
+   },
+   "answer": "{\"error\":\"Commit not found\"}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/diff",
+   "query": [
+    [
+     "session",
+     "tab-1"
+    ],
+    [
+     "hashOnly",
+     "true"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400691000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"oIwXLc6Dr8-L8x5P2iAxTebMSV4\"",
+    "content-length": "81"
+   },
+   "answer": "{\"isGitRepo\":true,\"hash\":\"ce791f98308b6718\",\"ahead\":0,\"behind\":0,\"fetched\":false}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/diff",
+   "query": [
+    [
+     "session",
+     "tab-1"
+    ],
+    [
+     "hashOnly",
+     "true"
+    ],
+    [
+     "fetch",
+     "true"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400692000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"0u1h-jCJ4MeRyXFWcFArxQZxNto\"",
+    "content-length": "80"
+   },
+   "answer": "{\"isGitRepo\":true,\"hash\":\"ce791f98308b6718\",\"ahead\":0,\"behind\":1,\"fetched\":true}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/diff",
+   "query": [
+    [
+     "session",
+     "tab-broken"
+    ],
+    [
+     "hashOnly",
+     "true"
+    ],
+    [
+     "fetch",
+     "true"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400693000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"QaP-s_3s3UYZ1EhYkl04FKXldB8\"",
+    "content-length": "81"
+   },
+   "answer": "{\"isGitRepo\":true,\"hash\":\"63eefa53a09b7f2a\",\"ahead\":0,\"behind\":0,\"fetched\":false}"
+  },
+  {
+   "method": "GET",
+   "path": "/api/layout/diff",
+   "query": [
+    [
+     "session",
+     "tab-1"
+    ],
+    [
+     "fetch",
+     "true"
+    ],
+    [
+     "fetch",
+     "true"
+    ],
+    [
+     "hashOnly",
+     "true"
+    ]
+   ],
+   "headers": {
+    "cookie": "session-token=good"
+   },
+   "body": "",
+   "at": 1792400694000,
+   "status": 200,
+   "answerHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "etag": "\"9zBhRrWHUeOu-Kk5s5UC2UFtp0Q\"",
+    "content-length": "81"
+   },
+   "answer": "{\"isGitRepo\":true,\"hash\":\"ce791f98308b6718\",\"ahead\":0,\"behind\":1,\"fetched\":false}"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     "a"
+    ],
+    [
+     "session",
+     "b"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "at": 1792400695000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  },
+  {
+   "method": "POST",
+   "path": "/api/git/sync",
+   "query": [
+    [
+     "session",
+     ""
+    ],
+    [
+     "session",
+     "b"
+    ]
+   ],
+   "headers": {
+    "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   },
+   "body": "",
+   "at": 1792400696000,
+   "status": 500,
+   "answerHeaders": {
+    "content-type": "text/plain"
+   },
+   "answer": "Internal Server Error"
+  }
+ ]
+}
