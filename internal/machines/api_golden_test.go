@@ -1,8 +1,6 @@
 package machines
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -47,11 +45,6 @@ type apiGolden struct {
 		Conditional   bool              `json:"conditional"`
 	} `json:"requests"`
 	Files map[string]*string `json:"files"`
-}
-
-func etagOf(b []byte) string {
-	sum := sha1.Sum(b)
-	return `"` + base64.RawURLEncoding.EncodeToString(sum[:])[:27] + `"`
 }
 
 // TestGoldenAPI sends the requests the previous runtime's dispatcher answered to these routes behind the gate, on the

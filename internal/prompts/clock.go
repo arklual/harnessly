@@ -34,8 +34,6 @@ func (SystemClock) AfterFunc(d time.Duration, f func()) Timer {
 	return time.AfterFunc(d, f)
 }
 
-func ms(t time.Time) int64 { return t.UnixMilli() }
-
 // Steps marks how long the parts of one delivery took, in milliseconds since it started, in the order they happened.
 type Steps struct {
 	clock Clock

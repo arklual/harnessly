@@ -63,7 +63,7 @@ func (f *fakeTUI) record(v any) {
 		return
 	}
 	defer file.Close()
-	file.Write(append(raw, '\n'))
+	_, _ = file.Write(append(raw, '\n'))
 }
 
 func isoNow() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000Z") }

@@ -117,13 +117,6 @@ func (j *jsonlWatch) dropPath(path string) {
 	}
 }
 
-func (j *jsonlWatch) watching(tabID string) bool {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	_, ok := j.byTab[tabID]
-	return ok
-}
-
 func (j *jsonlWatch) closeAll() {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -136,7 +129,6 @@ func (j *jsonlWatch) changed(path string) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	for tabID := range j.byPath[path] {
-		tabID := tabID
 		if t := j.debounc[tabID]; t != nil {
 			t.Stop()
 		}

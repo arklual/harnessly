@@ -18,7 +18,7 @@ func TestBodyRouteShadowComparesStatusHeadersAndBytes(t *testing.T) {
 			w.Header().Set("ETag", etag)
 			w.Header().Set("Content-Length", "3")
 			w.WriteHeader(200)
-			io.WriteString(w, body)
+			_, _ = io.WriteString(w, body)
 		}
 	}
 	old := httptest.NewServer(serve("png", `"a"`))
@@ -106,7 +106,7 @@ func TestShadowOutlivesTheAnswer(t *testing.T) {
 	old := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 		w.WriteHeader(200)
-		io.WriteString(w, "png")
+		_, _ = io.WriteString(w, "png")
 	}))
 	defer old.Close()
 	f, dir := newGate(t, strings.TrimPrefix(old.URL, "http://"))
@@ -118,7 +118,7 @@ func TestShadowOutlivesTheAnswer(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "image/png")
 		w.WriteHeader(200)
-		io.WriteString(w, "png")
+		_, _ = io.WriteString(w, "png")
 	}})...)
 	if err := os.WriteFile(filepath.Join(dir, "state-mode.json"), []byte(`{"goSlices":["files-shadow"]}`), 0o600); err != nil {
 		t.Fatal(err)

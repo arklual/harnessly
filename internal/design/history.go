@@ -121,10 +121,7 @@ func isInsideIgnored(segments []string) bool {
 
 // IsHistoryPath is whether a change at this path (relative to the root) is something the history keeps.
 func IsHistoryPath(rel string) bool {
-	var segs []string
-	for _, s := range strings.FieldsFunc(rel, func(r rune) bool { return r == '/' || r == '\\' }) {
-		segs = append(segs, s)
-	}
+	segs := strings.FieldsFunc(rel, func(r rune) bool { return r == '/' || r == '\\' })
 	return len(segs) > 0 && !isInsideIgnored(segs) && !strings.HasSuffix(segs[len(segs)-1], ".tmp")
 }
 

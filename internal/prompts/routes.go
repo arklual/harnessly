@@ -261,7 +261,7 @@ func (s *Service) RunCommandRoute(body []byte) Response {
 		return Response{400, &RunError{Error: RunInvalid, Message: "Нужна строка команды"}}
 	}
 	r := s.RunCommand(RunInput{Session: session, Provider: provider, Line: line})
-	return Response{r.Status, r.Body}
+	return Response(r)
 }
 
 // --- GET|POST /commands/screen ------------------------------------------------------------------------------------

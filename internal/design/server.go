@@ -85,7 +85,11 @@ func (l *Library) EnsureServer() (int, error) {
 	go func() { _ = s.srv.Serve(ln) }()
 	_ = l.EnsureGuide()
 	go l.WatchModes()
-	go l.StartBackground()
+	l.bgStarts.Add(1)
+	go func() {
+		defer l.bgStarts.Done()
+		l.StartBackground()
+	}()
 	return s.port, nil
 }
 
@@ -102,7 +106,8 @@ func (l *Library) ServerPort() int {
 	return s.port
 }
 
-// StopServer closes the server (a test's cleanup).
+// StopServer closes the server and stops the background work it started, waiting out a history snapshot under way (a
+// test's cleanup: nothing may write into the folders a test is about to remove).
 func (l *Library) StopServer() {
 	l.mu.Lock()
 	s := l.srv
@@ -110,6 +115,17 @@ func (l *Library) StopServer() {
 	l.mu.Unlock()
 	if s != nil && s.srv != nil {
 		_ = s.srv.Close()
+	}
+	l.bgStarts.Wait()
+	l.StopBackground()
+	for {
+		l.hist.mu.Lock()
+		running := l.hist.running
+		l.hist.mu.Unlock()
+		if !running {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

@@ -189,7 +189,7 @@ func TestCodexUsagePollSendsTheLoginAndWritesCodex(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"tokens":{"access_token":"tok","account_id":"acc"}}`), 0o600)
 	login := ReadCodexLogin(home)
 	c := &Cache{File: filepath.Join(t.TempDir(), "rate-limits.json")}
-	c.Write("codex", Data{"ts": 1.0, "five_hour": map[string]any{"used_percentage": 9.0, "resets_at": 5.0}, "seven_day": nil})
+	_, _ = c.Write("codex", Data{"ts": 1.0, "five_hour": map[string]any{"used_percentage": 9.0, "resets_at": 5.0}, "seven_day": nil})
 	if _, err := PollCodexUsageOnce(context.Background(), *login, nil, srv.URL, c, func() float64 { return 3000 }); err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestCodexUsagePollSendsTheLoginAndWritesCodex(t *testing.T) {
 		t.Fatalf("a complete source must clear the window the plan lacks: %v", codex)
 	}
 	status = http.StatusUnauthorized
-	PollCodexUsageOnce(context.Background(), *login, nil, srv.URL, c, func() float64 { return 3100 })
+	_, _ = PollCodexUsageOnce(context.Background(), *login, nil, srv.URL, c, func() float64 { return 3100 })
 	if msg := c.Read()["codex"]["codexbarError"].(map[string]any)["message"]; msg != "Codex: вход Codex истёк, откройте Codex на машине" {
 		t.Fatalf("%v", msg)
 	}
@@ -217,7 +217,7 @@ func TestPollersSkipAFreshCodexValue(t *testing.T) {
 	home := t.TempDir()
 	_ = os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"tokens":{"access_token":"tok"}}`), 0o600)
 	c := &Cache{File: filepath.Join(t.TempDir(), "rate-limits.json")}
-	c.Write("codex", Data{"ts": 1000.0, "source": "codex-usage", "five_hour": nil, "seven_day": nil})
+	_, _ = c.Write("codex", Data{"ts": 1000.0, "source": "codex-usage", "five_hour": nil, "seven_day": nil})
 	p := &Pollers{Cache: c, CodexHome: home, URL: srv.URL, Clock: func() float64 { return 1059 }}
 	p.pollCodexUsage(context.Background())
 	if calls != 0 {

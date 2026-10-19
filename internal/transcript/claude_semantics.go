@@ -73,12 +73,6 @@ func opt(v any, k string) any {
 	return get(v, k)
 }
 
-// has is `k in v` for an object.
-func has(v any, k string) bool {
-	o, ok := v.(*jsvalue.Object)
-	return ok && o.Has(k)
-}
-
 func coalesce(v, def any) any {
 	if nullish(v) {
 		return def

@@ -7,7 +7,6 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 )
 
@@ -112,5 +111,3 @@ func asErrBody(err error) (bodyError, bool) {
 	ok := errors.As(err, &be)
 	return be, ok
 }
-
-func itoa(n int) string { return strconv.Itoa(n) }

@@ -104,7 +104,7 @@ func TestStatsMergeAndCleanup(t *testing.T) {
 	if got, _ := s.Update("../escape", jsvalue.NewObject("x", 1.0)); got != nil {
 		t.Fatal("a non-UUID id was written")
 	}
-	s.Update(id, jsvalue.NewObject("sessionId", id, "inputTokens", 5.0, "model", "Opus", "transcriptPath", "/t.jsonl"))
+	_, _ = s.Update(id, jsvalue.NewObject("sessionId", id, "inputTokens", 5.0, "model", "Opus", "transcriptPath", "/t.jsonl"))
 	got, _ := s.Update(id, jsvalue.NewObject("model", nil, "cost", 1.5), "transcriptPath")
 	if want := `{"sessionId":"` + id + `","inputTokens":5,"model":null,"cost":1.5}`; string(jsvalue.Stringify(got, "")) != want {
 		t.Fatalf("%s", jsvalue.Stringify(got, ""))
@@ -116,7 +116,7 @@ func TestStatsMergeAndCleanup(t *testing.T) {
 	_ = os.MkdirAll(filepath.Join(projects, "-srv-app"), 0o755)
 	keep := "1b8f5c2e-1d2a-4e6f-9a7b-3c4d5e6f7a8b"
 	_ = os.WriteFile(filepath.Join(projects, "-srv-app", keep+".jsonl"), nil, 0o600)
-	s.Update(keep, jsvalue.NewObject())
+	_, _ = s.Update(keep, jsvalue.NewObject())
 	if n := s.CleanupOrphans(projects); n != 1 || s.Read(id) != nil || s.Read(keep) == nil {
 		t.Fatalf("removed %d", n)
 	}

@@ -164,11 +164,11 @@ func TestRoutesOnARepository(t *testing.T) {
 	}
 	dir := t.TempDir()
 	gitIn(t, dir, "init", "-q", "-b", "main")
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("one\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "a.txt"), []byte("one\n"), 0o644)
 	gitIn(t, dir, "add", ".")
 	gitIn(t, dir, "commit", "-q", "-m", "first")
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("one\ntwo\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, "new.txt"), []byte("fresh\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "a.txt"), []byte("one\ntwo\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "new.txt"), []byte("fresh\n"), 0o644)
 	head := gitIn(t, dir, "rev-parse", "HEAD")
 
 	s := New(fakeTmux{cwd: dir})

@@ -31,7 +31,6 @@ var comparedHeaders = []string{"Content-Type", "Content-Length", "Content-Range"
 func (f *Gate) AsBodyRoutes(routes ...BodyRoute) []Route {
 	out := make([]Route, 0, 2*len(routes))
 	for _, br := range routes {
-		br := br
 		out = append(out, Route{Slice: br.Slice, Match: br.Match, Handler: br.Serve}, Route{
 			Slice: br.Slice + "-shadow",
 			Match: func(r *http.Request) bool { return r.Method == http.MethodGet && br.Match(r) },

@@ -288,10 +288,3 @@ func around(a, b string) string {
 	from, to := max(0, i-300), min(len(a), i+300)
 	return fmt.Sprintf("@%d …%s…", i, a[from:to])
 }
-
-func clip(s string) string {
-	if len(s) > 1500 {
-		return s[:1500] + "…"
-	}
-	return s
-}

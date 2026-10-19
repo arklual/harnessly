@@ -4,7 +4,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"harnessly/internal/jscompat"
 	"harnessly/internal/jsvalue"
@@ -20,8 +19,6 @@ const (
 )
 
 var claudeExcluded = map[string]bool{"progress": true, "system": true, "file-history-snapshot": true, "agent-name": true}
-
-func nowMillis() int64 { return time.Now().UnixMilli() }
 
 // ReadTail is the last max entries of a transcript (readTailEntries).
 func ReadTail(path string, max int) Chunk {

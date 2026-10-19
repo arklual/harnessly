@@ -140,7 +140,7 @@ func TestEqualize(t *testing.T) {
 	if ra != 33.33 || rb != 50 {
 		t.Fatalf("ratios %v %v: %s", ra, rb, jsvalue.Stringify(l, ""))
 	}
-	l, _ = r2.s.PatchLayout("ws-x", LayoutPatch{RatioUpdate: &RatioUpdate{Path: []int{1}, Ratio: float64(80)}})
+	_, _ = r2.s.PatchLayout("ws-x", LayoutPatch{RatioUpdate: &RatioUpdate{Path: []int{1}, Ratio: float64(80)}})
 	l, _ = r2.s.SplitPane("ws-x", "pane-a", "vertical", "", "")
 	if isEqualized(root(l)) {
 		t.Fatal("a tree that was not equal must not be equalized by a split")

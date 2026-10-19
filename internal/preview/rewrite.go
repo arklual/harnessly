@@ -280,7 +280,7 @@ func standCookie(own, sessionHeader string) string {
 		if pair == "" {
 			continue
 		}
-		name := pair
+		var name string
 		if i := strings.IndexByte(pair, '='); i >= 0 {
 			name = pair[:i]
 		} else {

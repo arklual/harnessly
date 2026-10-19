@@ -157,16 +157,6 @@ func (rt *Route) History(r *http.Request) (int, any, http.Header) {
 	})(r)
 }
 
-type facetLine struct {
-	SessionID    any `json:"session_id"`
-	Outcome      any `json:"outcome"`
-	SessionType  any `json:"session_type"`
-	Goals        any `json:"goal_categories"`
-	Satisfaction any `json:"user_satisfaction_counts"`
-	Helpfulness  any `json:"claude_helpfulness"`
-	Summary      any `json:"brief_summary"`
-}
-
 // Facets answers GET /api/stats/facets?period=.
 func (rt *Route) Facets(r *http.Request) (int, any, http.Header) {
 	return rt.getRoute(func(r *http.Request) string { return "facets:" + string(periodOf(r)) }, func(r *http.Request) (any, error) {

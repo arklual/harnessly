@@ -109,7 +109,6 @@ type event struct {
 	err  error
 	msg  map[string]json.RawMessage
 	exit *string // decoder: nil for a clean end
-	gen  int     // the asr connection or decoder it came from
 }
 
 type session struct {
@@ -308,7 +307,6 @@ func (ss *session) onInternal(ev event) {
 type asrConn struct {
 	lang        string
 	out         chan []byte // nil once the connection is done
-	conn        net.Conn
 	ready, done bool
 	timer       *time.Timer
 	cancel      context.CancelFunc

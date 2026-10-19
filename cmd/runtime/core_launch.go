@@ -112,7 +112,7 @@ func (c *core) newLauncher() {
 type launchLines struct{ a *coreAgents }
 
 func (l launchLines) Launch(provider, ws string, launch *agents.Launch, files []string) (string, error) {
-	return lines{l.a}.Launch(provider, ws, launch, files)
+	return lines(l).Launch(provider, ws, launch, files)
 }
 func (l launchLines) Resume(provider, sid, ws string, launch *agents.Launch) (string, error) {
 	return l.a.ResumeLine(provider, sid, ws, launch)

@@ -73,6 +73,7 @@ type Library struct {
 	listing  listingCache
 	srv      *server
 	bg       background
+	bgStarts sync.WaitGroup
 	live     liveState
 	tabs     func() ([]Chat, bool)
 	identity identityCache

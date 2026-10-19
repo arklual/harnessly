@@ -1,0 +1,67 @@
+# GoReleaser v2: `goreleaser release --snapshot --clean` builds the same archives locally into dist/.
+version: 2
+
+project_name: harnessly
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: agent
+    main: ./cmd/agent
+    binary: agent
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X harnessly/internal/agent.BuildVersion={{ .Version }}
+  - id: runtime
+    main: ./cmd/runtime
+    binary: runtime
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X harnessly/internal/agent.BuildVersion={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge "
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([^)]+\))?!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\([^)]+\))?!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\([^)]+\))?!?:.+$'
+      order: 2
+    - title: Other changes
+      order: 999
+
+release:
+  github:
+    owner: ly-solutions
+    name: harnessly
+  prerelease: auto

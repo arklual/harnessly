@@ -20,10 +20,7 @@ func TestServeForCLI(t *testing.T) {
 	rig := newGoldenRig(t)
 	ln, _ := net.Listen("tcp", "127.0.0.1:0")
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasPrefix(path, "/agents") {
-			path = path[len("/agents"):]
-		}
+		path := strings.TrimPrefix(r.URL.Path, "/agents")
 		if h := os.Getenv("DESIGN_SERVE_TOKEN_HEADER"); h != "" {
 			r.Header.Set("X-Cli-Token", r.Header.Get(h))
 		}
@@ -34,7 +31,7 @@ func TestServeForCLI(t *testing.T) {
 		}
 		writeGateAnswer(w, h(r))
 	})}
-	go srv.Serve(ln)
+	go func() { _ = srv.Serve(ln) }()
 	_ = os.WriteFile(out, []byte(strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)), 0o644)
 	for i := 0; i < 600; i++ {
 		if _, err := os.Stat(out + ".stop"); err == nil {

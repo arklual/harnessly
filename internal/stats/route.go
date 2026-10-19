@@ -153,14 +153,6 @@ func (rt *Route) within(ms float64, p period) bool {
 	return ms >= float64(rt.periodStart(p).UnixMilli()) && ms <= float64(rt.now().UnixMilli())
 }
 
-// withinText is isWithinPeriod for a timestamp as text.
-func (rt *Route) withinText(ts string, p period) bool {
-	if p == periodAll {
-		return true
-	}
-	return rt.within(jscompat.ParseDate(ts), p)
-}
-
 // withinDate is isDateStringWithinPeriod.
 func (rt *Route) withinDate(date string, p period) bool {
 	if p == periodAll {

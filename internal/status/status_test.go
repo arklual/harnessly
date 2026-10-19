@@ -380,7 +380,7 @@ func TestTranscriptStartsATurnWithoutAHook(t *testing.T) {
 	ts := e.m.now() + 5000
 	e.claude.setSnap(transcript, agents.Snapshot{Idle: false, LastEntryTs: &ts})
 	f, _ := os.OpenFile(transcript, os.O_APPEND|os.O_WRONLY, 0)
-	f.WriteString("{\"type\":\"user\"}\n")
+	_, _ = f.WriteString("{\"type\":\"user\"}\n")
 	f.Close()
 	waitFor(t, "synthetic prompt-submit", func() bool { return e.entry().CliState == Busy })
 }

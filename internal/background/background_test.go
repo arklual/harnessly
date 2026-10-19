@@ -106,7 +106,7 @@ func TestReaderReadsOnlyAppendedLines(t *testing.T) {
 			flag = os.O_CREATE | os.O_WRONLY | os.O_APPEND
 		}
 		f, _ := os.OpenFile(file, flag, 0o600)
-		f.WriteString(s)
+		_, _ = f.WriteString(s)
 		f.Close()
 	}
 	write(line(`{"type":"tool_use","id":"t1","name":"Agent","input":{"description":"Research"}}`, ts)+"\n"+result("t1", "Async agent launched successfully. agentId: a1aaaaaaa (internal ID)", ts)+"\n", false)

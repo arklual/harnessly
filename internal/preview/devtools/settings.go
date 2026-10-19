@@ -123,9 +123,3 @@ func field(o *jsvalue.Object, k string) any {
 	v, _ := o.Get(k)
 	return v
 }
-
-// decodeJSON parses as JSON.parse does: objects keep their keys in JavaScript's order.
-func decodeJSON(b []byte) (any, bool) {
-	v, err := jsvalue.Parse(b)
-	return v, err == nil
-}

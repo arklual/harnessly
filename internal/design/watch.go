@@ -25,8 +25,6 @@ type rootWatch struct {
 	w        *fsnotify.Watcher
 	mu       sync.Mutex
 	dirs     int
-	subs     map[int]func(rel string)
-	next     int
 	done     chan struct{}
 	stopping bool
 }

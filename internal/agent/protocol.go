@@ -59,13 +59,6 @@ type StateResult struct {
 	Error   *string         `json:"error,omitempty"`
 }
 
-type response struct {
-	ID     json.RawMessage `json:"id"`
-	OK     bool            `json:"ok"`
-	Result any             `json:"result,omitempty"`
-	Error  string          `json:"error,omitempty"`
-}
-
 // Events.
 
 type evTranscripts struct {

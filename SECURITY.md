@@ -1,5 +1,9 @@
 # Security
 
+## Supported versions
+
+harnessly is in `0.x`: fixes land on `main` and in the next release. Use the latest release.
+
 ## Reporting a vulnerability
 
 Please report security problems privately, through GitHub's private vulnerability reporting: open the repository's

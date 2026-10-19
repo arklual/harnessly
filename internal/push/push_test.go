@@ -322,8 +322,10 @@ func verifyVAPID(t *testing.T, header, origin, subject string) {
 		t.Fatalf("authorization %q", header)
 	}
 	pub, _ := b64.DecodeString(mm[4])
-	x, y := new(big.Int).SetBytes(pub[1:33]), new(big.Int).SetBytes(pub[33:])
-	key := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+	key, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(), pub)
+	if err != nil {
+		t.Fatalf("vapid key: %v", err)
+	}
 	sig, _ := b64.DecodeString(mm[3])
 	digest := sha256.Sum256([]byte(mm[1] + "." + mm[2]))
 	if len(sig) != 64 || !ecdsa.Verify(key, digest[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])) {

@@ -1195,9 +1195,3 @@ func parseJSON(s string) (any, bool) {
 	v, err := jsvalue.Parse([]byte(s))
 	return v, err == nil
 }
-
-func nan() float64 { var z float64; return z / z }
-
-func isNaNOrInf(f float64) bool {
-	return f != f || f > 1.7976931348623157e308 || f < -1.7976931348623157e308
-}

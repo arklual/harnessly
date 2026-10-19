@@ -623,7 +623,7 @@ func (m *LoadMonitor) Load() (*MachineLoad, error) {
 		l := m.served
 		if m.d.Now().Sub(m.servedAt) >= loadCacheTTL && !m.refreshing {
 			m.refreshing = true
-			go m.refresh()
+			go func() { _, _ = m.refresh() }()
 		}
 		m.mu.Unlock()
 		return l, nil

@@ -191,7 +191,7 @@ func (p *Projects) gitRepo(cwd string) *string {
 			text := jscompat.DecodeUTF8(raw)
 			if m := gitdirLine.FindStringSubmatch(text); m != nil {
 				if gitdir := jscompat.Trim(m[1]); gitdir != "" {
-					resolved := gitdir
+					var resolved string
 					if !strings.HasPrefix(gitdir, "/") {
 						resolved = filepath.Join(dir, gitdir)
 					} else {

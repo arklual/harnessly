@@ -63,12 +63,6 @@ func get(o *jsvalue.Object, k string) any {
 	return v
 }
 
-// str is a value as a string where the previous runtime used it as one; "" for anything else.
-func str(v any) string {
-	s, _ := v.(string)
-	return s
-}
-
 // template is `${v}`.
 func template(v any) string {
 	if v == jsvalue.Undefined {

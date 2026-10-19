@@ -156,7 +156,6 @@ func (c *core) promptRoutes(sessionOK func(*http.Request) bool, apiRefusal func(
 	}
 	routes := make([]gate.Route, 0, len(defs))
 	for _, d := range defs {
-		d := d
 		routes = append(routes, gate.Route{
 			Slice: "core",
 			Match: func(r *http.Request) bool { return pathIs(r, d.path) || pathIs(r, d.path+"/") },

@@ -298,6 +298,12 @@ func (s *Store) WaitForApplied(tabID, id string, d time.Duration) bool {
 		}
 	})
 	defer unsubscribe()
+	// A page may apply the intent between its broadcast and the subscription above.
+	for _, it := range s.List(tabID) {
+		if at, _ := it.Get("appliedAt"); it.String("id") == id && at != nil {
+			return true
+		}
+	}
 	t := time.NewTimer(d)
 	defer t.Stop()
 	select {

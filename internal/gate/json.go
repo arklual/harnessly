@@ -132,7 +132,6 @@ func encodeJSON(v any) []byte {
 func (f *Gate) AsRoutes(routes ...JSONRoute) []Route {
 	out := make([]Route, 0, 2*len(routes))
 	for _, jr := range routes {
-		jr := jr
 		out = append(out, Route{
 			Slice: jr.Slice,
 			Match: jr.Match,

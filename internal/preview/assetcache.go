@@ -279,7 +279,6 @@ type teeReader struct {
 	tmp      string
 	size     int64
 	declared int64
-	finished bool
 }
 
 func (t *teeReader) give() {
