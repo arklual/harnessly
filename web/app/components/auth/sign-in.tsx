@@ -1,5 +1,6 @@
 // The runtime keeps one password in its config. A fresh machine has none: the first visitor sets it (the runtime
-// listens on loopback by default, so that is the person at the machine), and then signs in with it.
+// listens on loopback by default, so that is the person at the machine), and then signs in with it. A machine started
+// with an initial password (INIT_PASSWORD) asks for that first, so nobody else can claim it, and then offers the setup.
 import { useState, type FormEvent } from 'react';
 import HlMark from '@/components/agents/hl-mark';
 import { auth } from '@/runtime/endpoints';
@@ -7,7 +8,20 @@ import { appConfig } from '@/platform/config';
 import './sign-in.css';
 import { t } from '@/lib/i18n';
 
-export default function SignIn({ needsSetup, onSignedIn }: { needsSetup: boolean; onSignedIn: () => void }) {
+type TMode = 'signin' | 'init' | 'setup';
+
+export default function SignIn({
+  needsSetup,
+  requiresAuth = false,
+  onSignedIn,
+}: {
+  needsSetup: boolean;
+  /** The machine has no password yet but an initial one stands guard: sign in with it before the setup. */
+  requiresAuth?: boolean;
+  onSignedIn: () => void;
+}) {
+  const [mode, setMode] = useState<TMode>(needsSetup ? (requiresAuth ? 'init' : 'setup') : 'signin');
+  const setup = mode === 'setup';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -16,15 +30,18 @@ export default function SignIn({ needsSetup, onSignedIn }: { needsSetup: boolean
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
-    if (needsSetup) {
+    if (setup) {
       if (password.length < 4) return setError(t('auth.signIn.passwordTooShort'));
       if (password !== confirm) return setError(t('auth.signIn.passwordsDontMatch'));
     }
     setBusy(true);
     try {
-      if (needsSetup) await auth.setup(password);
+      if (setup) await auth.setup(password);
       await auth.login(password);
-      onSignedIn();
+      if (mode === 'init') {
+        setPassword('');
+        setMode('setup');
+      } else onSignedIn();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
@@ -34,30 +51,34 @@ export default function SignIn({ needsSetup, onSignedIn }: { needsSetup: boolean
 
   return (
     <div className="hl-signin">
-      <form
-        className="hl-signin-card"
-        data-testid={needsSetup ? 'setup-form' : 'signin-form'}
-        onSubmit={submit}
-      >
+      <form className="hl-signin-card" data-testid={`${mode}-form`} onSubmit={submit}>
         <HlMark className="hl-signin-mark" />
         <h1>
-          {needsSetup
-            ? t('auth.signIn.setupTitle')
-            : t('auth.signIn.signInTitle', { product: appConfig().productName })}
+          {mode === 'init'
+            ? t('auth.signIn.initTitle')
+            : setup
+              ? t('auth.signIn.setupTitle')
+              : t('auth.signIn.signInTitle', { product: appConfig().productName })}
         </h1>
-        <p>{needsSetup ? t('auth.signIn.setupHint') : t('auth.signIn.signInHint')}</p>
+        <p>
+          {mode === 'init'
+            ? t('auth.signIn.initHint')
+            : setup
+              ? t('auth.signIn.setupHint')
+              : t('auth.signIn.signInHint')}
+        </p>
         <label>
           <span>{t('auth.signIn.password')}</span>
           <input
             type="password"
             name="password"
-            autoComplete={needsSetup ? 'new-password' : 'current-password'}
+            autoComplete={setup ? 'new-password' : 'current-password'}
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </label>
-        {needsSetup && (
+        {setup && (
           <label>
             <span>{t('auth.signIn.passwordAgain')}</span>
             <input
@@ -77,7 +98,7 @@ export default function SignIn({ needsSetup, onSignedIn }: { needsSetup: boolean
         <button type="submit" className="hl-btn" disabled={!password || busy}>
           {busy
             ? t('auth.signIn.checking')
-            : needsSetup
+            : setup
               ? t('auth.signIn.saveAndSignIn')
               : t('auth.signIn.signIn')}
         </button>

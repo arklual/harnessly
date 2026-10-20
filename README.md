@@ -68,7 +68,7 @@
 | **Gate and shadow** | Per-machine slice switches re-read every second, shadow comparison of answers, per-path proxy statistics. |
 | **Web page** | Sign-in, workspaces, split panes with terminal and agent tabs, the conversation with live state, the machine's load; compiled into release runtimes. |
 | **Boards and documents** | Agents get `BOARDS_URL`, `ARTIFACTS_URL`, tokens and their conversation id; board and document links become chips that open in a side pane, which also lists the conversation's documents. |
-| **Ways to run** | Dockerfile, docker compose with boards, artifacts and MinIO, a Helm chart, Argo CD examples, a systemd unit and `make` targets. |
+| **Ways to run** | Dockerfile, docker compose with boards and artifacts (MinIO optional), a Helm chart, Argo CD examples, a systemd unit and `make` targets. |
 | **Byte-for-byte compatible** | Status codes, JSON key order, headers and ETags pinned by golden tests recorded from the previous implementation. |
 
 ## Quick start
@@ -160,7 +160,7 @@ rm -rf "$DEMO_HOME"
 ```
 
 To run an agent instead of a shell, start the runtime with your own `HOME` (where Claude Code and Codex keep their
-logins) and ask for a `claude-code` or `codex-cli` tab with a prompt:
+logins) and ask for a `claude-code` or `codex-cli` tab, with a first prompt or without one:
 `{"workspaceId":"…","panelType":"claude-code","prompt":"…"}`. The tab's `cliState` in
 `/api/cli/tabs/<tab>/status` then follows the agent's turn, from `busy` to `ready-for-review`.
 
@@ -170,7 +170,7 @@ More in [Getting started](docs/getting-started.md).
 
 ```sh
 make run                          # the runtime with the page on http://127.0.0.1:8022, data in ~/.harnessly
-docker compose up --build         # harnessly + boards + artifacts + MinIO on http://localhost:8022
+docker compose up -d --build      # harnessly + boards + artifacts, built here, on http://localhost:8022
 helm install ada deploy/helm/harnessly --set ownerName=Ada
 ```
 
@@ -179,11 +179,13 @@ helm install ada deploy/helm/harnessly --set ownerName=Ada
 | Plain commands | `make run`, or a release binary: `RUNTIME_GATE_LISTEN=127.0.0.1:8022 RUNTIME_GATE_UPSTREAM= ./runtime` |
 | systemd | `make install install-systemd`, then `systemctl --user enable --now harnessly` — one service per Unix account; agents keep working through restarts |
 | Docker | `docker build -t harnessly .` (`--target with-agents` adds Claude Code and Codex), the home folder on a volume |
-| docker compose | [compose.yaml](compose.yaml): the whole workspace on one host, boards and documents wired in |
+| docker compose | [compose.yaml](compose.yaml): the whole workspace on one host, boards and documents wired in; MinIO as an option |
 | Kubernetes | [deploy/helm/harnessly](deploy/helm/harnessly): a StatefulSet per person with a PVC for its home |
 | Argo CD | [deploy/argocd](deploy/argocd): one Application, or an app of apps with boards and artifacts |
 
-All of them, and how to give the runtime the agent CLIs, in [docs/deploy.md](docs/deploy.md).
+All of them, how to give the runtime the agent CLIs and how to put it on a public server (three hostnames, Caddy,
+automatic TLS) are in [docs/deploy.md](docs/deploy.md). Nothing is published as an image yet: compose and Docker
+build locally, `docker compose up -d --build`.
 
 ### The web page
 

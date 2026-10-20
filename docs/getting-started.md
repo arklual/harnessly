@@ -51,8 +51,10 @@ A second runtime on the same data directory refuses to start.
 
 ## Drive it through the API
 
-Routes under `/api/cli/` take the `cli-token`; the page routes take it too, or a session cookie signed with the
-config's secret.
+Routes under `/api/cli/` take **only** the `cli-token` (the `x-cli-token` header, or the headers named by
+`RUNTIME_CLI_TOKEN_HEADERS`). A signed-in page session cookie is not accepted there: the answer is `403` with a body
+that names the header. Most other routes (`/api/workspace`, …) take the token too, or a session cookie signed with the
+config's secret, which is what the page uses.
 
 ```sh
 TOKEN=$(cat "$DEMO_HOME/.harnessly/cli-token")
@@ -82,6 +84,26 @@ curl "${API[@]}" -X DELETE "127.0.0.1:4321/api/cli/tabs/$TAB?workspaceId=$WS"
 Every tab is a session on the runtime's tmux server, so `tmux -L harnessly-demo ls` lists them and
 `tmux -L harnessly-demo attach -t <sessionName>` joins one.
 
+### Text and keys
+
+`send` takes `content`, the **text** to type, and `keys`, **keys** to press:
+
+- `content` is pasted into the tab as a bracketed paste, then the runtime presses Enter (and once more shortly after,
+  for agents that need it). Control characters in it are not typed: ESC is shown as `␛` and the others, a `\u0003`
+  for Ctrl-C included, are dropped. A trailing `\n` is not needed.
+- `keys` is an array of tmux key names, pressed in order after the text, or alone when there is no `content`:
+  `Enter`, `Escape`, `Tab`, `Space`, `BSpace`, `Up`, `Down`, `Left`, `Right`, `F5`, `C-c` (Ctrl-C), `C-d`, `M-x`
+  (Alt-x), `S-Tab`. At most 64 keys, each a letter or digit followed by up to 31 letters, digits, `-` or `_`.
+  See the KEYS section of `man tmux`.
+
+```sh
+# start a command, then interrupt it
+curl "${API[@]}" "127.0.0.1:4321/api/cli/tabs/$TAB/send?workspaceId=$WS" -d '{"content":"sleep 600"}'
+curl "${API[@]}" "127.0.0.1:4321/api/cli/tabs/$TAB/send?workspaceId=$WS" -d '{"keys":["C-c"]}'
+# text, then keys: type a line, then press Up and Enter to run the previous one again
+curl "${API[@]}" "127.0.0.1:4321/api/cli/tabs/$TAB/send?workspaceId=$WS" -d '{"content":"echo one","keys":["Up","Enter"]}'
+```
+
 ## Run an agent
 
 Agents need their CLIs signed in, and Claude Code and Codex keep their logins under the home, so run the runtime with
@@ -95,7 +117,10 @@ API=(-s -H "x-cli-token: $TOKEN" -H "content-type: application/json")
 WS=$(curl "${API[@]}" 127.0.0.1:4321/api/workspace -d "{\"name\":\"work\",\"directory\":\"$PWD\"}" | jq -r .id)
 ```
 
-Then open a `claude-code` or `codex-cli` tab with a prompt (and optionally `model` and `effort`):
+Then open a `claude-code` or `codex-cli` tab with a prompt (and optionally `model` and `effort`). The `prompt` is
+optional too: without one the agent starts and waits for you, as the page's «New conversation» does. The `panelType`
+is what makes the tab an agent: it is never a plain shell, and `prompt`, `model` and `effort` on a `terminal` tab are
+refused with `400`. The answer carries `"launched": true`.
 
 ```sh
 curl "${API[@]}" 127.0.0.1:4321/api/cli/tabs \

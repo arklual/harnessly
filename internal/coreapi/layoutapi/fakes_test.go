@@ -76,6 +76,10 @@ func (f *fakeTmux) SendBracketedPaste(name, text string) error {
 	f.note("paste", name, text)
 	return nil
 }
+func (f *fakeTmux) SendKeySequence(name string, keys ...string) error {
+	f.note(append([]string{"keys", name}, keys...)...)
+	return nil
+}
 func (f *fakeTmux) ListSessions() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()

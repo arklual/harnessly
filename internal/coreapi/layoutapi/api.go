@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -34,6 +35,7 @@ type Tmux interface {
 	Capture(name string) (string, bool)
 	SendKeys(name, line string) error
 	SendBracketedPaste(name, text string) error
+	SendKeySequence(name string, keys ...string) error
 	PaneCurrentCommand(name string) string
 	CheckTerminalProcess(name string) (safe bool, process string)
 	ListSessions() []string
@@ -380,7 +382,7 @@ func (a *api) serve(w http.ResponseWriter, r *http.Request, e *entry, params map
 	c.body = body
 	defer func() {
 		if p := recover(); p != nil {
-			agent.Log("error", "api handler failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: p})
+			agent.Log("error", "api handler failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: fmt.Sprint(p)})
 			plain(w, 500, "Internal Server Error")
 		}
 	}()

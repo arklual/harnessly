@@ -189,12 +189,12 @@ func (a *api) cliTabCreate(c *call) {
 	}
 	provider := agents.ProviderOfPanel(resolved)
 	_, promptIsString := prompt.(string)
-	wantsAgent := promptIsString || hasModel || hasEffort
-	if wantsAgent && provider == "" {
+	if (promptIsString || hasModel || hasEffort) && provider == "" {
 		c.fail(400, "prompt, model and effort need a claude-code or codex-cli tab")
 		return
 	}
-	if provider != "" && wantsAgent {
+	// An agent tab always starts its agent, with or without a first message, as the page's «New conversation» does.
+	if provider != "" {
 		if a.d.Agents == nil {
 			c.fail(503, "Agent start is not available")
 			return
@@ -205,7 +205,7 @@ func (a *api) cliTabCreate(c *call) {
 			return
 		}
 		var promptArg any
-		if promptIsString {
+		if promptIsString && prompt != "" {
 			promptArg = prompt
 		}
 		var tabName any
@@ -311,7 +311,9 @@ func (c *call) cliTabPrelude(method string) *tabLocation {
 		if c.body == nil {
 			panic("body is null")
 		}
-		if content, _ := c.field("content"); !jsvalue.Truthy(content) {
+		content, _ := c.field("content")
+		keys, _ := c.field("keys")
+		if !jsvalue.Truthy(content) && !jsvalue.Truthy(keys) {
 			c.fail(400, "content is required")
 			return nil
 		}
@@ -341,22 +343,59 @@ func (a *api) cliTabResult(c *call) {
 	c.reply(200, jsvalue.NewObject("content", content))
 }
 
+// keyName is one tmux key name in the send route's keys: Enter, Escape, Up, F5, C-c, M-x, S-Tab. It starts with a letter or
+// a digit, so it can never read as an option of tmux's send-keys.
+var keyName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
+
+const maxSendKeys = 64
+
+// sendKeysField reads the keys of a send request: an array of tmux key names, nil when there is none.
+func sendKeysField(v any) (keys []string, ok bool) {
+	arr, isArr := v.([]any)
+	if !isArr || len(arr) == 0 || len(arr) > maxSendKeys {
+		return nil, false
+	}
+	for _, k := range arr {
+		name, isStr := k.(string)
+		if !isStr || !keyName.MatchString(name) {
+			return nil, false
+		}
+		keys = append(keys, name)
+	}
+	return keys, true
+}
+
 // POST /api/cli/tabs/<tabId>/send: text pasted into the tab; a bare agent command into its idle shell starts the
-// agent the platform's way.
+// agent the platform's way. {"keys": ["C-c"]} presses keys instead, or after the text: control characters in the text
+// are not typed (the text is a bracketed paste), so Ctrl-C, Escape or an arrow are keys.
 func (a *api) cliTabSend(c *call) {
 	found := c.cliTabPrelude("POST")
 	if found == nil {
 		return
 	}
 	ws, _ := c.qString("workspaceId")
-	v, _ := c.field("content")
+	v, hasContent := c.field("content")
+	keysField, hasKeys := c.field("keys")
+	var keys []string
+	if hasKeys && keysField != nil {
+		var ok bool
+		if keys, ok = sendKeysField(keysField); !ok {
+			c.fail(400, `keys must be an array of 1 to 64 tmux key names, such as ["C-c"] or ["Escape", "Enter"]`)
+			return
+		}
+	}
 	content, isStr := v.(string)
-	if !isStr {
+	if !isStr && !(keys != nil && !hasContent) {
 		panic("content is not a string")
 	}
 	session := found.tab.String("sessionName")
 	if !a.d.Tmux.HasSession(session) {
 		c.fail(409, "Tab session is not running")
+		return
+	}
+	if !isStr {
+		must(a.d.Tmux.SendKeySequence(session, keys...))
+		c.reply(200, jsvalue.NewObject("status", "sent"))
 		return
 	}
 	panelType, _ := found.tab.Get("panelType")
@@ -374,6 +413,9 @@ func (a *api) cliTabSend(c *call) {
 		}
 	}
 	must(a.d.Tmux.SendBracketedPaste(session, content))
+	if keys != nil {
+		must(a.d.Tmux.SendKeySequence(session, keys...))
+	}
 	c.reply(200, jsvalue.NewObject("status", "sent"))
 }
 

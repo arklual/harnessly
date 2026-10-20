@@ -242,11 +242,13 @@ func (f *Gate) SetFallback(h http.Handler) { f.fallback = h }
 func (f *Gate) Add(routes ...Route) { f.routes = append(f.routes, routes...) }
 
 func (f *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if f.recorder != nil {
-		f.recorder.wrap(w, r, f.tokens, f.serve)
-		return
-	}
-	f.serve(w, r)
+	f.withCLIHint(w, r, func(w http.ResponseWriter, r *http.Request) {
+		if f.recorder != nil {
+			f.recorder.wrap(w, r, f.tokens, f.serve)
+			return
+		}
+		f.serve(w, r)
+	})
 }
 
 // serve answers r; true when a Go route did.

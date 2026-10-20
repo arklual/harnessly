@@ -80,10 +80,14 @@ func optionalString(v any) *string {
 	return nil
 }
 
-// start answers a refusal itself and gives the conversation; an unexpected failure is the bare 500 of an exception.
+// start answers a refusal itself and gives the conversation; a start that fails is a 500 that says why.
 func (a *api) start(c *call, o launch.Options) *jsvalue.Object {
 	r, err := a.l.Starter.Start(o)
-	must(err)
+	if err != nil {
+		agent.Log("error", "the conversation did not start", agent.F{K: "provider", V: o.Provider}, agent.F{K: "error", V: err.Error()})
+		c.fail(500, "Could not start the agent: "+err.Error())
+		return nil
+	}
 	if !r.OK {
 		c.reply(r.Status, r.Body)
 		return nil

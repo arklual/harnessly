@@ -73,6 +73,8 @@ type coreAgentsConfig struct {
 	// environment of its commands.
 	SkillsPluginDir string
 	PassServiceEnv  bool
+	// CodexContainerSandbox: RUNTIME_CODEX_SANDBOX=container, Codex runs without its own sandbox (the container is one).
+	CodexContainerSandbox bool
 }
 
 // skipPermissions: the runtime config's dangerouslySkipPermissions, read at every launch as the old runtime did.
@@ -120,12 +122,13 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 		codexLauncher:  filepath.Join(c.DataDir, "codex-launcher.js"),
 		launcherScript: launcherScriptConfig(c),
 		codexArgs: codex.LaunchConfig{
-			Hooks:           &codex.HookConfig{Script: filepath.Join(c.DataDir, "codex-hook.sh"), UserConfig: filepath.Join(c.Home, ".codex", "config.toml")},
-			MCP:             codexMCP(c),
-			WorkspacePrompt: func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "codex-prompt.md") },
-			SkipPermissions: skipPermissions(c.ConfigFile),
-			PassServiceEnv:  c.PassServiceEnv,
-			ShellEnvExclude: []string{c.MCP.TokenEnv},
+			Hooks:            &codex.HookConfig{Script: filepath.Join(c.DataDir, "codex-hook.sh"), UserConfig: filepath.Join(c.Home, ".codex", "config.toml")},
+			MCP:              codexMCP(c),
+			WorkspacePrompt:  func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "codex-prompt.md") },
+			SkipPermissions:  skipPermissions(c.ConfigFile),
+			PassServiceEnv:   c.PassServiceEnv,
+			ContainerSandbox: c.CodexContainerSandbox,
+			ShellEnvExclude:  []string{c.MCP.TokenEnv},
 		},
 		old:    c.Old,
 		oldAPI: c.OldAPI,
@@ -306,7 +309,8 @@ func (a *coreAgents) codexLine(workspaceID, resumeID string, launch *agents.Laun
 		content, err = codex.LauncherScript(*a.launcherScript), nil
 	}
 	if err != nil {
-		return "", errors.New("the Codex launcher is not written yet")
+		return "", errors.New("the Codex launcher " + a.codexLauncher + " is not written yet (a runtime in front of a previous one leaves it to that one, " +
+			"or needs RUNTIME_SCRIPT_DATA_DIRS and RUNTIME_MCP_TOKEN_ENV to write it)")
 	}
 	return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content}.LauncherLine(workspaceID, resumeID, launch)
 }
@@ -374,14 +378,16 @@ func optionalText(v any) *string {
 	return nil
 }
 
-// Start starts a conversation: here with the launch slice on, else through the old runtime. A failure the old runtime
-// answered with a bare 500 panics, for the route's own 500.
+// Start starts a conversation: here with the launch slice on, else through the old runtime. A start that fails here
+// (the Codex launcher cannot be written, say) is a 500 whose body says why.
 func (a *coreAgents) Start(r layoutapi.StartRequest) layoutapi.StartResult {
 	if a.launching() {
 		res, err := a.starter.Start(launch.Options{Provider: r.Provider, WorkspaceID: r.WorkspaceID, Prompt: optionalText(r.Prompt),
 			Launch: r.Launch, TabName: optionalText(r.TabName)})
 		if err != nil {
-			panic(err)
+			agent.Log("error", "core: the conversation did not start", agent.F{K: "provider", V: r.Provider}, agent.F{K: "error", V: err.Error()})
+			return layoutapi.StartResult{Status: http.StatusInternalServerError,
+				Body: errorJSON(locale.Pick("Could not start the agent: "+err.Error(), "Не удалось запустить агента: "+err.Error()))}
 		}
 		if res.OK {
 			return layoutapi.StartResult{ConversationID: res.ConversationID()}

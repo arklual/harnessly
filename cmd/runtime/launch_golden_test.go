@@ -69,6 +69,10 @@ func (g *goldenTmux) SendBracketedPaste(name, text string) error {
 	g.rec("paste", name, text)
 	return nil
 }
+func (g *goldenTmux) SendKeySequence(name string, keys ...string) error {
+	g.rec(append([]string{"keys", name}, keys...)...)
+	return nil
+}
 func (g *goldenTmux) ListSessions() []string {
 	g.mu.Lock()
 	defer g.mu.Unlock()

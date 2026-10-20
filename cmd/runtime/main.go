@@ -155,6 +155,12 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		Home:       home,
 		PaneEnv:    paneEnv,
 	})
+	// Without a previous runtime to write the Codex launcher, this one does, and needs a folder and a variable for it:
+	// the environment's, else the defaults, so Codex works with no configuration.
+	scriptDirs, tokenEnv := splitList(os.Getenv("RUNTIME_SCRIPT_DATA_DIRS")), os.Getenv("RUNTIME_MCP_TOKEN_ENV")
+	if cfg.Standalone() {
+		scriptDirs, tokenEnv = scriptDataDirs(cfg.DataDir, home), mcpTokenEnv()
+	}
 	ref := &coreRef{}
 	terms := terminal.New(terminal.Config{
 		Tmux: tm, Bridge: terminalBridge{old: old, api: env("RUNTIME_OLD_INTERNAL_API", "/api/internal"), core: ref}, Home: home, Env: inheritedEnv(),
@@ -173,9 +179,10 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			DefaultsKey: env("RUNTIME_LAUNCH_DEFAULTS_KEY", "launchDefaults"), Launcher: os.Getenv("RUNTIME_CLAUDE_LAUNCHER"),
 			EditorScript: promptEditorScript(cfg.DataDir), HumanEditorVar: promptHumanEditorVar(),
 			Old: old, OldAPI: env("RUNTIME_OLD_INTERNAL_API", "/api/internal"),
-			Port: listenPort(cfg.Listen), MCP: codex.MCP{Server: env("RUNTIME_MCP_SERVER", "harnessly"), TokenEnv: os.Getenv("RUNTIME_MCP_TOKEN_ENV")},
-			MCPPath: env("RUNTIME_MCP_PATH", "/api/cli/preview/mcp"), ScriptDataDirs: splitList(os.Getenv("RUNTIME_SCRIPT_DATA_DIRS")),
-			TokenHeaders: old.TokenHeaders, SkillsPluginDir: skillsPluginDir(cfg.DataDir), PassServiceEnv: integ.Enabled()}),
+			Port: listenPort(cfg.Listen), MCP: codex.MCP{Server: env("RUNTIME_MCP_SERVER", "harnessly"), TokenEnv: tokenEnv},
+			MCPPath: env("RUNTIME_MCP_PATH", "/api/cli/preview/mcp"), ScriptDataDirs: scriptDirs,
+			TokenHeaders: old.TokenHeaders, SkillsPluginDir: skillsPluginDir(cfg.DataDir), PassServiceEnv: integ.Enabled(),
+			CodexContainerSandbox: env("RUNTIME_CODEX_SANDBOX", "codex") == "container"}),
 		Launch:     launchConfigFromEnv(home, cfg.DataDir),
 		Timeline:   timelineConfigFromEnv(cfg.DataDir),
 		Standalone: cfg.Standalone()})

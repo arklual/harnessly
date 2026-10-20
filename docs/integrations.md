@@ -112,8 +112,12 @@ Two things about Codex in a container:
   runtime's own CLI token is left out. (`harnessly` reads that token from the data folder, not from its environment.)
 - Codex's own sandbox (bubblewrap) needs user namespaces, which a default Docker container does not allow: every
   command then fails with "No permissions to create a new namespace". Inside such a container the container is the
-  sandbox: turn on `dangerouslySkipPermissions` in the runtime's settings (Codex then runs with `--yolo`), or put
-  `sandbox_mode = "danger-full-access"` and `approval_policy = "never"` in `~/.codex/config.toml`.
+  sandbox, so the Docker image sets `RUNTIME_CODEX_SANDBOX=container`: the runtime starts Codex with
+  `-c sandbox_mode="danger-full-access" -c approval_policy="never"` (Codex does not ask before running commands).
+  Everywhere else the default is `codex`, which leaves Codex's sandbox and approvals alone. Set the variable to either
+  value to override the image, for instance `RUNTIME_CODEX_SANDBOX=codex` on a container that does allow user
+  namespaces. `dangerouslySkipPermissions` in the runtime's settings (Codex then runs with `--yolo`) says the same and
+  wins, and `sandbox_mode` / `approval_policy` in `~/.codex/config.toml` apply under `codex`.
 
 ### The `harnessly` command
 

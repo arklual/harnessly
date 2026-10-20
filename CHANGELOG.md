@@ -50,7 +50,28 @@ All notable changes to this project are documented here. The format follows
   word or a secret.
 - A gitleaks configuration with narrow allowlists for test fixtures.
 
+- `POST /api/cli/tabs/<tab>/send` takes `keys`, an array of tmux key names (`C-c`, `Escape`, `Enter`, `Up`, …) pressed
+  after the text or alone: control characters in `content` were never typed.
+- `INIT_PASSWORD` is handled by the page: it asks for the initial password first, then offers the setup. compose,
+  `.env.example` and the systemd env example carry it.
+- `compose.yaml` takes the public addresses (`HARNESSLY_PUBLIC_URL`, `BOARDS_PUBLIC_URL`, `ARTIFACTS_PUBLIC_URL`) and
+  derives the frame and CORS origins from them; MinIO is behind the `minio` profile. `docs/deploy.md` has a section for
+  a public server: three hostnames, Caddy with automatic TLS, ufw, and `*.sslip.io` for a quick try.
+
 ### Changed
+
+- `RUNTIME_CODEX_SANDBOX=container`, the Docker image's default, starts Codex without its own sandbox (which cannot start
+  in a container): `sandbox_mode="danger-full-access"`, `approval_policy="never"`. Elsewhere Codex keeps its own.
+- A standalone runtime writes the Codex launcher with defaults (the data folder, `HARNESSLY_CLI_TOKEN`), so Codex
+  conversations start in Docker, compose, Helm and systemd without `RUNTIME_SCRIPT_DATA_DIRS` and
+  `RUNTIME_MCP_TOKEN_ENV`. A conversation that cannot start answers `500` with the reason instead of an empty error.
+- A `claude-code` or `codex-cli` tab made through `POST /api/cli/tabs` starts its agent without a `prompt` too; it used
+  to become a plain shell.
+- The standalone gate answers a `/api/cli/` request refused for lack of the cli-token with a `403` that names the
+  header (a page session cookie never worked there).
+- `compose.yaml` builds the images (`docker compose up -d --build`; nothing is published) under local `:local` tags and
+  never tries to pull them. boards and artifacts store on volumes by default; set `COMPOSE_PROFILES=minio` and
+  `HARNESSLY_STORAGE=s3` to keep using MinIO as before.
 
 - The module path is `github.com/ly-solutions/harnessly` (it was `harnessly`); imports and the version ldflags follow.
 - Release runtimes (GoReleaser and the GitLab tag build) carry the web page (the `webui` build tag). In gate mode it

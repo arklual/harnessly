@@ -335,6 +335,11 @@ func TestCLITabRoutes(t *testing.T) {
 	if s := r.agents.started[len(r.agents.started)-1]; s.Provider != "claude" || s.Prompt != "go" || *s.Launch.Model != "opus" || s.TabName != "N" {
 		t.Fatalf("%+v", s)
 	}
+	// An agent tab starts its agent without a prompt too, as the page's new conversation does.
+	r.want(r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","panelType":"codex-cli"}`), 201, "*")
+	if s := r.agents.started[len(r.agents.started)-1]; s.Provider != "codex" || s.Prompt != nil {
+		t.Fatalf("%+v", s)
+	}
 	plain := r.do("t", "POST", "/api/cli/tabs", `{"workspaceId":"`+ws+`","name":"Shell"}`)
 	r.want(plain, 201, "*")
 	pt := plain.json(t)
@@ -358,6 +363,21 @@ func TestCLITabRoutes(t *testing.T) {
 	r.tm.took()
 	r.want(r.do("t", "POST", "/api/cli/tabs/"+tab+"/send?workspaceId="+ws, `{"content":"echo hi"}`), 200, `{"status":"sent"}`)
 	if calls := r.tm.took(); len(calls) != 1 || calls[0][0] != "paste" || calls[0][2] != "echo hi" {
+		t.Fatal(calls)
+	}
+	// Control keys are keys, not text: Ctrl-C alone, or after a pasted line.
+	r.want(r.do("t", "POST", "/api/cli/tabs/"+tab+"/send?workspaceId="+ws, `{"keys":["C-c"]}`), 200, `{"status":"sent"}`)
+	if calls := r.tm.took(); len(calls) != 1 || strings.Join(calls[0], " ") != "keys "+session+" C-c" {
+		t.Fatal(calls)
+	}
+	r.want(r.do("t", "POST", "/api/cli/tabs/"+tab+"/send?workspaceId="+ws, `{"content":"ls","keys":["Escape","Enter"]}`), 200, `{"status":"sent"}`)
+	if calls := r.tm.took(); len(calls) != 2 || calls[0][0] != "paste" || strings.Join(calls[1], " ") != "keys "+session+" Escape Enter" {
+		t.Fatal(calls)
+	}
+	for _, bad := range []string{`{"keys":["-t"]}`, `{"keys":[1]}`, `{"keys":"C-c"}`, `{"keys":["C c"]}`} {
+		r.want(r.do("t", "POST", "/api/cli/tabs/"+tab+"/send?workspaceId="+ws, bad), 400, "*")
+	}
+	if calls := r.tm.took(); len(calls) != 0 {
 		t.Fatal(calls)
 	}
 	alive := r.do("t", "GET", "/api/cli/tabs/"+tab+"/status?workspaceId="+ws, "")

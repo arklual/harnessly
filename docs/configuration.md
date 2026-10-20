@@ -58,6 +58,7 @@ it stays with the previous runtime.
 | `RUNTIME_OLD_INTERNAL_API` | prefix of the previous runtime's internal routes the slices call |
 | `RUNTIME_PLATFORM_API` | prefix of the routes the platform's own pages call (default `/api/platform`) |
 | `RUNTIME_ACCESS_HOST` | the previous runtime's `HOST`: who may call the hook and agent routes (unset: the config's `networkAccess`; `HOST` itself is still read) |
+| `INIT_PASSWORD` | an initial password (4 characters or more) that guards the first-run setup: while no password is set, the page asks for it before it lets anyone choose one, and sign-in with it works until the real one is chosen. Unset, whoever opens the page first chooses the password ([deploy](deploy.md#the-first-visit)) |
 | `HOST` | the hook route's network access rule, as the previous runtime read it (`localhost`, `tailscale`, `lan`, `all` or CIDRs, comma-separated); unset takes `networkAccess` of the runtime config (`localhost`, `tailscale` or `all`, default `all`) |
 | `RUNTIME_AGENT_TOKEN_HEADER` | header of the machine agent's loopback routes, for committing state to the cluster |
 | `RUNTIME_RELEASE_FILE` | the release file (`{"version", "commit"}`) the snapshot and `/api/health` report (unset: none; health then says `0.0.0-development`) |
@@ -87,8 +88,9 @@ it stays with the previous runtime.
 | `RUNTIME_FIRST_WORKSPACE_NAME` | the workspace made when a conversation starts on a machine that has none (default `Workspace`) |
 | `RUNTIME_EVAL_RUNNER`, `RUNTIME_NODE_BIN` | the eval runner script an eval run starts detached, and the Node that runs it (default `node`); no script, no eval runs (501) |
 | `RUNTIME_SIDE_CHAT_CONFIG` | the machine's runtime config naming the Claude binary (`claude_binary`) and login folder (`auth_directory`) a side chat runs (unset: `claude`, the default login) |
-| `RUNTIME_MCP_SERVER`, `RUNTIME_MCP_PATH`, `RUNTIME_MCP_TOKEN_ENV` | the runtime's MCP server as Codex is told about it: its name, its route (default `/api/cli/preview/mcp`, on the gate's port) and the variable the Codex launcher puts the CLI token in |
-| `RUNTIME_SCRIPT_DATA_DIRS` | home-relative data folders the Codex launcher looks for, comma-separated; with it and `RUNTIME_MCP_TOKEN_ENV` the core writes a missing launcher itself |
+| `RUNTIME_MCP_SERVER`, `RUNTIME_MCP_PATH`, `RUNTIME_MCP_TOKEN_ENV` | the runtime's MCP server as Codex is told about it: its name, its route (default `/api/cli/preview/mcp`, on the gate's port) and the variable the Codex launcher puts the CLI token in (the server is called `harnessly` and the variable `HARNESSLY_CLI_TOKEN` unless set) |
+| `RUNTIME_SCRIPT_DATA_DIRS` | data folders the Codex launcher looks for the runtime in, home-relative or absolute, comma-separated; default the runtime's own data folder (`.harnessly`). A standalone runtime writes the launcher itself with the defaults, so Codex needs neither this nor `RUNTIME_MCP_TOKEN_ENV`; in front of a previous runtime, with both set, the core writes a missing launcher |
+| `RUNTIME_CODEX_SANDBOX` | `container`: start Codex with `sandbox_mode="danger-full-access"` and `approval_policy="never"` because the container is the sandbox (Codex's own cannot start without user namespaces); `codex` (default; `container` in the Docker image): leave them to Codex ([integrations](integrations.md#agent-skills)) |
 | `RUNTIME_CODEXBAR_BIN` | the codexbar binary the core polls for Claude's usage limits (unset: none) |
 | `CLAUDE_CONFIG_DIR`, `CODEX_HOME` | the agent CLIs' own folders, `~/.claude` and `~/.codex` by default |
 

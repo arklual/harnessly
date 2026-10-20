@@ -93,20 +93,39 @@ func ensureConfig(configFile string) error {
 	return store.UpdateConfig(jsvalue.NewObject("authSecret", store.Secret()))
 }
 
+// defaultMCPTokenEnv is the variable the Codex launcher puts the cli-token in when RUNTIME_MCP_TOKEN_ENV names none: the
+// MCP config Codex is given reads its header value from it.
+const defaultMCPTokenEnv = "HARNESSLY_CLI_TOKEN"
+
+// mcpTokenEnv is RUNTIME_MCP_TOKEN_ENV, else the neutral default.
+func mcpTokenEnv() string { return env("RUNTIME_MCP_TOKEN_ENV", defaultMCPTokenEnv) }
+
+// scriptDataDirs are the home-relative data folders the Codex launcher looks for the runtime in:
+// RUNTIME_SCRIPT_DATA_DIRS, else the runtime's own data folder, relative to the home when it lies under it (the
+// default ~/.harnessly is then ".harnessly") and absolute when it does not.
+func scriptDataDirs(dataDir, home string) []string {
+	if dirs := splitList(os.Getenv("RUNTIME_SCRIPT_DATA_DIRS")); len(dirs) > 0 {
+		return dirs
+	}
+	if home != "" {
+		if rel, err := filepath.Rel(home, dataDir); err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return []string{rel}
+		}
+	}
+	return []string{dataDir}
+}
+
 // hookFilesConfig names the product's parts of the agents' files, from the deployment.
 func hookFilesConfig(dataDir string) hooksetup.Config {
-	scriptDirs := splitList(os.Getenv("RUNTIME_SCRIPT_DATA_DIRS"))
-	scriptDir := dataDir
-	if len(scriptDirs) > 0 {
-		scriptDir = "$HOME/" + scriptDirs[0]
-	} else if home, err := os.UserHomeDir(); err == nil {
-		if rel, err := filepath.Rel(home, dataDir); err == nil && !strings.HasPrefix(rel, "..") {
-			scriptDir = "$HOME/" + rel
-		}
+	home, _ := os.UserHomeDir()
+	scriptDirs := scriptDataDirs(dataDir, home)
+	scriptDir := scriptDirs[0]
+	if !filepath.IsAbs(scriptDir) {
+		scriptDir = "$HOME/" + scriptDir
 	}
 	server := env("RUNTIME_MCP_SERVER", "harnessly")
 	headers := splitList(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"))
-	c := hooksetup.Config{
+	return hooksetup.Config{
 		DataDir:          dataDir,
 		ScriptDataDir:    scriptDir,
 		TokenHeaders:     headers,
@@ -118,12 +137,9 @@ func hookFilesConfig(dataDir string) hooksetup.Config {
 		HumanEditorVar:   promptHumanEditorVar(),
 		Handoff:          env("RUNTIME_PROMPT_HANDOFF_DIR", filepath.Join(dataDir, hooksetup.HandoffDir)),
 		LegacyTmuxSocket: env("RUNTIME_PROMPT_HANDOFF_UNKEYED_SOCKET", os.Getenv("RUNTIME_TMUX_LEGACY_SOCKET")),
+		Codex: &codex.LauncherScriptConfig{DataDirs: scriptDirs, PortFile: hooksetup.PortFile, TokenFile: hooksetup.TokenFile,
+			LaunchArgsPath: "/api/codex/launch-args", TokenHeaders: headers, TokenEnv: mcpTokenEnv()},
 	}
-	if len(scriptDirs) > 0 && os.Getenv("RUNTIME_MCP_TOKEN_ENV") != "" {
-		c.Codex = &codex.LauncherScriptConfig{DataDirs: scriptDirs, PortFile: hooksetup.PortFile, TokenFile: hooksetup.TokenFile,
-			LaunchArgsPath: "/api/codex/launch-args", TokenHeaders: headers, TokenEnv: os.Getenv("RUNTIME_MCP_TOKEN_ENV")}
-	}
-	return c
 }
 
 // files writes what the agents call the runtime through, once the port is known (the old runtime's ensureHookSettings,
@@ -153,17 +169,14 @@ func (s *standalone) files(port int, tm *tmux.Tmux) {
 }
 
 // codexLauncherContent is the Codex launcher: the release's copy of the platform's own script (RUNTIME_CODEX_LAUNCHER_FILE,
-// else <release>/runtime-static/codex-launcher.js), else the neutral one; nil without what either needs.
+// else <release>/runtime-static/codex-launcher.js), else the neutral one.
 func codexLauncherContent(dataDir string) []byte {
 	if f := releaseStatic("RUNTIME_CODEX_LAUNCHER_FILE", "codex-launcher.js"); f != "" {
 		if raw, err := os.ReadFile(f); err == nil {
 			return raw
 		}
 	}
-	if c := hookFilesConfig(dataDir).Codex; c != nil {
-		return codex.LauncherScript(*c)
-	}
-	return nil
+	return codex.LauncherScript(*hookFilesConfig(dataDir).Codex)
 }
 
 // workspacePrompts are the agents' per-workspace prompt templates (RUNTIME_WORKSPACE_PROMPTS_FILE, else the release's

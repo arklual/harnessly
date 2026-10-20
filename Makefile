@@ -102,7 +102,7 @@ install-systemd: ## Install the systemd user service and an env file to fill in 
 image: ## Build the container image (TARGET=with-agents adds Claude Code and Codex)
 	docker build --build-arg VERSION=$(VERSION) $(if $(TARGET),--target $(TARGET)) -t $(IMAGE) .
 
-compose-up: ## Start harnessly, boards, artifacts and MinIO with docker compose (http://localhost:8022)
+compose-up: ## Build and start harnessly, boards and artifacts with docker compose (http://localhost:8022)
 	docker compose up --build -d
 
 compose-down: ## Stop the compose workspace (volumes stay)

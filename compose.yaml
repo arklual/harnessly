@@ -1,13 +1,18 @@
 # The whole workspace on one host: harnessly (terminals and conversations), boards (whiteboards) and artifacts
-# (documents), with MinIO as their S3 storage.
+# (documents). Nothing is published as an image yet, so the first start builds all three:
 #
-#   docker compose up --build        then open http://localhost:8022
+#   docker compose up -d --build     then open http://localhost:8022
 #
-# boards and artifacts run in harnessly's network namespace, the way containers of one pod do: the page, the runtime
-# and the agents in its tabs all reach them at the same addresses (http://localhost:8081, http://localhost:8082), so
-# the links agents post open in the browser as they are, and the three share one site for the panes' cookies.
-# Everything is bound to 127.0.0.1 and the tokens below are local placeholders: for a shared host set your own in
-# .env (see .env.example) and put TLS in front, or use the Helm chart.
+# On a server with real hostnames set the three public URLs in .env (see .env.example and docs/deploy.md).
+#
+# Storage: boards and artifacts keep their data on volumes (fs). For S3 through a bundled MinIO set
+#   COMPOSE_PROFILES=minio and HARNESSLY_STORAGE=s3
+# in .env; any other S3 store works by pointing BOARDS_S3_* / ARTIFACTS_S3_* at it.
+#
+# boards and artifacts run in harnessly's network namespace, the way containers of one pod do: the runtime and the
+# agents in its tabs reach them at http://localhost:<port> while the browser uses the public URLs, and the three
+# share one site for the panes' cookies. Every port is bound to 127.0.0.1 and the tokens below are local
+# placeholders: for a shared host set your own in .env and put TLS in front, or use the Helm chart.
 
 name: harnessly
 
@@ -16,32 +21,47 @@ x-ports:
   boards: &boards-port ${BOARDS_PORT:-8081}
   artifacts: &artifacts-port ${ARTIFACTS_PORT:-8082}
 
+x-public-urls:
+  # The addresses people's browsers use, without a trailing slash. The harnessly page's origin is what boards and
+  # artifacts allow to frame them and to call their APIs.
+  harnessly: &harnessly-url ${HARNESSLY_PUBLIC_URL:-http://localhost:${HARNESSLY_PORT:-8022}}
+  boards: &boards-url ${BOARDS_PUBLIC_URL:-http://localhost:${BOARDS_PORT:-8081}}
+  artifacts: &artifacts-url ${ARTIFACTS_PUBLIC_URL:-http://localhost:${ARTIFACTS_PORT:-8082}}
+
 services:
   harnessly:
     build:
       context: .
       target: ${HARNESSLY_TARGET:-runtime}
-    image: ${HARNESSLY_IMAGE:-ghcr.io/ly-solutions/harnessly:latest}
+    image: ${HARNESSLY_IMAGE:-ghcr.io/ly-solutions/harnessly:local}
+    # The images are built here, not pulled: HARNESSLY_PULL_POLICY=missing uses published ones named by *_IMAGE.
+    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
     environment:
       RUNTIME_GATE_LISTEN: 0.0.0.0:${HARNESSLY_PORT:-8022}
       RUNTIME_OWNER_NAME: ${HARNESSLY_OWNER_NAME:-}
-      RUNTIME_BOARDS_URL: http://localhost:${BOARDS_PORT:-8081}
+      # Whoever opens the page first sets the password, unless INIT_PASSWORD is set: then that password signs in
+      # to the setup, and only after it can the real one be chosen.
+      INIT_PASSWORD: ${INIT_PASSWORD:-}
+      RUNTIME_BOARDS_URL: *boards-url
       RUNTIME_BOARDS_TOKEN: ${BOARDS_RUNTIME_TOKEN:-local-boards-runtime-token}
       RUNTIME_BOARDS_AGENT_TOKEN: ${BOARDS_AGENT_TOKEN:-local-boards-agent-token}
-      RUNTIME_ARTIFACTS_URL: http://localhost:${ARTIFACTS_PORT:-8082}
+      RUNTIME_ARTIFACTS_URL: *artifacts-url
       RUNTIME_ARTIFACTS_TOKEN: ${ARTIFACTS_EDITOR_TOKEN:-local-artifacts-editor-token}
       RUNTIME_ARTIFACTS_READ_TOKEN: ${ARTIFACTS_VIEWER_TOKEN:-local-artifacts-viewer-token}
     ports:
       - "127.0.0.1:${HARNESSLY_PORT:-8022}:${HARNESSLY_PORT:-8022}"
       - "127.0.0.1:${BOARDS_PORT:-8081}:${BOARDS_PORT:-8081}"
       - "127.0.0.1:${ARTIFACTS_PORT:-8082}:${ARTIFACTS_PORT:-8082}"
+      # The MinIO console (only listening with the minio profile); MINIO_CONSOLE_PORT moves it when 9001 is taken.
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - home:/home/agent
     restart: unless-stopped
 
   minio:
+    # Only with the minio profile (COMPOSE_PROFILES=minio, and HARNESSLY_STORAGE=s3 to use it).
     # Community build of MinIO (AGPL-3.0); any S3-compatible store works.
+    profiles: [minio]
     image: ${MINIO_IMAGE:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z}
     network_mode: service:harnessly
     command: ["server", "/data", "--address", "127.0.0.1:9000", "--console-address", ":9001"]
@@ -59,54 +79,67 @@ services:
 
   boards:
     build: ${BOARDS_SOURCE:-https://github.com/ly-solutions/boards.git#main}
-    image: ${BOARDS_IMAGE:-ghcr.io/ly-solutions/boards:latest}
+    image: ${BOARDS_IMAGE:-ghcr.io/ly-solutions/boards:local}
+    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
     network_mode: service:harnessly
     depends_on:
       minio:
         condition: service_healthy
+        required: false
     environment:
       PORT: *boards-port
       BOARDS_METRICS_PORT: "0"
-      BOARDS_PUBLIC_URL: http://localhost:${BOARDS_PORT:-8081}
+      BOARDS_PUBLIC_URL: *boards-url
       BOARDS_AUTH: token
       BOARDS_API_TOKENS: ${BOARDS_RUNTIME_TOKEN:-local-boards-runtime-token},${BOARDS_AGENT_TOKEN:-local-boards-agent-token}
       BOARDS_SESSION_SECRET: ${BOARDS_SESSION_SECRET:-local-boards-session-secret-change-me}
-      BOARDS_FRAME_ANCESTORS: "'self' http://localhost:${HARNESSLY_PORT:-8022}"
-      BOARDS_CORS_ORIGINS: http://localhost:${HARNESSLY_PORT:-8022}
-      BOARDS_STORAGE: s3
-      BOARDS_S3_ENDPOINT: http://127.0.0.1:9000
-      BOARDS_S3_BUCKET: boards
+      BOARDS_FRAME_ANCESTORS: "'self' ${HARNESSLY_PUBLIC_URL:-http://localhost:${HARNESSLY_PORT:-8022}}"
+      BOARDS_CORS_ORIGINS: *harnessly-url
+      BOARDS_STORAGE: ${HARNESSLY_STORAGE:-fs}
+      BOARDS_DATA_DIR: /data
+      BOARDS_S3_ENDPOINT: ${BOARDS_S3_ENDPOINT:-http://127.0.0.1:9000}
+      BOARDS_S3_BUCKET: ${BOARDS_S3_BUCKET:-boards}
       BOARDS_S3_FORCE_PATH_STYLE: "true"
       BOARDS_S3_CREATE_BUCKET: "true"
-      BOARDS_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-harnessly}
-      BOARDS_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-local-minio-password}
+      BOARDS_S3_ACCESS_KEY_ID: ${BOARDS_S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-harnessly}}
+      BOARDS_S3_SECRET_ACCESS_KEY: ${BOARDS_S3_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-local-minio-password}}
+    volumes:
+      - boards-data:/data
     restart: unless-stopped
 
   artifacts:
     build: ${ARTIFACTS_SOURCE:-https://github.com/ly-solutions/artifacts.git#main}
-    image: ${ARTIFACTS_IMAGE:-ghcr.io/ly-solutions/artifacts:latest}
+    image: ${ARTIFACTS_IMAGE:-ghcr.io/ly-solutions/artifacts:local}
+    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
     network_mode: service:harnessly
     depends_on:
       minio:
         condition: service_healthy
+        required: false
     environment:
       ARTIFACTS_PORT: *artifacts-port
-      ARTIFACTS_PUBLIC_URL: http://localhost:${ARTIFACTS_PORT:-8082}
+      ARTIFACTS_PUBLIC_URL: *artifacts-url
       ARTIFACTS_AUTH: token
       ARTIFACTS_TOKEN: ${ARTIFACTS_EDITOR_TOKEN:-local-artifacts-editor-token}
       ARTIFACTS_READ_TOKEN: ${ARTIFACTS_VIEWER_TOKEN:-local-artifacts-viewer-token}
       ARTIFACTS_SECRET: ${ARTIFACTS_SECRET:-local-artifacts-secret-change-me}
-      ARTIFACTS_FRAME_ANCESTORS: http://localhost:${HARNESSLY_PORT:-8022}
-      ARTIFACTS_STORAGE: s3
-      ARTIFACTS_S3_ENDPOINT: http://127.0.0.1:9000
-      ARTIFACTS_S3_BUCKET: artifacts
+      ARTIFACTS_FRAME_ANCESTORS: *harnessly-url
+      ARTIFACTS_CORS_ORIGINS: *harnessly-url
+      ARTIFACTS_STORAGE: ${HARNESSLY_STORAGE:-fs}
+      ARTIFACTS_DATA_DIR: /data
+      ARTIFACTS_S3_ENDPOINT: ${ARTIFACTS_S3_ENDPOINT:-http://127.0.0.1:9000}
+      ARTIFACTS_S3_BUCKET: ${ARTIFACTS_S3_BUCKET:-artifacts}
       ARTIFACTS_S3_FORCE_PATH_STYLE: "true"
       ARTIFACTS_S3_CREATE_BUCKET: "true"
-      ARTIFACTS_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-harnessly}
-      ARTIFACTS_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-local-minio-password}
+      ARTIFACTS_S3_ACCESS_KEY_ID: ${ARTIFACTS_S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-harnessly}}
+      ARTIFACTS_S3_SECRET_ACCESS_KEY: ${ARTIFACTS_S3_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-local-minio-password}}
       ARTIFACTS_LOG_FORMAT: text
+    volumes:
+      - artifacts-data:/data
     restart: unless-stopped
 
 volumes:
   home:
+  boards-data:
+  artifacts-data:
   minio-data:

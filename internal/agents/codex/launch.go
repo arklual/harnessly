@@ -64,6 +64,10 @@ func RuntimeLaunchArgs(l *agents.Launch) ([]string, error) {
 	return args, nil
 }
 
+// ContainerSandboxArgs let Codex run commands without its own sandbox, which needs user namespaces a container does not
+// give; the container is the boundary.
+var ContainerSandboxArgs = []string{"-c", `sandbox_mode="danger-full-access"`, "-c", `approval_policy="never"`}
+
 // LaunchConfig is what a Codex launch is built from; the deployment fills it.
 type LaunchConfig struct {
 	// LauncherScript is where the launcher script lives (written by EnsureLauncher), LauncherContent its text.
@@ -76,6 +80,9 @@ type LaunchConfig struct {
 	WorkspacePrompt func(workspaceID string) string
 	// SkipPermissions adds --yolo when it says so.
 	SkipPermissions func() bool
+	// ContainerSandbox: the runtime runs in a container that is the sandbox, where Codex's own (bubblewrap) cannot start.
+	// Codex then runs with sandbox_mode "danger-full-access" and approval_policy "never" instead.
+	ContainerSandbox bool
 	// PassServiceEnv lets the commands Codex runs see the variables the workspace's services need (BOARDS_TOKEN,
 	// ARTIFACTS_TOKEN): by default Codex drops every variable whose name has KEY, SECRET or TOKEN in it. ShellEnvExclude
 	// are variables that still stay out (the runtime's own CLI token).
@@ -117,6 +124,8 @@ func (c LaunchConfig) RuntimeArgs(workspaceID, resumeID string, launch *agents.L
 	args = append(args, c.shellEnvArgs()...)
 	if c.SkipPermissions != nil && c.SkipPermissions() {
 		args = append(args, "--yolo")
+	} else if c.ContainerSandbox {
+		args = append(args, ContainerSandboxArgs...)
 	}
 	launchArgs, err := RuntimeLaunchArgs(launch)
 	if err != nil {
@@ -177,7 +186,7 @@ func EnsureLauncher(path string, content []byte) error {
 
 // LauncherScriptConfig is what the launcher script needs to find the runtime.
 type LauncherScriptConfig struct {
-	// DataDirs are home-relative data folders, the first that exists is used (the last when none does).
+	// DataDirs are data folders, relative to the home or absolute; the first that exists is used (the last when none does).
 	DataDirs []string
 	// PortFile and TokenFile are file names in the data folder.
 	PortFile, TokenFile string
@@ -196,7 +205,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
-const dataDirs = [{{range $i, $d := .DataDirs}}{{if $i}}, {{end}}{{js $d}}{{end}}].map((dir) => path.join(os.homedir(), dir));
+const dataDirs = [{{range $i, $d := .DataDirs}}{{if $i}}, {{end}}{{js $d}}{{end}}].map((dir) => path.resolve(os.homedir(), dir));
 const baseDir = dataDirs.find((dir) => fs.existsSync(dir)) || dataDirs[dataDirs.length - 1];
 
 const readTrim = (filePath) => {

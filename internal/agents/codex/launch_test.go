@@ -315,3 +315,36 @@ func TestServiceEnvArgs(t *testing.T) {
 		t.Fatalf("exclude: %v", parsed)
 	}
 }
+
+// In a container Codex's own sandbox cannot start (no user namespaces): it runs unsandboxed and without approvals
+// instead, after the service environment and before the model, and not at all next to --yolo, which says the same.
+func TestContainerSandboxArgs(t *testing.T) {
+	dir := t.TempDir()
+	c := LaunchConfig{Hooks: &HookConfig{Script: "/data/codex-hook.sh", UserConfig: filepath.Join(dir, "none.toml")}, MCP: testMCP}
+	plain, _, err := c.RuntimeArgs("", "", nil)
+	if err != nil || slices.Contains(plain, `sandbox_mode="danger-full-access"`) || slices.Contains(plain, `approval_policy="never"`) {
+		t.Fatalf("off by default: %v %q", err, plain)
+	}
+	c.ContainerSandbox = true
+	args, _, err := c.RuntimeArgs("", "", choice("gpt-5.4", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.Index(args, `sandbox_mode="danger-full-access"`)
+	if i < 1 || args[i-1] != "-c" || !slices.Equal(args[i+1:i+4], []string{"-c", `approval_policy="never"`, "-m"}) {
+		t.Fatalf("container sandbox flags: %q", args)
+	}
+	for _, a := range args[i-1 : i+3] {
+		if strings.Contains(a, "=") {
+			var parsed map[string]string
+			if _, err := toml.Decode(a, &parsed); err != nil {
+				t.Fatalf("%q is not TOML: %v", a, err)
+			}
+		}
+	}
+	c.SkipPermissions = func() bool { return true }
+	args, _, _ = c.RuntimeArgs("", "", nil)
+	if !slices.Contains(args, "--yolo") || slices.Contains(args, `sandbox_mode="danger-full-access"`) {
+		t.Fatalf("--yolo is enough: %q", args)
+	}
+}

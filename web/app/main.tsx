@@ -56,7 +56,9 @@ document.documentElement.lang = locale();
 type TBootstrap = Record<string, unknown>;
 
 type TPhase =
-  { kind: 'checking' } | { kind: 'signed-out'; needsSetup: boolean } | { kind: 'ready'; boot: TBootstrap };
+  | { kind: 'checking' }
+  | { kind: 'signed-out'; needsSetup: boolean; requiresAuth: boolean }
+  | { kind: 'ready'; boot: TBootstrap };
 
 /** Signs in when the runtime asks for it, then loads the page's start data (it answers 503 while the core starts). */
 const useBootstrap = (): [TPhase, () => void] => {
@@ -69,8 +71,9 @@ const useBootstrap = (): [TPhase, () => void] => {
       const res = await appFetch('/api/platform/bootstrap').catch(() => null);
       if (!alive) return;
       if (res?.status === 401) {
-        const state = await auth.state().catch(() => ({ needsSetup: false }));
-        if (alive) setPhase({ kind: 'signed-out', needsSetup: state.needsSetup });
+        const state = await auth.state().catch(() => ({ needsSetup: false, requiresAuth: false }));
+        if (alive)
+          setPhase({ kind: 'signed-out', needsSetup: state.needsSetup, requiresAuth: state.requiresAuth });
         return;
       }
       if (!res || res.status === 503) {
@@ -110,7 +113,9 @@ const App = () => {
   const { pathname } = useRouter();
   const [phase, reload] = useBootstrap();
   if (phase.kind === 'checking') return null;
-  if (phase.kind === 'signed-out') return <SignIn needsSetup={phase.needsSetup} onSignedIn={reload} />;
+  if (phase.kind === 'signed-out') {
+    return <SignIn needsSetup={phase.needsSetup} requiresAuth={phase.requiresAuth} onSignedIn={reload} />;
+  }
   const boot = phase.boot;
   const props = ((boot.props as Record<string, unknown> | undefined) ?? boot) as Record<string, unknown>;
   return (

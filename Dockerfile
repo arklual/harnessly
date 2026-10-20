@@ -55,7 +55,8 @@ ENV HOME=/home/agent \
     RUNTIME_GATE_LISTEN=0.0.0.0:8022 \
     RUNTIME_GATE_UPSTREAM= \
     RUNTIME_WORKSPACE_DIR=/home/agent/work \
-    RUNTIME_APP_BASE_PATH=/
+    RUNTIME_APP_BASE_PATH=/ \
+    RUNTIME_CODEX_SANDBOX=container
 USER agent
 WORKDIR /home/agent
 VOLUME ["/home/agent"]
