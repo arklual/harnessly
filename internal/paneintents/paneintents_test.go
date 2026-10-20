@@ -16,7 +16,7 @@ func cmd(pairs ...any) *jsvalue.Object { return jsvalue.NewObject(pairs...) }
 func TestFirstApplicationOnly(t *testing.T) {
 	now := time.UnixMilli(1000)
 	s := New(filepath.Join(t.TempDir(), "a.json"), func() time.Time { return now }, false)
-	intent := s.Add("tab-1", cmd("kind", "open", "tab", "task", "target", "TCK-1"))
+	intent := s.Add("tab-1", cmd("kind", "open", "tab", "task", "target", "PROJ-1"))
 	if len(s.List("tab-2")) != 0 {
 		t.Fatal("other tab")
 	}
@@ -30,7 +30,7 @@ func TestFirstApplicationOnly(t *testing.T) {
 	if at, _ := again[0].Number("appliedAt"); at != 2000 || again[0].String("appliedOn") != "desktop" {
 		t.Fatal(jsvalue.Stringify(again[0], ""))
 	}
-	if string(jsvalue.Stringify(intent, "")) != `{"id":"`+intent.String("id")+`","command":{"kind":"open","tab":"task","target":"TCK-1"},"createdAt":1000,"appliedAt":null,"appliedOn":null}` {
+	if string(jsvalue.Stringify(intent, "")) != `{"id":"`+intent.String("id")+`","command":{"kind":"open","tab":"task","target":"PROJ-1"},"createdAt":1000,"appliedAt":null,"appliedOn":null}` {
 		t.Fatal(string(jsvalue.Stringify(intent, "")))
 	}
 }

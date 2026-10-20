@@ -95,7 +95,7 @@ var (
 	reasonFlat        = locale.T("usage is below the measurement step (1%)", "расход меньше шага измерения (1%)")
 )
 
-// formatSpan: "20 min", "6 h", "1 h 30 min" (in Russian «20 мин», «6 ч», «1 ч 30 мин»).
+// formatSpan: "20 min", "6 h", "1 h 30 min" (Russian uses its own abbreviations for minutes and hours).
 func formatSpan(seconds float64) string {
 	mins, hrs := locale.Pick(" min", " мин"), locale.Pick(" h", " ч")
 	minutes := jsRound(seconds / 60)

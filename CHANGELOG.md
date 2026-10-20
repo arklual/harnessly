@@ -43,9 +43,14 @@ All notable changes to this project are documented here. The format follows
 - The README is rewritten around a quick start that runs the runtime standalone; the configuration tables and the
   slice details moved to `docs/`.
 - Golden test data stores fake provider credentials as placeholders built at run time.
+- Every text the runtime shows people follows `RUNTIME_LOCALE`: English by default, Russian with `RUNTIME_LOCALE=ru`
+  (the previous texts, byte for byte). That covers error bodies, notifications, the shared snapshot page and file, the
+  command catalog, the design library pages and the prompts it writes for agents, preview pages and limit messages.
 
 ### Fixed
 
+- Titles of board and document chips are looked up by origin, so boards and artifacts served over http on other ports
+  of one host (the compose workspace) get them too. `RUNTIME_ARTIFACTS_URL` and `RUNTIME_BOARDS_URL` name those origins.
 - Stopping the design library's server also stops its background history and waits for a snapshot under way.
 - A pane command a page applied before the runtime started waiting for it is reported as applied.
 - Tests no longer depend on the machine's umask, wait for the standalone run's panes to exit, and the timeline golden

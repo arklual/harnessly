@@ -1,0 +1,261 @@
+/* Model and effort chip and picker. Tokens --t-*, classes tw-*. */
+
+/* The welcome composer is the container the segmented control and the chip collapse against (≤ 480px). */
+.tw-welcome-composer {
+  container-type: inline-size;
+}
+.tw-welcome-toolbar {
+  min-width: 0;
+}
+.tw-welcome-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tw-welcome-controls .tw-ui-segmented {
+  flex-shrink: 0;
+}
+
+.tw-launch-chip {
+  max-width: 240px;
+}
+.tw-launch-chip > svg:first-child {
+  color: var(--t-accent-purple-soft);
+}
+@container (max-width: 480px) {
+  .tw-launch-chip {
+    max-width: 150px;
+  }
+}
+
+.tw-launch-popover {
+  width: min(380px, var(--tw-ui-layer-max-w));
+  max-height: min(560px, var(--tw-ui-layer-max-h, 70vh));
+  overflow-y: auto;
+  padding: 10px;
+}
+.tw-launch-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tw-launch-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tw-launch-section + .tw-launch-section {
+  padding-top: 10px;
+  border-top: 1px solid var(--t-border-subtle);
+}
+.tw-launch-heading {
+  margin: 0;
+  padding: 2px 8px 4px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-text-muted);
+}
+.tw-launch-note,
+.tw-launch-current {
+  margin: 0;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--t-text-muted);
+}
+.tw-launch-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--t-text);
+}
+.tw-launch-alert {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--t-accent-amber-bg);
+  color: var(--t-accent-amber-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.tw-launch-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 8px 2px;
+  border-top: 1px solid var(--t-border-subtle);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--t-text-muted);
+}
+.tw-launch-footer p {
+  margin: 0;
+}
+.tw-launch-warning {
+  color: var(--t-accent-amber-soft);
+}
+.tw-launch-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--t-text-secondary);
+}
+.tw-launch-error p {
+  margin: 0;
+}
+.tw-launch-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 12.5px;
+  color: var(--t-text-muted);
+}
+
+/* Effort icon: four rising bars; data-level fills the first N (EFFORT_BARS). */
+.tw-effort-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  width: 17px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.tw-effort-bars > i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--t-border-default);
+}
+.tw-effort-bars > i:nth-child(1) {
+  height: 5px;
+}
+.tw-effort-bars > i:nth-child(2) {
+  height: 8px;
+}
+.tw-effort-bars > i:nth-child(3) {
+  height: 11px;
+}
+.tw-effort-bars > i:nth-child(4) {
+  height: 14px;
+}
+.tw-effort-bars[data-level='1'] > i:nth-child(-n + 1),
+.tw-effort-bars[data-level='2'] > i:nth-child(-n + 2),
+.tw-effort-bars[data-level='3'] > i:nth-child(-n + 3),
+.tw-effort-bars[data-level='4'] > i {
+  background: var(--t-accent-purple);
+}
+
+/* The running model and effort in the composer footer. */
+.tw-launch-session {
+  display: inline-flex;
+  min-width: 0;
+  margin-left: auto;
+}
+.tw-launch-chip-session {
+  height: 24px;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11px;
+}
+.tw-launch-pending {
+  margin-left: 6px;
+  color: var(--t-text-muted);
+  font-size: 11px;
+}
+.tw-launch-chip[data-pending] .tw-launch-pending::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  vertical-align: middle;
+  border-radius: 999px;
+  background: var(--t-accent-amber);
+  animation: tw-cbreathe 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-launch-chip[data-pending] .tw-launch-pending::before {
+    animation: none;
+  }
+}
+.tw-launch-static {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--t-surface-raised);
+  color: var(--t-text-muted);
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+@container (max-width: 360px) {
+  .tw-launch-chip-session {
+    max-width: 160px;
+  }
+}
+
+/* Workspace (directory) choice in the welcome composer, shown when a machine has several. */
+.tw-welcome-workspace {
+  max-width: 200px;
+}
+@media (max-width: 767px) {
+  .tw-welcome-workspace {
+    max-width: 132px;
+  }
+}
+
+/* Ultracode: the effort's name and bars flow in rainbow colours, like the keyword in Claude Code. */
+[data-ultra].tw-launch-effort,
+.tw-csheet-value[data-ultra],
+span[data-ultra]:not(.tw-effort-bars) {
+  background: linear-gradient(90deg, #ff6b6b, #ffa94d, #ffd43b, #69db7c, #4dabf7, #9775fa, #f783ac, #ff6b6b);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 600;
+  animation: tw-ultra-flow 2.4s linear infinite;
+}
+.tw-effort-bars[data-ultra] > i {
+  background: linear-gradient(180deg, #ffd43b, #f783ac 55%, #9775fa);
+  background-size: 100% 200%;
+  animation: tw-ultra-bars 1.6s ease-in-out infinite alternate;
+}
+.tw-effort-bars[data-ultra] > i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.tw-effort-bars[data-ultra] > i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.tw-effort-bars[data-ultra] > i:nth-child(4) {
+  animation-delay: 0.45s;
+}
+@keyframes tw-ultra-flow {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes tw-ultra-bars {
+  to {
+    background-position: 0 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ultra],
+  .tw-effort-bars[data-ultra] > i {
+    animation: none;
+  }
+}

@@ -214,7 +214,7 @@ func findModel(models []catalog.Model, id string) *catalog.Model {
 	return nil
 }
 
-// effortsFor: the levels offered for a model; for «Авто», those of the CLI's default model, else Claude's own list.
+// effortsFor: the levels offered for a model; for "Auto", those of the CLI's default model, else Claude's own list.
 func effortsFor(provider string, o catalog.LaunchOptions, model *string) []string {
 	if model != nil {
 		if m := findModel(o.Models, *model); m != nil {

@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
-// TCK-3027: the data directory is ~/.acme-ai, a link to ~/.oldmux on machines that had it.
+// The data directory is ~/.acme-ai, a link to ~/.oldmux on machines that had it.
 const baseDir = fs.existsSync(path.join(os.homedir(), '.acme-ai'))
   ? path.join(os.homedir(), '.acme-ai')
   : path.join(os.homedir(), '.oldmux');

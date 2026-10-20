@@ -115,11 +115,11 @@ export const fixtureSet = (sha) => {
     customFields: [{ name: 'Assignee', value: { login: 'asmith', name: 'asmith' } }, { name: 'Type', value: { name: 'ИДЕЯ' } }],
     parent: { issues: [{ idReadable: 'DEMO-1', summary: 'Idea', customFields: [{ name: 'Type', value: { name: 'Идея' } }] }] },
   }));
-  yt(`/api/issues/OPS-4?fields=${ISSUE_FIELDS}`, missing());
-  yt(`/api/issues/OPS-6?fields=${ISSUE_FIELDS}`, json({ idReadable: 'OPS-6', summary: 'Bad fields', customFields: { State: 1 } }));
-  yt(`/api/issues/OPS-7?fields=${ISSUE_FIELDS}`, json({ idReadable: 'OPS-7', summary: 7, customFields: [{ name: 'Assignee', value: 'nobody' }], parent: { issues: 'x' } }));
+  yt(`/api/issues/APP-4?fields=${ISSUE_FIELDS}`, missing());
+  yt(`/api/issues/APP-6?fields=${ISSUE_FIELDS}`, json({ idReadable: 'APP-6', summary: 'Bad fields', customFields: { State: 1 } }));
+  yt(`/api/issues/APP-7?fields=${ISSUE_FIELDS}`, json({ idReadable: 'APP-7', summary: 7, customFields: [{ name: 'Assignee', value: 'nobody' }], parent: { issues: 'x' } }));
   yt('/api/admin/projects?fields=shortName,archived&$top=200', json([
-    { shortName: 'ACME' }, { shortName: 'DEMO', archived: false }, { shortName: 'OLD', archived: true }, { shortName: 'OPS' }, { shortName: 'x1' }, { shortName: 'TOOLONGNAME1' },
+    { shortName: 'ACME' }, { shortName: 'DEMO', archived: false }, { shortName: 'OLD', archived: true }, { shortName: 'APP' }, { shortName: 'x1' }, { shortName: 'TOOLONGNAME1' },
   ]));
   yt('/hub/api/rest/avatar/abc?dpr=2', { status: 200, headers: { 'content-type': 'image/png' }, bodyB64: png(40) });
   yt('/api/users?query=asmith&fields=login,avatarUrl&$top=10', json([{ login: 'asmith2', avatarUrl: '/hub/api/rest/avatar/no' }, { login: 'asmith', avatarUrl: `https://${T}/hub/api/rest/avatar/zzz` }]));
@@ -139,15 +139,15 @@ export const fixtureSet = (sha) => {
     subtasks: { issues: [
       { idReadable: 'ACME-13', summary: 'Child', resolved: 5, customFields: [{ name: 'State', value: { name: 'Done' } }] },
       { idReadable: 'OTHER-1', summary: 'Foreign' }, null,
-      { idReadable: 'OPS-2', summary: '', customFields: [] },
+      { idReadable: 'APP-2', summary: '', customFields: [] },
     ] },
     customFields: [assignee, { name: 'Type', value: { name: 'Bug' } }, { name: 'State', value: { name: 'Open' } }, { name: 'Priority', value: { name: 'Major' } }],
     comments: Array.from({ length: 12 }, (_, i) => ({ author: i % 3 ? { login: `u${i}`, fullName: i % 2 ? `User ${i}` : '' } : null, created: 1792321500000 + i, text: `comment ${i}${'x'.repeat(i === 11 ? 5000 : 0)}` })),
   }));
   yt(`/api/issues/DEMO-404?fields=${TASK_FIELDS}`, missing());
-  yt(`/api/issues/OPS-5?fields=${TASK_FIELDS}`, { status: 500, body: 'oops' });
-  yt(`/api/issues/OPS-8?fields=${TASK_FIELDS}`, json({ idReadable: 'OTHER-8', summary: 'Wrong space' }));
-  yt(`/api/issues/OPS-9?fields=${TASK_FIELDS}`, json({ idReadable: 'OPS-9', summary: 'Minimal' }));
+  yt(`/api/issues/APP-5?fields=${TASK_FIELDS}`, { status: 500, body: 'oops' });
+  yt(`/api/issues/APP-8?fields=${TASK_FIELDS}`, json({ idReadable: 'OTHER-8', summary: 'Wrong space' }));
+  yt(`/api/issues/APP-9?fields=${TASK_FIELDS}`, json({ idReadable: 'APP-9', summary: 'Minimal' }));
 
   // Published pages.
   const D = 'docs.example.com';
@@ -294,11 +294,11 @@ export const cases = [
   { method: 'GET', url: `${R}/link-meta?url=${encodeURIComponent('https://youtrack.example.com/youtrack/issue/DEMO-3')}`, headers: ses },
   { method: 'GET', url: `${R}/link-meta?key=ACME-12`, headers: ses },
   { method: 'GET', url: `${R}/link-meta?key=ACME-12`, headers: { ...ses, 'if-none-match': 'ETAG' } },
-  { method: 'GET', url: `${R}/link-meta?key=${encodeURIComponent(' OPS-4 ')}`, headers: ses },
+  { method: 'GET', url: `${R}/link-meta?key=${encodeURIComponent(' APP-4 ')}`, headers: ses },
   { method: 'GET', url: `${R}/link-meta?key=ZZZ-1`, headers: ses },
   { method: 'GET', url: `${R}/link-meta?key=OLD-1`, headers: ses },
-  { method: 'GET', url: `${R}/link-meta?key=OPS-6`, headers: ses },
-  { method: 'GET', url: `${R}/link-meta?key=OPS-7`, headers: ses },
+  { method: 'GET', url: `${R}/link-meta?key=APP-6`, headers: ses },
+  { method: 'GET', url: `${R}/link-meta?key=APP-7`, headers: ses },
   { method: 'GET', url: `${R}/link-meta?url=${encodeURIComponent(`https://${G}/group/alpha/-/merge_requests/70`)}`, headers: ses },
   { method: 'GET', url: `${R}/link-meta?url=${encodeURIComponent(`https://${P}/team/sub/beta/-/merge_requests/3/diffs`)}`, headers: ses },
   { method: 'GET', url: `${R}/link-meta?url=${encodeURIComponent(`https://${G}/group/../alpha/-/merge_requests/70`)}`, headers: ses },
@@ -337,17 +337,17 @@ export const cases = [
   { method: 'GET', url: `${R}/task?key=ACME-12`, headers: ses },
   { method: 'GET', url: `${R}/task?key=ACME-12`, headers: { ...ses, 'if-none-match': 'ETAG' } },
   { method: 'GET', url: `${R}/task?key=DEMO-404`, headers: ses },
-  { method: 'GET', url: `${R}/task?key=OPS-5`, headers: ses },
-  { method: 'GET', url: `${R}/task?key=OPS-8`, headers: ses },
-  { method: 'GET', url: `${R}/task?key=OPS-9`, headers: ses },
+  { method: 'GET', url: `${R}/task?key=APP-5`, headers: ses },
+  { method: 'GET', url: `${R}/task?key=APP-8`, headers: ses },
+  { method: 'GET', url: `${R}/task?key=APP-9`, headers: ses },
   { method: 'GET', url: `${R}/task?key=NOPE-1`, headers: ses },
   { method: 'GET', url: `${R}/task?key=ACME-1&key=ACME-2`, headers: ses },
   { method: 'PUT', url: `${R}/task?key=ACME-12`, headers: ses },
-  { setup: { env: { YOUTRACK_TOKEN: ' yt-env ' } }, method: 'GET', url: `${R}/task?key=OPS-9`, headers: ses },
+  { setup: { env: { YOUTRACK_TOKEN: ' yt-env ' } }, method: 'GET', url: `${R}/task?key=APP-9`, headers: ses },
   { method: 'GET', url: `${R}/task?key=ACME-12`, headers: ses },
-  { setup: { env: { YOUTRACK_TOKEN: null }, files: { 'home/.config/acme/youtrack-token': null } }, method: 'GET', url: `${R}/task?key=OPS-77`, headers: ses },
+  { setup: { env: { YOUTRACK_TOKEN: null }, files: { 'home/.config/acme/youtrack-token': null } }, method: 'GET', url: `${R}/task?key=APP-77`, headers: ses },
   { method: 'GET', url: `${R}/link-meta/avatar?login=newperson`, headers: ses },
-  { setup: { files: { 'home/.config/acme/youtrack-token': 'yt-file' } }, method: 'GET', url: `${R}/task?key=OPS-9`, headers: ses },
+  { setup: { files: { 'home/.config/acme/youtrack-token': 'yt-file' } }, method: 'GET', url: `${R}/task?key=APP-9`, headers: ses },
 
   // Site icons.
   { method: 'GET', url: `${R}/favicon?host=icons.example.org`, headers: ses },

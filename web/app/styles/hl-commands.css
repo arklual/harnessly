@@ -1,0 +1,379 @@
+/* Slash command list, TUI menu mirror. Tokens --t-*, classes tw-*. */
+
+/* Slash-command list above a composer. In flow, inside the composer column: no portal, no clipping. */
+.tw-slash-popover {
+  --tw-ui-listbox-max-h: min(320px, 42vh);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 6px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: var(--t-radius-xl);
+  background: var(--t-surface-raised);
+  box-shadow: var(--t-shadow-popover);
+  color: var(--t-text);
+  font-size: 13px;
+  animation: tw-slash-rise var(--t-duration-base) ease-out backwards;
+}
+.tw-welcome-composer .tw-slash-popover {
+  margin: 0 0 6px;
+  box-shadow: none;
+}
+@keyframes tw-slash-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.tw-slash-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 6px 4px;
+}
+.tw-slash-title {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-text-muted);
+  white-space: nowrap;
+}
+.tw-slash-count {
+  font-variant-numeric: tabular-nums;
+}
+.tw-slash-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--t-text-muted);
+  white-space: nowrap;
+}
+.tw-slash-all {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11.5px;
+}
+/* One compact line per command: name, then the description filling the rest, then the source. */
+.tw-slash-list .tw-ui-option {
+  min-height: 30px;
+  padding-block: 4px;
+}
+.tw-slash-list .tw-ui-option-text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.tw-slash-list .tw-ui-option-label {
+  flex-shrink: 0;
+  max-width: 55%;
+  overflow: hidden;
+  font-family: var(--t-font-family-mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-slash-list .tw-ui-option-description {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-slash-list .tw-ui-option-check {
+  display: none;
+}
+.tw-slash-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 45%;
+}
+.tw-slash-source {
+  max-width: 160px;
+  overflow: hidden;
+  color: var(--t-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-slash-source[data-source='builtin'],
+.tw-slash-source[data-source='quick'] {
+  color: var(--t-accent-purple-soft);
+}
+.tw-slash-exec {
+  font-size: 11px;
+  color: var(--t-text-secondary);
+  white-space: nowrap;
+}
+.tw-slash-exec[data-execution='blocked'] {
+  color: var(--t-danger);
+}
+.tw-slash-exec[data-execution='model'],
+.tw-slash-exec[data-execution='effort'],
+.tw-slash-exec[data-execution='menu'] {
+  color: var(--t-accent-purple-soft);
+}
+.tw-slash-foot {
+  margin: 0;
+  padding: 4px 8px 2px;
+  font-size: 11.5px;
+  color: var(--t-text-muted);
+}
+.tw-slash-warning {
+  color: var(--t-accent-amber);
+}
+.tw-slash-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px;
+  font-size: 12.5px;
+  color: var(--t-danger);
+}
+.tw-slash-hint {
+  margin: -4px 0 0;
+  font-family: var(--t-font-family-mono);
+  font-size: 11.5px;
+  color: var(--t-text-muted);
+}
+
+/* Narrow composer (phone, split pane): keys legend and execution badges give way to the command itself. */
+.tw-slash-popover {
+  container-type: inline-size;
+}
+@container (max-width: 520px) {
+  .tw-slash-keys,
+  .tw-slash-exec {
+    display: none;
+  }
+  .tw-slash-meta {
+    max-width: 40%;
+  }
+  .tw-slash-source {
+    max-width: 110px;
+  }
+}
+
+/* Mirror of a TUI menu or panel above the composer. */
+.tw-tui-mirror {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid var(--t-accent-purple-bg);
+  border-radius: var(--t-radius-xl);
+  background: var(--t-surface-raised);
+  box-shadow: var(--t-shadow-popover);
+  color: var(--t-text);
+  animation: tw-slash-rise var(--t-duration-base) ease-out backwards;
+}
+.tw-tui-mirror-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tw-tui-mirror-eyebrow {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-accent-purple-soft);
+}
+.tw-tui-mirror-title {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+.tw-tui-mirror-request {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--t-text-secondary);
+  white-space: pre-line;
+}
+.tw-tui-mirror-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tw-tui-mirror-option {
+  max-width: 100%;
+}
+.tw-tui-mirror-number {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+.tw-tui-mirror-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-tui-mirror-screen {
+  max-height: min(360px, 45vh);
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: var(--t-radius-lg);
+  background: var(--t-bg);
+  color: var(--t-text-secondary);
+  font-family: var(--t-font-family-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre;
+  scrollbar-width: thin;
+}
+.tw-tui-mirror-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tw-tui-mirror-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--t-danger);
+}
+.tw-tui-mirror-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-slash-popover,
+  .tw-tui-mirror {
+    animation: none;
+  }
+}
+@container (max-width: 480px) {
+  .tw-slash-list .tw-ui-option-description {
+    display: none;
+  }
+  .tw-slash-list .tw-ui-option-label {
+    max-width: none;
+  }
+}
+
+/* «@»-context popover: in flow above the composer on desktop, a bottom sheet on phones. */
+.tw-at-popover {
+  display: contents;
+}
+.tw-at-backdrop {
+  display: none;
+}
+.tw-at-sheet {
+  --tw-ui-listbox-max-h: min(280px, 40vh);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 6px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: var(--t-radius-xl);
+  background: var(--t-surface-raised);
+  box-shadow: var(--t-shadow-popover);
+  color: var(--t-text);
+  font-size: 13px;
+  animation: tw-slash-rise var(--t-duration-base) ease-out backwards;
+}
+.tw-welcome-composer .tw-at-sheet {
+  margin: 0 0 6px;
+  box-shadow: none;
+}
+.tw-at-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 6px 4px;
+}
+.tw-at-title {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-text-muted);
+  white-space: nowrap;
+}
+.tw-at-keys {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--t-text-muted);
+  white-space: nowrap;
+}
+.tw-at-list .tw-ui-option[aria-disabled] {
+  padding-top: 10px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-text-muted);
+  cursor: default;
+}
+.tw-at-list .tw-ui-option[aria-disabled] .tw-ui-option-check {
+  display: none;
+}
+.tw-at-list .tw-ui-option-description {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-at-list .tw-ui-option-check {
+  display: none;
+}
+
+.tw-at-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tw-at-chips .tw-ui-chip-label {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 767px) {
+  .tw-at-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: color-mix(in oklab, black 40%, transparent);
+    animation: tw-slash-rise var(--t-duration-base) ease-out backwards;
+  }
+  .tw-at-sheet {
+    position: fixed;
+    z-index: 41;
+    inset: auto 0 0 0;
+    margin: 0;
+    max-height: 70vh;
+    border-radius: var(--t-radius-xl) var(--t-radius-xl) 0 0;
+    border-bottom: none;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .tw-at-keys {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-at-backdrop,
+  .tw-at-sheet {
+    animation: none;
+  }
+}

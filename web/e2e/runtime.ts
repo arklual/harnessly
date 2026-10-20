@@ -97,6 +97,7 @@ export async function startRuntime(
     RUNTIME_WORKSPACE_DIR: project,
     RUNTIME_FIRST_WORKSPACE_NAME: 'Demo',
     RUNTIME_CLAUDE_LAUNCHER: join(bin, 'claude'),
+    RUNTIME_LOCALE: 'en',
     RUNTIME_AGENT_NICE: '10',
     RUNTIME_GATE_COUNT_SECONDS: '3600',
     ...opts.env,

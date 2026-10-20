@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
@@ -133,7 +134,7 @@ func (a *Assets) Serve(w http.ResponseWriter, r *http.Request, segments []string
 		if res != nil {
 			res.Body.Close()
 		}
-		writeError(w, r, http.StatusBadGateway, "Не удалось скачать "+segments[len(segments)-1])
+		writeError(w, r, http.StatusBadGateway, locale.Pick("Could not download ", "Не удалось скачать ")+segments[len(segments)-1])
 		return
 	}
 	defer res.Body.Close()

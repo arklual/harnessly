@@ -17,4 +17,19 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
+  {
+    // The agents page parses terminal output (control characters on purpose), keeps Russian copy with no-break spaces
+    // and swallows failures of best-effort browser APIs (storage, clipboard) in empty catch blocks.
+    files: ['app/**/*.{ts,tsx}'],
+    rules: {
+      'no-control-regex': 'off',
+      'no-irregular-whitespace': [
+        'error',
+        { skipStrings: true, skipTemplates: true, skipComments: true, skipJSXText: true },
+      ],
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-useless-assignment': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 );

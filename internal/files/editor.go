@@ -15,6 +15,8 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/text/collate"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Realpath resolves every link of an absolute path. The result is text as the old runtime held it (invalid UTF-8
@@ -65,16 +67,36 @@ type EditorError struct {
 func (e *EditorError) Error() string { return e.Text }
 
 var (
-	errNotInProject   = &EditorError{403, "Можно открывать только файлы текущего проекта."}
-	errOutside        = &EditorError{403, "Путь находится за пределами проекта."}
-	errLinkOutside    = &EditorError{403, "Ссылка ведёт за пределы проекта."}
-	errTooLarge       = &EditorError{415, "Редактор поддерживает файлы до 1 МБ."}
-	errNotText        = &EditorError{415, "Этот файл не является текстовым."}
-	errNotUTF8        = &EditorError{415, "Редактор поддерживает только текст в UTF-8."}
-	errNotRegular     = &EditorError{415, "Можно редактировать только обычные текстовые файлы."}
-	errGone           = &EditorError{404, "Файл или папка больше не существуют."}
-	errNoAccess       = &EditorError{403, "Нет доступа к этому файлу."}
-	errCannotReadFile = &EditorError{500, "Не удалось прочитать или сохранить файл."}
+	errNotInProject = func() *EditorError {
+		return &EditorError{403, locale.Pick("Only files of the current project can be opened.", "Можно открывать только файлы текущего проекта.")}
+	}
+	errOutside = func() *EditorError {
+		return &EditorError{403, locale.Pick("The path is outside the project.", "Путь находится за пределами проекта.")}
+	}
+	errLinkOutside = func() *EditorError {
+		return &EditorError{403, locale.Pick("The link leads outside the project.", "Ссылка ведёт за пределы проекта.")}
+	}
+	errTooLarge = func() *EditorError {
+		return &EditorError{415, locale.Pick("The editor supports files up to 1 MB.", "Редактор поддерживает файлы до 1 МБ.")}
+	}
+	errNotText = func() *EditorError {
+		return &EditorError{415, locale.Pick("This file is not a text file.", "Этот файл не является текстовым.")}
+	}
+	errNotUTF8 = func() *EditorError {
+		return &EditorError{415, locale.Pick("The editor only supports UTF-8 text.", "Редактор поддерживает только текст в UTF-8.")}
+	}
+	errNotRegular = func() *EditorError {
+		return &EditorError{415, locale.Pick("Only regular text files can be edited.", "Можно редактировать только обычные текстовые файлы.")}
+	}
+	errGone = func() *EditorError {
+		return &EditorError{404, locale.Pick("The file or folder no longer exists.", "Файл или папка больше не существуют.")}
+	}
+	errNoAccess = func() *EditorError {
+		return &EditorError{403, locale.Pick("No access to this file.", "Нет доступа к этому файлу.")}
+	}
+	errCannotReadFile = func() *EditorError {
+		return &EditorError{500, locale.Pick("Could not read or save the file.", "Не удалось прочитать или сохранить файл.")}
+	}
 )
 
 // editorFail maps a failure to the editor's refusal.
@@ -85,31 +107,31 @@ func editorFail(err error) *EditorError {
 	}
 	switch errnoOf(err) {
 	case syscall.ENOENT, syscall.ENOTDIR:
-		return errGone
+		return errGone()
 	case syscall.EACCES, syscall.EPERM, syscall.ELOOP:
-		return errNoAccess
+		return errNoAccess()
 	}
-	return errCannotReadFile
+	return errCannotReadFile()
 }
 
 // resolveInProject is a path of the project (relative to root) resolved: refused when it is absolute, leaves the
 // project by name, or leads out of it through a link.
 func resolveInProject(root, relative string) (realRoot, target string, err error) {
 	if strings.Contains(relative, "\x00") || strings.HasPrefix(relative, "/") {
-		return "", "", errNotInProject
+		return "", "", errNotInProject()
 	}
 	if realRoot, err = Realpath(root); err != nil {
 		return "", "", err
 	}
 	lexical := filepath.Join(realRoot, relative)
 	if !within(realRoot, lexical) {
-		return "", "", errOutside
+		return "", "", errOutside()
 	}
 	if target, err = Realpath(lexical); err != nil {
 		return "", "", err
 	}
 	if !within(realRoot, target) {
-		return "", "", errLinkOutside
+		return "", "", errLinkOutside()
 	}
 	return realRoot, target, nil
 }
@@ -206,10 +228,10 @@ func readBounded(f *os.File) ([]byte, *EditorError) {
 		return nil, editorFail(err)
 	}
 	if !st.Mode().IsRegular() {
-		return nil, errNotRegular
+		return nil, errNotRegular()
 	}
 	if st.Size() > editorMaxBytes {
-		return nil, errTooLarge
+		return nil, errTooLarge()
 	}
 	buf := make([]byte, editorMaxBytes+1)
 	n := 0
@@ -233,11 +255,11 @@ func readBounded(f *os.File) ([]byte, *EditorError) {
 func checkText(data []byte) *EditorError {
 	switch {
 	case len(data) > editorMaxBytes:
-		return errTooLarge
+		return errTooLarge()
 	case bytes.IndexByte(data, 0) >= 0:
-		return errNotText
+		return errNotText()
 	case !utf8.Valid(data):
-		return errNotUTF8
+		return errNotUTF8()
 	}
 	return nil
 }
@@ -253,9 +275,13 @@ func revisionOf(realRoot, target string, data []byte) string {
 }
 
 var (
-	errChanged     = &EditorError{409, "Файл изменился после открытия. Скопируйте свои правки и загрузите актуальную версию."}
-	errUnsupported = &EditorError{415, "Текст содержит неподдерживаемые символы."}
-	writeLocks     = keyedLocks{held: map[string]*keyedLock{}}
+	errChanged = func() *EditorError {
+		return &EditorError{409, locale.Pick("The file changed after it was opened. Copy your edits and load the current version.", "Файл изменился после открытия. Скопируйте свои правки и загрузите актуальную версию.")}
+	}
+	errUnsupported = func() *EditorError {
+		return &EditorError{415, locale.Pick("The text contains unsupported characters.", "Текст содержит неподдерживаемые символы.")}
+	}
+	writeLocks = keyedLocks{held: map[string]*keyedLock{}}
 )
 
 // keyedLocks serialize saves of one file, so two pages cannot both save over the same revision; a file's lock is
@@ -303,7 +329,7 @@ func WriteProjectFile(root, relative, content, revision string, loneSurrogate bo
 		return nil, ee
 	}
 	if loneSurrogate {
-		return nil, errUnsupported
+		return nil, errUnsupported()
 	}
 	defer writeLocks.lock(target)()
 	f, err := openNoFollow(target, syscall.O_RDWR)
@@ -316,7 +342,7 @@ func WriteProjectFile(root, relative, content, revision string, loneSurrogate bo
 		return nil, ee
 	}
 	if revisionOf(realRoot, target, current) != revision {
-		return nil, errChanged
+		return nil, errChanged()
 	}
 	if _, err := f.WriteAt(data, 0); err != nil {
 		return nil, editorFail(err)

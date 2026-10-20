@@ -11,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/machine"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/tmux"
@@ -68,19 +69,19 @@ func fileRoutes(d deps) []gate.JSONRoute {
 			return answer(r, status, files.Error(text), noStore())
 		}
 		if !d.SessionOK(r) {
-			return fail(401, "Войдите в рабочее пространство.")
+			return fail(401, locale.Pick("Sign in to the workspace.", "Войдите в рабочее пространство."))
 		}
 		q := files.RequestQuery(r)
 		session, ok := q.String("session")
 		if !ok || !editorSession.MatchString(session) {
-			return fail(400, "Не выбрана активная сессия.")
+			return fail(400, locale.Pick("No active session is selected.", "Не выбрана активная сессия."))
 		}
 		if !d.Tmux.HasSession(session) {
-			return fail(404, "Сессия больше не существует.")
+			return fail(404, locale.Pick("The session no longer exists.", "Сессия больше не существует."))
 		}
 		root := sessionDir(d.Tmux, session)
 		if root == "" {
-			return fail(404, "Не удалось определить папку проекта.")
+			return fail(404, locale.Pick("Could not determine the project folder.", "Не удалось определить папку проекта."))
 		}
 		var (
 			v   files.Object
@@ -89,7 +90,7 @@ func fileRoutes(d deps) []gate.JSONRoute {
 		if list {
 			relative := ""
 			if values := q["path"]; len(values) > 1 {
-				return fail(400, "Некорректный путь.")
+				return fail(400, locale.Pick("Invalid path.", "Некорректный путь."))
 			} else if len(values) == 1 {
 				relative = values[0]
 			}
@@ -97,7 +98,7 @@ func fileRoutes(d deps) []gate.JSONRoute {
 		} else {
 			relative, ok := q.String("path")
 			if !ok || relative == "" {
-				return fail(400, "Не выбран файл.")
+				return fail(400, locale.Pick("No file is selected.", "Не выбран файл."))
 			}
 			v, err = files.ReadProjectFile(root, relative)
 		}
@@ -177,17 +178,17 @@ func fileRoutes(d deps) []gate.JSONRoute {
 				cwd, _ := q.String("cwd")
 				query, _ := q.String("q")
 				if cwd == "" || !strings.HasPrefix(cwd, "/") || strings.Contains(cwd, "\x00") {
-					return answer(r, 400, files.Error("Нужен абсолютный путь"), noStore)
+					return answer(r, 400, files.Error(locale.Pick("An absolute path is required", "Нужен абсолютный путь")), noStore)
 				}
 				root, err := files.Realpath(cwd)
 				if err != nil {
-					return answer(r, 404, files.Error("Папка не найдена"), noStore)
+					return answer(r, 404, files.Error(locale.Pick("Folder not found", "Папка не найдена")), noStore)
 				}
 				if !files.AllowedContextRoot(root, []string{d.WorkspaceRoot, sharedProjects}) {
-					return answer(r, 403, files.Error("Папка вне рабочего пространства"), noStore)
+					return answer(r, 403, files.Error(locale.Pick("The folder is outside the workspace", "Папка вне рабочего пространства")), noStore)
 				}
 				if st, err := os.Stat(root); err != nil || !st.IsDir() {
-					return answer(r, 400, files.Error("Это не папка"), noStore)
+					return answer(r, 400, files.Error(locale.Pick("This is not a folder", "Это не папка")), noStore)
 				}
 				return answer(r, 200, files.Object{{K: "files", V: files.SearchContext(root, files.QueryUnits(query))}}, noStore)
 			},
@@ -210,7 +211,7 @@ func fileRoutes(d deps) []gate.JSONRoute {
 				name, _ := files.RequestQuery(r).String("name")
 				note, ok := files.ReadMemoryNote(name, memoryParents(d.Home))
 				if !ok {
-					return answer(r, 404, files.Error("Такой памяти на этой машине нет"), noStore)
+					return answer(r, 404, files.Error(locale.Pick("There is no such memory on this machine", "Такой памяти на этой машине нет")), noStore)
 				}
 				return answer(r, 200, note, noStore)
 			},

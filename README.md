@@ -187,10 +187,12 @@ All of them, and how to give the runtime the agent CLIs, in [docs/deploy.md](doc
 
 ### The web page
 
-`web/` is a browser front-end for a machine run on its own: sign-in, workspaces, panes with terminal and agent tabs
-(live state, the conversation, sending and interrupting), the machine's load and limits, and a side pane for boards and
-documents ([integrations](docs/integrations.md)). Release runtimes carry it; it is served at `RUNTIME_APP_BASE_PATH`
-(default `/agents`, and `/` redirects there):
+`web/` is the agents workspace in the browser: conversations with Claude Code and Codex in a sidebar with projects and
+pins, each agent's timeline (turns, tool runs, plans, questions) with a composer that takes slash commands, files,
+context and dictation, and a right pane with the terminal, a browser for the machine's dev servers, files, changes,
+documents and boards ([integrations](docs/integrations.md)), GitHub and GitLab, subagents and the session's cost.
+English by default, Russian with `RUNTIME_LOCALE=ru`. Release runtimes carry it; it is served at
+`RUNTIME_APP_BASE_PATH` (default `/agents`, and `/` redirects there):
 
 ```sh
 make runtime-web               # pnpm build in web/, then bin/runtime with the page compiled in

@@ -1,0 +1,1423 @@
+/* Projects, pins and the left panel. Tokens --t-*, classes tw-*. */
+
+/*
+ * One grid for every row of the panel: 8px inset, a 20px icon slot, 8px gap, the title,
+ * a right column for the compact time. Rows are 32px on a pointer, 44px on touch; spacing steps are 4/8/16.
+ */
+.tw-left {
+  --tw-srow-h: 32px;
+  --tw-srow-x: 8px;
+  --tw-srow-lead: 20px;
+  --tw-srow-gap: 8px;
+}
+
+/* Header: panel toggle and history on top, the app menu, search and notifications under it. */
+.tw-shead {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 4px;
+}
+.tw-shead-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tw-shead-bar .tw-icon-button {
+  width: 28px;
+  height: 28px;
+}
+.tw-shead-bar .tw-icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+.tw-shead-bar .tw-icon-button:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.tw-shead-title {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+}
+.tw-shead-title .tw-icon-button {
+  width: 32px;
+  height: 32px;
+}
+.tw-shead-title .tw-icon-button svg {
+  width: 17px;
+  height: 17px;
+}
+.tw-shead-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 8px 0 3px;
+  border-radius: 10px;
+  color: var(--t-text);
+  transition: background 0.15s;
+}
+.tw-shead-brand:hover,
+.tw-shead-brand[aria-expanded='true'] {
+  background: var(--t-surface-hover);
+}
+.tw-shead-brand .tw-brand-name {
+  font-size: 15px;
+}
+.tw-shead-brand-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--t-text-muted);
+}
+.tw-shead-spacer {
+  flex: 1;
+}
+.tw-shead-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  margin-top: 2px;
+  padding: 0 10px;
+  border: 1px solid var(--t-border-default);
+  border-radius: 8px;
+  background: var(--t-surface);
+  color: var(--t-text-muted);
+  font-size: 12.5px;
+  text-align: left;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.tw-shead-search svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.tw-shead-search:hover {
+  background: var(--t-surface-hover);
+  border-color: var(--t-border-strong);
+}
+.tw-shead-bell {
+  position: relative;
+}
+.tw-shead-badge {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  background: var(--t-danger);
+  color: var(--t-fg-on-accent);
+  box-shadow: 0 0 0 2px var(--t-surface);
+}
+.tw-shead-bell.tw-notify-invite::after {
+  top: 5px;
+  right: 5px;
+  box-shadow: 0 0 0 2px var(--t-surface);
+}
+
+/* The icon slot: the agent mark, a status tile, a project tile or a nav glyph, always centred in 20px. */
+.tw-srow-lead {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--tw-srow-lead);
+  height: var(--tw-srow-lead);
+  color: var(--t-text-muted);
+}
+.tw-srow-lead > svg {
+  width: 16px;
+  height: 16px;
+}
+.tw-srow-lead .tw-provider {
+  width: var(--tw-srow-lead);
+  height: var(--tw-srow-lead);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--t-text-muted);
+}
+.tw-srow-lead .tw-provider svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-srow-lead .tw-provider .tw-spark {
+  width: 16px;
+  height: 16px;
+}
+.tw-srow-lead .tw-provider-sparking {
+  color: var(--tw-clay);
+}
+.tw-srow-lead .tw-provider-working {
+  color: var(--t-text);
+}
+.tw-srow-lead .tw-provider-working::after,
+.tw-rail-conv .tw-provider-working::after {
+  display: none;
+}
+.tw-row:hover .tw-srow-lead .tw-provider:not(.tw-provider-sparking),
+.tw-row-active .tw-srow-lead .tw-provider:not(.tw-provider-sparking) {
+  color: var(--t-text-secondary);
+}
+
+/* "New conversation" [▾] and the nav rows under it (Stats, Claude Design). */
+.tw-snew {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tw-snew-main {
+  flex: 1;
+  min-width: 0;
+  height: var(--tw-srow-h);
+  gap: var(--tw-srow-gap);
+  padding: 0 var(--tw-srow-x);
+  color: var(--t-text);
+  font-weight: 550;
+}
+.tw-snew-main > svg {
+  width: 16px;
+  height: 16px;
+  margin: 0 2px;
+  flex-shrink: 0;
+  color: var(--t-text-secondary);
+}
+.tw-snew-main .tw-row-title {
+  font-size: 13.5px;
+}
+.tw-snew-more {
+  width: 32px;
+  height: 32px;
+}
+.tw-snew-more svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-brand-island .tw-nav-link {
+  height: var(--tw-srow-h);
+  margin-top: 2px;
+  gap: var(--tw-srow-gap);
+  padding: 0 var(--tw-srow-x);
+  color: var(--t-text-secondary);
+}
+.tw-brand-island .tw-nav-link .tw-row-title {
+  font-size: 13.5px;
+}
+.tw-brand-island .tw-nav-link:focus-visible,
+.tw-snew-main:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--t-focus-ring);
+}
+
+/* Sections: a quiet heading on the row grid, 16px between blocks, actions on hover. */
+.tw-slist {
+  margin-top: 0;
+  padding-top: 0;
+}
+.tw-ssection + .tw-ssection {
+  margin-top: 12px;
+}
+.tw-ssection-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 2px 0 0;
+  background: linear-gradient(var(--t-surface) 80%, transparent);
+}
+.tw-ssection-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px 0 var(--tw-srow-x);
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--t-text-muted);
+}
+.tw-ssection-toggle:hover {
+  color: var(--t-text);
+}
+.tw-ssection-toggle:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--t-focus-ring);
+}
+.tw-ssection-chevron {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transition:
+    transform 0.2s var(--tw-ease),
+    opacity 0.15s;
+}
+.tw-ssection-head:hover .tw-ssection-chevron,
+.tw-ssection-toggle:focus-visible .tw-ssection-chevron,
+.tw-ssection-toggle[aria-expanded='false'] .tw-ssection-chevron {
+  opacity: 1;
+}
+.tw-ssection-toggle[aria-expanded='false'] .tw-ssection-chevron {
+  transform: rotate(-90deg);
+}
+.tw-ssection-actions {
+  margin-left: auto;
+  display: inline-flex;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tw-ssection-head:hover .tw-ssection-actions,
+.tw-ssection-head:focus-within .tw-ssection-actions {
+  opacity: 1;
+}
+.tw-ssection-action {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+.tw-ssection-action svg {
+  width: 14px;
+  height: 14px;
+}
+.tw-ssection-body .tw-group + .tw-group {
+  margin-top: 4px;
+}
+.tw-ssection-body .tw-group-title {
+  position: static;
+  padding: 6px var(--tw-srow-x) 2px calc(var(--tw-srow-x) + var(--tw-srow-lead) + var(--tw-srow-gap));
+  font-size: 11px;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--t-text-muted) 80%, transparent);
+  background: none;
+}
+
+/* A row: one link for opening, the compact time on the right, ⋯ over it on hover and focus. */
+.tw-srow {
+  height: var(--tw-srow-h);
+  padding: 0;
+  gap: 0;
+  border-radius: 8px;
+}
+.tw-srow-main {
+  display: flex;
+  align-items: center;
+  gap: var(--tw-srow-gap);
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--tw-srow-x);
+  border-radius: inherit;
+  text-align: left;
+  color: inherit;
+  text-decoration: none;
+  -webkit-touch-callout: none;
+}
+.tw-srow-main:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--t-focus-ring);
+}
+.tw-srow .tw-row-title {
+  font-size: 13px;
+}
+.tw-srow-nested .tw-srow-main {
+  padding-left: calc(var(--tw-srow-x) + 16px);
+}
+.tw-srow-project {
+  flex-shrink: 0;
+}
+.tw-srow-machine {
+  flex-shrink: 0;
+  max-width: 40px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 15px;
+  font-weight: 600;
+  color: var(--t-text-muted);
+  box-shadow: inset 0 0 0 1px var(--t-border-subtle);
+}
+.tw-srow-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  min-width: 28px;
+}
+.tw-srow-kbd {
+  display: none;
+  margin-left: 0;
+  font-size: 10.5px;
+  color: var(--t-text-secondary);
+}
+.tw-srow-time {
+  font-size: 11px;
+  color: var(--t-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* ⌘ held: numbers replace the time (sidebar-provider.tsx). */
+:root[data-tw-mod] .tw-srow-kbd {
+  display: inline-flex;
+}
+:root[data-tw-mod] .tw-srow-meta:has(.tw-srow-kbd) .tw-srow-time {
+  display: none;
+}
+.tw-snew-kbd {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tw-snew-main:hover .tw-snew-kbd,
+.tw-snew-main:focus-visible .tw-snew-kbd,
+:root[data-tw-mod] .tw-snew-kbd {
+  display: inline-flex;
+  opacity: 1;
+}
+.tw-srow-note {
+  display: inline-grid;
+  place-items: center;
+  color: var(--t-accent-amber-soft);
+}
+.tw-srow-note svg {
+  width: 14px;
+  height: 14px;
+}
+.tw-srow-actions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding-left: 16px;
+  background: linear-gradient(90deg, transparent, var(--tw-row-bg, var(--t-surface-hover)) 14px);
+  border-radius: 0 8px 8px 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.tw-srow:hover .tw-srow-actions,
+.tw-srow:focus-within .tw-srow-actions,
+.tw-srow-held .tw-srow-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.tw-srow:hover .tw-srow-meta,
+.tw-srow:focus-within .tw-srow-meta,
+.tw-srow-held .tw-srow-meta {
+  visibility: hidden;
+}
+.tw-srow-held {
+  background: var(--t-surface-hover);
+}
+.tw-srow-more {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--t-text-secondary);
+}
+.tw-srow-more:hover,
+.tw-srow-more[aria-expanded='true'] {
+  background: var(--t-surface-raised);
+  color: var(--t-text);
+}
+.tw-srow-more:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--t-focus-ring);
+}
+.tw-srow-more svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-srow-spinner {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--t-text-muted);
+}
+.tw-srow-inactive .tw-row-title {
+  color: var(--t-text-muted);
+}
+.tw-srow-inactive .tw-srow-lead {
+  opacity: 0.45;
+}
+.tw-srow-loading .tw-row-title {
+  color: var(--t-text-muted);
+}
+.tw-srow-loading .tw-row-dot {
+  animation: tw-dot-blink 1.4s ease-in-out infinite;
+}
+
+/* Project folders: the tile turns into the chevron under the pointer, as in Codex. */
+.tw-sfolder {
+  border-radius: 8px;
+}
+.tw-sfolder + .tw-sfolder {
+  margin-top: 1px;
+}
+.tw-sfolder-head .tw-row-title {
+  color: var(--t-text);
+  font-weight: 520;
+}
+.tw-sfolder-lead .tw-sfolder-chevron {
+  position: absolute;
+  inset: 2px;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  color: var(--t-text-secondary);
+  transition:
+    transform 0.2s var(--tw-ease),
+    opacity 0.12s;
+}
+.tw-sfolder-lead .tw-project-tile {
+  transition: opacity 0.12s;
+}
+.tw-sfolder-head:hover .tw-sfolder-chevron,
+.tw-sfolder-head .tw-srow-main:focus-visible .tw-sfolder-chevron {
+  opacity: 1;
+}
+.tw-sfolder-head:hover .tw-sfolder-lead .tw-project-tile,
+.tw-sfolder-head .tw-srow-main:focus-visible .tw-sfolder-lead .tw-project-tile {
+  opacity: 0;
+}
+.tw-sfolder-head .tw-srow-main[aria-expanded='true'] .tw-sfolder-chevron {
+  transform: rotate(90deg);
+}
+.tw-sfolder-summary,
+.tw-sfolder-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 28px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text-muted);
+}
+.tw-sfolder-head:hover .tw-sfolder-summary,
+.tw-sfolder-head:hover .tw-sfolder-count,
+.tw-sfolder-head:focus-within .tw-sfolder-summary,
+.tw-sfolder-head:focus-within .tw-sfolder-count {
+  visibility: hidden;
+}
+.tw-sfolder-summary-needs-input {
+  color: var(--tw-st-warn);
+}
+.tw-sfolder-summary-working {
+  color: var(--tw-st-done);
+}
+.tw-sfolder-summary-ready {
+  color: var(--tw-st-review);
+}
+.tw-sfolder-summary-failed {
+  color: var(--tw-st-fail);
+}
+.tw-sfolder-body {
+  display: flex;
+  flex-direction: column;
+}
+.tw-sfolder-empty {
+  margin: 0;
+  padding: 6px var(--tw-srow-x) 6px calc(var(--tw-srow-x) + 16px + var(--tw-srow-lead) + var(--tw-srow-gap));
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--t-text-muted);
+}
+.tw-sfolder-more {
+  height: 28px;
+  padding: 0 var(--tw-srow-x) 0 calc(var(--tw-srow-x) + 16px + var(--tw-srow-lead) + var(--tw-srow-gap));
+  font-size: 12px;
+  text-align: left;
+  border-radius: 8px;
+}
+/* No projects yet: one muted row with «+», nothing boxed. */
+.tw-sempty {
+  height: var(--tw-srow-h);
+  gap: var(--tw-srow-gap);
+  padding: 0 var(--tw-srow-x);
+  color: var(--t-text-muted);
+}
+.tw-sempty .tw-row-title {
+  font-size: 13px;
+}
+.tw-sempty .tw-srow-lead svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-sempty:hover {
+  color: var(--t-text);
+}
+.tw-sempty:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--t-focus-ring);
+}
+.tw-sstale {
+  padding: 6px var(--tw-srow-x);
+  text-align: left;
+  font-size: 11.5px;
+  color: var(--t-text-muted);
+}
+.tw-ssection-body > .tw-more {
+  height: 28px;
+  padding: 0 var(--tw-srow-x) 0 calc(var(--tw-srow-x) + var(--tw-srow-lead) + var(--tw-srow-gap));
+  font-size: 12px;
+  text-align: left;
+  border-radius: 8px;
+}
+.tw-ssection-body > .tw-empty-list {
+  padding: 8px var(--tw-srow-x);
+  font-size: 12.5px;
+  color: var(--t-text-muted);
+}
+
+/* Footer: one line — avatar and name, the machines chip, the theme. The machine list opens above it. */
+.tw-machines-island {
+  padding: 6px;
+  gap: 0;
+}
+.tw-machines-island .tw-profile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 0 0 4px;
+  border-top: 0;
+  flex-shrink: 0;
+}
+.tw-machines-island .tw-machines + .tw-profile {
+  border-top: 1px solid var(--t-border-subtle);
+  margin-top: 4px;
+  padding-top: 4px;
+  height: 44px;
+}
+.tw-profile .tw-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.tw-profile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--t-text);
+}
+.tw-profile-theme {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.tw-profile-theme svg {
+  width: 16px;
+  height: 16px;
+}
+.tw-machines-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text-secondary);
+  box-shadow: inset 0 0 0 1px var(--t-border-subtle);
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.tw-machines-chip:hover,
+.tw-machines-chip[aria-expanded='true'] {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-machines-chip:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--t-focus-ring);
+}
+.tw-machines-chip > svg {
+  width: 13px;
+  height: 13px;
+}
+.tw-machines-chip .tw-machines-count {
+  font-weight: 600;
+}
+.tw-machines-chip .tw-machines-peek,
+.tw-machines-chip .tw-machines-warning {
+  margin: 0 0 0 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding-left: 5px;
+  border-left: 1px solid var(--t-border-subtle);
+}
+.tw-machines-chip .tw-machines-peek svg,
+.tw-machines-chip .tw-machines-warning svg {
+  width: 11px;
+  height: 11px;
+}
+.tw-machines-chip .tw-machines-warning {
+  color: var(--t-accent-amber-soft);
+}
+.tw-machines-chip-stale {
+  color: var(--t-accent-amber-soft);
+}
+.tw-machines-island .tw-machines {
+  min-height: 0;
+  overflow-y: auto;
+}
+.tw-machines-island .tw-machines-head {
+  height: 28px;
+  padding: 0 var(--tw-srow-x);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--t-text-muted);
+  pointer-events: none;
+}
+.tw-machines-island .tw-machines-head:hover {
+  background: none;
+  color: var(--t-text-muted);
+}
+
+/* Project tile: the project's color with its first letter. */
+.tw-project-tile {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--tw-tile-fg);
+  background: var(--tw-tile-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tw-tile-fg) 22%, transparent);
+}
+.tw-project-tile-sm {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  font-size: 8.5px;
+}
+.tw-project-tile-blue {
+  --tw-tile-fg: var(--t-accent-blue-soft);
+  --tw-tile-bg: var(--t-accent-blue-bg);
+}
+.tw-project-tile-green {
+  --tw-tile-fg: var(--t-accent-green-soft);
+  --tw-tile-bg: var(--t-accent-green-bg);
+}
+.tw-project-tile-amber {
+  --tw-tile-fg: var(--t-accent-amber-soft);
+  --tw-tile-bg: var(--t-accent-amber-bg);
+}
+.tw-project-tile-rose {
+  --tw-tile-fg: var(--t-accent-rose-soft);
+  --tw-tile-bg: var(--t-accent-rose-bg);
+}
+.tw-project-tile-purple {
+  --tw-tile-fg: var(--t-accent-purple-soft);
+  --tw-tile-bg: var(--t-accent-purple-bg);
+}
+.tw-project-tile-teal {
+  --tw-tile-fg: var(--t-accent-teal-soft);
+  --tw-tile-bg: var(--t-accent-teal-bg);
+}
+
+/* Default machine away / organizer stale */
+.tw-sbanner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 2px 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--t-accent-amber-bg);
+  color: var(--t-text);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.tw-sbanner p {
+  margin: 0;
+}
+.tw-sbanner small {
+  color: var(--t-text-secondary);
+  font-size: 11.5px;
+}
+.tw-sbanner-retry {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: 550;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-subtle);
+}
+.tw-sbanner-retry:hover {
+  border-color: var(--t-border-hover);
+}
+.tw-sbanner-retry svg {
+  width: 13px;
+  height: 13px;
+}
+.tw-snote {
+  margin: 2px 6px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--t-accent-amber-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Skeleton widths without inline styles */
+.tw-skeleton-line {
+  flex: 1;
+  max-width: 72%;
+}
+.tw-skeleton-row:nth-child(2) .tw-skeleton-line {
+  max-width: 56%;
+}
+.tw-skeleton-row:nth-child(3) .tw-skeleton-line {
+  max-width: 64%;
+}
+.tw-skeleton-row:nth-child(4) .tw-skeleton-line {
+  max-width: 48%;
+}
+.tw-skeleton-row:nth-child(5) .tw-skeleton-line {
+  max-width: 60%;
+}
+
+/* Project name dialog */
+.tw-sform {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tw-sform-label {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--t-text-secondary);
+}
+.tw-sform-input {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--t-text);
+  border: 1px solid var(--t-border-input);
+  background: var(--t-surface-input);
+  outline: none;
+}
+.tw-sform-input:focus-visible {
+  border-color: color-mix(in oklab, var(--t-accent-purple) 55%, var(--t-border-input));
+  box-shadow: 0 0 0 3px var(--t-accent-purple-bg);
+}
+
+/* Shortcuts list */
+.tw-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+.tw-shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+.tw-shortcuts-row:last-child {
+  border-bottom: 0;
+}
+.tw-shortcuts-row dt {
+  font-size: 13px;
+  color: var(--t-text);
+}
+.tw-shortcuts-row dd {
+  margin: 0;
+}
+
+/* Settings */
+.tw-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tw-settings-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--t-text);
+}
+.tw-settings-section-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--t-text-secondary);
+}
+.tw-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-top: 1px solid var(--t-border-subtle);
+}
+.tw-settings-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+.tw-settings-row-title {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--t-text);
+}
+.tw-settings-row-status {
+  display: inline-flex;
+  align-items: center;
+}
+.tw-settings-row-hint {
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--t-text-muted);
+}
+.tw-settings-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Rail */
+.tw-rail-hotkey {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  font-size: 8.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text-muted);
+  background: var(--t-surface-raised);
+}
+.tw-rail-inactive {
+  opacity: 0.5;
+}
+.tw-rail-project .tw-project-tile {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  font-size: 11.5px;
+}
+.tw-rail-project > .tw-status-dot {
+  right: 5px;
+  bottom: 5px;
+}
+.tw-srow-lead .tw-status-dot {
+  right: -2px;
+  bottom: -2px;
+}
+
+/* Rail tooltip: the bubble is the inverted tw-ui-tooltip, its content is laid out here. */
+.tw-ui-tooltip:has(.tw-rail-tip) {
+  max-width: min(260px, var(--tw-ui-layer-max-w, 260px));
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+.tw-rail-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+}
+.tw-rail-tip-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.tw-rail-tip-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.tw-rail-tip .tw-ui-kbd {
+  margin-left: 0;
+  border-color: color-mix(in oklab, var(--t-bg) 30%, transparent);
+  background: color-mix(in oklab, var(--t-bg) 14%, transparent);
+  color: inherit;
+}
+.tw-rail-tip-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 550;
+}
+.tw-rail-tip-status .tw-status-dot {
+  --tw-dot-ring: transparent;
+}
+.tw-rail-tip-text {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  opacity: 0.78;
+}
+.tw-rail-tip-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 2px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in oklab, var(--t-bg) 20%, transparent);
+  font-size: 11.5px;
+}
+.tw-rail-tip-fact {
+  display: contents;
+}
+.tw-rail-tip-fact dt {
+  opacity: 0.62;
+}
+.tw-rail-tip-fact dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Header: project crumb and pin */
+.tw-crumb-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 200px;
+}
+.tw-crumb-project span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The bell: one popover (a bottom sheet on phones) grouped by what the person has to do. */
+.tw-ui-popover.tw-notices {
+  --tw-srow-lead: 20px;
+  width: min(392px, var(--tw-ui-layer-max-w));
+  max-height: min(560px, 76vh);
+  padding: 6px;
+  gap: 0;
+}
+.tw-notices-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tw-notices-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  padding: 0 2px 0 10px;
+  flex-shrink: 0;
+}
+.tw-notices-head strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+.tw-notices-spacer {
+  flex: 1;
+}
+.tw-notices-readall {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--t-text-secondary);
+}
+.tw-notices-readall svg {
+  width: 14px;
+  height: 14px;
+}
+.tw-notices-readall:hover:not(:disabled) {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-notices-readall:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tw-notices-readall:focus-visible,
+.tw-notices-settings:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--t-focus-ring);
+}
+.tw-notices-settings {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+.tw-notices-settings svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-notices-settings-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--t-accent-purple);
+}
+.tw-notices-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+.tw-notices-group + .tw-notices-group {
+  margin-top: 6px;
+}
+.tw-notices-group ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-notices-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--t-text-muted);
+}
+.tw-notices-group-title span {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.tw-notices-group-title[data-group='waiting'] {
+  color: color-mix(in oklab, var(--tw-st-warn) 70%, var(--t-text));
+}
+.tw-notices-group-title[data-group='failed'] {
+  color: var(--tw-st-fail-edge);
+}
+
+.tw-notice {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  border-radius: 10px;
+  transition: background 0.12s;
+}
+.tw-notice:hover,
+.tw-notice:focus-within {
+  background: var(--t-surface-hover);
+}
+.tw-notice-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: inherit;
+  text-align: left;
+  color: inherit;
+}
+.tw-notice-main:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--t-focus-ring);
+}
+.tw-notice-main > .tw-srow-lead {
+  margin-top: 1px;
+}
+.tw-notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.tw-notice-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.tw-notice-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-text-secondary);
+}
+.tw-notice-unread .tw-notice-title {
+  font-weight: 600;
+  color: var(--t-text);
+}
+.tw-notice-time {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text-muted);
+}
+.tw-notice-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--t-text-muted);
+  overflow-wrap: anywhere;
+}
+.tw-notice[data-group='waiting'] .tw-notice-text {
+  color: var(--t-text-secondary);
+}
+.tw-notice-dot {
+  position: absolute;
+  left: 3px;
+  top: 16px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--t-accent-purple);
+}
+.tw-notice[data-group='waiting'] .tw-notice-dot {
+  background: var(--tw-st-warn);
+}
+.tw-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 6px 6px 0 0;
+}
+.tw-notice-actions:empty {
+  display: none;
+}
+.tw-notice-read {
+  width: 28px;
+  height: 28px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tw-notice-read svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-notice:hover .tw-notice-read,
+.tw-notice:focus-within .tw-notice-read {
+  opacity: 1;
+}
+.tw-notices-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 24px 32px;
+  text-align: center;
+}
+.tw-notices-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--t-surface-raised);
+  color: var(--t-text-muted);
+}
+.tw-notices-empty-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.tw-notices-empty strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.tw-notices-empty p {
+  margin: 0;
+  max-width: 240px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--t-text-muted);
+}
+.tw-notices .tw-notify-card {
+  width: auto;
+  padding: 8px 6px 6px;
+}
+.tw-notify-back {
+  width: 28px;
+  height: 28px;
+  margin: 2px -2px 0 -4px;
+  flex-shrink: 0;
+}
+.tw-notify-back svg {
+  width: 16px;
+  height: 16px;
+}
+.tw-shead-bell-waiting {
+  color: var(--t-text);
+}
+
+/* Touch: 44px rows, time and ⋯ side by side, section actions visible, no ⌘ badges (no keyboard to press them). */
+@media (pointer: coarse), (max-width: 767px) {
+  .tw-left {
+    --tw-srow-h: 44px;
+    --tw-srow-x: 10px;
+  }
+  .tw-srow .tw-row-title,
+  .tw-sempty .tw-row-title {
+    font-size: 14.5px;
+  }
+  .tw-srow-actions {
+    position: static;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+    background: none;
+    padding: 0 4px 0 0;
+  }
+  .tw-srow:hover .tw-srow-meta,
+  .tw-srow:focus-within .tw-srow-meta,
+  .tw-srow-held .tw-srow-meta {
+    visibility: visible;
+  }
+  .tw-sfolder-head:hover .tw-sfolder-summary,
+  .tw-sfolder-head:hover .tw-sfolder-count,
+  .tw-sfolder-head:focus-within .tw-sfolder-summary,
+  .tw-sfolder-head:focus-within .tw-sfolder-count {
+    visibility: visible;
+  }
+  .tw-srow-more {
+    width: 32px;
+    height: 32px;
+  }
+  .tw-srow-main {
+    padding-right: 4px;
+  }
+  .tw-srow-kbd,
+  .tw-rail-hotkey {
+    display: none;
+  }
+  .tw-ssection-chevron,
+  .tw-ssection-actions {
+    opacity: 1;
+  }
+  .tw-ssection-head {
+    height: 36px;
+  }
+  .tw-ssection-action {
+    width: 32px;
+    height: 32px;
+  }
+  .tw-machines-island .tw-profile {
+    height: 48px;
+  }
+  .tw-machines-chip {
+    height: 36px;
+    padding: 0 10px;
+  }
+  .tw-profile-theme {
+    width: 40px;
+    height: 40px;
+  }
+  .tw-ui-popover.tw-notices[data-sheet] {
+    width: auto;
+  }
+  .tw-ui-popover.tw-notices {
+    max-height: var(--bs-max-height);
+    padding: 6px 6px calc(12px + env(safe-area-inset-bottom));
+  }
+  .tw-notice-main {
+    padding: 10px;
+  }
+  .tw-notice-title {
+    font-size: 14.5px;
+  }
+  .tw-notice-text {
+    font-size: 13.5px;
+  }
+  .tw-notice-read {
+    opacity: 1;
+    width: 40px;
+    height: 40px;
+  }
+  .tw-notices-readall {
+    height: 36px;
+  }
+  .tw-notices-settings {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-srow-loading .tw-row-dot {
+    animation: none;
+  }
+  .tw-sfolder-chevron,
+  .tw-ssection-chevron,
+  .tw-sfolder-lead .tw-project-tile {
+    transition: none;
+  }
+}

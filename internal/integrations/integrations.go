@@ -29,6 +29,8 @@ type Config struct {
 	// ArtifactsToken is the editor token agents publish with; ArtifactsReadToken the runtime's viewer token for listing a
 	// conversation's documents (ArtifactsToken when empty).
 	ArtifactsToken, ArtifactsReadToken string
+	// ArtifactsShareToken opens and closes a document's public link from the reader (ArtifactsToken when empty).
+	ArtifactsShareToken string
 	// Author is who agents publish as (ARTIFACTS_AUTHOR): RUNTIME_ARTIFACTS_AUTHOR, else "<RUNTIME_OWNER_NAME> (agent)";
 	// empty leaves it to the CLI.
 	Author string
@@ -39,13 +41,14 @@ type Config struct {
 // FromEnv reads the RUNTIME_BOARDS_* and RUNTIME_ARTIFACTS_* variables.
 func FromEnv(getenv func(string) string) Config {
 	c := Config{
-		BoardsURL:          origin(getenv("RUNTIME_BOARDS_URL")),
-		BoardsToken:        strings.TrimSpace(getenv("RUNTIME_BOARDS_TOKEN")),
-		BoardsAgentToken:   strings.TrimSpace(getenv("RUNTIME_BOARDS_AGENT_TOKEN")),
-		ArtifactsURL:       origin(getenv("RUNTIME_ARTIFACTS_URL")),
-		ArtifactsToken:     strings.TrimSpace(getenv("RUNTIME_ARTIFACTS_TOKEN")),
-		ArtifactsReadToken: strings.TrimSpace(getenv("RUNTIME_ARTIFACTS_READ_TOKEN")),
-		Author:             strings.TrimSpace(getenv("RUNTIME_ARTIFACTS_AUTHOR")),
+		BoardsURL:           origin(getenv("RUNTIME_BOARDS_URL")),
+		BoardsToken:         strings.TrimSpace(getenv("RUNTIME_BOARDS_TOKEN")),
+		BoardsAgentToken:    strings.TrimSpace(getenv("RUNTIME_BOARDS_AGENT_TOKEN")),
+		ArtifactsURL:        origin(getenv("RUNTIME_ARTIFACTS_URL")),
+		ArtifactsToken:      strings.TrimSpace(getenv("RUNTIME_ARTIFACTS_TOKEN")),
+		ArtifactsReadToken:  strings.TrimSpace(getenv("RUNTIME_ARTIFACTS_READ_TOKEN")),
+		ArtifactsShareToken: strings.TrimSpace(getenv("RUNTIME_ARTIFACTS_SHARE_TOKEN")),
+		Author:              strings.TrimSpace(getenv("RUNTIME_ARTIFACTS_AUTHOR")),
 	}
 	if name := strings.TrimSpace(getenv("RUNTIME_OWNER_NAME")); c.Author == "" && name != "" {
 		c.Author = name + " (agent)"

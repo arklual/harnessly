@@ -3,22 +3,25 @@ package catalog
 import (
 	"regexp"
 	"strings"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-var sourceLabels = map[string]string{
-	"quick":   "быстрая",
-	"builtin": "встроенная",
-	"project": "проект",
-	"user":    "моя",
-	"skill":   "навык",
-	"plugin":  "плагин",
+var sourceLabels = map[string]locale.Text{
+	"quick":   locale.T("quick", "быстрая"),
+	"builtin": locale.T("built-in", "встроенная"),
+	"project": locale.T("project", "проект"),
+	"user":    locale.T("mine", "моя"),
+	"skill":   locale.T("skill", "навык"),
+	"plugin":  locale.T("plugin", "плагин"),
 }
 
 const (
 	maxItems          = 2000
 	maxDescriptionLen = 240
-	tooManyWarning    = "Команд слишком много — показаны первые 2000"
 )
+
+var tooManyWarning = locale.T("Too many commands: only the first 2000 are shown", "Команд слишком много — показаны первые 2000")
 
 // Item is one command a composer can offer. Field order is the answer's.
 type Item struct {
@@ -101,13 +104,13 @@ func clipDescription(text string) string {
 type builtin struct {
 	name         string
 	aliases      []string
-	description  string
-	argumentHint string
+	description  locale.Text
+	argumentHint locale.Text
 	execution    string
 	output       string
 	welcome      bool
 	hidden       bool
-	note         string
+	note         locale.Text
 	danger       bool
 }
 
@@ -117,9 +120,9 @@ func builtinItem(row builtin) Item {
 		Name:        row.name,
 		Trigger:     "/",
 		Aliases:     append([]string{}, row.aliases...),
-		Description: row.description,
+		Description: row.description.String(),
 		Source:      "builtin",
-		SourceLabel: sourceLabels["builtin"],
+		SourceLabel: sourceLabels["builtin"].String(),
 		Execution:   row.execution,
 		Output:      row.output,
 		Welcome:     row.welcome,
@@ -129,22 +132,22 @@ func builtinItem(row builtin) Item {
 	if it.Output == "" {
 		it.Output = "none"
 	}
-	if row.argumentHint != "" {
-		it.ArgumentHint = strPtr(row.argumentHint)
+	if hint := row.argumentHint.String(); hint != "" {
+		it.ArgumentHint = strPtr(hint)
 	}
-	if row.note != "" {
-		it.Note = strPtr(row.note)
+	if note := row.note.String(); note != "" {
+		it.Note = strPtr(note)
 	}
 	return it
 }
 
 // promptItem: a command, skill or quick prompt, typed as is; its answer is the model's reply.
 func promptItem(name, trigger, source string, plugin *string, description string, argumentHint *string) Item {
-	pluginID, label := "", sourceLabels[source]
+	pluginID, label := "", sourceLabels[source].String()
 	if plugin != nil {
 		pluginID = *plugin
 		if *plugin != "" {
-			label = sourceLabels["plugin"] + " · " + *plugin
+			label = sourceLabels["plugin"].String() + " · " + *plugin
 		}
 	}
 	return Item{

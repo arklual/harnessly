@@ -101,7 +101,7 @@ func TestPickOff(t *testing.T) {
 
 func at(v float64) *float64 { return &v }
 
-// agent-sleep: resume at startup (TCK-2951).
+// agent-sleep: resume at startup.
 func TestShouldResumeAtStartup(t *testing.T) {
 	midTurnOnly := config
 	midTurnOnly.ResumeRecentMs = 0

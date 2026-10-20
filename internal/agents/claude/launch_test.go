@@ -79,7 +79,7 @@ func TestManagedLauncher(t *testing.T) {
 	}
 }
 
-// launch-options: quotes the model, checks both values again and keeps «Авто» flagless.
+// launch-options: quotes the model, checks both values again and keeps "Auto" flagless.
 func TestLaunchFlags(t *testing.T) {
 	for _, c := range []struct {
 		l    *agents.Launch

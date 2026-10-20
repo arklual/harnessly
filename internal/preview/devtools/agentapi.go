@@ -7,6 +7,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // What an agent can do with a slot's DevTools record: read the network and console logs and the dev server's terminal,
@@ -40,7 +41,7 @@ type API struct {
 }
 
 func (a *API) noSlotMessage() string {
-	return "Превью ещё не открывали — откройте страницу в браузере панели: " + a.CLI + " panel open browser <port>"
+	return locale.Pick("The preview has not been opened yet: open the page in the pane browser: ", "Превью ещё не открывали — откройте страницу в браузере панели: ") + a.CLI + " panel open browser <port>"
 }
 
 func (a *API) slotOf(asked string) (string, Outcome) {
@@ -48,7 +49,7 @@ func (a *API) slotOf(asked string) (string, Outcome) {
 		return slot, Outcome{}
 	}
 	if asked != "" {
-		return "", fail(404, "Слот не найден: "+asked+". Список слотов: "+a.CLI+" preview slots")
+		return "", fail(404, locale.Pick("Slot not found: "+asked+". List of slots: "+a.CLI+" preview slots", "Слот не найден: "+asked+". Список слотов: "+a.CLI+" preview slots"))
 	}
 	return "", fail(404, a.noSlotMessage())
 }
@@ -155,7 +156,7 @@ func (a *API) ServerLogOf(asked string, all bool, lines int) Outcome {
 	}
 	log, err := a.ServerLog(slot, all, lines)
 	if err != nil {
-		return fail(500, "Не удалось прочитать терминал dev-сервера")
+		return fail(500, locale.Pick("Could not read the dev server terminal", "Не удалось прочитать терминал dev-сервера"))
 	}
 	return Outcome{Value: ServerLogView{Slot: slot, Target: a.Store.TargetOf(slot), ServerLog: log}}
 }
@@ -203,7 +204,7 @@ func patternList(v any, present bool, field string) ([]string, string) {
 		}
 	}
 	if !ok {
-		return nil, field + ": список шаблонов адреса, каждый до " + itoa(MaxPattern) + " символов"
+		return nil, field + locale.Pick(": a list of address patterns, each up to ", ": список шаблонов адреса, каждый до ") + itoa(MaxPattern) + locale.Pick(" characters", " символов")
 	}
 	out := []string{}
 	seen := map[string]bool{}
@@ -226,7 +227,7 @@ func (a *API) ChangeSettings(asked string, body any) Outcome {
 	}
 	raw, ok := body.(*jsvalue.Object)
 	if !ok {
-		return fail(400, "Нужен объект настроек")
+		return fail(400, locale.Pick("A settings object is required", "Нужен объект настроек"))
 	}
 	patch, msg := ParseSettingsPatch(raw)
 	if msg != "" {
@@ -260,12 +261,12 @@ func (a *API) ChangeSettings(asked string, body any) Outcome {
 			}
 		}
 		if len(next) > MaxBlocked {
-			return fail(400, "Не больше "+itoa(MaxBlocked)+" заблокированных шаблонов")
+			return fail(400, locale.Pick("At most "+itoa(MaxBlocked)+" blocked patterns", "Не больше "+itoa(MaxBlocked)+" заблокированных шаблонов"))
 		}
 		patch.Blocked = next
 	}
 	if patch.empty() {
-		return fail(400, "Нечего менять: нужны throttle, blocked, blockedAdd, blockedRemove или disableCache")
+		return fail(400, locale.Pick("Nothing to change: throttle, blocked, blockedAdd, blockedRemove or disableCache is required", "Нечего менять: нужны throttle, blocked, blockedAdd, blockedRemove или disableCache"))
 	}
 	settings := a.Store.SetSettings(slot, patch)
 	ch := BlockedChanges{Added: []string{}, Removed: []string{}, Missing: []string{}}
@@ -370,12 +371,15 @@ func whole(text string, given bool, min, max float64) (v float64, set bool, bad 
 	return 0, false, true
 }
 
-const (
-	sinceError = "since: целое число от 0, курсор прошлого ответа"
-	maxSafe    = 9007199254740991
-)
+const maxSafe = 9007199254740991
 
-func limitError() string { return "limit: целое число от 1 до " + itoa(MaxLimit) }
+func sinceError() string {
+	return locale.Pick("since: an integer from 0, the cursor of the previous answer", "since: целое число от 0, курсор прошлого ответа")
+}
+
+func limitError() string {
+	return locale.Pick("limit: an integer from 1 to ", "limit: целое число от 1 до ") + itoa(MaxLimit)
+}
 
 // ParseNetworkQuery is the HTTP form: since, errors=1, thirdParty=1, url, type (comma-separated), limit.
 func ParseNetworkQuery(q Query) (NetworkQuery, string) {
@@ -383,7 +387,7 @@ func ParseNetworkQuery(q Query) (NetworkQuery, string) {
 	t, g := q.single("since")
 	since, _, bad := whole(t, g, 0, maxSafe)
 	if bad {
-		return out, sinceError
+		return out, sinceError()
 	}
 	t, g = q.single("limit")
 	limit, _, bad := whole(t, g, 1, MaxLimit)
@@ -397,7 +401,7 @@ func ParseNetworkQuery(q Query) (NetworkQuery, string) {
 				continue
 			}
 			if !contains(resourceTypes, part) {
-				return out, "type: " + strings.Join(resourceTypes, ", ") + "; несколько через запятую"
+				return out, "type: " + strings.Join(resourceTypes, ", ") + locale.Pick("; several separated by commas", "; несколько через запятую")
 			}
 			out.Types = append(out.Types, part)
 		}
@@ -413,7 +417,7 @@ func ParseConsoleQuery(q Query) (ConsoleQuery, string) {
 	t, g := q.single("since")
 	since, _, bad := whole(t, g, 0, maxSafe)
 	if bad {
-		return out, sinceError
+		return out, sinceError()
 	}
 	t, g = q.single("limit")
 	limit, _, bad := whole(t, g, 1, MaxLimit)
@@ -435,7 +439,7 @@ func ParseServerLogQuery(q Query) (bool, int, string) {
 	t, g := q.single("lines")
 	lines, _, bad := whole(t, g, 1, MaxServerLines)
 	if bad {
-		return false, 0, "lines: целое число от 1 до " + itoa(MaxServerLines)
+		return false, 0, locale.Pick("lines: an integer from 1 to ", "lines: целое число от 1 до ") + itoa(MaxServerLines)
 	}
 	return q.flag("all"), int(lines), ""
 }

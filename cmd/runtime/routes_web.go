@@ -22,6 +22,8 @@ type webConfig struct {
 	files fs.FS
 	// base is where the page lives ("" for the root); api is the prefix its API calls take.
 	base, api string
+	// meta is the page config written into <meta name="hl-config"> (web_config.go).
+	meta string
 }
 
 // webConfigFromEnv is nil when this process serves no page.
@@ -48,7 +50,7 @@ func webConfigFromEnv(standalone bool) *webConfig {
 	}
 	// The API answers under the page's base too (apiAlias), so one proxy prefix covers both.
 	base := appBase()
-	return &webConfig{files: files, base: base, api: base}
+	return &webConfig{files: files, base: base, api: base, meta: pageConfigMeta(pageConfigFromEnv())}
 }
 
 // appBase is RUNTIME_APP_BASE_PATH as a path prefix: "/agents" by default, "" for the root.
@@ -147,6 +149,9 @@ func (c *webConfig) handler() http.HandlerFunc {
 			[]byte(`<meta name="api-base" content="`+html.EscapeString(c.api)+`" />`), 1)
 		raw = bytes.Replace(raw, []byte(`<meta name="platform-api" content="/api/platform" />`),
 			[]byte(`<meta name="platform-api" content="`+html.EscapeString(platformAPI)+`" />`), 1)
+		if c.meta != "" {
+			raw = bytes.Replace(raw, []byte(`<meta name="hl-config" content="{}" />`), []byte(`<meta name="hl-config" content="`+c.meta+`" />`), 1)
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("X-Content-Type-Options", "nosniff")

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 var sessionRe = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
@@ -45,7 +46,7 @@ func (a *API) History(r *http.Request) Answer {
 		return JSON(r, http.StatusConflict, errorBody(err.Error()), noStore())
 	}
 	a.warn("design library request failed", err)
-	return JSON(r, http.StatusInternalServerError, errorBody("Не удалось открыть историю доски"), noStore())
+	return JSON(r, http.StatusInternalServerError, errorBody(locale.Pick("Could not open the board history", "Не удалось открыть историю доски")), noStore())
 }
 
 // CLIHistoryNeedsKeeper: an agent's restore with its session names the chat it speaks from, which the tab keeper knows.
@@ -104,17 +105,17 @@ func (a *API) CLIHistory(r *http.Request) Answer {
 		}
 	} else {
 		if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-			return JSON(r, http.StatusUnsupportedMediaType, errorBody("Нужен application/json"), h)
+			return JSON(r, http.StatusUnsupportedMediaType, errorBody(locale.Pick("application/json is required", "Нужен application/json")), h)
 		}
 		body := Fields(raw)
 		if action, _ := Field(body, "action").(string); action != "restore" {
-			return JSON(r, http.StatusBadRequest, errorBody("Неизвестное действие: restore"), h)
+			return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("Unknown action: restore", "Неизвестное действие: restore")), h)
 		}
 		session := ""
 		if Has(body, "session") {
 			s, ok := Field(body, "session").(string)
 			if !ok || !sessionRe.MatchString(s) {
-				return JSON(r, http.StatusBadRequest, errorBody("Непонятная сессия вкладки агента"), h)
+				return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid session of the agent's tab", "Непонятная сессия вкладки агента")), h)
 			}
 			session = s
 		}
@@ -131,7 +132,7 @@ func (a *API) CLIHistory(r *http.Request) Answer {
 		return JSON(r, http.StatusConflict, errorBody(err.Error()), h)
 	}
 	a.warn("design library request failed", err)
-	return JSON(r, http.StatusInternalServerError, errorBody("Не удалось выполнить команду истории"), h)
+	return JSON(r, http.StatusInternalServerError, errorBody(locale.Pick("Could not run the history command", "Не удалось выполнить команду истории")), h)
 }
 
 func decodeHeader(v string) string {
@@ -156,7 +157,7 @@ func saveBody(r *http.Request, file string) (int64, error) {
 		return n, err
 	}
 	if n > LimitUploadBytes {
-		return n, importErr("Архив больше 300 МБ")
+		return n, importErr(locale.Pick("The archive is over 300 MB", "Архив больше 300 МБ"))
 	}
 	return n, nil
 }
@@ -173,10 +174,10 @@ func (a *API) Import(r *http.Request) Answer {
 		return JSON(r, http.StatusForbidden, errorBody("Forbidden"), h)
 	}
 	if !strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/zip") {
-		return JSON(r, http.StatusUnsupportedMediaType, errorBody("Ожидается zip-архив"), h)
+		return JSON(r, http.StatusUnsupportedMediaType, errorBody(locale.Pick("A zip archive is expected", "Ожидается zip-архив")), h)
 	}
 	if declared, ok := jsNumber(r.Header.Get("Content-Length")); ok && r.Header.Get("Content-Length") != "" && declared > LimitUploadBytes {
-		return JSON(r, http.StatusRequestEntityTooLarge, errorBody("Архив больше 300 МБ"), h)
+		return JSON(r, http.StatusRequestEntityTooLarge, errorBody(locale.Pick("The archive is over 300 MB", "Архив больше 300 МБ")), h)
 	}
 	parts := pathSep.Split(decodeHeader(r.Header.Get("X-Design-Filename")), -1)
 	name := jscompat.Slice(parts[len(parts)-1], 200)
@@ -211,14 +212,14 @@ func (a *API) Import(r *http.Request) Answer {
 		}
 	}()
 	if errors.Is(err, errEmptyUpload) {
-		return JSON(r, http.StatusBadRequest, errorBody("Пустой файл"), h)
+		return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("The file is empty", "Пустой файл")), h)
 	}
 	var ie *ImportError
 	if errors.As(err, &ie) {
 		return JSON(r, 422, errorBody(ie.Msg), h)
 	}
 	if err != nil {
-		return JSON(r, http.StatusInternalServerError, errorBody("Не удалось загрузить проект"), h)
+		return JSON(r, http.StatusInternalServerError, errorBody(locale.Pick("Could not upload the project", "Не удалось загрузить проект")), h)
 	}
 	return JSON(r, http.StatusCreated, struct {
 		ID     string `json:"id"`

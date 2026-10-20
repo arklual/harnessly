@@ -9,6 +9,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/push"
 )
 
@@ -33,7 +34,7 @@ func (a *API) Library(r *http.Request) Answer {
 		self = &tab
 	}
 	fail := func() Answer {
-		return JSON(r, 500, errorBody("Не удалось открыть библиотеку макетов"), h)
+		return JSON(r, 500, errorBody(locale.Pick("Could not open the design library", "Не удалось открыть библиотеку макетов")), h)
 	}
 	port, err := a.L.EnsureServer()
 	if err != nil {
@@ -70,7 +71,7 @@ func (a *API) Boards(r *http.Request) Answer {
 		return *no
 	}
 	h := noStore()
-	bad := JSON(r, 400, errorBody("Неверный запрос"), h)
+	bad := JSON(r, 400, errorBody(locale.Pick("Invalid request", "Неверный запрос")), h)
 	artifact, ok1 := strField(body, "artifact")
 	action, ok2 := strField(body, "action")
 	if !ok1 || !ok2 || !BoardActions[action] {
@@ -95,7 +96,7 @@ func (a *API) Boards(r *http.Request) Answer {
 		if IsBoardEditError(err) {
 			return JSON(r, 422, errorBody(err.Error()), h)
 		}
-		return JSON(r, 500, errorBody("Не удалось изменить доски"), h)
+		return JSON(r, 500, errorBody(locale.Pick("Could not change the boards", "Не удалось изменить доски")), h)
 	}
 	return JSON(r, 200, struct {
 		Boards []Board `json:"boards"`
@@ -138,7 +139,7 @@ func (a *API) Message(r *http.Request) Answer {
 		max = 24000
 	}
 	if !ok1 || !ok2 || !IsLibraryID(artifact) || !ok3 || jscompat.Trim(txt) == "" || jscompat.Len(txt) > max {
-		return JSON(r, 400, errorBody("Пустое сообщение или неизвестный макет"), h)
+		return JSON(r, 400, errorBody(locale.Pick("An empty message or an unknown design", "Пустое сообщение или неизвестный макет")), h)
 	}
 	if a.Terminal == nil {
 		return JSON(r, 503, errorBody("the tab keeper is not running"), h)
@@ -146,10 +147,10 @@ func (a *API) Message(r *http.Request) Answer {
 	session, panel, found := a.Terminal.AgentTab(tabID)
 	design := a.L.ReadArtifact(artifact)
 	if !found || !agentPanels[panel] {
-		return JSON(r, 404, errorBody("Разговор агента уже закрыт"), h)
+		return JSON(r, 404, errorBody(locale.Pick("The agent conversation is already closed", "Разговор агента уже закрыт")), h)
 	}
 	if design == nil {
-		return JSON(r, 404, errorBody("Макета больше нет"), h)
+		return JSON(r, 404, errorBody(locale.Pick("The design is gone", "Макета больше нет")), h)
 	}
 	state := "unknown"
 	tabs, _ := a.L.Tabs()
@@ -160,7 +161,7 @@ func (a *API) Message(r *http.Request) Answer {
 	}
 	safe, process := a.Terminal.Front(session)
 	if stoppedStates[state] || safe || process == "unknown" {
-		return JSON(r, 409, errorBody("Агент в этом разговоре не запущен: откройте разговор и продолжите там"), h)
+		return JSON(r, 409, errorBody(locale.Pick("The agent is not running in this conversation: open the conversation and continue there", "Агент в этом разговоре не запущен: откройте разговор и продолжите там")), h)
 	}
 	msg := AgentMessage(design, txt)
 	if multiline {
@@ -206,7 +207,8 @@ func pathnameOf(board string) string {
 
 // NoPhoneError is what the person reads when there is no phone to send to.
 func (l *Library) NoPhoneError() string {
-	return "Нет телефона с уведомлениями: откройте " + l.cfg.Texts.Host + " на телефоне, установите как приложение и включите уведомления"
+	return locale.Pick("No phone with notifications: open "+l.cfg.Texts.Host+" on the phone, install it as an app and turn notifications on",
+		"Нет телефона с уведомлениями: откройте "+l.cfg.Texts.Host+" на телефоне, установите как приложение и включите уведомления")
 }
 
 // Send is POST {artifact, board, title?, deviceId?}: a push to the person's other devices that opens the board alone in
@@ -228,7 +230,7 @@ func (a *API) Send(r *http.Request) Answer {
 	}
 	art := a.L.ReadArtifact(id)
 	if art == nil {
-		return JSON(r, 404, errorBody("Макета больше нет"), h)
+		return JSON(r, 404, errorBody(locale.Pick("The design is gone", "Макета больше нет")), h)
 	}
 	title := rawTitle
 	if !isTitle || jscompat.Trim(rawTitle) == "" {
@@ -273,7 +275,7 @@ func (a *API) Send(r *http.Request) Answer {
 	if gone == len(statuses) {
 		return JSON(r, 409, errorBody(a.L.NoPhoneError()), h)
 	}
-	return JSON(r, 502, errorBody("Сервис уведомлений не принял сообщение, попробуйте ещё раз"), h)
+	return JSON(r, 502, errorBody(locale.Pick("The notification service did not accept the message, try again", "Сервис уведомлений не принял сообщение, попробуйте ещё раз")), h)
 }
 
 // Continue is POST {artifact, prompt?}: a new agent conversation in the design's folder.
@@ -285,11 +287,11 @@ func (a *API) Continue(r *http.Request, resolveCwd func(string, []string) (strin
 	h := noStore()
 	id, ok := strField(body, "artifact")
 	if !ok {
-		return JSON(r, 400, errorBody("Неизвестный макет"), h)
+		return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 	}
 	prompt, isPrompt := strField(body, "prompt")
 	if Has(body, "prompt") && (!isPrompt || jscompat.Len(prompt) > 12000) {
-		return JSON(r, 400, errorBody("Задача слишком длинная"), h)
+		return JSON(r, 400, errorBody(locale.Pick("The task is too long", "Задача слишком длинная")), h)
 	}
 	res := a.StartProjectDialog(id, prompt, resolveCwd)
 	if res.TabID == "" {
@@ -319,7 +321,7 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 	if r.Method == http.MethodGet && len(q["logs"]) == 1 {
 		id := q["logs"][0]
 		if !IsLibraryID(id) {
-			return JSON(r, 400, errorBody("Неизвестный макет"), h)
+			return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 		}
 		return JSON(r, 200, struct {
 			Artifact string         `json:"artifact"`
@@ -329,7 +331,7 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 	if r.Method == http.MethodGet && len(q["state"]) == 1 {
 		id := q["state"][0]
 		if !IsLibraryID(id) {
-			return JSON(r, 400, errorBody("Неизвестный макет"), h)
+			return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 		}
 		return JSON(r, 200, struct {
 			Artifact string       `json:"artifact"`
@@ -353,16 +355,16 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 	body := cliBody(raw)
 	artifact, ok := strField(body, "artifact")
 	if !ok || !IsLibraryID(artifact) {
-		return JSON(r, 400, errorBody("Неизвестный макет"), h)
+		return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 	}
 	if Has(body, "control") {
 		c := ParseControl(Field(body, "control"))
 		if c == nil {
-			return JSON(r, 400, errorBody("Пустая команда: board, view, panel или props"), h)
+			return JSON(r, 400, errorBody(locale.Pick("Empty command: board, view, panel or props", "Пустая команда: board, view, panel или props")), h)
 		}
 		pages := a.L.SendControl(artifact, *c)
 		if pages == 0 {
-			return JSON(r, 409, errorBody("Макет сейчас не открыт в превью: попросите человека открыть доску во вкладке Claude Design"), h)
+			return JSON(r, 409, errorBody(locale.Pick("The design is not open in a preview now: ask the person to open the board in the Claude Design tab", "Макет сейчас не открыт в превью: попросите человека открыть доску во вкладке Claude Design")), h)
 		}
 		time.Sleep(900 * time.Millisecond)
 		return JSON(r, 200, struct {
@@ -401,7 +403,7 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 			return JSON(r, 400, errorBody(ce.Msg), h)
 		}
 		a.warn("design library request failed", err)
-		return JSON(r, 500, errorBody("Не удалось выполнить команду заявок"), h)
+		return JSON(r, 500, errorBody(locale.Pick("Could not run the claims command", "Не удалось выполнить команду заявок")), h)
 	}
 	if r.Method == http.MethodGet {
 		var project any
@@ -417,12 +419,12 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 		}{lines}, h)
 	}
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		return JSON(r, 415, errorBody("Нужен application/json"), h)
+		return JSON(r, 415, errorBody(locale.Pick("application/json is required", "Нужен application/json")), h)
 	}
 	body := Fields(raw)
 	session, ok := strField(body, "session")
 	if !ok || !sessionRe.MatchString(session) {
-		return JSON(r, 400, errorBody("Нужна сессия вкладки агента (tmux)"), h)
+		return JSON(r, 400, errorBody(locale.Pick("The session of the agent's tab (tmux) is required", "Нужна сессия вкладки агента (tmux)")), h)
 	}
 	cli := a.L.cfg.Texts.CLI
 	switch Field(body, "action") {
@@ -430,7 +432,7 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 		project, okP := strField(body, "project")
 		board, okB := strField(body, "board")
 		if !okP || !okB {
-			return JSON(r, 400, errorBody("Нужны проект и доска: "+cli+" design claim <проект> <доска>"), h)
+			return JSON(r, 400, errorBody(locale.Pick("A project and a board are required: "+cli+" design claim <project> <board>", "Нужны проект и доска: "+cli+" design claim <проект> <доска>")), h)
 		}
 		out, err := a.L.ClaimForChat(session, project, board)
 		if err != nil {
@@ -455,7 +457,7 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 		_, pStr := pv.(string)
 		_, bStr := bv.(string)
 		if (Has(body, "project") && !pStr) || (Has(body, "board") && !bStr) || (!Has(body, "project") && Has(body, "board")) {
-			return JSON(r, 400, errorBody("Снять заявки: "+cli+" design release [<проект> <доска>]"), h)
+			return JSON(r, 400, errorBody(locale.Pick("To release claims: "+cli+" design release [<project> <board>]", "Снять заявки: "+cli+" design release [<проект> <доска>]")), h)
 		}
 		released, err := a.L.ReleaseForChat(session, pv, bv)
 		if err != nil {
@@ -473,7 +475,7 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 			Released []item `json:"released"`
 		}{list}, h)
 	}
-	return JSON(r, 400, errorBody("Неизвестное действие: claim или release"), h)
+	return JSON(r, 400, errorBody(locale.Pick("Unknown action: claim or release", "Неизвестное действие: claim или release")), h)
 }
 
 // PhoneTargets are the sender's other devices that said they are phones, else those that said nothing.
@@ -500,7 +502,7 @@ func PhoneTargets(subs []push.Subscription, sender string) []push.Subscription {
 
 // PushMessage is the notification of a board sent to a phone.
 func PushMessage(req PushRequest, tagPrefix string) push.Message {
-	body := "Посмотрите мобильную версию: " + push.Clip(req.Title, 90)
+	body := locale.Pick("Take a look at the mobile version: ", "Посмотрите мобильную версию: ") + push.Clip(req.Title, 90)
 	return push.Message{Kind: "design", Title: "Claude Design", Body: body, ConversationTitle: "Claude Design", Detail: body,
 		Provider: "claude", Tag: tagPrefix + req.Tag, At: nowMs(), URL: req.URL}
 }
@@ -527,14 +529,14 @@ func (a *API) Create(r *http.Request, resolveCwd func(string, []string) (string,
 			}
 			return JSON(r, 422, errorBody(ce.Msg), h)
 		}
-		return JSON(r, 500, errorBody("Не удалось создать проект"), h)
+		return JSON(r, 500, errorBody(locale.Pick("Could not create the project", "Не удалось создать проект")), h)
 	}
 	res := a.StartProjectDialog(project.ID, a.L.NewProjectPrompt(project.Title, brief), resolveCwd)
 	if res.TabID == "" {
 		return JSON(r, res.Status, struct {
 			Error string `json:"error"`
 			ID    string `json:"id"`
-		}{"Проект «" + project.Title + "» создан, но диалог не запустился: " + res.Error, project.ID}, h)
+		}{locale.Pick("Project \""+project.Title+"\" was created, but the conversation did not start: ", "Проект «"+project.Title+"» создан, но диалог не запустился: ") + res.Error, project.ID}, h)
 	}
 	return JSON(r, 201, struct {
 		ID    string `json:"id"`

@@ -1,0 +1,413 @@
+/* The page's design tokens: colours, radii, shadows. base.css maps Tailwind's utility colours onto them. */
+/**
+ * Hl design tokens. Raw colors are defined only in this file.
+ * Component styles consume semantic/component var(--t-*) aliases.
+ */
+
+:root,
+[data-theme='light'] {
+  /* Hl Design Tokens - light */
+  --t-bg: oklch(0.992 0.004 95);
+  --t-surface: oklch(1 0 0);
+  --t-surface-hover: oklch(0.985 0.006 260);
+  --t-border: oklch(0.92 0.01 255);
+  --t-border-hover: oklch(0.84 0.02 255);
+  --t-border-dashed: oklch(0.82 0.018 255);
+
+  --t-text: oklch(0.26 0.02 255);
+  --t-text-secondary: oklch(0.48 0.015 255);
+  --t-text-muted: oklch(0.62 0.014 255);
+
+  --t-accent-purple: oklch(0.55 0.24 285);
+  --t-accent-purple-soft: oklch(0.49 0.19 285);
+  --t-accent-purple-bg: oklch(0.55 0.24 285 / 10%);
+  --t-accent-green: oklch(0.72 0.19 155);
+  --t-accent-green-soft: oklch(0.48 0.13 155);
+  --t-accent-green-bg: oklch(0.72 0.19 155 / 11%);
+  --t-accent-blue: oklch(0.6 0.19 255);
+  --t-accent-blue-soft: oklch(0.47 0.15 255);
+  --t-accent-blue-bg: oklch(0.6 0.19 255 / 10%);
+  --t-accent-amber: oklch(0.8 0.16 80);
+  --t-accent-amber-soft: oklch(0.56 0.13 80);
+  --t-accent-amber-bg: oklch(0.8 0.16 80 / 12%);
+  --t-accent-rose: oklch(0.64 0.24 15);
+  --t-accent-rose-soft: oklch(0.56 0.19 15);
+  --t-accent-rose-bg: oklch(0.64 0.24 15 / 11%);
+  --t-accent-teal: oklch(0.75 0.12 180);
+  --t-accent-teal-soft: oklch(0.44 0.09 180);
+  --t-accent-teal-bg: oklch(0.75 0.12 180 / 12%);
+
+  --t-radius-sm: 0.4375rem;
+  --t-radius-md: 0.625rem;
+  --t-radius-lg: 0.75rem;
+  --t-radius-xl: 0.875rem;
+  --t-radius-2xl: 1rem;
+  --t-radius-3xl: 1.25rem;
+
+  /* Radius of the shell's window-like surfaces: the content card, the assistant panel,
+       the sidebar and the header. One token, so the floating surfaces on the screen
+       read as one set. The theme does not change it, so it is declared
+       in :root only. */
+  --shell-surface-radius: var(--t-radius-3xl);
+
+  --t-gap-xs: 0.5rem;
+  --t-gap-sm: 0.75rem;
+  --t-gap-md: 1rem;
+  --t-gap-lg: 1.5rem;
+  --t-gap-xl: 2rem;
+  --t-gap-2xl: 2.5rem;
+  --t-gap-3xl: 3rem;
+
+  --t-shadow-fab: 0 0.25rem 1.5rem oklch(0.55 0.24 285 / 18%);
+  --t-shadow-sm: 0 0.0625rem 0.125rem color-mix(in srgb, var(--t-text) 8%, transparent);
+  --t-shadow-overlay: 0 0.375rem 1rem oklch(0 0 0 / 16%);
+  --t-shadow-popover: 0 1.125rem 3rem oklch(0 0 0 / 22%), 0 0 0 0.0625rem var(--t-border-default);
+  --t-stepper-glow: radial-gradient(circle, var(--t-accent-purple-bg), transparent 62%);
+  --t-stepper-complete-bg: linear-gradient(135deg, oklch(0.72 0.18 155), oklch(0.62 0.2 150));
+  --t-stepper-complete-shadow:
+    0 0.375rem 1.125rem oklch(0.62 0.2 150 / 35%), inset 0 0.0625rem 0 oklch(1 0 0 / 25%);
+  --t-page-layout-default-max: 100rem;
+  --t-page-layout-narrow-max: 70rem;
+  --t-sticky-footer-bg: oklch(from var(--t-surface) l c h / 72%);
+  --t-sticky-footer-border: oklch(from var(--t-border) l c h / 50%);
+
+  /* ── Added for legalize company redesign ── */
+
+  /* text + surface variants */
+  --t-text-primary: oklch(0.145 0 0);
+  --t-text-faint: oklch(0.62 0.014 255 / 0.55);
+  --t-surface-raised: oklch(0.98 0 0);
+  --t-surface-input-hover: oklch(0.96 0 0);
+  /* Surface and border of input fields. Separate from --t-surface-raised:
+       in the dark theme a field is darker than a raised surface. */
+  --t-surface-input: oklch(0.98 0 0);
+  --t-border-input: oklch(0.145 0 0 / 0.14);
+
+  /* skeleton (loading shimmer): more contrast than the card surface */
+  --t-skeleton-base: oklch(0.91 0.006 255);
+  --t-skeleton-shine: oklch(0.965 0.004 255);
+
+  /* border scale */
+  --t-border-subtle: oklch(0.145 0 0 / 0.08);
+  --t-border-default: oklch(0.145 0 0 / 0.14);
+  --t-border-strong: oklch(0.145 0 0 / 0.22);
+
+  /* semantic */
+  --t-danger: oklch(0.62 0.22 22);
+  --t-danger-bg: oklch(0.62 0.22 22 / 0.1);
+  --t-danger-border: oklch(0.62 0.22 22 / 0.3);
+
+  --t-success: oklch(0.72 0.19 155);
+  --t-success-bg: oklch(0.72 0.19 155 / 0.1);
+  --t-success-border: oklch(0.72 0.19 155 / 0.22);
+
+  /* gradients (same in light/dark) */
+  --t-accent-blue-grad: linear-gradient(135deg, oklch(0.68 0.18 255), oklch(0.8 0.14 210));
+  --t-accent-amber-grad: linear-gradient(135deg, oklch(0.72 0.18 45), oklch(0.82 0.15 70));
+  --t-accent-green-grad: linear-gradient(135deg, oklch(0.76 0.18 145), oklch(0.78 0.15 165));
+  --t-accent-rose-grad: linear-gradient(135deg, oklch(0.68 0.24 320), oklch(0.7 0.22 0));
+  --t-accent-purple-grad: linear-gradient(135deg, oklch(0.55 0.24 285), oklch(0.68 0.24 295));
+
+  /* glow + focus */
+  --t-accent-purple-glow:
+    0 0 0 0.375rem oklch(0.55 0.24 285 / 0.15), 0 0 1.5rem 0.125rem oklch(0.55 0.24 285 / 0.35);
+  --t-focus-ring: oklch(0.68 0.24 295 / 0.65);
+
+  /* ── @libs/ui/date-picker (--dp-*) → --t-* mapping ──
+       Gives SegmentedInput, Calendar and TimeSelector the look of the app:
+       the same surface/border/accent/radius as .form-input. */
+  /* The picker's accent is the app's violet, not the library's default indigo:
+       otherwise the selected day and the "Select" button fall out of the palette. */
+  --dp-bg: var(--t-surface-raised);
+  --dp-bg-elevated: var(--t-surface);
+  --dp-bg-hover: var(--t-surface-input-hover);
+  --dp-bg-pressed: var(--t-surface);
+  --dp-bg-disabled: var(--t-surface-input);
+  --dp-overlay-bg: oklch(0.145 0 0 / 0.45);
+
+  --dp-fg: var(--t-text-primary);
+  --dp-fg-muted: var(--t-text-secondary);
+  --dp-fg-faint: var(--t-text-muted);
+  --dp-fg-disabled: var(--t-text-faint);
+  --dp-fg-on-accent: white;
+  --dp-fg-danger: var(--t-danger);
+
+  --dp-accent: var(--t-accent-purple);
+  --dp-accent-hover: var(--t-accent-purple-soft);
+  --dp-accent-pressed: var(--t-accent-purple-soft);
+  --dp-accent-fg: white;
+  --dp-accent-soft: var(--t-accent-purple-bg);
+  --dp-accent-soft-hover: var(--t-accent-purple-bg);
+  --dp-range-bg: var(--t-accent-purple-bg);
+  --dp-range-bg-edge: var(--t-accent-purple);
+  --dp-range-fg-edge: white;
+  --dp-today-ring: var(--t-accent-purple);
+  --dp-today-fg: var(--t-accent-purple);
+
+  --dp-border: var(--t-border-input);
+  --dp-border-strong: var(--t-border-strong);
+  --dp-border-focus: var(--t-accent-purple);
+
+  --dp-radius-xs: var(--t-radius-sm);
+  --dp-radius-sm: var(--t-radius-sm);
+  --dp-radius-md: var(--t-radius-md);
+  --dp-radius-lg: var(--t-radius-lg);
+  --dp-radius-xl: var(--t-radius-xl);
+  --dp-radius-pill: 624.9375rem;
+  --dp-radius-cell: var(--t-radius-md);
+
+  --dp-space-0: 0;
+  --dp-space-1: 0.25rem;
+  --dp-space-2: 0.5rem;
+  --dp-space-3: 0.75rem;
+  --dp-space-4: 1rem;
+  --dp-space-5: 1.25rem;
+  --dp-space-6: 1.5rem;
+  --dp-space-8: 2rem;
+
+  --dp-padding-popover: 0.75rem;
+  --dp-padding-modal: 1.25rem;
+  --dp-padding-sheet: 1rem;
+
+  --dp-cell-size: 2.25rem;
+  --dp-cell-size-mobile: 2.75rem;
+  --dp-cell-gap: 0.125rem;
+  --dp-grid-columns: 7;
+  --dp-grid-rows: 6;
+  --dp-month-grid-columns: 3;
+
+  --dp-font-family: inherit;
+  --dp-font-size-md: 0.875rem;
+  --dp-font-size-sm: 0.8125rem;
+
+  --dp-duration-fast: 150ms;
+  --dp-duration-base: 200ms;
+  --dp-easing: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --dp-shadow-popover: 0 0.25rem 1rem oklch(0.145 0 0 / 0.12), 0 0 0 0.0625rem var(--t-border);
+  --dp-shadow-modal: 0 1.5rem 3rem oklch(0.145 0 0 / 0.18);
+
+  --dp-z-popover: 50;
+  --dp-z-modal: 100;
+  --dp-z-sheet: 100;
+
+  /* ── Overlay stacking (docs/migrations/overlay-contract.md) ──
+       z-index = family base + --t-overlay-order × --t-overlay-z-step.
+       The component writes --t-overlay-order: a blocking layer (Modal,
+       BottomSheet, SideSheet) takes its 1-based position in the
+       shared stack, a popup or tooltip takes the order of the nearest blocking
+       layer around it (0 on the page). All bases lie within one step, so a
+       nested layer of any family paints above every surface of its parent,
+       and a popup above the layer it was opened in. Override a base on an
+       element (e.g. --pp-z-index on a Popover.Content class) to move just it.
+
+       Popovers still outrank the bottom sheet of the same order: a SelectMenu
+       / picker opened INSIDE a sheet portals to document.body as the sheet's
+       sibling. Guarded by libs/shared/styles/overlay-layers.test.ts and
+       src/styles/overlay-tokens.test.ts. */
+  --t-overlay-z-step: 10;
+  --modal-z-index: 1000; /* backdrop; content +1 */
+  --side-sheet-z-index: 1000; /* backdrop; panel +1 */
+  --pp-z-index: 1002; /* Popover, SelectMenu, DropdownMenu */
+  --tt-z-index: 1004;
+
+  /* ── @libs/ui/bottom-sheet (--bs-*) → --t-* mapping ──
+       The bottom-sheet ships its own tokens.scss, but the admin app never
+       imports it, so every --bs-* var was undefined: the mobile date-picker
+       sheet rendered with z-index:auto (the fixed mobile nav, z-index 59,
+       painted over the "Apply" button) plus a transparent background and
+       no radius/shadow. Wire them here, mirroring the --dp-* mapping. z-index
+       sits above the mobile nav (59) and follows the overlay stacking block.
+
+       The look is "glass": a translucent surface plus backdrop-blur,
+       hairline dividers instead of solid borders. The fallback for browsers without
+       backdrop-filter is in bottom-sheet.module.scss (@supports). */
+  --bs-bg: oklch(1 0 0 / 0.82);
+  --bs-bar-bg: oklch(1 0 0 / 0.6);
+  --bs-blur: 1.25rem;
+  --bs-bg-opaque: var(--t-surface);
+  --bs-border: var(--t-border-subtle);
+  --bs-color: var(--t-text-primary);
+  --bs-overlay-bg: oklch(0.145 0 0 / 0.55);
+  --bs-overlay-blur: 0.25rem;
+  --bs-radius: var(--t-radius-3xl);
+  --bs-shadow: 0 -0.75rem 3rem oklch(0.145 0 0 / 0.22);
+  --bs-handle-bg: var(--t-border-strong);
+  --bs-min-height: 50svh;
+  --bs-max-height: 92svh;
+  --bs-overlay-bg-opaque: oklch(0.145 0 0 / 0.62);
+  --bs-overlay-z-index: 1000;
+  --bs-z-index: 1001;
+
+  /* Onboarding. The tour sits above the overlays on purpose (base 1000 + 10 for each
+       nested layer): a step may point at an element inside an open
+       modal, sheet or popover. The beacon, on the contrary, sits below the product's
+       mobile navigation (59), so it does not run onto its capsule. */
+  --onb-scrim: oklch(0.145 0 0 / 0.42);
+  --onb-scrim-blur: 3px;
+  --onb-scrim-z: 2000;
+  --onb-card-z: 2001;
+  --onb-beacon-z: 58;
+  --bs-motion-duration: 300ms;
+  /* Canonical foundation, semantic, fluid layout, and component tokens. */
+  --t-space-0: 0;
+  --t-space-1: 0.25rem;
+  --t-space-2: 0.5rem;
+  --t-space-3: 0.75rem;
+  --t-space-4: 1rem;
+  --t-space-5: 1.25rem;
+  --t-space-6: 1.5rem;
+  --t-space-8: 2rem;
+  --t-space-10: 2.5rem;
+  --t-space-12: 3rem;
+  --t-font-family-ui: 'Inter', system-ui, sans-serif;
+  --t-font-family-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --t-font-size-xs: 0.75rem;
+  --t-font-size-sm: 0.8125rem;
+  --t-font-size-md: 0.875rem;
+  --t-font-size-lg: 1rem;
+  --t-font-size-xl: 1.25rem;
+  --t-control-sm: 2rem;
+  --t-control-md: 2.5rem;
+  --t-control-lg: 3rem;
+  --t-icon-sm: 1rem;
+  --t-icon-md: 1.25rem;
+  --t-icon-lg: 1.5rem;
+  --t-duration-fast: 120ms;
+  --t-duration-base: 180ms;
+  --t-duration-slow: 280ms;
+  --t-bg-canvas: var(--t-bg);
+  --t-bg-surface: var(--t-surface);
+  --t-bg-surface-raised: var(--t-surface-raised);
+  --t-bg-interactive: var(--t-surface-input);
+  --t-fg-primary: var(--t-text-primary);
+  --t-fg-secondary: var(--t-text-secondary);
+  --t-fg-muted: var(--t-text-muted);
+  --t-fg-on-accent: oklch(0.985 0 0);
+  --t-border-default-semantic: var(--t-border-default);
+  --t-action-primary: var(--t-accent-purple);
+  --t-action-primary-hover: var(--t-accent-purple-soft);
+  --t-status-success: var(--t-success);
+  --t-status-warning: var(--t-accent-amber);
+  --t-status-danger: var(--t-danger);
+  --t-status-info: var(--t-accent-blue);
+  --t-layout-page-inline: clamp(1rem, 0.5rem + 1.5vi, 2rem);
+  --t-layout-page-block: clamp(1rem, 0.75rem + 1vi, 2rem);
+  --t-layout-section-gap: clamp(1.5rem, 1rem + 1.5vi, 3rem);
+  --t-layout-content-max: 90rem;
+  --t-layout-content-narrow: 50rem;
+  --t-button-primary-bg: var(--t-accent-purple-grad);
+  /* Pure white on the gradient, as the admin buttons draw it (not the 0.985 sidebar tint). */
+  --t-button-primary-fg: white;
+  --t-button-radius: var(--t-radius-md);
+  --t-toggle-knob-bg: oklch(0.985 0 0);
+  --t-toggle-knob-shadow: 0 0.0625rem 0.1875rem color-mix(in oklch, var(--t-fg-primary) 35%, transparent);
+  --t-input-block-size: 2.75rem;
+}
+
+[data-theme='dark'],
+.dark {
+  /* In the dark theme pure black over a dark backdrop reads as dirt:
+       the scrim goes to a cold tone and gets denser. */
+  --onb-scrim: oklch(0.12 0.012 265 / 0.58);
+
+  /* ── Hl Design Tokens ── */
+  --t-bg: oklch(0.13 0 0);
+  --t-surface: oklch(0.17 0 0);
+  --t-surface-hover: oklch(0.19 0 0);
+  --t-border: oklch(0.21 0 0);
+  --t-border-hover: oklch(0.27 0 0);
+  --t-border-dashed: oklch(0.3 0 0);
+
+  --t-text: oklch(0.98 0 0);
+  --t-text-secondary: oklch(0.55 0 0);
+  --t-text-muted: oklch(0.42 0 0);
+
+  --t-accent-purple: oklch(0.55 0.24 285);
+  --t-accent-purple-soft: oklch(0.72 0.17 285);
+  --t-accent-purple-bg: oklch(0.55 0.24 285 / 12%);
+  --t-accent-green: oklch(0.72 0.19 155);
+  --t-accent-green-soft: oklch(0.8 0.17 155);
+  --t-accent-green-bg: oklch(0.72 0.19 155 / 12%);
+  --t-accent-blue: oklch(0.6 0.19 255);
+  --t-accent-blue-soft: oklch(0.73 0.14 255);
+  --t-accent-blue-bg: oklch(0.6 0.19 255 / 12%);
+  --t-accent-amber: oklch(0.8 0.16 80);
+  --t-accent-amber-soft: oklch(0.85 0.14 85);
+  --t-accent-amber-bg: oklch(0.8 0.16 80 / 12%);
+  --t-accent-rose: oklch(0.64 0.24 15);
+  --t-accent-rose-soft: oklch(0.74 0.18 15);
+  --t-accent-rose-bg: oklch(0.64 0.24 15 / 12%);
+  --t-accent-teal: oklch(0.75 0.12 180);
+  --t-accent-teal-soft: oklch(0.82 0.1 180);
+  --t-accent-teal-bg: oklch(0.75 0.12 180 / 12%);
+
+  --t-radius-sm: 0.4375rem;
+  --t-radius-md: 0.625rem;
+  --t-radius-lg: 0.75rem;
+  --t-radius-xl: 0.875rem;
+  --t-radius-2xl: 1rem;
+  --t-radius-3xl: 1.25rem;
+
+  --t-gap-xs: 0.5rem;
+  --t-gap-sm: 0.75rem;
+  --t-gap-md: 1rem;
+  --t-gap-lg: 1.5rem;
+  --t-gap-xl: 2rem;
+  --t-gap-2xl: 2.5rem;
+  --t-gap-3xl: 3rem;
+
+  --t-shadow-fab: 0 0.25rem 1.5rem oklch(0.55 0.24 285 / 30%);
+  --t-shadow-sm: 0 0.0625rem 0.125rem color-mix(in srgb, var(--t-text) 8%, transparent);
+  --t-shadow-overlay: 0 0.375rem 1rem oklch(0 0 0 / 36%);
+  --t-shadow-popover: 0 1.125rem 3rem oklch(0 0 0 / 48%), 0 0 0 0.0625rem var(--t-border-default);
+
+  /* ── Added for legalize company redesign ── */
+
+  --t-text-primary: oklch(1 0 0);
+  --t-text-faint: oklch(1 0 0 / 0.28);
+  --t-surface-raised: oklch(0.22 0 0);
+  --t-surface-input-hover: oklch(0.26 0 0);
+  --t-surface-input: oklch(0.19 0 0);
+  --t-border-input: oklch(1 0 0 / 0.18);
+
+  /* skeleton (loading shimmer): clearly lighter than the card (0.17) */
+  --t-skeleton-base: oklch(0.26 0 0);
+  --t-skeleton-shine: oklch(0.34 0 0);
+
+  --t-border-subtle: oklch(1 0 0 / 0.08);
+  --t-border-default: oklch(1 0 0 / 0.14);
+  --t-border-strong: oklch(1 0 0 / 0.22);
+
+  --t-danger: oklch(0.72 0.19 22);
+  --t-danger-bg: oklch(0.72 0.19 22 / 0.12);
+  --t-danger-border: oklch(0.72 0.19 22 / 0.3);
+
+  --t-success: oklch(0.79 0.18 155);
+  --t-success-bg: oklch(0.79 0.18 155 / 0.1);
+  --t-success-border: oklch(0.79 0.18 155 / 0.22);
+
+  --t-accent-blue-grad: linear-gradient(135deg, oklch(0.68 0.18 255), oklch(0.8 0.14 210));
+  --t-accent-amber-grad: linear-gradient(135deg, oklch(0.72 0.18 45), oklch(0.82 0.15 70));
+  --t-accent-green-grad: linear-gradient(135deg, oklch(0.76 0.18 145), oklch(0.78 0.15 165));
+  --t-accent-rose-grad: linear-gradient(135deg, oklch(0.68 0.24 320), oklch(0.7 0.22 0));
+  --t-accent-purple-grad: linear-gradient(135deg, oklch(0.55 0.24 285), oklch(0.68 0.24 295));
+
+  --t-accent-purple-glow:
+    0 0 0 0.375rem oklch(0.55 0.24 285 / 0.15), 0 0 1.5rem 0.125rem oklch(0.55 0.24 285 / 0.35);
+  --t-focus-ring: oklch(0.68 0.24 295 / 0.65);
+
+  /* date-picker overlays/shadows on dark: overridden for contrast.
+       Surface/border/accent follow through the --t-* variables already. */
+  --dp-overlay-bg: oklch(0 0 0 / 0.6);
+  --dp-shadow-popover: 0 0.25rem 1rem oklch(0 0 0 / 0.4), 0 0 0 0.0625rem var(--t-border);
+  --dp-shadow-modal: 0 1.5rem 3rem oklch(0 0 0 / 0.6);
+
+  /* bottom-sheet "glass" on dark: the surface is lighter than the background, so the sheet
+       reads as a raised layer, not as a hole in the page. */
+  --bs-bg: oklch(0.24 0 0 / 0.72);
+  --bs-bar-bg: oklch(0.24 0 0 / 0.55);
+  --bs-bg-opaque: var(--t-surface-raised);
+  --bs-overlay-bg: oklch(0 0 0 / 0.66);
+  --bs-shadow: 0 -0.75rem 3rem oklch(0 0 0 / 0.5);
+}

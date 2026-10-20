@@ -16,6 +16,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Board claims: a soft lock the chats of the library's runtimes keep in the shared folder, telling that a board is
@@ -64,7 +65,7 @@ type Claim struct {
 func CleanBoardKey(v any) (string, error) {
 	b, ok := CleanText(v, 120)
 	if !ok || b == "." || b == ".." || strings.ContainsAny(b, `\/`) {
-		return "", claimErr("Назовите доску её именем, без пути")
+		return "", claimErr(locale.Pick("Name the board by its name, without a path", "Назовите доску её именем, без пути"))
 	}
 	return b, nil
 }
@@ -105,7 +106,7 @@ func ParseClaim(raw any) (Claim, bool) {
 	}
 	title, okTitle := CleanText(get(owner, "chatTitle"), 120)
 	if !okTitle {
-		title = "Агент"
+		title = locale.Pick("Agent", "Агент")
 	}
 	return Claim{Project: project, Board: board, Owner: ClaimOwner{User: person, Runtime: runtime, TabID: tabID, ChatTitle: title}, Since: since, Heartbeat: hb}, true
 }
@@ -163,7 +164,7 @@ func openChild(parent *os.File, name string, create bool) (*os.File, error) {
 		return openDirNoFollow(target)
 	}
 	if create && (errors.Is(err, syscall.ELOOP) || errors.Is(err, syscall.ENOTDIR)) {
-		return nil, claimErr(ClaimsDirname + "/" + name + " в библиотеке не папка: заявки не принимаются, пока её не уберут")
+		return nil, claimErr(ClaimsDirname + "/" + name + locale.Pick(" in the library is not a folder: claims are not accepted until it is removed", " в библиотеке не папка: заявки не принимаются, пока её не уберут"))
 	}
 	return nil, nil
 }
@@ -316,7 +317,7 @@ func (l *Library) ClaimBoard(project, board string, owner ClaimOwner, now int64)
 			return err
 		}
 		if dir == nil {
-			return claimErr("Нет такого проекта в библиотеке")
+			return claimErr(locale.Pick("No such project in the library", "Нет такого проекта в библиотеке"))
 		}
 		defer dir.Close()
 		name := ClaimFileName(board)
@@ -341,7 +342,7 @@ func (l *Library) ClaimBoard(project, board string, owner ClaimOwner, now int64)
 					continue
 				}
 				if !removeFile(dir, name) {
-					return claimErr("Не удалось освободить старую заявку на доску")
+					return claimErr(locale.Pick("Could not release the old claim on the board", "Не удалось освободить старую заявку на доску"))
 				}
 			}
 			c := Claim{Project: project, Board: board, Owner: owner, Since: now, Heartbeat: now}
@@ -354,7 +355,7 @@ func (l *Library) ClaimBoard(project, board string, owner ClaimOwner, now int64)
 				return nil
 			}
 		}
-		return claimErr("Доску только что взял другой чат: повторите через несколько секунд")
+		return claimErr(locale.Pick("Another chat has just taken the board: try again in a few seconds", "Доску только что взял другой чат: повторите через несколько секунд"))
 	})
 	return out, err
 }
@@ -524,7 +525,7 @@ func (l *Library) SweepClaims(now int64, runtime string, chat func(tabID string)
 			if t, has := CleanText(view.Title, 120); has {
 				title = t
 			} else {
-				title = "Агент"
+				title = locale.Pick("Agent", "Агент")
 			}
 		}
 		if !ok {

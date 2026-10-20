@@ -29,6 +29,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 const (
@@ -36,13 +37,16 @@ const (
 	stderrTail   = 2000
 	readLimit    = 256 * 1024
 	readyTimeout = 30 * time.Second
+)
 
-	msgNoFfmpeg     = "На этой машине не найден ffmpeg — серверная расшифровка недоступна."
-	msgUnavailable  = "Серверное распознавание речи на этой машине не запущено"
-	msgNotLoaded    = "Модель распознавания не успела загрузиться"
-	msgRestarted    = "Сервис распознавания перезапустился, попробуйте ещё раз"
-	msgServiceDown  = "Сервис распознавания недоступен: "
-	msgCannotDecode = "Не удалось разобрать звук: "
+// The texts a failed dictation shows, in the runtime's language.
+var (
+	msgNoFfmpeg     = locale.T("ffmpeg was not found on this machine: server-side transcription is unavailable.", "На этой машине не найден ffmpeg — серверная расшифровка недоступна.")
+	msgUnavailable  = locale.T("Server-side speech recognition is not running on this machine", "Серверное распознавание речи на этой машине не запущено")
+	msgNotLoaded    = locale.T("The recognition model did not manage to load", "Модель распознавания не успела загрузиться")
+	msgRestarted    = locale.T("The recognition service restarted, try again", "Сервис распознавания перезапустился, попробуйте ещё раз")
+	msgServiceDown  = locale.T("The recognition service is unavailable: ", "Сервис распознавания недоступен: ")
+	msgCannotDecode = locale.T("Could not decode the audio: ", "Не удалось разобрать звук: ")
 )
 
 // Config is what the deployment names.
@@ -268,7 +272,7 @@ func (ss *session) start(lang any) {
 	ss.started = true
 	bin := ss.s.ffmpeg()
 	if bin == "" {
-		ss.finish(&failure{msgNoFfmpeg, "unavailable"})
+		ss.finish(&failure{msgNoFfmpeg.String(), "unavailable"})
 		return
 	}
 	resolved := "ru"
@@ -296,7 +300,7 @@ func (ss *session) onInternal(ev event) {
 				ss.asr.stop()
 			}
 		} else if ev.exit != nil {
-			ss.finish(&failure{msgCannotDecode + *ev.exit, "failed"})
+			ss.finish(&failure{msgCannotDecode.String() + *ev.exit, "failed"})
 		}
 	}
 }
@@ -466,16 +470,16 @@ func rawValue(raw json.RawMessage) any {
 func (a *asrConn) handle(ss *session, ev event) {
 	switch ev.kind {
 	case "readyTimeout":
-		a.fail(ss, msgNotLoaded, "unavailable")
+		a.fail(ss, msgNotLoaded.String(), "unavailable")
 	case "asrError":
 		var se *serviceError
 		if errors.As(ev.err, &se) && se.missing {
-			a.fail(ss, msgUnavailable, a.code())
+			a.fail(ss, msgUnavailable.String(), a.code())
 		} else {
-			a.fail(ss, msgServiceDown+ev.err.Error(), a.code())
+			a.fail(ss, msgServiceDown.String()+ev.err.Error(), a.code())
 		}
 	case "asrClosed":
-		a.fail(ss, msgRestarted, a.code())
+		a.fail(ss, msgRestarted.String(), a.code())
 	case "asr":
 		if a.done {
 			return

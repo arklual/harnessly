@@ -12,6 +12,12 @@ import (
 	"time"
 )
 
+func TestMain(m *testing.M) {
+	// The expectations below are the previous runtime's texts, which were in Russian.
+	os.Setenv("RUNTIME_LOCALE", "ru")
+	os.Exit(m.Run())
+}
+
 func write(t *testing.T, path, body string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -186,7 +192,7 @@ func TestScanClaude(t *testing.T) {
 		t.Errorf("warnings %q", b.warnings)
 	}
 	write(t, filepath.Join(claude, "plugins/installed_plugins.json"), "{broken")
-	if b := scanClaude(claude, cwd, root, []map[string]any{{"prompt": 5}}); !slices.Equal(b.warnings, []string{quickPromptsWarning, claudePluginsWarning}) {
+	if b := scanClaude(claude, cwd, root, []map[string]any{{"prompt": 5}}); !slices.Equal(b.warnings, []string{quickPromptsWarning.String(), claudePluginsWarning.String()}) {
 		t.Errorf("warnings %q", b.warnings)
 	}
 }
@@ -210,7 +216,7 @@ func TestScanCodex(t *testing.T) {
 		t.Errorf("items\n got %q\nwant %q", got, want)
 	}
 	write(t, filepath.Join(codex, "config.toml"), "[plugins\n")
-	if b := scanCodex(codex); !slices.Equal(b.warnings, []string{codexConfigWarning}) {
+	if b := scanCodex(codex); !slices.Equal(b.warnings, []string{codexConfigWarning.String()}) {
 		t.Errorf("warnings %q", b.warnings)
 	}
 }
@@ -235,9 +241,9 @@ func TestResolveCwdAndCache(t *testing.T) {
 		{"", root, root, ""},
 		{filepath.Join(root, "a") + "/", filepath.Join(root, "a"), root, ""},
 		{filepath.Join(extra, "b"), filepath.Join(extra, "b"), extra, ""},
-		{filepath.Join(root, "esc"), "", "", ErrOutside},
-		{filepath.Join(root, "missing"), "", "", ErrNotFound},
-		{"relative/path", "", "", ErrOutside},
+		{filepath.Join(root, "esc"), "", "", ErrOutside.String()},
+		{filepath.Join(root, "missing"), "", "", ErrNotFound.String()},
+		{"relative/path", "", "", ErrOutside.String()},
 	} {
 		dir, r, e := c.ResolveCwd(tc.in)
 		if dir != tc.dir || r != tc.root || e != tc.err {

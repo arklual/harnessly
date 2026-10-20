@@ -1,0 +1,240 @@
+/* A fragment selected in the timeline gets a pill next to it; the browser's own selection stays, a fragment
+   waiting in the composer is only tinted, a sent one is drawn as a quote. */
+::highlight(annotation-picked) {
+  background-color: color-mix(in oklab, var(--t-accent-purple) 14%, transparent);
+  color: inherit;
+}
+
+.tw-textsel {
+  position: fixed;
+  z-index: 1010;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  padding: 0 4px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 999px;
+  background: var(--t-surface-raised);
+  color: var(--t-text);
+  box-shadow: var(--t-shadow-popover);
+  animation: tw-textsel-in 0.14s var(--tw-ease, ease-out);
+}
+@keyframes tw-textsel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.tw-textsel[data-side='below'] {
+  animation-name: tw-textsel-in-below;
+}
+@keyframes tw-textsel-in-below {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-textsel,
+  .tw-textsel[data-side='below'] {
+    animation: none;
+  }
+}
+
+.tw-textsel-actions {
+  display: flex;
+  align-items: center;
+  height: 34px;
+}
+.tw-textsel-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--t-text);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--t-duration-fast),
+    color var(--t-duration-fast);
+}
+.tw-textsel-action svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.tw-textsel-action[data-icon-only] {
+  width: 30px;
+  padding: 0;
+}
+.tw-textsel-action:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-textsel-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--t-focus-ring);
+}
+.tw-textsel-sep {
+  width: 1px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0 2px;
+  background: var(--t-border-subtle);
+}
+.tw-textsel[data-compact] .tw-textsel-actions {
+  height: 44px;
+}
+.tw-textsel[data-compact] .tw-textsel-action {
+  height: 40px;
+  padding: 0 10px;
+}
+.tw-textsel[data-compact] .tw-textsel-action[data-icon-only] {
+  width: 40px;
+  padding: 0;
+}
+
+/* Fragments waiting in the composer: a small card each, the composer text under them is their comment. */
+.tw-quote-cards {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 6px 6px 2px 0;
+  overflow-x: auto;
+}
+.tw-quote-card {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 120px;
+  height: 76px;
+  padding: 8px 9px 7px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 12px;
+  background: var(--t-surface);
+}
+.tw-quote-card-text {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 0;
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  color: var(--t-text-secondary);
+}
+.tw-quote-card-foot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--t-text-muted);
+}
+.tw-quote-card-foot svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--t-accent-purple);
+}
+.tw-quote-card-foot span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-quote-card-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 999px;
+  background: var(--t-surface-raised);
+  color: var(--t-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--t-duration-fast),
+    color var(--t-duration-fast);
+}
+.tw-quote-card-remove svg {
+  width: 11px;
+  height: 11px;
+}
+.tw-quote-card:hover .tw-quote-card-remove,
+.tw-quote-card-remove:focus-visible {
+  opacity: 1;
+}
+.tw-quote-card-remove:hover {
+  color: var(--t-text);
+}
+.tw-quote-card-remove:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--t-focus-ring);
+}
+@media (pointer: coarse) {
+  .tw-quote-card-remove {
+    opacity: 1;
+    width: 24px;
+    height: 24px;
+    top: -8px;
+    right: -8px;
+  }
+}
+
+/* A sent fragment: the action, the quote with a thin bar, the comment as plain text. */
+.tw-wrapped-quote .tw-wrapped-head svg {
+  color: var(--t-accent-purple);
+}
+.tw-wrapped-quote .tw-wrapped-annotation-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--t-text-secondary);
+}
+.tw-wrapped-quote .tw-quote-text {
+  margin: 0;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid color-mix(in oklab, var(--t-accent-purple) 45%, transparent);
+}
+.tw-quote-text p {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--t-text-secondary);
+}
+.tw-quote-text small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--t-text-muted);
+}
+.tw-quote-comment {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--t-text) !important;
+}

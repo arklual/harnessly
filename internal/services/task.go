@@ -11,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
@@ -211,7 +212,7 @@ func (s *Service) parseTask(raw any, avatarOf func(login string, source any) any
 		if a := opt(c, "author"); isRecord(a) {
 			author = or(shortText(opt(a, "fullName")), shortText(opt(a, "login")))
 		}
-		comments = append(comments, obj("author", or(author, "Без имени"), "at", timestamp(opt(c, "created")),
+		comments = append(comments, obj("author", or(author, locale.Pick("Unnamed", "Без имени")), "at", timestamp(opt(c, "created")),
 			"text", cleanTaskText(opt(c, "text"), taskCommentMax)))
 	}
 	return obj("key", opt(raw, "idReadable"), "title", title, "project", project, "type", nameOf("Type"), "state", nameOf("State"),

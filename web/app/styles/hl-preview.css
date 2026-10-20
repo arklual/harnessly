@@ -1,0 +1,511 @@
+.tw-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  container: tw-preview / inline-size;
+}
+.tw-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tw-preview-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  color: var(--t-text);
+  background: var(--t-surface-input);
+  border: 1px solid var(--t-border-input);
+  border-radius: var(--t-radius-md);
+}
+.tw-preview-frame {
+  width: 100%;
+  height: 420px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+}
+iframe.tw-preview-frame {
+  background: #fff;
+}
+.tw-preview-expanded .tw-preview-frame {
+  height: calc(100dvh - 180px);
+}
+.tw-preview-view {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  container: tw-preview-view / inline-size;
+}
+.tw-preview-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.tw-preview-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0 4px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12px;
+  font-family: var(--t-font-family-mono);
+  color: var(--t-text-secondary);
+  text-align: left;
+  cursor: copy;
+  background: var(--t-surface-input);
+  border: 1px solid var(--t-border-input);
+  border-radius: var(--t-radius-md);
+}
+.tw-preview-path:hover {
+  background: var(--t-surface-input-hover);
+}
+.tw-preview-path-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-preview-path-copied {
+  flex: none;
+  font-family: var(--t-font-family-ui);
+  color: var(--t-text-muted);
+}
+.tw-preview-path-copied:empty {
+  display: none;
+}
+.tw-preview-pick {
+  flex: none;
+}
+/* The stage holds the page: fluid fills it, a device is scaled into it and centred, never wider than the stage. */
+.tw-preview-stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  height: 420px;
+  overflow: hidden;
+}
+.tw-preview-stage-device {
+  height: min(720px, 75dvh);
+  padding: 8px;
+  background: var(--t-surface-hover);
+  border-radius: var(--t-radius-md);
+}
+.tw-preview-expanded .tw-preview-stage {
+  height: calc(100dvh - 220px);
+}
+.tw-preview-stage .tw-preview-frame {
+  height: 100%;
+}
+.tw-preview-device {
+  position: relative;
+  flex: none;
+  width: var(--tw-device-fit-w);
+  height: var(--tw-device-fit-h);
+}
+.tw-preview-device-fluid .tw-device-body,
+.tw-preview-device-fluid .tw-device-screen {
+  display: contents;
+}
+.tw-preview-device-fluid {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+}
+.tw-preview-device-fluid iframe.tw-preview-frame {
+  box-sizing: border-box;
+  position: static;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  transform: none;
+}
+.tw-preview-pick-anchor {
+  position: absolute;
+  left: var(--tw-pick-x);
+  top: var(--tw-pick-y);
+  width: var(--tw-pick-w);
+  height: var(--tw-pick-h);
+  pointer-events: none;
+}
+.tw-preview-pick-popover {
+  width: min(320px, calc(100vw - 32px));
+}
+.tw-preview-pick-text {
+  margin: 0 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--t-text-secondary);
+}
+.tw-preview-pick-comment {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--t-text);
+  resize: vertical;
+  background: var(--t-surface-input);
+  border: 1px solid var(--t-border-input);
+  border-radius: var(--t-radius-md);
+}
+.tw-preview-pick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+.tw-preview-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-danger);
+}
+.tw-preview-address {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-family: var(--t-font-family-mono);
+  color: var(--t-text-secondary);
+}
+.tw-preview-more {
+  width: 28px;
+  height: 28px;
+}
+.tw-preview-more svg {
+  width: 16px;
+  height: 16px;
+}
+.tw-preview-ports {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tw-preview-ports-loading {
+  height: 64px;
+  border-radius: var(--t-radius-md);
+}
+.tw-preview-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tw-preview-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 2px 0;
+  padding: 0;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-text-muted);
+  background: none;
+  border: 0;
+}
+.tw-preview-group-toggle {
+  cursor: pointer;
+}
+.tw-preview-group-toggle:hover {
+  color: var(--t-text-secondary);
+}
+.tw-preview-group-count {
+  font-weight: 500;
+}
+.tw-preview-group-chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--t-duration-fast);
+}
+.tw-preview-group-chevron-folded {
+  transform: rotate(-90deg);
+}
+.tw-preview-port-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-preview-port {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 2px 0 8px;
+  border-radius: var(--t-radius-md);
+}
+.tw-preview-port:hover {
+  background: var(--t-surface-hover);
+}
+.tw-preview-port-current {
+  background: var(--t-accent-purple-bg);
+}
+.tw-preview-port-number {
+  font-family: var(--t-font-family-mono);
+  font-size: 12.5px;
+  color: var(--t-text);
+}
+.tw-preview-port-note {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--t-text-secondary);
+}
+.tw-preview-port-silent .tw-preview-port-note {
+  color: var(--t-text-muted);
+}
+.tw-preview-port-proc {
+  display: inline-flex;
+  flex-shrink: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+.tw-preview-port-usage {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--t-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* A narrow island moves the process figures and "Stop" to a line of their own under the port. */
+@container tw-preview (max-width: 440px) {
+  .tw-preview-port {
+    flex-wrap: wrap;
+    padding-block: 2px;
+  }
+  .tw-preview-port-proc {
+    order: 1;
+    flex: 1 0 100%;
+    justify-content: space-between;
+    padding-left: 44px;
+  }
+}
+.tw-preview-port-kind {
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--t-text-muted);
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 999px;
+}
+.tw-preview-taken {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--t-text-secondary);
+  border: 1px dashed var(--t-border-default);
+  border-radius: var(--t-radius-md);
+}
+.tw-preview-taken > span {
+  flex: 1;
+  min-width: 0;
+}
+.tw-preview-offer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  font-size: 12.5px;
+  color: var(--t-text-primary);
+  border: 1px solid var(--t-border-default);
+  border-radius: var(--t-radius-md);
+  background: var(--t-surface-raised);
+}
+.tw-preview-offer-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tw-preview-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-preview-history-item {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-preview-detached {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  font-size: 12.5px;
+  color: var(--t-text-secondary);
+  border: 1px dashed var(--t-border-default);
+  border-radius: var(--t-radius-md);
+}
+.tw-preview-detached > span {
+  flex: 1;
+  min-width: 0;
+}
+/* Above the chat and the right column, below scrims (40), drawers, dialogs and menus. */
+.tw-floating-preview {
+  position: fixed;
+  left: var(--tw-float-x);
+  top: var(--tw-float-y);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: var(--tw-float-w);
+  height: var(--tw-float-h);
+  overflow: hidden;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-subtle);
+  border-radius: var(--t-radius-lg);
+  box-shadow: var(--t-shadow-popover);
+}
+.tw-floating-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 36px;
+  padding: 0 6px 0 12px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+.tw-floating-preview-moving .tw-floating-preview-header {
+  cursor: grabbing;
+}
+.tw-floating-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+}
+.tw-floating-preview-body > .tw-preview-frame {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.tw-floating-preview-body .tw-preview-view {
+  flex: 1;
+}
+.tw-floating-preview-body .tw-preview-stage {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+/* An iframe under the pointer swallows pointermove: no pointers for it while the window moves or resizes. */
+.tw-floating-preview-moving iframe {
+  pointer-events: none;
+}
+.tw-floating-preview-moving {
+  user-select: none;
+}
+.tw-floating-preview-edge {
+  position: absolute;
+  z-index: 1;
+  touch-action: none;
+}
+.tw-floating-preview-edge-n,
+.tw-floating-preview-edge-s {
+  left: 12px;
+  right: 12px;
+  height: 6px;
+  cursor: ns-resize;
+}
+.tw-floating-preview-edge-e,
+.tw-floating-preview-edge-w {
+  top: 12px;
+  bottom: 12px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.tw-floating-preview-edge-n {
+  top: 0;
+}
+.tw-floating-preview-edge-s {
+  bottom: 0;
+}
+.tw-floating-preview-edge-e {
+  right: 0;
+}
+.tw-floating-preview-edge-w {
+  left: 0;
+}
+.tw-floating-preview-edge-ne,
+.tw-floating-preview-edge-nw,
+.tw-floating-preview-edge-se,
+.tw-floating-preview-edge-sw {
+  width: 12px;
+  height: 12px;
+}
+.tw-floating-preview-edge-ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+.tw-floating-preview-edge-sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+.tw-floating-preview-edge-nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.tw-floating-preview-edge-se {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+}
+
+/* A phone's panel: the address keeps room to be read, "Select" is its icon, the Claude Design badge
+   gives way to the board name in the address, and nothing is pushed past the edge. */
+@container tw-preview-view (max-width: 520px) {
+  .tw-preview-toolbar {
+    gap: 0;
+  }
+  .tw-preview-toolbar > .tw-rpane-address,
+  .tw-preview-toolbar > .tw-preview-path {
+    flex: 1 1 96px;
+    min-width: 96px;
+  }
+  .tw-preview-pick .tw-ui-button-label,
+  .tw-preview-toolbar .tw-rpane-design-badge {
+    display: none;
+  }
+  .tw-preview-toolbar > * {
+    flex-shrink: 0;
+  }
+}

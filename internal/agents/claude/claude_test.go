@@ -77,7 +77,7 @@ const (
 	prompt        = `{"type":"user","uuid":"p1","timestamp":"2026-10-10T10:01:00.000Z","message":{"content":"Сделай ещё"}}`
 )
 
-// claude-local-command-turn: local slash commands are not turns (TCK-2899).
+// claude-local-command-turn: local slash commands are not turns.
 func TestLocalCommandsAreNotTurns(t *testing.T) {
 	scan := ScanLines(entries(t, assistantDone, fixture(t, "claude-2.1.282-effort-user-triplet.jsonl")), 1000)
 	if !scan.Matched || !scan.Idle || scan.Interrupted {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Secret and path redaction of a snapshot. It runs when a snapshot is captured and again on every render, so one pass's
@@ -17,15 +18,21 @@ import (
 // value that is already a placeholder. Regular expressions are the previous runtime's, read with JavaScript's meaning
 // of \s, ".", ^ and $.
 
-func placeholder(rule string) string { return "[скрыто: " + rule + "]" }
+// placeholder is what replaces a hidden value, in the runtime's language. The web page builds the same text
+// (hl-share-redact.ts), so the two stay byte for byte equal per language.
+func placeholder(rule string) string {
+	return locale.Pick("[hidden: "+rule+"]", "[скрыто: "+rule+"]")
+}
 
 // JavaScript's \s as a class body, "." and the multiline anchors, for regexp2 in ECMAScript mode.
 const (
-	jsSpace  = `\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff`
-	jsDot    = `[^\n\r\u2028\u2029]`
-	jsLineA  = `(?<![^\n\r\u2028\u2029])`
-	jsLineZ  = `(?![^\n\r\u2028\u2029])`
-	notPlace = `(?![` + jsSpace + `"']*\[скрыто)`
+	jsSpace = `\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff`
+	jsDot   = `[^\n\r\u2028\u2029]`
+	jsLineA = `(?<![^\n\r\u2028\u2029])`
+	jsLineZ = `(?![^\n\r\u2028\u2029])`
+	// notPlace skips a value that is already a placeholder. Both languages are recognised, so a snapshot taken by a
+	// Russian runtime passes an English one unchanged and the other way round.
+	notPlace = `(?![` + jsSpace + `"']*\[(?:скрыто|hidden: ))`
 )
 
 type patternRule struct {

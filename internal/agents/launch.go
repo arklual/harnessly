@@ -14,7 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// Launch is the model and reasoning effort a conversation starts with; nil means the CLI's own default («Авто»). Same
+// Launch is the model and reasoning effort a conversation starts with; nil means the CLI's own default ("Auto"). Same
 // shape as catalog.Choice, so either converts to the other.
 type Launch struct {
 	Model  *string `json:"model"`

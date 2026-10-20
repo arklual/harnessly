@@ -143,7 +143,7 @@ func TestWithInitialPrompt(t *testing.T) {
 	}
 }
 
-// initial-prompt: reads a long prompt back from a file and removes the file (TCK-2314).
+// initial-prompt: reads a long prompt back from a file and removes the file.
 func TestLongPromptThroughFile(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "prompt 'dir' ")
 	text := "Событие:\n" + strings.Repeat(`{"a":"b\"c", 'd'} $HOME `, 2000)
@@ -170,8 +170,8 @@ func TestLongPromptThroughFile(t *testing.T) {
 
 // agent-start: env keys and values are checked before anything is typed.
 func TestFormatStartEnv(t *testing.T) {
-	got, err := agents.FormatStartEnv([]agents.EnvVar{{"APP_TASK", "TCK-1"}, {"APP_MODE", "a.b_c"}}, "APP_")
-	if err != nil || got != "APP_TASK='TCK-1' APP_MODE='a.b_c' " {
+	got, err := agents.FormatStartEnv([]agents.EnvVar{{"APP_TASK", "PROJ-1"}, {"APP_MODE", "a.b_c"}}, "APP_")
+	if err != nil || got != "APP_TASK='PROJ-1' APP_MODE='a.b_c' " {
 		t.Fatalf("%q %v", got, err)
 	}
 	if got, _ := agents.FormatStartEnv(nil, "APP_"); got != "" {

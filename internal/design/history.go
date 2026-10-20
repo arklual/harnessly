@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // The history of the shared library: a git repository, snapshotted a while after the files stop changing and rolled
@@ -95,7 +96,7 @@ func (l *Library) HistoryGitDir(root string) string {
 func (l *Library) historyRepo() (historyRepo, error) {
 	real, err := filepath.EvalSymlinks(l.Root())
 	if err != nil {
-		return historyRepo{}, historyErr("Папки библиотеки нет: история не ведётся")
+		return historyRepo{}, historyErr(locale.Pick("The library folder does not exist: no history is kept", "Папки библиотеки нет: история не ведётся"))
 	}
 	return historyRepo{root: real, gitDir: l.HistoryGitDir(real)}, nil
 }
@@ -172,7 +173,7 @@ func (l *Library) spawnGit(args []string, cwd string, timeout time.Duration) (gi
 	if err != nil {
 		var exit *exec.ExitError
 		if !errors.As(err, &exit) {
-			return res, &gitFailure{"Не удалось запустить git: " + err.Error()}
+			return res, &gitFailure{locale.Pick("Could not start git: ", "Не удалось запустить git: ") + err.Error()}
 		}
 		res.code = exit.ExitCode()
 		if res.code < 0 {
@@ -200,7 +201,7 @@ func (l *Library) gitOK(repo historyRepo, args ...string) (string, error) {
 	if res.code != 0 {
 		msg := firstLine(res.stderr)
 		if msg == "" {
-			msg = "код " + strconv.Itoa(res.code)
+			msg = locale.Pick("code ", "код ") + strconv.Itoa(res.code)
 		}
 		return "", &gitFailure{"git " + args[0] + ": " + msg}
 	}
@@ -236,7 +237,7 @@ func (l *Library) ensureRepo() (historyRepo, error) {
 	}
 	st, err := os.Lstat(repo.gitDir)
 	if err == nil && !st.IsDir() {
-		return repo, historyErr(repo.gitDir + " не папка: история не ведётся, пока его не уберут")
+		return repo, historyErr(repo.gitDir + locale.Pick(" is not a folder: no history is kept until it is removed", " не папка: история не ведётся, пока его не уберут"))
 	}
 	if err != nil {
 		parent := filepath.Dir(repo.gitDir)
@@ -367,18 +368,18 @@ func SnapshotMessage(paths, editors []string, runtime, subject string) (string, 
 			}
 			quoted := make([]string, len(shown))
 			for i, b := range shown {
-				quoted[i] = "«" + b + "»"
+				quoted[i] = locale.Pick("\""+b+"\"", "«"+b+"»")
 			}
-			line = "Правки: " + strings.Join(quoted, ", ")
+			line = locale.Pick("Edits: ", "Правки: ") + strings.Join(quoted, ", ")
 			if len(boards) > maxSubjectBoards {
-				line += " и ещё " + strconv.Itoa(len(boards)-maxSubjectBoards)
+				line += locale.Pick(" and ", " и ещё ") + strconv.Itoa(len(boards)-maxSubjectBoards) + locale.Pick(" more", "")
 			}
 		case len(projects) == 1:
-			line = "Правки общих файлов проекта " + projects[0]
+			line = locale.Pick("Edits to the shared files of project ", "Правки общих файлов проекта ") + projects[0]
 		case len(projects) > 1:
-			line = "Правки в проектах: " + strconv.Itoa(len(projects))
+			line = locale.Pick("Edits in projects: ", "Правки в проектах: ") + strconv.Itoa(len(projects))
 		default:
-			line = "Правки в библиотеке"
+			line = locale.Pick("Edits in the library", "Правки в библиотеке")
 		}
 	}
 	trailers := []string{"Runtime: " + runtime}
@@ -390,7 +391,7 @@ func SnapshotMessage(paths, editors []string, runtime, subject string) (string, 
 	}
 	s, ok := CleanText(line, 200)
 	if !ok {
-		s = "Правки в библиотеке"
+		s = locale.Pick("Edits in the library", "Правки в библиотеке")
 	}
 	return s, strings.Join(trailers, "\n")
 }
@@ -441,7 +442,7 @@ func (l *Library) snapshotNow(runtime string, editors []string, subject string, 
 		return snapshotOutcome{}, err
 	}
 	if subject == "" && head.code != 0 {
-		subject = "Начальный снимок библиотеки"
+		subject = locale.Pick("Initial snapshot of the library", "Начальный снимок библиотеки")
 	}
 	paths := make([]string, len(staged))
 	for i, s := range staged {
@@ -544,14 +545,14 @@ func ParseLog(out string) []HistoryEntry {
 // ScopePath is the path a scope names in the repository: a project, or one board file of it.
 func ScopePath(project string, file *string) (string, error) {
 	if !IsLibraryID(project) {
-		return "", historyErr("Нет такого проекта")
+		return "", historyErr(locale.Pick("No such project", "Нет такого проекта"))
 	}
 	if file == nil {
 		return project, nil
 	}
 	f := *file
 	if !IsBoardFile(f) || strings.ContainsAny(f, "\\\x00\n\r") || strings.HasPrefix(f, ".") {
-		return "", historyErr("История есть у досок-файлов (*.dc.html)")
+		return "", historyErr(locale.Pick("History exists for board files (*.dc.html)", "История есть у досок-файлов (*.dc.html)"))
 	}
 	return project + "/" + ProjectDirname + "/" + f, nil
 }
@@ -599,7 +600,7 @@ func WhoOf(e HistoryEntry) string {
 	if len(e.Editors) > 0 {
 		return strings.Join(e.Editors, ", ")
 	}
-	return "автоснимок"
+	return locale.Pick("autosnapshot", "автоснимок")
 }
 
 // BoardSnapshot is a saved state of a board as the panel lists it.
@@ -665,7 +666,7 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 	}
 	wanted, ok := ParseRestoreTarget(at)
 	if !ok {
-		return restoreResult{}, historyErr("Версию задают так: --at <sha | 30m | 2h | 1d>")
+		return restoreResult{}, historyErr(locale.Pick("Give the version like this: --at <sha | 30m | 2h | 1d>", "Версию задают так: --at <sha | 30m | 2h | 1d>"))
 	}
 	board := BoardTitleOf(file)
 	for _, c := range l.LiveClaims(project, now.UnixMilli()) {
@@ -673,7 +674,7 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 			continue
 		}
 		if actor.owner == nil || !sameOwner(c.Owner, *actor.owner) {
-			return restoreResult{}, historyErr("Доску «" + board + "» сейчас правит " + c.Owner.User + " (чат «" + c.Owner.ChatTitle + "»): вернуть версию можно, когда он закончит")
+			return restoreResult{}, historyErr(locale.Pick("The board \""+board+"\" is being edited by "+c.Owner.User+" (chat \""+c.Owner.ChatTitle+"\"): a version can be restored when they finish", "Доску «"+board+"» сейчас правит "+c.Owner.User+" (чат «"+c.Owner.ChatTitle+"»): вернуть версию можно, когда он закончит"))
 		}
 		break
 	}
@@ -682,7 +683,7 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 		return restoreResult{}, err
 	}
 	if !isPlainFolder(repo.root, project) || !isPlainFolder(filepath.Join(repo.root, project), ProjectDirname) {
-		return restoreResult{}, historyErr("Папка проекта не обычная папка: вернуть версию нельзя")
+		return restoreResult{}, historyErr(locale.Pick("The project folder is not a plain folder: a version cannot be restored", "Папка проекта не обычная папка: вернуть версию нельзя"))
 	}
 	var revision string
 	if wanted.Revision != "" {
@@ -691,7 +692,7 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 			return restoreResult{}, err
 		}
 		if res.code != 0 {
-			return restoreResult{}, historyErr("Такой версии нет в истории")
+			return restoreResult{}, historyErr(locale.Pick("No such version in the history", "Такой версии нет в истории"))
 		}
 		revision = strings.TrimSpace(res.stdout)
 	} else {
@@ -704,7 +705,7 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 			revision = strings.TrimSpace(res.stdout)
 		}
 		if revision == "" {
-			return restoreResult{}, historyErr("Раньше этого времени у доски не было сохранённых версий")
+			return restoreResult{}, historyErr(locale.Pick("The board had no saved versions before that time", "Раньше этого времени у доски не было сохранённых версий"))
 		}
 	}
 	existed, err := l.git(repo, "cat-file", "-e", revision+":"+target)
@@ -712,20 +713,20 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 		return restoreResult{}, err
 	}
 	if existed.code != 0 {
-		return restoreResult{}, historyErr("В этой версии такой доски ещё не было")
+		return restoreResult{}, historyErr(locale.Pick("This board did not exist in that version yet", "В этой версии такой доски ещё не было"))
 	}
 	editors := []string{actor.line}
-	pre, err := l.snapshotNow(actor.runtime, editors, "Перед возвратом «"+board+"»", now)
+	pre, err := l.snapshotNow(actor.runtime, editors, locale.Pick("Before restoring \""+board+"\"", "Перед возвратом «"+board+"»"), now)
 	if err != nil {
 		return restoreResult{}, err
 	}
 	if pre.kind == SnapshotBusy {
-		return restoreResult{}, historyErr("История сейчас занята другим сохранением: повторите через несколько секунд")
+		return restoreResult{}, historyErr(locale.Pick("The history is busy with another save: try again in a few seconds", "История сейчас занята другим сохранением: повторите через несколько секунд"))
 	}
 	if _, err := l.gitOK(repo, "restore", "--source="+revision, "--worktree", "--", target); err != nil {
 		return restoreResult{}, err
 	}
-	snap, err := l.snapshotNow(actor.runtime, editors, "Вернул «"+board+"» к версии "+revision[:min(7, len(revision))], now)
+	snap, err := l.snapshotNow(actor.runtime, editors, locale.Pick("Restored \""+board+"\" to version ", "Вернул «"+board+"» к версии ")+revision[:min(7, len(revision))], now)
 	if err != nil {
 		return restoreResult{}, err
 	}
@@ -734,7 +735,7 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 
 // OwnerLine is a claim's holder as a snapshot's Editor trailer names it.
 func OwnerLine(o ClaimOwner) string {
-	return o.User + " · чат «" + o.ChatTitle + "» (" + o.Runtime + ")"
+	return locale.Pick(o.User+" · chat \""+o.ChatTitle+"\" ("+o.Runtime+")", o.User+" · чат «"+o.ChatTitle+"» ("+o.Runtime+")")
 }
 
 // historyState is the history of this runtime while its design slice runs: a snapshot follows every burst of changes
@@ -998,7 +999,7 @@ func (l *Library) historyProject(project any) (*Artifact, error) {
 			return a, nil
 		}
 	}
-	return nil, historyErr("Нет такого проекта: смотрите " + l.cfg.Texts.CLI + " design list")
+	return nil, historyErr(locale.Pick("No such project: see ", "Нет такого проекта: смотрите ") + l.cfg.Texts.CLI + " design list")
 }
 
 // CLIHistoryLine is a version as `design history` prints it.
@@ -1062,7 +1063,7 @@ func (l *Library) RestoreForCLI(session string, project, board, at any) (CLIRest
 	}
 	atS, ok := at.(string)
 	if !ok {
-		return CLIRestored{}, historyErr("Версию задают так: --at <sha | 30m | 2h | 1d>")
+		return CLIRestored{}, historyErr(locale.Pick("Give the version like this: --at <sha | 30m | 2h | 1d>", "Версию задают так: --at <sha | 30m | 2h | 1d>"))
 	}
 	id, err := l.Identity()
 	if err != nil {
@@ -1088,7 +1089,7 @@ func panelFile(board any) (string, error) {
 	if s, ok := board.(string); ok && IsBoardFile(s) {
 		return s, nil
 	}
-	return "", historyErr("История есть у досок-файлов; экран, собранный из общего бандла, версий не имеет")
+	return "", historyErr(locale.Pick("History exists for board files; a screen built from a shared bundle has no versions", "История есть у досок-файлов; экран, собранный из общего бандла, версий не имеет"))
 }
 
 // HistoryForPanel lists the latest versions of a board file.
@@ -1116,7 +1117,7 @@ func (l *Library) RestoreForPanel(artifact, board, revision any) error {
 	}
 	rev, ok := revision.(string)
 	if !ok || !fullSHA.MatchString(rev) {
-		return historyErr("Не удалось понять, какую версию вернуть")
+		return historyErr(locale.Pick("Could not tell which version to restore", "Не удалось понять, какую версию вернуть"))
 	}
 	id, err := l.Identity()
 	if err != nil {

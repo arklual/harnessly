@@ -117,7 +117,7 @@ func TestCLIPanelHideAndStatus(t *testing.T) {
 	r.want(r.ask(`{"session":"`+agentSession+`","command":{"kind":"hide"}}`), 200, `{"ok":true,"message":"Страница с этим разговором сейчас не открыта: скрывать нечего"}`)
 
 	r2 := panelRig(t)
-	r2.deps.Intents.Add("tab-1", jsvalue.NewObject("kind", "open", "tab", "task", "target", "TCK-3004"))
+	r2.deps.Intents.Add("tab-1", jsvalue.NewObject("kind", "open", "tab", "task", "target", "PROJ-3004"))
 	a := r2.ask(`{"session":"` + agentSession + `","command":{"kind":"status"}}`)
 	o := a.json(t)
 	if a.status != 200 || o.String("message") != "Страница с этим разговором сейчас не открыта" || !strings.Contains(o.Array("intents")[0].(string), "ждёт") {
@@ -167,7 +167,7 @@ func TestPaneIntentsRoute(t *testing.T) {
 	r := panelRig(t)
 	const id = "00000000-0000-4000-8000-000000000000"
 	r.want(r.do("", "GET", "/api/platform/pane-intents?tabId=tab-1", ""), 401, "*")
-	intent := r.deps.Intents.Add("tab-1", jsvalue.NewObject("kind", "open", "tab", "task", "target", "TCK-1"))
+	intent := r.deps.Intents.Add("tab-1", jsvalue.NewObject("kind", "open", "tab", "task", "target", "PROJ-1"))
 	listed := r.do("s", "GET", "/api/platform/pane-intents?tabId=tab-1", "")
 	r.want(listed, 200, `{"intents":[`+string(jsvalue.Stringify(intent, ""))+`]}`)
 	if listed.header.Get("Cache-Control") != "no-store" {

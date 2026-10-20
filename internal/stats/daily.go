@@ -335,6 +335,8 @@ func (rt *Route) codexReportSessions(date string) []reportSession {
 	return out
 }
 
+// localeLanguages names each interface language the way a model recognises it: in English with the native name. The native
+// names are data for the prompt, not display text.
 var localeLanguages = map[string]string{
 	"en": "English", "ko": "Korean (한국어)", "ja": "Japanese (日本語)", "zh-CN": "Simplified Chinese (简体中文)",
 	"zh-TW": "Traditional Chinese (繁體中文)", "de": "German (Deutsch)", "es": "Spanish (Español)", "fr": "French (Français)",

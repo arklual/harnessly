@@ -385,6 +385,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(f.AsRoutes(ref.c.stateCoreRoutes(d)...)...)
 	f.Add(unshadowed(f, append(automationRoutes(d, settingsStore), ref.c.browserTabRoutes(d)...))...)
 	f.Add(integrationRoutes(d, integ)...)
+	f.Add(docsRoutes(d, integ)...)
+	f.Add(githubRoutes(d, githubFromEnv())...)
 	if w := webConfigFromEnv(cfg.Standalone()); w != nil {
 		f.Add(gate.Route{Match: w.matches, Handler: w.handler()})
 	}

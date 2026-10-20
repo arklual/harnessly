@@ -18,6 +18,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Importing an export of the design tool (a zip, or a project folder) into the library: unpacked aside, attachments no
@@ -35,13 +36,15 @@ func (e *ImportError) Error() string { return e.Msg }
 func importErr(msg string) error { return &ImportError{Msg: msg} }
 
 func importConflict(id string) error {
-	return &ImportError{Msg: "Макет «" + id + "» уже есть", Conflict: true}
+	return &ImportError{Msg: locale.Pick("Design \""+id+"\" already exists", "Макет «"+id+"» уже есть"), Conflict: true}
 }
 
 var (
 	attachmentDirs = []string{"uploads", "screenshots"}
 	textExt        = map[string]bool{".html": true, ".htm": true, ".js": true, ".jsx": true, ".css": true, ".json": true}
-	translit       = map[rune]string{
+	// translit turns a Russian project name into a Latin library id. It is input handling, not display text: a design
+	// exported under a Russian name must still get an id, whatever language the runtime speaks.
+	translit = map[rune]string{
 		'а': "a", 'б': "b", 'в': "v", 'г': "g", 'д': "d", 'е': "e", 'ё': "e", 'ж': "zh", 'з': "z", 'и': "i", 'й': "y", 'к': "k", 'л': "l", 'м': "m", 'н': "n", 'о': "o",
 		'п': "p", 'р': "r", 'с': "s", 'т': "t", 'у': "u", 'ф': "f", 'х': "h", 'ц': "ts", 'ч': "ch", 'ш': "sh", 'щ': "sch", 'ъ': "", 'ы': "y", 'ь': "", 'э': "e", 'ю': "yu", 'я': "ya",
 	}
@@ -104,7 +107,7 @@ func listArchive(archive string) (string, error) {
 	err := cmd.Run()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
-			return "", importErr("На этой машине нет unzip: поставьте пакет unzip")
+			return "", importErr(locale.Pick("unzip is not installed on this machine: install the unzip package", "На этой машине нет unzip: поставьте пакет unzip"))
 		}
 		return "", nil
 	}
@@ -137,10 +140,10 @@ func unpack(archive, into string) error {
 	}
 	b, e, ok := ParseUnzipListing(stdout)
 	if !ok {
-		return importErr("Это не zip-архив проекта")
+		return importErr(locale.Pick("This is not a project zip archive", "Это не zip-архив проекта"))
 	}
 	if b > LimitUnpackedBytes || e > LimitEntries {
-		return importErr("Архив слишком большой: больше гигабайта или двадцати тысяч файлов")
+		return importErr(locale.Pick("The archive is too large: over a gigabyte or twenty thousand files", "Архив слишком большой: больше гигабайта или двадцати тысяч файлов"))
 	}
 	// unzip skips entries with .. or an absolute path itself; a link it restores is dropped below with the agent files.
 	cmd := exec.Command("unzip", "-q", "-o", archive, "-d", into)
@@ -150,7 +153,7 @@ func unpack(archive, into string) error {
 		var exit *exec.ExitError
 		// Exit code 1 is unzip's «warnings, the rest unpacked».
 		if !errors.As(err, &exit) || exit.ExitCode() != 1 {
-			return importErr("Архив не распаковался: он повреждён или зашифрован")
+			return importErr(locale.Pick("The archive could not be unpacked: it is damaged or encrypted", "Архив не распаковался: он повреждён или зашифрован"))
 		}
 	}
 	return nil
@@ -316,6 +319,8 @@ func readBoardSources(project string) ([]boardSource, error) {
 	return out, nil
 }
 
+// overviewBoard is the title Claude Design gives the overview board of a Russian-language export. It is compared with
+// the titles read from the imported files, so it stays Russian whatever language the runtime speaks.
 const overviewBoard = "Все страницы"
 
 // DetectBoards: wrapper boards become their pages, the rest stay as they are; the overview board goes first, the rest
@@ -376,7 +381,7 @@ func isoNow() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000Z"
 func (l *Library) ImportProject(o ImportOptions) (ImportResult, error) {
 	defer l.listing.invalidateAll()
 	if !IsLibraryID(o.ID) {
-		return ImportResult{}, importErr("Имя макета: латинские буквы в нижнем регистре, цифры и дефисы")
+		return ImportResult{}, importErr(locale.Pick("Design name: lower-case Latin letters, digits and hyphens", "Имя макета: латинские буквы в нижнем регистре, цифры и дефисы"))
 	}
 	target := l.ArtifactDir(o.ID)
 	if exists(target) && !o.Force {
@@ -394,7 +399,7 @@ func (l *Library) ImportProject(o ImportOptions) (ImportResult, error) {
 	}
 	st, err := os.Stat(o.Source)
 	if err != nil {
-		return ImportResult{}, importErr("Файл проекта не найден")
+		return ImportResult{}, importErr(locale.Pick("The project file was not found", "Файл проекта не найден"))
 	}
 	if st.IsDir() {
 		err = copyTree(o.Source, project)
@@ -420,7 +425,7 @@ func (l *Library) ImportProject(o ImportOptions) (ImportResult, error) {
 	}
 	boards := DetectBoards(sources)
 	if len(boards) == 0 {
-		return ImportResult{}, importErr("В проекте нет досок *.dc.html: это точно экспорт Claude Design?")
+		return ImportResult{}, importErr(locale.Pick("The project has no *.dc.html boards: is this really a Claude Design export?", "В проекте нет досок *.dc.html: это точно экспорт Claude Design?"))
 	}
 	shown := ""
 	if o.Title != nil {

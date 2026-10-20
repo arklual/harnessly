@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Files the agent produced or read, opened in the viewer or handed over to be saved.
@@ -106,16 +108,16 @@ func lastDotExt(p string) string {
 
 func (a *Access) locate(requested string) (string, *Target) {
 	if !strings.HasPrefix(requested, "/") || strings.Contains(requested, "\x00") {
-		t := refuse(400, "Нужен абсолютный путь")
+		t := refuse(400, locale.Pick("An absolute path is required", "Нужен абсолютный путь"))
 		return "", &t
 	}
 	real, err := Realpath(requested)
 	if err != nil {
-		t := refuse(404, "Файл не найден")
+		t := refuse(404, locale.Pick("File not found", "Файл не найден"))
 		return "", &t
 	}
 	if !a.allowed(real) || a.Secret(real) {
-		t := refuse(403, "Этот файл нельзя открыть из рабочего пространства")
+		t := refuse(403, locale.Pick("This file cannot be opened from the workspace", "Этот файл нельзя открыть из рабочего пространства"))
 		return "", &t
 	}
 	return real, nil
@@ -130,18 +132,18 @@ func (a *Access) Preview(requested string) Target {
 	ext := lastDotExt(real)
 	contentType, video := PreviewType(ext)
 	if contentType == "" {
-		return refuse(415, "Просмотр есть только для картинок, видео, md, html и pdf")
+		return refuse(415, locale.Pick("Preview exists only for pictures, video, md, html and pdf", "Просмотр есть только для картинок, видео, md, html и pdf"))
 	}
 	st, err := os.Stat(real)
 	if err != nil || !st.Mode().IsRegular() {
-		return refuse(404, "Файл не найден")
+		return refuse(404, locale.Pick("File not found", "Файл не найден"))
 	}
 	limit := int64(MaxPreviewBytes)
 	if video {
 		limit = MaxVideoBytes
 	}
 	if st.Size() > limit {
-		return refuse(413, "Файл слишком большой для просмотра")
+		return refuse(413, locale.Pick("The file is too large to preview", "Файл слишком большой для просмотра"))
 	}
 	return Target{OK: true, Real: real, Ext: ext, Size: st.Size()}
 }
@@ -154,10 +156,10 @@ func (a *Access) Download(requested string) Target {
 	}
 	st, err := os.Stat(real)
 	if err != nil || !st.Mode().IsRegular() {
-		return refuse(404, "Файл не найден")
+		return refuse(404, locale.Pick("File not found", "Файл не найден"))
 	}
 	if st.Size() > MaxDownloadBytes {
-		return refuse(413, "Файл слишком большой")
+		return refuse(413, locale.Pick("The file is too large", "Файл слишком большой"))
 	}
 	return Target{OK: true, Real: real, Ext: lastDotExt(real), Size: st.Size()}
 }

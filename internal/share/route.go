@@ -15,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/launch"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/transcript"
 )
@@ -193,15 +194,15 @@ func (rt *Route) Snapshots(r *http.Request) (int, any, http.Header) {
 		return http.StatusMethodNotAllowed, nil, h
 	}
 	if !jsonType(r) {
-		return nodejson.Answer(r, http.StatusUnsupportedMediaType, errorBody("Нужен application/json"), h)
+		return nodejson.Answer(r, http.StatusUnsupportedMediaType, errorBody(locale.Pick("application/json is required", "Нужен application/json")), h)
 	}
 	tabID, isStr := field(b, "tabId").(string)
 	if !isStr || !tabIDRe.MatchString(tabID) {
-		return nodejson.Answer(r, http.StatusBadRequest, errorBody("Неверный диалог"), h)
+		return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid conversation", "Неверный диалог")), h)
 	}
 	opts, ok := ParseOptions(field(b, "options"))
 	if !ok {
-		return nodejson.Answer(r, http.StatusBadRequest, errorBody("Неверные настройки снимка"), h)
+		return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid snapshot settings", "Неверные настройки снимка")), h)
 	}
 	rt.Store.SweepDrafts()
 	var sub any
@@ -240,7 +241,7 @@ var (
 func CleanTitle(title string) string {
 	text := jscompat.Trim(spaceRun.ReplaceAllString(titleWrapper.ReplaceAllString(title, " "), " "))
 	if text == "" {
-		return "Без названия"
+		return locale.Pick("Untitled", "Без названия")
 	}
 	return text
 }
@@ -251,7 +252,7 @@ func (rt *Route) capture(tabID string, opts Options, sub any) (*jsvalue.Object, 
 		tab, _ = rt.FindTab(tabID)
 	}
 	if tab == nil {
-		return nil, 404, "Диалог не найден на этой машине", nil
+		return nil, 404, locale.Pick("Conversation not found on this machine", "Диалог не найден на этой машине"), nil
 	}
 	panel := ""
 	if p, ok := tab.Get("panelType"); ok && p != nil {
@@ -259,7 +260,7 @@ func (rt *Route) capture(tabID string, opts Options, sub any) (*jsvalue.Object, 
 	}
 	provider := providerByPanel[panel]
 	if provider == "" {
-		return nil, 409, "Снимок можно сделать только для диалога с агентом", nil
+		return nil, 409, locale.Pick("A snapshot can only be made of a conversation with an agent", "Снимок можно сделать только для диалога с агентом"), nil
 	}
 	state := tab.Object("agentState")
 	jsonl := nullish(get(state, "jsonlPath"))
@@ -268,14 +269,14 @@ func (rt *Route) capture(tabID string, opts Options, sub any) (*jsvalue.Object, 
 	}
 	path, _ := jsonl.(string)
 	if !truthy(jsonl) {
-		return nil, 409, "У диалога ещё нет транскрипта", nil
+		return nil, 409, locale.Pick("The conversation has no transcript yet", "У диалога ещё нет транскрипта"), nil
 	}
 	st, err := os.Stat(path)
 	if err != nil {
-		return nil, 409, "Транскрипт диалога не найден", nil
+		return nil, 409, locale.Pick("The conversation's transcript was not found", "Транскрипт диалога не найден"), nil
 	}
 	if st.Size() > maxTranscript {
-		return nil, 413, "Диалог слишком большой для снимка", nil
+		return nil, 413, locale.Pick("The conversation is too large for a snapshot", "Диалог слишком большой для снимка"), nil
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -306,7 +307,7 @@ func (rt *Route) capture(tabID string, opts Options, sub any) (*jsvalue.Object, 
 	snapshot, report, ok := Capture(CaptureInput{Timeline: timeline, Provider: provider, Title: title, OwnerSub: sub, Options: opts,
 		Economics: econ, Redactor: rt.redactor(), Now: float64(rt.now().UnixMilli())})
 	if !ok {
-		return nil, 413, "Снимок больше 5 МБ: выключите диффы или действия агента", nil
+		return nil, 413, locale.Pick("The snapshot is over 5 MB: turn off diffs or agent actions", "Снимок больше 5 МБ: выключите диффы или действия агента"), nil
 	}
 	d, err := rt.Store.SaveDraft(tabID, snapshot, report)
 	if err != nil {
@@ -371,7 +372,7 @@ func (rt *Route) liveDraft(r *http.Request, id string) (*jsvalue.Object, int, an
 		return nil, status, v, h, false
 	}
 	if d == nil {
-		status, v, h := nodejson.Answer(r, http.StatusNotFound, errorBody("Черновик снимка не найден или устарел"), noStore())
+		status, v, h := nodejson.Answer(r, http.StatusNotFound, errorBody(locale.Pick("The snapshot draft was not found or is out of date", "Черновик снимка не найден или устарел")), noStore())
 		return nil, status, v, h, false
 	}
 	return d, 0, nil, nil, true
@@ -389,7 +390,7 @@ func (rt *Route) Download(r *http.Request, id string) (int, any, http.Header) {
 	}
 	format, _ := queryString(r, "format")
 	if format != "html" && format != "md" {
-		return nodejson.Answer(r, http.StatusBadRequest, errorBody("Формат: html или md"), h)
+		return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Format: html or md", "Формат: html или md")), h)
 	}
 	d, status, v, eh, ok := rt.liveDraft(r, id)
 	if !ok {
@@ -437,7 +438,7 @@ func (rt *Route) Preview(r *http.Request, id string) (int, any, http.Header) {
 	return textAnswer(r, http.StatusOK, "text/html; charset=utf-8", html, htmlHeaders())
 }
 
-const notConfigured = "Ссылки для коллег на этом сервере ещё не включены"
+var notConfigured = locale.T("Links for colleagues are not enabled on this server yet", "Ссылки для коллег на этом сервере ещё не включены")
 
 func (rt *Route) sessionOrJSON403(r *http.Request) (any, int, any, http.Header, bool) {
 	if status, v, h, refused := rt.APIRefusal(r); refused {
@@ -466,7 +467,7 @@ func (rt *Route) Shares(r *http.Request) (int, any, http.Header) {
 		var tab *string
 		if vs, present := jscompat.Query(r.URL.RawQuery)["tabId"]; present {
 			if len(vs) != 1 || !tabIDRe.MatchString(vs[0]) {
-				return nodejson.Answer(r, http.StatusBadRequest, errorBody("Неверный диалог"), h)
+				return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid conversation", "Неверный диалог")), h)
 			}
 			tab = &vs[0]
 		}
@@ -481,30 +482,30 @@ func (rt *Route) Shares(r *http.Request) (int, any, http.Header) {
 		return http.StatusMethodNotAllowed, nil, h
 	}
 	if !jsonType(r) {
-		return nodejson.Answer(r, http.StatusUnsupportedMediaType, errorBody("Нужен application/json"), h)
+		return nodejson.Answer(r, http.StatusUnsupportedMediaType, errorBody(locale.Pick("application/json is required", "Нужен application/json")), h)
 	}
 	if routeBase == "" {
-		return nodejson.Answer(r, http.StatusUnprocessableEntity, errorBody(notConfigured), h)
+		return nodejson.Answer(r, http.StatusUnprocessableEntity, errorBody(notConfigured.String()), h)
 	}
 	draftID, isStr := field(b, "draftId").(string)
 	if !isStr || !ShareIDRe.MatchString(draftID) {
-		return nodejson.Answer(r, http.StatusBadRequest, errorBody("Неверный черновик"), h)
+		return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid draft", "Неверный черновик")), h)
 	}
 	days := field(b, "expiresInDays")
 	if !IsExpiryDays(days) {
-		return nodejson.Answer(r, http.StatusBadRequest, errorBody("Срок: 7, 30 или 90 дней"), h)
+		return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Lifetime: 7, 30 or 90 days", "Срок: 7, 30 или 90 дней")), h)
 	}
 	replaceID := ""
 	switch rv := field(b, "replaceId").(type) {
 	case nil:
 	case string:
 		if !ShareIDRe.MatchString(rv) {
-			return nodejson.Answer(r, http.StatusBadRequest, errorBody("Неверная ссылка"), h)
+			return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid link", "Неверная ссылка")), h)
 		}
 		replaceID = rv
 	default:
 		if rv != jsvalue.Undefined {
-			return nodejson.Answer(r, http.StatusBadRequest, errorBody("Неверная ссылка"), h)
+			return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid link", "Неверная ссылка")), h)
 		}
 	}
 	draft, err := rt.Store.ReadDraft(draftID)
@@ -512,7 +513,7 @@ func (rt *Route) Shares(r *http.Request) (int, any, http.Header) {
 		return internalError(r.URL.Path, err, h)
 	}
 	if draft == nil {
-		return nodejson.Answer(r, http.StatusNotFound, errorBody("Черновик устарел: соберите снимок заново"), h)
+		return nodejson.Answer(r, http.StatusNotFound, errorBody(locale.Pick("The draft is out of date: capture the snapshot again", "Черновик устарел: соберите снимок заново")), h)
 	}
 	m, err := rt.Store.Publish(draft, routeBase, days.(float64), replaceID)
 	if err != nil {
@@ -534,7 +535,7 @@ func (rt *Route) Share(r *http.Request, id string) (int, any, http.Header) {
 	}
 	h = noStore()
 	if !ShareIDRe.MatchString(id) {
-		return nodejson.Answer(r, http.StatusNotFound, errorBody(errLinkMissing), h)
+		return nodejson.Answer(r, http.StatusNotFound, errorBody(errLinkMissing.String()), h)
 	}
 	if r.Method == http.MethodDelete {
 		m, err := rt.Store.Revoke(id)
@@ -551,11 +552,11 @@ func (rt *Route) Share(r *http.Request, id string) (int, any, http.Header) {
 		return http.StatusMethodNotAllowed, nil, h
 	}
 	if !jsonType(r) {
-		return nodejson.Answer(r, http.StatusUnsupportedMediaType, errorBody("Нужен application/json"), h)
+		return nodejson.Answer(r, http.StatusUnsupportedMediaType, errorBody(locale.Pick("application/json is required", "Нужен application/json")), h)
 	}
 	days := field(b, "expiresInDays")
 	if !IsExpiryDays(days) {
-		return nodejson.Answer(r, http.StatusBadRequest, errorBody("Срок: 7, 30 или 90 дней"), h)
+		return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Lifetime: 7, 30 or 90 days", "Срок: 7, 30 или 90 дней")), h)
 	}
 	m, err := rt.Store.Extend(id, days.(float64))
 	if err != nil {

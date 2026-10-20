@@ -67,14 +67,14 @@ const genIcons = () => Array.from({ length: Math.floor(rnd() * 6) }, () => `<${p
 
 const field = (name, value) => ({ name, value });
 const genTask = () => {
-  const keyed = pick(['ACME-12', 'DEMO-1', 'OPS-123456', 'OPS-1234567', 'NOPE-1', 12, null, undefined]);
+  const keyed = pick(['ACME-12', 'DEMO-1', 'APP-123456', 'APP-1234567', 'NOPE-1', 12, null, undefined]);
   const text = () => (rnd() < 0.04 ? pick(['x'.repeat(301), '😀'.repeat(151)])
     : pick(['plain', '  spaced\tout\n', 'line\r\nbreak\rhere', 'esc \u001b[1m bold', 'bell\u0007', '', 5, null, undefined, 'a\u0085b']));
   const raw = {
     idReadable: keyed, summary: text(), description: rnd() < 0.01 ? 'd'.repeat(20481) : text(), resolved: pick([null, undefined, 0, 1, false]),
     updated: pick([1792321500123, 'x', null, Infinity, 1.5]), project: pick([{ shortName: text() }, null, 'ACME', [1]]),
     parent: pick([{ issues: [{ idReadable: pick(['ACME-1', 'X-1', 3]), summary: text() }] }, { issues: [] }, { issues: 'x' }, null, []]),
-    subtasks: rnd() < 0.02 ? { issues: Array(52).fill({ idReadable: 'OPS-1', summary: 's' }) } : pick([{ issues: Array.from({ length: Math.floor(rnd() * 4) }, () => ({ idReadable: pick(['ACME-2', 'NOPE-2', null]), summary: text(), resolved: pick([null, 1]), customFields: pick([[field('State', { name: text() })], 'x', null]) })) }, null]),
+    subtasks: rnd() < 0.02 ? { issues: Array(52).fill({ idReadable: 'APP-1', summary: 's' }) } : pick([{ issues: Array.from({ length: Math.floor(rnd() * 4) }, () => ({ idReadable: pick(['ACME-2', 'NOPE-2', null]), summary: text(), resolved: pick([null, 1]), customFields: pick([[field('State', { name: text() })], 'x', null]) })) }, null]),
     customFields: pick([[field('Assignee', pick([{ login: pick(['jdoe', 5, '']), fullName: text(), name: text(), avatarUrl: pick(['/hub/x', null, 3]) }, null, 'str'])), field('Type', { name: text() }), field('State', 'x'), field('Priority', { name: text() })], 'x', null, [null, 1, field('State', { name: 'S' })]]),
     comments: pick([Array.from({ length: Math.floor(rnd() * 13) }, (_, i) => ({ author: pick([{ fullName: text(), login: text() }, null, 'a']), created: pick([i, 'x', null]), text: rnd() < 0.02 ? 'c'.repeat(4097) : text() })), null, 'x']),
   };

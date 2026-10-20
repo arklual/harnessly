@@ -50,13 +50,13 @@ const int = (n) => Math.floor(rnd() * n);
 const iso = (s) => new RealDate(Date.parse('2026-10-18T10:00:00.000Z') + s * 1000).toISOString();
 
 // Stand-ins: a.example.io (documents, boards), ai.example.io (the platform's reader), tracker.example.io and
-// youtrack.example.io (issues), gitlab.example.io (GitLab), project keys ABC, EXP and OPS.
+// youtrack.example.io (issues), gitlab.example.io (GitLab), project keys ABC, DEV and APP.
 const linkTexts = [
   'See [the report](https://a.example.io/a/report-1) and https://a.example.io/b/board-2?k=abc.',
   'Board docs: https://a.example.io/b/api and https://a.example.io/b/api/ and https://a.example.io/c/x',
   'MR https://gitlab.example.io/group/sub/proj/-/merge_requests/42/diffs, also https://gitlab.com/a/b/-/merge_requests/007!',
-  'Issues ABC-123, EXP-7 and OPS-1; not ABC-1234567, x/ABC-5, ABC-12-3, ABC-9x, a.ABC-4 or ABCX-2.',
-  'Tracker https://tracker.example.io/issue/OPS-9 and https://youtrack.example.io/youtrack/issue/ABC-77/ plus https://tracker.example.io/agiles/1',
+  'Issues ABC-123, DEV-7 and APP-1; not ABC-1234567, x/ABC-5, ABC-12-3, ABC-9x, a.ABC-4 or ABCX-2.',
+  'Tracker https://tracker.example.io/issue/APP-9 and https://youtrack.example.io/youtrack/issue/ABC-77/ plus https://tracker.example.io/agiles/1',
   'Reader https://ai.example.io/agents/docs/my-doc and https://ai.example.io/agents/docs/a/b',
   '[Artifact](https://claude.ai/public/artifacts/abc-123) https://claude.ai/code/artifact/x_y/ https://github.com/acme/x/pull/3',
   'Local http://localhost:3000/x http://127.1/x http://0.0.0.0:8080 https://[::1]:3000/ and https://www.a.example.io/a/x',
@@ -67,7 +67,7 @@ const linkTexts = [
   'Spaces [x](https://x.example.org/a b) and (https://x.example.org/paren) and `https://x.example.org/tick` <https://x.example.org/angle>',
   'Unicode https://пример.рф/путь https://example.org/%D0%BF and https://EXAMPLE.org/Case and https://user:pw@example.org:443/a',
   'Bad http:// https://) https://exa mple.org http://example.org:99999/ x https://a..b/ yhttps://glued.example.org/z',
-  'Готово: [отчёт](https://a.example.io/a/otchet), задача ABC-42 и EXP-300000.',
+  'Готово: [отчёт](https://a.example.io/a/otchet), задача ABC-42 и DEV-300000.',
   'No links here at all.',
   '',
 ];

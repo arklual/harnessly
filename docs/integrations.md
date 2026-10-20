@@ -84,20 +84,19 @@ The `artifacts` CLI the skill uses is `npm install -g @ly-solutions/artifacts`.
 
 ## In the page
 
-- **Chips.** A board link (`<boards>/b/<slug>?k=<key>`) or a document link (`<artifacts>/a/<slug>`, `/embed/<slug>`,
-  with `?v=`) in an agent's reply or a person's message is a chip; clicking it opens it in the side pane. Other links
-  open in a new tab.
+- **Chips.** A board link (`<boards>/b/<slug>?k=<key>`) or a document link (`<artifacts>/a/<slug>`, or the page's own
+  reader `<base>/docs/<slug>`) in an agent's reply or a person's message is a chip; clicking it opens it in the right
+  pane. GitHub issue and pull request links, tracker task keys and GitLab merge requests are chips too.
 - **Board tab.** Before loading a board, the page asks the runtime for a one-time sign-in link
   (`POST /api/integrations/boards/sign-in`, which calls boards' `POST /b/api/handoff` with the runtime's token for the
-  signed-in person) and loads that: boards sets its own session and lands on the board's live editor. Without
-  `RUNTIME_BOARDS_TOKEN` the pane loads the board directly and boards signs people in its own way (a shared identity
-  provider or proxy).
-- **Document tab.** The embed view of the document, in the page's theme (changes are sent with `postMessage`, no
-  reload). When the catalog wants a sign-in, the pane opens it in a window and reloads after. Above it, the documents
-  of the current conversation (`GET /api/integrations/artifacts/documents?session=<tab id>`), refreshed every 15
-  seconds.
-- The pane is toggled from the top bar, resizable, and remembers its width. It shows only when the runtime names a
-  service (`GET /api/integrations`, which answers the origins and never a token).
+  signed-in person) and frames that: boards sets its own session and lands on the board's live editor. Without
+  `RUNTIME_BOARDS_TOKEN` the pane loads the board directly and boards signs people in its own way.
+- **Document reader.** `<platform>/docs/…` serves the reader from the catalog: the list of documents with open
+  threads and unread comments, one document, its versions and their diff, and a short-lived read link
+  (`GET /api/v1/artifacts/{slug}/access` with the viewer token) the reader frames, so no token reaches the browser.
+  The public-link switch uses the sharer token. Comment threads are kept by the runtime in `doc-threads.json` in its
+  data directory.
+- **Artifacts tab.** The documents of the current conversation (`GET /api/integrations/artifacts/documents?session=…`).
 
 ## Not done yet
 
@@ -106,3 +105,5 @@ The `artifacts` CLI the skill uses is `npm install -g @ly-solutions/artifacts`.
 - There is no conversation URL for `ARTIFACTS_SESSION_URL` yet, so the catalog cannot link a document back to its
   conversation.
 - The pane has no board picker or "new board" button; agents create boards, people paste links.
+- Selecting text in the reader to start a thread needs the reader's selection bridge inside the document frame,
+  which the catalog's read view does not carry yet; threads can be read and answered.

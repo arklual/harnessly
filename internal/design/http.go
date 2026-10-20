@@ -10,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
@@ -166,7 +167,7 @@ func (a *API) Guard(r *http.Request, methods ...string) (body *jsvalue.Object, r
 		return nil, &ans
 	}
 	if r.Method != http.MethodGet && !strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
-		ans := JSON(r, http.StatusUnsupportedMediaType, errorBody("Ожидается application/json"), h)
+		ans := JSON(r, http.StatusUnsupportedMediaType, errorBody(locale.Pick("application/json is expected", "Ожидается application/json")), h)
 		return nil, &ans
 	}
 	return Fields(raw), nil

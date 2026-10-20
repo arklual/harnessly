@@ -67,7 +67,7 @@ func standaloneEnv(t *testing.T, home, data string) {
 		"RUNTIME_SCRIPT_DATA_DIRS": ".acme-ai,.oldmux", "RUNTIME_CLI_TOKEN_HEADERS": "x-acme-token,x-omux-token",
 		"RUNTIME_MCP_SERVER": "acme-preview", "RUNTIME_MCP_ALLOW": "mcp__acme-preview,mcp__oldmux-preview", "RUNTIME_MCP_TOKEN_ENV": "ACME_PREVIEW_TOKEN",
 		"RUNTIME_MCP_PATH": "", "RUNTIME_PROMPT_EDITOR": filepath.Join(data, "bin", "acme-prompt-editor"), "RUNTIME_PROMPT_EDITOR_NAME": "",
-		"RUNTIME_PROMPT_EDITOR_TITLE": "Acme prompt editor (TCK-3010)", "RUNTIME_PROMPT_HUMAN_EDITOR_VAR": "ACME_HUMAN_EDITOR",
+		"RUNTIME_PROMPT_EDITOR_TITLE": "Acme prompt editor", "RUNTIME_PROMPT_HUMAN_EDITOR_VAR": "ACME_HUMAN_EDITOR",
 		"RUNTIME_PROMPT_HANDOFF_DIR": filepath.Join(data, "prompt-handoff"), "RUNTIME_PROMPT_HANDOFF_UNKEYED_SOCKET": "violet",
 		"RUNTIME_LOCK_FILE": "omux.lock", "RUNTIME_HEALTH_APP": "oldmux", "RUNTIME_RELEASE_FILE": "",
 		"RUNTIME_WORKSPACE_PROMPTS_FILE": filepath.Join(wd, "testdata", "standalone", "workspace-prompts.json"),

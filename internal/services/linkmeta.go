@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -97,6 +98,35 @@ var (
 	projectKeyRe = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}$`)
 )
 
+// OriginOf is the origin of an http(s) address (scheme, host and non-default port), "" for anything else. A deployment
+// names its documents and boards services by it.
+func OriginOf(raw string) string {
+	u, ok := parseWebURL(raw, nil)
+	if !ok || (u.Scheme != "https" && u.Scheme != "http") || u.Username != "" || u.Password != "" {
+		return ""
+	}
+	return u.Origin()
+}
+
+// isPortal says whether an address is on the documents or boards service, by origin: the scheme and the port count.
+func (s *Service) isPortal(u *webURL) bool {
+	if s.cfg.DocsHost != "" && u.Scheme == "https" && u.Host == s.cfg.DocsHost && u.Port == "" {
+		return true
+	}
+	return slices.Contains(s.cfg.PortalOrigins, u.Origin())
+}
+
+// portalOrigin is where the platform's reader links are mapped to: the documents service.
+func (s *Service) portalOrigin() string {
+	if s.cfg.DocsHost != "" {
+		return "https://" + s.cfg.DocsHost
+	}
+	if len(s.cfg.PortalOrigins) > 0 {
+		return s.cfg.PortalOrigins[0]
+	}
+	return ""
+}
+
 func (s *Service) isTrackerHost(host string) bool {
 	for _, h := range s.cfg.TrackerHosts {
 		if h == host {
@@ -109,11 +139,11 @@ func (s *Service) isTrackerHost(host string) bool {
 // docSlugOf is the slug of a published document or board, from its own address or from the platform's reader.
 func (s *Service) docSlugOf(raw string) (string, bool) {
 	u, ok := parseWebURL(raw, nil)
-	if !ok || u.Scheme != "https" {
+	if !ok {
 		return "", false
 	}
 	switch {
-	case s.cfg.DocsHost != "" && u.Host == s.cfg.DocsHost:
+	case s.isPortal(u):
 		m := portalPathRe.FindStringSubmatch(u.Pathname())
 		if m == nil {
 			return "", false
@@ -125,7 +155,7 @@ func (s *Service) docSlugOf(raw string) (string, bool) {
 			return "", false
 		}
 		return m[2], true
-	case s.cfg.ReaderHost != "" && u.Host == s.cfg.ReaderHost:
+	case s.cfg.ReaderHost != "" && u.Scheme == "https" && u.Host == s.cfg.ReaderHost:
 		rest, ok := strings.CutPrefix(u.Pathname(), s.cfg.ReaderPath)
 		rest = strings.TrimSuffix(rest, "/")
 		if ok && rest != "" && !strings.ContainsFunc(rest, func(r rune) bool { return !isWordRune(r) && r != '-' }) {
@@ -142,17 +172,23 @@ func isWordRune(r rune) bool {
 // parseLinkTarget is the strict list of links the server reads metadata for; anything else is refused.
 func (s *Service) parseLinkTarget(raw string) *linkTarget {
 	u, ok := parseWebURL(raw, nil)
-	if !ok || u.Scheme != "https" || u.Username != "" || u.Password != "" || u.Port != "" {
+	if !ok || u.Username != "" || u.Password != "" {
 		return nil
 	}
+	// The tracker, GitLab and the platform's reader are plain https addresses; the documents and boards services are
+	// recognised by origin, so a workspace on http://localhost with a port per service gets titles too.
+	plain := u.Scheme == "https" && u.Port == ""
 	path := u.Pathname()
-	if s.isTrackerHost(u.Host) {
+	if !plain && !s.isPortal(u) {
+		return nil
+	}
+	if plain && s.isTrackerHost(u.Host) {
 		if m := issueURLRe.FindStringSubmatch(path); m != nil {
 			return &linkTarget{kind: "issue", key: m[1]}
 		}
 		return nil
 	}
-	if s.isGitlabHost(u.Host) {
+	if plain && s.isGitlabHost(u.Host) {
 		m := mrURLRe.FindStringSubmatch(path)
 		if m == nil {
 			return nil
@@ -166,12 +202,12 @@ func (s *Service) parseLinkTarget(raw string) *linkTarget {
 		return &linkTarget{kind: "mr", host: u.Host, project: m[1], iid: iid}
 	}
 	href := u.Href()
-	if s.cfg.ReaderHost != "" && u.Host == s.cfg.ReaderHost {
+	if plain && s.cfg.ReaderHost != "" && u.Host == s.cfg.ReaderHost && s.portalOrigin() != "" {
 		if slug, ok := s.docSlugOf(href); ok {
-			return &linkTarget{kind: "artifact", url: "https://" + s.cfg.DocsHost + "/a/" + slug}
+			return &linkTarget{kind: "artifact", url: s.portalOrigin() + "/a/" + slug}
 		}
 	}
-	if s.cfg.DocsHost != "" && u.Host == s.cfg.DocsHost {
+	if s.isPortal(u) {
 		m := artifactRe.FindStringSubmatch(path)
 		if m == nil || m[1] == "api" {
 			return nil
@@ -180,7 +216,7 @@ func (s *Service) parseLinkTarget(raw string) *linkTarget {
 		if k != nil && !boardKeyRe.MatchString(*k) {
 			return nil
 		}
-		target := "https://" + s.cfg.DocsHost + path
+		target := u.Origin() + path
 		if k != nil && *k != "" {
 			target += "?k=" + *k
 		}
@@ -251,9 +287,11 @@ func (s *Service) rememberAvatar(login any, source any) {
 	}
 }
 
-// epicOf: an idea above an epic is strategy, not context for a task row, so only an epic is shown as the parent.
+// ideaRe matches the tracker's idea level in English or Russian. It is checked against names the tracker returns, so it
+// is data, not display text.
 var ideaRe = regexp.MustCompile(`(?i)^(idea|идея)$`)
 
+// epicOf: an idea above an epic is strategy, not context for a task row, so only an epic is shown as the parent.
 func epicOf(parent any) (any, error) {
 	if !truthy(parent) {
 		return nil, nil

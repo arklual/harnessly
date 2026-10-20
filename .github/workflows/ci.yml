@@ -77,6 +77,23 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # The runtime carries the page it was built next to: the compiled-in files are the agents workspace.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Runtime with the page compiled in
+        working-directory: .
+        run: |
+          go test -tags webui -count=1 -run TestWebUIBuild ./cmd/runtime
+          go build -tags webui -o "$RUNNER_TEMP/runtime" ./cmd/runtime
+          RUNTIME_GATE_LISTEN=127.0.0.1:8022 RUNTIME_GATE_UPSTREAM= RUNTIME_APP_BASE_PATH=/ HOME="$RUNNER_TEMP/home" \
+            "$RUNNER_TEMP/runtime" &
+          for i in $(seq 1 30); do curl -fsS 127.0.0.1:8022/api/health >/dev/null && break; sleep 1; done
+          page=$(curl -fsS 127.0.0.1:8022/)
+          echo "$page" | grep -q '<title>harnessly'
+          bundle=$(echo "$page" | grep -o 'assets/index-[^"]*\.js' | head -n1)
+          curl -fsS "127.0.0.1:8022/$bundle" >/dev/null
+          kill %1
 
   deploy:
     name: deploy files

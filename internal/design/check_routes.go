@@ -10,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
@@ -53,7 +54,7 @@ func (a *API) Check(r *http.Request) Answer {
 		}
 	}
 	if !IsLibraryID(artifact) {
-		return JSON(r, http.StatusBadRequest, errorBody("Неизвестный макет"), h)
+		return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 	}
 	if r.Method == http.MethodGet {
 		v, _ := a.L.ReadCheckReport(artifact)
@@ -62,7 +63,7 @@ func (a *API) Check(r *http.Request) Answer {
 	only, _ := stringsOf(Field(body, "boards"), 400)
 	report := a.L.StartCheck(artifact, only)
 	if report == nil {
-		return JSON(r, http.StatusNotFound, errorBody("Нет такого макета или такой доски"), h)
+		return JSON(r, http.StatusNotFound, errorBody(locale.Pick("No such design or board", "Нет такого макета или такой доски")), h)
 	}
 	return JSON(r, http.StatusAccepted, jsvalue.NewObject("report", reportValue(report)), h)
 }
@@ -86,7 +87,7 @@ func (a *API) CLICheck(r *http.Request, body *jsvalue.Object, artifact string) A
 	only, _ := stringsOf(Field(body, "boards"), 0)
 	started := a.L.StartCheck(artifact, only)
 	if started == nil {
-		return JSON(r, http.StatusNotFound, errorBody("Нет такого макета или такой доски: смотри "+a.L.cfg.Texts.CLI+" design list"), h)
+		return JSON(r, http.StatusNotFound, errorBody(locale.Pick("No such design or board: see "+a.L.cfg.Texts.CLI+" design list", "Нет такого макета или такой доски: смотри "+a.L.cfg.Texts.CLI+" design list")), h)
 	}
 	if w, _ := Field(body, "wait").(bool); !w {
 		return JSON(r, http.StatusAccepted, a.L.ForAgent(started), h)

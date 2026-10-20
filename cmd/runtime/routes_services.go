@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -32,6 +33,18 @@ var (
 	servicesFor = map[*gate.OldRuntime]*services.Handlers{}
 )
 
+// portalOrigins are the origins of the documents and boards services as the deployment names them; a link on one gets
+// its title in a chip, whatever scheme and port it has.
+func portalOrigins() []string {
+	var out []string
+	for _, name := range []string{"RUNTIME_ARTIFACTS_URL", "RUNTIME_BOARDS_URL"} {
+		if origin := services.OriginOf(os.Getenv(name)); origin != "" && !slices.Contains(out, origin) {
+			out = append(out, origin)
+		}
+	}
+	return out
+}
+
 // serviceConfig is what the deployment names; empty values leave their routes to the old runtime.
 func serviceConfig(d deps) services.Config {
 	cfg := services.Config{
@@ -41,6 +54,7 @@ func serviceConfig(d deps) services.Config {
 		TrackerURL:    os.Getenv("RUNTIME_TRACKER_URL"),
 		TrackerHosts:  splitList(os.Getenv("RUNTIME_TRACKER_HOSTS")),
 		DocsHost:      os.Getenv("RUNTIME_DOCS_HOST"),
+		PortalOrigins: portalOrigins(),
 		ReaderHost:    os.Getenv("RUNTIME_PLATFORM_HOST"),
 		ReaderPath:    env("RUNTIME_DOCS_READER_PATH", "/agents/docs/"),
 		AvatarPath:    platformAPI + "/link-meta/avatar",
@@ -53,6 +67,10 @@ func serviceConfig(d deps) services.Config {
 		} else {
 			agent.Log("warn", "RUNTIME_TASK_KEY_RE does not compile", agent.F{K: "error", V: err.Error()})
 		}
+	}
+	// A standalone runtime has nobody behind it to keep the person's pins and projects: it keeps them itself.
+	if cfg.OrganizerFile == "" && d.Standalone {
+		cfg.OrganizerFile = "organizer.json"
 	}
 	if cfg.OrganizerFile != "" && !filepath.IsAbs(cfg.OrganizerFile) {
 		cfg.OrganizerFile = filepath.Join(d.DataDir, cfg.OrganizerFile)
@@ -171,7 +189,7 @@ func serviceRoutes(d deps) []gate.JSONRoute {
 			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/gitlab-view"), Compute: viaMemory(d, h.GitLabView), Shape: true},
 		)
 	}
-	if cfg.TrackerURL != "" && len(cfg.GitLabHosts) > 0 && cfg.DocsHost != "" {
+	if cfg.TrackerURL != "" && len(cfg.GitLabHosts) > 0 && (cfg.DocsHost != "" || len(cfg.PortalOrigins) > 0) {
 		out = append(out,
 			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/link-meta"), Compute: viaMemory(d, h.LinkMeta), Shape: true},
 			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/link-meta/projects"), Compute: viaMemory(d, h.Projects)},

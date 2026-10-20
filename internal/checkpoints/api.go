@@ -6,6 +6,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // API is the checkpoints route of the platform's pages, past the API's own checks (a caller with a page session): GET
@@ -36,7 +37,7 @@ type Request struct {
 // TextAnswer is a plain-text answer (the dispatcher's own failure).
 type TextAnswer string
 
-const busyText = "Агент работает: дождитесь конца хода"
+var busyText = locale.T("The agent is working: wait for the turn to end", "Агент работает: дождитесь конца хода")
 
 func errBody(text string) *jsvalue.Object { return jsvalue.NewObject("error", text) }
 
@@ -68,19 +69,19 @@ func (a *API) Serve(req Request) (int, any, http.Header) {
 	}
 	post := req.Method == http.MethodPost
 	if post && !strings.HasPrefix(req.ContentType, "application/json") {
-		return http.StatusUnsupportedMediaType, errBody("Нужен application/json"), h
+		return http.StatusUnsupportedMediaType, errBody(locale.Pick("application/json is required", "Нужен application/json")), h
 	}
 	tabID, ok := req.TabID.Value.(string)
 	if !req.TabID.Present || !ok || !ValidTabID(tabID) {
-		return http.StatusBadRequest, errBody("Нужен tabId"), h
+		return http.StatusBadRequest, errBody(locale.Pick("tabId is required", "Нужен tabId")), h
 	}
 	id, idString := req.ID.Value.(string)
 	if (post || req.ID.Present) && !(req.ID.Present && idString && ValidID(id)) {
-		return http.StatusBadRequest, errBody("Неверная точка отката"), h
+		return http.StatusBadRequest, errBody(locale.Pick("Invalid checkpoint", "Неверная точка отката")), h
 	}
 	sc, busy := a.scope(tabID)
 	if sc == nil {
-		return http.StatusNotFound, errBody("Вкладка не найдена"), h
+		return http.StatusNotFound, errBody(locale.Pick("Tab not found", "Вкладка не найдена")), h
 	}
 	if !post && !req.ID.Present {
 		list, err := sc.List()
@@ -97,32 +98,32 @@ func (a *API) Serve(req Request) (int, any, http.Header) {
 	if !post {
 		diff, err := sc.DiffTo(id)
 		if err != nil {
-			return http.StatusUnprocessableEntity, errBody("Не удалось сравнить с текущим состоянием"), h
+			return http.StatusUnprocessableEntity, errBody(locale.Pick("Could not compare with the current state", "Не удалось сравнить с текущим состоянием")), h
 		}
 		if diff == nil {
-			return http.StatusNotFound, errBody("Точка отката не найдена"), h
+			return http.StatusNotFound, errBody(locale.Pick("Checkpoint not found", "Точка отката не найдена")), h
 		}
 		return http.StatusOK, diff.JSON(), h
 	}
 	if busy {
-		return http.StatusConflict, errBody(busyText), h
+		return http.StatusConflict, errBody(busyText.String()), h
 	}
 	result, err := sc.Rewind(id, Hooks{IsBusy: func() bool {
 		_, state, ok := a.Tab(tabID)
 		return !ok || busyState(state)
 	}})
 	if err != nil {
-		return http.StatusInternalServerError, errBody("Откат не удался"), h
+		return http.StatusInternalServerError, errBody(locale.Pick("The rollback failed", "Откат не удался")), h
 	}
 	switch result.Reason {
 	case "":
 		return http.StatusOK, result.JSON(), h
 	case Busy:
-		return http.StatusConflict, errBody(busyText), h
+		return http.StatusConflict, errBody(busyText.String()), h
 	case NotFound:
-		return http.StatusNotFound, errBody("Точка отката не найдена"), h
+		return http.StatusNotFound, errBody(locale.Pick("Checkpoint not found", "Точка отката не найдена")), h
 	}
-	return http.StatusUnprocessableEntity, errBody("Не удалось сохранить текущее состояние, откат не выполнен"), h
+	return http.StatusUnprocessableEntity, errBody(locale.Pick("Could not save the current state, the rollback was not done", "Не удалось сохранить текущее состояние, откат не выполнен")), h
 }
 
 // SnapshotTurnEnd snapshots a tab's folder once its agent's turn ended; a failure is logged and never reaches the agent.

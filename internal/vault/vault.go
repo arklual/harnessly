@@ -14,6 +14,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
@@ -128,13 +129,13 @@ func CLIReply(o Outcome) (int, *jsvalue.Object) {
 	case "answered":
 		return 200, o.Result.JSON()
 	case "timeout":
-		return 200, Result{"needs-approval", "Человек не ответил на просьбу войти: попросите его подтвердить в окне и повторите"}.JSON()
+		return 200, Result{"needs-approval", locale.Pick("The person did not answer the sign-in request: ask them to confirm it in the window and try again", "Человек не ответил на просьбу войти: попросите его подтвердить в окне и повторите")}.JSON()
 	case "no-ui":
-		return 503, jsvalue.NewObject("error", "Интерфейс не подключён: сейчас никто не смотрит эту машину (страница закрыта)")
+		return 503, jsvalue.NewObject("error", locale.Pick("The interface is not connected: nobody is looking at this machine now (the page is closed)", "Интерфейс не подключён: сейчас никто не смотрит эту машину (страница закрыта)"))
 	case "busy":
-		return 409, jsvalue.NewObject("error", "Предыдущая просьба войти ещё ждёт ответа человека")
+		return 409, jsvalue.NewObject("error", locale.Pick("The previous sign-in request is still waiting for the person's answer", "Предыдущая просьба войти ещё ждёт ответа человека"))
 	}
-	return 429, jsvalue.NewObject("error", "Слишком часто: не больше 6 просьб войти за 10 минут")
+	return 429, jsvalue.NewObject("error", locale.Pick("Too often: at most 6 sign-in requests in 10 minutes", "Слишком часто: не больше 6 просьб войти за 10 минут"))
 }
 
 // Rule is one sliding window: at most Limit takes within Window.

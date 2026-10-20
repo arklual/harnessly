@@ -89,7 +89,7 @@ type Options struct {
 	WorkspaceID string
 	// Prompt is the first message; nil for none.
 	Prompt *string
-	// Launch is the checked model and effort; nil or both nil is «Авто».
+	// Launch is the checked model and effort; nil or both nil is "Auto".
 	Launch *agents.Launch
 	// Cwd is an explicit launch folder: it must exist and lie inside the project root or one of CwdRoots.
 	Cwd      string

@@ -19,7 +19,7 @@ func TestServiceRoutesThroughTheGate(t *testing.T) {
 	dir, home := t.TempDir(), t.TempDir()
 	for k, v := range map[string]string{
 		"RUNTIME_GITLAB_HOSTS": "gitlab.example.com,gitlab.com", "RUNTIME_TRACKER_URL": "https://tracker.example.com",
-		"RUNTIME_TRACKER_HOSTS": "tracker.example.com", "RUNTIME_DOCS_HOST": "docs.example.com", "RUNTIME_TASK_KEY_RE": `^(ACME|OPS)-[0-9]{1,6}$`,
+		"RUNTIME_TRACKER_HOSTS": "tracker.example.com", "RUNTIME_DOCS_HOST": "docs.example.com", "RUNTIME_TASK_KEY_RE": `^(ACME|APP)-[0-9]{1,6}$`,
 		"RUNTIME_ORGANIZER_FILE": "organizer.json", "RUNTIME_SECRET_CONFIG_DIRS": ".config/acme", "YOUTRACK_TOKEN": "", "GITLAB_TOKEN": "", "GITLAB_SELF_TOKEN": "",
 	} {
 		t.Setenv(k, v)
@@ -72,7 +72,7 @@ func TestServiceRoutesThroughTheGate(t *testing.T) {
 		{"PATCH", "/api/platform/organizer", `{"ops":[{"op":"pin","ref":"agent:tab-1"}]}`, append([]string{"Content-Type", "application/json"}, asPerson...), 200, ""},
 		{"PATCH", "/api/platform/organizer", `{"ops":`, append([]string{"Content-Type", "application/json"}, asPerson...), 400, "Invalid JSON"},
 		{"GET", "/api/platform/task?key=NOPE-1", "", asPerson, 400, `{"error":"Unsupported key"}`},
-		{"GET", "/api/platform/task?key=OPS-1", "", asPerson, 503, `{"error":"no-token"}`},
+		{"GET", "/api/platform/task?key=APP-1", "", asPerson, 503, `{"error":"no-token"}`},
 		{"POST", "/api/platform/link-meta/projects", "", asPerson, 200, `{"keys":[]}`},
 		{"GET", "/api/platform/link-meta?url=https%3A%2F%2Fexample.com%2F", "", asPerson, 400, `{"error":"Unsupported url"}`},
 		{"GET", "/api/platform/gitlab-view?url=x", "", asPerson, 400, `{"error":"Нужна ссылка на merge request или коммит GitLab"}`},

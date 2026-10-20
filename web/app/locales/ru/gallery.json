@@ -1,0 +1,12 @@
+{
+  "gallery.galleryView.filterAll": "Все",
+  "gallery.galleryView.filterMine": "Мои",
+  "gallery.galleryView.filterAgent": "От агента",
+  "gallery.galleryView.sourceYou": "вы",
+  "gallery.galleryView.sourceAgent": "агент",
+  "gallery.galleryView.emptyTitle": "В этом разговоре пока нет картинок",
+  "gallery.galleryView.emptyHint": "Здесь соберутся изображения, которые вы прикрепили, и те, что агент создал или открыл.",
+  "gallery.galleryView.title": "Галерея",
+  "gallery.galleryView.sourceTabs": "Источник картинок",
+  "gallery.galleryView.noneFromSource": "Нет картинок из этого источника"
+}

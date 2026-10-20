@@ -14,6 +14,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Codex subscription usage straight from ChatGPT, the endpoint Codex's own /status reads: the Codex transcript carries
@@ -150,7 +152,7 @@ func fetchCodexUsage(ctx context.Context, login CodexLogin, client *http.Client,
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		if res.StatusCode == http.StatusUnauthorized {
-			return nil, "вход Codex истёк, откройте Codex на машине"
+			return nil, locale.Pick("the Codex sign-in has expired: open Codex on the machine", "вход Codex истёк, откройте Codex на машине")
 		}
 		return nil, "HTTP " + strconv.Itoa(res.StatusCode)
 	}
@@ -165,5 +167,5 @@ func fetchCodexUsage(ctx context.Context, login CodexLogin, client *http.Client,
 	if data := ParseCodexUsage(body, now); data != nil {
 		return data, ""
 	}
-	return nil, "в ответе нет окон лимита"
+	return nil, locale.Pick("the answer has no limit windows", "в ответе нет окон лимита")
 }

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
@@ -9,10 +10,15 @@ const runtime = process.env.RUNTIME_URL ?? 'http://127.0.0.1:8022';
 
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@kit': fileURLToPath(new URL('./kit', import.meta.url)),
+      '@/': fileURLToPath(new URL('./app/', import.meta.url)),
+      'next/router': fileURLToPath(new URL('./app/platform/router.ts', import.meta.url)),
+      'next/head': fileURLToPath(new URL('./app/platform/head.tsx', import.meta.url)),
+      'next/dynamic': fileURLToPath(new URL('./app/platform/dynamic.tsx', import.meta.url)),
+      'next-themes': fileURLToPath(new URL('./app/platform/theme.tsx', import.meta.url)),
     },
   },
   build: {
@@ -28,7 +34,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.{ts,tsx}', 'kit/**/*.test.{ts,tsx}'],
+    include: ['app/**/*.test.{ts,tsx}', 'kit/**/*.test.{ts,tsx}'],
     css: false,
   },
 });

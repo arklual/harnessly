@@ -10,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
@@ -26,7 +27,7 @@ type Config struct {
 	AccessHost string
 	// BindsLoopback: the previous runtime would have listened on the loopback address only.
 	BindsLoopback bool
-	// ValidateLaunch checks a launch choice against this machine's catalog (nil when the shape is "Авто").
+	// ValidateLaunch checks a launch choice against this machine's catalog (nil when the shape is "Auto").
 	ValidateLaunch func(provider string, model, effort any) (*agents.Launch, string)
 	APIRefusal     func(*http.Request) (status int, body any, h http.Header, refused bool)
 }
@@ -282,18 +283,18 @@ func (cfg Config) patchConfig(r *http.Request, raw any) (int, any, http.Header) 
 	if has, _ := in(body, cfg.DefaultsKey); has {
 		defaults, ok := get(body, cfg.DefaultsKey).(*jsvalue.Object)
 		if !ok {
-			return bad("Неверные умолчания запуска")
+			return bad(locale.Pick("Invalid launch defaults", "Неверные умолчания запуска"))
 		}
 		patch := jsvalue.NewObject()
 		for _, provider := range defaults.Keys() {
 			choice, _ := defaults.Get(provider)
 			if provider != agents.Claude && provider != agents.Codex {
-				return bad("Неизвестный агент")
+				return bad(locale.Pick("Unknown agent", "Неизвестный агент"))
 			}
 			switch choice.(type) {
 			case *jsvalue.Object, []any:
 			default:
-				return bad("Неверные умолчания запуска")
+				return bad(locale.Pick("Invalid launch defaults", "Неверные умолчания запуска"))
 			}
 			model, effort := get(choice, "model"), get(choice, "effort")
 			var launch *agents.Launch

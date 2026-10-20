@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Claude subscription usage from the codexbar CLI, once a minute. Only percentages, reset times, the plan name and
@@ -114,7 +115,7 @@ func codexbarPace(raw any) any {
 func ParseCodexbar(stdout []byte, now float64) (Data, string) {
 	var parsed any
 	if json.Unmarshal(stdout, &parsed) != nil {
-		return nil, "codexbar: ответ не JSON"
+		return nil, locale.Pick("codexbar: the answer is not JSON", "codexbar: ответ не JSON")
 	}
 	entries, isList := parsed.([]any)
 	if !isList {
@@ -128,18 +129,18 @@ func ParseCodexbar(stdout []byte, now float64) (Data, string) {
 		}
 	}
 	if entry == nil {
-		return nil, "codexbar: в ответе нет Claude"
+		return nil, locale.Pick("codexbar: the answer has no Claude", "codexbar: в ответе нет Claude")
 	}
 	if e, ok := object(entry["error"]); ok {
 		msg, isStr := e["message"].(string)
 		if !isStr {
-			msg = "без описания"
+			msg = locale.Pick("no description", "без описания")
 		}
 		return nil, "codexbar: " + Sanitize(msg)
 	}
 	usage, ok := object(entry["usage"])
 	if !ok {
-		return nil, "codexbar: в ответе нет usage"
+		return nil, locale.Pick("codexbar: the answer has no usage", "codexbar: в ответе нет usage")
 	}
 	data := Data{"ts": now, "five_hour": nil, "seven_day": nil, "source": SourceCodexbar, "codexbarError": nil}
 	slotWindow := map[string]string{}
@@ -149,7 +150,7 @@ func ParseCodexbar(stdout []byte, now float64) (Data, string) {
 		}
 		minutes, w, ok := codexbarWindow(usage[slot], now)
 		if !ok {
-			return nil, "codexbar: окно " + slot + " не по контракту"
+			return nil, locale.Pick("codexbar: the "+slot+" window does not follow the contract", "codexbar: окно "+slot+" не по контракту")
 		}
 		key := windowKeyOfMinutes(minutes)
 		if key == "" || data[key] != nil {
@@ -159,7 +160,7 @@ func ParseCodexbar(stdout []byte, now float64) (Data, string) {
 		slotWindow[slot] = key
 	}
 	if data["five_hour"] == nil && data["seven_day"] == nil {
-		return nil, "codexbar: нет окон 5 ч и 7 д"
+		return nil, locale.Pick("codexbar: no 5 h and 7 d windows", "codexbar: нет окон 5 ч и 7 д")
 	}
 	if login, ok := usage["loginMethod"].(string); ok && jscompat.Trim(login) != "" {
 		data["plan"] = map[string]any{"name": Sanitize(login), "at": now}
@@ -227,9 +228,9 @@ func runCodexbarCLI(ctx context.Context, bin string, args []string) ([]byte, err
 	err := cmd.Run()
 	if err != nil && out.Len() == 0 {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, errors.New("таймаут " + strconv.Itoa(int(codexbarTimeout/time.Second)) + " с")
+			return nil, errors.New(locale.Pick("timeout "+strconv.Itoa(int(codexbarTimeout/time.Second))+" s", "таймаут "+strconv.Itoa(int(codexbarTimeout/time.Second))+" с"))
 		}
-		return nil, errors.New("не запустился (" + failureCode(err) + ")")
+		return nil, errors.New(locale.Pick("did not start (", "не запустился (") + failureCode(err) + ")")
 	}
 	return out.Bytes(), nil
 }
@@ -241,7 +242,7 @@ func failureCode(err error) string {
 		if code := exit.ExitCode(); code >= 0 {
 			return strconv.Itoa(code)
 		}
-		return "ошибка"
+		return locale.Pick("error", "ошибка")
 	}
 	var errno syscall.Errno
 	if errors.As(err, &errno) {
@@ -260,7 +261,7 @@ func failureCode(err error) string {
 	if errors.Is(err, fs.ErrPermission) {
 		return "EACCES"
 	}
-	return "ошибка"
+	return locale.Pick("error", "ошибка")
 }
 
 // PollCodexbarOnce runs codexbar once and writes the result (or the failure) as Claude's entry.

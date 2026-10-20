@@ -43,7 +43,7 @@ type goldenStep struct {
 
 func testLinks() *Links {
 	return &Links{TrackerURL: "https://tracker.example.io", TrackerHosts: []string{"tracker.example.io", "youtrack.example.io"},
-		IssueKeys: []string{"ABC", "EXP", "OPS"}, GitLabHosts: []string{"gitlab.com", "gitlab.example.io"},
+		IssueKeys: []string{"ABC", "DEV", "APP"}, GitLabHosts: []string{"gitlab.com", "gitlab.example.io"},
 		DocsHost: "a.example.io", ReaderHost: "ai.example.io", ReaderPath: "/agents/docs/"}
 }
 

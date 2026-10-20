@@ -9,6 +9,8 @@ import (
 	"slices"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Choice is a model and reasoning effort; nil means the CLI's own default.
@@ -61,10 +63,10 @@ func isKnownEffort(v string) bool { return slices.Contains(effortOrder, v) }
 func claudeModels() []Model {
 	all := func() []string { return append([]string{}, claudeEfforts...) }
 	return []Model{
-		{ID: "fable", Label: "Fable", Hint: "псевдоним: последняя модель Fable", Efforts: all()},
-		{ID: "opus", Label: "Opus", Hint: "псевдоним: последняя модель Opus", Efforts: all()},
-		{ID: "sonnet", Label: "Sonnet", Hint: "псевдоним: последняя модель Sonnet", Efforts: all()},
-		{ID: "haiku", Label: "Haiku", Hint: "без выбора глубины", Efforts: []string{}},
+		{ID: "fable", Label: "Fable", Hint: locale.Pick("alias: the latest Fable model", "псевдоним: последняя модель Fable"), Efforts: all()},
+		{ID: "opus", Label: "Opus", Hint: locale.Pick("alias: the latest Opus model", "псевдоним: последняя модель Opus"), Efforts: all()},
+		{ID: "sonnet", Label: "Sonnet", Hint: locale.Pick("alias: the latest Sonnet model", "псевдоним: последняя модель Sonnet"), Efforts: all()},
+		{ID: "haiku", Label: "Haiku", Hint: locale.Pick("no reasoning depth to choose", "без выбора глубины"), Efforts: []string{}},
 	}
 }
 
@@ -162,7 +164,7 @@ func parseCodexModels(raw string) (codexModels, error) {
 		}
 		hint := slug
 		if def != nil {
-			hint = slug + " · по умолчанию " + *def
+			hint = slug + locale.Pick(" · default ", " · по умолчанию ") + *def
 		}
 		out.models = append(out.models, Model{ID: slug, Label: label, Hint: hint, Efforts: efforts, DefaultEffort: def})
 	}
@@ -199,7 +201,7 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 	if provider == "claude" {
 		settings, state := readParsed(filepath.Join(c.ClaudeDir, "settings.json"), parseJSONText)
 		if state == fileBroken {
-			warnings = append(warnings, "~/.claude/settings.json не читается — значение «Авто» неизвестно")
+			warnings = append(warnings, locale.Pick("~/.claude/settings.json cannot be read: the value of \"Auto\" is unknown", "~/.claude/settings.json не читается — значение «Авто» неизвестно"))
 		}
 		var def Choice
 		if s, ok := settings.(map[string]any); ok && state == fileOK {
@@ -210,15 +212,15 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 		models, state := readParsed(filepath.Join(c.CodexDir, "models_cache.json"), parseCodexModels)
 		switch {
 		case state == fileMissing:
-			warnings = append(warnings, "~/.codex/models_cache.json не найден: Codex создаёт его при первом запуске")
+			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json not found: Codex creates it on its first run", "~/.codex/models_cache.json не найден: Codex создаёт его при первом запуске"))
 		case state == fileBroken:
-			warnings = append(warnings, "~/.codex/models_cache.json не читается")
+			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json cannot be read", "~/.codex/models_cache.json не читается"))
 		case len(models.models) == 0:
-			warnings = append(warnings, "В ~/.codex/models_cache.json нет доступных моделей")
+			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json has no available models", "В ~/.codex/models_cache.json нет доступных моделей"))
 		}
 		def, cfgState := readParsed(filepath.Join(c.CodexDir, "config.toml"), parseCodexDefault)
 		if cfgState == fileBroken {
-			warnings = append(warnings, "~/.codex/config.toml не читается — значение «Авто» неизвестно")
+			warnings = append(warnings, locale.Pick("~/.codex/config.toml cannot be read: the value of \"Auto\" is unknown", "~/.codex/config.toml не читается — значение «Авто» неизвестно"))
 		}
 		out = LaunchOptions{Provider: "codex", Source: "models-cache", FetchedAt: models.fetchedAt, Models: models.models, CliDefault: def}
 		if out.Models == nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/paneintents"
 	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/state"
@@ -416,12 +417,12 @@ func (c *call) agentGuard(parse func() bool, notOwned string) string {
 		return ""
 	}
 	if !c.contentTypeJSON() {
-		c.fail(415, "Нужен application/json")
+		c.fail(415, locale.Pick("application/json is required", "Нужен application/json"))
 		return ""
 	}
 	session, ok := c.str("session")
 	if !ok || !agentSessionRe.MatchString(session) {
-		c.fail(400, "Нужна сессия вкладки агента (tmux)")
+		c.fail(400, locale.Pick("The session of the agent's tab (tmux) is required", "Нужна сессия вкладки агента (tmux)"))
 		return ""
 	}
 	if !parse() {
@@ -437,7 +438,9 @@ func (c *call) agentGuard(parse func() bool, notOwned string) string {
 	return tabID
 }
 
-const tooOften = "Слишком часто: не больше 12 команд панели в минуту"
+func tooOften() string {
+	return locale.Pick("Too often: at most 12 pane commands per minute", "Слишком часто: не больше 12 команд панели в минуту")
+}
 
 // POST /api/cli/panel: the agent's command to the right pane of its own tab (the tab owning its tmux session).
 func (a *api) cliPanel(c *call) {
@@ -450,7 +453,7 @@ func (a *api) cliPanel(c *call) {
 			return false
 		}
 		return true
-	}, "Эта сессия не принадлежит вкладке агента: панелью управляет агент из своей вкладки")
+	}, locale.Pick("This session does not belong to an agent tab: the pane is controlled by an agent from its own tab", "Эта сессия не принадлежит вкладке агента: панелью управляет агент из своей вкладки"))
 	if tabID == "" {
 		return
 	}
@@ -458,32 +461,32 @@ func (a *api) cliPanel(c *call) {
 	switch k {
 	case "open", "show":
 		if !a.d.Panel.RateAllowed(tabID) {
-			c.fail(429, tooOften)
+			c.fail(429, tooOften())
 			return
 		}
 		intent := a.d.Intents.Add(tabID, command.JSON())
 		a.d.Sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tabID))
 		applied := a.d.Sync.ClientCount() > 0 && a.d.Intents.WaitForApplied(tabID, intent.String("id"), a.d.PanelWait)
-		what := "Панель покажется"
+		what := locale.Pick("The pane will show", "Панель покажется")
 		if k == "open" {
-			what = "Вкладка «" + command.Tab + "»"
+			what = locale.Pick("Tab \""+command.Tab+"\"", "Вкладка «"+command.Tab+"»")
 			if command.Target != "" {
 				what += " (" + command.Target + ")"
 			}
 		}
-		msg := what + ": записано за разговором, откроется, когда человек придёт в разговор"
+		msg := what + locale.Pick(": recorded for the conversation, it will open when the person comes to the conversation", ": записано за разговором, откроется, когда человек придёт в разговор")
 		if applied {
-			msg = what + ": открыто у человека"
+			msg = what + locale.Pick(": opened for the person", ": открыто у человека")
 		}
 		c.reply(200, jsvalue.NewObject("ok", true, "id", intent.String("id"), "applied", applied, "message", msg))
 	case "status":
 		intents := a.d.Intents.List(tabID)
 		live := a.d.Panel.Dispatch(tabID, command, a.d.PanelWait)
 		if live.Kind == "rate-limited" {
-			c.fail(429, tooOften)
+			c.fail(429, tooOften())
 			return
 		}
-		out := jsvalue.NewObject("ok", true, "message", "Страница с этим разговором сейчас не открыта")
+		out := jsvalue.NewObject("ok", true, "message", locale.Pick("The page with this conversation is not open now", "Страница с этим разговором сейчас не открыта"))
 		if live.Kind == "answered" {
 			out.Set("message", live.Result.Message)
 			if live.Result.State != nil {
@@ -492,7 +495,7 @@ func (a *api) cliPanel(c *call) {
 		}
 		lines := paneintents.Describe(intents)
 		if len(lines) == 0 {
-			lines = []string{"Команд панели за сутки не было"}
+			lines = []string{locale.Pick("No pane commands in the last day", "Команд панели за сутки не было")}
 		}
 		out.Set("intents", lines)
 		c.reply(200, out)
@@ -500,11 +503,11 @@ func (a *api) cliPanel(c *call) {
 		outcome := a.d.Panel.Dispatch(tabID, command, a.d.PanelWait)
 		switch outcome.Kind {
 		case "no-ui", "timeout":
-			c.reply(200, jsvalue.NewObject("ok", true, "message", "Страница с этим разговором сейчас не открыта: скрывать нечего"))
+			c.reply(200, jsvalue.NewObject("ok", true, "message", locale.Pick("The page with this conversation is not open now: nothing to hide", "Страница с этим разговором сейчас не открыта: скрывать нечего")))
 		case "busy":
-			c.fail(409, "Предыдущая команда панели ещё выполняется")
+			c.fail(409, locale.Pick("The previous pane command is still running", "Предыдущая команда панели ещё выполняется"))
 		case "rate-limited":
-			c.fail(429, tooOften)
+			c.fail(429, tooOften())
 		default:
 			r := outcome.Result
 			out := jsvalue.NewObject("ok", r.OK)
@@ -529,11 +532,11 @@ func (a *api) cliVault(c *call) {
 	tabID := c.agentGuard(func() bool {
 		v, _ := c.field("origin")
 		if origin = vault.Origin(v); origin == "" {
-			c.fail(400, "Адрес сайта: только https://хост[:порт], без пути и логина")
+			c.fail(400, locale.Pick("Site address: only https://host[:port], without a path or a login", "Адрес сайта: только https://хост[:порт], без пути и логина"))
 			return false
 		}
 		return true
-	}, "Эта сессия не принадлежит вкладке агента: входить просит агент из своей вкладки")
+	}, locale.Pick("This session does not belong to an agent tab: signing in is requested by an agent from its own tab", "Эта сессия не принадлежит вкладке агента: входить просит агент из своей вкладки"))
 	if tabID == "" {
 		return
 	}

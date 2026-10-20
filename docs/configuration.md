@@ -61,7 +61,7 @@ it stays with the previous runtime.
 | `HOST` | the hook route's network access rule, as the previous runtime read it (`localhost`, `tailscale`, `lan`, `all` or CIDRs, comma-separated); unset takes `networkAccess` of the runtime config (`localhost`, `tailscale` or `all`, default `all`) |
 | `RUNTIME_AGENT_TOKEN_HEADER` | header of the machine agent's loopback routes, for committing state to the cluster |
 | `RUNTIME_RELEASE_FILE` | the release file (`{"version", "commit"}`) the snapshot and `/api/health` report (unset: none; health then says `0.0.0-development`) |
-| `RUNTIME_LOCALE` | the language of the texts the routes answer people with: `en` (default) or `ru`, the previous runtime's texts byte for byte (set it where pages show those texts as they were) |
+| `RUNTIME_LOCALE` | the language of every text the runtime shows people (error bodies, notifications, the shared snapshot page, the command catalog, the design library pages and the agent prompts it writes): `en` (default) or `ru`, the previous runtime's texts byte for byte |
 | `RUNTIME_HEALTH_APP` | the app name `/api/health` reports (default `harnessly`) |
 | `RUNTIME_MANIFEST_FILE` | the installable app's manifest served at `/api/manifest` (unset: the previous runtime's) |
 | `RUNTIME_API_GUIDE_FILE` | the CLI's API guide served at `/api/cli/api-guide` (default `runtime-static/api-guide.md` beside `RUNTIME_RELEASE_FILE`; no file: the previous runtime's) |
@@ -218,6 +218,17 @@ the previous runtime the pages are someone else's and the gate leaves those path
 | --- | --- |
 | `RUNTIME_WEB` | `on` serves the page in front of the previous runtime too, `off` never; unset: standalone only |
 | `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page |
+| `RUNTIME_APP_NAME` | the product name the page shows in its titles and brand (default `harnessly`) |
+| `RUNTIME_LOCALE` | the page's and the API's language: `en` (default) or `ru` |
+| `RUNTIME_WEB_FEATURES` | optional parts of the page, comma separated: `chats` (plain chats through an OpenWebUI next to the runtime), `efficiency` (the team report), `vault` (the password safe), `design` (Claude Design boards); none by default |
+| `RUNTIME_WEB_COPY_FILE` | a JSON file of product copy the page uses instead of its defaults (welcome line, suggested first prompts) |
+| `RUNTIME_PEOPLE` | `login=Name` pairs, comma separated: display names of the people of this installation (greeting, statistics, mentions) |
+| `RUNTIME_PANE_HOSTS` | extra hosts whose pages the side pane's browser tab may open |
+| `RUNTIME_SPEED_POSTHOG_HOST`, `RUNTIME_SPEED_POSTHOG_KEY` | a PostHog project the page reports its own speed to (load, long tasks); unset: nothing is sent |
+
+The runtime writes these into the page as `<meta name="hl-config">` when it serves `index.html`, together with the
+service addresses below, the tracker and GitLab settings, `RUNTIME_LAYOUT_KEY` and `RUNTIME_LAUNCH_DEFAULTS_KEY`. No token
+ever reaches the page.
 
 ### Boards and artifacts
 
@@ -236,5 +247,18 @@ address is set, and only tabs this runtime starts get the variables.
 | `RUNTIME_ARTIFACTS_URL` | the catalog's origin, e.g. `https://artifacts.example.com`; agents get it as `ARTIFACTS_URL` and the tab's id as `ARTIFACTS_SESSION` |
 | `RUNTIME_ARTIFACTS_TOKEN` | the editor token agents publish with (`ARTIFACTS_TOKEN`) |
 | `RUNTIME_ARTIFACTS_READ_TOKEN` | the viewer token the runtime lists a conversation's documents with (default `RUNTIME_ARTIFACTS_TOKEN`) |
+| `RUNTIME_ARTIFACTS_SHARE_TOKEN` | a sharer token for the reader's public-link switch (default `RUNTIME_ARTIFACTS_TOKEN`) |
 | `RUNTIME_ARTIFACTS_AUTHOR` | who agents publish as (`ARTIFACTS_AUTHOR`); default `<RUNTIME_OWNER_NAME> (agent)` when that is set |
 | `RUNTIME_OWNER_NAME` | the person's display name, for board hand-offs and the default author; the hand-off's e-mail is the session's, else `RUNTIME_OWNER_EMAIL` |
+
+### GitHub
+
+Issues and pull requests of GitHub (or GitHub Enterprise) for the page: an issue key `owner/repo#12` opens as a task
+tab, issue and pull request links show as chips with their state.
+
+| Variable | Meaning |
+| --- | --- |
+| `RUNTIME_GITHUB_TOKEN` | a token with read access to the repositories (public repositories work without one, rate limited) |
+| `RUNTIME_GITHUB_HOST` | the web host, default `github.com`; for GitHub Enterprise its host (the API is then `https://<host>/api/v3`) |
+| `RUNTIME_GITHUB_API` | the REST API root when it is elsewhere |
+| `RUNTIME_GITHUB_REPOS` | repositories the page may read, `owner/repo` or `owner/*`, comma separated; empty allows any |

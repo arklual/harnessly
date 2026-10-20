@@ -17,6 +17,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // The owner's drafts and published links, under <data>/shares, in the previous runtime's formats:
@@ -31,17 +32,20 @@ import (
 // the first six characters of an id ever reach a log line.
 
 const (
-	draftTTL       = 60 * 60 * 1000.0
-	dayMs          = 24 * 60 * 60 * 1000.0
-	maxLifetime    = 90 * dayMs
-	tombstoneKeep  = 30 * dayMs
-	viewersKept    = 20
-	maxTranscript  = 256 * 1024 * 1024
-	statusLive     = "published"
-	statusRevoked  = "revoked"
-	statusExpired  = "expired"
-	errGone        = "Ссылка отозвана или истекла"
-	errLinkMissing = "Ссылка не найдена"
+	draftTTL      = 60 * 60 * 1000.0
+	dayMs         = 24 * 60 * 60 * 1000.0
+	maxLifetime   = 90 * dayMs
+	tombstoneKeep = 30 * dayMs
+	viewersKept   = 20
+	maxTranscript = 256 * 1024 * 1024
+	statusLive    = "published"
+	statusRevoked = "revoked"
+	statusExpired = "expired"
+)
+
+var (
+	errGone        = locale.T("The link was revoked or has expired", "Ссылка отозвана или истекла")
+	errLinkMissing = locale.T("Link not found", "Ссылка не найдена")
 )
 
 // ShareIDRe is a draft's or a link's id: 32 random bytes in base64url.
@@ -369,13 +373,13 @@ func (s *Store) Publish(draft *jsvalue.Object, routeBase string, days float64, r
 	if replaceID != "" {
 		existing := findRecord(idx, replaceID)
 		if existing == nil {
-			return Mutation{Status: 404, Error: errLinkMissing}, nil
+			return Mutation{Status: 404, Error: errLinkMissing.String()}, nil
 		}
 		if statusOf(existing, now) != statusLive {
-			return Mutation{Status: 410, Error: errGone}, nil
+			return Mutation{Status: 410, Error: errGone.String()}, nil
 		}
 		if !jsvalue.SameValue(get(existing, "tabId"), get(draft, "tabId")) {
-			return Mutation{Status: 409, Error: "Ссылка открыта для другого диалога"}, nil
+			return Mutation{Status: 409, Error: locale.Pick("The link is open for another conversation", "Ссылка открыта для другого диалога")}, nil
 		}
 		existing.Set("version", jsNumber(number(existing, "version")+1))
 		existing.Set("updatedAt", now)
@@ -446,13 +450,13 @@ func (s *Store) Extend(id string, days float64) (Mutation, error) {
 	s.sweep(idx, now)
 	r := findRecord(idx, id)
 	if r == nil {
-		return Mutation{Status: 404, Error: errLinkMissing}, nil
+		return Mutation{Status: 404, Error: errLinkMissing.String()}, nil
 	}
 	if statusOf(r, now) != statusLive {
 		if err := s.writeIndex(idx); err != nil {
 			return Mutation{}, err
 		}
-		return Mutation{Status: 410, Error: errGone}, nil
+		return Mutation{Status: 410, Error: errGone.String()}, nil
 	}
 	r.Set("expiresAt", jsNumber(expiryFrom(now, days, number(r, "publishedAt"))))
 	if err := s.writeIndex(idx); err != nil {
@@ -473,7 +477,7 @@ func (s *Store) Revoke(id string) (Mutation, error) {
 	s.sweep(idx, now)
 	r := findRecord(idx, id)
 	if r == nil {
-		return Mutation{Status: 404, Error: errLinkMissing}, nil
+		return Mutation{Status: 404, Error: errLinkMissing.String()}, nil
 	}
 	_ = os.Remove(s.contentFile(id))
 	if isNull(r, "revokedAt") {

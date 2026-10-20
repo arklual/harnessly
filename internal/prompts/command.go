@@ -8,6 +8,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/catalog"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
@@ -45,14 +46,14 @@ type RunLine struct {
 // error text is shown to the person.
 func ParseRunLine(line string) (RunLine, string) {
 	if n := jscompat.Len(line); n < 2 || n > CommandLineMax {
-		return RunLine{}, "Команда должна быть от 2 до 2000 символов"
+		return RunLine{}, locale.Pick("The command must be 2 to 2000 characters", "Команда должна быть от 2 до 2000 символов")
 	}
 	if forbiddenChars.MatchString(line) {
-		return RunLine{}, "Команда должна быть одной строкой без управляющих символов"
+		return RunLine{}, locale.Pick("The command must be one line without control characters", "Команда должна быть одной строкой без управляющих символов")
 	}
 	m := commandLineRE.FindStringSubmatch(line)
 	if m == nil || !catalog.IsCommandName(m[1]) {
-		return RunLine{}, "Команда начинается с «/» и имени"
+		return RunLine{}, locale.Pick(`The command starts with "/" and a name`, "Команда начинается с «/» и имени")
 	}
 	return RunLine{Name: m[1], Args: jscompat.Trim(m[2])}, ""
 }
@@ -163,41 +164,41 @@ func RunCommandLine(in RunInput, d CommandDriver, clock Clock) RunResult {
 	}
 	command := "/" + line.Name
 	if !SessionNameRE.MatchString(in.Session) {
-		return runFail(400, RunInvalid, "Неверная сессия")
+		return runFail(400, RunInvalid, msgBadSession.String())
 	}
 	item, known := ClassifyCommand(in.Provider, line.Name)
 	if known && item.Execution == "blocked" {
-		note := "команда заблокирована"
+		note := locale.Pick("the command is blocked", "команда заблокирована")
 		if item.Note != nil {
 			note = *item.Note
 		}
-		return runFail(422, RunBlocked, command+" недоступна в вебе: "+note)
+		return runFail(422, RunBlocked, command+locale.Pick(" is not available on the web: ", " недоступна в вебе: ")+note)
 	}
 	change, changes := LaunchChangeOf(in.Provider, line)
 	if in.ExpectModel && change.Model == nil {
-		return runFail(400, RunInvalid, "Неизвестная модель")
+		return runFail(400, RunInvalid, msgUnknownModel.String())
 	}
 	if !d.HasSession(in.Session) {
-		return runFail(404, RunNotFound, "Сессия не найдена")
+		return runFail(404, RunNotFound, msgNoSession.String())
 	}
 	if proc := d.CurrentCommand(in.Session); proc == "" || d.IsShell(proc) {
-		return runFail(409, RunNotRunning, "Агент в этом диалоге не запущен — перезапустите диалог")
+		return runFail(409, RunNotRunning, locale.Pick("The agent is not running in this conversation: restart the conversation", "Агент в этом диалоге не запущен — перезапустите диалог"))
 	}
 	before, ok := d.CaptureStyled(in.Session)
 	if !ok {
-		return runFail(500, RunNoScreen, "Не получилось прочитать экран агента")
+		return runFail(500, RunNoScreen, msgNoMirror.String())
 	}
 	start := screen.Read(before)
 	if start.Menu != nil {
-		return runFail(409, RunMenuOpen, "В терминале открыто меню — ответьте на него или закройте")
+		return runFail(409, RunMenuOpen, locale.Pick("A menu is open in the terminal: answer it or close it", "В терминале открыто меню — ответьте на него или закройте"))
 	}
 	queueable := !known || (item.Execution == "send" && item.Output == "reply")
 	state, _ := d.CliState(in.Session)
 	if (start.Busy || state == StateBusy) && !queueable {
-		return runFail(409, RunBusy, "Агент сейчас работает — дождитесь конца шага или остановите его")
+		return runFail(409, RunBusy, locale.Pick("The agent is working: wait for the step to end or stop it", "Агент сейчас работает — дождитесь конца шага или остановите его"))
 	}
 	if start.Input != "" {
-		return runFail(409, RunInputNotEmpty, "В поле ввода терминала уже есть текст — отправьте или сотрите его")
+		return runFail(409, RunInputNotEmpty, msgConflict.String())
 	}
 
 	typed := command
@@ -205,7 +206,7 @@ func RunCommandLine(in RunInput, d CommandDriver, clock Clock) RunResult {
 		typed += " " + line.Args
 	}
 	if err := d.SendLine(in.Session, typed); err != nil {
-		return runFail(500, RunNoScreen, "Не получилось набрать команду")
+		return runFail(500, RunNoScreen, locale.Pick("Could not type the command", "Не получилось набрать команду"))
 	}
 
 	exec := item.Execution
@@ -254,7 +255,7 @@ func RunCommandLine(in RunInput, d CommandDriver, clock Clock) RunResult {
 			return RunResult{Status: 200, Body: &RunBody{Outcome: "confirmed", Applied: &change, Asked: boolPtr(answeredAt != nil), Command: command}}
 		}
 		if changes && answeredAt != nil && screen.CountKept(s.Plain) > screen.CountKept(start.Plain) {
-			return runFail(409, RunDeclined, "Агент оставил прежнее значение")
+			return runFail(409, RunDeclined, locale.Pick("The agent kept the previous value", "Агент оставил прежнее значение"))
 		}
 		if answeredAt != nil {
 			continue

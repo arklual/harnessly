@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
@@ -209,10 +210,10 @@ func (l *ServerLogs) sourceOf(pid int) logSource {
 func (l *ServerLogs) read(port int, all bool, limit int) ServerLog {
 	listener, err := l.Listener(port)
 	if err != nil || listener == nil {
-		return ServerLog{Lines: []LogLine{}, Reason: reason(fmt.Sprintf("На порту %d никто не слушает", port))}
+		return ServerLog{Lines: []LogLine{}, Reason: reason(fmt.Sprintf(locale.Pick("Nobody is listening on port %d", "На порту %d никто не слушает"), port))}
 	}
 	if !listener.HasPID {
-		return ServerLog{Lines: []LogLine{}, Reason: reason(fmt.Sprintf("Порт %d занят процессом другого пользователя", port))}
+		return ServerLog{Lines: []LogLine{}, Reason: reason(fmt.Sprintf(locale.Pick("Port %d is held by another user's process", "Порт %d занят процессом другого пользователя"), port))}
 	}
 	pick := func(text string) []LogLine {
 		if all {
@@ -225,7 +226,7 @@ func (l *ServerLogs) read(port int, all bool, limit int) ServerLog {
 	case "file":
 		text, err := tailOf(src.path)
 		if err != nil {
-			return ServerLog{Lines: []LogLine{}, Reason: reason("Не удалось прочитать " + src.path)}
+			return ServerLog{Lines: []LogLine{}, Reason: reason(locale.Pick("Could not read ", "Не удалось прочитать ") + src.path)}
 		}
 		return ServerLog{Source: &LogSource{Kind: "file", Path: src.path, Command: listener.Command}, Lines: pick(text)}
 	case "tmux":
@@ -239,7 +240,7 @@ func (l *ServerLogs) read(port int, all bool, limit int) ServerLog {
 		}
 		text, ok := capture(src.session, history)
 		if !ok {
-			return ServerLog{Lines: []LogLine{}, Reason: reason("Терминал сервера не ответил")}
+			return ServerLog{Lines: []LogLine{}, Reason: reason(locale.Pick("The server terminal did not respond", "Терминал сервера не ответил"))}
 		}
 		_, pane, _, _ := l.Tmux.ParseSessionName(src.session)
 		return ServerLog{Source: &LogSource{Kind: "tmux", Session: src.session, Pane: pane, Command: listener.Command}, Lines: pick(text)}
@@ -261,10 +262,10 @@ func limitOf(lines int, all bool) int {
 func (l *ServerLogs) Get(slot string, all bool, lines int) (ServerLog, error) {
 	target := l.Store.TargetOf(slot)
 	if target == nil {
-		return ServerLog{Lines: []LogLine{}, Reason: reason("Превью ещё не открывали")}, nil
+		return ServerLog{Lines: []LogLine{}, Reason: reason(locale.Pick("The preview has not been opened yet", "Превью ещё не открывали"))}, nil
 	}
 	if target.Kind == "url" {
-		return ServerLog{Lines: []LogLine{}, Reason: reason("Внешний сайт: терминала нет")}, nil
+		return ServerLog{Lines: []LogLine{}, Reason: reason(locale.Pick("An external site: there is no terminal", "Внешний сайт: терминала нет"))}, nil
 	}
 	limit := limitOf(lines, all)
 	key := fmt.Sprintf("%d\n%t\n%d", target.Port, all, limit)

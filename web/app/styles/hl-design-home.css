@@ -1,0 +1,652 @@
+/* «Claude Design» of the left menu: design/library/*. A gallery in the spirit of a project list: a large title,
+   covers without boxes, names under them. Only --t-* tokens and the tw-ui primitives; both themes follow from the tokens.
+   Spacing is on an 8px grid. */
+
+.tw-dhome {
+  container: tw-dhome / inline-size;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Holds the scrolling page and the drop hint, which must stay on screen while the page scrolls. */
+.tw-dhome-dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.tw-dhome-dropzone[data-dragging] .tw-dhome-scroll {
+  opacity: 0.5;
+}
+
+.tw-dhome-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 40px;
+  min-height: 0;
+  padding: 48px 48px 64px;
+  overflow-y: auto;
+  transition: opacity var(--t-duration-fast, 0.15s);
+}
+
+.tw-dhome-drop {
+  position: absolute;
+  inset: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed color-mix(in oklab, var(--t-accent-purple) 70%, transparent);
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--t-text);
+  pointer-events: none;
+}
+
+.tw-dhome-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
+.tw-dhome-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tw-dhome-title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 40px;
+  letter-spacing: -0.02em;
+  color: var(--t-text);
+  overflow-wrap: anywhere;
+}
+
+.tw-dhome-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.tw-dhome-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -4px;
+  padding: 2px 8px 2px 2px;
+  border: 0;
+  border-radius: var(--t-radius-md);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 24px;
+  color: var(--t-text-muted);
+  cursor: pointer;
+}
+
+.tw-dhome-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tw-dhome-back:hover {
+  color: var(--t-text);
+}
+
+.tw-dhome-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 40px 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tw-dhome-grid > li {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+/* The card's menu for a pointer: dots on the cover that appear on hover or focus. A finger long-presses the card instead. */
+.tw-dhome-card-more {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: color-mix(in oklab, var(--t-surface) 90%, transparent);
+  box-shadow: 0 0 0 1px var(--t-border);
+  opacity: 0;
+  transition: opacity var(--t-duration-fast, 0.15s);
+}
+
+.tw-dhome-grid > li:hover > .tw-dhome-card-more,
+.tw-dhome-grid > li:focus-within > .tw-dhome-card-more,
+.tw-dhome-card-more[aria-expanded='true'] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .tw-dhome-card-more {
+    display: none;
+  }
+}
+
+.tw-dhome-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tw-dhome-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--t-surface-hover);
+  transition:
+    transform var(--t-duration-fast, 0.15s) ease,
+    filter var(--t-duration-fast, 0.15s) ease;
+}
+
+.tw-dhome-cover[data-loading] {
+  background: linear-gradient(
+    90deg,
+    var(--t-skeleton-base) 0%,
+    var(--t-skeleton-shine) 50%,
+    var(--t-skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: tw-skeleton 1.4s ease-in-out infinite;
+}
+
+.tw-dhome-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--t-text) 9%, transparent);
+  pointer-events: none;
+}
+
+.tw-dhome-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: left top;
+}
+
+.tw-dhome-cover-plain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--t-text-muted);
+}
+
+.tw-dhome-card:hover .tw-dhome-cover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.tw-dhome-card:focus-visible {
+  outline: none;
+}
+
+.tw-dhome-card:focus-visible .tw-dhome-cover {
+  box-shadow: 0 0 0 2px var(--t-accent-purple);
+}
+
+.tw-dhome-card-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--t-text);
+}
+
+.tw-dhome-card-caption {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--t-text-muted);
+}
+
+.tw-dhome-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.tw-dhome-skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+}
+
+.tw-dhome-skeleton-short {
+  width: 40%;
+}
+
+.tw-dhome-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--t-text-muted);
+}
+
+.tw-dhome-empty svg {
+  width: 28px;
+  height: 28px;
+}
+
+.tw-dhome-empty strong {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--t-text);
+}
+
+.tw-dhome-empty p {
+  max-width: 420px;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.tw-dhome-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tw-dhome-uploads {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: -16px;
+}
+
+.tw-dhome-uploads ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tw-dhome-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  font-size: 13px;
+}
+
+.tw-dhome-upload-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--t-text);
+}
+
+.tw-dhome-upload-state {
+  color: var(--t-text-muted);
+}
+
+.tw-dhome-upload[data-status='error'] .tw-dhome-upload-state {
+  color: var(--t-danger);
+}
+
+.tw-dhome-upload-bar {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 3px;
+  accent-color: var(--t-accent-purple);
+}
+
+.tw-dhome-quiet {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--t-text-muted);
+  cursor: pointer;
+}
+
+.tw-dhome-quiet:hover {
+  color: var(--t-text);
+}
+
+.tw-dhome-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tw-dhome-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--t-text-secondary);
+}
+
+/* The board page: one slim toolbar, a line for comments only when there are some, and the board filling the rest. */
+.tw-dhome-board-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.tw-dhome-board-page .tw-preview-toolbar,
+.tw-dhome-board-stage .tw-preview-toolbar {
+  flex: none;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+
+.tw-dhome-claim {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--t-border-subtle);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--t-text-muted);
+}
+
+.tw-dhome-board-select {
+  width: 220px;
+  max-width: 40cqi;
+}
+
+.tw-dhome-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: 8px;
+}
+
+.tw-dhome-target-label {
+  flex: none;
+  font-size: 12px;
+  color: var(--t-text-muted);
+}
+
+.tw-dhome-target-select {
+  width: 168px;
+  max-width: 30cqi;
+}
+
+.tw-dhome-frame-spacer {
+  flex: 1;
+}
+
+.tw-dhome-tray {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--t-border-subtle);
+}
+
+.tw-dhome-tray > .tw-dlib-note {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.tw-dhome-annotations {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 280px;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tw-dhome-annotation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 4px 2px 12px;
+  border-radius: var(--t-radius-md);
+  background: var(--t-surface-hover);
+}
+
+.tw-dhome-annotation-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--t-text-secondary);
+}
+
+.tw-dhome-annotation-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--t-text);
+}
+
+.tw-dhome-annotation-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tw-dhome-board-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.tw-dhome-board-stage .tw-preview-view {
+  flex: 1;
+  gap: 0;
+  min-height: 0;
+}
+
+.tw-dhome-board-stage .tw-preview-stage {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+.tw-dhome-board-stage .tw-preview-stage-device {
+  height: auto;
+  border-radius: 0;
+}
+
+.tw-dhome-board-stage .tw-preview-device-fluid > iframe.tw-preview-frame {
+  border: 0;
+  border-radius: 0;
+}
+
+.tw-dhome-board-stage > .tw-preview-frame {
+  flex: 1;
+  height: auto;
+  border-radius: 0;
+}
+
+.tw-dhome-board-stage .tw-preview-taken,
+.tw-dhome-board-stage > .tw-preview-error {
+  margin: 16px;
+}
+
+.tw-dhome-full {
+  background: var(--t-bg);
+}
+
+/* The bar of the board that fills the window: a small pill over the page's top edge, folded to its last button. */
+.tw-dhome-full .tw-dhome-board-stage .tw-preview-toolbar {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 3;
+  flex-wrap: nowrap;
+  gap: 2px;
+  max-width: calc(100% - 16px);
+  padding: 4px 6px;
+  border: 1px solid var(--t-border);
+  border-radius: 14px;
+  background: var(--t-surface-raised);
+  box-shadow: 0 8px 28px -12px oklch(0 0 0 / 45%);
+  transform: translateX(-50%);
+}
+
+.tw-dhome-full .tw-dhome-board-stage .tw-preview-toolbar > .tw-dhome-full-title {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 28ch;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-text);
+}
+
+.tw-dhome-full[data-folded] .tw-preview-toolbar > :not(.tw-dhome-full-fold) {
+  display: none;
+}
+
+.tw-dhome-full .tw-dhome-board-stage .tw-preview-stage-device {
+  padding-top: calc(56px + env(safe-area-inset-top));
+}
+
+@container tw-dhome (max-width: 640px) {
+  .tw-dhome-full .tw-preview-more {
+    display: none;
+  }
+}
+
+@container tw-dhome (max-width: 900px) {
+  .tw-dhome-scroll {
+    padding: 32px 24px 48px;
+  }
+}
+
+@container tw-dhome (max-width: 640px) {
+  .tw-dhome-scroll {
+    gap: 32px;
+    padding: 24px 16px 40px;
+  }
+
+  .tw-dhome-title {
+    font-size: 28px;
+    line-height: 36px;
+  }
+
+  .tw-dhome-head-inline .tw-dhome-title {
+    font-size: 26px;
+    line-height: 32px;
+    white-space: nowrap;
+  }
+
+  .tw-dhome-grid {
+    gap: 32px 16px;
+  }
+
+  .tw-dhome-board-page .tw-preview-toolbar,
+  .tw-dhome-board-stage .tw-preview-toolbar {
+    flex-wrap: wrap;
+    padding-inline: 8px;
+  }
+
+  .tw-dhome-board-select {
+    flex: 1;
+    width: auto;
+    max-width: none;
+  }
+
+  .tw-dhome-target {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .tw-dhome-target-select {
+    flex: 1;
+    width: auto;
+    max-width: none;
+  }
+
+  .tw-dhome-tray {
+    padding-inline: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-dhome-cover,
+  .tw-dhome-scroll {
+    transition: none;
+  }
+
+  .tw-dhome-cover[data-loading] {
+    animation: none;
+  }
+
+  .tw-dhome-card:hover .tw-dhome-cover {
+    transform: none;
+  }
+}

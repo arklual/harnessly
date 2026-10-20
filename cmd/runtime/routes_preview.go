@@ -19,6 +19,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/preview"
 	"github.com/ly-solutions/harnessly/internal/preview/devtools"
@@ -129,10 +130,10 @@ func previewOf(d deps) *previewSet {
 	scanner := &ports.Scanner{Home: d.Home, Worktrees: env("RUNTIME_WORKTREES_ROOT", filepath.Join(d.Home, ".worktrees")), Hidden: hidden}
 	where := os.Getenv("RUNTIME_PLATFORM_HOST")
 	if where == "" {
-		where = "платформы"
+		where = locale.Pick("the platform", "платформы")
 	}
 	logs := &devtools.ServerLogs{Store: store, Tmux: d.Tmux, Listener: scanner.Listener,
-		Outside: "Сервер запущен не в терминале " + where + ", и его вывод не пишется в файл"}
+		Outside: locale.Pick("The server was not started in a terminal of "+where+", and its output is not written to a file", "Сервер запущен не в терминале "+where+", и его вывод не пишется в файл")}
 	api := &devtools.API{Store: store, CLI: env("RUNTIME_CLI_NAME", "harnessly"), ServerLog: logs.Get}
 	secret, err := agent.Config{SecretFile: os.Getenv("AGENT_SECRET_FILE"), ConfigFile: d.ConfigFile}.LoadSecret()
 	if err != nil {
@@ -335,7 +336,7 @@ func previewRoutes(d deps) []gate.JSONRoute {
 				return api.SettingsOf(slot)
 			}
 			if ct, _ := previewHeader(r, "Content-Type"); !strings.HasPrefix(ct, "application/json") {
-				return previewRefusal(415, "Нужен application/json")
+				return previewRefusal(415, locale.Pick("application/json is required", "Нужен application/json"))
 			}
 			return api.ChangeSettings(slot, body)
 		}),
@@ -491,11 +492,11 @@ func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
 		return answerJSON(r, 405, previewError{"Method not allowed"}, h)
 	}
 	if ct, _ := previewHeader(r, "Content-Type"); !strings.HasPrefix(ct, "application/json") {
-		return answerJSON(r, 415, previewError{"Нужен application/json"}, previewNoStore())
+		return answerJSON(r, 415, previewError{locale.Pick("application/json is required", "Нужен application/json")}, previewNoStore())
 	}
 	raw, err := io.ReadAll(io.LimitReader(r.Body, previewMCPLimit+1))
 	if err != nil || len(raw) > previewMCPLimit {
-		return answerJSON(r, 413, previewError{"Сообщение слишком большое"}, previewNoStore())
+		return answerJSON(r, 413, previewError{locale.Pick("The message is too large", "Сообщение слишком большое")}, previewNoStore())
 	}
 	payload, err := jsvalue.Parse([]byte(jscompat.DecodeUTF8(raw)))
 	if err != nil {

@@ -1,0 +1,55 @@
+/* Base layer of the agents page: Tailwind utilities, the dark variant, and the utility colours mapped onto the hl
+   tokens (hl-tokens.css), so `text-muted-foreground` and the like follow the theme. */
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--t-bg);
+  --color-foreground: var(--t-text);
+  --color-muted: var(--t-surface-raised);
+  --color-muted-foreground: var(--t-text-muted);
+  --color-accent: var(--t-surface-hover);
+  --color-accent-foreground: var(--t-text);
+  --color-border: var(--t-border-default);
+  --color-destructive: var(--t-danger);
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@utility max-w-content {
+  max-width: var(--content-max-width);
+}
+
+@utility animate-delayed-fade-in {
+  animation: hl-delayed-fade-in 400ms ease-out 200ms both;
+}
+
+@keyframes hl-delayed-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+:root {
+  --content-max-width: 64rem;
+  --titlebar-height: 0px;
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--t-bg);
+  color: var(--t-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}

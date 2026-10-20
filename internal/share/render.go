@@ -10,6 +10,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // The snapshot page: static HTML without a single script, rebuilt from the stored JSON on every read so render fixes
@@ -84,9 +85,26 @@ func at(ms float64) time.Time {
 	return time.UnixMilli(int64(math.Floor(ms))).In(moscow)
 }
 
-func formatTime(ms float64) string     { return at(ms).Format("15:04") }
-func formatDate(ms float64) string     { return at(ms).Format("02.01.2006") }
-func formatDateTime(ms float64) string { return at(ms).Format("02.01.2006, 15:04") }
+func formatTime(ms float64) string { return at(ms).Format("15:04") }
+
+// formatDate and formatDateTime write the day as dd.mm.yyyy in Russian and as an ISO date in English.
+func formatDate(ms float64) string {
+	return at(ms).Format(locale.Pick("2006-01-02", "02.01.2006"))
+}
+func formatDateTime(ms float64) string {
+	return at(ms).Format(locale.Pick("2006-01-02, 15:04", "02.01.2006, 15:04"))
+}
+
+// count is the unit for n in the runtime's language: English has one form for 1 and one for the rest, Russian three.
+func count(n float64, enOne, enMany, ruOne, ruFew, ruMany string) string {
+	if !locale.Russian() {
+		if n == 1 {
+			return enOne
+		}
+		return enMany
+	}
+	return plural(n, ruOne, ruFew, ruMany)
+}
 
 // plural is the Russian form for n.
 func plural(n float64, one, few, many string) string {
@@ -101,8 +119,8 @@ func plural(n float64, one, few, many string) string {
 	return many
 }
 
-// formatNumber is Intl.NumberFormat('ru-RU', {maximumFractionDigits: 1}): half away from zero on the shortest decimal
-// form, a comma for the decimal point, no-break spaces between thousands.
+// formatNumber is Intl.NumberFormat(locale, {maximumFractionDigits: 1}): half away from zero on the shortest decimal
+// form. Russian writes a comma for the decimal point and no-break spaces between thousands, English a point and commas.
 func formatNumber(x float64) string {
 	neg := x < 0
 	digits := strconv.FormatFloat(math.Abs(x), 'f', -1, 64)
@@ -126,7 +144,7 @@ func formatNumber(x float64) string {
 		var b strings.Builder
 		for i, c := range intPart {
 			if i > 0 && (len(intPart)-i)%3 == 0 {
-				b.WriteString(" ")
+				b.WriteString(locale.Pick(",", "\u00a0"))
 			}
 			b.WriteRune(c)
 		}
@@ -134,7 +152,7 @@ func formatNumber(x float64) string {
 	}
 	out := intPart
 	if frac != "" {
-		out += "," + frac
+		out += locale.Pick(".", ",") + frac
 	}
 	if neg && out != "0" {
 		out = "-" + out
@@ -144,28 +162,28 @@ func formatNumber(x float64) string {
 
 func formatTokens(n float64) string {
 	if n < 1000 {
-		return jscompat.Number(n) + " " + plural(n, "токен", "токена", "токенов")
+		return jscompat.Number(n) + " " + count(n, "token", "tokens", "токен", "токена", "токенов")
 	}
 	if n < 1_000_000 {
-		return formatNumber(n/1000) + " тыс. токенов"
+		return formatNumber(n/1000) + locale.Pick("k tokens", " тыс. токенов")
 	}
-	return formatNumber(n/1_000_000) + " млн токенов"
+	return formatNumber(n/1_000_000) + locale.Pick("M tokens", " млн токенов")
 }
 
 func formatDuration(ms float64) string {
 	minutes := math.Floor(ms/60_000 + 0.5)
 	if minutes < 1 {
-		return "меньше минуты"
+		return locale.Pick("under a minute", "меньше минуты")
 	}
 	if minutes < 60 {
-		return jscompat.Number(minutes) + " мин"
+		return jscompat.Number(minutes) + locale.Pick(" min", " мин")
 	}
 	rest := math.Mod(minutes, 60)
 	hours := jscompat.Number(math.Floor(minutes / 60))
 	if rest != 0 {
-		return hours + " ч " + jscompat.Number(rest) + " мин"
+		return hours + locale.Pick(" h ", " ч ") + jscompat.Number(rest) + locale.Pick(" min", " мин")
 	}
-	return hours + " ч"
+	return hours + locale.Pick(" h", " ч")
 }
 
 func num(o *jsvalue.Object, k string) float64 {
@@ -178,11 +196,11 @@ func economicsLine(e *jsvalue.Object) string {
 	parts := []string{formatTokens(num(t, "input") + num(t, "output") + num(t, "cacheRead") + num(t, "cacheWrite"))}
 	if a, ok := e.Get("activeMs"); ok && a != nil {
 		f, _ := a.(float64)
-		parts = append(parts, "активно "+formatDuration(f))
+		parts = append(parts, locale.Pick("active ", "активно ")+formatDuration(f))
 	}
-	parts = append(parts, "всего "+formatDuration(num(e, "wallMs")))
+	parts = append(parts, locale.Pick("total ", "всего ")+formatDuration(num(e, "wallMs")))
 	if turns := num(e, "turns"); turns > 0 {
-		parts = append(parts, jscompat.Number(turns)+" "+plural(turns, "ход", "хода", "ходов"))
+		parts = append(parts, jscompat.Number(turns)+" "+count(turns, "turn", "turns", "ход", "хода", "ходов"))
 	}
 	return strings.Join(parts, " · ")
 }
@@ -206,15 +224,15 @@ func actionsSummary(actions []*jsvalue.Object) string {
 		}
 	}
 	n := float64(len(actions))
-	parts := []string{jscompat.Number(n) + " " + plural(n, "действие", "действия", "действий") + " агента"}
+	parts := []string{jscompat.Number(n) + " " + count(n, "agent action", "agent actions", "действие", "действия", "действий") + locale.Pick("", " агента")}
 	if read > 0 {
-		parts = append(parts, "чтение и поиск: "+jscompat.Number(read))
+		parts = append(parts, locale.Pick("reading and search: ", "чтение и поиск: ")+jscompat.Number(read))
 	}
 	if command > 0 {
-		parts = append(parts, "команды: "+jscompat.Number(command))
+		parts = append(parts, locale.Pick("commands: ", "команды: ")+jscompat.Number(command))
 	}
 	if edit > 0 {
-		parts = append(parts, "правки: "+jscompat.Number(edit))
+		parts = append(parts, locale.Pick("edits: ", "правки: ")+jscompat.Number(edit))
 	}
 	return strings.Join(parts, " · ")
 }
@@ -299,11 +317,16 @@ func (p Page) markdown(text string) *hnode {
 	return el("div", renderMarkdown(text, p.transform)...).attr("class", "tw-share-md")
 }
 
+// hiddenImages is the "n images hidden" label of a user message.
+func hiddenImages(n float64) string {
+	return count(n, "image hidden", "images hidden", "изображение скрыто", "изображения скрыты", "изображений скрыто")
+}
+
 func ownerName(s *jsvalue.Object) string {
 	if sub, ok := s.Object("owner").Get("sub"); ok && sub != nil {
 		return jscompat.String(sub)
 	}
-	return "Человек"
+	return locale.Pick("Person", "Человек")
 }
 
 func (p Page) feedEntry(e, s *jsvalue.Object) *hnode {
@@ -315,7 +338,7 @@ func (p Page) feedEntry(e, s *jsvalue.Object) *hnode {
 			art.kids = append(art.kids, el("div", txt(t)).attr("class", "tw-share-text"))
 		}
 		if n := num(e, "images"); n > 0 {
-			label := "[" + plural(n, "изображение скрыто", "изображения скрыты", "изображений скрыто") + ": " + jscompat.Number(n) + "]"
+			label := "[" + hiddenImages(n) + ": " + jscompat.Number(n) + "]"
 			art.kids = append(art.kids, el("div", txt(label)).attr("class", "tw-share-muted"))
 		}
 		return art
@@ -323,10 +346,10 @@ func (p Page) feedEntry(e, s *jsvalue.Object) *hnode {
 		author := el("div", txt(assistantNames[s.String("provider")]+" "), timeSpan(e)).attr("class", "tw-share-author")
 		return el("article", author, p.markdown(e.String("markdown"))).attr("class", "tw-share-msg").attr("data-role", "assistant")
 	case "thinking":
-		return el("details", el("summary", txt("Размышления модели")),
+		return el("details", el("summary", txt(locale.Pick("Model reasoning", "Размышления модели"))),
 			el("div", txt(e.String("text"))).attr("class", "tw-share-fold-body tw-share-text tw-share-muted")).attr("class", "tw-share-fold")
 	case "plan":
-		author := el("div", txt("План "), timeSpan(e)).attr("class", "tw-share-author")
+		author := el("div", txt(locale.Pick("Plan ", "План ")), timeSpan(e)).attr("class", "tw-share-author")
 		return el("article", author, p.markdown(e.String("markdown"))).attr("class", "tw-share-msg tw-share-plan").attr("data-role", "plan")
 	case "note":
 		return el("p", txt(e.String("text"))).attr("class", "tw-share-note")
@@ -354,12 +377,12 @@ func actionGroup(actions []*jsvalue.Object) *hnode {
 }
 
 func footerText(o RenderOptions) string {
-	parts := []string{"Секреты и пути скрыты автоматически"}
+	parts := []string{locale.Pick("Secrets and paths are hidden automatically", "Секреты и пути скрыты автоматически")}
 	if o.ExpiresAt != 0 {
-		parts = append(parts, "ссылка действует до "+formatDate(o.ExpiresAt))
+		parts = append(parts, locale.Pick("link valid until ", "ссылка действует до ")+formatDate(o.ExpiresAt))
 	}
 	if o.Viewer != "" {
-		parts = append(parts, "открыто как "+o.Viewer)
+		parts = append(parts, locale.Pick("opened as ", "открыто как ")+o.Viewer)
 	}
 	return strings.Join(parts, " · ")
 }
@@ -371,9 +394,9 @@ func metaLine(s *jsvalue.Object) string {
 		parts = append(parts, jscompat.String(m))
 	}
 	if sub, ok := s.Object("owner").Get("sub"); ok && truthy(sub) {
-		parts = append(parts, "автор "+jscompat.String(sub))
+		parts = append(parts, locale.Pick("author ", "автор ")+jscompat.String(sub))
 	}
-	parts = append(parts, "снимок "+formatDateTime(num(s, "capturedAt"))+" МСК")
+	parts = append(parts, locale.Pick("snapshot ", "снимок ")+formatDateTime(num(s, "capturedAt"))+locale.Pick(" MSK", " МСК"))
 	var kept []string
 	for _, p := range parts {
 		if p != "" {
@@ -387,18 +410,18 @@ func metaLine(s *jsvalue.Object) string {
 func (p Page) RenderHTML(source *jsvalue.Object, r *Redactor, o RenderOptions) string {
 	s := RedactSnapshot(source, r)
 	var b strings.Builder
-	b.WriteString(`<!doctype html><html lang="ru"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>`)
+	b.WriteString(`<!doctype html><html lang="` + locale.Pick("en", "ru") + `"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>`)
 	b.WriteString(`<meta name="referrer" content="no-referrer"/><meta name="robots" content="noindex, nofollow"/>`)
 	b.WriteString(`<meta http-equiv="Content-Security-Policy" content="` + reactEscape(PageCSP) + `"/>`)
 	b.WriteString(`<title>` + reactEscape(s.String("title")+" · "+p.Brand) + `</title><style>` + pageCSS + `</style></head><body>`)
 	main := el("main").attr("class", "tw-share")
 	if o.Mode == ModePreview {
-		main.kids = append(main.kids, el("div", txt("Предпросмотр: так снимок увидит коллега. Проверьте, что в нём нет лишнего — автоматическое скрытие не гарантирует полноты.")).
+		main.kids = append(main.kids, el("div", txt(locale.Pick("Preview: this is how a colleague will see the snapshot. Check that nothing extra is in it, because automatic hiding does not guarantee completeness.", "Предпросмотр: так снимок увидит коллега. Проверьте, что в нём нет лишнего — автоматическое скрытие не гарантирует полноты."))).
 			attr("class", "tw-share-banner").attr("role", "note"))
 	}
-	top := el("div", el("span", el("span", txt(p.Brand)).attr("class", "tw-share-brand"), txt(" · только чтение"))).attr("class", "tw-share-top")
+	top := el("div", el("span", el("span", txt(p.Brand)).attr("class", "tw-share-brand"), txt(locale.Pick(" · read-only", " · только чтение")))).attr("class", "tw-share-top")
 	if o.Viewer != "" {
-		top.kids = append(top.kids, el("span", txt("открыто: "+o.Viewer)))
+		top.kids = append(top.kids, el("span", txt(locale.Pick("opened: ", "открыто: ")+o.Viewer)))
 	}
 	head := el("header", el("h1", txt(s.String("title"))).attr("class", "tw-share-title"), el("p", txt(metaLine(s))).attr("class", "tw-share-meta")).
 		attr("class", "tw-share-head")
@@ -408,7 +431,7 @@ func (p Page) RenderHTML(source *jsvalue.Object, r *Redactor, o RenderOptions) s
 	feed := el("div").attr("class", "tw-share-feed")
 	entries := s.Array("entries")
 	if len(entries) == 0 {
-		feed.kids = append(feed.kids, el("p", txt("В снимке нет сообщений")).attr("class", "tw-share-note"))
+		feed.kids = append(feed.kids, el("p", txt(locale.Pick("The snapshot has no messages", "В снимке нет сообщений"))).attr("class", "tw-share-note"))
 	}
 	for _, item := range groupFeed(entries) {
 		if item.entry == nil {
@@ -506,15 +529,15 @@ func (p Page) RenderMarkdown(source *jsvalue.Object, r *Redactor) string {
 		case "user":
 			images := ""
 			if n := num(e, "images"); n > 0 {
-				images = "\n>\n> _[" + plural(n, "изображение скрыто", "изображения скрыты", "изображений скрыто") + ": " + jscompat.Number(n) + "]_"
+				images = "\n>\n> _[" + hiddenImages(n) + ": " + jscompat.Number(n) + "]_"
 			}
 			blocks = append(blocks, "**"+ownerName(s)+"** · "+t+"\n\n"+quote(e.String("text"))+images)
 		case "assistant":
 			blocks = append(blocks, "**"+assistantNames[s.String("provider")]+"** · "+t+"\n\n"+e.String("markdown"))
 		case "thinking":
-			blocks = append(blocks, "<details><summary>Размышления модели</summary>\n\n"+quote(e.String("text"))+"\n\n</details>")
+			blocks = append(blocks, "<details><summary>"+locale.Pick("Model reasoning", "Размышления модели")+"</summary>\n\n"+quote(e.String("text"))+"\n\n</details>")
 		case "plan":
-			blocks = append(blocks, "**План** · "+t+"\n\n"+e.String("markdown"))
+			blocks = append(blocks, "**"+locale.Pick("Plan", "План")+"** · "+t+"\n\n"+e.String("markdown"))
 		case "note":
 			blocks = append(blocks, "_"+e.String("text")+"_")
 		}

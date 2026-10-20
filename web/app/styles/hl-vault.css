@@ -1,0 +1,184 @@
+/* "Vault" in the right panel, "Log in as …" in the browser toolbar and the agent's request. */
+.tw-vault {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px 16px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.tw-vault-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tw-vault-intro {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--t-text-secondary);
+}
+.tw-vault-head .tw-ui-button {
+  flex-shrink: 0;
+}
+.tw-vault-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-vault-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--t-border-subtle);
+}
+.tw-vault-row:last-child {
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+.tw-vault-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.tw-vault-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--t-text);
+}
+.tw-vault-login-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--t-text-secondary);
+}
+.tw-vault-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+.tw-vault-muted {
+  color: var(--t-text-muted);
+}
+.tw-vault-off {
+  min-height: 220px;
+}
+.tw-vault-off p {
+  max-width: 36ch;
+}
+
+.tw-vault-audit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tw-vault-audit-toggle {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--t-text-secondary);
+}
+.tw-vault-audit-toggle::after {
+  content: ' ▾';
+  color: var(--t-text-muted);
+}
+.tw-vault-audit-toggle[aria-expanded='true']::after {
+  content: ' ▴';
+}
+.tw-vault-audit-toggle:focus-visible {
+  outline: 2px solid var(--t-focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.tw-vault-audit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-vault-audit-row {
+  display: grid;
+  grid-template-columns: 78px 44px 1fr;
+  gap: 2px 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--t-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.tw-vault-audit-row > :last-child {
+  grid-column: 2 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tw-vault-form .tw-sform-label:not(:first-child) {
+  margin-top: 6px;
+}
+.tw-vault-form .tw-sform-input[readonly] {
+  color: var(--t-text-secondary);
+  background: var(--t-surface-raised);
+}
+.tw-vault-form .tw-sform-input[aria-invalid='true'] {
+  border-color: var(--t-danger);
+}
+.tw-vault-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--t-text);
+}
+
+.tw-vault-login .tw-vault-login-text {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .tw-vault-login .tw-vault-login-text {
+    display: none;
+  }
+  .tw-vault-head {
+    flex-direction: column;
+  }
+}
+
+.tw-vault-ask-origin {
+  word-break: break-all;
+}
+.tw-vault-ask-logins {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.tw-vault-ask-login {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--t-text);
+}

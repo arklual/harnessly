@@ -27,7 +27,7 @@ func testConfig(dir string) Config {
 		MCPPath:          "/api/cli/preview/mcp",
 		Allow:            []string{"mcp__acme-preview", "mcp__oldmux-preview"},
 		EditorName:       "acme-prompt-editor",
-		EditorTitle:      "Acme prompt editor (TCK-3010)",
+		EditorTitle:      "Acme prompt editor",
 		HumanEditorVar:   "ACME_HUMAN_EDITOR",
 		LegacyTmuxSocket: "violet",
 	}

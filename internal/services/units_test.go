@@ -26,7 +26,7 @@ func unitService() *Service {
 		Home: "/home/agent", GitLabHosts: []string{"gitlab.example.com", "gitlab.com"},
 		TrackerURL: "https://tracker.example.com", TrackerHosts: []string{"tracker.example.com", "youtrack.example.com"},
 		DocsHost: "docs.example.com", ReaderHost: "platform.example.com", ReaderPath: "/agents/docs/",
-		TaskKey: regexp.MustCompile(`^(ACME|DEMO|OPS)-[0-9]{1,6}$`), AvatarPath: "/api/platform/link-meta/avatar",
+		TaskKey: regexp.MustCompile(`^(ACME|DEMO|APP)-[0-9]{1,6}$`), AvatarPath: "/api/platform/link-meta/avatar",
 	})
 }
 

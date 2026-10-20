@@ -10,6 +10,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --settings) settings="$2"; shift ;;
     --resume) sid="$2"; shift ;;
+    # Everything after "--" is the first prompt, as the runtime launches a conversation started with a message.
+    --) shift; prompt="$*"; break ;;
     --*) case "$2" in --*|"") ;; *) shift ;; esac ;;
     *) prompt="$1" ;;
   esac

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/preview/weburl"
 )
 
@@ -26,12 +27,12 @@ func escapeHTML(v string) string {
 const pageStyle = "body{margin:0;padding:16px;box-sizing:border-box;text-align:center;min-height:100vh;display:grid;place-items:center;font:15px/1.5 system-ui,sans-serif;background:#f7f7f8;color:#1c1c1f}a,button{font:inherit;color:inherit}button{margin-right:12px;padding:6px 14px;border-radius:6px;border:1px solid currentColor;background:none;cursor:pointer}@media (prefers-color-scheme:dark){body{background:#121214;color:#ececef}}"
 
 func layout(title, body string) string {
-	return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>` + escapeHTML(title) +
+	return `<!doctype html><html lang="` + locale.Pick("en", "ru") + `"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>` + escapeHTML(title) +
 		`</title><style>` + pageStyle + `</style></head><body>` + body + `</body></html>`
 }
 
 func statusPage(status int, text string) string {
-	return layout("Превью · "+strconv.Itoa(status), "<p>"+escapeHTML(text)+"</p>")
+	return layout(locale.Pick("Preview · ", "Превью · ")+strconv.Itoa(status), "<p>"+escapeHTML(text)+"</p>")
 }
 
 // offerPage: the site redirects to another origin. The runtime never follows it: the page asks the preview island to
@@ -39,7 +40,7 @@ func statusPage(status int, text string) string {
 func offerPage(u *weburl.URL, parentOrigin, nonce string) string {
 	button, script := "", ""
 	if parentOrigin != "" {
-		button = `<button type="button" id="tk-open" hidden data-url="` + escapeHTML(u.Href()) + `" data-parent="` + escapeHTML(parentOrigin) + `">Открыть в превью</button>`
+		button = `<button type="button" id="tk-open" hidden data-url="` + escapeHTML(u.Href()) + `" data-parent="` + escapeHTML(parentOrigin) + `">` + locale.Pick("Open in preview", "Открыть в превью") + `</button>`
 		script = `<script nonce="` + nonce + `">(function () {
   var button = document.getElementById('tk-open');
   var parentOrigin = button.getAttribute('data-parent');
@@ -49,8 +50,8 @@ func offerPage(u *weburl.URL, parentOrigin, nonce string) string {
   button.addEventListener('click', function () { window.parent.postMessage({ type: 'tk:open', url: button.getAttribute('data-url') }, parentOrigin); });
 })();</script>`
 	}
-	return layout("Превью · переход", `<div><p>Сайт перенаправляет на `+escapeHTML(u.Origin())+`</p><p>`+button+`<a href="`+escapeHTML(u.Href())+
-		`" target="_blank" rel="noopener noreferrer">Открыть в новой вкладке</a></p></div>`+script)
+	return layout(locale.Pick("Preview · redirect", "Превью · переход"), `<div><p>`+locale.Pick("The site redirects to ", "Сайт перенаправляет на ")+escapeHTML(u.Origin())+`</p><p>`+button+`<a href="`+escapeHTML(u.Href())+
+		`" target="_blank" rel="noopener noreferrer">`+locale.Pick("Open in a new tab", "Открыть в новой вкладке")+`</a></p></div>`+script)
 }
 
 func offerPolicy(nonce string) string {
@@ -63,7 +64,7 @@ func signInPage(signInURL, parentOrigin, nonce string) string {
 	parent, hint, script := "", "", ""
 	if parentOrigin != "" {
 		parent = ` data-parent="` + escapeHTML(parentOrigin) + `"`
-		hint = `<p id="tk-sign-in-hint" hidden>Нажмите «Войти» над страницей: после входа она обновится.</p>`
+		hint = `<p id="tk-sign-in-hint" hidden>` + locale.Pick("Press \"Sign in\" above the page: it will refresh after you sign in.", "Нажмите «Войти» над страницей: после входа она обновится.") + `</p>`
 		script = `<script nonce="` + nonce + `">(function () {
   var link = document.getElementById('tk-sign-in');
   var parentOrigin = link.getAttribute('data-parent');
@@ -77,8 +78,8 @@ func signInPage(signInURL, parentOrigin, nonce string) string {
   });
 })();</script>`
 	}
-	return layout("Превью · вход", `<div><p>Стенд закрыт входом через Keycloak</p>`+hint+`<p><a id="tk-sign-in"`+parent+` href="`+escapeHTML(signInURL)+
-		`" target="_blank" rel="noopener noreferrer">Войти</a></p></div>`+script)
+	return layout(locale.Pick("Preview · sign-in", "Превью · вход"), `<div><p>`+signInRequired.String()+`</p>`+hint+`<p><a id="tk-sign-in"`+parent+` href="`+escapeHTML(signInURL)+
+		`" target="_blank" rel="noopener noreferrer">`+locale.Pick("Sign in", "Войти")+`</a></p></div>`+script)
 }
 
 // bridgeTag is the script element of the page's bridge: the parent it talks to, the target's cookie tag, and the

@@ -16,6 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/gitsync"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/machines"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
@@ -245,29 +246,29 @@ func fswriteRoutes(d deps) []gate.JSONRoute {
 					return files.Answer(r, status, files.Error(text), noStore())
 				}
 				if !d.SessionOK(r) {
-					return fail(401, "Войдите в рабочее пространство.")
+					return fail(401, locale.Pick("Sign in to the workspace.", "Войдите в рабочее пространство."))
 				}
 				if site, _ := fetchSite(r); site == "cross-site" {
-					return fail(403, "Сохранение доступно только из рабочего пространства.")
+					return fail(403, locale.Pick("Saving is only available from the workspace.", "Сохранение доступно только из рабочего пространства."))
 				}
 				q := files.RequestQuery(r)
 				session, ok := q.String("session")
 				if !ok || !editorSession.MatchString(session) {
-					return fail(400, "Не выбрана активная сессия.")
+					return fail(400, locale.Pick("No active session is selected.", "Не выбрана активная сессия."))
 				}
 				if !d.Tmux.HasSession(session) {
-					return fail(404, "Сессия больше не существует.")
+					return fail(404, locale.Pick("The session no longer exists.", "Сессия больше не существует."))
 				}
 				root := sessionDir(d.Tmux, session)
 				if root == "" {
-					return fail(404, "Не удалось определить папку проекта.")
+					return fail(404, locale.Pick("Could not determine the project folder.", "Не удалось определить папку проекта."))
 				}
 				relative, ok := q.String("path")
 				if !ok || relative == "" {
-					return fail(400, "Не выбран файл.")
+					return fail(400, locale.Pick("No file is selected.", "Не выбран файл."))
 				}
 				if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-					return fail(415, "Ожидается текст файла в JSON.")
+					return fail(415, locale.Pick("The file text in JSON is expected.", "Ожидается текст файла в JSON."))
 				}
 				var content, revision any
 				if o, isObject := body.(*jsvalue.Object); isObject {
@@ -277,7 +278,7 @@ func fswriteRoutes(d deps) []gate.JSONRoute {
 				c, okContent := content.(string)
 				rev, okRevision := revision.(string)
 				if !okContent || !okRevision || !revisionPattern.MatchString(rev) {
-					return fail(400, "Не переданы содержимое и версия файла.")
+					return fail(400, locale.Pick("The file's content and version were not sent.", "Не переданы содержимое и версия файла."))
 				}
 				saved, ee := files.WriteProjectFile(root, relative, c, rev, contentHasLoneSurrogate(raw))
 				if ee != nil {

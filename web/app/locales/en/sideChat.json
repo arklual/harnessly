@@ -1,0 +1,23 @@
+{
+  "sideChat.sideChatExcerptChips.list": "Excerpts for the question",
+  "sideChat.sideChatExcerptChips.excerpt": "Excerpt",
+  "sideChat.sideChatExcerptChips.removeLabel": "Remove the excerpt from the question",
+  "sideChat.sideChatExcerptChips.remove": "Remove the excerpt",
+  "sideChat.sideChatMessage.answering": "Answering…",
+  "sideChat.sideChatMessage.stopped": "Stopped",
+  "sideChat.sideChatMessage.retry": "Retry",
+  "sideChat.sideChatView.note": "Ask about this session without touching the main conversation. The agent sees the whole context, nothing from here is added to the session.",
+  "sideChat.sideChatView.noteShort": "The main conversation does not change.",
+  "sideChat.sideChatView.unsupported": "Side chat works only with Claude for now: another agent runs in this tab.",
+  "sideChat.sideChatView.session": "Session: {name}",
+  "sideChat.sideChatView.clearLabel": "Clear side chat",
+  "sideChat.sideChatView.clear": "Clear",
+  "sideChat.sideChatView.ephemeral": "The conversation is temporary and goes away when you close the page.",
+  "sideChat.sideChatView.log": "Questions and answers",
+  "sideChat.sideChatView.fieldLabel": "Quick question about the session",
+  "sideChat.sideChatView.placeholder": "Quick question…",
+  "sideChat.sideChatView.stopLabel": "Stop the answer",
+  "sideChat.sideChatView.stop": "Stop",
+  "sideChat.sideChatView.sendLabel": "Send the question",
+  "sideChat.sideChatView.send": "Send (Enter)"
+}

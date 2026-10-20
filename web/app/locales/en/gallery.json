@@ -1,0 +1,12 @@
+{
+  "gallery.galleryView.filterAll": "All",
+  "gallery.galleryView.filterMine": "Mine",
+  "gallery.galleryView.filterAgent": "From the agent",
+  "gallery.galleryView.sourceYou": "you",
+  "gallery.galleryView.sourceAgent": "agent",
+  "gallery.galleryView.emptyTitle": "No images in this conversation yet",
+  "gallery.galleryView.emptyHint": "Images you attach and the ones the agent creates or opens will show up here.",
+  "gallery.galleryView.title": "Gallery",
+  "gallery.galleryView.sourceTabs": "Image source",
+  "gallery.galleryView.noneFromSource": "No images from this source"
+}

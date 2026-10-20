@@ -11,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
@@ -193,7 +194,7 @@ func (h *Handlers) GitLabView(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	url, _ := queryString(r, "url")
 	if !h.S.IsGitLabRef(url) {
-		writeJSON(w, r, 400, errorBody("Нужна ссылка на merge request или коммит GitLab"))
+		writeJSON(w, r, 400, errorBody(locale.Pick("A link to a GitLab merge request or commit is required", "Нужна ссылка на merge request или коммит GitLab")))
 		return
 	}
 	view, err := h.S.GitLabView(r.Context(), url)
@@ -202,7 +203,7 @@ func (h *Handlers) GitLabView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if view == nil {
-		writeJSON(w, r, 404, errorBody("GitLab не отдал этот объект"))
+		writeJSON(w, r, 404, errorBody(locale.Pick("GitLab did not return this object", "GitLab не отдал этот объект")))
 		return
 	}
 	writeJSON(w, r, 200, view)

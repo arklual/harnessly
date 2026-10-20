@@ -12,6 +12,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/push"
 )
 
@@ -176,8 +177,8 @@ func (s *service) pushTest(r *http.Request, body any) (int, any, http.Header) {
 	if target == nil {
 		return answer(r, 404, errorBody("Subscription not found"), nil)
 	}
-	text := "Так будет выглядеть сообщение, когда агент закончит работу или задаст вопрос."
-	status, err := s.cfg.Push.Send(*target, s.message("test", "Уведомления включены", text))
+	text := locale.Pick("This is what a message looks like when an agent finishes its work or asks a question.", "Так будет выглядеть сообщение, когда агент закончит работу или задаст вопрос.")
+	status, err := s.cfg.Push.Send(*target, s.message("test", locale.Pick("Notifications are on", "Уведомления включены"), text))
 	if err != nil {
 		s.log("warn", "web push failed", "err", err.Error())
 	}
@@ -231,11 +232,11 @@ func (s *service) releaseNotice(r *http.Request, body any) (int, any, http.Heade
 		s.log("error", "api handler failed", "path", r.URL.Path, "err", err.Error())
 		return textAnswer(500, "Internal Server Error")
 	}
-	text := "Нажмите, чтобы обновить"
+	text := locale.Pick("Tap to update", "Нажмите, чтобы обновить")
 	if version != nil {
-		text = "Версия " + *version + " — нажмите, чтобы обновить"
+		text = locale.Pick("Version "+*version+" — tap to update", "Версия "+*version+" — нажмите, чтобы обновить")
 	}
-	msg := s.message("release", "Вышла новая версия "+s.cfg.AppName, text)
+	msg := s.message("release", locale.Pick("A new version of "+s.cfg.AppName+" is out", "Вышла новая версия "+s.cfg.AppName), text)
 	sent := 0
 	for _, sub := range s.cfg.Push.Store.Subscriptions() {
 		status, err := s.cfg.Push.Send(sub, msg)
@@ -277,7 +278,7 @@ func (s *service) docsNotify(r *http.Request, body any) (int, any, http.Header) 
 	}
 	title, detail := text("title", 120), text("body", 240)
 	if url == "" || title == "" {
-		return answer(r, 400, errorBody("Нужны title и url документа"), nil)
+		return answer(r, 400, errorBody(locale.Pick("The document title and url are required", "Нужны title и url документа")), nil)
 	}
 	tag := text("tag", 120)
 	if tag == "" {

@@ -2,11 +2,14 @@ package design
 
 import (
 	"embed"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 //go:embed texts
@@ -23,20 +26,33 @@ const (
 	DesignArtifactType = "https://claude.ai/artifact/QKN21svewxgyPb6SYRqWnd"
 )
 
-// text is an embedded text with the deployment's words put in.
+// text is an embedded text with the deployment's words put in. A text has an English file (guide.md) and a Russian one
+// next to it (guide.ru.md); a file without a Russian twin (a stylesheet) is the same in both languages.
 func (l *Library) text(name string) string {
-	if v, ok := l.texts.Load(name); ok {
+	file, key := name, name
+	if locale.Russian() {
+		ext := filepath.Ext(name)
+		if ru := strings.TrimSuffix(name, ext) + ".ru" + ext; textFileExists(ru) {
+			file, key = ru, ru
+		}
+	}
+	if v, ok := l.texts.Load(key); ok {
 		return v.(string)
 	}
-	b, err := textFiles.ReadFile("texts/" + name)
+	b, err := textFiles.ReadFile("texts/" + file)
 	if err != nil {
 		panic(err)
 	}
 	t := l.cfg.Texts
 	out := strings.NewReplacer("{{tag}}", t.Tag, "{{cli}}", t.CLI, "{{host}}", t.Host, "{{shared}}", t.SharedDir,
 		"{{kit}}", t.KitGlobal, "{{pages}}", t.PagesGlobal, "{{args}}", t.ArgsGlobal, "{{app}}", t.AppName).Replace(string(b))
-	l.texts.Store(name, out)
+	l.texts.Store(key, out)
 	return out
+}
+
+func textFileExists(name string) bool {
+	_, err := fs.Stat(textFiles, "texts/"+name)
+	return err == nil
 }
 
 func (l *Library) GuidePath() string { return filepath.Join(l.Root(), GuideFile) }

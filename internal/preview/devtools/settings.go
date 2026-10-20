@@ -6,6 +6,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
@@ -89,7 +90,7 @@ func ParseSettingsPatch(v any) (Patch, string) {
 	raw, ok := v.(*jsvalue.Object)
 	if !ok {
 		if _, isList := v.([]any); !isList {
-			return Patch{}, "Нужен объект настроек"
+			return Patch{}, locale.Pick("A settings object is required", "Нужен объект настроек")
 		}
 		raw = jsvalue.NewObject()
 	}
@@ -97,21 +98,21 @@ func ParseSettingsPatch(v any) (Patch, string) {
 	if t, present := raw.Get("throttle"); present {
 		th, ok := ParseThrottle(t)
 		if !ok {
-			return Patch{}, "throttle: preset — none, fast-4g, slow-4g, 3g, offline или custom с latencyMs, downKbps, upKbps"
+			return Patch{}, locale.Pick("throttle: preset is none, fast-4g, slow-4g, 3g, offline or custom with latencyMs, downKbps, upKbps", "throttle: preset — none, fast-4g, slow-4g, 3g, offline или custom с latencyMs, downKbps, upKbps")
 		}
 		p.Throttle = &th
 	}
 	if b, present := raw.Get("blocked"); present {
 		list, ok := ParseBlocked(b)
 		if !ok {
-			return Patch{}, "blocked: список шаблонов адреса, не больше " + itoa(MaxBlocked)
+			return Patch{}, locale.Pick("blocked: a list of address patterns, at most ", "blocked: список шаблонов адреса, не больше ") + itoa(MaxBlocked)
 		}
 		p.Blocked = list
 	}
 	if d, present := raw.Get("disableCache"); present {
 		b, ok := d.(bool)
 		if !ok {
-			return Patch{}, "disableCache: true или false"
+			return Patch{}, locale.Pick("disableCache: true or false", "disableCache: true или false")
 		}
 		p.DisableCache = &b
 	}

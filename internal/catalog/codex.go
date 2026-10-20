@@ -9,9 +9,11 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"golang.org/x/text/collate"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-const codexConfigWarning = "~/.codex/config.toml не разобрался — навыки плагинов Codex не показаны"
+var codexConfigWarning = locale.T("~/.codex/config.toml could not be parsed: the skills of Codex plugins are not shown", "~/.codex/config.toml не разобрался — навыки плагинов Codex не показаны")
 
 var pluginKey = regexp.MustCompile(`^([A-Za-z0-9._-]+)@([A-Za-z0-9._-]+)$`)
 
@@ -134,7 +136,7 @@ func scanCodex(codexDir string) *builder {
 	var plugins []codexPlugin
 	if raw, err := os.ReadFile(filepath.Join(codexDir, "config.toml")); err == nil {
 		if plugins, err = enabledCodexPlugins(decodeUTF8(raw)); err != nil {
-			b.warn(codexConfigWarning)
+			b.warn(codexConfigWarning.String())
 		}
 	}
 	cacheDir := filepath.Join(codexDir, "plugins", "cache")

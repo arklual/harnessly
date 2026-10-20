@@ -15,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 const (
@@ -200,7 +201,7 @@ func Summarize(raw string, meta any, id string, mtimeMs float64, now float64) (s
 		if first = jscompat.Slice(first, 80); first != "" {
 			description = first
 		} else {
-			description = "Субагент"
+			description = locale.Pick("Subagent", "Субагент")
 		}
 	}
 	if status != "done" {

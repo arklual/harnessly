@@ -1,0 +1,56 @@
+.hl-signin {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: 16px;
+  background: var(--t-bg);
+}
+.hl-signin-card {
+  display: grid;
+  gap: 14px;
+  width: min(360px, 100%);
+  padding: 28px;
+  border-radius: 18px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-default);
+  box-shadow: var(--t-shadow-popover);
+}
+.hl-signin-mark {
+  width: 40px;
+  height: 40px;
+}
+.hl-signin-card h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.hl-signin-card p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--t-text-secondary);
+}
+.hl-signin-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--t-text-secondary);
+}
+.hl-signin-card input {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--t-border-default);
+  background: var(--t-surface-raised);
+  color: var(--t-text);
+  font: inherit;
+}
+.hl-signin-card input:focus {
+  outline: 2px solid var(--t-accent-purple-soft);
+  outline-offset: 1px;
+}
+.hl-signin-card .hl-btn {
+  height: 40px;
+}
+.hl-signin-error {
+  color: var(--t-danger) !important;
+}

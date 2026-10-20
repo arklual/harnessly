@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/panel"
 )
 
@@ -320,9 +321,9 @@ func clock(ms float64) string { return time.UnixMilli(int64(ms)).In(moscow).Form
 
 func describeCommand(cmd *jsvalue.Object) string {
 	if cmd.String("kind") == "show" {
-		return "показать панель"
+		return locale.Pick("show the pane", "показать панель")
 	}
-	s := "открыть «" + cmd.String("tab") + "»"
+	s := locale.Pick("open \""+cmd.String("tab")+"\"", "открыть «"+cmd.String("tab")+"»")
 	if t := cmd.String("target"); t != "" {
 		s += " (" + t + ")"
 	}
@@ -337,12 +338,12 @@ func Describe(intents []*jsvalue.Object) []string {
 		when := clock(createdAt(it))
 		at, _ := it.Number("appliedAt")
 		if v, _ := it.Get("appliedAt"); v == nil {
-			out = append(out, when+" "+what+" — ждёт, откроется, когда человек придёт в разговор")
+			out = append(out, when+" "+what+locale.Pick(" — waiting, it will open when the person comes to the conversation", " — ждёт, откроется, когда человек придёт в разговор"))
 			continue
 		}
-		line := when + " " + what + " — открыто " + clock(at)
+		line := when + " " + what + locale.Pick(" — opened ", " — открыто ") + clock(at)
 		if on, _ := it.Get("appliedOn"); on == "phone" {
-			line += " на телефоне"
+			line += locale.Pick(" on the phone", " на телефоне")
 		}
 		out = append(out, line)
 	}

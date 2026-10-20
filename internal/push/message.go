@@ -11,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/status"
 )
 
@@ -228,6 +229,10 @@ func codexEntries(path string) []entry {
 	return out
 }
 
+// allowWord starts every permission request the notification words itself; a question that starts so is a request, not a
+// question the agent asks.
+var allowWord = locale.T("Allow", "Разрешить")
+
 func questionFrom(entries []entry) (string, bool) {
 	for i := len(entries) - 1; i >= 0; i-- {
 		switch e := entries[i]; e.kind {
@@ -237,7 +242,7 @@ func questionFrom(entries []entry) (string, bool) {
 			return "", false
 		case "tool":
 			if !e.finished {
-				return "Разрешить: " + e.text, e.text != ""
+				return allowWord.String() + ": " + e.text, e.text != ""
 			}
 		case "user":
 			return "", false
@@ -304,15 +309,15 @@ func permissionText(raw []byte) (string, bool) {
 	}
 	switch r.Type {
 	case "ExecApprovalRequest":
-		return "Разрешить команду: " + r.Command, true
+		return locale.Pick("Allow the command: ", "Разрешить команду: ") + r.Command, true
 	case "ApplyPatchApprovalRequest":
 		names := make([]string, len(r.Patches))
 		for i, p := range r.Patches {
 			names[i] = p.Path[strings.LastIndexByte(p.Path, '/')+1:]
 		}
-		return "Разрешить правку: " + strings.Join(names, ", "), true
+		return locale.Pick("Allow the edit: ", "Разрешить правку: ") + strings.Join(names, ", "), true
 	}
-	return "Просит разрешение", true
+	return locale.Pick("Asks for permission", "Просит разрешение"), true
 }
 
 // BuildMessage writes the notification of a finished turn ("done") or a question ("question"): the conversation's
@@ -331,7 +336,7 @@ func BuildMessage(tabID string, e status.Entry, kind, tagPrefix string, now time
 	if e.JSONLPath != "" && !codexTab {
 		title = sessionTitle(e.JSONLPath)
 	}
-	for _, alt := range []string{e.AgentSummary.Value(), e.LastUserMessage.Value(), e.TabName, "Разговор"} {
+	for _, alt := range []string{e.AgentSummary.Value(), e.LastUserMessage.Value(), e.TabName, locale.Pick("Conversation", "Разговор")} {
 		if title != "" {
 			break
 		}
@@ -349,7 +354,7 @@ func BuildMessage(tabID string, e status.Entry, kind, tagPrefix string, now time
 		if !ok {
 			question, ok = questionFrom(entries)
 		}
-		asked = !ok || strings.HasPrefix(question, "Разрешить")
+		asked = !ok || strings.HasPrefix(question, allowWord.String())
 		if !ok {
 			question = ""
 		}
@@ -360,27 +365,27 @@ func BuildMessage(tabID string, e status.Entry, kind, tagPrefix string, now time
 	case kind == "question" && question != "":
 		detail = question
 	case kind == "question":
-		detail = "Агент остановился и ждёт твоего решения"
+		detail = locale.Pick("The agent stopped and is waiting for your decision", "Агент остановился и ждёт твоего решения")
 	default:
 		if a, ok := answerFrom(entries); ok {
 			detail = a
 		} else if e.LastAssistantMessage.Has() {
 			detail = e.LastAssistantMessage.Value()
 		} else if failed {
-			detail = "Ход закончился ошибкой"
+			detail = locale.Pick("The turn ended with an error", "Ход закончился ошибкой")
 		} else {
-			detail = "Агент закончил работу"
+			detail = locale.Pick("The agent finished its work", "Агент закончил работу")
 		}
 	}
 	body := detail
 	if kind == "question" {
 		if !asked {
-			body = "Вопрос: " + detail
+			body = locale.Pick("Question: ", "Вопрос: ") + detail
 		}
 	} else if failed {
-		body = "Ошибка — " + detail
+		body = locale.Pick("Error — ", "Ошибка — ") + detail
 	} else {
-		body = "Готово — " + detail
+		body = locale.Pick("Done — ", "Готово — ") + detail
 	}
 	provider := agents.Claude
 	if codexTab {

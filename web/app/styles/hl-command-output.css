@@ -1,0 +1,221 @@
+/* Slash command entries in the timeline. Tokens --t-*, classes tw-*. */
+
+.tw-cmd {
+  margin: 4px 0;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 10px;
+  background: var(--t-surface);
+  overflow: hidden;
+}
+.tw-cmd[data-state='error'] {
+  border-color: var(--t-danger-border);
+}
+
+.tw-cmd-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  padding: 7px 12px;
+  font-size: 12.5px;
+}
+.tw-cmd-glyph {
+  flex-shrink: 0;
+  color: var(--t-accent-amber-soft);
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-weight: 600;
+}
+.tw-cmd-name {
+  flex-shrink: 0;
+  color: var(--t-text);
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+.tw-cmd-args {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--t-text-secondary);
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12px;
+}
+.tw-cmd-caption {
+  color: var(--t-text-secondary);
+}
+.tw-cmd-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+  font-size: 11.5px;
+  color: var(--t-text-muted);
+}
+.tw-cmd-status .tw-ui-spinner {
+  width: 12px;
+  height: 12px;
+}
+.tw-cmd[data-state='error'] .tw-cmd-status {
+  color: var(--t-danger);
+}
+
+.tw-cmd-body {
+  border-top: 1px solid var(--t-border-subtle);
+}
+.tw-cmd-output {
+  margin: 0;
+  padding: 9px 12px;
+  max-height: 60vh;
+  overflow: auto;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--t-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scrollbar-width: thin;
+}
+.tw-cmd-output[data-error] {
+  color: var(--t-danger);
+}
+.tw-cmd-output[data-clipped] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.tw-cmd-toggle {
+  margin: 0 6px 6px;
+}
+
+/* A `!` line of the prompt, run in the agent's shell: Claude Code's bash mode as a terminal card. */
+.tw-shell {
+  --tw-shell-accent: #fd5db1;
+  position: relative;
+  margin: 6px 0 6px auto;
+  max-width: min(100%, 720px);
+  border: 1px solid color-mix(in oklab, var(--tw-shell-accent) 34%, var(--t-border-subtle));
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--tw-shell-accent) 5%, var(--t-surface));
+  overflow: hidden;
+  animation: tw-shell-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.tw-shell[data-state='error'] {
+  border-color: var(--t-danger-border);
+}
+.tw-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--tw-shell-accent), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  opacity: 0;
+}
+.tw-shell[data-state='running']::before {
+  opacity: 1;
+  animation: tw-shell-sweep 1.3s linear infinite;
+}
+.tw-shell-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 12px;
+}
+.tw-shell-bang {
+  flex-shrink: 0;
+  color: var(--tw-shell-accent);
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-weight: 700;
+}
+.tw-shell-command {
+  min-width: 0;
+  color: var(--t-text);
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tw-shell[data-state='running'] .tw-shell-command::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  background: var(--tw-shell-accent);
+  animation: tw-shell-caret 1s steps(1) infinite;
+}
+.tw-shell-status {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+  font-size: 11.5px;
+  color: var(--t-text-muted);
+}
+.tw-shell[data-state='error'] .tw-shell-status {
+  color: var(--t-danger);
+}
+.tw-shell-out {
+  animation: tw-shell-out 240ms ease-out both;
+}
+.tw-shell-out .tw-cmd-body {
+  border-top-color: color-mix(in oklab, var(--tw-shell-accent) 20%, var(--t-border-subtle));
+}
+.tw-shell-empty {
+  padding: 0 12px 9px 28px;
+  font-size: 11.5px;
+  color: var(--t-text-muted);
+  animation: tw-shell-out 240ms ease-out both;
+}
+@keyframes tw-shell-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tw-shell-sweep {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+@keyframes tw-shell-caret {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes tw-shell-out {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-shell,
+  .tw-shell-out,
+  .tw-shell-empty {
+    animation: none;
+  }
+  .tw-shell[data-state='running']::before {
+    animation: none;
+    opacity: 0.6;
+    background-size: 100% 100%;
+  }
+  .tw-shell[data-state='running'] .tw-shell-command::after {
+    animation: none;
+  }
+}

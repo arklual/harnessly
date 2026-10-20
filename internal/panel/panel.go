@@ -11,6 +11,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
@@ -295,24 +296,27 @@ func (t Targets) taskTarget(text string) string {
 func (t Targets) hint(tab string, k targetKind) string {
 	switch k {
 	case port:
-		return "open browser: открывается порт этой машины (4400, localhost:4400/путь) или фича-стенд https://<slug>" + t.StandDomain + "; другие внешние адреса агент не открывает"
+		return locale.Pick("open browser: opens a port of this machine (4400, localhost:4400/path) or a feature stand https://<slug>"+t.StandDomain+"; the agent does not open other external addresses",
+			"open browser: открывается порт этой машины (4400, localhost:4400/путь) или фича-стенд https://<slug>"+t.StandDomain+"; другие внешние адреса агент не открывает")
 	case doc:
-		return "open artifacts: нужна ссылка на документ или доску " + t.PortalHost + " (https://" + t.PortalHost + "/a/… или /b/…)"
+		return locale.Pick("open artifacts: a link to a document or a board of "+t.PortalHost+" is required (https://"+t.PortalHost+"/a/… or /b/…)",
+			"open artifacts: нужна ссылка на документ или доску "+t.PortalHost+" (https://"+t.PortalHost+"/a/… или /b/…)")
 	case gitlab:
 		first := ""
 		if len(t.GitLabHosts) > 0 {
 			first = t.GitLabHosts[0]
 		}
-		return "open gitlab: нужна ссылка на merge request или коммит GitLab (https://" + first + "/…)"
+		return locale.Pick("open gitlab: a link to a GitLab merge request or commit is required (https://"+first+"/…)",
+			"open gitlab: нужна ссылка на merge request или коммит GitLab (https://"+first+"/…)")
 	case task:
-		return "open task: нужен ключ задачи трекера (" + t.TaskExamples + ")"
+		return locale.Pick("open task: a tracker task key is required ("+t.TaskExamples+")", "open task: нужен ключ задачи трекера ("+t.TaskExamples+")")
 	}
-	return "open " + tab + ": нужен путь без «..» и управляющих символов"
+	return locale.Pick("open "+tab+": a path without \"..\" and control characters is required", "open "+tab+": нужен путь без «..» и управляющих символов")
 }
 
 func (t Targets) parseOpen(tab, target any) (Command, string) {
 	if !IsTabKind(tab) {
-		return Command{}, "open: неизвестная вкладка, доступны " + strings.Join(TabKinds, ", ")
+		return Command{}, locale.Pick("open: unknown tab, available: ", "open: неизвестная вкладка, доступны ") + strings.Join(TabKinds, ", ")
 	}
 	name := tab.(string)
 	if s, isStr := target.(string); target == nil || (isStr && jsvalue.TrimJS(s) == "") {
@@ -320,11 +324,11 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 	}
 	k := targetOf[name]
 	if k == none {
-		return Command{}, "open " + name + ": этой вкладке цель не нужна"
+		return Command{}, locale.Pick("open "+name+": this tab needs no target", "open "+name+": этой вкладке цель не нужна")
 	}
 	text, isStr := target.(string)
 	if !isStr || jscompat.Len(text) > MaxArg {
-		return Command{}, "open " + name + ": цель слишком длинная или не строка"
+		return Command{}, locale.Pick("open "+name+": the target is too long or not a string", "open "+name+": цель слишком длинная или не строка")
 	}
 	var c string
 	switch k {
@@ -350,7 +354,7 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 func (t Targets) Parse(input any) (Command, string) {
 	o, ok := input.(*jsvalue.Object)
 	if !ok {
-		return Command{}, "Нужен объект команды"
+		return Command{}, locale.Pick("A command object is required", "Нужен объект команды")
 	}
 	kind, _ := o.Get("kind")
 	switch kind {
@@ -361,7 +365,7 @@ func (t Targets) Parse(input any) (Command, string) {
 	case "show", "hide", "status":
 		return Command{Kind: kind.(string)}, ""
 	}
-	return Command{}, "Неизвестная команда: open, show, hide, status"
+	return Command{}, locale.Pick("Unknown command: open, show, hide, status", "Неизвестная команда: open, show, hide, status")
 }
 
 // Result is a page's answer to a command, shape-checked, cleaned and clipped: the browser is not trusted.

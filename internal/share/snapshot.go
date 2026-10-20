@@ -10,6 +10,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // A snapshot is a whitelist projection of a conversation's timeline: tool results, images, attachments, approval
@@ -21,8 +22,12 @@ const (
 	snapshotBytes      = 5 * 1024 * 1024
 	actionSummaryChars = 400
 	noteChars          = 600
-	truncatedMark      = "\n\n…[обрезано: запись длиннее 20 000 символов]"
 )
+
+// truncatedMark closes an entry cut at entryChars; hl-share-snapshot.ts builds the same text.
+func truncatedMark() string {
+	return locale.Pick("\n\n…[truncated: entry longer than 20,000 characters]", "\n\n…[обрезано: запись длиннее 20 000 символов]")
+}
 
 // Options are what the owner chose to include.
 type Options struct {
@@ -219,17 +224,17 @@ func Project(timeline []*jsvalue.Object, o Options) []*jsvalue.Object {
 			}
 			questions := strings.Join(qs, " · ")
 			if answer := get(e, "answer"); truthy(answer) {
-				note(at, "Вопрос агента: "+questions+" — ответ: "+template(answer))
+				note(at, locale.Pick("Agent question: ", "Вопрос агента: ")+questions+locale.Pick(" — answer: ", " — ответ: ")+template(answer))
 			} else {
-				note(at, "Вопрос агента: "+questions)
+				note(at, locale.Pick("Agent question: ", "Вопрос агента: ")+questions)
 			}
 		case "interrupt":
-			note(at, "Ход прерван")
+			note(at, locale.Pick("Turn interrupted", "Ход прерван"))
 		case "context-compacted":
-			note(at, "Контекст диалога сжат")
+			note(at, locale.Pick("Conversation context compacted", "Контекст диалога сжат"))
 		case "error-notice":
 			if get(e, "severity") == "error" {
-				note(at, "Ошибка: "+template(get(e, "message")))
+				note(at, locale.Pick("Error: ", "Ошибка: ")+template(get(e, "message")))
 			}
 		case "slash-command":
 			if !truthy(get(e, "pending")) {
@@ -354,7 +359,7 @@ func Capture(in CaptureInput) (snapshot, report *jsvalue.Object, ok bool) {
 			return v
 		}
 		truncated = true
-		return jscompat.Slice(v, entryChars) + truncatedMark
+		return jscompat.Slice(v, entryChars) + truncatedMark()
 	}
 	limited := redacted.Array("entries")
 	for i, e := range limited {

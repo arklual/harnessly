@@ -1,0 +1,5 @@
+# Native builds of the local speech model's server-side dependencies are not needed: the page runs it in the browser.
+allowBuilds:
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false

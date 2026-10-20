@@ -21,6 +21,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
@@ -61,19 +62,19 @@ func clean(s string) string { return tmux.StripControlChars(s) }
 func parseExcerpt(raw any) (Excerpt, string) {
 	o, ok := raw.(*jsvalue.Object)
 	if !ok {
-		return Excerpt{}, "Неверный фрагмент"
+		return Excerpt{}, locale.Pick("Invalid excerpt", "Неверный фрагмент")
 	}
 	q, has := o.Get("quote")
 	qs, isStr := q.(string)
 	if !has || !isStr {
-		return Excerpt{}, "Неверный фрагмент"
+		return Excerpt{}, locale.Pick("Invalid excerpt", "Неверный фрагмент")
 	}
 	quote := jscompat.Trim(clean(qs))
 	if quote == "" {
-		return Excerpt{}, "Фрагмент пустой"
+		return Excerpt{}, locale.Pick("The excerpt is empty", "Фрагмент пустой")
 	}
 	if jscompat.Len(quote) > MaxExcerpt {
-		return Excerpt{}, fmt.Sprintf("Фрагмент длиннее %d символов", MaxExcerpt)
+		return Excerpt{}, fmt.Sprintf(locale.Pick("The excerpt is longer than %d characters", "Фрагмент длиннее %d символов"), MaxExcerpt)
 	}
 	src, has := o.Get("source")
 	if !has {
@@ -81,12 +82,12 @@ func parseExcerpt(raw any) (Excerpt, string) {
 	}
 	so, ok := src.(*jsvalue.Object)
 	if !ok {
-		return Excerpt{}, "Неверный источник фрагмента"
+		return Excerpt{}, locale.Pick("Invalid excerpt source", "Неверный источник фрагмента")
 	}
 	entry, isStr := func() (string, bool) { v, _ := so.Get("entryId"); s, ok := v.(string); return s, ok }()
 	role, _ := func() (any, bool) { return so.Get("role") }()
 	if !isStr || role != "agent" && role != "user" {
-		return Excerpt{}, "Неверный источник фрагмента"
+		return Excerpt{}, locale.Pick("Invalid excerpt source", "Неверный источник фрагмента")
 	}
 	return Excerpt{Quote: quote, HasSource: true, EntryID: jscompat.Slice(clean(entry), 200), Role: role.(string)}, ""
 }
@@ -115,12 +116,12 @@ func parseTurn(raw any) (Turn, bool) {
 func ParseRequest(body any) (Request, string) {
 	o, ok := body.(*jsvalue.Object)
 	if !ok {
-		return Request{}, "Нужен JSON"
+		return Request{}, locale.Pick("JSON is required", "Нужен JSON")
 	}
 	tabID, _ := o.Get("tabId")
 	tid, isStr := tabID.(string)
 	if !isStr || !tabIDRe.MatchString(tid) {
-		return Request{}, "Нужен tabId"
+		return Request{}, locale.Pick("tabId is required", "Нужен tabId")
 	}
 	rawQ, _ := o.Get("question")
 	question := ""
@@ -128,16 +129,16 @@ func ParseRequest(body any) (Request, string) {
 		question = jscompat.Trim(clean(s))
 	}
 	if question == "" {
-		return Request{}, "Вопрос пустой"
+		return Request{}, locale.Pick("The question is empty", "Вопрос пустой")
 	}
 	if jscompat.Len(question) > MaxQuestion {
-		return Request{}, fmt.Sprintf("Вопрос длиннее %d символов", MaxQuestion)
+		return Request{}, fmt.Sprintf(locale.Pick("The question is longer than %d characters", "Вопрос длиннее %d символов"), MaxQuestion)
 	}
 	model := ""
 	if m, has := o.Get("model"); has {
 		s, ok := m.(string)
 		if !ok || !agents.ModelIDRe.MatchString(s) {
-			return Request{}, "Неизвестная модель"
+			return Request{}, locale.Pick("Unknown model", "Неизвестная модель")
 		}
 		model = s
 	}
@@ -145,7 +146,7 @@ func ParseRequest(body any) (Request, string) {
 	if v, has := o.Get("excerpts"); has {
 		list, ok := v.([]any)
 		if !ok || len(list) > MaxExcerpts {
-			return Request{}, fmt.Sprintf("Не больше %d фрагментов", MaxExcerpts)
+			return Request{}, fmt.Sprintf(locale.Pick("At most %d excerpts", "Не больше %d фрагментов"), MaxExcerpts)
 		}
 		for _, raw := range list {
 			e, msg := parseExcerpt(raw)
@@ -158,7 +159,7 @@ func ParseRequest(body any) (Request, string) {
 	if v, has := o.Get("history"); has {
 		list, ok := v.([]any)
 		if !ok {
-			return Request{}, "Неверная история"
+			return Request{}, locale.Pick("Invalid history", "Неверная история")
 		}
 		if len(list) > MaxHistory {
 			list = list[len(list)-MaxHistory:]
@@ -166,7 +167,7 @@ func ParseRequest(body any) (Request, string) {
 		for _, raw := range list {
 			t, ok := parseTurn(raw)
 			if !ok {
-				return Request{}, "Неверная история"
+				return Request{}, locale.Pick("Invalid history", "Неверная история")
 			}
 			r.History = append(r.History, t)
 		}
@@ -239,7 +240,9 @@ func Format(e Event) string {
 	return "data: " + string(jsvalue.Stringify(o, "")) + "\n\n"
 }
 
-var cancelled = Event{Type: "error", Code: "cancelled", Message: "Остановлено"}
+func cancelled() Event {
+	return Event{Type: "error", Code: "cancelled", Message: locale.Pick("Stopped", "Остановлено")}
+}
 
 // Args make the fork answer once and leave nothing behind: its own id, no persistence, no tools, MCP servers, slash
 // commands or hooks. The question goes through stdin.
@@ -393,16 +396,16 @@ var (
 
 func failureMessage(cli string) string {
 	if tooLong.MatchString(cli) {
-		return "Контекст сессии слишком велик для быстрого вопроса"
+		return locale.Pick("The session context is too large for a quick question", "Контекст сессии слишком велик для быстрого вопроса")
 	}
 	if noLogin.MatchString(cli) {
-		return "Claude не авторизован на этой машине"
+		return locale.Pick("Claude is not signed in on this machine", "Claude не авторизован на этой машине")
 	}
 	c := jscompat.Slice(jscompat.Trim(spaces.ReplaceAllString(clean(cli), " ")), maxErrorChars)
 	if c != "" {
-		return "Claude не смог ответить: " + c
+		return locale.Pick("Claude could not answer: ", "Claude не смог ответить: ") + c
 	}
-	return "Claude не смог ответить"
+	return locale.Pick("Claude could not answer", "Claude не смог ответить")
 }
 
 type streamState struct {
@@ -482,7 +485,7 @@ type Run struct {
 // one done or error. A cancelled ctx or the timeout kills the process.
 func Ask(ctx context.Context, run Run, onEvent func(Event)) {
 	if ctx.Err() != nil {
-		onEvent(cancelled)
+		onEvent(cancelled())
 		return
 	}
 	logf := func(level, msg string, kv ...any) {
@@ -513,7 +516,7 @@ func Ask(ctx context.Context, run Run, onEvent func(Event)) {
 		}
 		setFork(forkID, false)
 		mu.Lock()
-		e := cancelled
+		e := cancelled()
 		if outcome != nil {
 			e = *outcome
 		}
@@ -523,7 +526,7 @@ func Ask(ctx context.Context, run Run, onEvent func(Event)) {
 	args, err := Args(run.SessionID, forkID, run.Model)
 	if err != nil {
 		logf("warn", "side chat failed to start", "err", err.Error())
-		finish(Event{Type: "error", Code: "unavailable", Message: "Claude не запускается на этой машине"})
+		finish(Event{Type: "error", Code: "unavailable", Message: locale.Pick("Claude does not start on this machine", "Claude не запускается на этой машине")})
 		return
 	}
 	cmd := exec.Command(run.Runtime.Binary, args...)
@@ -535,7 +538,7 @@ func Ask(ctx context.Context, run Run, onEvent func(Event)) {
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
 		logf("warn", "side chat could not start the CLI", "err", err.Error())
-		finish(Event{Type: "error", Code: "unavailable", Message: "Claude не запускается на этой машине"})
+		finish(Event{Type: "error", Code: "unavailable", Message: locale.Pick("Claude does not start on this machine", "Claude не запускается на этой машине")})
 		return
 	}
 	timeout := run.Timeout
@@ -560,9 +563,9 @@ func Ask(ctx context.Context, run Run, onEvent func(Event)) {
 		select {
 		case <-stopped:
 		case <-ctx.Done():
-			stop(cancelled)
+			stop(cancelled())
 		case <-time.After(timeout):
-			stop(Event{Type: "error", Code: "timeout", Message: "Агент не ответил вовремя"})
+			stop(Event{Type: "error", Code: "timeout", Message: locale.Pick("The agent did not answer in time", "Агент не ответил вовремя")})
 		}
 	}()
 	st := &streamState{}
@@ -590,7 +593,7 @@ func Ask(ctx context.Context, run Run, onEvent func(Event)) {
 		finish(Event{Type: "done", Text: st.text})
 	case outcome == nil:
 		logf("warn", "side chat CLI ended without an answer", "stderr", stderr.String())
-		finish(Event{Type: "error", Code: "failed", Message: "Claude не смог ответить"})
+		finish(Event{Type: "error", Code: "failed", Message: locale.Pick("Claude could not answer", "Claude не смог ответить")})
 	}
 }
 

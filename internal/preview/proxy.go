@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 	"github.com/ly-solutions/harnessly/internal/preview/weburl"
@@ -367,10 +368,10 @@ func refuse(w *trackedWriter, r *http.Request, status int, text, why string) {
 	w.WriteHeader(status)
 }
 
-const offlineText = "Нет сети — включён режим «Офлайн» в DevTools"
+var offlineText = locale.T("No network: the \"Offline\" mode is on in DevTools", "Нет сети — включён режим «Офлайн» в DevTools")
 
 func blockedText(pattern string) string {
-	return "Запрос заблокирован в DevTools: " + pattern
+	return locale.Pick("The request is blocked in DevTools: ", "Запрос заблокирован в DevTools: ") + pattern
 }
 
 // targetURLOf is the address a request really goes to, as DevTools show it.
@@ -403,7 +404,7 @@ func (p *Proxy) admit(r *http.Request) admission {
 	token, _ := header(r, p.cfg.ClaimHeader)
 	c := VerifyClaim(token, p.cfg.Secret, p.cfg.Audience, time.Now())
 	if c == nil {
-		return admission{status: 401, text: "Сессия превью устарела — нажмите «Перезагрузить» в окне превью"}
+		return admission{status: 401, text: locale.Pick("The preview session has expired: press \"Reload\" in the preview window", "Сессия превью устарела — нажмите «Перезагрузить» в окне превью")}
 	}
 	path := p.upstreamPath(r)
 	if c.Target.Kind == "url" {
@@ -411,16 +412,16 @@ func (p *Proxy) admit(r *http.Request) admission {
 		res := p.resolver.get(u.Hostname)
 		switch res.Error {
 		case "forbidden":
-			return admission{status: 403, text: "Адрес во внутренней сети — открыть нельзя"}
+			return admission{status: 403, text: locale.Pick("The address is in an internal network and cannot be opened", "Адрес во внутренней сети — открыть нельзя")}
 		case "":
 		default:
-			return admission{status: 502, text: "Не удалось найти адрес " + u.Host()}
+			return admission{status: 502, text: locale.Pick("Could not find the address ", "Не удалось найти адрес ") + u.Host()}
 		}
 		return admission{claim: c, route: &route{kind: "url", url: u, address: res.Address, path: path}}
 	}
 	rt := routeOf(c, c.Target.Port, path)
 	if rt == nil {
-		return admission{status: 404, text: "Этот порт не открыт в превью"}
+		return admission{status: 404, text: locale.Pick("This port is not open in the preview", "Этот порт не открыт в превью")}
 	}
 	forbidden := map[int]bool{}
 	if p.cfg.Forbidden != nil {
@@ -428,7 +429,7 @@ func (p *Proxy) admit(r *http.Request) admission {
 	}
 	for _, port := range []int{c.Target.Port, rt.port} {
 		if forbidden[port] {
-			return admission{status: 403, text: "Порт " + strconv.Itoa(port) + " служебный, его нельзя открыть в превью"}
+			return admission{status: 403, text: locale.Pick("Port "+strconv.Itoa(port)+" is a service port and cannot be opened in the preview", "Порт "+strconv.Itoa(port)+" служебный, его нельзя открыть в превью")}
 		}
 	}
 	return admission{claim: c, route: rt}
@@ -509,7 +510,7 @@ func (p *Proxy) serveRequest(w *trackedWriter, r *http.Request) {
 	}()
 	if devtools.IsOffline(settings.Throttle) {
 		log.fail("offline", false)
-		refuse(w, r, 503, offlineText, "offline")
+		refuse(w, r, 503, offlineText.String(), "offline")
 		return
 	}
 	if pattern := devtools.BlockedBy(target, settings.Blocked); pattern != "" {
@@ -591,7 +592,7 @@ func (p *Proxy) serveBridge(w *trackedWriter, r *http.Request) {
 			p.cfg.Fallback(w.ResponseWriter, r)
 			return
 		}
-		reply(w, 502, "Скрипт превью недоступен")
+		reply(w, 502, locale.Pick("The preview script is unavailable", "Скрипт превью недоступен"))
 		return
 	}
 	h := w.Header()
@@ -782,9 +783,7 @@ func (p *Proxy) deliver(w *trackedWriter, r *http.Request, c *Claim, rt *route, 
 	}
 }
 
-const (
-	signInRequired = "Стенд закрыт входом через Keycloak"
-)
+var signInRequired = locale.T("The stand is behind a Keycloak sign-in", "Стенд закрыт входом через Keycloak")
 
 var redirects = map[int]bool{301: true, 302: true, 303: true, 307: true, 308: true}
 
@@ -830,12 +829,12 @@ func (p *Proxy) answerRedirect(w *trackedWriter, r *http.Request, c *Claim, rt *
 	if p.needsSignIn(rt, a) {
 		_, _ = io.Copy(io.Discard, a.body)
 		if !isDocumentRequest(r) {
-			reply(w, 401, signInRequired)
+			reply(w, 401, signInRequired.String())
 			return true
 		}
 		url := p.cfg.Stands.signInURL(rt.url.Origin() + rt.path)
 		if url == "" {
-			reply(w, 502, "Не удалось собрать адрес входа на стенд")
+			reply(w, 502, locale.Pick("Could not build the sign-in address of the stand", "Не удалось собрать адрес входа на стенд"))
 			return true
 		}
 		nonce := newNonce()
@@ -860,11 +859,11 @@ func (p *Proxy) answerRedirect(w *trackedWriter, r *http.Request, c *Claim, rt *
 	}
 	_, _ = io.Copy(io.Discard, a.body)
 	if invalid {
-		reply(w, 502, "Сайт перенаправляет на адрес, который нельзя открыть в превью")
+		reply(w, 502, locale.Pick("The site redirects to an address that cannot be opened in the preview", "Сайт перенаправляет на адрес, который нельзя открыть в превью"))
 		return true
 	}
 	if !isDocumentRequest(r) {
-		reply(w, 502, "Сайт перенаправляет на "+next.Origin())
+		reply(w, 502, locale.Pick("The site redirects to ", "Сайт перенаправляет на ")+next.Origin())
 		return true
 	}
 	nonce := newNonce()
@@ -1056,17 +1055,17 @@ func nodeCode(err error) string {
 
 func failure(err error, rt *route) (int, string) {
 	if rt.kind == "port" {
-		return 502, "Сервер на порту " + strconv.Itoa(rt.port) + " не отвечает"
+		return 502, locale.Pick("The server on port "+strconv.Itoa(rt.port)+" is not responding", "Сервер на порту "+strconv.Itoa(rt.port)+" не отвечает")
 	}
 	host := rt.url.Host()
 	code := nodeCode(err)
 	switch {
 	case code == "ETIMEDOUT":
-		return 504, host + " не ответил вовремя"
+		return 504, host + locale.Pick(" did not respond in time", " не ответил вовремя")
 	case tlsCode.MatchString(code):
-		return 502, "Сертификат " + host + " не прошёл проверку"
+		return 502, locale.Pick("The certificate of "+host+" failed verification", "Сертификат "+host+" не прошёл проверку")
 	}
-	return 502, host + " не отвечает"
+	return 502, host + locale.Pick(" is not responding", " не отвечает")
 }
 
 // requestLog is the proxy's side of the request log: one entry per slot request, filled in when its response ends.

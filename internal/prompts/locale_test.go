@@ -22,3 +22,20 @@ func TestRoutesAnswerInEnglish(t *testing.T) {
 		t.Errorf("ru blank: %v", err)
 	}
 }
+
+func TestEnglishRunLineErrors(t *testing.T) {
+	t.Setenv("RUNTIME_LOCALE", "en")
+	for line, want := range map[string]string{
+		"/":       "The command must be 2 to 2000 characters",
+		"/a\x01b": "The command must be one line without control characters",
+		"compact": `The command starts with "/" and a name`,
+	} {
+		if _, msg := ParseRunLine(line); msg != want {
+			t.Errorf("%q: %q, want %q", line, msg, want)
+		}
+	}
+	t.Setenv("RUNTIME_LOCALE", "ru")
+	if _, msg := ParseRunLine("compact"); msg != "Команда начинается с «/» и имени" {
+		t.Errorf("ru: %q", msg)
+	}
+}

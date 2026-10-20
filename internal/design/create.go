@@ -12,6 +12,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // A new project of the library: the library's .template/ folder copied to <library>/<id>/ with the title and the
@@ -32,7 +33,7 @@ func (e *CreateError) Error() string { return e.Msg }
 func createErr(msg string) error { return &CreateError{Msg: msg} }
 
 func createConflict(id string) error {
-	return &CreateError{Msg: "Проект «" + id + "» уже есть", Conflict: true}
+	return &CreateError{Msg: locale.Pick("Project \""+id+"\" already exists", "Проект «"+id+"» уже есть"), Conflict: true}
 }
 
 var (
@@ -47,10 +48,10 @@ func (l *Library) TemplateDir() string { return filepath.Join(l.Root(), Template
 func cleanProjectTitle(v string) (string, error) {
 	t := jscompat.Trim(spaceRun.ReplaceAllString(titleControls.ReplaceAllString(v, " "), " "))
 	if t == "" {
-		return "", createErr("Назовите проект")
+		return "", createErr(locale.Pick("Name the project", "Назовите проект"))
 	}
 	if jscompat.Len(t) > LimitTitle {
-		return "", createErr("Название длиннее " + strconv.Itoa(LimitTitle) + " знаков")
+		return "", createErr(locale.Pick("The title is longer than "+strconv.Itoa(LimitTitle)+" characters", "Название длиннее "+strconv.Itoa(LimitTitle)+" знаков"))
 	}
 	return t, nil
 }
@@ -59,7 +60,7 @@ func (l *Library) checkTemplate() error {
 	dir := l.TemplateDir()
 	st, err := os.Lstat(dir)
 	if err != nil || !st.IsDir() {
-		return createErr("В библиотеке нет шаблона нового проекта: положите его в " + dir)
+		return createErr(locale.Pick("The library has no new-project template: put it in "+dir, "В библиотеке нет шаблона нового проекта: положите его в "+dir))
 	}
 	real, err := filepath.EvalSymlinks(dir)
 	if err != nil {
@@ -70,17 +71,17 @@ func (l *Library) checkTemplate() error {
 		return err
 	}
 	if !isInside(real, root) {
-		return createErr("Шаблон нового проекта " + dir + " ведёт за пределы библиотеки")
+		return createErr(locale.Pick("The new-project template "+dir+" leads outside the library", "Шаблон нового проекта "+dir+" ведёт за пределы библиотеки"))
 	}
 	if st, err := os.Lstat(filepath.Join(dir, ProjectDirname)); err != nil || !st.IsDir() {
-		return createErr("В шаблоне нового проекта " + dir + " нет папки " + ProjectDirname + "/")
+		return createErr(locale.Pick("The new-project template "+dir+" has no "+ProjectDirname+"/ folder", "В шаблоне нового проекта "+dir+" нет папки "+ProjectDirname+"/"))
 	}
 	return nil
 }
 
 func (l *Library) readTemplateMeta() (*jsvalue.Object, error) {
 	file := filepath.Join(l.TemplateDir(), ArtifactFile)
-	broken := createErr("Шаблон нового проекта повреждён: не читается " + TemplateDirname + "/" + ArtifactFile)
+	broken := createErr(locale.Pick("The new-project template is damaged: "+TemplateDirname+"/"+ArtifactFile+" cannot be read", "Шаблон нового проекта повреждён: не читается "+TemplateDirname+"/"+ArtifactFile))
 	if st, err := os.Lstat(file); err != nil || !st.Mode().IsRegular() {
 		return nil, broken
 	}
@@ -94,7 +95,7 @@ func (l *Library) readTemplateMeta() (*jsvalue.Object, error) {
 	}
 	o, ok := raw.(*jsvalue.Object)
 	if !ok {
-		return nil, createErr("Шаблон нового проекта повреждён: " + TemplateDirname + "/" + ArtifactFile + " не объект")
+		return nil, createErr(locale.Pick("The new-project template is damaged: "+TemplateDirname+"/"+ArtifactFile+" is not an object", "Шаблон нового проекта повреждён: "+TemplateDirname+"/"+ArtifactFile+" не объект"))
 	}
 	return o, nil
 }
@@ -119,7 +120,7 @@ func copyFileNoFollow(source, target string, budget *copyBudget) error {
 	}
 	budget.bytes -= st.Size()
 	if budget.bytes < 0 {
-		return createErr("Шаблон нового проекта больше, чем можно скопировать")
+		return createErr(locale.Pick("The new-project template is larger than can be copied", "Шаблон нового проекта больше, чем можно скопировать"))
 	}
 	to, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, st.Mode().Perm())
 	if err != nil {
@@ -145,7 +146,7 @@ func copyTemplate(from string, into *os.File, realRoot string, budget *copyBudge
 		return err
 	}
 	if !isInside(link, realRoot) {
-		return createErr("Шаблон нового проекта ведёт за пределы библиотеки")
+		return createErr(locale.Pick("The new-project template leads outside the library", "Шаблон нового проекта ведёт за пределы библиотеки"))
 	}
 	entries, err := os.ReadDir(viaFd(dir, ""))
 	if err != nil {
@@ -157,7 +158,7 @@ func copyTemplate(from string, into *os.File, realRoot string, budget *copyBudge
 		}
 		budget.entries--
 		if budget.entries < 0 {
-			return createErr("В шаблоне нового проекта слишком много файлов")
+			return createErr(locale.Pick("The new-project template has too many files", "В шаблоне нового проекта слишком много файлов"))
 		}
 		switch {
 		case e.IsDir():
@@ -237,7 +238,7 @@ func (l *Library) copyInto(id, title string, meta *jsvalue.Object) (CreatedProje
 	err = func() error {
 		defer into.Close()
 		if link, err := os.Readlink(viaFd(into, "")); err != nil || link != filepath.Join(realLibrary, stageName) {
-			return createErr("Папка нового проекта подменена во время создания")
+			return createErr(locale.Pick("The new project's folder was replaced while it was being created", "Папка нового проекта подменена во время создания"))
 		}
 		if err := copyTemplate(l.TemplateDir(), into, realTemplate, &copyBudget{bytes: LimitUnpackedBytes, entries: LimitEntries}); err != nil {
 			return err
@@ -259,7 +260,7 @@ func (l *Library) copyInto(id, title string, meta *jsvalue.Object) (CreatedProje
 		return CreatedProject{}, err
 	}
 	if st, err := os.Lstat(target); err != nil || !st.IsDir() {
-		return CreatedProject{}, createErr("Папка нового проекта подменена во время создания")
+		return CreatedProject{}, createErr(locale.Pick("The new project's folder was replaced while it was being created", "Папка нового проекта подменена во время создания"))
 	}
 	return CreatedProject{ID: id, Title: title, Dir: target}, nil
 }
@@ -295,10 +296,10 @@ func CleanBrief(v any) (string, error) {
 	s, _ := v.(string)
 	b := jscompat.Trim(briefControls.ReplaceAllString(s, " "))
 	if b == "" {
-		return "", createErr("Опишите, что нарисовать")
+		return "", createErr(locale.Pick("Describe what to draw", "Опишите, что нарисовать"))
 	}
 	if jscompat.Len(b) > 4000 {
-		return "", createErr("Описание длиннее 4000 знаков")
+		return "", createErr(locale.Pick("The description is longer than 4000 characters", "Описание длиннее 4000 знаков"))
 	}
 	return b, nil
 }
@@ -306,8 +307,21 @@ func CleanBrief(v any) (string, error) {
 // NewProjectPrompt is the first message of the chat a new project opens.
 func (l *Library) NewProjectPrompt(title, brief string) string {
 	t := l.cfg.Texts
+	clean := jscompat.Trim(spaceRun.ReplaceAllString(title, " "))
+	if !locale.Russian() {
+		return strings.Join([]string{
+			"The new project \"" + clean + "\" was created from the library template. The person's task:",
+			"",
+			brief,
+			"",
+			"Make the boards next to `project/_board-template.html`: a copy of the template under the name you need with the `.dc.html` extension,",
+			"markup inside `<main class=\"board\">`. Build them from the UI kit's components (`window." + t.KitGlobal + "`, README in `project/_ds/*/`);",
+			"for how that looks in live boards, see the neighbouring projects of the library. Every new `*.dc.html` in `project/` appears",
+			"in the library by itself. When the boards are ready, check them: `" + t.CLI + " design check <id> --board \"<board file>\"`.",
+		}, "\n")
+	}
 	return strings.Join([]string{
-		"Новый проект «" + jscompat.Trim(spaceRun.ReplaceAllString(title, " ")) + "» создан из шаблона библиотеки. Задача от человека:",
+		"Новый проект «" + clean + "» создан из шаблона библиотеки. Задача от человека:",
 		"",
 		brief,
 		"",

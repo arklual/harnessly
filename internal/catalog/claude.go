@@ -6,11 +6,13 @@ import (
 	"strings"
 
 	"golang.org/x/text/collate"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-const (
-	quickPromptsWarning  = "Быстрые промпты не прочитались"
-	claudePluginsWarning = "Список плагинов Claude не прочитался"
+var (
+	quickPromptsWarning  = locale.T("Quick prompts could not be read", "Быстрые промпты не прочитались")
+	claudePluginsWarning = locale.T("The list of Claude plugins could not be read", "Список плагинов Claude не прочитался")
 )
 
 // projectDirs: cwd and its parents up to root (inclusive), nearest first; just cwd when it is outside root.
@@ -159,7 +161,7 @@ func addQuickPrompts(b *builder, prompts []map[string]any) {
 	for _, q := range prompts {
 		prompt, ok := q["prompt"].(string)
 		if !ok {
-			b.warn(quickPromptsWarning)
+			b.warn(quickPromptsWarning.String())
 			return
 		}
 		line := trim(prompt)
@@ -172,7 +174,7 @@ func addQuickPrompts(b *builder, prompts []map[string]any) {
 		case string:
 			desc = n
 		default:
-			b.warn(quickPromptsWarning)
+			b.warn(quickPromptsWarning.String())
 			return
 		}
 		b.add(promptItem(line[1:], "/", "quick", nil, desc, nil))
@@ -206,7 +208,7 @@ func scanClaude(claudeDir, cwd, root string, prompts []map[string]any) *builder 
 	installedFile := filepath.Join(claudeDir, "plugins", "installed_plugins.json")
 	installed, ok := readJSON(installedFile)
 	if (!ok || installed == nil) && mtimeMs(installedFile) > 0 {
-		b.warn(claudePluginsWarning)
+		b.warn(claudePluginsWarning.String())
 	}
 	enabled := enabledPlugins(claudeDir, dirs)
 	inst, _ := installed.(map[string]any)

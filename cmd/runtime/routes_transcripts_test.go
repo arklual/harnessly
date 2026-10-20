@@ -20,8 +20,8 @@ import (
 
 func TestTrackerKeysFromTheTaskPattern(t *testing.T) {
 	t.Setenv("RUNTIME_TRACKER_KEYS", "")
-	t.Setenv("RUNTIME_TASK_KEY_RE", `^(ABC|EXP|OPS)-[0-9]{1,6}$`)
-	if got := strings.Join(trackerKeys(), ","); got != "ABC,EXP,OPS" {
+	t.Setenv("RUNTIME_TASK_KEY_RE", `^(ABC|DEV|APP)-[0-9]{1,6}$`)
+	if got := strings.Join(trackerKeys(), ","); got != "ABC,DEV,APP" {
 		t.Fatalf("keys %q", got)
 	}
 	t.Setenv("RUNTIME_TRACKER_KEYS", "XY, Z")

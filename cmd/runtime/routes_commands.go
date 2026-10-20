@@ -11,6 +11,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/catalog"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 func init() { routeGroups = append(routeGroups, commandRoutes) }
@@ -143,7 +144,7 @@ func commandRoutes(d deps) []gate.JSONRoute {
 		}
 		return "", false
 	}
-	const unknownAgent = "Неизвестный агент"
+	unknownAgent := locale.T("Unknown agent", "Неизвестный агент")
 
 	return []gate.JSONRoute{
 		{
@@ -158,7 +159,7 @@ func commandRoutes(d deps) []gate.JSONRoute {
 				q := nodeQuery(r.URL.RawQuery)
 				p, ok := provider(q)
 				if !ok {
-					return tagged(r, http.StatusBadRequest, errorBody(unknownAgent), h)
+					return tagged(r, http.StatusBadRequest, errorBody(unknownAgent.String()), h)
 				}
 				var cwd string
 				switch vals := q["cwd"]; len(vals) {
@@ -166,7 +167,7 @@ func commandRoutes(d deps) []gate.JSONRoute {
 				case 1:
 					cwd = vals[0]
 				default:
-					return tagged(r, http.StatusBadRequest, errorBody(catalog.ErrOutside), h)
+					return tagged(r, http.StatusBadRequest, errorBody(catalog.ErrOutside.String()), h)
 				}
 				dir, root, errText := commands.ResolveCwd(cwd)
 				if errText != "" {
@@ -190,7 +191,7 @@ func commandRoutes(d deps) []gate.JSONRoute {
 				}
 				p, ok := provider(nodeQuery(r.URL.RawQuery))
 				if !ok {
-					return tagged(r, http.StatusBadRequest, errorBody(unknownAgent), h)
+					return tagged(r, http.StatusBadRequest, errorBody(unknownAgent.String()), h)
 				}
 				return tagged(r, http.StatusOK, launch.Launch(p), h)
 			},

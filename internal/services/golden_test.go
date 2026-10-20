@@ -185,7 +185,7 @@ func TestGoldenRoutes(t *testing.T) {
 		Home: home, SecretDirs: []string{".config/acme"}, GitLabHosts: []string{"gitlab.example.com", "gitlab.com"},
 		TrackerURL: "https://tracker.example.com", TrackerHosts: []string{"tracker.example.com", "youtrack.example.com"},
 		DocsHost: "docs.example.com", ReaderHost: "platform.example.com", ReaderPath: "/agents/docs/",
-		TaskKey: regexp.MustCompile(`^(ACME|DEMO|OPS)-[0-9]{1,6}$`), AvatarPath: "/api/platform/link-meta/avatar",
+		TaskKey: regexp.MustCompile(`^(ACME|DEMO|APP)-[0-9]{1,6}$`), AvatarPath: "/api/platform/link-meta/avatar",
 		IconAgent: "ExampleBot favicon", OrganizerFile: filepath.Join(home, ".acme-data", "organizer.json"),
 		Transport: fakeServices(t, fixtures),
 	})

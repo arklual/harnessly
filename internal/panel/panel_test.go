@@ -15,7 +15,7 @@ var targets = Targets{
 	PortalHost:  "a.example.org",
 	ReaderHost:  "ai.example.org",
 	GitLabHosts: []string{"gitlab.example.org", "gitlab.com"},
-	TaskKey:     regexp.MustCompile(`^(TCK|EXP|OPS)-\d{1,6}$`),
+	TaskKey:     regexp.MustCompile(`^(PROJ|DEMO|ACME)-\d{1,6}$`),
 }
 
 func obj(pairs ...any) *jsvalue.Object { return jsvalue.NewObject(pairs...) }
@@ -124,10 +124,10 @@ func TestGitLab(t *testing.T) {
 }
 
 func TestTasks(t *testing.T) {
-	for _, key := range []string{"TCK-2147", "EXP-14", "OPS-9"} {
+	for _, key := range []string{"PROJ-2147", "DEMO-14", "ACME-9"} {
 		wantOpen(t, open("task", " "+key+" "), "task", key)
 	}
-	for _, target := range []any{"ABC-1", "tck-1", "TCK-", "TCK-1234567", "TCK-1/../x", "TCK-1\u001b[201~", "https://tracker.example.org/issue/TCK-1",
+	for _, target := range []any{"ABC-1", "proj-1", "PROJ-", "PROJ-1234567", "PROJ-1/../x", "PROJ-1\u001b[201~", "https://tracker.example.org/issue/PROJ-1",
 		strings.Repeat("x", MaxArg+1), float64(5)} {
 		refused(t, open("task", target))
 	}

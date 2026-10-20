@@ -39,9 +39,13 @@ type Config struct {
 	TrackerHosts []string
 	// DocsHost serves published documents (/a/<slug>) and boards (/b/<slug>); ReaderHost and ReaderPath are where the
 	// platform shows the same document.
-	DocsHost   string
-	ReaderHost string
-	ReaderPath string
+	DocsHost string
+	// PortalOrigins are the origins (scheme, host and port) of the documents and boards services when they are not one
+	// https host: a workspace on http://localhost with a port per service. Links on them get the same metadata as links
+	// on DocsHost. The first one is where the platform's reader links are mapped to.
+	PortalOrigins []string
+	ReaderHost    string
+	ReaderPath    string
 	// TaskKey is a task key the task card serves.
 	TaskKey *regexp.Regexp
 	// AvatarPath is the route that serves tracker avatars, as the page loads it.

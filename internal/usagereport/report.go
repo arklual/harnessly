@@ -261,7 +261,7 @@ func Build(files []*Facts, person, machine, timezone string, clock Clock, nowMs 
 			if m.Model >= 0 && m.Model < len(f.Models) && f.Models[m.Model] != nil {
 				model = f.Models[m.Model]
 			}
-			project := noProject
+			project := noProject()
 			if m.Project >= 0 && m.Project < len(f.Projects) {
 				project = f.Projects[m.Project]
 			}
@@ -303,7 +303,7 @@ func Build(files []*Facts, person, machine, timezone string, clock Clock, nowMs 
 			day.Prompts++
 			day.Hours[clock.hourOf(p.Ts)]++
 			session.Prompts++
-			project := noProject
+			project := noProject()
 			if p.Project >= 0 && p.Project < len(f.Projects) {
 				project = f.Projects[p.Project]
 			}

@@ -1,0 +1,406 @@
+/* Side chat: a quick question about the session of a tab, answered by a fork that is never saved. */
+.tw-sidechat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+  background: var(--t-bg);
+  color: var(--t-text);
+}
+
+.tw-sidechat-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tw-sidechat-note {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--t-surface-raised);
+  color: var(--t-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.tw-sidechat-note[data-compact] {
+  overflow: hidden;
+  padding-block: 8px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-sidechat-session {
+  display: block;
+  margin-top: 4px;
+  color: var(--t-text-secondary);
+  overflow-wrap: anywhere;
+}
+.tw-sidechat-clear {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 10px;
+  background: var(--t-surface);
+  color: var(--t-text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background var(--t-duration-fast),
+    color var(--t-duration-fast);
+}
+.tw-sidechat-clear svg {
+  width: 14px;
+  height: 14px;
+}
+.tw-sidechat-clear:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+
+.tw-sidechat-empty {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 0 16px;
+  text-align: center;
+  color: var(--t-text-muted);
+}
+.tw-sidechat-empty svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 4px;
+  color: var(--t-text-secondary);
+}
+.tw-sidechat-empty h3 {
+  margin: 0;
+  color: var(--t-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+.tw-sidechat-empty p {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tw-sidechat-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 4px 2px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.tw-sidechat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.tw-sidechat .agent-message {
+  padding: 0;
+}
+.tw-sidechat .agent-message-body {
+  padding-left: 0;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.tw-sidechat-question {
+  align-self: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  max-width: 88%;
+  padding: 8px 12px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 14px 14px 4px 14px;
+  background: color-mix(in oklab, var(--t-accent-purple) 10%, var(--t-surface));
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.tw-sidechat-question p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tw-sidechat-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--t-text-muted);
+  font-size: 12.5px;
+}
+.tw-sidechat-status[data-tone='error'] {
+  padding: 8px 10px;
+  border: 1px solid var(--t-danger-border);
+  border-radius: 10px;
+  background: var(--t-danger-bg);
+  color: var(--t-danger);
+}
+.tw-sidechat-status span:not(.tw-sidechat-dots) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tw-sidechat-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid currentcolor;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.tw-sidechat-retry svg {
+  width: 13px;
+  height: 13px;
+}
+.tw-sidechat-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.tw-sidechat-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentcolor;
+  opacity: 0.35;
+  animation: tw-sidechat-dot 1.1s ease-in-out infinite;
+}
+.tw-sidechat-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.tw-sidechat-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes tw-sidechat-dot {
+  40% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-sidechat-dots i {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+.tw-sidechat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 16px;
+  background: var(--t-surface-raised);
+  transition:
+    border-color var(--t-duration-fast),
+    box-shadow var(--t-duration-fast);
+}
+.tw-sidechat-composer:focus-within {
+  border-color: var(--t-border-hover);
+  box-shadow: 0 0 0 2px var(--t-focus-ring);
+}
+.tw-sidechat-composer[data-disabled] {
+  opacity: 0.6;
+}
+.tw-sidechat-field {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.tw-sidechat-input {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--t-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: none;
+}
+.tw-sidechat-input::placeholder {
+  color: var(--t-text-muted);
+}
+.tw-sidechat-send {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--t-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--t-duration-fast),
+    color var(--t-duration-fast);
+}
+.tw-sidechat-send svg {
+  width: 16px;
+  height: 16px;
+}
+.tw-sidechat-send:hover:not(:disabled) {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-sidechat-send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tw-sidechat-send[data-stop] {
+  color: var(--t-danger);
+}
+.tw-sidechat-clear:focus-visible,
+.tw-sidechat-send:focus-visible,
+.tw-sidechat-retry:focus-visible,
+.tw-sidechat-chip-remove:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--t-focus-ring);
+}
+
+.tw-sidechat-chips {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+.tw-sidechat-chip {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 168px;
+  min-height: 84px;
+  padding: 8px 10px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 12px;
+  background: var(--t-surface);
+}
+.tw-sidechat-chip::before {
+  content: '';
+  position: absolute;
+  inset: 8px auto 30px 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--t-border-strong);
+}
+.tw-sidechat-chip-quote {
+  display: -webkit-box;
+  margin: 0 0 0 6px;
+  overflow: hidden;
+  color: var(--t-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+.tw-sidechat-chip-label {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--t-surface-hover);
+  color: var(--t-text-secondary);
+  font-size: 11.5px;
+}
+.tw-sidechat-chip-label svg {
+  width: 11px;
+  height: 11px;
+}
+.tw-sidechat-chip-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--t-text-muted);
+  cursor: pointer;
+}
+.tw-sidechat-chip-remove svg {
+  width: 12px;
+  height: 12px;
+}
+.tw-sidechat-chip-remove:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-sidechat-question .tw-sidechat-chips {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.tw-sidechat-question .tw-sidechat-chip {
+  width: 100%;
+  min-height: 0;
+}
+.tw-sidechat-question .tw-sidechat-chip::before {
+  bottom: 30px;
+}
+
+@media (max-width: 640px) {
+  .tw-sidechat {
+    padding: 8px;
+  }
+  .tw-sidechat-input {
+    font-size: 16px;
+  }
+  .tw-sidechat-send,
+  .tw-sidechat-clear {
+    min-height: 40px;
+  }
+  .tw-sidechat-send {
+    width: 40px;
+    height: 40px;
+  }
+  .tw-sidechat-question {
+    max-width: 94%;
+  }
+}

@@ -1,0 +1,2121 @@
+/* The right panel as in Codex desktop: a row of tabs, the new tab with the address and the tools, a tab per tool. */
+.tw-rpane {
+  display: flex;
+  flex-direction: column;
+  width: var(--tw-right-w, 480px);
+  height: 100%;
+  margin-left: 10px;
+  overflow: hidden;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: var(--shell-surface-radius);
+  background: var(--t-surface);
+  box-shadow: 0 24px 80px -48px oklch(0 0 0 / 70%);
+}
+
+.tw-rpane-strip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  height: 52px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+.tw-rpane-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tw-rpane-tabs::-webkit-scrollbar {
+  display: none;
+}
+.tw-rpane-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 220px;
+  min-width: 64px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--t-text-secondary);
+  transition:
+    background var(--t-duration-fast, 0.15s),
+    color var(--t-duration-fast, 0.15s);
+  animation: tw-rpane-tab-in 180ms var(--tw-ease) both;
+}
+.tw-rpane-tab:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-rpane-tab[data-active] {
+  flex: 0 0 auto;
+  min-width: 120px;
+  max-width: 240px;
+}
+.tw-rpane-tab[data-active] {
+  background: var(--t-surface-raised);
+  color: var(--t-text);
+  box-shadow: inset 0 0 0 1px var(--t-border-subtle);
+}
+.tw-rpane-tab-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+.tw-rpane-tab-button svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+.tw-rpane-tab-button:focus-visible {
+  outline: 2px solid var(--t-focus-ring);
+  outline-offset: -2px;
+}
+.tw-rpane-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-rpane-tab-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-right: 5px;
+  border-radius: 6px;
+  color: var(--t-text-muted);
+  opacity: 0;
+  transition:
+    opacity var(--t-duration-fast, 0.15s),
+    background var(--t-duration-fast, 0.15s);
+}
+.tw-rpane-tab-close svg {
+  width: 13px;
+  height: 13px;
+}
+.tw-rpane-tab:not([data-active]) .tw-rpane-tab-close {
+  position: absolute;
+  right: 0;
+  background: var(--t-surface-hover);
+}
+.tw-rpane-tab:not([data-active]) .tw-rpane-tab-button {
+  padding-right: 10px;
+}
+.tw-rpane-tab[data-active] .tw-rpane-tab-close,
+.tw-rpane-tab:hover .tw-rpane-tab-close {
+  opacity: 1;
+}
+.tw-rpane-tab-close:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+@media (hover: none) {
+  .tw-rpane-tab-close {
+    opacity: 1;
+  }
+}
+.tw-rpane-new {
+  width: 30px;
+  height: 30px;
+}
+.tw-rpane-new svg {
+  width: 16px;
+  height: 16px;
+}
+.tw-rpane-strip-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding-left: 6px;
+}
+.tw-rpane-strip-actions .tw-icon-button {
+  width: 30px;
+  height: 30px;
+}
+.tw-rpane-strip-actions .tw-icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tw-rpane-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--t-border) transparent;
+  animation: tw-rpane-panel-in 160ms ease-out both;
+}
+.tw-rpane-panel[hidden] {
+  display: none;
+}
+.tw-rpane-panel-browser,
+.tw-rpane-panel-terminal,
+.tw-rpane-panel-tools {
+  padding: 0;
+  overflow: hidden;
+}
+.tw-rpane-panel-files:has(.tw-viewer-content) {
+  overflow: hidden;
+}
+.tw-rpane-panel-artifacts:has(.td-app) {
+  padding: 0;
+  overflow: hidden;
+}
+.tw-rpane-panel .tw-inspector-empty {
+  padding: 28px 12px;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.tw-rpane-muted {
+  margin: 4px 2px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--t-text-muted);
+}
+.tw-rpane-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  padding: 24px;
+  text-align: center;
+  color: var(--t-text-secondary);
+}
+.tw-rpane-empty svg {
+  width: 26px;
+  height: 26px;
+  color: var(--t-text-muted);
+}
+.tw-rpane-empty strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t-text);
+}
+.tw-rpane-empty p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-text-muted);
+}
+
+/* Browser bar: back, forward, reload and the address, as on Codex's new tab. */
+.tw-rpane-browser-bar,
+.tw-rpane-browser-page .tw-preview-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  min-width: 0;
+  padding: 8px 8px 8px 6px;
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+.tw-rpane-nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.tw-rpane-address {
+  flex: 1;
+  min-width: 0;
+}
+.tw-rpane-address-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--t-text);
+  background: var(--t-surface-input, var(--t-surface-hover));
+  outline: none;
+  transition:
+    border-color var(--t-duration-fast, 0.15s),
+    background var(--t-duration-fast, 0.15s);
+}
+.tw-rpane-address-input::placeholder {
+  color: var(--t-text-muted);
+}
+.tw-rpane-address-input:hover {
+  background: var(--t-surface-input-hover, var(--t-surface-hover));
+}
+.tw-rpane-address-input:focus {
+  text-align: left;
+  border-color: var(--t-border-input, var(--t-border));
+}
+.tw-rpane-browser-more {
+  width: 30px;
+  height: 30px;
+}
+.tw-rpane-browser-more svg {
+  width: 16px;
+  height: 16px;
+}
+
+.tw-rpane-browser {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.tw-rpane-browser-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.tw-rpane-browser-page .tw-preview-view {
+  flex: 1;
+  gap: 0;
+  min-height: 0;
+}
+.tw-rpane-browser-page .tw-preview-stage {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.tw-rpane-browser-page .tw-preview-stage-device {
+  height: auto;
+  border-radius: 0;
+}
+.tw-rpane-browser-page .tw-preview-device-fluid > iframe.tw-preview-frame,
+.tw-rpane-browser-page > .tw-preview-frame {
+  border: 0;
+  border-radius: 0;
+}
+.tw-rpane-browser-page > .tw-preview-frame {
+  flex: 1;
+  height: auto;
+}
+.tw-rpane-browser-page .tw-preview-taken {
+  margin: 12px;
+}
+.tw-rpane-browser > .tw-preview-error,
+.tw-rpane-browser > .tw-mload-gate {
+  margin: 10px 12px 0;
+}
+.tw-rpane-browser-home {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+.tw-rpane-browser-home[hidden] {
+  display: none;
+}
+
+/* The new tab: "Tools" as tiles. */
+.tw-rpane-tools-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.tw-rpane-tools {
+  width: min(100%, 900px);
+  margin: 0 auto;
+  padding: 32px 24px 24px;
+  container: tw-rpane-tools / inline-size;
+}
+.tw-rpane-tools-title {
+  margin: 0 0 10px 2px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t-text);
+}
+.tw-rpane-tool-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@container tw-rpane-tools (min-width: 440px) {
+  .tw-rpane-tool-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.tw-rpane-tool {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--t-surface-hover);
+  transition: background var(--t-duration-fast, 0.15s);
+  animation: tw-rpane-panel-in 200ms ease-out both;
+}
+.tw-rpane-tool:hover {
+  background: var(--t-surface-raised);
+}
+.tw-rpane-tool-open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px 0 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: left;
+  color: var(--t-text);
+}
+.tw-rpane-tool-open > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--t-text-secondary);
+}
+.tw-rpane-tool-open:focus-visible {
+  outline: 2px solid var(--t-focus-ring);
+  outline-offset: -2px;
+}
+.tw-rpane-tool-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-rpane-tool-open .tw-rpane-tool-kbd {
+  flex: none;
+  height: 20px;
+  margin-left: 0;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--t-text-secondary);
+  background: var(--t-surface-raised);
+}
+.tw-rpane-tool:hover .tw-rpane-tool-kbd {
+  background: var(--t-surface);
+}
+.tw-rpane-tool-more {
+  width: 28px;
+  height: 28px;
+  margin-right: 6px;
+  border-radius: 7px;
+  opacity: 0;
+  transition: opacity var(--t-duration-fast, 0.15s);
+}
+.tw-rpane-tool-more svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-rpane-tool:hover .tw-rpane-tool-more,
+.tw-rpane-tool-more:focus-visible,
+.tw-rpane-tool-more[aria-expanded='true'] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .tw-rpane-tool-more {
+    opacity: 1;
+  }
+}
+.tw-rpane-count {
+  flex: none;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text-muted);
+}
+.tw-rpane-count-live {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t-fg-on-accent, #fff);
+  background: var(--t-accent-purple);
+}
+
+/* A file or a document opened from a list. */
+/* For the window too, not only a tab of the panel: scoped to the panel, it left the window's content as tall as the
+   file, so the window had nothing to scroll and cut the file off. */
+.tw-viewer-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  outline: none;
+}
+.tw-rpane-file-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The terminal tab. */
+.tw-rpane-shell {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: var(--tw-term-bg, var(--t-surface));
+}
+.tw-rpane-shell-note {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--t-text-secondary);
+  background: var(--t-surface-raised);
+}
+
+/* "Expand": the panel covers the conversation until it is put back. */
+.tw-main {
+  position: relative;
+}
+.tw-inspector-host[data-maximised] {
+  position: absolute;
+  inset: 10px;
+  z-index: 30;
+  width: auto !important;
+  height: auto;
+}
+.tw-runtime-root .tw-inspector-host[data-maximised] {
+  inset: 0;
+}
+.tw-runtime-root[data-split] .tw-inspector-host[data-maximised] {
+  position: absolute;
+  inset: var(--tw-frame-top) 0 0 0;
+}
+
+/* Summary from the header button: outputs, side chats, sources. */
+.tw-rpane-summary-popover {
+  width: 320px;
+  padding: 6px;
+}
+.tw-rpane-summary {
+  display: flex;
+  flex-direction: column;
+}
+.tw-rpane-summary-section {
+  padding: 6px 4px;
+}
+.tw-rpane-summary-section + .tw-rpane-summary-section {
+  border-top: 1px solid var(--t-border-subtle);
+}
+.tw-rpane-summary-section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-rpane-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  padding: 0 2px 0 8px;
+  font-size: 13px;
+  color: var(--t-text-secondary);
+}
+.tw-rpane-summary-add {
+  width: 26px;
+  height: 26px;
+}
+.tw-rpane-summary-add svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-rpane-summary-empty {
+  margin: 2px 8px 6px;
+  font-size: 12.5px;
+  color: var(--t-text-muted);
+}
+.tw-rpane-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--t-text);
+}
+.tw-rpane-summary-row:hover,
+.tw-rpane-summary-row:focus-visible {
+  background: var(--t-surface-hover);
+  outline: none;
+}
+.tw-rpane-summary-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--t-text-secondary);
+}
+.tw-rpane-summary-icon svg,
+.tw-rpane-summary-icon img {
+  width: 16px;
+  height: 16px;
+}
+.tw-rpane-summary-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-rpane-summary-anchor {
+  position: absolute;
+  top: 0;
+  right: 12px;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+/* The panel is an island of its own beside the conversation: a gap, its own border and corners. Its strip
+   of tabs is as tall as the header (52px), so the two islands line up. In a machine frame the shell keeps the column. */
+.tw-runtime-root[data-split] .tw-rpane {
+  width: var(--tw-right-w);
+  margin-left: 10px;
+}
+@media (min-width: 1100px) {
+  .tw-root[data-sidebar='open'] .tw-main[data-pane] .tw-rpane {
+    width: min(var(--tw-right-w), calc(100vw - var(--tw-left-w, 272px) - 460px));
+  }
+  .tw-root[data-sidebar='closed'] .tw-main[data-pane] .tw-rpane {
+    width: min(var(--tw-right-w), calc(100vw - 64px - 460px));
+  }
+}
+.tw-runtime-root .tw-inspector-host {
+  position: relative;
+}
+
+/* Below 1100px the panel is a sheet over the screen. */
+@media (max-width: 1099px) {
+  .tw-rpane {
+    width: min(560px, 100vw);
+    margin: 0;
+    border-width: 0 0 0 1px;
+    border-radius: 0;
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+    background: var(--t-surface);
+    box-shadow: -24px 0 60px -20px oklch(0 0 0 / 50%);
+  }
+  .tw-runtime-root .tw-inspector-host {
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 55;
+  }
+  .tw-runtime-root[data-split] .tw-inspector-host {
+    position: relative;
+    inset: auto;
+    z-index: auto;
+  }
+  .tw-rpane-strip-actions .tw-rpane-maximise {
+    display: none;
+  }
+  .tw-rpane-tools {
+    padding: 20px 14px;
+  }
+}
+
+.tw-root .tw-main .tw-inspector-host[data-maximised] .tw-rpane {
+  width: 100%;
+  margin: 0;
+  border-radius: var(--shell-surface-radius);
+  border-width: 1px;
+  box-shadow: var(--t-shadow-popover);
+  animation: tw-rpane-max-in 200ms var(--tw-ease) both;
+}
+
+@keyframes tw-rpane-tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+/* A tab the agent opened arrives: a pass of light along its edge in front, a soft glow behind. Both layers
+   sit under the buttons and cost nothing until use-pane-arrivals plays them. */
+.tw-rpane-tab {
+  isolation: isolate;
+}
+.tw-rpane-tab-button {
+  position: relative;
+}
+.tw-rpane-tab-light,
+.tw-rpane-tab-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+.tw-rpane-tab-light {
+  overflow: hidden;
+  padding: 1px;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+.tw-rpane-tab-light::before {
+  content: '';
+  position: absolute;
+  inset: -40% 0;
+  background: linear-gradient(
+    100deg,
+    transparent 25%,
+    color-mix(in oklab, var(--t-accent-purple) 85%, white) 50%,
+    transparent 75%
+  );
+}
+.tw-rpane-tab-light::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--t-accent-purple) 35%, transparent);
+}
+.tw-rpane-tab-glow {
+  background: color-mix(in oklab, var(--t-accent-purple) 14%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--t-accent-purple) 45%, transparent),
+    0 0 18px -4px color-mix(in oklab, var(--t-accent-purple) 55%, transparent);
+}
+.tw-rpane-tab-unread {
+  transform-origin: center;
+}
+@keyframes tw-rpane-panel-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes tw-rpane-max-in {
+  from {
+    opacity: 0.6;
+    transform: scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-rpane-tab,
+  .tw-rpane-panel,
+  .tw-rpane-tool,
+  .tw-root .tw-main .tw-inspector-host[data-maximised] .tw-rpane {
+    animation: none;
+  }
+  .tw-rpane-tab,
+  .tw-rpane-tab-close,
+  .tw-rpane-tool,
+  .tw-rpane-tool-more,
+  .tw-rpane-address-input {
+    transition: none;
+  }
+}
+
+/* The overview: the islands of the conversation, folded to their headers until opened. */
+.tw-rpane-tab[data-pinned] {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: none;
+}
+.tw-rpane-tab[data-pinned] .tw-rpane-tab-button {
+  padding-right: 10px;
+}
+.tw-rpane-tab-unread {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: var(--t-accent-purple);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-accent-purple) 22%, transparent);
+}
+.tw-rpane-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: min-content;
+}
+.tw-rpane-isle {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-width: 0;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 12px;
+  background: var(--t-surface);
+  animation: tw-rpane-isle-in 240ms var(--tw-ease) both;
+}
+.tw-rpane-isle[hidden] {
+  display: none;
+}
+.tw-rpane-isle-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 42px;
+  padding-right: 6px;
+}
+.tw-rpane-isle-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px 0 9px;
+  border-radius: 11px;
+  text-align: left;
+  color: var(--t-text);
+}
+.tw-rpane-isle-toggle:focus-visible {
+  outline: 2px solid var(--t-focus-ring);
+  outline-offset: -2px;
+}
+.tw-rpane-isle-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: var(--t-text-secondary);
+  background: var(--t-surface-hover);
+}
+.tw-rpane-isle-icon svg,
+.tw-rpane-isle-icon img {
+  width: 14px;
+  height: 14px;
+}
+.tw-rpane-isle-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-rpane-isle-chevron {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--t-text-muted);
+  transition: transform 0.2s var(--tw-ease);
+}
+.tw-rpane-isle[data-folded] .tw-rpane-isle-chevron {
+  transform: rotate(-90deg);
+}
+.tw-rpane-isle-toggle:hover .tw-rpane-isle-chevron {
+  color: var(--t-text);
+}
+.tw-rpane-isle-open {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  opacity: 0;
+  transition: opacity var(--t-duration-fast, 0.15s);
+}
+.tw-rpane-isle-open svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-rpane-isle:hover .tw-rpane-isle-open,
+.tw-rpane-isle-open:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .tw-rpane-isle-open {
+    opacity: 1;
+  }
+}
+.tw-rpane-isle-body {
+  min-width: 0;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  padding: 2px 10px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--t-border) transparent;
+}
+.tw-rpane-isle-body[hidden] {
+  display: none;
+}
+.tw-rpane-isle[data-kind='changes'] .tw-rpane-isle-body {
+  max-height: min(70vh, 720px);
+}
+.tw-rpane-isle-body .tw-inspector-empty {
+  padding: 14px 8px 18px;
+}
+.tw-rpane-isle-body .tw-inspector-summary {
+  margin-top: 0;
+}
+.tw-rpane-overview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 18px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--t-text-secondary);
+}
+.tw-rpane-overview-empty svg {
+  width: 22px;
+  height: 22px;
+  color: var(--t-text-muted);
+}
+.tw-rpane-overview-empty p {
+  margin: 0;
+  max-width: 320px;
+}
+.tw-rpane-overview-auto {
+  flex: none;
+  margin-top: auto;
+  padding: 12px 4px 0;
+  border-top: 1px solid var(--t-border-subtle);
+}
+
+/* A file card: the click is the window, this button (or the middle button) is the tab of the panel. */
+.tw-file-item {
+  position: relative;
+  min-width: 0;
+}
+.tw-file-pane {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: var(--t-text);
+  background: var(--t-surface);
+  box-shadow: 0 0 0 1px var(--t-border-subtle);
+  opacity: 0;
+  transition: opacity var(--t-duration-fast, 0.15s);
+}
+.tw-file-pane svg {
+  width: 14px;
+  height: 14px;
+}
+.tw-file-item:hover .tw-file-pane,
+.tw-file-pane:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .tw-file-pane {
+    opacity: 1;
+  }
+}
+
+/* A commit, a merge request: the title, what it is, the diff. */
+.tw-rpane-commit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.tw-rpane-commit-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.tw-rpane-commit-head .tw-icon-button {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+.tw-rpane-commit-head .tw-icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-rpane-commit-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.tw-rpane-commit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  color: var(--t-text-secondary);
+}
+.tw-rpane-commit-meta > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.tw-rpane-commit-meta code {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11.5px;
+  color: var(--t-text);
+}
+.tw-rpane-commit-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tw-rpane-commit-branch svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+.tw-rpane-commit-description {
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 10px;
+}
+.tw-rpane-commit-description summary {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--t-text-secondary);
+  cursor: pointer;
+}
+.tw-rpane-commit-description[open] summary {
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+.tw-rpane-commit-description .tw-viewer-md {
+  padding: 4px 12px 10px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.tw-commit-open {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin-left: 2px;
+  opacity: 0;
+  transition: opacity var(--t-duration-fast, 0.15s);
+}
+.tw-commit-open svg {
+  width: 14px;
+  height: 14px;
+}
+.tw-commit-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.tw-commit-line .tw-commit-row {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.tw-commit-line:hover .tw-commit-open,
+.tw-commit-open:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .tw-commit-open {
+    opacity: 1;
+  }
+}
+
+/* A machine's frame shows the panel without the shell's column motion: it comes in from the right by itself, on the
+   same spring as the shell's view transition. */
+.tw-runtime-root .tw-inspector-host:not([data-maximised]) > .tw-rpane {
+  animation: tw-rpane-arrive 560ms var(--tw-pane-spring) both;
+}
+
+@keyframes tw-rpane-isle-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-rpane-isle,
+  .tw-runtime-root .tw-inspector-host > .tw-rpane {
+    animation: none;
+  }
+  .tw-rpane-isle-chevron,
+  .tw-rpane-isle-open,
+  .tw-commit-open {
+    transition: none;
+  }
+}
+
+/* A task of the tracker as a tab: the card of the task without leaving the conversation. */
+.tw-task {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.tw-task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.tw-task-key {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-text-secondary);
+}
+.tw-task-tracker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 4px 9px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--t-text-secondary);
+  text-decoration: none;
+  transition:
+    background var(--t-duration-fast, 0.15s),
+    color var(--t-duration-fast, 0.15s);
+}
+.tw-task-tracker:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-task-tracker svg {
+  width: 13px;
+  height: 13px;
+}
+.tw-task-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.tw-task-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-task-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 999px;
+  background: var(--t-surface-raised);
+  font-size: 12px;
+  color: var(--t-text);
+}
+.tw-task-chips small {
+  font-size: 11px;
+  color: var(--t-text-muted);
+}
+.tw-task-chips .tw-link-state {
+  font-size: 12px;
+  color: var(--t-text);
+}
+.tw-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 12.5px;
+}
+.tw-task-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.tw-task-person .tw-link-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+.tw-task-muted {
+  font-size: 12.5px;
+  color: var(--t-text-muted);
+}
+.tw-task-parent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 10px;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--t-text-secondary);
+}
+.tw-task-parent:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-task-parent svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.tw-task-parent b {
+  flex: none;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11.5px;
+  color: var(--t-text);
+}
+.tw-task-parent span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-task-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.tw-task-section .tw-inspector-heading {
+  margin: 0;
+}
+.tw-task-children,
+.tw-task-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tw-task-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--t-text);
+}
+.tw-task-child:hover {
+  background: var(--t-surface-hover);
+}
+.tw-task-child b {
+  flex: none;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11.5px;
+  color: var(--t-text-secondary);
+}
+.tw-task-child > span:not(.tw-link-state) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-task-child small {
+  flex: none;
+  font-size: 11px;
+  color: var(--t-text-muted);
+}
+.tw-task-child > svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--t-text-muted);
+}
+.tw-task-comments {
+  gap: 10px;
+}
+.tw-task-comment {
+  padding: 10px 12px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 10px;
+}
+.tw-task-comment header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+.tw-task-comment time {
+  font-size: 11px;
+  color: var(--t-text-muted);
+}
+
+.tw-task-md {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--t-text);
+  overflow-wrap: anywhere;
+}
+.tw-task-md > :last-child {
+  margin-bottom: 0;
+}
+.tw-task-md :is(p, ul, ol, pre, table, blockquote) {
+  margin: 0 0 10px;
+}
+.tw-task-md :is(h1, h2, h3, h4) {
+  margin: 14px 0 6px;
+  font-size: 13.5px;
+  font-weight: 650;
+}
+.tw-task-md > :first-child {
+  margin-top: 0;
+}
+.tw-task-md ul {
+  padding-left: 20px;
+  list-style: disc;
+}
+.tw-task-md ol {
+  padding-left: 20px;
+  list-style: decimal;
+}
+.tw-task-md ul.contains-task-list,
+.tw-task-md .task-list-item {
+  list-style: none;
+}
+.tw-task-md ul.contains-task-list {
+  padding-left: 2px;
+}
+.tw-task-md .task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.tw-task-md .task-list-item input {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 3px;
+  accent-color: var(--t-success);
+}
+.tw-task-md .task-list-item:has(input:checked) {
+  color: var(--t-text-secondary);
+}
+.tw-task-md a:not(.message-link) {
+  color: var(--t-accent-purple-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tw-task-md code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--t-surface-hover);
+  font-size: 12px;
+}
+.tw-task-md pre {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--t-surface);
+  overflow-x: auto;
+}
+.tw-task-md pre code {
+  padding: 0;
+  background: none;
+}
+.tw-task-md blockquote {
+  padding-left: 12px;
+  border-left: 3px solid var(--t-border-default);
+  color: var(--t-text-secondary);
+}
+.tw-task-md table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.tw-task-md :is(th, td) {
+  padding: 5px 9px;
+  border: 1px solid var(--t-border-subtle);
+  text-align: left;
+}
+
+.tw-task-error p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--t-text-secondary);
+}
+.tw-task-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tw-task-retry {
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--t-accent-purple-grad);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+}
+.tw-task-skeleton-key {
+  width: 72px;
+}
+.tw-task-skeleton-title {
+  width: 84%;
+  height: 16px;
+}
+.tw-task-skeleton-chips {
+  width: 60%;
+  height: 22px;
+  border-radius: 999px;
+}
+.tw-task-skeleton-text {
+  width: 100%;
+}
+.tw-task-skeleton-text:last-child {
+  width: 55%;
+}
+
+/* The "Disk" tab: folders of the machine, upload queue. */
+.tw-rpane-panel-disk {
+  padding: 0;
+  overflow: hidden;
+}
+.tw-disk {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  container: tw-disk / inline-size;
+}
+.tw-disk[data-dragging] {
+  outline: 2px dashed var(--t-accent-purple);
+  outline-offset: -6px;
+  border-radius: var(--t-radius-lg);
+}
+.tw-disk-drop {
+  position: absolute;
+  inset: 8px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--t-radius-lg);
+  background: color-mix(in oklab, var(--t-surface) 82%, transparent);
+  color: var(--t-accent-purple-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.tw-disk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+.tw-disk-crumbs {
+  min-width: 0;
+  flex: 1 1 160px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tw-disk-crumbs ol {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  white-space: nowrap;
+}
+.tw-disk-crumbs li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tw-disk-crumbs li > svg {
+  width: 14px;
+  height: 14px;
+  color: var(--t-text-muted);
+}
+.tw-disk-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--t-text-secondary);
+}
+.tw-disk-crumb svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-disk-crumb:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-disk-crumb[aria-current='page'] {
+  color: var(--t-text);
+  font-weight: 600;
+}
+.tw-disk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tw-disk-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--t-border-subtle);
+}
+.tw-disk-input {
+  flex: 1 1 140px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--t-border);
+  border-radius: 8px;
+  background: var(--t-surface);
+  color: var(--t-text);
+  font: inherit;
+  font-size: 13px;
+}
+.tw-disk-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--t-border) transparent;
+}
+.tw-disk-list {
+  margin: 0;
+  padding: 4px 6px;
+  list-style: none;
+}
+.tw-disk-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--t-text);
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+}
+.tw-disk-row:hover {
+  background: var(--t-surface-hover);
+}
+.tw-disk-row:focus-visible {
+  outline-offset: -2px;
+}
+.tw-disk-row[data-muted] {
+  color: var(--t-text-muted);
+}
+.tw-disk-row-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--t-text-secondary);
+}
+.tw-disk-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-disk-row-size {
+  grid-column: 3;
+  color: var(--t-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.tw-disk-row-date {
+  display: none;
+  color: var(--t-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tw-disk-row-download {
+  grid-column: 4;
+  width: 15px;
+  height: 15px;
+  color: var(--t-text-muted);
+  opacity: 0;
+}
+.tw-disk-row:hover .tw-disk-row-download,
+.tw-disk-row:focus-visible .tw-disk-row-download {
+  opacity: 1;
+}
+@container tw-disk (min-width: 420px) {
+  .tw-disk-row {
+    grid-template-columns: 20px minmax(0, 1fr) 76px 128px 16px;
+  }
+  .tw-disk-row-size {
+    grid-column: auto;
+    text-align: right;
+  }
+  .tw-disk-row-date {
+    display: block;
+  }
+  .tw-disk-row-download {
+    grid-column: auto;
+  }
+}
+.tw-disk-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 16px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--t-text-muted);
+}
+.tw-disk-note p {
+  margin: 0;
+}
+div.tw-disk-note {
+  flex-wrap: wrap;
+}
+.tw-disk-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 14px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--t-danger-border);
+  border-radius: 8px;
+  background: var(--t-danger-bg);
+  color: var(--t-danger);
+  font-size: 12.5px;
+}
+.tw-disk-new .tw-disk-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+.tw-disk-link {
+  color: var(--t-accent-purple-soft);
+  font-size: 12.5px;
+  text-decoration: underline;
+}
+.tw-disk-more {
+  display: flex;
+  justify-content: center;
+  padding: 8px 14px 14px;
+}
+.tw-disk-queue {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  max-height: 45%;
+  border-top: 1px solid var(--t-border-subtle);
+  background: var(--t-surface-raised);
+}
+.tw-disk-queue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  padding: 8px 14px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-text-secondary);
+}
+.tw-disk-uploads {
+  margin: 0;
+  padding: 0 14px 10px;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.tw-disk-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--t-border-subtle);
+  font-size: 12.5px;
+}
+.tw-disk-upload:last-child {
+  border-bottom: 0;
+}
+.tw-disk-upload-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.tw-disk-upload-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--t-text);
+}
+.tw-disk-upload-actions {
+  display: flex;
+  flex: none;
+}
+.tw-disk-upload-actions .tw-icon-button {
+  width: 26px;
+  height: 26px;
+}
+.tw-disk-upload-actions .tw-icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-disk-upload-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--t-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.tw-disk-upload[data-state='failed'] .tw-disk-upload-status {
+  color: var(--t-danger);
+}
+.tw-disk-upload[data-state='done'] .tw-disk-upload-status {
+  color: var(--t-accent-green-soft);
+}
+.tw-disk-progress {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  border: 0;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--t-border);
+  accent-color: var(--t-accent-purple);
+}
+.tw-disk-progress::-webkit-progress-bar {
+  background: var(--t-border);
+}
+.tw-disk-progress::-webkit-progress-value {
+  background: var(--t-accent-purple);
+}
+.tw-disk-progress::-moz-progress-bar {
+  background: var(--t-accent-purple);
+}
+.tw-disk-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tw-disk-conflict-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tw-disk-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--t-text-secondary);
+  font-size: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-disk-row-download {
+    transition: none;
+  }
+}
+
+/* Pinned folders of the "Disk" tab. */
+.tw-disk-favorites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: none;
+  max-height: 84px;
+  padding: 8px 14px;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--t-border-subtle);
+  scrollbar-width: thin;
+}
+.tw-disk-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  background: var(--t-surface-raised);
+  color: var(--t-text-secondary);
+  font-size: 12.5px;
+}
+.tw-disk-chip:hover {
+  border-color: var(--t-border-hover);
+  color: var(--t-text);
+}
+.tw-disk-chip-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+}
+.tw-disk-chip-open svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.tw-disk-chip-open span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-disk-chip[data-missing] {
+  opacity: 0.6;
+}
+.tw-disk-chip[data-missing] .tw-disk-chip-open {
+  cursor: not-allowed;
+}
+.tw-disk-chip-remove {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-right: 2px;
+  border-radius: 999px;
+}
+.tw-disk-chip-remove svg {
+  width: 13px;
+  height: 13px;
+}
+.tw-disk-chip-remove:hover {
+  background: var(--t-surface-hover);
+}
+.tw-disk-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tw-disk-item .tw-disk-row {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+.tw-disk-star {
+  width: 28px;
+  height: 28px;
+  color: var(--t-text-muted);
+}
+.tw-disk-star svg {
+  width: 16px;
+  height: 16px;
+}
+.tw-disk-star[data-pinned] {
+  color: var(--t-accent-amber-soft);
+}
+.tw-disk-star[data-pinned] svg {
+  fill: currentColor;
+}
+.tw-disk-star[aria-disabled='true'] {
+  cursor: default;
+}
+.tw-disk-star[data-busy] {
+  opacity: 0.5;
+}
+.tw-disk-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tw-disk-crumbs {
+  overflow: visible;
+}
+.tw-disk-crumbs ol {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+/* Actions of the "Disk" tab: one height, one radius, no glow; the path of the folder above the list. */
+.tw-disk-actions {
+  align-items: center;
+}
+.tw-disk-actions .tw-ui-button {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--t-radius-md);
+}
+.tw-disk-actions .tw-ui-button[data-variant='primary'] {
+  box-shadow: none;
+}
+.tw-disk-actions .tw-ui-button[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.tw-disk-actions .tw-ui-button[aria-disabled='true']:hover {
+  filter: none;
+}
+.tw-disk-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--t-button-primary-bg);
+  color: var(--t-button-primary-fg);
+}
+.tw-disk-upload svg {
+  width: 15px;
+  height: 15px;
+}
+.tw-disk-upload-caret {
+  margin-left: 2px;
+  opacity: 0.8;
+}
+.tw-disk-upload[aria-expanded='true'] {
+  filter: brightness(1.06);
+}
+.tw-disk-hint {
+  margin: 0;
+  padding: 8px 14px 0;
+  font-size: 12px;
+  color: var(--t-text-muted);
+}
+.tw-disk-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  width: 100%;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--t-border-subtle);
+  color: var(--t-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  text-align: left;
+}
+.tw-disk-path:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-disk-path:focus-visible {
+  outline-offset: -2px;
+}
+.tw-disk-path-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.tw-disk-path svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.tw-disk-path-state {
+  flex: none;
+  color: var(--t-accent-green-soft);
+  font-family: inherit;
+}
+.tw-disk-path-state:empty {
+  display: none;
+}
+
+/* The spring of the panel's arrival, sampled for CSS (stiffness 260, damping 26: a 1% settle, no bounce). */
+:root {
+  --tw-pane-spring: linear(
+    0,
+    0.02662,
+    0.09177,
+    0.1798,
+    0.279,
+    0.3809,
+    0.4797,
+    0.5717,
+    0.6546,
+    0.725,
+    0.7896,
+    0.8403,
+    0.8848,
+    0.9194,
+    0.9467,
+    0.9677,
+    0.9834,
+    0.9949,
+    1.003,
+    1.008,
+    1.011,
+    1.013,
+    1.013,
+    1.013,
+    1.012,
+    1.011,
+    1.01,
+    1.008,
+    1.007,
+    1.006,
+    1.005,
+    1.004,
+    1.003,
+    1.002,
+    1.002,
+    1.001,
+    1.001,
+    1,
+    1,
+    1,
+    1
+  );
+}
+@keyframes tw-rpane-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(64px) scale(0.985);
+  }
+  45% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* A line of light along the bottom edge of the strip of tabs, played once when the agent brings a tab in. */
+.tw-rpane-strip {
+  position: relative;
+}
+.tw-rpane-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+.tw-rpane-edge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--t-accent-purple) 90%, white) 50%,
+    transparent 100%
+  );
+}
+.tw-rpane-arrival-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 2px;
+}
+.tw-rpane-arrival-skeleton .tw-skeleton {
+  height: 12px;
+  animation: none;
+}
+.tw-rpane-arrival-skeleton .tw-skeleton:nth-child(1) {
+  width: 62%;
+}
+.tw-rpane-arrival-skeleton .tw-skeleton:nth-child(2) {
+  width: 88%;
+}
+.tw-rpane-arrival-skeleton .tw-skeleton:nth-child(3) {
+  width: 74%;
+}
+.tw-rpane-arrival-skeleton .tw-skeleton:nth-child(4) {
+  width: 48%;
+}
+.tw-rpane-panel[data-arriving] {
+  position: relative;
+}
+.tw-rpane-arrival-skeleton[data-over] {
+  position: absolute;
+  inset: 12px 14px auto;
+  z-index: 1;
+  background: var(--t-surface);
+  padding-bottom: 40px;
+}
+
+/* While the panel slides in it stands over the right of the conversation, out of the flow (use-pane-column-flip). */
+@media (min-width: 1100px) {
+  .tw-main > .tw-inspector-host[data-entering] {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    bottom: 10px;
+    height: auto;
+    z-index: 6;
+  }
+}

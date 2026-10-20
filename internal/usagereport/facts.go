@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // The rows of a file's facts, each with its dedup key: streamed chunks repeat one usage, and resumed or forked
@@ -83,12 +84,16 @@ type Facts struct {
 }
 
 const (
-	noProject      = "без проекта"
-	outsideRepos   = "вне репозиториев"
 	interruptText  = "[Request interrupted by user"
 	denialText     = "The user doesn't want to proceed with this tool use"
 	defaultCodexAI = "gpt-5"
 )
+
+// noProject and outsideRepos name the buckets of work that belongs to no project, in the runtime's language.
+func noProject() string { return locale.Pick("no project", "без проекта") }
+func outsideRepos() string {
+	return locale.Pick("outside repositories", "вне репозиториев")
+}
 
 // harnessPrefix: user entries the harness wrote (command echoes, notifications, peer messages), not a person.
 var harnessPrefix = regexp.MustCompile(`^` + jscompat.SpaceClass + `*<(local-command|command-|task-notification|system-reminder|teammate-message|cross-session-message|user-prompt-submit-hook|bash-(input|stdout|stderr))`)
@@ -216,7 +221,7 @@ func (p *Projects) gitRepo(cwd string) *string {
 func (p *Projects) Of(cwd string, has bool) string {
 	p.init()
 	if !has || cwd == "" {
-		return noProject
+		return noProject()
 	}
 	if repo := p.gitRepo(cwd); repo != nil && *repo != "" && *repo != p.Root && *repo != "workspace" {
 		return *repo
@@ -236,7 +241,7 @@ func (p *Projects) Of(cwd string, has bool) string {
 		}
 	}
 	if rootAt == -1 {
-		return outsideRepos
+		return outsideRepos()
 	}
 	if rootAt+1 >= len(parts) {
 		return p.Root
@@ -659,7 +664,7 @@ func (p *Projects) ParseCodex(path string) (*Facts, error) {
 	var tasks ordered
 	turnStarts := map[string]float64{}
 	model := defaultCodexAI
-	project := projects.add(noProject)
+	project := projects.add(noProject())
 	var prev [4]float64 // input, cached input, cache write, output of the last cumulative total
 	hasPrev := false
 	prompt := func(key any, ts float64, text string) {

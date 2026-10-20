@@ -11,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/history"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
@@ -78,7 +79,7 @@ func (rt *Route) Answer(r *http.Request) (int, any, http.Header) {
 		id = v[0]
 	}
 	if !tabID.MatchString(id) {
-		return nodejson.Answer(r, http.StatusBadRequest, errorBody("Неверный id диалога"), h)
+		return nodejson.Answer(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid conversation id", "Неверный id диалога")), h)
 	}
 	fresh := len(q["fresh"]) == 1 && q["fresh"][0] == "1"
 	now := rt.now()

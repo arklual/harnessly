@@ -17,7 +17,7 @@
   }
   window.addEventListener('error', function (event) {
     var error = event.error || {};
-    var message = String(error.message || event.message || 'Ошибка скрипта');
+    var message = String(error.message || event.message || 'Script error');
     errors.push({ message: message, stack: String(error.stack || '') });
     report('error', (error.stack || message) + (event.filename ? ' @ ' + event.filename + ':' + event.lineno : ''));
     if (onError) onError();
@@ -30,7 +30,7 @@
   });
   try {
     new PerformanceObserver(function (list) {
-      list.getEntries().forEach(function (entry) { if (entry.duration >= 200) report('longtask', 'Главный поток занят ' + Math.round(entry.duration) + ' мс'); });
+      list.getEntries().forEach(function (entry) { if (entry.duration >= 200) report('longtask', 'Main thread busy ' + Math.round(entry.duration) + ' ms'); });
     }).observe({ type: 'longtask', buffered: true });
   } catch (e) {}
   window.addEventListener('load', function () {
@@ -38,8 +38,8 @@
       var nav = performance.getEntriesByType('navigation')[0];
       if (nav && nav.loadEventStart >= 3000) {
         var heavy = performance.getEntriesByType('resource').sort(function (a, b) { return b.duration - a.duration; }).slice(0, 3)
-          .map(function (r) { return r.name.split('/').pop() + ' ' + Math.round(r.duration) + ' мс'; }).join(', ');
-        report('slow', 'Загрузка ' + Math.round(nav.loadEventStart) + ' мс; дольше всех: ' + heavy);
+          .map(function (r) { return r.name.split('/').pop() + ' ' + Math.round(r.duration) + ' ms'; }).join(', ');
+        report('slow', 'Load ' + Math.round(nav.loadEventStart) + ' ms; slowest: ' + heavy);
       }
     }, 0);
   });
@@ -53,7 +53,7 @@
       window.addEventListener('load', function () { window.scrollTo(0, Number(saved) || 0); });
     }
   } catch (e) {}
-  // TCK-2844. A change is applied in place, the way Claude Design streams edits into an open board: the board's own
+  // A change is applied in place, the way Claude Design streams edits into an open board: the board's own
   // template and logic go to the runtime (__dcUpdate), a stylesheet is swapped, a page script of a wrapper board is
   // run again and the page drawn anew. Only what cannot be applied reloads the page. Changes come as a stream;
   // a slow poll catches what a stream that a proxy holds back would miss.
@@ -220,11 +220,11 @@
   listen();
 
   var LABELS = {
-    Desktop: 'Экран', Mobile: 'Экран', Empty: 'Пусто', Loading: 'Загрузка', ErrorState: 'Ошибка', History: 'История', Blank: 'Пустая',
-    Description: 'Описание', Cover: 'Обложка', Venue: 'Площадка', SalesSettings: 'Продажи', PageContent: 'Страница', Media: 'Медиа',
-    EventLinks: 'Ссылки', Waves: 'Волны', PromoCodes: 'Промокоды', Blocks: 'Блоки', BlocksLoading: 'Блоки · загрузка',
-    Highlights: 'Хайлайты', HighlightsEmpty: 'Хайлайты · пусто', HighlightsLoading: 'Хайлайты · загрузка', HighlightsError: 'Хайлайты · ошибка',
-    Albums: 'Альбомы', AlbumsEmpty: 'Альбомы · пусто'
+    Desktop: 'Screen', Mobile: 'Screen', Empty: 'Empty', Loading: 'Loading', ErrorState: 'Error', History: 'History', Blank: 'Blank',
+    Description: 'Description', Cover: 'Cover', Venue: 'Venue', SalesSettings: 'Sales', PageContent: 'Page', Media: 'Media',
+    EventLinks: 'Links', Waves: 'Waves', PromoCodes: 'Promo codes', Blocks: 'Blocks', BlocksLoading: 'Blocks · loading',
+    Highlights: 'Highlights', HighlightsEmpty: 'Highlights · empty', HighlightsLoading: 'Highlights · loading', HighlightsError: 'Highlights · error',
+    Albums: 'Albums', AlbumsEmpty: 'Albums · empty'
   };
   var ICONS = {"prev":"<svg viewBox=\"0 0 24 24\"><path d=\"M15 18l-6-6 6-6\"/></svg>","next":"<svg viewBox=\"0 0 24 24\"><path d=\"M9 18l6-6-6-6\"/></svg>","down":"<svg viewBox=\"0 0 24 24\"><path d=\"M6 9l6 6 6-6\"/></svg>","sun":"<svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4\"/></svg>","moon":"<svg viewBox=\"0 0 24 24\"><path d=\"M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z\"/></svg>","hide":"<svg viewBox=\"0 0 24 24\"><path d=\"M5 12h14\"/></svg>","close":"<svg viewBox=\"0 0 24 24\"><path d=\"M6 6l12 12M18 6L6 18\"/></svg>","sliders":"<svg viewBox=\"0 0 24 24\"><path d=\"M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0\"/><circle cx=\"16\" cy=\"6\" r=\"2\"/><circle cx=\"10\" cy=\"12\" r=\"2\"/><circle cx=\"18\" cy=\"18\" r=\"2\"/></svg>","boards":"<svg viewBox=\"0 0 24 24\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/></svg>"};
   var COLLAPSED = 'tk-lib-bar-collapsed';
@@ -295,7 +295,7 @@
   root.appendChild(toast);
   var toastTimer = 0;
   applied = function () {
-    toast.textContent = 'Обновлено';
+    toast.textContent = 'Updated';
     toast.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toast.hidden = true; }, 1200);
@@ -307,7 +307,7 @@
   root.appendChild(card);
   var boards = [];
   var paint = function () {};
-  // TCK-2845. The panel puts the error in the composer by itself: the person presses send, the agent fixes the board.
+  // The panel puts the error in the composer by itself: the person presses send, the agent fixes the board.
   var sentErrors = {};
   function sendToChat(error) {
     if (window.parent === window) return false;
@@ -321,27 +321,27 @@
     if (!sentErrors[key]) sentErrors[key] = sendToChat(first) ? 'sent' : 'local';
     var inChat = sentErrors[key] === 'sent';
     card.textContent = '';
-    card.appendChild(make('h2', {}, 'Доска не отрисовалась'));
+    card.appendChild(make('h2', {}, 'The board did not render'));
     card.appendChild(make('p', {}, inChat
-      ? 'Ошибка уже прикреплена к сообщению в чате: отправьте его — агент найдёт причину в файлах макета и починит.'
-      : 'Ошибка в коде самого макета, а не панели: так он падает и в Claude Design.'));
+      ? 'The error is already attached to the message in the chat: send it, and the agent will find the cause in the design files and fix it.'
+      : 'The error is in the design\'s own code, not in the panel: it fails the same way in Claude Design.'));
     card.appendChild(make('pre', {}, first.message + (first.stack ? '\n\n' + first.stack.split('\n').slice(0, 6).join('\n') : '')));
     var actions = make('div', { class: 'actions' });
     if (window.parent !== window) {
-      var chat = make('button', { type: 'button', class: 'primary' }, inChat ? 'В чате ✓' : 'Отправить в чат');
+      var chat = make('button', { type: 'button', class: 'primary' }, inChat ? 'In the chat ✓' : 'Send to the chat');
       chat.addEventListener('click', function () { if (sendToChat(first)) { sentErrors[key] = 'sent'; showError(); } });
       actions.appendChild(chat);
     }
-    var copy = make('button', { type: 'button' }, 'Скопировать');
+    var copy = make('button', { type: 'button' }, 'Copy');
     copy.addEventListener('click', function () {
       var text = location.href + '\n' + first.message + '\n' + first.stack;
-      if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { copy.textContent = 'Скопировано'; }, function () {});
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { copy.textContent = 'Copied'; }, function () {});
     });
-    var hide = make('button', { type: 'button' }, 'Скрыть');
+    var hide = make('button', { type: 'button' }, 'Hide');
     hide.addEventListener('click', function () { card.hidden = true; });
     actions.appendChild(copy);
     if (boards.length > 1) {
-      var skip = make('button', { type: 'button' }, 'Следующая доска');
+      var skip = make('button', { type: 'button' }, 'Next board');
       skip.addEventListener('click', function () { step(1); });
       actions.appendChild(skip);
     }
@@ -377,16 +377,17 @@
     .then(function (response) { return response.ok ? response.json() : null; })
     .then(function (data) { if (data && data.boards && data.boards.length) mount(data.boards); }, function () {});
 
-  // TCK-2839. «Состояния»: a floating panel with the board's settings — screen state, theme, desktop or phone, and
+  // "States": a floating panel with the board's settings — screen state, theme, desktop or phone, and
   // every prop the board declares (data-props: flags like a skeleton, enums, text). It moves, folds and closes;
   // an agent drives it too ({{cli}} design panel), and the page tells the server what it shows.
   var PANEL_POS = 'tk-lib-tweaks-pos';
   var PANEL_OPEN = 'tk-lib-tweaks-open';
   var PANEL_FOLDED = 'tk-lib-tweaks-folded';
-  var THEMES = [{ value: 'dark', text: 'Тёмная' }, { value: 'light', text: 'Светлая' }];
+  var THEMES = [{ value: 'dark', text: 'Dark' }, { value: 'light', text: 'Light' }];
+  // The suffix of a phone board's title in the projects this panel serves: compared with titles, so it stays Russian.
   var MOBILE_SUFFIX = ' · Мобильная';
-  var PROP_LABELS = { variant: 'Состояние', theme: 'Тема', loading: 'Загрузка', skeleton: 'Скелетон', empty: 'Пусто', error: 'Ошибка' };
-  var tweaks = make('section', { class: 'tweaks', 'aria-label': 'Состояния доски', hidden: '' });
+  var PROP_LABELS = { variant: 'State', theme: 'Theme', loading: 'Loading', skeleton: 'Skeleton', empty: 'Empty', error: 'Error' };
+  var tweaks = make('section', { class: 'tweaks', 'aria-label': 'Board states', hidden: '' });
   root.appendChild(tweaks);
   var tweaksOpen = stored(PANEL_OPEN) === '1';
   var tweaksFolded = stored(PANEL_FOLDED) === '1';
@@ -413,7 +414,7 @@
         items.push({
           name: key,
           label: item.label || PROP_LABELS[key] || key,
-          section: item.section || 'Свойства',
+          section: item.section || 'Properties',
           editor: item.editor || typeof item.default,
           options: (item.options || []).map(function (option) { return { value: option, text: label(String(option)) }; }),
           value: Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : item.default,
@@ -425,10 +426,10 @@
     var board = currentBoard();
     var tweak = board && board.tweaks;
     if (tweak && tweak.variants && tweak.variants.length > 1) {
-      items.push({ name: 'variant', label: 'Состояние', section: 'Экран', editor: 'enum', value: here().searchParams.get('v') || tweak.variants[0],
+      items.push({ name: 'variant', label: 'State', section: 'Screen', editor: 'enum', value: here().searchParams.get('v') || tweak.variants[0],
         options: tweak.variants.map(function (variant) { return { value: variant, text: label(variant) }; }) });
     }
-    if (tweak && tweak.themes) items.push({ name: 'theme', label: 'Тема', section: 'Экран', editor: 'enum', value: here().searchParams.get('theme') || 'dark', options: THEMES });
+    if (tweak && tweak.themes) items.push({ name: 'theme', label: 'Theme', section: 'Screen', editor: 'enum', value: here().searchParams.get('theme') || 'dark', options: THEMES });
     return items;
   }
   function setControl(item, value) {
@@ -478,10 +479,10 @@
     tweaks.textContent = '';
     tweaks.toggleAttribute('data-folded', tweaksFolded);
     var head = make('header', { class: 'tweaks-head' });
-    head.appendChild(make('span', { class: 'tweaks-title' }, 'Состояния'));
-    var fold = iconButton(tweaksFolded ? 'down' : 'hide', tweaksFolded ? 'Развернуть' : 'Свернуть');
+    head.appendChild(make('span', { class: 'tweaks-title' }, 'States'));
+    var fold = iconButton(tweaksFolded ? 'down' : 'hide', tweaksFolded ? 'Expand' : 'Collapse');
     fold.addEventListener('click', function () { tweaksFolded = !tweaksFolded; store(PANEL_FOLDED, tweaksFolded ? '1' : ''); renderTweaks(); reportState(); });
-    var close = iconButton('close', 'Закрыть');
+    var close = iconButton('close', 'Close');
     close.addEventListener('click', function () { showTweaks(false); });
     head.appendChild(fold);
     head.appendChild(close);
@@ -494,9 +495,9 @@
     var phone = siblingOf(board, true);
     if (board && desktop && phone) {
       var view = make('div', { class: 'section' });
-      view.appendChild(make('h3', {}, 'Вид'));
+      view.appendChild(make('h3', {}, 'View'));
       var onPhone = board === phone;
-      view.appendChild(chips([{ value: 'desktop', text: 'Десктоп' }, { value: 'phone', text: 'Телефон' }],
+      view.appendChild(chips([{ value: 'desktop', text: 'Desktop' }, { value: 'phone', text: 'Phone' }],
         function (option) { return (option.value === 'phone') === onPhone; },
         function (option) { var target = option.value === 'phone' ? phone : desktop; if (target !== board) go(target.href); }));
       body.appendChild(view);
@@ -513,7 +514,7 @@
       sections[name].forEach(function (item) { section.appendChild(controlRow(item)); });
       body.appendChild(section);
     });
-    if (!order.length && !(desktop && phone)) body.appendChild(make('p', { class: 'muted' }, 'У этой доски нет настроек: попросите агента добавить свойства в data-props.'));
+    if (!order.length && !(desktop && phone)) body.appendChild(make('p', { class: 'muted' }, 'This board has no settings: ask the agent to add properties to data-props.'));
     tweaks.appendChild(body);
     placeTweaks();
   }
@@ -599,7 +600,7 @@
       var base = item.title.split(MOBILE_SUFFIX).join('');
       var cut = base.indexOf(' - ');
       var section = cut < 0 ? base : base.slice(0, cut);
-      var screen = cut < 0 ? 'Главная' : base.slice(cut + 3);
+      var screen = cut < 0 ? 'Main' : base.slice(cut + 3);
       if (!bySection[section]) { bySection[section] = { name: section, screens: [], byScreen: {} }; groups.push(bySection[section]); }
       var group = bySection[section];
       if (!group.byScreen[screen]) { group.byScreen[screen] = { name: screen, desktop: null, phone: null }; group.screens.push(group.byScreen[screen]); }
@@ -621,15 +622,15 @@
       location.href = carryTheme(page);
     });
 
-    var bar = make('div', { class: 'bar', role: 'toolbar', 'aria-label': 'Доски макета Claude Design' });
+    var bar = make('div', { class: 'bar', role: 'toolbar', 'aria-label': 'Boards of the Claude Design project' });
     var pill = make('div', { class: 'pill' });
-    var expand = iconButton('boards', 'Показать панель досок');
+    var expand = iconButton('boards', 'Show the boards bar');
     pill.appendChild(expand);
     var panels = [];
     var closeAll = function () { panels.forEach(function (item) { item.close(); }); };
     var popover = function (trigger, title, searchable, items) {
       var panel = make('div', { class: 'panel', role: 'dialog', 'aria-label': title, hidden: '' });
-      var search = searchable ? make('input', { type: 'search', placeholder: 'Найти доску', 'aria-label': 'Найти доску', autocomplete: 'off' }) : null;
+      var search = searchable ? make('input', { type: 'search', placeholder: 'Find a board', 'aria-label': 'Find a board', autocomplete: 'off' }) : null;
       var rows = make('div', { class: 'list' });
       if (search) panel.appendChild(search);
       panel.appendChild(rows);
@@ -644,7 +645,7 @@
           row.addEventListener('click', function () { closeAll(); item.pick(); });
           rows.appendChild(row);
         });
-        if (!found) rows.appendChild(make('div', { class: 'empty' }, 'Такой доски нет'));
+        if (!found) rows.appendChild(make('div', { class: 'empty' }, 'No such board'));
       };
       var entry = {
         close: function () { panel.hidden = true; trigger.setAttribute('aria-expanded', 'false'); },
@@ -673,8 +674,8 @@
     };
 
     var boardFinder = function (trigger, board) {
-      var panel = make('div', { class: 'panel finder', role: 'dialog', 'aria-label': 'Доски макета', hidden: '' });
-      var search = make('input', { type: 'search', placeholder: 'Найти доску', 'aria-label': 'Найти доску', autocomplete: 'off' });
+      var panel = make('div', { class: 'panel finder', role: 'dialog', 'aria-label': 'Boards of the project', hidden: '' });
+      var search = make('input', { type: 'search', placeholder: 'Find a board', 'aria-label': 'Find a board', autocomplete: 'off' });
       var rows = make('div', { class: 'list' });
       panel.appendChild(search);
       panel.appendChild(rows);
@@ -692,7 +693,7 @@
             open.addEventListener('click', function () { closeAll(); go(main.href); });
             if (!first) first = open;
             row.appendChild(open);
-            [['desktop', 'Десктоп'], ['phone', 'Телефон']].forEach(function (pair) {
+            [['desktop', 'Desktop'], ['phone', 'Phone']].forEach(function (pair) {
               var item = screen[pair[0]];
               if (!item) return;
               var chip = make('button', { type: 'button', class: 'view', 'aria-current': String(item === board), title: item.title }, pair[1]);
@@ -702,7 +703,7 @@
             rows.appendChild(row);
           });
         });
-        if (!groups.length) rows.appendChild(make('div', { class: 'empty' }, 'Такой доски нет'));
+        if (!groups.length) rows.appendChild(make('div', { class: 'empty' }, 'No such board'));
       };
       var entry = {
         close: function () { panel.hidden = true; trigger.setAttribute('aria-expanded', 'false'); },
@@ -739,15 +740,15 @@
       for (var i = 0; i < boards.length; i += 1) if (isBoard(boards[i].href)) { index = i; break; }
       var board = index >= 0 ? boards[index] : null;
 
-      var prev = iconButton('prev', 'Предыдущая доска · [');
+      var prev = iconButton('prev', 'Previous board · [');
       prev.addEventListener('click', function () { step(-1); });
-      var pick = make('button', { type: 'button', title: 'Все доски' });
-      pick.appendChild(make('span', { class: 'board' }, board ? board.title : 'Доски'));
+      var pick = make('button', { type: 'button', title: 'All boards' });
+      pick.appendChild(make('span', { class: 'board' }, board ? board.title : 'Boards'));
       if (index >= 0) pick.appendChild(make('span', { class: 'count' }, index + 1 + '/' + boards.length));
       var caret = make('span', {});
       caret.innerHTML = ICONS.down;
       pick.appendChild(caret);
-      var next = iconButton('next', 'Следующая доска · ]');
+      var next = iconButton('next', 'Next board · ]');
       next.addEventListener('click', function () { step(1); });
       bar.appendChild(prev);
       bar.appendChild(pick);
@@ -755,12 +756,12 @@
       boardFinder(pick, board);
 
       bar.appendChild(make('span', { class: 'sep' }));
-      var gear = iconButton('sliders', tweaksOpen ? 'Скрыть состояния' : 'Состояния доски: экран, тема, свойства');
+      var gear = iconButton('sliders', tweaksOpen ? 'Hide states' : 'Board states: screen, theme, properties');
       gear.setAttribute('aria-pressed', String(tweaksOpen));
       gear.addEventListener('click', function () { showTweaks(!tweaksOpen); });
       bar.appendChild(gear);
       bar.appendChild(make('span', { class: 'sep' }));
-      var collapse = iconButton('hide', 'Свернуть панель досок');
+      var collapse = iconButton('hide', 'Collapse the boards bar');
       collapse.addEventListener('click', function () { setCollapsed(true); expand.focus(); });
       bar.appendChild(collapse);
       renderTweaks();
@@ -781,7 +782,7 @@
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || ''))) return;
       if (event.key === '[') { event.preventDefault(); step(-1); }
       if (event.key === ']') { event.preventDefault(); step(1); }
-      if (event.key === 's' || event.key === 'ы') { event.preventDefault(); showTweaks(!tweaksOpen); }
+      if (event.key === 's' || event.key === '\u044b') { event.preventDefault(); showTweaks(!tweaksOpen); }
     });
 
     root.appendChild(bar);

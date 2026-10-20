@@ -1,0 +1,697 @@
+/* «Claude Design» tab and island of the right panel: pane/design-library-tab.tsx. Only --t-* tokens. */
+
+.tw-dlib {
+  container: tw-dlib / inline-size;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 16px 24px;
+  overflow-y: auto;
+}
+
+.tw-dlib[data-dragging] {
+  outline: 2px dashed var(--t-accent, currentColor);
+  outline-offset: -6px;
+  border-radius: 10px;
+}
+
+.tw-dlib-drop {
+  position: absolute;
+  inset: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--t-surface) 88%, transparent);
+  color: var(--t-text);
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none;
+}
+
+.tw-dlib-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tw-dlib-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tw-dlib-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tw-dlib-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t-text);
+}
+
+.tw-dlib-file {
+  display: none;
+}
+
+.tw-dlib-demo {
+  cursor: help;
+}
+
+.tw-dlib-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tw-dlib-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 2px 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-text-muted);
+}
+
+.tw-dlib-section-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--t-surface-hover);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.tw-dlib-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 10px;
+  background: var(--t-surface);
+}
+
+.tw-dlib-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tw-dlib-card-titles {
+  min-width: 0;
+}
+
+.tw-dlib-card-title {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--t-text);
+}
+
+.tw-dlib-card-meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--t-text-muted);
+}
+
+.tw-dlib-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+}
+
+.tw-dlib-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--t-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tw-dlib-link:hover {
+  color: var(--t-text);
+}
+
+.tw-dlib-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tw-dlib-link:focus-visible,
+.tw-dlib-board:focus-visible {
+  outline: 2px solid var(--t-accent, currentColor);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tw-dlib-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--t-text-muted);
+  transition: transform var(--t-duration-fast, 0.15s);
+}
+
+.tw-dlib-chevron-open {
+  transform: rotate(90deg);
+}
+
+.tw-dlib-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tw-dlib-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--t-surface-hover);
+}
+
+.tw-dlib-agent-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.tw-dlib-agent-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t-text-muted);
+}
+
+.tw-dlib-agent-dot[data-state='busy'] {
+  background: var(--t-success, #2fbf71);
+  animation: tw-dlib-pulse 1.6s ease-in-out infinite;
+}
+
+.tw-dlib-agent-dot[data-state='needs-input'] {
+  background: var(--t-warning, #e8a33d);
+}
+
+.tw-dlib-agent-dot[data-state='ready-for-review'] {
+  background: var(--t-accent, #7c5cf0);
+}
+
+.tw-dlib-agent-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t-text);
+}
+
+.tw-dlib-agent-state {
+  font-size: 12px;
+  color: var(--t-text-muted);
+}
+
+.tw-dlib-agent-actions {
+  display: inline-flex;
+  margin-left: auto;
+  gap: 2px;
+}
+
+.tw-dlib-compose {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tw-dlib-compose .tw-dlib-filter {
+  flex: 1;
+  min-width: 0;
+}
+
+.tw-dlib-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--t-text-secondary);
+}
+
+.tw-dlib-note-error {
+  color: var(--t-danger, var(--t-text));
+}
+
+.tw-dlib-boards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tw-dlib-filter {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 6px;
+  background: var(--t-bg-surface, var(--t-surface));
+  color: var(--t-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tw-dlib-filter:focus-visible {
+  outline: 2px solid var(--t-accent, currentColor);
+  outline-offset: -1px;
+}
+
+.tw-dlib-board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.tw-dlib-board {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--t-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tw-dlib-board:hover {
+  background: var(--t-surface-hover);
+}
+
+.tw-dlib-root code {
+  font-size: 11.5px;
+  word-break: break-all;
+  color: var(--t-text-secondary);
+}
+
+.tw-dlib-island {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tw-dlib-island-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tw-dlib-island-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t-text);
+}
+
+.tw-dlib-island-meta {
+  flex: none;
+  font-size: 12px;
+  color: var(--t-text-muted);
+}
+
+.tw-dlib-island-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tw-rpane-design-badge {
+  flex: none;
+  cursor: help;
+  white-space: nowrap;
+}
+
+@keyframes tw-dlib-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-dlib-agent-dot[data-state='busy'] {
+    animation: none;
+  }
+  .tw-dlib-chevron {
+    transition: none;
+  }
+}
+
+.tw-dlib-link:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Compact cards, faces of the agents, board menus. */
+.tw-dlib-card-head {
+  align-items: center;
+}
+.tw-dlib-cover {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--t-border-subtle);
+  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--t-accent, #7c5cf0) 30%, transparent),
+    transparent
+  );
+  color: var(--t-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  cursor: pointer;
+}
+.tw-dlib-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.tw-dlib-card-titles {
+  flex: 1;
+}
+.tw-dlib-flag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--t-surface-hover);
+  color: var(--t-text-secondary);
+  font-size: 11px;
+  cursor: help;
+}
+.tw-dlib-faces {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+.tw-dlib-face,
+.tw-dlib-face-more {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  border: 2px solid var(--t-surface);
+  border-radius: 50%;
+  background: var(--t-surface-hover);
+  color: var(--t-text-secondary);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+.tw-dlib-face:first-child {
+  margin-left: 0;
+}
+.tw-dlib-face[data-state='busy'] {
+  box-shadow: 0 0 0 2px var(--t-success, #2fbf71);
+}
+.tw-dlib-face[data-state='needs-input'] {
+  box-shadow: 0 0 0 2px var(--t-warning, #e8a33d);
+}
+.tw-dlib-face[data-self] {
+  background: color-mix(in oklab, var(--t-accent, #7c5cf0) 35%, var(--t-surface-hover));
+  color: var(--t-text);
+}
+.tw-dlib-face-more {
+  font-size: 9px;
+}
+.tw-dlib-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--t-border-subtle);
+}
+.tw-dlib-board-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.tw-dlib-board-row .tw-dlib-board {
+  flex: 1;
+  min-width: 0;
+}
+.tw-dlib-board-row .tw-dlib-filter {
+  flex: 1;
+}
+.tw-dlib-board-more {
+  opacity: 0;
+}
+.tw-dlib-board-row:hover .tw-dlib-board-more,
+.tw-dlib-board-more:focus-visible,
+.tw-dlib-board-more[aria-expanded='true'] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .tw-dlib-board-more {
+    opacity: 1;
+  }
+}
+
+/* Board check */
+.tw-dlib-flag-error {
+  color: var(--t-danger);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+.tw-dcheck {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--t-border-subtle);
+}
+.tw-dcheck-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tw-dcheck-summary {
+  font-size: 12px;
+  color: var(--t-text-muted);
+}
+.tw-dcheck-progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--t-accent-purple-soft);
+}
+.tw-dcheck-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tw-dcheck-board {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--t-bg-surface);
+  border-left: 3px solid transparent;
+}
+.tw-dcheck-board[data-status='error'],
+.tw-dcheck-board[data-status='blank'] {
+  border-left-color: var(--t-danger);
+}
+.tw-dcheck-board[data-status='warning'] {
+  border-left-color: var(--t-status-warning);
+}
+.tw-dcheck-shots {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tw-dcheck-shot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--t-bg-canvas);
+  font-size: 10px;
+  color: var(--t-text-muted);
+}
+.tw-dcheck-shot[data-view='desktop'] {
+  width: 102px;
+}
+.tw-dcheck-shot[data-view='phone'] {
+  width: 30px;
+}
+.tw-dcheck-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.tw-dcheck-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tw-dcheck-title {
+  font-size: 13px;
+  color: var(--t-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-dcheck-status,
+.tw-dcheck-more {
+  font-size: 12px;
+  color: var(--t-text-muted);
+}
+.tw-dcheck-problem {
+  font-size: 11px;
+  color: var(--t-danger);
+  overflow-wrap: anywhere;
+}
+.tw-dcheck-toggle {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--t-accent-purple-soft);
+  cursor: pointer;
+}
+.tw-dcheck-toggle:hover {
+  color: var(--t-text);
+}
+
+/* A narrow panel (a phone): the title gets the row, agents and "Open" go under it. */
+@container tw-dlib (max-width: 520px) {
+  .tw-dlib-card-head {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .tw-dlib-card-titles {
+    flex: 1 1 calc(100% - 112px);
+    order: 1;
+  }
+  .tw-dlib-card-head > .tw-icon-button {
+    order: 2;
+  }
+  .tw-dlib-faces {
+    order: 3;
+  }
+  .tw-dlib-card-head > .tw-ui-button {
+    order: 4;
+    margin-left: auto;
+  }
+  .tw-dlib-card-meta {
+    white-space: normal;
+  }
+}
+
+/* Fields of the "New project" dialog. */
+.tw-design-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--t-border-input, var(--t-border));
+  border-radius: var(--t-radius-md, 10px);
+  background: var(--t-surface-input, var(--t-surface));
+  color: var(--t-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  transition:
+    border-color var(--t-duration-fast, 0.15s),
+    box-shadow var(--t-duration-fast, 0.15s);
+}
+.tw-design-input::placeholder {
+  color: var(--t-text-muted);
+}
+.tw-design-input:hover:not(:disabled) {
+  border-color: var(--t-border-hover, var(--t-border-strong));
+}
+.tw-design-input:focus-visible {
+  outline: none;
+  border-color: var(--t-accent-purple);
+  box-shadow: 0 0 0 3px var(--t-focus-ring);
+}
+.tw-design-input[aria-invalid='true'] {
+  border-color: var(--t-danger);
+}
+.tw-design-input:disabled {
+  opacity: 0.6;
+}
+.tw-design-textarea {
+  resize: vertical;
+  min-height: 56px;
+}

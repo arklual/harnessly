@@ -5,6 +5,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"strconv"
 	"strings"
 
@@ -557,9 +558,9 @@ func (r *mdRenderer) inline(n gast.Node) []*hnode {
 	case *gast.Image:
 		alt := r.plain(n)
 		if alt != "" {
-			return []*hnode{el("span", txt("[изображение скрыто: "+alt+"]")).attr("class", "tw-share-img")}
+			return []*hnode{el("span", txt(locale.Pick("[image hidden: ", "[изображение скрыто: ")+alt+"]")).attr("class", "tw-share-img")}
 		}
-		return []*hnode{el("span", txt("[изображение скрыто]")).attr("class", "tw-share-img")}
+		return []*hnode{el("span", txt(locale.Pick("[image hidden]", "[изображение скрыто]"))).attr("class", "tw-share-img")}
 	case *gast.RawHTML:
 		var b bytes.Buffer
 		for i := 0; i < n.Segments.Len(); i++ {

@@ -1,0 +1,23 @@
+{
+  "sideChat.sideChatExcerptChips.list": "Фрагменты к вопросу",
+  "sideChat.sideChatExcerptChips.excerpt": "Фрагмент",
+  "sideChat.sideChatExcerptChips.removeLabel": "Убрать фрагмент из вопроса",
+  "sideChat.sideChatExcerptChips.remove": "Убрать фрагмент",
+  "sideChat.sideChatMessage.answering": "Отвечает…",
+  "sideChat.sideChatMessage.stopped": "Остановлено",
+  "sideChat.sideChatMessage.retry": "Повторить",
+  "sideChat.sideChatView.note": "Спросите про эту сессию, не трогая основной разговор. Агент видит весь контекст, сюда ничего не добавляется в сессию.",
+  "sideChat.sideChatView.noteShort": "Основной разговор не меняется.",
+  "sideChat.sideChatView.unsupported": "Side chat пока только для Claude: в этой вкладке работает другой агент.",
+  "sideChat.sideChatView.session": "Сессия: {name}",
+  "sideChat.sideChatView.clearLabel": "Очистить side chat",
+  "sideChat.sideChatView.clear": "Очистить",
+  "sideChat.sideChatView.ephemeral": "Разговор временный и пропадает, когда вы закрываете страницу.",
+  "sideChat.sideChatView.log": "Вопросы и ответы",
+  "sideChat.sideChatView.fieldLabel": "Быстрый вопрос по сессии",
+  "sideChat.sideChatView.placeholder": "Быстрый вопрос…",
+  "sideChat.sideChatView.stopLabel": "Остановить ответ",
+  "sideChat.sideChatView.stop": "Остановить",
+  "sideChat.sideChatView.sendLabel": "Отправить вопрос",
+  "sideChat.sideChatView.send": "Отправить (Enter)"
+}

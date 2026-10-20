@@ -1,0 +1,225 @@
+/* Our dialog, popover, command and button primitives; colours come from the hl tokens. */
+.hl-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.hl-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(0 0 0 / 0.45);
+  transition: opacity 150ms;
+}
+.hl-dialog-backdrop[data-starting-style],
+.hl-dialog-backdrop[data-ending-style] {
+  opacity: 0;
+}
+.hl-dialog {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(32rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 14px;
+  background: var(--t-surface);
+  color: var(--t-text);
+  border: 1px solid var(--t-border);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.25);
+  transition:
+    opacity 150ms,
+    transform 150ms;
+}
+.hl-dialog[data-starting-style],
+.hl-dialog[data-ending-style] {
+  opacity: 0;
+  transform: translate(-50%, -48%) scale(0.98);
+}
+.hl-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: inherit;
+  opacity: 0.6;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.hl-dialog-close:hover {
+  opacity: 1;
+  background: var(--t-surface-hover);
+}
+.hl-dialog-header {
+  display: grid;
+  gap: 0.375rem;
+}
+.hl-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.hl-dialog-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.hl-dialog-description {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.75;
+}
+
+.hl-popover-positioner {
+  z-index: 50;
+}
+.hl-popover {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  outline: none;
+  background: var(--t-surface);
+  color: var(--t-text);
+  border: 1px solid var(--t-border);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.18);
+  transition:
+    opacity 120ms,
+    transform 120ms;
+  transform-origin: var(--transform-origin);
+}
+.hl-popover[data-starting-style],
+.hl-popover[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+.hl-command-dialog {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  width: min(40rem, calc(100vw - 2rem));
+}
+.hl-command {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.hl-command-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.875rem;
+  border-bottom: 1px solid var(--t-border);
+  opacity: 0.95;
+}
+.hl-command-input input {
+  flex: 1;
+  height: 2.75rem;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.hl-command-list {
+  max-height: min(60dvh, 26rem);
+  overflow: auto;
+  padding: 0.375rem;
+}
+.hl-command-empty {
+  padding: 1.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  opacity: 0.6;
+}
+.hl-command-group [cmdk-group-heading] {
+  padding: 0.5rem 0.5rem 0.25rem;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+.hl-command-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+.hl-command-item[data-selected='true'] {
+  background: var(--t-surface-hover);
+}
+.hl-command-item[data-disabled='true'] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.hl-command-shortcut {
+  margin-left: auto;
+  font-size: 0.75rem;
+  opacity: 0.55;
+}
+
+.hl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2.25rem;
+  padding: 0 0.875rem;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background 120ms,
+    opacity 120ms;
+  background: var(--t-text);
+  color: var(--t-surface);
+}
+.hl-btn[data-variant='outline'] {
+  background: transparent;
+  color: inherit;
+  border-color: var(--t-border);
+}
+.hl-btn[data-variant='ghost'] {
+  background: transparent;
+  color: inherit;
+}
+.hl-btn[data-variant='secondary'] {
+  background: var(--t-surface-hover);
+  color: inherit;
+}
+.hl-btn[data-variant='destructive'] {
+  background: #dc2626;
+  color: #fff;
+}
+.hl-btn[data-size='sm'] {
+  height: 2rem;
+  padding: 0 0.625rem;
+}
+.hl-btn[data-size='icon'] {
+  width: 2.25rem;
+  padding: 0;
+}
+.hl-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

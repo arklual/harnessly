@@ -9,12 +9,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Errors of a folder check, as the composer shows them.
-const (
-	ErrOutside  = "Каталог вне рабочей папки"
-	ErrNotFound = "Каталог не найден"
+var (
+	ErrOutside  = locale.T("The folder is outside the workspace", "Каталог вне рабочей папки")
+	ErrNotFound = locale.T("Folder not found", "Каталог не найден")
 )
 
 const cacheTTL = time.Minute
@@ -78,18 +80,18 @@ func (c *Commands) ResolveCwd(cwd string) (dir, root, errText string) {
 		return top, top, ""
 	}
 	if !filepath.IsAbs(cwd) || utf16Len(cwd) > 4096 || strings.ContainsRune(cwd, 0) {
-		return "", "", ErrOutside
+		return "", "", ErrOutside.String()
 	}
 	real, ok := realpath(cwd)
 	if !ok {
-		return "", "", ErrNotFound
+		return "", "", ErrNotFound.String()
 	}
 	for _, candidate := range append([]string{top}, workspaceDirs(c.cfg.WorkspacesFile)...) {
 		if rc, ok := realpath(candidate); ok && isInside(rc, real) {
 			return real, rc, ""
 		}
 	}
-	return "", "", ErrOutside
+	return "", "", ErrOutside.String()
 }
 
 func (c *Commands) watched(provider, cwd, root string) []string {
@@ -132,7 +134,7 @@ func (c *Commands) Get(provider, cwd, root string) Result {
 		Truncated:   b.truncated,
 	}
 	if b.truncated {
-		cat.Warnings = append(append([]string{}, b.warnings...), tooManyWarning)
+		cat.Warnings = append(append([]string{}, b.warnings...), tooManyWarning.String())
 	}
 	for _, it := range cat.Items {
 		cat.Counts.add(it.Source)

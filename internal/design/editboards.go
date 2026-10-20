@@ -12,6 +12,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Managing the boards of a design from the panel: rename, reorder, duplicate, remove, and the design's own title.
@@ -45,7 +46,7 @@ func cleanBoardTitle(v *string) (string, error) {
 		t = jscompat.Trim(spaceRun.ReplaceAllString(boardTitleControls.ReplaceAllString(*v, " "), " "))
 	}
 	if t == "" {
-		return "", editErr("Название не может быть пустым")
+		return "", editErr(locale.Pick("The title cannot be empty", "Название не может быть пустым"))
 	}
 	return jscompat.Slice(t, LimitTitle), nil
 }
@@ -89,7 +90,7 @@ func (l *Library) writeMeta(id string, meta *jsvalue.Object) error {
 func (l *Library) copyName(dir, file string) (string, error) {
 	stem := strings.TrimSuffix(file, dcSuffix)
 	for n := 1; n < 100; n++ {
-		name := stem + " копия"
+		name := stem + locale.Pick(" copy", " копия")
 		if n > 1 {
 			name += " " + strconv.Itoa(n)
 		}
@@ -98,7 +99,7 @@ func (l *Library) copyName(dir, file string) (string, error) {
 			return name, nil
 		}
 	}
-	return "", editErr("Слишком много копий этой доски")
+	return "", editErr(locale.Pick("Too many copies of this board", "Слишком много копий этой доски"))
 }
 
 // boardFile is the board's own file inside the project, through realpath: a link to a file elsewhere is never copied
@@ -110,7 +111,7 @@ func (l *Library) boardFile(id, file string) (string, error) {
 			return real, nil
 		}
 	}
-	return "", editErr("Файл доски не найден в проекте")
+	return "", editErr(locale.Pick("The board file was not found in the project", "Файл доски не найден в проекте"))
 }
 
 func copyExclusive(from, to string) error {
@@ -154,11 +155,11 @@ func (l *Library) EditBoards(id string, e BoardEdit) ([]Board, error) {
 	// What this edit wrote is read back at once, not when the watcher hears of it.
 	defer l.listing.invalidatePath(id)
 	if !IsLibraryID(id) {
-		return nil, editErr("Доски можно менять только у макетов библиотеки")
+		return nil, editErr(locale.Pick("Boards can only be changed in library designs", "Доски можно менять только у макетов библиотеки"))
 	}
 	a := l.ReadArtifact(id)
 	if a == nil {
-		return nil, editErr("Макета больше нет")
+		return nil, editErr(locale.Pick("The design is gone", "Макета больше нет"))
 	}
 	meta := l.readMeta(id)
 	boards := append([]Board{}, a.Boards...)
@@ -179,7 +180,7 @@ func (l *Library) EditBoards(id string, e BoardEdit) ([]Board, error) {
 		}
 	}
 	if at < 0 {
-		return nil, editErr("Такой доски нет")
+		return nil, editErr(locale.Pick("No such board", "Такой доски нет"))
 	}
 	board := boards[at]
 	switch e.Action {
@@ -206,7 +207,7 @@ func (l *Library) EditBoards(id string, e BoardEdit) ([]Board, error) {
 		boards = append(boards[:to], append([]Board{moved}, boards[to:]...)...)
 	case "duplicate":
 		if !IsBoardFile(board.Path) {
-			return nil, editErr("Копировать можно доску-файл; экран админки собран из общего бандла")
+			return nil, editErr(locale.Pick("Only a board file can be copied; the admin screen is built from a shared bundle", "Копировать можно доску-файл; экран админки собран из общего бандла"))
 		}
 		name, err := l.copyName(l.ProjectDir(id), board.Path)
 		if err != nil {
@@ -219,11 +220,11 @@ func (l *Library) EditBoards(id string, e BoardEdit) ([]Board, error) {
 		if err := copyExclusive(src, filepath.Join(l.ProjectDir(id), name)); err != nil {
 			return nil, err
 		}
-		dup := Board{Title: board.Title + " копия", Path: name, W: board.W, H: board.H}
+		dup := Board{Title: board.Title + locale.Pick(" copy", " копия"), Path: name, W: board.W, H: board.H}
 		boards = append(boards[:at+1], append([]Board{dup}, boards[at+1:]...)...)
 	case "remove":
 		if len(boards) == 1 {
-			return nil, editErr("Последнюю доску не удалить: удалите макет целиком")
+			return nil, editErr(locale.Pick("The last board cannot be removed: remove the whole design", "Последнюю доску не удалить: удалите макет целиком"))
 		}
 		boards = append(boards[:at], boards[at+1:]...)
 		still := false
@@ -236,7 +237,7 @@ func (l *Library) EditBoards(id string, e BoardEdit) ([]Board, error) {
 			}
 		}
 	default:
-		return nil, editErr("Неизвестное действие")
+		return nil, editErr(locale.Pick("Unknown action", "Неизвестное действие"))
 	}
 	meta.Set("boards", boardsValue(boards))
 	return boards, l.writeMeta(id, meta)

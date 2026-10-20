@@ -16,6 +16,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
@@ -358,7 +359,7 @@ func clickThrough(cdp *cdpPipe, session string, errs *shotErrors) {
 		time.Sleep(clickSettle)
 		errs.mu.Lock()
 		for at := before; at < len(errs.errs); at++ {
-			errs.errs[at] = line("клик «" + jscompat.String(label) + "»: " + errs.errs[at])
+			errs.errs[at] = line(locale.Pick("click \""+jscompat.String(label)+"\": ", "клик «"+jscompat.String(label)+"»: ") + errs.errs[at])
 		}
 		errs.mu.Unlock()
 	}
@@ -618,14 +619,14 @@ func (l *Library) runCheck(report *CheckReport, all []Board, targets []checkTarg
 	bin := l.findChrome()
 	if bin == "" {
 		s.mu.Lock()
-		report.Failure = strp("На машине нет Chrome: поставьте google-chrome или задайте RUNTIME_DESIGN_CHROME")
+		report.Failure = strp(locale.Pick("Chrome is not installed on this machine: install google-chrome or set RUNTIME_DESIGN_CHROME", "На машине нет Chrome: поставьте google-chrome или задайте RUNTIME_DESIGN_CHROME"))
 		s.mu.Unlock()
 		finish()
 		return
 	}
 	fatal := func(err error) {
 		s.mu.Lock()
-		report.Failure = strp("Проверка оборвалась: " + line(err.Error()))
+		report.Failure = strp(locale.Pick("The check was cut short: ", "Проверка оборвалась: ") + line(err.Error()))
 		s.mu.Unlock()
 	}
 	base, err := libraryBase(l)
