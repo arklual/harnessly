@@ -296,3 +296,47 @@ func TestURI(t *testing.T) {
 		}
 	}
 }
+
+// A deployment with separate servers for documents and boards, as an open install has: each link is accepted on its own
+// server only, a plain-http server on this machine counts, and the board's key stays in the target.
+func TestSeparateDocumentAndBoardServers(t *testing.T) {
+	split := Targets{ArtifactsHost: "docs.example.com", BoardsHost: "boards.example.com", ReaderPath: "/docs/"}
+	for _, c := range []struct {
+		target string
+		want   string
+	}{
+		{"https://docs.example.com/a/plan-x1", "/docs/plan-x1"},
+		{"https://boards.example.com/b/arch?k=abc123", "https://boards.example.com/b/arch?k=abc123"},
+	} {
+		cmd, refusal := split.Parse(open("artifacts", c.target))
+		if refusal != "" || cmd.Target != c.want {
+			t.Errorf("%s: %+v %q", c.target, cmd, refusal)
+		}
+	}
+	for _, bad := range []string{
+		"https://boards.example.com/a/plan-x1",     // a document path on the boards server
+		"https://docs.example.com/b/arch?k=abc123", // a board path on the documents server
+		"https://evil.example.com/a/plan-x1",       // another server
+		"http://docs.example.com/a/plan-x1",        // plain http to a remote server
+		"https://docs.example.com:8443/a/plan-x1",  // another port
+		"https://user@docs.example.com/a/plan-x1",  // with a login
+	} {
+		if _, refusal := split.Parse(open("artifacts", bad)); refusal == "" {
+			t.Errorf("%s should be refused", bad)
+		}
+	}
+	if _, refusal := split.Parse(open("artifacts", "https://x.example.org/a/p")); !strings.Contains(refusal, "docs.example.com or boards.example.com") {
+		t.Errorf("the hint names the servers: %q", refusal)
+	}
+
+	local := Targets{ArtifactsHost: "localhost:8082", BoardsHost: "localhost:8081", ReaderPath: "/docs/"}
+	if cmd, refusal := local.Parse(open("artifacts", "http://localhost:8082/a/plan-x1")); refusal != "" || cmd.Target != "/docs/plan-x1" {
+		t.Errorf("local document: %+v %q", cmd, refusal)
+	}
+	if cmd, refusal := local.Parse(open("artifacts", "http://localhost:8081/b/arch?k=k1")); refusal != "" || cmd.Target != "http://localhost:8081/b/arch?k=k1" {
+		t.Errorf("local board: %+v %q", cmd, refusal)
+	}
+	if _, refusal := local.Parse(open("artifacts", "http://localhost:8082/b/arch?k=k1")); refusal == "" {
+		t.Errorf("a board on the documents port is refused")
+	}
+}

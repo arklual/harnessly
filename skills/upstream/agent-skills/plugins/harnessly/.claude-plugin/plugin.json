@@ -1,0 +1,17 @@
+{
+  "name": "harnessly",
+  "version": "0.1.0",
+  "description": "Skill for coding agents running in harnessly: show documents, boards, files and dev servers in the person's right pane, and hand work to another agent in another tab.",
+  "homepage": "https://github.com/ly-solutions/harnessly",
+  "repository": "https://github.com/ly-solutions/harnessly",
+  "license": "Apache-2.0",
+  "keywords": [
+    "workspace",
+    "tabs",
+    "agents"
+  ],
+  "author": {
+    "name": "Ly Solutions",
+    "url": "https://github.com/ly-solutions"
+  }
+}

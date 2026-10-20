@@ -169,3 +169,29 @@ func TestPromptFiles(t *testing.T) {
 		t.Fatalf("workspace prompt first: %q", got)
 	}
 }
+
+// The workspace skills ride in a plugin folder loaded with --plugin-dir, on a fresh start and on a resume; no folder, no flag.
+func TestPluginDirFlag(t *testing.T) {
+	c := testConfig(t)
+	base := "--settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json"
+	if got, _ := c.Flags("", nil, nil); got != base {
+		t.Fatalf("no plugin: %q", got)
+	}
+	dir := "/data/it's skills"
+	c.PluginDir = func() string { return dir }
+	want := base + ` --plugin-dir '/data/it'\''s skills'`
+	if got, _ := c.Flags("", nil, nil); got != want {
+		t.Fatalf("%q", got)
+	}
+	if got, _ := c.ResumeCommand(session, "", nil); !strings.Contains(got, " --resume "+session+" "+want) {
+		t.Fatalf("resume: %q", got)
+	}
+	if got, _ := c.Flags("work", launch("opus", ""), nil); !strings.HasPrefix(got, want+" --append-system-prompt-file /tmp/prompt.md") || !strings.HasSuffix(got, "--model 'opus'") {
+		t.Fatalf("order: %q", got)
+	}
+	// A plugin folder that is not there yet adds nothing.
+	dir = ""
+	if got, _ := c.Flags("", nil, nil); got != base {
+		t.Fatalf("empty: %q", got)
+	}
+}

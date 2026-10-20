@@ -31,7 +31,7 @@ import (
 const fakeClaude = `#!/bin/bash
 if [ "$1" = "--version" ]; then echo "2.1.99 (Claude Code)"; exit 0; fi
 echo "$*" >> "$HOME/claude-calls.log"
-env | grep -E '^(BOARDS|ARTIFACTS|RUNTIME)_' | sort >> "$HOME/claude-env.log"
+env | grep -E '^(BOARDS|ARTIFACTS|RUNTIME|HARNESSLY)_' | sort >> "$HOME/claude-env.log"
 settings=""; sid=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -378,6 +378,27 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 	if !strings.Contains(read(filepath.Join(home, "claude-calls.log")), "--append-system-prompt-file "+filepath.Join(data, "workspaces", ws.ID, "claude-prompt.md")) {
 		t.Fatal("claude started without its workspace prompt")
 	}
+	// The workspace's skills: a Claude plugin loaded with --plugin-dir, Codex user skills, and the launchers on the PATH.
+	if !strings.Contains(read(filepath.Join(home, "claude-calls.log")), "--plugin-dir "+filepath.Join(data, "agent-skills", "claude")) {
+		t.Fatal("claude started without the skills plugin")
+	}
+	for _, f := range []string{
+		filepath.Join(data, "agent-skills", "claude", ".claude-plugin", "plugin.json"),
+		filepath.Join(data, "agent-skills", "claude", "skills", "harnessly", "SKILL.md"),
+		filepath.Join(data, "agent-skills", "claude", "skills", "boards", "SKILL.md"),
+		filepath.Join(data, "agent-skills", "claude", "skills", "artifacts", "SKILL.md"),
+		filepath.Join(home, ".codex", "skills", "harnessly", "harnessly", "SKILL.md"),
+		filepath.Join(home, ".codex", "skills", "harnessly", "boards", "scripts", "boards"),
+		filepath.Join(home, ".codex", "skills", "harnessly", "artifacts", "SKILL.md"),
+		filepath.Join(home, ".local", "bin", "boards"), filepath.Join(home, ".local", "bin", "artifacts"),
+	} {
+		if _, err := os.Stat(f); err != nil {
+			t.Fatalf("skills: %v", err)
+		}
+	}
+	if p := read(filepath.Join(data, "workspaces", ws.ID, "claude-prompt.md")); !strings.Contains(p, "Acme platform context") {
+		t.Fatalf("the prompts file the deployment names is used, not the built-in one: %.80q", p)
+	}
 	var sid string
 	waitFor("the turn to end through the hooks", 40*time.Second, func() bool {
 		s := status(tab)
@@ -393,7 +414,7 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 
 	// --- the integrations: the agent's environment, and what the page asks the runtime for ------------------------------
 	wantEnv := strings.Join([]string{"ARTIFACTS_AUTHOR=Ada (agent)", "ARTIFACTS_SESSION=" + tab, "ARTIFACTS_TOKEN=editor-token",
-		"ARTIFACTS_URL=" + services.URL, "BOARDS_TOKEN=agent-token", "BOARDS_URL=" + services.URL}, "\n") + "\n"
+		"ARTIFACTS_URL=" + services.URL, "BOARDS_TOKEN=agent-token", "BOARDS_URL=" + services.URL, "HARNESSLY_DATA_DIR=" + data}, "\n") + "\n"
 	if got := read(filepath.Join(home, "claude-env.log")); got != wantEnv {
 		t.Fatalf("the agent's environment:\n%s\nwant\n%s", got, wantEnv)
 	}

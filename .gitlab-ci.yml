@@ -1,5 +1,5 @@
 # Verify on merge requests and main; on a version tag, build the binaries and publish them to this project's
-# generic package registry as agent/<tag>/<binary>-<os>-<arch> (binary: agent, runtime) with a SHA256SUMS file.
+# generic package registry as agent/<tag>/<binary>-<os>-<arch> (binary: agent, harnessly, runtime) with a SHA256SUMS file.
 # The runtime is built with the web page compiled in (the webui tag); in front of a previous runtime (gate mode) it
 # serves the page only with RUNTIME_WEB=on, so machines that run it that way see no change.
 # RUNNER_TAG is a project CI/CD variable: which runners take the jobs is the deployment's business, not the code's.
@@ -84,15 +84,15 @@ build:
     - |
       for target in linux/amd64 linux/arm64 darwin/arm64; do
         os=${target%/*}; arch=${target#*/}
-        for bin in agent runtime; do
+        for bin in agent harnessly runtime; do
           tags=""
           [ "$bin" = runtime ] && tags="-tags webui"
           CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath $tags \
-            -ldflags "-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${CI_COMMIT_TAG#v}" \
+            -ldflags "-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${CI_COMMIT_TAG#v} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${CI_COMMIT_TAG#v}" \
             -o "dist/$bin-$os-$arch" ./cmd/$bin
         done
       done
-    - (cd dist && sha256sum agent-* runtime-* > SHA256SUMS)
+    - (cd dist && sha256sum agent-* harnessly-* runtime-* > SHA256SUMS)
     - |
       for f in dist/*; do
         curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file "$f" \

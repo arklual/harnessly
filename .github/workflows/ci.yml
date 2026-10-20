@@ -118,6 +118,14 @@ jobs:
           curl -fsS 127.0.0.1:8022/ | grep -q '<title>harnessly'
           docker rm -f hs
 
+  # The vendored agent skills (skills/upstream) must be the files of the commits pinned in skills/SOURCES.
+  skills:
+    name: vendored skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: make skills-check
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:

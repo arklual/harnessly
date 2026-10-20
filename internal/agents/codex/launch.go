@@ -76,6 +76,11 @@ type LaunchConfig struct {
 	WorkspacePrompt func(workspaceID string) string
 	// SkipPermissions adds --yolo when it says so.
 	SkipPermissions func() bool
+	// PassServiceEnv lets the commands Codex runs see the variables the workspace's services need (BOARDS_TOKEN,
+	// ARTIFACTS_TOKEN): by default Codex drops every variable whose name has KEY, SECRET or TOKEN in it. ShellEnvExclude
+	// are variables that still stay out (the runtime's own CLI token).
+	PassServiceEnv  bool
+	ShellEnvExclude []string
 }
 
 func invalidID(id string) error { return errors.New("Invalid codex session ID format: " + id) }
@@ -109,6 +114,7 @@ func (c LaunchConfig) RuntimeArgs(workspaceID, resumeID string, launch *agents.L
 	args = append(args, MCPArgs(c.MCP)...)
 	args = append(args, "--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false")
 	args = append(args, devArgs...)
+	args = append(args, c.shellEnvArgs()...)
 	if c.SkipPermissions != nil && c.SkipPermissions() {
 		args = append(args, "--yolo")
 	}
@@ -117,6 +123,21 @@ func (c LaunchConfig) RuntimeArgs(workspaceID, resumeID string, launch *agents.L
 		return nil, false, err
 	}
 	return append(args, launchArgs...), configParseError, nil
+}
+
+// shellEnvArgs are the two flags that keep Codex from dropping the services' tokens from its commands' environment.
+func (c LaunchConfig) shellEnvArgs() []string {
+	if !c.PassServiceEnv {
+		return nil
+	}
+	exclude := make([]string, 0, len(c.ShellEnvExclude))
+	for _, name := range c.ShellEnvExclude {
+		if name != "" {
+			exclude = append(exclude, TOMLBasicString(name))
+		}
+	}
+	return []string{"-c", "shell_environment_policy.ignore_default_excludes=true",
+		"-c", "shell_environment_policy.exclude=[" + strings.Join(exclude, ", ") + "]"}
 }
 
 // LauncherLine is what is typed into the pane: `node '<launcher>' [--workspace-id …] [--resume-session-id …]

@@ -1,0 +1,10 @@
+cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  ./agent-skills/LICENSE
+fed2fa9f5d1629c90259d31d21df949318deea06fb23a9b1b403382bd4164690  ./agent-skills/plugins/boards/.claude-plugin/plugin.json
+14ea77bd7157e3453d73bf62fabcba03644637fe8c8d9a32ed139421889481d7  ./agent-skills/plugins/boards/skills/boards/SKILL.md
+1d77b9e33590fec868700eb7b7f81740f33a4e5d02f2dcc21b656611c4396de1  ./agent-skills/plugins/boards/skills/boards/scripts/boards
+d6276c0b307e6a7050a677ca964789e5bac1bd4206d02aa2cf608ff7ad9b157a  ./agent-skills/plugins/harnessly/.claude-plugin/plugin.json
+f79dbe4d2e87ccc87954e3fae171b97e76cfebea401ad740a3ec11642e514a70  ./agent-skills/plugins/harnessly/skills/harnessly/SKILL.md
+cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  ./artifacts/LICENSE
+e5470e80937dc5adb58f2ae034b15f278215182415187c84ae8b61c910bce908  ./artifacts/bin/artifacts.mjs
+918304211ab595c15e3e3a69cf231321a59b037c7fe2a1fd6b19151214ea96af  ./artifacts/skills/artifacts/SKILL.md
+940538f78a3e9f911c42b8656553c348133574cab02177a8fd9ca47872724333  ./artifacts/src/cli.mjs

@@ -1,4 +1,4 @@
-# A pushed version tag (v1.2.3) builds agent and runtime (with the web page compiled in) for linux and darwin, amd64
+# A pushed version tag (v1.2.3) builds agent, harnessly and runtime (with the web page compiled in) for linux and darwin, amd64
 # and arm64, and publishes them with checksums and a changelog as a GitHub release.
 name: release
 

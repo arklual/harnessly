@@ -1,0 +1,17 @@
+{
+  "name": "boards",
+  "version": "0.1.0",
+  "description": "Skill for coding agents: read, draw and edit Excalidraw whiteboards on a boards server as text.",
+  "homepage": "https://github.com/ly-solutions/boards",
+  "repository": "https://github.com/ly-solutions/boards",
+  "license": "Apache-2.0",
+  "keywords": [
+    "whiteboard",
+    "excalidraw",
+    "diagrams"
+  ],
+  "author": {
+    "name": "Ly Solutions",
+    "url": "https://github.com/ly-solutions"
+  }
+}

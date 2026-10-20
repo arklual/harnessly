@@ -76,7 +76,7 @@ it stays with the previous runtime.
 | `RUNTIME_TMUX_SOCKET`, `RUNTIME_TMUX_LEGACY_SOCKET` | the runtime's tmux servers (`-L`; default `harnessly`, no legacy one) |
 | `RUNTIME_SESSION_PREFIX`, `RUNTIME_LEGACY_SESSION_PREFIX` | tab session name prefixes (default `hs-`); a legacy one may live on either server |
 | `RUNTIME_TMUX_CONF` | the tmux.conf a new tmux server reads and is re-read after each new session (set but empty: tmux defaults; unset: none in front of the previous runtime, and standalone `tmux.conf` in the data directory, written with the status bar off when missing) |
-| `RUNTIME_PANE_BIN_DIR` | folder put first on a new pane shell's `PATH` (pane-side wrappers) |
+| `RUNTIME_PANE_BIN_DIR` | folder put first on a new pane shell's `PATH` (pane-side wrappers; default `RUNTIME_AGENT_BIN_DIR` while the [agent skills](integrations.md#agent-skills) are on). Debian-style login shells rebuild `PATH` from `/etc/profile`, which keeps `~/.local/bin` when it exists but drops this folder |
 | `RUNTIME_AGENT_NICE` | niceness of a tmux server the runtime starts, 0–19, `0` = off (default 10) |
 | `RUNTIME_TAB_META_KEY` | the layout tab field holding the platform's own metadata (launch choice, mode) |
 | `RUNTIME_CLAUDE_LAUNCHER` | the managed Claude launcher (an absolute path) typed instead of `claude`; unset types `claude` |
@@ -201,7 +201,7 @@ These apply when `RUNTIME_GATE_UPSTREAM` is empty and the runtime does the start
 | `RUNTIME_LOCK_FILE` | the single-instance lock, a path or a name in the data directory (default `runtime.lock`) |
 | `RUNTIME_MCP_ALLOW` | the permissions the hook settings grant, comma-separated (default `mcp__$RUNTIME_MCP_SERVER`) |
 | `RUNTIME_PROMPT_EDITOR_TITLE` | the name the prompt editor script's comment gives it |
-| `RUNTIME_WORKSPACE_PROMPTS_FILE` | the agents' per-workspace prompts, `{"claude": …, "codex": …}` with `{{workspaceId}}` (default the release's `runtime-static/workspace-prompts.json`; none: no prompts) |
+| `RUNTIME_WORKSPACE_PROMPTS_FILE` | the agents' per-workspace prompts, `{"claude": …, "codex": …}` with `{{workspaceId}}` (default the release's `runtime-static/workspace-prompts.json`; none: the built-in prompts, which tell both agents about the `harnessly` command and, when configured, the `artifacts` and `boards` commands) |
 | `RUNTIME_CODEX_LAUNCHER_FILE` | the Codex launcher script as the platform ships it (default the release's `runtime-static/codex-launcher.js`; none: a neutral one) |
 | `RUNTIME_TELEMETRY_URL`, `RUNTIME_TELEMETRY_KEY` | a PostHog-compatible batch endpoint and project key a released runtime reports corrected tab states to (unset: logged only) |
 | `RUNTIME_TELEMETRY_PROPERTIES`, `RUNTIME_TELEMETRY_ANONYMOUS_ID`, `RUNTIME_TELEMETRY_MISMATCH_EVENT` | the properties every event starts with (a JSON object), who the events are about without an owner e-mail (default `runtime`), the event's name (default `platform_status_mismatch`) |
@@ -250,6 +250,17 @@ address is set, and only tabs this runtime starts get the variables.
 | `RUNTIME_ARTIFACTS_SHARE_TOKEN` | a sharer token for the reader's public-link switch (default `RUNTIME_ARTIFACTS_TOKEN`) |
 | `RUNTIME_ARTIFACTS_AUTHOR` | who agents publish as (`ARTIFACTS_AUTHOR`); default `<RUNTIME_OWNER_NAME> (agent)` when that is set |
 | `RUNTIME_OWNER_NAME` | the person's display name, for board hand-offs and the default author; the hand-off's e-mail is the session's, else `RUNTIME_OWNER_EMAIL` |
+
+#### Agent skills
+
+A standalone runtime installs the [agent skills](integrations.md#agent-skills) for Claude Code and Codex when it starts:
+the `harnessly` skill always, `boards` with `RUNTIME_BOARDS_URL`, `artifacts` with `RUNTIME_ARTIFACTS_URL`.
+
+| Variable | Meaning |
+| --- | --- |
+| `RUNTIME_AGENT_SKILLS` | `off` (also `0`, `false`, `no`, `none`) installs nothing, loads no skills plugin into Claude and adds no `PATH` folder; anything else, or unset, installs them |
+| `RUNTIME_AGENT_BIN_DIR` | where the `artifacts`, `boards` and `harnessly` launchers go (default `~/.local/bin`, which login shells put on the `PATH` when it exists) |
+| `CODEX_HOME` | Codex's folder (default `~/.codex`); its user skills go to `$CODEX_HOME/skills/harnessly/` |
 
 ### GitHub
 

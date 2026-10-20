@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	_ "embed"
 	"math"
 	"net/http"
 	"net/netip"
@@ -134,8 +135,12 @@ func stateRoutes(d deps, store *settings.Store, validate func(provider string, m
 		route("/api/react-scan", reactScan()),
 	)
 	guide := releaseStatic("RUNTIME_API_GUIDE_FILE", "api-guide.md")
+	// With no guide file a standalone runtime answers with the built-in one.
+	builtIn := d.Old == nil || d.Old.Upstream == ""
 	routes = append(routes, gate.JSONRoute{Slice: settings.Slice,
-		Match: func(r *http.Request) bool { return guide != "" && pathIs(r, "/api/cli/api-guide") && fileExists(guide) },
+		Match: func(r *http.Request) bool {
+			return pathIs(r, "/api/cli/api-guide") && ((guide != "" && fileExists(guide)) || builtIn)
+		},
 		Compute: open(func(r *http.Request, _ any) (int, any, http.Header) {
 			if r.Method != http.MethodGet {
 				return stateAnswer(r, http.StatusMethodNotAllowed, errBody("Method not allowed"), http.Header{"Allow": {"GET"}})
@@ -143,9 +148,12 @@ func stateRoutes(d deps, store *settings.Store, validate func(provider string, m
 			if !d.Old.CLITokenOK(r) {
 				return stateAnswer(r, http.StatusForbidden, errBody("Forbidden"), nil)
 			}
-			text, err := os.ReadFile(guide)
-			if err != nil {
-				return http.StatusInternalServerError, handlerFailed, nil
+			text := []byte(builtInAPIGuide)
+			if guide != "" && fileExists(guide) {
+				var err error
+				if text, err = os.ReadFile(guide); err != nil {
+					return http.StatusInternalServerError, handlerFailed, nil
+				}
 			}
 			return settings.AnswerRaw(r, 200, "text/markdown; charset=utf-8", text, nil)
 		})})
@@ -836,3 +844,8 @@ func fileExists(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && st.Mode().IsRegular()
 }
+
+// builtInAPIGuide is what /api/cli/api-guide answers when the deployment names no guide file.
+//
+//go:embed api-guide.md
+var builtInAPIGuide string

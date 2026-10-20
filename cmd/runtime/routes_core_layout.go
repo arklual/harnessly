@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/subtle"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/status"
@@ -42,10 +44,14 @@ func panelTargets() panel.Targets {
 		StandDomain:  os.Getenv("RUNTIME_STAND_DOMAIN"),
 		PortalHost:   os.Getenv("RUNTIME_DOCS_HOST"),
 		ReaderHost:   os.Getenv("RUNTIME_PLATFORM_HOST"),
-		ReaderPath:   env("RUNTIME_DOCS_READER_PATH", "/agents/docs/"),
+		ReaderPath:   env("RUNTIME_DOCS_READER_PATH", appBase()+"/docs/"),
 		GitLabHosts:  splitList(os.Getenv("RUNTIME_GITLAB_HOSTS")),
 		TaskExamples: os.Getenv("RUNTIME_TASK_EXAMPLES"),
 	}
+	// The servers of an open install: documents and boards each on their own address.
+	integ := integrations.FromEnv(os.Getenv)
+	t.ArtifactsHost = hostOf(integ.ArtifactsURL)
+	t.BoardsHost = hostOf(integ.BoardsURL)
 	if re := os.Getenv("RUNTIME_TASK_KEY_RE"); re != "" {
 		if compiled, err := regexp.Compile(re); err == nil {
 			t.TaskKey = compiled
@@ -54,6 +60,15 @@ func panelTargets() panel.Targets {
 		}
 	}
 	return t
+}
+
+// hostOf is the host[:port] of an origin, lower-cased; "" for none.
+func hostOf(origin string) string {
+	u, err := url.Parse(origin)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Host)
 }
 
 // coreSyncHook is the sync socket as the routes use it.

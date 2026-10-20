@@ -133,9 +133,14 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	home, _ := os.UserHomeDir()
 	nice, niceSet := os.LookupEnv("RUNTIME_AGENT_NICE")
 	integ := integrations.FromEnv(os.Getenv)
-	var paneEnv func(string) []string
-	if integ.Enabled() {
-		paneEnv = integ.AgentEnv
+	// Every pane learns where the runtime keeps its files (the harnessly command finds the runtime there); the services'
+	// addresses and tokens come with them when boards or artifacts are configured.
+	paneEnv := func(conversation string) []string {
+		env := []string{"HARNESSLY_DATA_DIR=" + cfg.DataDir}
+		if integ.Enabled() {
+			env = append(env, integ.AgentEnv(conversation)...)
+		}
+		return env
 	}
 	tm := tmux.NewConfig(tmux.Config{
 		Names: tmux.Names{
@@ -145,7 +150,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			LegacyPrefix: os.Getenv("RUNTIME_LEGACY_SESSION_PREFIX"),
 		},
 		ConfigFile: tmuxConfigFile(cfg),
-		PaneBinDir: os.Getenv("RUNTIME_PANE_BIN_DIR"),
+		PaneBinDir: paneBinDir(home),
 		Nice:       tmux.ParseNiceness(nice, niceSet),
 		Home:       home,
 		PaneEnv:    paneEnv,
@@ -170,7 +175,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			Old: old, OldAPI: env("RUNTIME_OLD_INTERNAL_API", "/api/internal"),
 			Port: listenPort(cfg.Listen), MCP: codex.MCP{Server: env("RUNTIME_MCP_SERVER", "harnessly"), TokenEnv: os.Getenv("RUNTIME_MCP_TOKEN_ENV")},
 			MCPPath: env("RUNTIME_MCP_PATH", "/api/cli/preview/mcp"), ScriptDataDirs: splitList(os.Getenv("RUNTIME_SCRIPT_DATA_DIRS")),
-			TokenHeaders: old.TokenHeaders}),
+			TokenHeaders: old.TokenHeaders, SkillsPluginDir: skillsPluginDir(cfg.DataDir), PassServiceEnv: integ.Enabled()}),
 		Launch:     launchConfigFromEnv(home, cfg.DataDir),
 		Timeline:   timelineConfigFromEnv(cfg.DataDir),
 		Standalone: cfg.Standalone()})

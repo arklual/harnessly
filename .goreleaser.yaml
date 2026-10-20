@@ -20,6 +20,15 @@ builds:
     flags: [-trimpath]
     ldflags:
       - -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion={{ .Version }}
+  - id: harnessly
+    main: ./cmd/harnessly
+    binary: harnessly
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/ly-solutions/harnessly/internal/hlcli.Version={{ .Version }}
   - id: runtime
     main: ./cmd/runtime
     binary: runtime

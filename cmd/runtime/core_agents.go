@@ -68,6 +68,11 @@ type coreAgentsConfig struct {
 	MCPPath        string
 	ScriptDataDirs []string
 	TokenHeaders   []string
+	// SkillsPluginDir is the Claude plugin folder holding the workspace's skills ("" when they are off): Claude loads it
+	// once it exists. PassServiceEnv is set when boards or artifacts are configured: Codex then keeps their tokens in the
+	// environment of its commands.
+	SkillsPluginDir string
+	PassServiceEnv  bool
 }
 
 // skipPermissions: the runtime config's dangerouslySkipPermissions, read at every launch as the old runtime did.
@@ -105,6 +110,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			HooksPath:       filepath.Join(c.DataDir, "hooks.json"),
 			MCPConfigPath:   filepath.Join(c.DataDir, "preview-mcp.json"),
 			WorkspacePrompt: func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "claude-prompt.md") },
+			PluginDir:       pluginDirOnce(c.SkillsPluginDir),
 			JoinDir:         filepath.Join(c.DataDir, "launch-prompts"),
 			Launcher:        c.Launcher,
 			SkipPermissions: skipPermissions(c.ConfigFile),
@@ -118,10 +124,26 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			MCP:             codexMCP(c),
 			WorkspacePrompt: func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "codex-prompt.md") },
 			SkipPermissions: skipPermissions(c.ConfigFile),
+			PassServiceEnv:  c.PassServiceEnv,
+			ShellEnvExclude: []string{c.MCP.TokenEnv},
 		},
 		old:    c.Old,
 		oldAPI: c.OldAPI,
 		client: &http.Client{Timeout: 60 * time.Second},
+	}
+}
+
+// pluginDirOnce is the skills plugin's folder while it exists (it is written after the runtime starts, and by then the
+// first launch may already be asking); "" for no plugin.
+func pluginDirOnce(dir string) func() string {
+	if dir == "" {
+		return nil
+	}
+	return func() string {
+		if _, err := os.Stat(filepath.Join(dir, ".claude-plugin", "plugin.json")); err != nil {
+			return ""
+		}
+		return dir
 	}
 }
 

@@ -280,3 +280,38 @@ func TestLauncherLine(t *testing.T) {
 		t.Fatal("toml string")
 	}
 }
+
+// The services' tokens must reach the commands Codex runs: by default Codex drops every variable named like a secret.
+// The flags are valid TOML, come after the instructions and before the permissions, and keep the CLI token out.
+func TestServiceEnvArgs(t *testing.T) {
+	dir := t.TempDir()
+	c := LaunchConfig{Hooks: &HookConfig{Script: "/data/codex-hook.sh", UserConfig: filepath.Join(dir, "none.toml")}, MCP: testMCP}
+	plain, _, err := c.RuntimeArgs("", "", nil)
+	if err != nil || slices.ContainsFunc(plain, func(a string) bool { return strings.Contains(a, "shell_environment_policy") }) {
+		t.Fatalf("off by default: %v %q", err, plain)
+	}
+	prompt := filepath.Join(dir, "codex-prompt.md")
+	_ = os.WriteFile(prompt, []byte("# Context\n"), 0o600)
+	c.WorkspacePrompt = func(string) string { return prompt }
+	c.SkipPermissions = func() bool { return true }
+	c.PassServiceEnv = true
+	c.ShellEnvExclude = []string{"RT_PREVIEW_TOKEN", ""}
+	args, _, err := c.RuntimeArgs("ws", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.Index(args, "shell_environment_policy.ignore_default_excludes=true")
+	if i < 1 || args[i-1] != "-c" || args[i+1] != "-c" || args[i+3] != "--yolo" {
+		t.Fatalf("flags misplaced: %q", args)
+	}
+	if !strings.HasPrefix(args[i-2], "developer_instructions=") {
+		t.Fatalf("after the instructions: %q", args)
+	}
+	var parsed map[string]map[string]any
+	if _, err := toml.Decode(args[i+2], &parsed); err != nil {
+		t.Fatalf("%q: %v", args[i+2], err)
+	}
+	if ex, _ := parsed["shell_environment_policy"]["exclude"].([]any); len(ex) != 1 || ex[0] != "RT_PREVIEW_TOKEN" {
+		t.Fatalf("exclude: %v", parsed)
+	}
+}

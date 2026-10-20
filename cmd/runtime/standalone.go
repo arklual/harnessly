@@ -146,6 +146,7 @@ func (s *standalone) files(port int, tm *tmux.Tmux) {
 			agent.Log("warn", "standalone: Codex launcher not written", agent.F{K: "err", V: err.Error()})
 		}
 	}
+	provisionAgentSkills(s.dataDir)
 	if tm != nil {
 		tm.ApplyConfig("")
 	}
@@ -166,17 +167,16 @@ func codexLauncherContent(dataDir string) []byte {
 }
 
 // workspacePrompts are the agents' per-workspace prompt templates (RUNTIME_WORKSPACE_PROMPTS_FILE, else the release's
-// runtime-static/workspace-prompts.json); nil writes none.
+// runtime-static/workspace-prompts.json); without one, the built-in prompts that describe the harnessly command.
 func workspacePrompts() hooksetup.Prompts {
 	f := releaseStatic("RUNTIME_WORKSPACE_PROMPTS_FILE", "workspace-prompts.json")
 	if f == "" {
-		agent.Log("warn", "standalone: no workspace prompts named (RUNTIME_WORKSPACE_PROMPTS_FILE); agents start without them")
-		return nil
+		return defaultWorkspacePrompts()
 	}
 	p, err := hooksetup.LoadPrompts(f)
 	if err != nil {
-		agent.Log("warn", "standalone: workspace prompts not read; agents start without them", agent.F{K: "file", V: f}, agent.F{K: "err", V: err.Error()})
-		return nil
+		agent.Log("warn", "standalone: workspace prompts not read; the built-in ones are used", agent.F{K: "file", V: f}, agent.F{K: "err", V: err.Error()})
+		return defaultWorkspacePrompts()
 	}
 	return p
 }

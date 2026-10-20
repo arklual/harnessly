@@ -22,6 +22,9 @@ type LaunchConfig struct {
 	MCPConfigPath string
 	// WorkspacePrompt is a workspace's system-prompt file; nil when workspaces have none.
 	WorkspacePrompt func(workspaceID string) string
+	// PluginDir is the folder of the plugin carrying the workspace's skills, loaded with --plugin-dir; nil, or "" from
+	// it, loads none.
+	PluginDir func() string
 	// JoinDir is where several prompt files are joined into one for the bare CLI.
 	JoinDir string
 	// Launcher is the managed launcher to run instead of `claude`; "" runs `claude`.
@@ -126,9 +129,15 @@ func (c LaunchConfig) promptFileFlags(workspaceID string, extra []string) ([]str
 	return []string{"--append-system-prompt-file " + agents.ShellQuote(joined)}, nil
 }
 
-// Flags are the launch flags in order: settings, MCP config, system-prompt files, permissions, model and effort.
+// Flags are the launch flags in order: settings, MCP config, skills plugin, system-prompt files, permissions, model and
+// effort.
 func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFiles []string) (string, error) {
 	parts := []string{"--settings " + c.HooksPath, "--mcp-config " + c.MCPConfigPath}
+	if c.PluginDir != nil {
+		if dir := c.PluginDir(); dir != "" {
+			parts = append(parts, "--plugin-dir "+agents.ShellQuote(dir))
+		}
+	}
 	prompts, err := c.promptFileFlags(workspaceID, promptFiles)
 	if err != nil {
 		return "", err

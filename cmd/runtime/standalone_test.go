@@ -64,6 +64,8 @@ func standaloneEnv(t *testing.T, home, data string) {
 	wd, _ := os.Getwd()
 	for k, v := range map[string]string{
 		"HOME": home, "AGENT_SECRET_FILE": "", "AGENT_CONFIG": "",
+		// The files compared here are the previous runtime's own; the agent skills are the Go runtime's addition.
+		"RUNTIME_AGENT_SKILLS":     "off",
 		"RUNTIME_SCRIPT_DATA_DIRS": ".acme-ai,.oldmux", "RUNTIME_CLI_TOKEN_HEADERS": "x-acme-token,x-omux-token",
 		"RUNTIME_MCP_SERVER": "acme-preview", "RUNTIME_MCP_ALLOW": "mcp__acme-preview,mcp__oldmux-preview", "RUNTIME_MCP_TOKEN_ENV": "ACME_PREVIEW_TOKEN",
 		"RUNTIME_MCP_PATH": "", "RUNTIME_PROMPT_EDITOR": filepath.Join(data, "bin", "acme-prompt-editor"), "RUNTIME_PROMPT_EDITOR_NAME": "",

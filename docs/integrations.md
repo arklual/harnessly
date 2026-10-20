@@ -18,6 +18,7 @@ harnessly's side.
                              └── runtime API ── /api/integrations…  ──▶ boards  POST /b/api/handoff        (runtime token)
                                                                     └─▶ artifacts GET /api/v1/artifacts?session=  (viewer token)
  agent in a tab ── BOARDS_URL, BOARDS_TOKEN, ARTIFACTS_URL, ARTIFACTS_TOKEN, ARTIFACTS_SESSION ──▶ boards, artifacts
+               └─ harnessly open … / tab … ──▶ runtime /api/cli  ──▶ the right pane, other tabs
 ```
 
 ## Configure
@@ -62,25 +63,77 @@ Every tab the runtime starts or resumes — Claude Code, Codex and plain shells 
 | `ARTIFACTS_TOKEN` | `RUNTIME_ARTIFACTS_TOKEN` |
 | `ARTIFACTS_SESSION` | the tab's id: the conversation the documents belong to |
 | `ARTIFACTS_AUTHOR` | `RUNTIME_ARTIFACTS_AUTHOR`, else "`<RUNTIME_OWNER_NAME>` (agent)" |
+| `HARNESSLY_DATA_DIR` | the runtime's data folder (the `harnessly` command reads its port and token there); set whether or not a service is configured |
 
 Nothing else of the runtime's environment reaches the panes: a tab's shell starts from an allow-list (`HOME`, `PATH`,
 `LANG`, …) plus these. In front of a previous runtime (gate mode), only tabs the Go runtime starts get them.
 
 ### Agent skills
 
-The variables are what the [agent skills](https://github.com/ly-solutions/agent-skills) read. Install them into Claude
-Code on the machine (or into the image) once:
+A standalone runtime installs the skills for both agents when it starts; there is nothing to do by hand and nothing to
+set up inside a tab. Which skills follow which service is configured:
+
+| Skill | When | What the agent learns |
+| --- | --- | --- |
+| `harnessly` | always | the [`harnessly` command](#the-harnessly-command): show a document, board, file or dev server in the right pane, start and read another agent in a new tab |
+| `boards` | `RUNTIME_BOARDS_URL` | read a board from its link as text, draw a diagram from a node and edge graph, edit shapes, answer comments (the `boards` command) |
+| `artifacts` | `RUNTIME_ARTIFACTS_URL` | search the catalog before writing, publish, publish a new version under the same slug, share only when asked (the `artifacts` command) |
+
+Where they go, all in folders named for harnessly, so nothing of your own is touched:
+
+| Agent | Location | How it is loaded |
+| --- | --- | --- |
+| Claude Code | a plugin in `<data folder>/agent-skills/claude` (skills show as `harnessly:boards` …) | the runtime starts every Claude with `--plugin-dir` for it |
+| Codex | `~/.codex/skills/harnessly/<skill>/SKILL.md` (`$CODEX_HOME/skills/harnessly`) | Codex reads its user skills by itself |
+| both | `artifacts` (a Node.js client, needs Node.js), `boards` (bash and curl) and a link to `harnessly` in `~/.local/bin` (`RUNTIME_AGENT_BIN_DIR`) | login shells put `~/.local/bin` on the `PATH` when it exists |
+
+Each folder keeps a manifest of the files harnessly wrote. A new release replaces them when they are unchanged; a
+file that is not harnessly's, or that you edited, is left as it is (the runtime logs it); a skill whose service you
+removed is deleted. Starting again with nothing new writes nothing. `RUNTIME_AGENT_SKILLS=off` turns all of it off.
+
+The skills are the files of [ly-solutions/agent-skills](https://github.com/ly-solutions/agent-skills) and
+[ly-solutions/artifacts](https://github.com/ly-solutions/artifacts) at the commits pinned in `skills/SOURCES`, compiled
+into the runtime, so an offline install has them. `skills/sync.sh` updates the copy and `make skills-check` verifies it
+(see `skills/README.md`). Claude Code outside harnessly can install the same plugins from the marketplace:
 
 ```text
 /plugin marketplace add ly-solutions/agent-skills
-/plugin install boards@ly-solutions
-/plugin install artifacts@ly-solutions
+/plugin install harnessly@ly-solutions
 ```
 
-With them an agent reads a board from its link as text, draws diagrams from a node and edge graph, answers board
-comments, searches the catalog before writing a document, publishes new versions under the same slug, and shares only
-when asked. Every document it publishes records `ARTIFACTS_SESSION`, so the pane can list a conversation's documents.
-The `artifacts` CLI the skill uses is `npm install -g @ly-solutions/artifacts`.
+Every agent also gets a short workspace prompt (Claude as a system-prompt file, Codex as developer instructions): where
+it is, the `harnessly` command, and the `artifacts` and `boards` commands when those services are set. A deployment can
+replace it with its own `RUNTIME_WORKSPACE_PROMPTS_FILE`.
+
+Two things about Codex in a container:
+
+- Codex drops every variable named like a secret (`KEY`, `SECRET`, `TOKEN`) from the commands it runs. The runtime
+  starts it with `shell_environment_policy` set so that `BOARDS_TOKEN` and `ARTIFACTS_TOKEN` stay, and only the
+  runtime's own CLI token is left out. (`harnessly` reads that token from the data folder, not from its environment.)
+- Codex's own sandbox (bubblewrap) needs user namespaces, which a default Docker container does not allow: every
+  command then fails with "No permissions to create a new namespace". Inside such a container the container is the
+  sandbox: turn on `dangerouslySkipPermissions` in the runtime's settings (Codex then runs with `--yolo`), or put
+  `sandbox_mode = "danger-full-access"` and `approval_policy = "never"` in `~/.codex/config.toml`.
+
+### The `harnessly` command
+
+The command is installed next to the runtime (in the image: `/usr/local/bin/harnessly`; from a release or `make install`:
+beside `harnessly-runtime`) and finds the runtime by itself: its port and token are files in the data folder, whose
+place every pane gets as `HARNESSLY_DATA_DIR`. It talks to the runtime's `/api/cli` routes; `harnessly api-guide`
+prints them for what the command does not cover. Run `harnessly --help` for all of it.
+
+```text
+harnessly open <link|file|port|kind>   show it in the person's right pane (documents, boards, files, a dev server, a merge request)
+harnessly panel show|hide              the whole pane
+harnessly status                       what was asked of the pane, what the person has seen
+harnessly workspaces                   the workspaces
+harnessly tab list|create|send|status|result|close
+                                       tabs; `tab create -t claude-code|codex-cli --prompt TEXT` starts another agent
+```
+
+`open` works with the page closed: the request waits with the conversation. Documents and boards open when their address
+is on the servers you configured (`RUNTIME_ARTIFACTS_URL`, `RUNTIME_BOARDS_URL`), a dev server by its port; an address
+the pane may not open is refused with the reason. `--json` prints the runtime's answer, `-w` picks the workspace.
 
 ## In the page
 

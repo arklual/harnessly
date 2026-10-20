@@ -8,6 +8,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Agents get the workspace out of the box. A standalone runtime installs agent skills for both Claude Code and Codex
+  when it starts: `harnessly` always, `boards` with `RUNTIME_BOARDS_URL`, `artifacts` with `RUNTIME_ARTIFACTS_URL`.
+  Claude loads them as a plugin with `--plugin-dir`, Codex from `~/.codex/skills/harnessly`, and the `artifacts`,
+  `boards` and `harnessly` launchers go to `~/.local/bin`. Files are tracked in a manifest per folder: yours are never
+  touched, a release replaces only unchanged ones, a removed service's skill is deleted. `RUNTIME_AGENT_SKILLS=off`
+  disables it; `RUNTIME_AGENT_BIN_DIR` moves the launchers. The skills are vendored in `skills/` at the commits pinned
+  in `skills/SOURCES` (`skills/sync.sh`, `make skills-check`), so an offline install has them.
+- The `harnessly` command (`cmd/harnessly`, in the image on the `PATH` and in the release archives): `open` shows a
+  document, board, file, dev server or merge request in the person's right pane, `panel`, `status`, `workspaces`,
+  `tab list|create|send|status|result|close` (start another Claude Code or Codex with a prompt), `api-guide`; with
+  `--json`. It finds the runtime by itself from the data folder, which every pane now gets as `HARNESSLY_DATA_DIR`.
+- Built-in workspace prompts for both agents when no `RUNTIME_WORKSPACE_PROMPTS_FILE` is set (the open install had
+  none): where the agent is, the `harnessly` command, and the `artifacts` and `boards` commands when configured.
+- `GET /api/cli/api-guide` answers with a built-in guide of the `/api/cli` routes when the deployment names none.
+- `open artifacts` accepts links to separate document and board servers (`RUNTIME_ARTIFACTS_URL`,
+  `RUNTIME_BOARDS_URL`), and plain-http ones on this machine; the reader path follows `RUNTIME_APP_BASE_PATH`.
+
 - Boards and artifacts integrations. `RUNTIME_BOARDS_URL` / `RUNTIME_ARTIFACTS_URL` with their tokens give every
   tab the runtime starts or resumes `BOARDS_URL`, `BOARDS_TOKEN`, `ARTIFACTS_URL`, `ARTIFACTS_TOKEN`,
   `ARTIFACTS_SESSION` (the tab's id) and `ARTIFACTS_AUTHOR`. New routes for the page: `GET /api/integrations`,
@@ -55,6 +72,9 @@ All notable changes to this project are documented here. The format follows
 - A pane command a page applied before the runtime started waiting for it is reported as applied.
 - Tests no longer depend on the machine's umask, wait for the standalone run's panes to exit, and the timeline golden
   scenario waits for events instead of time.
+- Codex dropped `BOARDS_TOKEN` and `ARTIFACTS_TOKEN` from the environment of its commands (it removes variables named
+  like secrets), so its agents could not use boards and artifacts. The runtime now starts Codex with
+  `shell_environment_policy` that keeps them and leaves only its own CLI token out.
 
 ## [0.9.0] - 2026-10-19
 

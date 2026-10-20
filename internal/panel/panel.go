@@ -45,7 +45,10 @@ type Targets struct {
 	// PortalHost publishes documents (/a/<slug>) and boards (/b/<slug>); ReaderHost is the platform, whose reader
 	// shows a document at ReaderPath<slug>.
 	PortalHost, ReaderHost string
-	ReaderPath             string
+	// ArtifactsHost and BoardsHost are the hosts of a deployment that serves documents (/a/<slug>) and boards (/b/<slug>)
+	// from separate servers; PortalHost is the one host that serves both.
+	ArtifactsHost, BoardsHost string
+	ReaderPath                string
 	// GitLabHosts are the GitLab servers whose merge requests and commits a tab shows; the first is named in hints.
 	GitLabHosts []string
 	// TaskKey matches a key of the tracker; TaskExamples are named in the hint.
@@ -189,6 +192,24 @@ var (
 	portalPath = regexp.MustCompile(`^/(a|b)/([\w-]+)/?$`)
 )
 
+// portalURL is a link to a portal server: https, or plain http for a server on this machine (a local install).
+func portalURL(raw string) *url.URL {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil {
+		return nil
+	}
+	switch u.Scheme {
+	case "https":
+		return u
+	case "http":
+		switch strings.ToLower(u.Hostname()) {
+		case "localhost", "127.0.0.1", "::1":
+			return u
+		}
+	}
+	return nil
+}
+
 func httpsURL(raw string) *url.URL {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
@@ -197,20 +218,25 @@ func httpsURL(raw string) *url.URL {
 	return u
 }
 
+// serves says whether the address is on a server of the portal that serves documents (kind "a") or boards (kind "b").
+func (t Targets) serves(u *url.URL, kind string) bool {
+	if t.PortalHost != "" && strings.ToLower(u.Hostname()) == t.PortalHost {
+		return true
+	}
+	host := strings.ToLower(u.Host)
+	return (kind == "a" && t.ArtifactsHost != "" && host == t.ArtifactsHost) ||
+		(kind == "b" && t.BoardsHost != "" && host == t.BoardsHost)
+}
+
 func (t Targets) docSlug(raw string) string {
-	u := httpsURL(raw)
+	u := portalURL(raw)
 	if u == nil {
 		return ""
 	}
-	host := strings.ToLower(u.Hostname())
-	switch {
-	case t.PortalHost != "" && host == t.PortalHost:
-		m := portalPath.FindStringSubmatch(u.Path)
-		if m == nil || (m[1] == "b" && m[2] == "api") {
-			return ""
-		}
+	if m := portalPath.FindStringSubmatch(u.Path); m != nil && !(m[1] == "b" && m[2] == "api") && t.serves(u, m[1]) {
 		return m[2]
-	case t.ReaderHost != "" && host == t.ReaderHost:
+	}
+	if host := strings.ToLower(u.Hostname()); t.ReaderHost != "" && host == t.ReaderHost {
 		rest, ok := strings.CutPrefix(u.Path, t.readerPath())
 		rest = strings.TrimSuffix(rest, "/")
 		if ok && slugRe.MatchString(rest) {
@@ -221,12 +247,12 @@ func (t Targets) docSlug(raw string) string {
 }
 
 func (t Targets) boardFrameURL(raw string) string {
-	u := httpsURL(raw)
-	if u == nil || t.PortalHost == "" || strings.ToLower(u.Hostname()) != t.PortalHost {
+	u := portalURL(raw)
+	if u == nil {
 		return ""
 	}
 	m := portalPath.FindStringSubmatch(u.Path)
-	if m == nil || m[1] != "b" || m[2] == "api" {
+	if m == nil || m[1] != "b" || m[2] == "api" || !t.serves(u, "b") {
 		return ""
 	}
 	q := u.Query()
@@ -234,7 +260,7 @@ func (t Targets) boardFrameURL(raw string) string {
 	if !boardKeyRe.MatchString(key) {
 		return ""
 	}
-	out := "https://" + t.PortalHost + "/b/" + m[2] + "?k=" + key
+	out := u.Scheme + "://" + strings.ToLower(u.Host) + "/b/" + m[2] + "?k=" + key
 	if at := q.Get("at"); at != "" && boardKeyRe.MatchString(at) {
 		out += "&at=" + at
 	}
@@ -293,12 +319,27 @@ func (t Targets) taskTarget(text string) string {
 	return ""
 }
 
+func nonEmpty(v ...string) []string {
+	var out []string
+	for _, s := range v {
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func (t Targets) hint(tab string, k targetKind) string {
 	switch k {
 	case port:
 		return locale.Pick("open browser: opens a port of this machine (4400, localhost:4400/path) or a feature stand https://<slug>"+t.StandDomain+"; the agent does not open other external addresses",
 			"open browser: открывается порт этой машины (4400, localhost:4400/путь) или фича-стенд https://<slug>"+t.StandDomain+"; другие внешние адреса агент не открывает")
 	case doc:
+		if t.PortalHost == "" {
+			where := strings.Join(nonEmpty(t.ArtifactsHost, t.BoardsHost), " or ")
+			return locale.Pick("open artifacts: a link to a document or a board of "+where+" is required (…/a/<slug> or …/b/<slug>?k=<key>)",
+				"open artifacts: нужна ссылка на документ или доску "+where+" (…/a/<slug> или …/b/<slug>?k=<ключ>)")
+		}
 		return locale.Pick("open artifacts: a link to a document or a board of "+t.PortalHost+" is required (https://"+t.PortalHost+"/a/… or /b/…)",
 			"open artifacts: нужна ссылка на документ или доску "+t.PortalHost+" (https://"+t.PortalHost+"/a/… или /b/…)")
 	case gitlab:

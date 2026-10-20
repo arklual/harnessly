@@ -27,13 +27,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
+COPY skills ./skills
 COPY web/*.go ./web/
 COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=dev
 ENV CGO_ENABLED=0
-RUN ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION}" \
+RUN ldflags="-s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=${VERSION} -X github.com/ly-solutions/harnessly/internal/hlcli.Version=${VERSION}" \
  && go build -trimpath -tags webui -ldflags "$ldflags" -o /out/runtime ./cmd/runtime \
- && go build -trimpath -ldflags "$ldflags" -o /out/agent ./cmd/agent
+ && go build -trimpath -ldflags "$ldflags" -o /out/agent ./cmd/agent \
+ && go build -trimpath -ldflags "$ldflags" -o /out/harnessly ./cmd/harnessly
 
 FROM debian:${DEBIAN_VERSION}-slim AS base
 LABEL org.opencontainers.image.title="harnessly" \
@@ -46,7 +48,7 @@ RUN apt-get update \
  && useradd --create-home --uid 10001 --user-group --shell /bin/bash agent \
  && mkdir -p /home/agent/work \
  && chown -R agent:agent /home/agent
-COPY --from=build /out/runtime /out/agent /usr/local/bin/
+COPY --from=build /out/runtime /out/agent /out/harnessly /usr/local/bin/
 ENV HOME=/home/agent \
     LANG=C.UTF-8 \
     SHELL=/bin/bash \
