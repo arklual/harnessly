@@ -58,6 +58,7 @@ type Manager struct {
 	pollReset    chan time.Duration
 
 	compactTimers map[string]*time.Timer
+	trustAnswered map[string]float64 // tab → when its trust dialog was last answered
 	persist       chan func()
 	watch         *jsonlWatch
 	feed          *background.Feed
@@ -73,7 +74,8 @@ func New(d Deps, hub Broadcaster) *Manager {
 		d.Log = func(string, string, ...any) {}
 	}
 	m := &Manager{d: d, hub: hub, tabs: map[string]*Entry{}, compactTimers: map[string]*time.Timer{},
-		persist: make(chan func(), 1024), pollReset: make(chan time.Duration, 1), ctx: context.Background()}
+		trustAnswered: map[string]float64{},
+		persist:       make(chan func(), 1024), pollReset: make(chan time.Duration, 1), ctx: context.Background()}
 	m.watch = newJSONLWatch(m)
 	m.feed = background.NewFeed(background.Deps{
 		ReadTasks: func(t string) []background.Task {
@@ -207,6 +209,7 @@ func (m *Manager) del(tabID string) {
 		return
 	}
 	delete(m.tabs, tabID)
+	delete(m.trustAnswered, tabID)
 	for i, id := range m.order {
 		if id == tabID {
 			m.order = append(m.order[:i], m.order[i+1:]...)

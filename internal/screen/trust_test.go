@@ -73,3 +73,22 @@ func TestMatchTrustPromptCaptures(t *testing.T) {
 		}
 	}
 }
+
+func TestTrustAcceptKeys(t *testing.T) {
+	// Claude focuses "No, exit" above "Yes"; Codex focuses "1. Yes, continue".
+	for name, want := range map[string][]string{
+		"claude-trust-folder.txt":   {"Down", "Enter"},
+		"codex-trust-directory.txt": {"Enter"},
+	} {
+		if got := TrustAcceptKeys(fixture(t, name)); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: got %v, want %v", name, got, want)
+		}
+	}
+	yesFirst := " Accessing workspace:\n /work/app\n Quick safety check: Is this a project you created or one you trust?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n"
+	if got := TrustAcceptKeys(yesFirst); !reflect.DeepEqual(got, []string{"Enter"}) {
+		t.Errorf("yes focused: got %v", got)
+	}
+	if got := TrustAcceptKeys("vibe@host:~$ ls\n"); got != nil {
+		t.Errorf("no dialog: got %v", got)
+	}
+}

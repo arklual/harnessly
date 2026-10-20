@@ -158,6 +158,9 @@ type Deps struct {
 	Push      Pusher
 	// TurnEnd snapshots the session folder for rewinding once a turn ended.
 	TurnEnd func(tabID, cwd string)
+	// AskFolderTrust leaves an agent's folder trust dialog to the person; by default the keeper answers yes for the
+	// folder the tab was started in, since the dialog is not on the page.
+	AskFolderTrust bool
 	// AgentLaunched hears of every agent the platform starts or resumes in a tab, before the keeper marks it.
 	AgentLaunched func(tabID string)
 	// Mismatch reports a corrected state.

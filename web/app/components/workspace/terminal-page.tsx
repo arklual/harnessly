@@ -1,6 +1,6 @@
 // The agent conversation in the centre of the page: the open workspace's agent tab the page's address names (else
 // the layout's focus), its timeline with the messages just sent, what the agent waits for, the composer and the
-// terminal bar. Keeps the workspace's layout loaded.
+// terminal bar; a plain terminal tab is its terminal. Keeps the workspace's layout loaded.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TimelineView from '@/components/timeline/timeline-view';
 import AgentComposer from '@/components/workspace/agent-composer';
@@ -18,6 +18,7 @@ import { sessionMetaFrom } from '@/lib/session-meta';
 import { parseAppLocation } from '@/lib/hl-conversation-url';
 import { appFetch } from '@/lib/app-path';
 import { useRouter } from '@/platform/router';
+import { TerminalView } from '@/terminal/terminal-view';
 import type { ITab } from '@/types/terminal';
 import type { IPendingMessageOptions, ITimelineEntry, ITimelineUserMessage } from '@/types/timeline';
 
@@ -167,6 +168,13 @@ const AgentConversation = ({ tab, workspaceId }: { tab: ITab; workspaceId: strin
   );
 };
 
+/** A plain terminal tab (a shell, no agent) the sidebar opens: its own session, full size. */
+const ShellConversation = ({ tab }: { tab: ITab }) => (
+  <div className="flex h-full min-h-0 flex-col" data-testid="shell-conversation">
+    <TerminalView session={tab.sessionName} focus />
+  </div>
+);
+
 export default function TerminalPage() {
   useRouter();
   const selectedRef = typeof window === 'undefined' ? null : parseAppLocation(window.location.search).ref;
@@ -189,6 +197,8 @@ export default function TerminalPage() {
     ? panes.flatMap((p) => p.tabs).find((t) => t.id === selectedTabId)
     : undefined;
   const tab = addressed ?? pane?.tabs.find((t) => t.id === pane.activeTabId) ?? pane?.tabs[0];
-  if (!tab || (tab.panelType !== 'claude-code' && tab.panelType !== 'codex-cli')) return null;
+  if (!tab) return null;
+  if (tab.panelType === 'terminal' || !tab.panelType) return <ShellConversation key={tab.id} tab={tab} />;
+  if (tab.panelType !== 'claude-code' && tab.panelType !== 'codex-cli') return null;
   return <AgentConversation key={tab.id} tab={tab} workspaceId={workspaceId} />;
 }

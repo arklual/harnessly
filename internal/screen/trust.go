@@ -103,3 +103,43 @@ func MatchTrustPrompt(text string) *TrustPrompt {
 	}
 	return nil
 }
+
+var (
+	trustYesRE    = re(`(?i)Yes,` + sp + `+(?:I trust this folder|continue)`)
+	trustNoRE     = re(`(?i)No,` + sp + `+(?:exit|quit)`)
+	trustFocusRE  = re(`^` + sp + `*[❯›>]`)
+	trustAnswered = []string{"Enter"}
+)
+
+// TrustAcceptKeys are the keys that answer a folder trust dialog with yes: arrows from the focused option to the yes
+// option, then Enter. Nil when the text is not such a dialog or its focus cannot be read.
+func TrustAcceptKeys(text string) []string {
+	if MatchTrustPrompt(text) == nil {
+		return nil
+	}
+	yes, focused, n := -1, -1, 0
+	for _, line := range strings.Split(text, "\n") {
+		isYes, isNo := trustYesRE.MatchString(line), trustNoRE.MatchString(line)
+		if !isYes && !isNo {
+			continue
+		}
+		if isYes && yes < 0 {
+			yes = n
+		}
+		if trustFocusRE.MatchString(line) {
+			focused = n
+		}
+		n++
+	}
+	if yes < 0 || focused < 0 {
+		return nil
+	}
+	keys := []string{}
+	for ; focused < yes; focused++ {
+		keys = append(keys, "Down")
+	}
+	for ; focused > yes; focused-- {
+		keys = append(keys, "Up")
+	}
+	return append(keys, trustAnswered...)
+}

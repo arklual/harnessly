@@ -286,6 +286,7 @@ func (c *core) start() {
 		},
 		TurnEnd:          c.turnEnd,
 		AgentLaunched:    c.reload.launched,
+		AskFolderTrust:   env("RUNTIME_FOLDER_TRUST", "") == "ask",
 		Mismatch:         c.reportMismatch,
 		BackgroundTasks:  c.bg.Read,
 		ForgetTranscript: c.bg.Forget,

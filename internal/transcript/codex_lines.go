@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/codemode"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
@@ -456,8 +457,14 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 		if safeString(prop(p, "status")) == "completed" {
 			status = "success"
 		}
+		summary := summarizeCodexCall(name, prop(p, "input"))
+		if input, ok := prop(p, "input").(string); ok && name == "exec" {
+			// Code mode: the script calls the real tools, so the entry says which ones.
+			d := codemode.Describe(input)
+			name, summary = d.Tool, d.Summary
+		}
 		return []*jsvalue.Object{codexEntry("tool-call", ts, "toolUseId", callID, "toolName", name,
-			"summary", summarizeCodexCall(name, prop(p, "input")), "status", status)}
+			"summary", summary, "status", status)}
 	case "web_search_call":
 		callID := safeString(prop(p, "call_id"))
 		if callID == "" {

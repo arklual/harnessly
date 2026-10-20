@@ -110,6 +110,9 @@ func (m *Manager) watchLaunch(tabID string, started float64) {
 		if running {
 			if pane, ok := m.d.Tmux.Capture(session); ok && pane != "" {
 				ready = screen.IsLaunchedPromptBoxReady(pane)
+				if !ready {
+					m.acceptTrust(tabID, session, pane)
+				}
 			}
 		}
 		now := m.now()

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/codemode"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
@@ -84,6 +85,19 @@ func functionCallAction(name string, raw any) *agents.CurrentAction {
 		if v, err := agents.Decode([]byte(s)); err == nil && v != nil {
 			args = v
 		}
+	}
+	if script, ok := raw.(string); ok && name == "exec" {
+		// Code mode: say what the script runs instead of the bare word.
+		d := codemode.Describe(script)
+		switch d.Tool {
+		case "exec_command":
+			return agents.Tool("Bash", d.Summary)
+		case "apply_patch":
+			return agents.Tool("Edit", d.Summary)
+		case "web_search":
+			return agents.Tool("WebSearch", d.Summary)
+		}
+		return agents.Tool(d.Tool, d.Summary)
 	}
 	tool := name
 	if isShell(name) {

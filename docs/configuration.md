@@ -79,6 +79,7 @@ it stays with the previous runtime.
 | `RUNTIME_TMUX_CONF` | the tmux.conf a new tmux server reads and is re-read after each new session (set but empty: tmux defaults; unset: none in front of the previous runtime, and standalone `tmux.conf` in the data directory, written with the status bar off when missing) |
 | `RUNTIME_PANE_BIN_DIR` | folder put first on a new pane shell's `PATH` (pane-side wrappers; default `RUNTIME_AGENT_BIN_DIR` while the [agent skills](integrations.md#agent-skills) are on). Debian-style login shells rebuild `PATH` from `/etc/profile`, which keeps `~/.local/bin` when it exists but drops this folder |
 | `RUNTIME_AGENT_NICE` | niceness of a tmux server the runtime starts, 0–19, `0` = off (default 10) |
+| `RUNTIME_FOLDER_TRUST` | `ask` leaves Claude's and Codex's "trust this folder?" dialog to the person in the terminal; unset, the runtime answers yes for the folder the conversation was started in (the dialog is not shown on the page, and the agent would wait at it unseen) |
 | `RUNTIME_TAB_META_KEY` | the layout tab field holding the platform's own metadata (launch choice, mode) |
 | `RUNTIME_CLAUDE_LAUNCHER` | the managed Claude launcher (an absolute path) typed instead of `claude`; unset types `claude` |
 | `RUNTIME_LAUNCH_DEFAULTS_KEY` | key of the runtime config (`AGENT_CONFIG`) holding the remembered model and effort per agent CLI |
@@ -219,7 +220,7 @@ the previous runtime the pages are someone else's and the gate leaves those path
 | Variable | Meaning |
 | --- | --- |
 | `RUNTIME_WEB` | `on` serves the page in front of the previous runtime too, `off` never; unset: standalone only |
-| `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page |
+| `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page; its files go out gzipped to browsers that accept it |
 | `RUNTIME_APP_NAME` | the product name the page shows in its titles and brand (default `harnessly`) |
 | `RUNTIME_LOCALE` | the page's and the API's language: `en` (default) or `ru` |
 | `RUNTIME_WEB_FEATURES` | optional parts of the page, comma separated: `chats` (plain chats through an OpenWebUI next to the runtime), `efficiency` (the team report), `vault` (the password safe), `design` (Claude Design boards); none by default |

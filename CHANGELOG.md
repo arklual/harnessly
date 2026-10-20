@@ -87,6 +87,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A first start of Claude Code or Codex in a new folder no longer hangs at «Starting». Both ask whether to trust the
+  folder, and the dialog was only in the terminal, so the agent waited there unseen while the messages sent to it
+  piled up as pending. The runtime now answers yes for the folder the conversation was started in;
+  `RUNTIME_FOLDER_TRUST=ask` leaves the dialog to the person.
+- A plain terminal tab opened from the sidebar shows its terminal; it was a blank page.
+- Codex in code mode no longer shows a bare `exec`: the timeline entry, the push text and the current-action line name
+  the commands, searches and other tools the script calls.
 - Titles of board and document chips are looked up by origin, so boards and artifacts served over http on other ports
   of one host (the compose workspace) get them too. `RUNTIME_ARTIFACTS_URL` and `RUNTIME_BOARDS_URL` name those origins.
 - Stopping the design library's server also stops its background history and waits for a snapshot under way.

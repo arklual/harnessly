@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"html"
 	"io/fs"
-	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -24,6 +23,8 @@ type webConfig struct {
 	base, api string
 	// meta is the page config written into <meta name="hl-config"> (web_config.go).
 	meta string
+	// static keeps the tags and gzipped copies of the page's files.
+	static staticCache
 }
 
 // webConfigFromEnv is nil when this process serves no page.
@@ -113,22 +114,7 @@ func (c *webConfig) handler() http.HandlerFunc {
 		}
 		name := strings.TrimPrefix(path.Clean(strings.TrimPrefix(r.URL.Path, c.base)), "/")
 		if name != "" && name != "index.html" {
-			if raw, err := fs.ReadFile(c.files, name); err == nil {
-				ct := mime.TypeByExtension(path.Ext(name))
-				if ct == "" {
-					ct = http.DetectContentType(raw)
-				}
-				w.Header().Set("Content-Type", ct)
-				// Vite names the built assets by their content.
-				if strings.HasPrefix(name, "assets/") {
-					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-				} else {
-					w.Header().Set("Cache-Control", "no-cache")
-				}
-				w.Header().Set("X-Content-Type-Options", "nosniff")
-				if r.Method != http.MethodHead {
-					_, _ = w.Write(raw)
-				}
+			if c.serveStatic(w, r, name) {
 				return
 			}
 			if path.Ext(name) != "" {
@@ -152,12 +138,6 @@ func (c *webConfig) handler() http.HandlerFunc {
 		if c.meta != "" {
 			raw = bytes.Replace(raw, []byte(`<meta name="hl-config" content="{}" />`), []byte(`<meta name="hl-config" content="`+c.meta+`" />`), 1)
 		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Referrer-Policy", "same-origin")
-		if r.Method != http.MethodHead {
-			_, _ = w.Write(raw)
-		}
+		serveHTML(w, r, raw)
 	}
 }

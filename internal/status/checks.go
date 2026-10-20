@@ -114,6 +114,18 @@ func (m *Manager) pollChecks(tabID string, e *Entry, p Provider, pane *tmux.Pane
 		}
 	}
 
+	// A first start in a new folder asks whether to trust it before the agent sends any event, whatever state the
+	// tab shows (a prompt given at launch makes it busy). Read at the pane's own width so the folder reads whole.
+	m.mu.Lock()
+	starting := p != nil && !e.LastEvent.Has() && e.LastResumeOrStartedAt != nil && now-*e.LastResumeOrStartedAt < ms(trustWindow)
+	startingSession := e.TmuxSession
+	m.mu.Unlock()
+	if starting && agentRunning() {
+		if content, ok := m.d.Tmux.Capture(startingSession); ok && content != "" && m.acceptTrust(tabID, startingSession, content) {
+			return true
+		}
+	}
+
 	m.mu.Lock()
 	heal := p != nil && p.ID() == agents.Claude && e.CliState == Inactive && e.LaunchingSince == nil
 	codexReady := p != nil && e.CliState == Inactive && e.PanelType.Value() == agents.CodexPanel
