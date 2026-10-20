@@ -3,7 +3,7 @@ package transcript
 import (
 	"math"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The previous runtime's zod (v4) schemas of a transcript line: which lines pass and what the parsed copy holds. A

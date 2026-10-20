@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 const dcSuffix = ".dc.html"

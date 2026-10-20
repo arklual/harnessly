@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"testing"
 
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 type routeCase struct {

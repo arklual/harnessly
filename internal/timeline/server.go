@@ -14,12 +14,12 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/proc"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 const (

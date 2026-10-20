@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // An upgraded socket stays with whichever side accepted it: switching a slice routes the next request, not a socket

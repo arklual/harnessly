@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // The share-read token: the platform's share route signs one per view and this runtime checks it. Its key is derived

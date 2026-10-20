@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
 
 // What a slot response may be cached as. A slot origin is one person's: no shared cache may keep or hand on what it

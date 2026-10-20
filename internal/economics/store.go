@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 const (

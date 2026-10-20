@@ -3,8 +3,8 @@ package main
 import (
 	"net/http"
 
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 // The design library's checks and pictures in a headless browser (slice "design"): a design's check report and its

@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -74,14 +75,34 @@ func (t *Tmux) shellEnv() [][2]string {
 // environment, so neither the tmux server's cached environment nor the runtime's own variables reach the pane. TMUX and
 // TMUX_PANE, set by tmux for the pane, are expanded by the shell tmux runs the command with and so survive `env -i`.
 // Every way of starting a pane shell must go through it.
-func (t *Tmux) ShellLaunchCommand() string {
+func (t *Tmux) ShellLaunchCommand() string { return t.shellLaunchCommand(nil) }
+
+// shellLaunchCommand is ShellLaunchCommand with extra KEY=VALUE variables after the allow-listed ones; an entry that
+// is not a valid variable name is dropped.
+func (t *Tmux) shellLaunchCommand(extra []string) string {
 	var b strings.Builder
 	b.WriteString(`env -i TMUX="$TMUX" TMUX_PANE="$TMUX_PANE"`)
 	for _, kv := range t.shellEnv() {
 		b.WriteString(" " + kv[0] + "=" + shQuote(kv[1]))
 	}
+	for _, kv := range extra {
+		k, v, ok := strings.Cut(kv, "=")
+		if ok && envNameRe.MatchString(k) {
+			b.WriteString(" " + k + "=" + shQuote(v))
+		}
+	}
 	b.WriteString(" " + shQuote(t.Shell()) + " -l")
 	return b.String()
+}
+
+var envNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// paneEnv is what PaneEnv adds for the session's tab.
+func (t *Tmux) paneEnv(session string) []string {
+	if t.cfg.PaneEnv == nil {
+		return nil
+	}
+	return t.cfg.PaneEnv(t.TabOf(session))
 }
 
 // ParseNiceness reads a niceness setting the way the previous runtime did: unset is 10, a whole number is clamped to
@@ -112,7 +133,7 @@ func (t *Tmux) CreateSession(name string, cols, rows int, cwd string) error {
 	if t.cfg.ConfigFile != "" {
 		args = append(args, "-f", t.cfg.ConfigFile)
 	}
-	args = append(args, "new-session", "-d", "-s", name, "-x", strconv.Itoa(cols), "-y", strconv.Itoa(rows), t.ShellLaunchCommand())
+	args = append(args, "new-session", "-d", "-s", name, "-x", strconv.Itoa(cols), "-y", strconv.Itoa(rows), t.shellLaunchCommand(t.paneEnv(name)))
 	program := "tmux"
 	if t.cfg.Nice > 0 {
 		program = "nice"

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/messagecounts"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/messagecounts"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // testdata/golden.json: what the previous runtime's dispatcher, conversation-sources and message-counts handlers

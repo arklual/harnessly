@@ -45,3 +45,13 @@ export const formatUntil = (epochSec: number, now = Date.now()): string => {
   const ms = epochSec * 1000 - now;
   return ms <= 0 ? 'now' : `in ${formatSpan(ms)}`;
 };
+
+/** How long ago an ISO moment was: "just now", "4 min ago", "2 h ago"; "" for a moment that does not parse. */
+export const formatAgo = (iso: string, now = Date.now()): string => {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return '';
+  const ms = now - at;
+  if (ms < 60_000) return 'just now';
+  if (ms >= 86_400_000) return `${Math.floor(ms / 86_400_000)} d ago`;
+  return `${formatSpan(ms).replace(/ \d+ min$/, '')} ago`;
+};

@@ -17,10 +17,10 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // Daily reports: a day's sessions summed up by the person's own Claude Code or Codex CLI, kept in

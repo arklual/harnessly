@@ -3,9 +3,12 @@ version: 2
 
 project_name: harnessly
 
+# The runtime is built with the web page compiled in (the webui tag), so the hooks build web/ first; they need Node.js
+# and pnpm (corepack). A runtime without the page is `go build ./cmd/runtime` (or `make build`).
 before:
   hooks:
     - go mod download
+    - sh -c 'cd web && pnpm install --frozen-lockfile && pnpm build'
 
 builds:
   - id: agent
@@ -16,7 +19,7 @@ builds:
     goarch: [amd64, arm64]
     flags: [-trimpath]
     ldflags:
-      - -s -w -X harnessly/internal/agent.BuildVersion={{ .Version }}
+      - -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion={{ .Version }}
   - id: runtime
     main: ./cmd/runtime
     binary: runtime
@@ -24,8 +27,9 @@ builds:
     goos: [linux, darwin]
     goarch: [amd64, arm64]
     flags: [-trimpath]
+    tags: [webui]
     ldflags:
-      - -s -w -X harnessly/internal/agent.BuildVersion={{ .Version }}
+      - -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion={{ .Version }}
 
 archives:
   - formats: [tar.gz]

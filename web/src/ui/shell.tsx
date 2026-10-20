@@ -1,11 +1,13 @@
 import { IconButton, Menu, Spinner, Tooltip, useTheme } from '@kit';
-import { LogOut, Monitor, Moon, PanelLeft, Sun } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { LogOut, Monitor, Moon, PanelLeft, PanelRight, Sun } from 'lucide-react';
+import { type PointerEvent as ReactPointerEvent, useEffect, useState } from 'react';
 
 import { workspaces as workspacesApi } from '../api/endpoints';
 import { useStore } from '../stores/store';
 import { connectionStore, workspacesStore } from '../stores/runtime';
+import { integrationsStore, loadIntegrations, showPane, sidePaneStore } from '../stores/side-pane';
 import { MachineButton } from './machine-panel';
+import { SidePane } from './side-pane';
 import { Sidebar } from './sidebar';
 import { Toasts } from './toasts';
 import { WorkspaceView } from './workspace-view';
@@ -13,6 +15,64 @@ import { WorkspaceView } from './workspace-view';
 function hashWorkspace(): string | null {
   const m = /^#\/w\/([\w-]+)/.exec(window.location.hash);
   return m?.[1] ?? null;
+}
+
+const WIDTH_KEY = 'side-pane-width';
+
+function savedWidth(): number {
+  try {
+    const v = Number(localStorage.getItem(WIDTH_KEY));
+    return Number.isFinite(v) && v >= 320 ? v : 520;
+  } catch {
+    return 520;
+  }
+}
+
+/** The divider between the workspace and the side pane: drag to resize, double-click for the default width. */
+function SideDivider({ width, onWidth }: { width: number; onWidth: (w: number) => void }) {
+  const clamp = (w: number) => Math.round(Math.max(320, Math.min(window.innerWidth * 0.7, w)));
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const start = width;
+    let last = start;
+    const move = (ev: PointerEvent) => {
+      last = clamp(start + startX - ev.clientX);
+      onWidth(last);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.classList.remove('is-resizing');
+      try {
+        localStorage.setItem(WIDTH_KEY, String(last));
+      } catch {
+        // the width is a convenience
+      }
+    };
+    document.body.classList.add('is-resizing');
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div
+      className="split__divider side-divider"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the side pane"
+      aria-valuenow={width}
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onDoubleClick={() => onWidth(520)}
+      onKeyDown={(e) => {
+        const step = e.key === 'ArrowLeft' ? 40 : e.key === 'ArrowRight' ? -40 : 0;
+        if (step) {
+          e.preventDefault();
+          onWidth(clamp(width + step));
+        }
+      }}
+    />
+  );
 }
 
 function ThemeMenu() {
@@ -44,6 +104,14 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
   const conn = useStore(connectionStore);
   const [selected, setSelected] = useState<string | null>(hashWorkspace);
   const [collapsed, setCollapsed] = useState(false);
+  const services = useStore(integrationsStore);
+  const sideOpen = useStore(sidePaneStore, (s) => s.open);
+  const [sideWidth, setSideWidth] = useState(savedWidth);
+  const hasServices = Boolean(services.boards || services.artifacts);
+
+  useEffect(() => {
+    void loadIntegrations();
+  }, []);
 
   const all = list?.workspaces ?? [];
   const current =
@@ -92,6 +160,19 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
               </span>
             </Tooltip>
           )}
+          {hasServices && (
+            <IconButton
+              label={sideOpen ? 'Hide boards and documents' : 'Boards and documents'}
+              size="s"
+              aria-pressed={sideOpen}
+              data-testid="side-pane-toggle"
+              onClick={() =>
+                showPane(!sideOpen, sideOpen ? undefined : services.boards ? undefined : 'document')
+              }
+            >
+              <PanelRight size={16} />
+            </IconButton>
+          )}
           <MachineButton />
           <ThemeMenu />
           <IconButton label="Sign out" size="s" onClick={onSignOut}>
@@ -104,7 +185,17 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
               <Spinner label="Loading workspaces" />
             </div>
           ) : current ? (
-            <WorkspaceView key={current.id} workspace={current} />
+            <div className="shell__work">
+              <WorkspaceView key={current.id} workspace={current} />
+              {hasServices && sideOpen && (
+                <>
+                  <SideDivider width={sideWidth} onWidth={setSideWidth} />
+                  <div className="shell__side" style={{ width: sideWidth }}>
+                    <SidePane workspaceId={current.id} />
+                  </div>
+                </>
+              )}
+            </div>
           ) : (
             <div className="shell__loading">Create a workspace to start.</div>
           )}

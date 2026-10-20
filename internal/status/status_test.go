@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/history"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/sockets"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/history"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/sockets"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 type fakeLayouts struct {

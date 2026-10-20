@@ -5,9 +5,9 @@ import (
 	"sort"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/pricing"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/pricing"
 )
 
 func claudeCost(model string, input, output, cacheRead, write5m, write1h float64) float64 {

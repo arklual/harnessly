@@ -8,8 +8,8 @@ import (
 
 	"github.com/dlclark/regexp2"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Secret and path redaction of a snapshot. It runs when a snapshot is captured and again on every render, so one pass's

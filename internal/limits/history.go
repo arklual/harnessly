@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // limits-history.jsonl (0600) holds every measurement of every window for the burn-rate forecast, one line per

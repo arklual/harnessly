@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 func main() {

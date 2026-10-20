@@ -1,0 +1,57 @@
+# artifacts: the documents agents publish. Each document records the harnessly conversation that produced it
+# (ARTIFACTS_SESSION), and the harnessly page frames its embed view.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: artifacts
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ly-solutions/artifacts.git
+    targetRevision: main
+    path: deploy/helm/artifacts
+    helm:
+      releaseName: artifacts
+      valuesObject:
+        config:
+          publicUrl: https://artifacts.example.com
+        storage:
+          driver: s3
+          s3:
+            bucket: example-artifacts
+            region: eu-central-1
+        auth:
+          mode: oidc
+          oidc:
+            issuer: https://id.example.com/realms/work
+            clientId: artifacts
+        # ARTIFACTS_TOKEN (agents' editor token), ARTIFACTS_READ_TOKEN (harnessly's viewer token), ARTIFACTS_SECRET,
+        # ARTIFACTS_OIDC_CLIENT_SECRET.
+        existingSecret: artifacts-secrets
+        embed:
+          frameAncestors: https://*.work.example.com
+        ingress:
+          enabled: true
+          className: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-body-size: 16m
+          hosts:
+            - host: artifacts.example.com
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: artifacts-tls
+              hosts: [artifacts.example.com]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: artifacts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

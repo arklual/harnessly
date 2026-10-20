@@ -1,0 +1,31 @@
+# harnessly for one Unix account, as a systemd user service: the runtime with the web page, tmux and the agents run as
+# that account, in its home. Install with `make install install-systemd`, or by hand:
+#   install -Dm755 bin/runtime ~/.local/bin/harnessly-runtime
+#   install -Dm644 deploy/systemd/harnessly.service ~/.config/systemd/user/harnessly.service
+#   install -Dm600 deploy/systemd/env.example ~/.config/harnessly/env
+#   systemctl --user daemon-reload && systemctl --user enable --now harnessly
+#   loginctl enable-linger "$USER"     # keep it running without a login session
+[Unit]
+Description=harnessly: terminals and coding agents of %u
+Documentation=https://github.com/ly-solutions/harnessly/blob/main/docs/deploy.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=RUNTIME_GATE_LISTEN=127.0.0.1:8022
+Environment=RUNTIME_GATE_UPSTREAM=
+Environment=RUNTIME_APP_BASE_PATH=/
+EnvironmentFile=-%h/.config/harnessly/env
+WorkingDirectory=%h
+ExecStart=%h/.local/bin/harnessly-runtime
+# Only the runtime stops with the service: the tmux server and the agents in it keep working through a restart or an
+# upgrade, and the next runtime picks them up.
+KillMode=process
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=15
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

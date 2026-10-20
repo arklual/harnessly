@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // jsKeys are Object.keys(v) of a decoded value: an object's keys, a string's or an array's indices.

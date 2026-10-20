@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 func dir(pid int) string { return "/proc/" + strconv.Itoa(pid) }

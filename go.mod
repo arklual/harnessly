@@ -1,4 +1,4 @@
-module harnessly
+module github.com/ly-solutions/harnessly
 
 go 1.26.0
 

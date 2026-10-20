@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/preview/devtools"
-	"harnessly/internal/preview/weburl"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/weburl"
 )
 
 // Claim is what the gateway says a request may reach.

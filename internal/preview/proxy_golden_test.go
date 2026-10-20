@@ -31,7 +31,7 @@ import (
 
 	"github.com/andybalholm/brotli"
 
-	"harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
 
 // proxy.json is the previous runtime's proxy run end to end (testdata/gen/gen-proxy.mjs): the same fixture servers

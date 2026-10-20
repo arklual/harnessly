@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"sync"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Kinds, plugins first: their reload also brings the skills plugins carry.

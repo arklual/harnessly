@@ -12,8 +12,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"harnessly/internal/machine"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // Claude Code turns a long or multi-line bracketed paste into "[Pasted text #n]" and hands it to the model as pasted

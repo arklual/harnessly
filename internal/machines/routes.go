@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/push"
 )
 
 // Slice is the gate slice of these routes.

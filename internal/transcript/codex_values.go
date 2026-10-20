@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // JavaScript semantics the Codex parser leans on: decoding bytes as Buffer.toString does, property reads that tell

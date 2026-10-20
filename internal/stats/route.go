@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // Route answers the routes under /api/stats/.

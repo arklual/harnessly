@@ -8,8 +8,8 @@ import (
 	"strings"
 	"text/template"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // MCP is the runtime's own MCP server as Codex is told about it. The token travels in an environment variable the

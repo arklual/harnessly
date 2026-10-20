@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
 )
 
 const token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

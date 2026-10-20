@@ -6,10 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // Paths are where the agents keep their transcripts: only a jsonl under one of them may be read.

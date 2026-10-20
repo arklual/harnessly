@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // JSONRoute is a read-only route a slice answers with JSON. Before the slice is switched on it can run in the shadow:

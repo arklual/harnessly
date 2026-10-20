@@ -5,9 +5,9 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/preview/weburl"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/preview/weburl"
 )
 
 // What the page's bridge reports: requests to other sites and its console. The page's own code can post anything here,

@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 type historyEntry struct {

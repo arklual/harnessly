@@ -605,3 +605,57 @@ func TestCaptureAtWidth(t *testing.T) {
 		}
 	}
 }
+
+// Integrations hand a new pane shell their variables, keyed by the tab the session belongs to; values are quoted for
+// the shell and names that are not variable names are dropped.
+func TestCreateSessionPaneEnv(t *testing.T) {
+	dir := t.TempDir()
+	shell := filepath.Join(dir, "capture-shell")
+	script := "#!/bin/sh\nprintf '%s|%s|%s|%s' \"$ARTIFACTS_SESSION\" \"$BOARDS_TOKEN\" \"${BAD-unset}\" \"$HOME\"\n"
+	if err := os.WriteFile(shell, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	var asked []string
+	f := newFake()
+	tm := f.tmux(Config{Names: fakeNames, Env: []string{"HOME=" + dir, "SHELL=" + shell}, PaneEnv: func(tab string) []string {
+		asked = append(asked, tab)
+		return []string{"ARTIFACTS_SESSION=" + tab, "BOARDS_TOKEN=it's $secret", "BAD NAME=x", "noequals"}
+	}})
+	session := tm.SessionName("ws-a", "pane-b", "tab-c")
+	if err := tm.CreateSession(session, 80, 24, dir); err != nil {
+		t.Fatal(err)
+	}
+	args := f.calls[0].args
+	command := args[len(args)-1]
+	if !strings.Contains(command, ` ARTIFACTS_SESSION='tab-c' BOARDS_TOKEN='it'\''s $secret' '`) || strings.Contains(command, "BAD") {
+		t.Fatalf("%s", command)
+	}
+	out, err := exec.Command("/bin/sh", "-c", command).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != "tab-c|it's $secret|unset|"+dir {
+		t.Fatalf("%q", out)
+	}
+	shellOfTab, _ := tm.PaneShellName("tab-d", false)
+	_ = tm.CreateSession(shellOfTab, 80, 24, dir)
+	_ = tm.CreateSession(tm.NewSessionName(), 80, 24, dir)
+	if !reflect.DeepEqual(asked, []string{"tab-c", "tab-d", ""}) {
+		t.Fatalf("tabs asked for: %q", asked)
+	}
+	if tm.ShellLaunchCommand() == command {
+		t.Fatal("the plain launch command has no pane variables")
+	}
+}
+
+func TestTabOf(t *testing.T) {
+	tm := New(Names{Socket: "main", Prefix: "nw-", LegacyPrefix: "ow-"})
+	for session, want := range map[string]string{
+		"nw-ws-a-pane-b-tab-c": "tab-c", "ow-ws-a-pane-b-tab-c": "tab-c", "nw-shell-tab-x": "tab-x", "ow-shell-tab-y": "tab-y",
+		"nw-abc-def-ghi": "", "other-ws-a-pane-b-tab-c": "", "nw-shell-": "",
+	} {
+		if got := tm.TabOf(session); got != want {
+			t.Errorf("TabOf(%q) = %q, want %q", session, got, want)
+		}
+	}
+}

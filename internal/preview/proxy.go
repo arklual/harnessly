@@ -20,10 +20,10 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/preview/devtools"
-	"harnessly/internal/preview/weburl"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/weburl"
 )
 
 // Config is what the deployment and the gate give the proxy.

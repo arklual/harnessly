@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // TrustPrompt is an agent asking whether to trust the folder it starts in.

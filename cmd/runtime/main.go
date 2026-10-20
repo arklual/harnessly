@@ -17,13 +17,14 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/agents/codex"
-	"harnessly/internal/gate"
-	"harnessly/internal/limits"
-	"harnessly/internal/preflight"
-	"harnessly/internal/terminal"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/integrations"
+	"github.com/ly-solutions/harnessly/internal/limits"
+	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/terminal"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 func env(name, fallback string) string {
@@ -131,6 +132,11 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	old := &gate.OldRuntime{Upstream: cfg.Upstream, DataDir: cfg.DataDir, TokenHeaders: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}
 	home, _ := os.UserHomeDir()
 	nice, niceSet := os.LookupEnv("RUNTIME_AGENT_NICE")
+	integ := integrations.FromEnv(os.Getenv)
+	var paneEnv func(string) []string
+	if integ.Enabled() {
+		paneEnv = integ.AgentEnv
+	}
 	tm := tmux.NewConfig(tmux.Config{
 		Names: tmux.Names{
 			Socket:       env("RUNTIME_TMUX_SOCKET", "harnessly"),
@@ -142,6 +148,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		PaneBinDir: os.Getenv("RUNTIME_PANE_BIN_DIR"),
 		Nice:       tmux.ParseNiceness(nice, niceSet),
 		Home:       home,
+		PaneEnv:    paneEnv,
 	})
 	ref := &coreRef{}
 	terms := terminal.New(terminal.Config{
@@ -377,6 +384,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(f.AsRoutes(stateRoutes(d, settingsStore, ref.c.agents.ValidateLaunch)...)...)
 	f.Add(f.AsRoutes(ref.c.stateCoreRoutes(d)...)...)
 	f.Add(unshadowed(f, append(automationRoutes(d, settingsStore), ref.c.browserTabRoutes(d)...))...)
+	f.Add(integrationRoutes(d, integ)...)
 	if w := webConfigFromEnv(cfg.Standalone()); w != nil {
 		f.Add(gate.Route{Match: w.matches, Handler: w.handler()})
 	}

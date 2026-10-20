@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"harnessly/internal/checkpoints/scripttest"
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/checkpoints/scripttest"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 func TestGoldenChangesRoute(t *testing.T) {

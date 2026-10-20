@@ -17,7 +17,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Undefined given to Set removes the key, as JSON.stringify drops an undefined property.

@@ -8,8 +8,8 @@ import (
 
 	"github.com/dlclark/regexp2"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // A snapshot is a whitelist projection of a conversation's timeline: tool results, images, attachments, approval

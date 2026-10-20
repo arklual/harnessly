@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/subagents"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/subagents"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // testdata/entries.json: what the previous runtime's dispatcher and transcript-page handler answered (testdata/entries,

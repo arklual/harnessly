@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
 // The reply Claude has printed in its terminal but not yet written to the transcript: Claude Code records a message

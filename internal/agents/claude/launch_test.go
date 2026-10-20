@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents"
 )
 
 const session = "11111111-2222-4333-8444-555555555555"

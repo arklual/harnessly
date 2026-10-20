@@ -1,0 +1,22 @@
+apiVersion: v2
+name: harnessly
+description: A workspace for people and coding agents — Claude Code and Codex in tmux, terminals and conversations in a web page, with boards and documents beside them.
+type: application
+version: 0.1.0
+appVersion: "0.10.0"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/ly-solutions/harnessly
+icon: https://raw.githubusercontent.com/ly-solutions/harnessly/main/docs/brand/harnessly-avatar.svg
+sources:
+  - https://github.com/ly-solutions/harnessly
+maintainers:
+  - name: Ly Solutions
+    url: https://github.com/ly-solutions
+keywords:
+  - ai-agents
+  - claude-code
+  - codex
+  - tmux
+  - workspace
+annotations:
+  artifacthub.io/license: Apache-2.0

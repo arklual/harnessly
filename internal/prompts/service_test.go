@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 func TestScheduleDeliversAfterTheSettle(t *testing.T) {

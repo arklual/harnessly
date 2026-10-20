@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Every read-modify-write of a layout holds that workspace's lock; tmux is started and stopped outside it, and the

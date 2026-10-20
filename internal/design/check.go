@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // The check the design tool runs after each change: every board opened in a headless browser of this machine as a

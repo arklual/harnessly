@@ -15,7 +15,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // waitEvent returns the first event of the given kind within d, setting aside the others.

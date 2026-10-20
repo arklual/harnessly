@@ -8,10 +8,10 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 func contextBackground() context.Context { return context.Background() }

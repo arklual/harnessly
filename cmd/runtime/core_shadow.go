@@ -16,13 +16,13 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/agents"
-	"harnessly/internal/agents/claude"
-	"harnessly/internal/agents/codex"
-	"harnessly/internal/gate"
-	"harnessly/internal/sockets"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/sockets"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 // The core's shadow (slice "core-shadow", while "core" is off): a Go keeper next to the old runtime's, reading the same

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
 // Agent work states the package reads (the status machine owns them).

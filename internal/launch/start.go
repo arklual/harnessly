@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/locale"
-	"harnessly/internal/state"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 // Lines are the agent CLIs' launch lines.

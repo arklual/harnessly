@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // The dev server's own output for the slot's port: the terminal it runs in, or the file its output goes to (a server an

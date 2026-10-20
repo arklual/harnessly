@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/state"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 type metadata struct {

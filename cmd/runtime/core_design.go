@@ -4,13 +4,13 @@ import (
 	"net/http"
 	"os"
 
-	"harnessly/internal/design"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/launch"
-	"harnessly/internal/prompts"
-	"harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/design"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/launch"
+	"github.com/ly-solutions/harnessly/internal/prompts"
+	"github.com/ly-solutions/harnessly/internal/push"
 )
 
 // designTerminal is a message to an agent through this core's layouts, tmux and prompt editor.

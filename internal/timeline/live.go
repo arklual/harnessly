@@ -3,7 +3,7 @@ package timeline
 import (
 	"time"
 
-	"harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents"
 )
 
 // The reply a working Claude has printed but not yet written, read off the screen once a second for the sessions

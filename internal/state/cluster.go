@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The cluster owns a pair's state once the machine agent says so in state-mode.json; it is re-read at most once a

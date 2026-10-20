@@ -15,12 +15,12 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/agents/claude"
-	"harnessly/internal/background"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/proc"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
+	"github.com/ly-solutions/harnessly/internal/background"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 const (

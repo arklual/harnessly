@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/files"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Bootstrap answers the page's start data from this machine's files: the person, whether tmux and git are usable,

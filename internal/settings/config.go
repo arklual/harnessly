@@ -3,7 +3,7 @@ package settings
 import (
 	"errors"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // ErrNotObject: the config file holds a string, a number or a boolean: the previous runtime failed to stamp it.

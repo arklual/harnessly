@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // The in-tab Whisper engine's model and ONNX Runtime files, served from the runtime's own origin so the page needs

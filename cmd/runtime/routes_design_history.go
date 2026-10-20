@@ -3,9 +3,9 @@ package main
 import (
 	"net/http"
 
-	"harnessly/internal/design"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/design"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 // designKeeperRunning says whether the tab keeper runs; routes that name a chat by its session match only then.

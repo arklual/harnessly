@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Claude subscription usage from the codexbar CLI, once a minute. Only percentages, reset times, the plan name and

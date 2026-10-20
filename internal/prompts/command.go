@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/catalog"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/catalog"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
 // The slash-command runner types a line into an agent's pane and reads what the TUI did with it: confirms "Switch

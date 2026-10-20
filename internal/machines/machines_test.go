@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/push"
 )
 
 func assistantLine(req string, ts time.Time, out int) string {

@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // Launch is the model and reasoning effort a conversation starts with; nil means the CLI's own default («Авто»). Same

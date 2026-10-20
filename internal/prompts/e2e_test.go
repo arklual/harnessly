@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // The end-to-end tests run a fake agent TUI in a pane of a private tmux server (hs-test-*): the test binary itself,

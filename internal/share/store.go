@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The owner's drafts and published links, under <data>/shares, in the previous runtime's formats:

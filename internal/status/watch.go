@@ -7,7 +7,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents"
 )
 
 const jsonlDebounce = 100 * time.Millisecond

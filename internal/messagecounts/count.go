@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Counts is the answer. Breakdown values are numbers, or strings where a tool is named after a property every

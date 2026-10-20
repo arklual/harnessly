@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/panel"
 )
 
 const agentSession = "pt-ws-1-aaa"

@@ -7,7 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"io"
 	"math/big"
 	"net/http"
@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 const tagPrefix = "app:"

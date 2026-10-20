@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // StatusSource is what the status socket reads and where the page's messages go.

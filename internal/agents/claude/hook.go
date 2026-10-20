@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"slices"
 
-	"harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents"
 )
 
 // TranslateHook turns a hook report (`<event>` as the status hook script names it, and Notification's type) into a

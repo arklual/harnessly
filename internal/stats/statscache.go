@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The stats cache: Claude Code days summed from the transcripts, finished days kept in <data>/stats/cache.json (the

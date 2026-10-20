@@ -218,3 +218,23 @@ the previous runtime the pages are someone else's and the gate leaves those path
 | --- | --- |
 | `RUNTIME_WEB` | `on` serves the page in front of the previous runtime too, `off` never; unset: standalone only |
 | `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page |
+
+### Boards and artifacts
+
+The sibling services [boards](https://github.com/ly-solutions/boards) (whiteboards) and
+[artifacts](https://github.com/ly-solutions/artifacts) (documents); see [integrations](integrations.md). With an address
+set, every tab this runtime starts (Claude Code, Codex, a shell; resumed ones too) gets the service's variables in its
+shell, and the page shows a board and a document pane. Tokens stay on the machine: the page asks the runtime for a
+board sign-in hand-off and for a conversation's documents. In front of the previous runtime nothing changes until an
+address is set, and only tabs this runtime starts get the variables.
+
+| Variable | Meaning |
+| --- | --- |
+| `RUNTIME_BOARDS_URL` | the boards server's origin, e.g. `https://boards.example.com`; agents get it as `BOARDS_URL` |
+| `RUNTIME_BOARDS_TOKEN` | an API token of the boards server (one of its `BOARDS_API_TOKENS`): the runtime mints sign-in hand-offs with it (`POST /b/api/handoff`); unset, the pane loads the board directly and boards signs people in its own way |
+| `RUNTIME_BOARDS_AGENT_TOKEN` | the token agents get as `BOARDS_TOKEN` (default `RUNTIME_BOARDS_TOKEN`); give agents their own so it can be revoked alone |
+| `RUNTIME_ARTIFACTS_URL` | the catalog's origin, e.g. `https://artifacts.example.com`; agents get it as `ARTIFACTS_URL` and the tab's id as `ARTIFACTS_SESSION` |
+| `RUNTIME_ARTIFACTS_TOKEN` | the editor token agents publish with (`ARTIFACTS_TOKEN`) |
+| `RUNTIME_ARTIFACTS_READ_TOKEN` | the viewer token the runtime lists a conversation's documents with (default `RUNTIME_ARTIFACTS_TOKEN`) |
+| `RUNTIME_ARTIFACTS_AUTHOR` | who agents publish as (`ARTIFACTS_AUTHOR`); default `<RUNTIME_OWNER_NAME> (agent)` when that is set |
+| `RUNTIME_OWNER_NAME` | the person's display name, for board hand-offs and the default author; the hand-off's e-mail is the session's, else `RUNTIME_OWNER_EMAIL` |

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 // The services slice through the gate: the API's own refusal, each handler's session check, the organizer written

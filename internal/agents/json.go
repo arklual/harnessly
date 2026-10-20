@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // Obj is a JSON object that remembers the order its keys came in: a transcript line's tool input is summarised by

@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/catalog"
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/catalog"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 func init() { routeGroups = append(routeGroups, commandRoutes) }

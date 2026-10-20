@@ -1,5 +1,5 @@
-# A pushed version tag (v1.2.3) builds agent and runtime for linux and darwin, amd64 and arm64, and publishes them with
-# checksums and a changelog as a GitHub release.
+# A pushed version tag (v1.2.3) builds agent and runtime (with the web page compiled in) for linux and darwin, amd64
+# and arm64, and publishes them with checksums and a changelog as a GitHub release.
 name: release
 
 on:
@@ -21,6 +21,15 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      # GoReleaser's before hook builds web/ for the runtime's webui tag.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
       - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser

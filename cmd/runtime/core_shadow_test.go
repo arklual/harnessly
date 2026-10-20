@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 func TestShadowReportsOnlyLastingDifferences(t *testing.T) {

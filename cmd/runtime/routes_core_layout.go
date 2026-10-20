@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/coreapi/layoutapi"
-	"harnessly/internal/gate"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/panel"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 // The core's routes over layouts, workspaces, the CLIs' tabs and the pane's bridges (slice "core"; the GETs without

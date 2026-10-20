@@ -7,8 +7,8 @@ import (
 	"slices"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
 // The operations behind the routes: each takes the request body (JSON) or query value and answers a Response. The HTTP

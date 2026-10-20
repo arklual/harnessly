@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents"
 )
 
 func TestMain(m *testing.M) {

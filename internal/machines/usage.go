@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/pricing"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/pricing"
 )
 
 // The spend history of the limits forecast, from the person's Claude Code and Codex transcripts: every model call's

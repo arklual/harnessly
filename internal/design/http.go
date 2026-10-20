@@ -7,10 +7,10 @@ import (
 	"net/url"
 	"strings"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // API answers the library's routes as the previous runtime's dispatcher and handlers did.

@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // The routes of the state slice that read the running machine, through the whole gate: tmux, the core's agents and

@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"os"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/subagents"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/subagents"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // entriesPage is how many entries a page holds when the request names no limit.

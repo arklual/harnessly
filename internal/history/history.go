@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // MaxEntries is how many turns the list keeps.

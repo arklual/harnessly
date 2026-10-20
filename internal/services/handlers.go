@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/files"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // Handlers answer the routes as the previous runtime's dispatcher and handlers did, after the caller passed the API's

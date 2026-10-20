@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Probe is what Claude Code's transcript says about a moment: the tools called and not answered, and where a message

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Locating a picked element, the design dialog an agent is started into, and the messages typed into an agent's

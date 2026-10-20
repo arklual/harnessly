@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/terminal"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/terminal"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 func TestTimelineRoutesAnswerWhileTheCoreRuns(t *testing.T) {

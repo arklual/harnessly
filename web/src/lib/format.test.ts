@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MachineLoad } from '../api/types';
-import { formatBytes, formatClock, formatSpan, formatUntil, formatUptime } from './format';
+import { formatAgo, formatBytes, formatClock, formatSpan, formatUntil, formatUptime } from './format';
 import { loadPerCore, metricTone, stopOutcome } from './machine-load';
 import { stripControlChars } from './terminal-text';
 
 describe('format', () => {
+  it('says how long ago', () => {
+    const now = Date.parse('2026-10-19T12:00:00.000Z');
+    expect(formatAgo('2026-10-19T11:59:30.000Z', now)).toBe('just now');
+    expect(formatAgo('2026-10-19T11:56:00.000Z', now)).toBe('4 min ago');
+    expect(formatAgo('2026-10-19T09:55:00.000Z', now)).toBe('2 h ago');
+    expect(formatAgo('2026-10-16T12:00:00.000Z', now)).toBe('3 d ago');
+    expect(formatAgo('soon', now)).toBe('');
+  });
+
   it('formats clocks and spans', () => {
     expect(formatClock(247_000)).toBe('4:07');
     expect(formatClock(3_729_000)).toBe('1:02:09');

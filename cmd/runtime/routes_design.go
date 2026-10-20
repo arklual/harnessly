@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/design"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/design"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 // The design library (slice "design"): the library's listing, its loopback server, board edits, imports and new

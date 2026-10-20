@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // MaxEvents is the most events one request carries.

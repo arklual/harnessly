@@ -19,7 +19,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 type client struct {

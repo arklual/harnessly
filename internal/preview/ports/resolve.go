@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Component is a component picked in a preview: its name, an Angular host tag, or the source a React build named.

@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
 
 var jsNumber = devtools.JSNumber

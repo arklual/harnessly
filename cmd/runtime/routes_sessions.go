@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"sync"
 
-	"harnessly/internal/agentdetect"
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/machine"
-	"harnessly/internal/preflight"
-	"harnessly/internal/sessions"
-	"harnessly/internal/settings"
+	"github.com/ly-solutions/harnessly/internal/agentdetect"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/sessions"
+	"github.com/ly-solutions/harnessly/internal/settings"
 )
 
 func init() { routeGroups = append(routeGroups, sessionRoutes) }

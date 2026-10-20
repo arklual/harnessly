@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/checkpoints"
-	"harnessly/internal/checkpoints/scripttest"
-	"harnessly/internal/gate"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/checkpoints"
+	"github.com/ly-solutions/harnessly/internal/checkpoints/scripttest"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // The previous runtime's dispatcher and handlers answered the requests of testdata/checkpoints-golden.json and

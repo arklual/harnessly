@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"sync"
 
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // Data is one provider's entry as it is stored: a JSON object whose fields beyond the windows are optional, so writers

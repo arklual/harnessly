@@ -18,13 +18,13 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/agents/claude"
-	"harnessly/internal/agents/codex"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/proc"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // The golden test plays testdata/scenario.json against this server and compares what every socket received, and what

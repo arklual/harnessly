@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 func cmd(pairs ...any) *jsvalue.Object { return jsvalue.NewObject(pairs...) }

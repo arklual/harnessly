@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 var (

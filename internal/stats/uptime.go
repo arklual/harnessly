@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The uptime: minutes in the last seven days when some agent was at work (a prompt or an answer, gaps up to 15 minutes

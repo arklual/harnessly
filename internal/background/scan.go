@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Kinds of background work.

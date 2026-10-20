@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // What this runtime does for the claims of its chats: who it is, which chat a command comes from, how a claim is

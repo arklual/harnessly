@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/panel"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // Statuses a page may report.

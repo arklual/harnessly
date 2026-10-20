@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 const (

@@ -1,0 +1,21 @@
+harnessly is starting as {{ include "harnessly.fullname" . }}-0 (one pod, the home folder on
+{{- if .Values.persistence.enabled }} a {{ .Values.persistence.size }} volume{{ else }} an emptyDir: it is lost with the pod{{ end }}).
+
+{{- if .Values.ingress.enabled }}
+Open:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ include "harnessly.basePath" $ | trimSuffix "/" }}/
+{{- end }}
+{{- else }}
+Reach it from your machine:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "harnessly.fullname" . }} 8022:{{ .Values.service.port }}
+  open http://127.0.0.1:8022{{ include "harnessly.basePath" . | trimSuffix "/" }}/
+{{- end }}
+
+The first visit sets the password. Agent CLIs: use an image built with the Dockerfile's with-agents target, or
+install them into the home volume from a terminal tab (docs/deploy.md).
+{{- if or .Values.integrations.boards.url .Values.integrations.artifacts.url }}
+
+Boards and documents: allow this page's origin on those servers (BOARDS_FRAME_ANCESTORS,
+ARTIFACTS_FRAME_ANCESTORS) and put the runtime's tokens into {{ include "harnessly.secretName" . }}.
+{{- end }}

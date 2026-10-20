@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/runlock"
-	"harnessly/internal/status"
-	"harnessly/internal/telemetry"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/runlock"
+	"github.com/ly-solutions/harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/telemetry"
 )
 
 // standaloneGolden is what the previous runtime wrote at its start on an empty data folder (testdata/standalone/gen.mjs).

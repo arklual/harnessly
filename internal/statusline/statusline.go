@@ -18,12 +18,12 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/history"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/limits"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/history"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/limits"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 const (

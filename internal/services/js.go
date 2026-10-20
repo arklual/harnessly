@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"unicode/utf16"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The answers are built from what external services send, read the way the previous runtime's handlers read it:

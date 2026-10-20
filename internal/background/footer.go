@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Counts is what the agent's own footer says is running (`· 2 shells, 1 monitor ·`); its `← N agent` counts peers,

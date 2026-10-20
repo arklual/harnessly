@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/limits"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/limits"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // testdata/golden.json holds the previous runtime's answers on generated inputs: its own code run under node by

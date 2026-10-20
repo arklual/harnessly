@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The session statistics of a Codex transcript (readCodexTimelineSessionStats of the previous runtime's Codex stats):

@@ -14,8 +14,8 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Store is the settings files of one data folder.

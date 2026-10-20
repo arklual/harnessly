@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // A new project of the library: the library's .template/ folder copied to <library>/<id>/ with the title and the

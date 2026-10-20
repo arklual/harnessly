@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // What an agent can do with a slot's DevTools record: read the network and console logs and the dev server's terminal,

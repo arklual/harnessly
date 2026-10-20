@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/gate"
-	"harnessly/internal/limits"
-	"harnessly/internal/machines"
-	"harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/limits"
+	"github.com/ly-solutions/harnessly/internal/machines"
+	"github.com/ly-solutions/harnessly/internal/push"
 )
 
 // The machines slice: the machine snapshot the machine agent polls, the machine load panel, health and the manifest,

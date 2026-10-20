@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/push"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // The machines slice answers with the core off, and its push routes write through the sender the core sends with.

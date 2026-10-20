@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // SubscriptionsFile is the browsers' push subscriptions in the data folder.

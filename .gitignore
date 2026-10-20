@@ -5,3 +5,4 @@
 /runtime
 /agent
 /agentprobe
+/.env

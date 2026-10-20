@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/files"
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Config is what the deployment names.

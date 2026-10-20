@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // cmdTimeout bounds each check; a check stopped by it is uncertain, not missing.

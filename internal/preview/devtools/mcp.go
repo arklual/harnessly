@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // The MCP server that gives an agent the DevTools of the right pane's browser. Stateless Streamable HTTP: every POST

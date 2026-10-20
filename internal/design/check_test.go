@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 type checkGolden struct {

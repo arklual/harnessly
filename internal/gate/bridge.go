@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // OldRuntime calls the previous runtime's internal routes for what the Go slices must tell it while it still keeps

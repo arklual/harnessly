@@ -1,0 +1,112 @@
+# The whole workspace on one host: harnessly (terminals and conversations), boards (whiteboards) and artifacts
+# (documents), with MinIO as their S3 storage.
+#
+#   docker compose up --build        then open http://localhost:8022
+#
+# boards and artifacts run in harnessly's network namespace, the way containers of one pod do: the page, the runtime
+# and the agents in its tabs all reach them at the same addresses (http://localhost:8081, http://localhost:8082), so
+# the links agents post open in the browser as they are, and the three share one site for the panes' cookies.
+# Everything is bound to 127.0.0.1 and the tokens below are local placeholders: for a shared host set your own in
+# .env (see .env.example) and put TLS in front, or use the Helm chart.
+
+name: harnessly
+
+x-ports:
+  harnessly: &harnessly-port ${HARNESSLY_PORT:-8022}
+  boards: &boards-port ${BOARDS_PORT:-8081}
+  artifacts: &artifacts-port ${ARTIFACTS_PORT:-8082}
+
+services:
+  harnessly:
+    build:
+      context: .
+      target: ${HARNESSLY_TARGET:-runtime}
+    image: ${HARNESSLY_IMAGE:-ghcr.io/ly-solutions/harnessly:latest}
+    environment:
+      RUNTIME_GATE_LISTEN: 0.0.0.0:${HARNESSLY_PORT:-8022}
+      RUNTIME_OWNER_NAME: ${HARNESSLY_OWNER_NAME:-}
+      RUNTIME_BOARDS_URL: http://localhost:${BOARDS_PORT:-8081}
+      RUNTIME_BOARDS_TOKEN: ${BOARDS_RUNTIME_TOKEN:-local-boards-runtime-token}
+      RUNTIME_BOARDS_AGENT_TOKEN: ${BOARDS_AGENT_TOKEN:-local-boards-agent-token}
+      RUNTIME_ARTIFACTS_URL: http://localhost:${ARTIFACTS_PORT:-8082}
+      RUNTIME_ARTIFACTS_TOKEN: ${ARTIFACTS_EDITOR_TOKEN:-local-artifacts-editor-token}
+      RUNTIME_ARTIFACTS_READ_TOKEN: ${ARTIFACTS_VIEWER_TOKEN:-local-artifacts-viewer-token}
+    ports:
+      - "127.0.0.1:${HARNESSLY_PORT:-8022}:${HARNESSLY_PORT:-8022}"
+      - "127.0.0.1:${BOARDS_PORT:-8081}:${BOARDS_PORT:-8081}"
+      - "127.0.0.1:${ARTIFACTS_PORT:-8082}:${ARTIFACTS_PORT:-8082}"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - home:/home/agent
+    restart: unless-stopped
+
+  minio:
+    # Community build of MinIO (AGPL-3.0); any S3-compatible store works.
+    image: ${MINIO_IMAGE:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z}
+    network_mode: service:harnessly
+    command: ["server", "/data", "--address", "127.0.0.1:9000", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-harnessly}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-minio-password}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  boards:
+    build: ${BOARDS_SOURCE:-https://github.com/ly-solutions/boards.git#main}
+    image: ${BOARDS_IMAGE:-ghcr.io/ly-solutions/boards:latest}
+    network_mode: service:harnessly
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      PORT: *boards-port
+      BOARDS_METRICS_PORT: "0"
+      BOARDS_PUBLIC_URL: http://localhost:${BOARDS_PORT:-8081}
+      BOARDS_AUTH: token
+      BOARDS_API_TOKENS: ${BOARDS_RUNTIME_TOKEN:-local-boards-runtime-token},${BOARDS_AGENT_TOKEN:-local-boards-agent-token}
+      BOARDS_SESSION_SECRET: ${BOARDS_SESSION_SECRET:-local-boards-session-secret-change-me}
+      BOARDS_FRAME_ANCESTORS: "'self' http://localhost:${HARNESSLY_PORT:-8022}"
+      BOARDS_CORS_ORIGINS: http://localhost:${HARNESSLY_PORT:-8022}
+      BOARDS_STORAGE: s3
+      BOARDS_S3_ENDPOINT: http://127.0.0.1:9000
+      BOARDS_S3_BUCKET: boards
+      BOARDS_S3_FORCE_PATH_STYLE: "true"
+      BOARDS_S3_CREATE_BUCKET: "true"
+      BOARDS_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-harnessly}
+      BOARDS_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-local-minio-password}
+    restart: unless-stopped
+
+  artifacts:
+    build: ${ARTIFACTS_SOURCE:-https://github.com/ly-solutions/artifacts.git#main}
+    image: ${ARTIFACTS_IMAGE:-ghcr.io/ly-solutions/artifacts:latest}
+    network_mode: service:harnessly
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      ARTIFACTS_PORT: *artifacts-port
+      ARTIFACTS_PUBLIC_URL: http://localhost:${ARTIFACTS_PORT:-8082}
+      ARTIFACTS_AUTH: token
+      ARTIFACTS_TOKEN: ${ARTIFACTS_EDITOR_TOKEN:-local-artifacts-editor-token}
+      ARTIFACTS_READ_TOKEN: ${ARTIFACTS_VIEWER_TOKEN:-local-artifacts-viewer-token}
+      ARTIFACTS_SECRET: ${ARTIFACTS_SECRET:-local-artifacts-secret-change-me}
+      ARTIFACTS_FRAME_ANCESTORS: http://localhost:${HARNESSLY_PORT:-8022}
+      ARTIFACTS_STORAGE: s3
+      ARTIFACTS_S3_ENDPOINT: http://127.0.0.1:9000
+      ARTIFACTS_S3_BUCKET: artifacts
+      ARTIFACTS_S3_FORCE_PATH_STYLE: "true"
+      ARTIFACTS_S3_CREATE_BUCKET: "true"
+      ARTIFACTS_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-harnessly}
+      ARTIFACTS_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-local-minio-password}
+      ARTIFACTS_LOG_FORMAT: text
+    restart: unless-stopped
+
+volumes:
+  home:
+  minio-data:

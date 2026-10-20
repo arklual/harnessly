@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The previous runtime's batchBody for the same event (its module run under node).

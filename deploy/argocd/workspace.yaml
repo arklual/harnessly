@@ -1,0 +1,24 @@
+# App of apps: the whole workspace — harnessly, boards and artifacts — from their own charts, as three child
+# Applications kept in deploy/argocd/workspace. Copy that folder into your own Git repository, set the hosts, the
+# buckets and the Secrets' names there, and point this Application at it.
+#   kubectl -n argocd apply -f deploy/argocd/workspace.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: workspace
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ly-solutions/harnessly.git
+    targetRevision: main
+    path: deploy/argocd/workspace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

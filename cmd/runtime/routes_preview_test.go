@@ -18,10 +18,10 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/gate"
-	"harnessly/internal/preview/devtools"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // devtools.json is the previous runtime's DevTools routes, MCP server and slot endpoints driven by one script

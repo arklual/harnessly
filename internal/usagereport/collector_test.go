@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 func answerBody(t *testing.T, rt *Route, target, cookie string) (int, string) {

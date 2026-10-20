@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/agents"
-	"harnessly/internal/agents/claude"
-	"harnessly/internal/agents/codex"
-	"harnessly/internal/coreapi/layoutapi"
-	"harnessly/internal/gate"
-	"harnessly/internal/launch"
-	"harnessly/internal/proc"
-	"harnessly/internal/sessions"
-	"harnessly/internal/sleep"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/launch"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/sessions"
+	"github.com/ly-solutions/harnessly/internal/sleep"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 // Starting and resuming agents (slice "launch"): conversations, automations, documents, evals, side chats, the Codex

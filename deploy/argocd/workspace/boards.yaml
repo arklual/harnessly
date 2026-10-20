@@ -1,0 +1,59 @@
+# boards: whiteboards people draw and agents read and edit. The harnessly page embeds its editor, so the page's
+# origin is allowed to frame it; all three hosts share example.com, so the editor keeps its sign-in cookie in the pane.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: boards
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ly-solutions/boards.git
+    targetRevision: main
+    path: deploy/helm/boards
+    helm:
+      releaseName: boards
+      valuesObject:
+        publicUrl: https://boards.example.com
+        storage:
+          driver: s3
+          s3:
+            bucket: example-boards
+            region: eu-central-1
+        auth:
+          mode: oidc
+          oidc:
+            issuer: https://id.example.com/realms/work
+            clientId: boards
+        # BOARDS_API_TOKENS (one for harnessly's runtime, one for agents), BOARDS_SESSION_SECRET,
+        # BOARDS_OIDC_CLIENT_SECRET.
+        existingSecret: boards-secrets
+        integration:
+          frameAncestors: "'self' https://*.work.example.com"
+          corsOrigins:
+            - https://ada.work.example.com
+        ingress:
+          enabled: true
+          className: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+            nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+          hosts:
+            - host: boards.example.com
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: boards-tls
+              hosts: [boards.example.com]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: boards
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

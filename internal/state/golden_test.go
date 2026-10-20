@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // fakeTmux is tmux as a set of session names, as testdata/gen/stub-tmux.mjs is for the previous runtime.

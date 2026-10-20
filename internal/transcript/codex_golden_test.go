@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The golden file is what the previous runtime's parser answered on the corpus (testdata/codex/gen). CODEX_GOLDEN and

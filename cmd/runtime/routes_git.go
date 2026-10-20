@@ -5,10 +5,10 @@ import (
 	"net/url"
 	"strings"
 
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/gitread"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gitread"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 func init() { routeGroups = append(routeGroups, gitRoutes) }

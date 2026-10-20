@@ -4,9 +4,9 @@ import (
 	"io"
 	"net/http"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
 
 // The slot's own paths, answered by the runtime before any routing to a dev server: the bridge script, and the

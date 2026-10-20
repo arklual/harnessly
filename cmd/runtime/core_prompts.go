@@ -7,15 +7,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/agents"
-	"harnessly/internal/catalog"
-	"harnessly/internal/files"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/proc"
-	"harnessly/internal/prompts"
-	"harnessly/internal/state"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/catalog"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/prompts"
+	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 // The prompt queue and every route that types into an agent's pane (internal/prompts), wired to the core's keeper,

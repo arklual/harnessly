@@ -8,6 +8,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Boards and artifacts integrations. `RUNTIME_BOARDS_URL` / `RUNTIME_ARTIFACTS_URL` with their tokens give every
+  tab the runtime starts or resumes `BOARDS_URL`, `BOARDS_TOKEN`, `ARTIFACTS_URL`, `ARTIFACTS_TOKEN`,
+  `ARTIFACTS_SESSION` (the tab's id) and `ARTIFACTS_AUTHOR`. New routes for the page: `GET /api/integrations`,
+  `POST /api/integrations/boards/sign-in` (a one-time boards hand-off) and
+  `GET /api/integrations/artifacts/documents?session=`. In gate mode they exist only once a service is configured.
+- The web page has a side pane with Board and Document tabs: the boards editor signed in through the hand-off, the
+  artifacts embed view following the page's theme, and the current conversation's documents. Board and document links
+  in conversations become chips that open there.
+- Ways to run: a multi-stage `Dockerfile` (with a `with-agents` target that adds Claude Code and Codex from npm), a
+  `compose.yaml` with boards, artifacts and MinIO wired together, the Helm chart `deploy/helm/harnessly`, Argo CD
+  examples (one Application, and an app of apps for the whole workspace), a systemd user unit and `make run`,
+  `install`, `install-systemd`, `image`, `compose-up` targets. `docs/deploy.md` and `docs/integrations.md` describe
+  them.
+- `tmux.Config.PaneEnv` and `Tmux.TabOf`: extra variables for a new session's pane shell, keyed by its tab.
 - GitHub workflows: tests with the race detector, a build for linux and darwin on amd64 and arm64, golangci-lint,
   CodeQL, OpenSSF Scorecard, gitleaks, and releases with GoReleaser on version tags.
 - A Makefile with the developer targets (`build`, `test`, `test-race`, `lint`, `fmt`, `vet`, `cover`, `cross`,
@@ -21,6 +35,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The module path is `github.com/ly-solutions/harnessly` (it was `harnessly`); imports and the version ldflags follow.
+- Release runtimes (GoReleaser and the GitLab tag build) carry the web page (the `webui` build tag). In gate mode it
+  stays off unless `RUNTIME_WEB=on`, so machines running in front of a previous runtime answer as before. `make build`
+  still builds a runtime without the page.
+- Links in agent replies open in a new tab.
 - The README is rewritten around a quick start that runs the runtime standalone; the configuration tables and the
   slice details moved to `docs/`.
 - Golden test data stores fake provider credentials as placeholders built at run time.

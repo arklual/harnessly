@@ -3,10 +3,10 @@ package main
 import (
 	"net/http"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/gitread"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gitread"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 func init() { routeGroups = append(routeGroups, changesRoutes) }

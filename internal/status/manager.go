@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/background"
-	"harnessly/internal/history"
-	"harnessly/internal/sockets"
+	"github.com/ly-solutions/harnessly/internal/background"
+	"github.com/ly-solutions/harnessly/internal/history"
+	"github.com/ly-solutions/harnessly/internal/sockets"
 )
 
 const (

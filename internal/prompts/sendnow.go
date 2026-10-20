@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
 // "Send now" for a message waiting in Claude Code's own queue: Claude's chord ctrl+x ctrl+s hands a running Bash or MCP

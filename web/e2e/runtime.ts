@@ -21,7 +21,7 @@ export interface Runtime {
   stop: () => Promise<void>;
 }
 
-function freePort(): Promise<number> {
+export function freePort(): Promise<number> {
   return new Promise((ok, fail) => {
     const srv = createServer();
     srv.once('error', fail);
@@ -47,8 +47,16 @@ async function waitFor(url: string, ms: number) {
   }
 }
 
-export async function startRuntime(opts: { binary?: string } = {}): Promise<Runtime> {
-  const root = mkdtempSync(join(tmpdir(), 'hs-web-e2e-'));
+export async function startRuntime(
+  opts: {
+    binary?: string;
+    root?: string;
+    port?: number;
+    /** More environment for the runtime (the integrations' addresses and tokens). */
+    env?: Record<string, string>;
+  } = {},
+): Promise<Runtime> {
+  const root = opts.root ?? mkdtempSync(join(tmpdir(), 'hs-web-e2e-'));
   const home = join(root, 'home');
   const data = join(home, '.harnessly');
   const bin = join(home, 'bin');
@@ -71,7 +79,7 @@ export async function startRuntime(opts: { binary?: string } = {}): Promise<Runt
       env: { ...process.env, GOFLAGS: '-mod=readonly' },
     });
   }
-  const port = await freePort();
+  const port = opts.port ?? (await freePort());
   const socket = `hs-test-web-${process.pid}-${port}`;
   const env: Record<string, string> = {
     HOME: home,
@@ -91,6 +99,7 @@ export async function startRuntime(opts: { binary?: string } = {}): Promise<Runt
     RUNTIME_CLAUDE_LAUNCHER: join(bin, 'claude'),
     RUNTIME_AGENT_NICE: '10',
     RUNTIME_GATE_COUNT_SECONDS: '3600',
+    ...opts.env,
   };
   // A page built since the binary was (pnpm build) is served from disk.
   if (process.env.RUNTIME_WEB_DIR) env.RUNTIME_WEB_DIR = resolve(process.env.RUNTIME_WEB_DIR);

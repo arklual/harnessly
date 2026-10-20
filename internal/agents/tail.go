@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // ReadTail reads the last n bytes of an open file of the given size.

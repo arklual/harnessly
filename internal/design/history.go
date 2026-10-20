@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // The history of the shared library: a git repository, snapshotted a while after the files stop changing and rolled

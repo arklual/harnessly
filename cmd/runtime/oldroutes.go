@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/files"
 )
 
 // oldRoutes are the previous runtime's API routes as its router knew them ("<platform>" is the platform's prefix, a

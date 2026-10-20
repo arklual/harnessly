@@ -5,12 +5,12 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/agents/claude"
-	"harnessly/internal/agents/codex"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/sleep"
-	"harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/sleep"
+	"github.com/ly-solutions/harnessly/internal/state"
 )
 
 // ResumeTmux is what the startup resume asks of tmux.

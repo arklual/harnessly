@@ -16,8 +16,8 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Importing an export of the design tool (a zip, or a project folder) into the library: unpacked aside, attachments no

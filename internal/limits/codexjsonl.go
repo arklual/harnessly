@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 const codexTailBytes = 1 << 20

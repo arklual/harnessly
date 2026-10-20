@@ -11,8 +11,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // HookConfig builds the `-c hooks.<Event>=[…]` flags of a Codex launch: the runtime's hook script first, then the

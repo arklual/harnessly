@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/machine"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // Tmux is what the stores ask of tmux. FromTmux adapts the runtime's own.

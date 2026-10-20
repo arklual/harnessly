@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/files"
 )
 
 // webURL is a URL as the WHATWG parser (JavaScript's new URL) reads one: the previous handlers decided what to fetch

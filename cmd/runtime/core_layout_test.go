@@ -16,10 +16,10 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/terminal"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/terminal"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // The layout routes inside a started core: the core's own store, keeper, sync socket and pane intents.

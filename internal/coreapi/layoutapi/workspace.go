@@ -3,12 +3,12 @@ package layoutapi
 import (
 	"errors"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/machine"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/state"
 )
 
 // GET, POST /api/workspace

@@ -1,6 +1,6 @@
 package layoutapi
 
-import "harnessly/internal/locale"
+import "github.com/ly-solutions/harnessly/internal/locale"
 
 // The texts the launch and platform routes answer people with, picked by RUNTIME_LOCALE when the answer is built; the
 // Russian ones are the previous runtime's texts, byte for byte.

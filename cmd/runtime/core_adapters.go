@@ -4,17 +4,17 @@ import (
 	"os"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/agents/claude"
-	"harnessly/internal/agents/codex"
-	"harnessly/internal/history"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/machine"
-	"harnessly/internal/proc"
-	"harnessly/internal/state"
-	"harnessly/internal/status"
-	"harnessly/internal/terminal"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/history"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/terminal"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // The core's collaborators, adapted to what the status keeper asks.

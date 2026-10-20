@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Headline is a transcript's last AI title and when the person last typed a prompt (epoch ms); nil when not found.

@@ -1,0 +1,144 @@
+# harnessly runs as one pod: the runtime, its tmux server and the agents' processes share the home volume, so the
+# StatefulSet has exactly one replica. Run one release per person.
+
+image:
+  # -- Image repository. Build the `with-agents` target of the Dockerfile for an image with Claude Code and Codex.
+  repository: ghcr.io/ly-solutions/harnessly
+  # -- Image tag; defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Path the page and its API are served under (RUNTIME_APP_BASE_PATH); "/" for the root of the host.
+basePath: /
+
+# -- The person's display name: boards shows it, agents publish documents as "<name> (agent)".
+ownerName: ""
+# -- The person's e-mail, used for board sign-ins when the page session names none.
+ownerEmail: ""
+
+integrations:
+  boards:
+    # -- Origin of a boards server as browsers reach it, e.g. https://boards.example.com. Empty: no board pane.
+    url: ""
+  artifacts:
+    # -- Origin of an artifacts catalog as browsers reach it, e.g. https://artifacts.example.com. Empty: no document pane.
+    url: ""
+
+# -- A Secret with the runtime's tokens, read as environment variables: RUNTIME_BOARDS_TOKEN,
+# RUNTIME_BOARDS_AGENT_TOKEN, RUNTIME_ARTIFACTS_TOKEN, RUNTIME_ARTIFACTS_READ_TOKEN, and anything else the agents or
+# the runtime should get (ANTHROPIC_API_KEY, OPENAI_API_KEY, ...). Empty: the chart creates one from `secrets`.
+existingSecret: ""
+
+# -- Values for the Secret the chart creates when existingSecret is empty (keep real tokens out of Git: prefer
+# existingSecret).
+secrets: {}
+#  RUNTIME_BOARDS_TOKEN: ""
+#  RUNTIME_ARTIFACTS_TOKEN: ""
+
+# -- More environment for the runtime (RUNTIME_* variables, see docs/configuration.md).
+extraEnv: []
+#  - name: RUNTIME_LOCALE
+#    value: en
+
+# -- More environment from ConfigMaps or Secrets.
+extraEnvFrom: []
+
+persistence:
+  # -- Keep the home folder (workspaces, the runtime's data, the agents' logins) on a PersistentVolumeClaim.
+  enabled: true
+  size: 20Gi
+  # -- StorageClass; empty uses the cluster's default.
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  # -- Annotations of the claim template.
+  annotations: {}
+
+# -- Size limit of the /tmp emptyDir (tmux's sockets live there).
+tmpSizeLimit: 1Gi
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  # -- Terminals and conversations are WebSockets: raise the proxy's read timeout (nginx shown).
+  annotations: {}
+  #  nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+  #  nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: harnessly.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: harnessly-tls
+  #    hosts: [harnessly.example.com]
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  # -- The agents run commands in this pod; leave the API token out unless they should talk to the cluster.
+  automount: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsUser: 10001
+  runAsGroup: 10001
+  runAsNonRoot: true
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  # The agents install tools and write caches; only the home volume and /tmp are writable mounts, the image itself
+  # stays read-only.
+  readOnlyRootFilesystem: true
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 4Gi
+
+startupProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 2
+  failureThreshold: 60
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+# -- Seconds the pod gets to stop: the runtime closes its sockets, tmux and the agents end with the pod.
+terminationGracePeriodSeconds: 30
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

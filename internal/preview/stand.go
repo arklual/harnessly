@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/preview/weburl"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/preview/weburl"
 )
 
 // Stands are the deployment's feature stands (https://<label><domain>): the one kind of external site that gets the

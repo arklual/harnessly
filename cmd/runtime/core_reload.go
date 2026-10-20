@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/pluginreload"
-	"harnessly/internal/prompts"
-	"harnessly/internal/screen"
-	"harnessly/internal/status"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/pluginreload"
+	"github.com/ly-solutions/harnessly/internal/prompts"
+	"github.com/ly-solutions/harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // The reload of plugins and skills in idle Claude tabs after the plugin reconciler changed them (internal/pluginreload).

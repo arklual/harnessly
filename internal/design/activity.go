@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // Who works on which design: the paths each agent conversation's transcript names, read through an index per

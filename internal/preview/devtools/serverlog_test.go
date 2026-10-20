@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // A dev server an agent started in the background writes to a file: the log is that file's tail, found from the

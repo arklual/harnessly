@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/voice"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/voice"
 )
 
 // The voice slice ("voice"): dictation over /api/voice (ffmpeg to the machine's recognition service) and the in-tab

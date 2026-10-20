@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/proc"
-	"harnessly/internal/sessions"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/sessions"
 )
 
 // ErrBadRecord: a pid file of a live Claude names no working folder, so its transcript cannot be found. The previous

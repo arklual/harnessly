@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/screen"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 const (

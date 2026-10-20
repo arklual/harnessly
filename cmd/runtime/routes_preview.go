@@ -14,15 +14,15 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/preview"
-	"harnessly/internal/preview/devtools"
-	"harnessly/internal/preview/ports"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/preview"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/ports"
 )
 
 // The preview slice ("preview"): the reverse proxy behind the right pane's browser with the slots' DevTools record,

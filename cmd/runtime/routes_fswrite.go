@@ -12,12 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/gitsync"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/machines"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gitsync"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/machines"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // Disk writes without agent state (slice fswrite): attachments uploaded into a conversation and their clean-up, an

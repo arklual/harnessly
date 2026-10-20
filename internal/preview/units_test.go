@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/preview/devtools"
-	"harnessly/internal/preview/ports"
-	"harnessly/internal/preview/weburl"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/ports"
+	"github.com/ly-solutions/harnessly/internal/preview/weburl"
 )
 
 // units.json holds the previous runtime's preview functions run on generated inputs (testdata/gen/gen-units.mjs); every

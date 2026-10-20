@@ -4,7 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 	"strings"
 	"sync"
 	"time"

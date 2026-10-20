@@ -18,7 +18,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 type fakeBridge struct {

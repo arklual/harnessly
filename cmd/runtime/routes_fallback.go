@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/settings"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/settings"
 )
 
 // headlessMode says whether state-mode.json makes the previous runtime headless (pages are the cluster's), re-read at

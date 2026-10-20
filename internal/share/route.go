@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/launch"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/launch"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // Route answers the snapshot and link routes under the platform API, as the previous runtime's dispatcher and handlers

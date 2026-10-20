@@ -14,11 +14,16 @@ import {
   type ToolResult,
   workSummary,
 } from '../api/timeline';
+import { MarkdownLink, TextWithChips } from './link-chip';
+
+const components = { a: MarkdownLink };
 
 const Text = memo(function Text({ markdown }: { markdown: string }) {
   return (
     <div className="md">
-      <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+      <Markdown remarkPlugins={[remarkGfm]} components={components}>
+        {markdown}
+      </Markdown>
     </div>
   );
 });
@@ -173,7 +178,9 @@ export function TimelineView({
           if (item.kind === 'user')
             return (
               <div key={item.entry.id} className="msg msg--user" data-testid="msg-user">
-                <div className="msg__bubble">{String(item.entry.text ?? '')}</div>
+                <div className="msg__bubble">
+                  <TextWithChips text={String(item.entry.text ?? '')} />
+                </div>
               </div>
             );
           if (item.kind === 'assistant')

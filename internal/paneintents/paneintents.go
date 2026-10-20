@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/panel"
 )
 
 const (

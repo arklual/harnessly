@@ -10,8 +10,8 @@ import (
 	"path"
 	"strings"
 
-	"harnessly/internal/agent"
-	"harnessly/web"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/web"
 )
 
 // The browser front-end (web/). A standalone runtime serves it at its app base path (RUNTIME_APP_BASE_PATH, default

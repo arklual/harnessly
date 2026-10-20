@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The agent → pane channel of one runtime: a command goes out over the sync socket to the person's pages, the page

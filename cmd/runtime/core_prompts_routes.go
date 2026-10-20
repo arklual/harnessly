@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/locale"
-	"harnessly/internal/prompts"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/prompts"
 )
 
 // The prompt routes (A.2.1–A.2.8) of the core slice. Each checks what the previous runtime's handler checked, in its

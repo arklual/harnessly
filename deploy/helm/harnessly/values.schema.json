@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "required": ["repository"]
+    },
+    "basePath": { "type": "string", "pattern": "^/" },
+    "ownerName": { "type": "string" },
+    "ownerEmail": { "type": "string" },
+    "integrations": {
+      "type": "object",
+      "properties": {
+        "boards": {
+          "type": "object",
+          "properties": { "url": { "type": "string", "pattern": "^(https?://[^/]+)?$" } }
+        },
+        "artifacts": {
+          "type": "object",
+          "properties": { "url": { "type": "string", "pattern": "^(https?://[^/]+)?$" } }
+        }
+      }
+    },
+    "existingSecret": { "type": "string" },
+    "secrets": { "type": "object", "additionalProperties": { "type": "string" } },
+    "extraEnv": { "type": "array" },
+    "extraEnvFrom": { "type": "array" },
+    "persistence": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "size": { "type": "string" },
+        "storageClass": { "type": "string" },
+        "accessModes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "hosts": { "type": "array" },
+        "tls": { "type": "array" }
+      }
+    }
+  }
+}

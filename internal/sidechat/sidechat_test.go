@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 func parse(t *testing.T, s string) any {

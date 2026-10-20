@@ -9,12 +9,12 @@ import (
 	"strings"
 	"sync"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/preflight"
-	"harnessly/internal/services"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/services"
 )
 
 // Routes that call external services with the person's tokens (slice "services"; their GETs also under

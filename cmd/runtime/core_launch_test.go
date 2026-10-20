@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/gate"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/preflight"
-	"harnessly/internal/terminal"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/terminal"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // A conversation started through the gate with the launch slice on: the core makes the tab on a real tmux server, types

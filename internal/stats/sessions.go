@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // claudeAgg is one Claude session of a period, as parseJsonlStream summed it.

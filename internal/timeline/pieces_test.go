@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The live-reply reader and the first screen's summary against the previous runtime's own answers

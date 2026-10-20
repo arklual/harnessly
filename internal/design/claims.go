@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Board claims: a soft lock the chats of the library's runtimes keep in the shared folder, telling that a board is

@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/proc"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // Peer is a live Claude Code session on this machine, under the name agents message each other by.

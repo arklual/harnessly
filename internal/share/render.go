@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The snapshot page: static HTML without a single script, rebuilt from the stored JSON on every read so render fixes

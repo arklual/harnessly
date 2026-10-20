@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // testdata/golden.json: what the previous runtime's dispatcher and handler answered (testdata/gen, under node) on the

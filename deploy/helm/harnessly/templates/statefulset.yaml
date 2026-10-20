@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "harnessly.fullname" . }}
+  labels:
+    {{- include "harnessly.labels" . | nindent 4 }}
+spec:
+  # One runtime per home: its tmux server and the agents' state are on the volume.
+  replicas: 1
+  serviceName: {{ include "harnessly.fullname" . }}-headless
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "harnessly.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "harnessly.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "harnessly.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      initContainers:
+        # A new volume is empty: the workspaces folder, and the shell's dotfiles the image's home had.
+        - name: home
+          image: "{{ .Values.image.repository }}:{{ include "harnessly.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c", "mkdir -p /home/agent/work && for f in /etc/skel/.[!.]*; do [ -e \"/home/agent/${f##*/}\" ] || cp \"$f\" /home/agent/; done"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+      containers:
+        - name: harnessly
+          image: "{{ .Values.image.repository }}:{{ include "harnessly.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8022
+              protocol: TCP
+          env:
+            - name: HOME
+              value: /home/agent
+            - name: RUNTIME_GATE_LISTEN
+              value: 0.0.0.0:8022
+            - name: RUNTIME_GATE_UPSTREAM
+              value: ""
+            - name: RUNTIME_APP_BASE_PATH
+              value: {{ include "harnessly.basePath" . | quote }}
+            - name: RUNTIME_WORKSPACE_DIR
+              value: /home/agent/work
+            {{- with .Values.ownerName }}
+            - name: RUNTIME_OWNER_NAME
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.ownerEmail }}
+            - name: RUNTIME_OWNER_EMAIL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.integrations.boards.url }}
+            - name: RUNTIME_BOARDS_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.integrations.artifacts.url }}
+            - name: RUNTIME_ARTIFACTS_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ include "harnessly.secretName" . }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- $health := include "harnessly.healthPath" . }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml (mergeOverwrite (deepCopy .) (dict "httpGet" (merge (dict "path" $health) (omit .httpGet "path")))) | nindent 12 }}
+          {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml (mergeOverwrite (deepCopy .) (dict "httpGet" (merge (dict "path" $health) (omit .httpGet "path")))) | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml (mergeOverwrite (deepCopy .) (dict "httpGet" (merge (dict "path" $health) (omit .httpGet "path")))) | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.tmpSizeLimit }}
+        {{- if not .Values.persistence.enabled }}
+        - name: home
+          emptyDir: {}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: home
+        labels:
+          {{- include "harnessly.selectorLabels" . | nindent 10 }}
+        {{- with .Values.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          {{- toYaml .Values.persistence.accessModes | nindent 10 }}
+        {{- with .Values.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

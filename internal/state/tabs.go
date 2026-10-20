@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The tab fields the status keeper writes, found by the tab's session name. When the cluster owns the state such a

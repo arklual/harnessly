@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/sessions"
+	"github.com/ly-solutions/harnessly/internal/sessions"
 )
 
 type panes map[string]int

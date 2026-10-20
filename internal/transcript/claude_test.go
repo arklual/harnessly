@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The golden cases are the previous runtime's own parser run on the same bytes (testdata/claude/gen).

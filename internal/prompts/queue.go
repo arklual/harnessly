@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Item is a message waiting in a tab's queue: sent while the agent worked, or before it was up.

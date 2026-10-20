@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // Config is what the gate takes from its environment.

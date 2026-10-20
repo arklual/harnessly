@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The Codex transcript (session-parser-codex and codex-lines in the previous runtime). Offsets are counted the way that

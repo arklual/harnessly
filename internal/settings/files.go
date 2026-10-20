@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 func (s *Store) file(name string) string { return filepath.Join(s.DataDir, name) }

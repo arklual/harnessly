@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/nodejson"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 // TTL is how long a push service keeps an undelivered notification.

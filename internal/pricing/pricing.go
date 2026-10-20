@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Claude prices, USD per million tokens; cache writes are priced by their lifetime.

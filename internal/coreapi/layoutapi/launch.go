@@ -12,14 +12,14 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/launch"
-	"harnessly/internal/locale"
-	"harnessly/internal/sidechat"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/launch"
+	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/sidechat"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 // Launch is what the launch slice's routes use besides Deps: the starter and document inbox, the Codex launch lines,

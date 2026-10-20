@@ -6,7 +6,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // codexJSON is JSON.parse into jsvalue values, hand-rolled because transcripts carry megabyte lines and the token

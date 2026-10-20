@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/push"
 )
 
 var tabIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)

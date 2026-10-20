@@ -7,7 +7,7 @@ import (
 	"sort"
 	"testing"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 type unitCase struct {

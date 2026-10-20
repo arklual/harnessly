@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Pure parts of the machine load: /proc parsers, the CPU delta, level hysteresis, process kinds, command redaction.

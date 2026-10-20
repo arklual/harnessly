@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/paneintents"
-	"harnessly/internal/panel"
-	"harnessly/internal/state"
-	"harnessly/internal/vault"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/paneintents"
+	"github.com/ly-solutions/harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/vault"
 )
 
 type goldenRequest struct {

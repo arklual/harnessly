@@ -7,7 +7,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // claudeParseJSON is jsvalue.Parse (JSON.parse: a repeated key keeps its first place and its last value, a lone

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
 
 // upgradeLog is a WebSocket's one entry: its handshake, 101 or the reason it failed. The first outcome counts.

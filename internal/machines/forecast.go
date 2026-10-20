@@ -4,9 +4,9 @@ import (
 	"math"
 	"slices"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/limits"
-	"harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/limits"
+	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
 // When a subscription window runs out. With the person's spend history the forecast follows their usual hours: the

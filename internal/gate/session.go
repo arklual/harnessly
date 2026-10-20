@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // SessionRefresh re-signs a page's session past half its age, as the previous runtime's API did on every request it

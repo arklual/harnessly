@@ -21,11 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/machines"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/machines"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // testdata/fswrite-golden.json: what the previous runtime's dispatcher and disk-writing handlers answered

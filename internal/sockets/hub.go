@@ -12,7 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 const (

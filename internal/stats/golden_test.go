@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 // testdata/golden.json: what the previous runtime's dispatcher and /api/stats/* handlers answered (testdata/gen, under

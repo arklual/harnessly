@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Whitespace means what JavaScript's \s means, so text is judged as the previous runtime judged it.

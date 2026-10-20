@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/files"
 )
 
 // canonical is r with its API path as the old runtime's router read it: trailing and doubled slashes dropped

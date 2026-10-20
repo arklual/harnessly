@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The previous runtime's pure functions on generated inputs (testdata/gen/units.mjs). SERVICES_UNITS names a larger

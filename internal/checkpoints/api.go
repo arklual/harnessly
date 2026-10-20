@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // API is the checkpoints route of the platform's pages, past the API's own checks (a caller with a page session): GET

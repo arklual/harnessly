@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 func tui(t *testing.T, name string) string {

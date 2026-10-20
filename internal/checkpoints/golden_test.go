@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/checkpoints/scripttest"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/checkpoints/scripttest"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The previous runtime's checkpoint store ran the script in testdata/golden.json (cmd/runtime/testdata/timeline/gen.mjs)

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/files"
 )
 
 // testdata/assets.json: what the previous runtime's allow-list made of generated paths, and what its dispatcher and

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strconv"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // Tmux is what the routes need of the runtime's tmux servers.

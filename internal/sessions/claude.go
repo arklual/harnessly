@@ -15,7 +15,7 @@ import (
 	"sync"
 	"unicode/utf16"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 const maxPreview = 200

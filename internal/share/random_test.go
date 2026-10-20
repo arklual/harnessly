@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // SHARE_RANDOM points at cases the generator made (GEN_RANDOM): redaction, capture, transcript economics and the page

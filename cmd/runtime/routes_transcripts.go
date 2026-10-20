@@ -8,15 +8,15 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/launch"
-	"harnessly/internal/messagecounts"
-	"harnessly/internal/preflight"
-	"harnessly/internal/share"
-	"harnessly/internal/sources"
-	"harnessly/internal/stats"
-	"harnessly/internal/transcript"
-	"harnessly/internal/usagereport"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/launch"
+	"github.com/ly-solutions/harnessly/internal/messagecounts"
+	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/share"
+	"github.com/ly-solutions/harnessly/internal/sources"
+	"github.com/ly-solutions/harnessly/internal/stats"
+	"github.com/ly-solutions/harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/usagereport"
 )
 
 // trackerKeys are the tracker's project keys a bare issue key is recognised by: RUNTIME_TRACKER_KEYS, else the

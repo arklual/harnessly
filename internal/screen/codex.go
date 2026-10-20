@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 const composerTailLines = 8

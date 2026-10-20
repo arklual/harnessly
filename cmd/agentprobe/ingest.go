@@ -10,7 +10,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // serveIngest stands in for the cluster the agent dials: the first call is answered 409 (a follower), the next one is

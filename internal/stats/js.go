@@ -17,8 +17,8 @@ import (
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // nullNum is a number read back as JSON null: arithmetic takes it as 0 (null + 1 is 1 in JavaScript), while a NaN

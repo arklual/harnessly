@@ -17,15 +17,15 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/agents"
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/machine"
-	"harnessly/internal/preflight"
-	"harnessly/internal/settings"
-	"harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/settings"
+	"github.com/ly-solutions/harnessly/internal/state"
 )
 
 // The state slice: the settings files the cluster serves from its database first (this runtime is their fallback and

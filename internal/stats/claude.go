@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // The Claude Code transcripts (projects/<folder>/<session>.jsonl) are read once per version of a file (size and

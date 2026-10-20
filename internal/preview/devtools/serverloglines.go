@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Which lines of a dev server's output are problems: Next, Vite, Angular CLI, webpack, esbuild, tsc and plain Node, by

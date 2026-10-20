@@ -44,6 +44,9 @@ type Config struct {
 	Env []string
 	// Home is the folder a session starts in when none is given; "" means HOME of Env, else "/".
 	Home string
+	// PaneEnv adds KEY=VALUE variables to the pane shell of a new session, given the tab the session belongs to ("" for
+	// an ad hoc session); nil adds nothing. Integrations hand agents their addresses and tokens this way.
+	PaneEnv func(tabID string) []string
 }
 
 const cmdTimeout = 5 * time.Second
@@ -240,6 +243,23 @@ func (t *Tmux) PaneShellName(tabID string, legacy bool) (string, bool) {
 }
 
 var workspaceNameRe = regexp.MustCompile(`^(ws-.*?)-(pane-.*?)-(tab-.+)$`)
+
+// TabOf is the tab a session belongs to: a workspace tab's session or a conversation's right-panel shell; "" for any
+// other session.
+func (t *Tmux) TabOf(session string) string {
+	if _, _, tab, ok := t.ParseSessionName(session); ok {
+		return tab
+	}
+	for _, prefix := range []string{t.cfg.Prefix, t.cfg.LegacyPrefix} {
+		if prefix == "" {
+			continue
+		}
+		if tab, ok := strings.CutPrefix(session, prefix+"shell-"); ok && tabIDRe.MatchString(tab) {
+			return tab
+		}
+	}
+	return ""
+}
 
 // ParseSessionName inverts SessionName for either prefix; false for any other name.
 func (t *Tmux) ParseSessionName(name string) (wsID, paneID, tabID string, ok bool) {

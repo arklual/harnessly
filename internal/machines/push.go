@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/push"
 )
 
 func jsonText(b []byte) json.RawMessage { return json.RawMessage(b) }

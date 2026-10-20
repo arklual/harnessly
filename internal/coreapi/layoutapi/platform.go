@@ -3,10 +3,10 @@ package layoutapi
 import (
 	"regexp"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/panel"
-	"harnessly/internal/vault"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/vault"
 )
 
 var (

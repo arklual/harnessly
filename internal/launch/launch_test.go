@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 func TestMain(m *testing.M) {

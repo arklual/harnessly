@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // DefaultWait is how long a request waits for a report being built before it is answered with the progress.

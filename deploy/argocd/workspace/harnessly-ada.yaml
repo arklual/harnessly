@@ -1,0 +1,49 @@
+# One person's harnessly. Add a copy per person (harnessly-<name>.yaml): each gets its own pod, home volume and host.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: harnessly-ada
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ly-solutions/harnessly.git
+    targetRevision: main
+    path: deploy/helm/harnessly
+    helm:
+      releaseName: ada
+      valuesObject:
+        ownerName: Ada
+        ownerEmail: ada@example.com
+        integrations:
+          boards:
+            url: https://boards.example.com
+          artifacts:
+            url: https://artifacts.example.com
+        # RUNTIME_BOARDS_TOKEN, RUNTIME_BOARDS_AGENT_TOKEN, RUNTIME_ARTIFACTS_TOKEN, RUNTIME_ARTIFACTS_READ_TOKEN.
+        existingSecret: harnessly-ada
+        ingress:
+          enabled: true
+          className: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+            nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+          hosts:
+            - host: ada.work.example.com
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: harnessly-ada-tls
+              hosts: [ada.work.example.com]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harnessly
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

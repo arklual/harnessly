@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // NeighbourPrefix is the path of the main slot under which neighbour ports (MFE remotes) are served.

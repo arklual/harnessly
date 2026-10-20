@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The layout changes that need no terminal, as data. Each answers false when its target is gone.

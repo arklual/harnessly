@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/machine"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // Read-only file routes (slice fsread): the editor's folder listing and file, both sides of a changed file, the

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // testdata/stop.json: what the previous runtime's stopper answered (testdata/gen/stop.mjs) on the same /proc with the

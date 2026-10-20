@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // Which files of a design changed, for the page script to apply them without a reload: a stream of the paths as they

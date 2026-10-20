@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "harnessly.fullname" . }}
+  labels:
+    {{- include "harnessly.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "harnessly.selectorLabels" . | nindent 4 }}
+---
+# The StatefulSet's governing Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "harnessly.fullname" . }}-headless
+  labels:
+    {{- include "harnessly.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8022
+      targetPort: http
+  selector:
+    {{- include "harnessly.selectorLabels" . | nindent 4 }}

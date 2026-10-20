@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Message is a prompt or an answer read from a rollout line.

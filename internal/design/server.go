@@ -19,8 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // A small read-only web server on the machine's loopback that serves the library. The right panel opens it like any

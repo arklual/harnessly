@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The Claude Code transcript (session-parser in the previous runtime): the same entries, ids aside, the same offsets,

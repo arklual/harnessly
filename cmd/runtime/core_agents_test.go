@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/coreapi/layoutapi"
-	"harnessly/internal/gate"
-	"harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/preflight"
 )
 
 // testdata/launch-golden.json holds the lines the previous runtime's own builders typed (testdata/launch/gen.mjs).

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Codex transcript lines into timeline entries (codex-lines in the previous runtime).

@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 // allSlices are the slices a machine runs with once every one is switched on.

@@ -1,7 +1,7 @@
 package prompts
 
 import (
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // Panes is the tmux layer the package types through. *tmux.Tmux has every method but CaptureAtWidth, which needs the

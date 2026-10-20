@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/pricing"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/pricing"
 )
 
 // Codex sessions (sessions/YYYY/MM/DD/*.jsonl): a session's totals come from its first line and the last megabyte, its

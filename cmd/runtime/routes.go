@@ -3,10 +3,10 @@ package main
 import (
 	"net/http"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/machine"
-	"harnessly/internal/preflight"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // deps is what a group of routes may use.

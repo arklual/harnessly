@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"time"
 
-	"harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
 // Delivery outcomes of one message.

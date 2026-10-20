@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/state"
 )
 
 func TestAuthAndBodyParsing(t *testing.T) {

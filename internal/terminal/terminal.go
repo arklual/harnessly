@@ -25,8 +25,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/creack/pty"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 const (

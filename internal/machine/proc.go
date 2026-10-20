@@ -3,9 +3,9 @@ package machine
 import (
 	"os"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/proc"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // ProcessArgs is a process's command line as ps prints it (arguments joined by spaces); false when it cannot be read.

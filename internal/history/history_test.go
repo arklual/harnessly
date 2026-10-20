@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // testdata/ts-session-history.json: what the previous runtime's store wrote, run under node on the same files.

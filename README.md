@@ -14,6 +14,7 @@
 <p align="center">
   <a href="https://github.com/ly-solutions/harnessly/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ly-solutions/harnessly/ci.yml?branch=main&label=ci"></a>
   <a href="https://github.com/ly-solutions/harnessly/actions/workflows/lint.yml"><img alt="Lint" src="https://img.shields.io/github/actions/workflow/status/ly-solutions/harnessly/lint.yml?branch=main&label=lint"></a>
+  <a href="https://pkg.go.dev/github.com/ly-solutions/harnessly"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/ly-solutions/harnessly.svg"></a>
   <a href="https://goreportcard.com/report/github.com/ly-solutions/harnessly"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/ly-solutions/harnessly"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/ly-solutions/harnessly"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/ly-solutions/harnessly/badge"></a>
   <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/ly-solutions/harnessly"></a>
@@ -23,6 +24,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
+  <a href="#ways-to-run">Ways to run</a> ·
   <a href="docs/README.md">Docs</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
@@ -41,6 +43,11 @@
   so nothing has to reach into the machine.
 - **An API first.** Workspaces, tabs, prompts, terminals, files and conversations are HTTP and WebSocket routes, so a
   web UI, a cluster or your own scripts drive the same thing.
+- **Boards and documents beside the conversation.** Agents draw on [boards](https://github.com/ly-solutions/boards)
+  and publish to [artifacts](https://github.com/ly-solutions/artifacts) with the addresses and tokens the runtime gives
+  them; their links open in a side pane of the page, signed in, next to the conversation that made them.
+- **Runs the way you run things.** A release binary, a systemd user service, a container, `docker compose up` for the
+  whole workspace, a Helm chart or an Argo CD app of apps.
 - **Moves in without a big bang.** In gate mode the runtime sits in front of an older runtime and takes over one slice
   of routes at a time, each compared in shadow first. In standalone mode it needs nothing else.
 
@@ -59,6 +66,9 @@
 | **Preview proxy** | A reverse proxy for dev servers with a DevTools record that agents can read through an MCP server. |
 | **Machine agent** | Transcripts, state files with versioned writes, socket relay and TCP tunnels over a single WebSocket link. |
 | **Gate and shadow** | Per-machine slice switches re-read every second, shadow comparison of answers, per-path proxy statistics. |
+| **Web page** | Sign-in, workspaces, split panes with terminal and agent tabs, the conversation with live state, the machine's load; compiled into release runtimes. |
+| **Boards and documents** | Agents get `BOARDS_URL`, `ARTIFACTS_URL`, tokens and their conversation id; board and document links become chips that open in a side pane, which also lists the conversation's documents. |
+| **Ways to run** | Dockerfile, docker compose with boards, artifacts and MinIO, a Helm chart, Argo CD examples, a systemd unit and `make` targets. |
 | **Byte-for-byte compatible** | Status codes, JSON key order, headers and ETags pinned by golden tests recorded from the previous implementation. |
 
 ## Quick start
@@ -156,11 +166,31 @@ logins) and ask for a `claude-code` or `codex-cli` tab with a prompt:
 
 More in [Getting started](docs/getting-started.md).
 
+## Ways to run
+
+```sh
+make run                          # the runtime with the page on http://127.0.0.1:8022, data in ~/.harnessly
+docker compose up --build         # harnessly + boards + artifacts + MinIO on http://localhost:8022
+helm install ada deploy/helm/harnessly --set ownerName=Ada
+```
+
+| | |
+| --- | --- |
+| Plain commands | `make run`, or a release binary: `RUNTIME_GATE_LISTEN=127.0.0.1:8022 RUNTIME_GATE_UPSTREAM= ./runtime` |
+| systemd | `make install install-systemd`, then `systemctl --user enable --now harnessly` — one service per Unix account; agents keep working through restarts |
+| Docker | `docker build -t harnessly .` (`--target with-agents` adds Claude Code and Codex), the home folder on a volume |
+| docker compose | [compose.yaml](compose.yaml): the whole workspace on one host, boards and documents wired in |
+| Kubernetes | [deploy/helm/harnessly](deploy/helm/harnessly): a StatefulSet per person with a PVC for its home |
+| Argo CD | [deploy/argocd](deploy/argocd): one Application, or an app of apps with boards and artifacts |
+
+All of them, and how to give the runtime the agent CLIs, in [docs/deploy.md](docs/deploy.md).
+
 ### The web page
 
 `web/` is a browser front-end for a machine run on its own: sign-in, workspaces, panes with terminal and agent tabs
-(live state, the conversation, sending and interrupting) and the machine's load and limits. Built into the runtime, it
-is served at `RUNTIME_APP_BASE_PATH` (default `/agents`, and `/` redirects there):
+(live state, the conversation, sending and interrupting), the machine's load and limits, and a side pane for boards and
+documents ([integrations](docs/integrations.md)). Release runtimes carry it; it is served at `RUNTIME_APP_BASE_PATH`
+(default `/agents`, and `/` redirects there):
 
 ```sh
 make runtime-web               # pnpm build in web/, then bin/runtime with the page compiled in
@@ -169,7 +199,8 @@ xdg-open http://127.0.0.1:4321/   # the first visit sets the machine's password
 ```
 
 `make web-check` runs what CI runs for the page; `make web-browser-test` drives it in headless Chrome against a
-standalone runtime with stand-in agents. See [the page's settings](docs/configuration.md#web-page).
+standalone runtime with stand-in agents (with `E2E_BOARDS_DIR` and `E2E_ARTIFACTS_DIR` naming checkouts of boards and
+artifacts, the side pane too). See [the page's settings](docs/configuration.md#web-page).
 
 ## Architecture
 
@@ -199,16 +230,19 @@ its hooks and files. The **machine agent** is the machine's only link to the clu
 | [Architecture](docs/architecture.md) | the runtime gate, the core, tmux, the machine agent, the repository layout |
 | [Slices](docs/slices.md) | every slice of routes, switching them per machine, the shadow comparison |
 | [Configuration](docs/configuration.md) | every `RUNTIME_*` and `AGENT_*` variable |
+| [Deploy](docs/deploy.md) | plain commands, systemd, Docker, docker compose, Helm, Argo CD |
+| [Integrations](docs/integrations.md) | boards, artifacts and the agent skills |
 | [Contributing](CONTRIBUTING.md) | development setup, tests and golden files, commit convention |
 
 ## Status
 
 harnessly is young and moving fast; versions are `0.x` and the API follows the previous runtime it replaces.
 
-- **Here now:** the machine runtime, with every route of the previous runtime in Go, gate and standalone modes, and
-  the machine agent (wire protocol v1).
-- **Coming:** the web UI, built on the project's own UI kit, and the cluster side. Both are being rebuilt and are not
-  in this repository yet.
+- **Here now:** the machine runtime, with every route of the previous runtime in Go, gate and standalone modes, the
+  machine agent (wire protocol v1), the web page on the project's own UI kit, and the boards and artifacts
+  integrations.
+- **Coming:** the cluster side (many machines and people behind one page), and the services' webhooks (board comments
+  routed to agents, live document updates).
 
 Follow the [changelog](CHANGELOG.md) and the [releases](https://github.com/ly-solutions/harnessly/releases).
 

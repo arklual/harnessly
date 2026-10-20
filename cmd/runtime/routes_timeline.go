@@ -5,17 +5,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"harnessly/internal/economics"
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/history"
-	"harnessly/internal/hooksetup"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/state"
-	"harnessly/internal/statusline"
-	"harnessly/internal/subagents"
-	"harnessly/internal/timeline"
-	"harnessly/internal/transcript"
+	"github.com/ly-solutions/harnessly/internal/economics"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/history"
+	"github.com/ly-solutions/harnessly/internal/hooksetup"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/statusline"
+	"github.com/ly-solutions/harnessly/internal/subagents"
+	"github.com/ly-solutions/harnessly/internal/timeline"
+	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // providerLimits is a provider's subscription limits on this machine with their forecasts, as the machine snapshot

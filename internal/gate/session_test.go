@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 func TestSessionRefreshPastHalfItsAge(t *testing.T) {

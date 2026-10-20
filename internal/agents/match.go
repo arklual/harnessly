@@ -3,8 +3,8 @@ package agents
 import (
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/proc"
 )
 
 // Match is how a process is recognised as an agent's.

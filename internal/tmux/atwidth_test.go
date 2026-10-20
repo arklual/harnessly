@@ -16,8 +16,8 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/terminal"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/terminal"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // The terminal server is what the capture resizes.

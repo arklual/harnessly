@@ -39,7 +39,21 @@ turn() {
   printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_%s","name":"Bash","input":{"command":"ls -la","description":"List files"}}]},"uuid":"t-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
   sleep 0.5
   printf '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%s","content":"total 0"}]},"uuid":"r-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
-  printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Fake agent reply: %s"}]},"uuid":"a-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$text" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  reply="Fake agent reply: $1"
+  # Asked to draw, it does what the boards and artifacts skills do with the environment the runtime gave it: a board
+  # from a graph and a document of this conversation, and it answers with their links.
+  case "$1" in *draw*)
+    if [ -n "$BOARDS_URL" ] && [ -n "$ARTIFACTS_URL" ]; then
+      board=$(curl -fsS -X POST "$BOARDS_URL/b/api/boards" -H "Authorization: Bearer $BOARDS_TOKEN" -H 'Content-Type: application/json' \
+        -d '{"title":"Checkout flow","graph":{"direction":"LR","nodes":[{"id":"cart","label":"Cart"},{"id":"pay","label":"Payment","color":"teal"},{"id":"done","label":"Receipt","color":"green"}],"edges":[{"from":"cart","to":"pay"},{"from":"pay","to":"done","label":"paid"}]}}' \
+        | grep -o '"url":"[^"]*"' | head -1 | cut -d'"' -f4)
+      doc=$(curl -fsS -X POST "$ARTIFACTS_URL/api/v1/artifacts" -H "Authorization: Bearer $ARTIFACTS_TOKEN" -H 'Content-Type: application/json' \
+        -d "{\"title\":\"Checkout plan\",\"markdown\":\"# Checkout plan\\n\\nThe cart hands over to payment; a paid order gets its receipt.\",\"session\":\"$ARTIFACTS_SESSION\",\"author\":\"$ARTIFACTS_AUTHOR\"}" \
+        | grep -o '"viewUrl": *"[^"]*"' | head -1 | sed 's/.*"\(http[^"]*\)"$/\1/')
+      reply="Drew [the checkout flow]($board) and wrote the plan: $doc"
+    fi ;;
+  esac
+  printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"%s"}]},"uuid":"a-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$(json "$reply")" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
   sleep 0.3
   echo "{\"session_id\":\"$sid\"}" | hook stop
 }

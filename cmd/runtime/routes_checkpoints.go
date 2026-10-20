@@ -4,12 +4,12 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"harnessly/internal/checkpoints"
-	"harnessly/internal/gate"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/machine"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/checkpoints"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // The checkpoints of the timeline slice: the platform pages' route over a conversation's snapshots, and the snapshot

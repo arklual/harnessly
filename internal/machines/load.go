@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // The machine load: CPU, memory, swap-in, disk, and the heaviest processes of the runtime user with what each one is

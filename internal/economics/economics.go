@@ -6,11 +6,11 @@ import (
 	"sort"
 	"time"
 
-	"harnessly/internal/history"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/pricing"
-	"harnessly/internal/subagents"
+	"github.com/ly-solutions/harnessly/internal/history"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/pricing"
+	"github.com/ly-solutions/harnessly/internal/subagents"
 )
 
 func breakdownOf(u *Usage) *jsvalue.Object {

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 // The design slice through the gate: its routes under both path forms while the slice is on, the API's refusal before

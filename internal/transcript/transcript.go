@@ -6,7 +6,7 @@ package transcript
 import (
 	"crypto/rand"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Chunk is a read of a stretch of a transcript.

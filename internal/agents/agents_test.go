@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/agents/claude"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
 )
 
 func TestDecodeKeepsJavaScriptKeyOrder(t *testing.T) {

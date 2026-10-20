@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/machine"
 )
 
 func TestShownTailAndScreenShows(t *testing.T) {

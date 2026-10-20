@@ -1,6 +1,6 @@
 package prompts
 
-import "harnessly/internal/locale"
+import "github.com/ly-solutions/harnessly/internal/locale"
 
 // The texts the routes answer people with. Each is picked by RUNTIME_LOCALE when the answer is built; the Russian ones
 // are the previous runtime's texts, byte for byte.

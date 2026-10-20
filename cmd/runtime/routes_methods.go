@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"slices"
 
-	"harnessly/internal/files"
-	"harnessly/internal/gate"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/nodejson"
-	"harnessly/internal/settings"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/settings"
 )
 
 func init() { routeGroups = append(routeGroups, otherMethodRoutes) }

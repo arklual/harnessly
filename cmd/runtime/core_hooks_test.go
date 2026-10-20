@@ -19,13 +19,13 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/proc"
-	"harnessly/internal/push"
-	"harnessly/internal/sessions"
-	"harnessly/internal/sleep"
-	"harnessly/internal/terminal"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/sessions"
+	"github.com/ly-solutions/harnessly/internal/sleep"
+	"github.com/ly-solutions/harnessly/internal/terminal"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // recorder is a fake HTTP peer (the old runtime, a push service) that keeps what it was sent.

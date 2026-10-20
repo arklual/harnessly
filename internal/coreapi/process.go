@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/locale"
-	"harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/status"
 )
 
 // ErrResumeLine: the resume line could not be built (a stored id that is no session id, a launcher not written yet);

@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
 
 // Port is one listener as the preview lists it.

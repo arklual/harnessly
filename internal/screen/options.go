@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // Options is a prompt's choices as drawn on screen: labels in screen order, the focused one, and the text above them.

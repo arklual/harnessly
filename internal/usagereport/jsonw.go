@@ -6,8 +6,8 @@ import (
 	"math"
 	"strconv"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // jw writes JSON as JSON.stringify does; the report and the facts file are large, so they are written directly.

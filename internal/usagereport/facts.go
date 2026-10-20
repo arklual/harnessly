@@ -17,7 +17,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // The rows of a file's facts, each with its dedup key: streamed chunks repeat one usage, and resumed or forked

@@ -4,13 +4,13 @@ import (
 	"errors"
 	"regexp"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/agents"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/paneintents"
-	"harnessly/internal/panel"
-	"harnessly/internal/state"
-	"harnessly/internal/vault"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/paneintents"
+	"github.com/ly-solutions/harnessly/internal/panel"
+	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/vault"
 )
 
 var (

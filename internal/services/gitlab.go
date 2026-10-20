@@ -14,9 +14,9 @@ import (
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
 
-	"harnessly/internal/files"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 const (

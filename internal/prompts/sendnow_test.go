@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
 // world is a pane and a transcript on the fake clock; a key may change both.

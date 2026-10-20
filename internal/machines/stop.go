@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Stopping a heavy process from the machine load list: every check runs on a fresh read of /proc, nothing from the

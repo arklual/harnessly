@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // Opt is a field the page tells apart in three ways: absent, null, or a value. The old runtime built its entries

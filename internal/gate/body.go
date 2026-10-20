@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // BodyRoute is a read-only route whose answer is not only JSON — a file, a picture, a range of a video. Like a

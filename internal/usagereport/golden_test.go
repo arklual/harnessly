@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/gate"
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // testdata/golden.json: what the previous runtime's dispatcher and handler answered (testdata/gen, under node) on the

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"harnessly/internal/preview/weburl"
+	"github.com/ly-solutions/harnessly/internal/preview/weburl"
 )
 
 // Pages the runtime answers inside a slot frame by itself: errors, the cross-origin redirect offer and the stand

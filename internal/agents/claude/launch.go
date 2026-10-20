@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // ErrLauncher: the managed launcher must be an absolute path without control characters.

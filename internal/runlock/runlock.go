@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Lock is a lock this process holds.

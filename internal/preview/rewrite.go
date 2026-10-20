@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/preview/devtools"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/preview/devtools"
 )
 
 // What the proxy changes so a local dev server works inside a slot origin.

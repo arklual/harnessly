@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/limits"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/limits"
 )
 
 // The machine snapshot: this runtime's machine with its load, its provider limits with a forecast per window, what it

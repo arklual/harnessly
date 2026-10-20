@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/gate"
 )
 
 const testIndex = `<!doctype html><html><head><base href="/" /><meta name="api-base" content="" />` +

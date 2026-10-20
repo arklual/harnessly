@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/pricing"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/pricing"
 )
 
 const (

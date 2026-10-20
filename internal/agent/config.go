@@ -61,7 +61,7 @@ const (
 	Protocol   = 1
 )
 
-// BuildVersion is set at link time: -ldflags "-X harnessly/internal/agent.BuildVersion=1.2.3".
+// BuildVersion is set at link time: -ldflags "-X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=1.2.3".
 var BuildVersion = "dev"
 
 func env(name, fallback string) string {

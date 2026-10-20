@@ -78,6 +78,29 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  deploy:
+    name: deploy files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - name: Helm chart
+        run: |
+          helm lint --strict deploy/helm/harnessly
+          helm template ci deploy/helm/harnessly > /dev/null
+          helm template ci deploy/helm/harnessly --set ingress.enabled=true --set persistence.enabled=false \
+            --set integrations.boards.url=https://boards.example.com --set existingSecret=s > /dev/null
+      - name: Compose file
+        run: docker compose config --quiet
+      - name: Image
+        run: docker build --target runtime -t harnessly:ci .
+      - name: Image answers
+        run: |
+          docker run -d --name hs -p 127.0.0.1:8022:8022 harnessly:ci
+          for i in $(seq 1 30); do curl -fsS 127.0.0.1:8022/api/health && break; sleep 1; done
+          curl -fsS 127.0.0.1:8022/ | grep -q '<title>harnessly'
+          docker rm -f hs
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:

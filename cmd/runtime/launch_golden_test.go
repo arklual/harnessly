@@ -16,16 +16,16 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/agents"
-	"harnessly/internal/agents/codex"
-	"harnessly/internal/coreapi/layoutapi"
-	"harnessly/internal/jsvalue"
-	"harnessly/internal/launch"
-	"harnessly/internal/sessions"
-	"harnessly/internal/sleep"
-	"harnessly/internal/state"
-	"harnessly/internal/status"
-	"harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/launch"
+	"github.com/ly-solutions/harnessly/internal/sessions"
+	"github.com/ly-solutions/harnessly/internal/sleep"
+	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/status"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
 // goldenTmux is tmux as recorded sessions, in the shape testdata/launch-routes/stub-tmux.mjs records them.

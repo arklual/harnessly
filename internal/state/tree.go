@@ -3,7 +3,7 @@ package state
 import (
 	"math"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The layout tree: a pane `{type:'pane', id, tabs, activeTabId}` or a split `{type:'split', orientation, ratio,

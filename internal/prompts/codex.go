@@ -3,7 +3,7 @@ package prompts
 import (
 	"time"
 
-	"harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/screen"
 )
 
 // A message for Codex is pasted and submitted, then its prompt box is read: an Enter that lands while Codex starts its

@@ -11,7 +11,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/norm"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 func validUTF8(s string) bool { return utf8.ValidString(s) }

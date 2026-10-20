@@ -11,8 +11,8 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // The JavaScript semantics the Claude parser leans on. Values are what jsvalue.Parse makes, plus jsvalue.Undefined.

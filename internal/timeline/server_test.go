@@ -12,7 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // What the golden scenario leaves out: the timers of ten seconds and more, and the socket cap.

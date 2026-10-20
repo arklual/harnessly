@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"harnessly/internal/files"
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // BodyLimit is the previous runtime's default request body limit.

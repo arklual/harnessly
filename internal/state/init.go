@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"harnessly/internal/agent"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // Init prepares the stores at start and after a tmux reset: the workspace list (migrated from the oldest single-layout

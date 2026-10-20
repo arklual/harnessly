@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,7 +21,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agent"
 )
 
 // fakeClaude stands in for Claude Code: it answers --version, notes its arguments, writes its pid file and transcript
@@ -30,6 +31,7 @@ import (
 const fakeClaude = `#!/bin/bash
 if [ "$1" = "--version" ]; then echo "2.1.99 (Claude Code)"; exit 0; fi
 echo "$*" >> "$HOME/claude-calls.log"
+env | grep -E '^(BOARDS|ARTIFACTS|RUNTIME)_' | sort >> "$HOME/claude-env.log"
 settings=""; sid=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -108,6 +110,21 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 	}
 	_ = os.WriteFile(filepath.Join(fakes, "claude"), []byte(fakeClaude), 0o755)
 	_ = os.WriteFile(filepath.Join(fakes, "codex"), []byte(fakeCodex), 0o755)
+	// The boards and artifacts servers: a hand-off and a conversation's documents, as the integrations call them.
+	services := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/b/api/handoff" && r.Header.Get("Authorization") == "Bearer runtime-token":
+			w.WriteHeader(201)
+			_, _ = io.WriteString(w, `{"url":"http://`+r.Host+`/b/auth/handoff?t=signed"}`)
+		case r.URL.Path == "/api/v1/artifacts" && r.Header.Get("Authorization") == "Bearer viewer-token":
+			_, _ = io.WriteString(w, `{"total":1,"items":[{"slug":"plan-4k2m9x","title":"Plan for `+r.URL.Query().Get("session")+`",`+
+				`"updatedAt":"2026-10-19T12:00:00.000Z","versionCount":1,"viewUrl":"http://`+r.Host+`/a/plan-4k2m9x","embedUrl":"http://`+r.Host+`/embed/plan-4k2m9x"}]}`)
+		default:
+			w.WriteHeader(401)
+			_, _ = io.WriteString(w, `{"error":"unauthorized"}`)
+		}
+	}))
+	defer services.Close()
 	release := filepath.Join(root, "release.json")
 	_ = os.WriteFile(release, []byte(`{"version":"9.9.9","commit":"abc"}`), 0o644)
 	socket := "hs-test-sa-" + strconv.Itoa(os.Getpid())
@@ -128,6 +145,9 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 		// The panes' login shells build their own PATH, where a real Claude may come first: launches name the stand-in.
 		"RUNTIME_CLAUDE_LAUNCHER=" + filepath.Join(fakes, "claude"),
 		"RUNTIME_PLUGIN_RELOAD_MARK=" + filepath.Join(home, ".local", "state", "sync", "claude-reload.json"),
+		"RUNTIME_BOARDS_URL=" + services.URL, "RUNTIME_BOARDS_TOKEN=runtime-token", "RUNTIME_BOARDS_AGENT_TOKEN=agent-token",
+		"RUNTIME_ARTIFACTS_URL=" + services.URL, "RUNTIME_ARTIFACTS_TOKEN=editor-token", "RUNTIME_ARTIFACTS_READ_TOKEN=viewer-token",
+		"RUNTIME_OWNER_NAME=Ada",
 	}
 	tmuxCmd := func(args ...string) *exec.Cmd {
 		c := exec.Command("tmux", append([]string{"-L", socket}, args...)...)
@@ -371,6 +391,28 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 		return err == nil
 	})
 
+	// --- the integrations: the agent's environment, and what the page asks the runtime for ------------------------------
+	wantEnv := strings.Join([]string{"ARTIFACTS_AUTHOR=Ada (agent)", "ARTIFACTS_SESSION=" + tab, "ARTIFACTS_TOKEN=editor-token",
+		"ARTIFACTS_URL=" + services.URL, "BOARDS_TOKEN=agent-token", "BOARDS_URL=" + services.URL}, "\n") + "\n"
+	if got := read(filepath.Join(home, "claude-env.log")); got != wantEnv {
+		t.Fatalf("the agent's environment:\n%s\nwant\n%s", got, wantEnv)
+	}
+	if code, body := call("GET", "/api/integrations", "", true); code != 200 ||
+		body != `{"boards":{"url":"`+services.URL+`"},"artifacts":{"url":"`+services.URL+`"}}`+"\n" {
+		t.Fatalf("integrations: %d %s", code, body)
+	}
+	if code, body := call("POST", "/agents/api/integrations/boards/sign-in", `{"next":"/b/plan-abc?k=key"}`, true); code != 200 ||
+		body != `{"url":"`+services.URL+`/b/auth/handoff?t=signed"}`+"\n" {
+		t.Fatalf("board sign-in: %d %s", code, body)
+	}
+	if code, _ := call("POST", "/api/integrations/boards/sign-in", `{"next":"/b/plan-abc?k=key"}`, false); code != 403 {
+		t.Fatalf("a cli-token signs nobody in to boards: %d", code)
+	}
+	if code, body := call("GET", "/api/integrations/artifacts/documents?session="+tab, "", true); code != 200 ||
+		!strings.Contains(body, `"title":"Plan for `+tab+`"`) || !strings.Contains(body, `"embedUrl":"`+services.URL+`/embed/plan-4k2m9x"`) {
+		t.Fatalf("documents: %d %s", code, body)
+	}
+
 	// --- the conversation and terminal sockets ---------------------------------------------------------------------------
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -452,6 +494,9 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 	waitFor("the restarted gate", 30*time.Second, func() bool { code, _ := call("GET", "/api/health", "", true); return code == 200 })
 	waitFor("the working agent to be resumed", 60*time.Second, func() bool {
 		return strings.Contains(read(filepath.Join(home, "claude-calls.log")), "--resume "+workingSID)
+	})
+	waitFor("the resumed agent's conversation in its environment", 10*time.Second, func() bool {
+		return strings.Count(read(filepath.Join(home, "claude-env.log")), "ARTIFACTS_SESSION="+working+"\n") == 2
 	})
 	waitFor("the resumed tab to show its conversation", 40*time.Second, func() bool {
 		s := status(working)

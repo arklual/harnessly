@@ -1,0 +1,57 @@
+# Argo CD Application for one person's harnessly, from the Helm chart in this repository.
+#   kubectl -n argocd apply -f deploy/argocd/application.yaml
+#
+# Secrets stay out of Git: create the Secret named in existingSecret first (kubectl, External Secrets, Sealed Secrets,
+# SOPS, ...) with the runtime's tokens (RUNTIME_BOARDS_TOKEN, RUNTIME_ARTIFACTS_TOKEN, ...) and, if the agents use API
+# keys instead of logins, ANTHROPIC_API_KEY / OPENAI_API_KEY.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: harnessly-ada
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ly-solutions/harnessly.git
+    # Pin a release tag in production, so upgrades are deliberate.
+    targetRevision: main
+    path: deploy/helm/harnessly
+    helm:
+      releaseName: ada
+      valuesObject:
+        ownerName: Ada
+        ownerEmail: ada@example.com
+        integrations:
+          boards:
+            url: https://boards.example.com
+          artifacts:
+            url: https://artifacts.example.com
+        existingSecret: harnessly-ada
+        persistence:
+          size: 50Gi
+        ingress:
+          enabled: true
+          className: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+            nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+            cert-manager.io/cluster-issuer: letsencrypt
+          hosts:
+            - host: ada.work.example.com
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: harnessly-ada-tls
+              hosts: [ada.work.example.com]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harnessly
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

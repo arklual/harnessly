@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 // testdata/ts-golden.json holds the previous runtime's answers on generated inputs: its own functions run under node.

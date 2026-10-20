@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 const (

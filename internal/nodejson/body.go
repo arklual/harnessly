@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"harnessly/internal/jscompat"
-	"harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 // BodyUTF8 says whether a request's body is text in UTF-8 as its content type names it (no charset, or utf-8): the

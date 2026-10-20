@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 type loadGolden struct {
