@@ -20,8 +20,10 @@ const (
 	LimitEntries       = 20000
 )
 
-// Board is a board of an artifact; Path is under project/, with the query the page needs.
+// Board is a board of an artifact; Path is under project/, with the query the page needs. ID is the permanent id of
+// its page in a project with meta/; "" for a board no page names.
 type Board struct {
+	ID    string `json:"id,omitempty"`
 	Title string `json:"title"`
 	Path  string `json:"path"`
 	W     *int   `json:"w"`
@@ -41,6 +43,7 @@ type Agent struct {
 // ClaimView is a claim on a board as the panel shows it.
 type ClaimView struct {
 	Board     string `json:"board"`
+	Page      string `json:"page,omitempty"`
 	Person    string `json:"person"`
 	TabID     string `json:"tabId"`
 	ChatTitle string `json:"chatTitle"`
@@ -72,6 +75,8 @@ type Artifact struct {
 	Check       *CheckSummary `json:"check"`
 	Agents      []Agent       `json:"agents"`
 	Claims      []ClaimView   `json:"claims"`
+	// Release is the board format's release the project is on; absent when releases are not used.
+	Release *ProjectRelease `json:"release,omitempty"`
 }
 
 // clone is a copy whose slices can be changed without touching a cached artifact.

@@ -323,7 +323,7 @@ func TestE2ESendNow(t *testing.T) {
 func TestE2ESteerHandsOver(t *testing.T) {
 	r := newE2E(t, true, "")
 	svc, _ := r.service(Tab{CliState: StateBusy})
-	res := svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "add", "text": "steer this in"}))
+	res := svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "add", "text": "steer this in", "now": true}))
 	if got := asJSON(t, res); res.Status != 200 || got["delivery"] != "steered" {
 		t.Fatalf("add: %d %v; log %q", res.Status, got, r.logLines())
 	}

@@ -45,10 +45,15 @@ func designConfig(d deps) design.Config {
 		AltWorkspaceDir: os.Getenv("RUNTIME_WORKSPACE"),
 		WorkspaceConfig: env("RUNTIME_WORKSPACE_CONFIG", os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")),
 		HistoryDir:      os.Getenv("RUNTIME_DESIGN_HISTORY_DIR"),
+		KitsDir:         os.Getenv("RUNTIME_DESIGN_KITS_DIR"),
+		KitOrigins:      splitList(os.Getenv("RUNTIME_DESIGN_KIT_ORIGINS")),
+		ReleasesDir:     os.Getenv("RUNTIME_DESIGN_RELEASES_DIR"),
 		Port:            port,
 		Chrome:          os.Getenv("RUNTIME_DESIGN_CHROME"),
 		PlatformAPI:     platformAPI,
 		OwnerEmail:      os.Getenv("RUNTIME_OWNER_EMAIL"),
+		CanvasKey:       os.Getenv("RUNTIME_DESIGN_CANVAS_KEY"),
+		EngineFile:      os.Getenv("RUNTIME_DESIGN_ENGINE_FILE"),
 		// The transcripts the listing reads to see who works on what: the agents' own folders under the home.
 		ClaudeProjects: filepath.Join(d.Home, ".claude", "projects"),
 		CodexSessions:  filepath.Join(d.Home, ".codex", "sessions"),
@@ -107,6 +112,8 @@ func designRoutes(d deps) []gate.JSONRoute {
 		designRoute(platformAPI+"/design/library/boards", a.Boards),
 		designRoute(platformAPI+"/design/library/locate", a.Locate),
 		designRoute(platformAPI+"/design/library/send", a.Send),
+		designRoute("/api/cli/design/pages", a.CLIPages),
+		designRoute(platformAPI+"/design/library/releases", a.Releases),
 	}
 }
 

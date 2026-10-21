@@ -268,7 +268,13 @@ func (s *Service) deliverHead(tabID string) {
 	if fresh, ok := s.cfg.Tabs.Tab(tabID); ok {
 		tab = fresh
 	}
-	outcome := s.Pump(tabID, MayDeliverQueue(tab.CliState, false), s.deliveryDriver(tab))
+	// A state not known yet (no hook seen since the page or the runtime came up) does not hold the queue when the agent
+	// is plainly there: a program other than a bare shell runs in the pane's foreground (fail-closed: tmux not saying
+	// counts as no), and the screen then decides — a prompt box with no spinner, no menu and an empty input takes the
+	// message. A shell never gets it: its prompt may look like the agent's and the text would run as a command.
+	ready := MayDeliverQueue(tab.CliState, false) || (tab.CliState == StateUnknown && s.agentInForeground(tab.Session)) ||
+		(tab.CliState == StateNeedsInput && s.questionOnScreen(tab.Session))
+	outcome := s.Pump(tabID, ready, s.deliveryDriver(tab))
 	switch outcome {
 	case PumpSent:
 		steps.Mark("enter")
@@ -335,10 +341,11 @@ const (
 	DeliveryQueued  = "queued"
 )
 
-// TakeNewPrompt hands a message just queued to the agent: a working agent gets it in its running turn now (steer), one
-// that is not working from the queue at once. A message the screen refuses stays queued.
-func (s *Service) TakeNewPrompt(tabID, id string) string {
-	if tab, ok := s.cfg.Tabs.Tab(tabID); !ok || tab.CliState != StateBusy {
+// TakeNewPrompt hands a message just queued to the agent, as Codex does: Enter queues — an agent that is not working
+// takes it from the queue at once, a working one when its turn ends; only "now" (⌘↵) puts it into the running turn
+// (steer). A message the screen refuses stays queued.
+func (s *Service) TakeNewPrompt(tabID, id string, now bool) string {
+	if tab, ok := s.cfg.Tabs.Tab(tabID); !ok || tab.CliState != StateBusy || !now {
 		s.Schedule(tabID, 0)
 		return DeliveryQueued
 	}
@@ -554,4 +561,22 @@ func (s *Service) RunCommand(in RunInput) RunResult {
 		s.cfg.Events.CommandsReloaded(in.Provider)
 	}
 	return r
+}
+
+// questionOnScreen: the agent waits on its AskUserQuestion dialog (not a permission prompt): a message for it is the
+// person's answer in words, delivered through «Chat about this».
+func (s *Service) questionOnScreen(session string) bool {
+	plain, ok := s.cfg.Panes.Capture(session)
+	if !ok {
+		return false
+	}
+	present, _ := screen.ChatAboutRow(plain)
+	return present
+}
+
+// agentInForeground: a program other than a bare shell runs in the foreground of the session's pane; false when tmux
+// does not say.
+func (s *Service) agentInForeground(session string) bool {
+	command := s.cfg.Panes.PaneCurrentCommand(session)
+	return command != "" && !tmux.SafeShells[command]
 }

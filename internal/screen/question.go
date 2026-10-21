@@ -2,6 +2,7 @@ package screen
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -243,4 +244,22 @@ func dropBytes(s string, n int) string {
 		return ""
 	}
 	return s[n:]
+}
+
+const chatAboutLabel = "Chat about this"
+
+var chatRowRE = regexp.MustCompile(`^(❯\s*)?(\d+\.\s*)?` + chatAboutLabel + `$`)
+
+// ChatAboutRow reads the «Chat about this» row of Claude's AskUserQuestion dialog off the plain screen: whether the
+// dialog has it among its last lines, and whether the cursor (❯) stands on it.
+func ChatAboutRow(screen string) (present, selected bool) {
+	if !IsQuestionOnScreen(screen) {
+		return false, false
+	}
+	for _, line := range tail(trimmedNonEmpty(screen), questionTailLines) {
+		if chatRowRE.MatchString(line) {
+			return true, strings.HasPrefix(line, "❯")
+		}
+	}
+	return false, false
 }

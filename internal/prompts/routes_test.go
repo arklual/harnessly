@@ -38,8 +38,14 @@ func TestPromptQueueRoute(t *testing.T) {
 	r := newRig(t, tui(t, "claude-busy-spinner.ansi.txt"), Tab{CliState: StateBusy})
 	r.svc.cfg.ReadTranscript = func(string) ([]string, bool) { return nil, false }
 
-	// Every new message is handed to the agent at once: a working one in its turn.
-	res := r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "add", "text": "и проверь ещё логи", "images": []any{}}))
+	// Enter to a working agent queues: the message waits for the end of its turn.
+	waits := r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "add", "text": "после хода", "images": []any{}}))
+	if w := asJSON(t, waits); waits.Status != 200 || w["delivery"] != "queued" {
+		t.Fatalf("add, Enter: %d %v", waits.Status, w)
+	}
+	r.svc.Queue().Take("tab-1", w0(t, waits))
+	// ⌘↵ ("now") hands it to the working agent in its turn.
+	res := r.svc.PromptQueue(body(map[string]any{"tabId": "tab-1", "action": "add", "text": "и проверь ещё логи", "images": []any{}, "now": true}))
 	got := asJSON(t, res)
 	item, _ := got["item"].(map[string]any)
 	if res.Status != 200 || got["delivery"] != "steered" || item["text"] != "и проверь ещё логи" {
@@ -308,4 +314,12 @@ func TestAnswerQuestionRoute(t *testing.T) {
 	r = setup(true)
 	r.panes.failOn = "keys:Right"
 	expectError(t, "tmux failed midway", call(r, questions, []any{choice([]int{0}, ""), choice([]int{0}, "")}), 500, "Failed to send answers")
+}
+
+// w0 is the id of the item an add answered with.
+func w0(t *testing.T, res Response) string {
+	t.Helper()
+	item, _ := asJSON(t, res)["item"].(map[string]any)
+	id, _ := item["id"].(string)
+	return id
 }

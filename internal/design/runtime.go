@@ -161,16 +161,25 @@ func (l *Library) SweepOwnClaims(missing map[string]int64) (SweepResult, error) 
 
 func stem(v string) string { return strings.TrimSuffix(v, dcSuffix) }
 
-// ResolveBoardKey is the board a person or an agent named: by its title, its file, or its file without the suffix; a
-// name no board has is kept, an agent claims the board it is about to create.
+// ResolveBoardKey is the board a person or an agent named: by its page id, its title, its file, or its file without the
+// suffix; the key is the page id when the board has one. A name no board has is kept, an agent claims the board it is
+// about to create.
 func ResolveBoardKey(a *Artifact, name any) (string, error) {
 	wanted, err := CleanBoardKey(name)
 	if err != nil {
 		return "", err
 	}
 	for _, b := range a.Boards {
+		if b.ID != "" && wanted == b.ID {
+			return b.ID, nil
+		}
+	}
+	for _, b := range a.Boards {
 		key := BoardKeyOf(b)
 		if wanted == key || wanted == b.Title || wanted == b.Path || stem(wanted) == key {
+			if b.ID != "" {
+				return b.ID, nil
+			}
 			return key, nil
 		}
 	}
@@ -218,7 +227,9 @@ func (l *Library) conflictMessage(holder Claim, local bool, workspaceID string, 
 
 // ClaimOutcome is a claim taken, or the holder and the words for the agent.
 type ClaimOutcome struct {
+	// Claim names the board as people know it; Page is the page id it is held under ("" for a board without one).
 	Claim     Claim
+	Page      string
 	Refreshed bool
 	Holder    *Claim
 	Message   string
@@ -246,20 +257,38 @@ func (l *Library) ClaimForChat(session string, project, board any) (ClaimOutcome
 		return ClaimOutcome{}, err
 	}
 	owner := ClaimOwner{User: id.Person, Runtime: id.Runtime, TabID: caller.TabID, ChatTitle: caller.ChatTitle}
+	// A runtime without meta/ claims the same page under its old key.
+	if legacy := legacyKeyOf(a, key); legacy != "" {
+		for _, c := range l.LiveClaims(a.ID, nowMs()) {
+			if c.Board == legacy && !sameOwner(c.Owner, owner) {
+				held := c
+				return l.claimRefused(a, &held, id)
+			}
+		}
+	}
 	res, err := l.ClaimBoard(a.ID, key, owner, nowMs())
 	if err != nil {
 		return ClaimOutcome{}, err
 	}
-	if res.Held == nil {
-		return ClaimOutcome{Claim: res.Claim, Refreshed: res.Refreshed}, nil
+	if res.Held != nil {
+		return l.claimRefused(a, res.Held, id)
 	}
+	out := ClaimOutcome{Claim: res.Claim, Refreshed: res.Refreshed}
+	out.Claim.Board, out.Page = claimShown(a, res.Claim.Board)
+	return out, nil
+}
+
+// claimRefused is the outcome of a board held by another chat, the holder named as people know the board.
+func (l *Library) claimRefused(a *Artifact, held *Claim, id Identity) (ClaimOutcome, error) {
+	shown := *held
+	shown.Board, _ = claimShown(a, held.Board)
 	local, ws := false, ""
-	if res.Held.Owner.Runtime == id.Runtime {
-		if c, ok := l.agentChats()[res.Held.Owner.TabID]; ok {
+	if held.Owner.Runtime == id.Runtime {
+		if c, ok := l.agentChats()[held.Owner.TabID]; ok {
 			local, ws = true, c.WorkspaceID
 		}
 	}
-	return ClaimOutcome{Holder: res.Held, Message: l.conflictMessage(*res.Held, local, ws, nowMs())}, nil
+	return ClaimOutcome{Holder: &shown, Message: l.conflictMessage(shown, local, ws, nowMs())}, nil
 }
 
 // ReleaseForChat lets go of the chat's claims: all, a project's, or one board's.
@@ -284,15 +313,22 @@ func (l *Library) ReleaseForChat(session string, project, board any) ([]Claim, e
 				return nil, err
 			}
 			f.AnyBoard = false
+			released := l.ReleaseClaims(f, nowMs())
+			if legacy := legacyKeyOf(a, f.Board); legacy != "" {
+				f.Board = legacy
+				released = append(released, l.ReleaseClaims(f, nowMs())...)
+			}
+			return l.shownClaims(released), nil
 		}
 	}
-	return l.ReleaseClaims(f, nowMs()), nil
+	return l.shownClaims(l.ReleaseClaims(f, nowMs())), nil
 }
 
 // ClaimLine is a claim as `who` prints it.
 type ClaimLine struct {
 	Project   string `json:"project"`
 	Board     string `json:"board"`
+	Page      string `json:"page,omitempty"`
 	Person    string `json:"person"`
 	Runtime   string `json:"runtime"`
 	ChatTitle string `json:"chatTitle"`
@@ -312,8 +348,13 @@ func (l *Library) WhoHolds(project any) ([]ClaimLine, error) {
 		return nil, err
 	}
 	lines := []ClaimLine{}
+	arts := map[string]*Artifact{}
 	for _, c := range l.LiveClaims(scope, nowMs()) {
-		lines = append(lines, ClaimLine{Project: c.Project, Board: c.Board, Person: c.Owner.User, Runtime: c.Owner.Runtime, ChatTitle: c.Owner.ChatTitle, Since: c.Since})
+		if _, ok := arts[c.Project]; !ok {
+			arts[c.Project] = l.ReadArtifact(c.Project)
+		}
+		board, page := claimShown(arts[c.Project], c.Board)
+		lines = append(lines, ClaimLine{Project: c.Project, Board: board, Page: page, Person: c.Owner.User, Runtime: c.Owner.Runtime, ChatTitle: c.Owner.ChatTitle, Since: c.Since})
 	}
 	sort.SliceStable(lines, func(i, j int) bool {
 		if c := compareRuPlain(lines[i].Project, lines[j].Project); c != 0 {
@@ -344,9 +385,10 @@ func (l *Library) AttachClaims(artifacts []*Artifact) error {
 				continue
 			}
 			_, here := chats[c.Owner.TabID]
-			claimed = append(claimed, ClaimView{Board: c.Board, Person: c.Owner.User, TabID: c.Owner.TabID, ChatTitle: c.Owner.ChatTitle, Since: c.Since,
+			board, page := claimShown(a, c.Board)
+			claimed = append(claimed, ClaimView{Board: board, Page: page, Person: c.Owner.User, TabID: c.Owner.TabID, ChatTitle: c.Owner.ChatTitle, Since: c.Since,
 				Local: c.Owner.Runtime == id.Runtime && here})
-			held[c.Board] = true
+			held[board] = true
 		}
 		for _, c := range a.Claims {
 			if c.Inferred && !held[c.Board] {
@@ -359,4 +401,18 @@ func (l *Library) AttachClaims(artifacts []*Artifact) error {
 		a.Claims = claimed
 	}
 	return nil
+}
+
+// shownClaims are claims with their keys named as people know the boards.
+func (l *Library) shownClaims(claims []Claim) []Claim {
+	arts := map[string]*Artifact{}
+	out := make([]Claim, 0, len(claims))
+	for _, c := range claims {
+		if _, ok := arts[c.Project]; !ok {
+			arts[c.Project] = l.ReadArtifact(c.Project)
+		}
+		c.Board, _ = claimShown(arts[c.Project], c.Board)
+		out = append(out, c)
+	}
+	return out
 }

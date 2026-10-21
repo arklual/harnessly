@@ -264,6 +264,9 @@ func (l *Library) ArtifactVersion(ref string, maxAge time.Duration) int64 {
 		if st, err := os.Stat(filepath.Join(l.ArtifactDir(ref), ArtifactFile)); err == nil {
 			meta = mtimeMs(st)
 		}
+		if isRealDir(l.MetaDir(ref)) {
+			meta = math.Max(meta, newestIn(l.MetaDir(ref), &budget))
+		}
 		return round(math.Max(project, meta))
 	})
 }
@@ -276,6 +279,23 @@ func (l *Library) readProject(ref string) *Artifact {
 	if st, err := os.Stat(project); err != nil || !st.IsDir() {
 		return nil
 	}
+	if model := l.ReadModel(ref); model != nil {
+		return &Artifact{
+			ID: ref, Title: model.Meta.Title, Source: model.Meta.Source, UpdatedAt: l.ArtifactVersion(ref, listVersionTTL),
+			Boards: modelBoards(project, model), HasSupport: exists(filepath.Join(project, SupportJSName)), ProjectPath: project,
+			Agents: []Agent{}, Claims: []ClaimView{},
+		}
+	}
+	boards, title, source := l.legacyListing(ref, project)
+	return &Artifact{
+		ID: ref, Title: title, Source: source, UpdatedAt: l.ArtifactVersion(ref, listVersionTTL), Boards: boards,
+		HasSupport: exists(filepath.Join(project, SupportJSName)), ProjectPath: project, Agents: []Agent{}, Claims: []ClaimView{},
+	}
+}
+
+// legacyListing is the boards, title and source of a project without meta/: artifact.json's list with the other board
+// files of project/, else canvas.json's boards, else the board files; sizes from canvas.json where the list has none.
+func (l *Library) legacyListing(ref, project string) ([]Board, string, *string) {
 	meta := ParseArtifactFile(readJSON(filepath.Join(l.ArtifactDir(ref), ArtifactFile)))
 	var canvas []CanvasBoard
 	var canvasTitle *string
@@ -314,10 +334,7 @@ func (l *Library) readProject(ref string) *Artifact {
 	} else if canvasTitle != nil {
 		title = *canvasTitle
 	}
-	return &Artifact{
-		ID: ref, Title: title, Source: meta.Source, UpdatedAt: l.ArtifactVersion(ref, listVersionTTL), Boards: boards,
-		HasSupport: exists(filepath.Join(project, SupportJSName)), ProjectPath: project, Agents: []Agent{}, Claims: []ClaimView{},
-	}
+	return boards, title, meta.Source
 }
 
 // ReadArtifact is one artifact by its ref; nil when there is none. The answer is a copy the caller may change.

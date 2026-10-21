@@ -670,7 +670,7 @@ func (l *Library) restoreBoard(project, file, at string, actor restoreActor, now
 	}
 	board := BoardTitleOf(file)
 	for _, c := range l.LiveClaims(project, now.UnixMilli()) {
-		if c.Board != board {
+		if !l.claimNamesFile(project, c.Board, file) {
 			continue
 		}
 		if actor.owner == nil || !sameOwner(c.Owner, *actor.owner) {
@@ -777,15 +777,19 @@ func (l *Library) noteEditors(rel string) {
 	h.mu.Unlock()
 	_, changed, isBoard := BoardOfPath(filepath.ToSlash(rel))
 	claims := l.LiveClaims(project, now.UnixMilli())
+	var held []Claim
+	for _, c := range claims {
+		if !isBoard || l.claimNamesFile(project, c.Board, changed+dcSuffix) {
+			held = append(held, c)
+		}
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for _, c := range claims {
-		if !isBoard || c.Board == changed {
-			line := OwnerLine(c.Owner)
-			if !h.editors[line] {
-				h.editors[line] = true
-				h.editorList = append(h.editorList, line)
-			}
+	for _, c := range held {
+		line := OwnerLine(c.Owner)
+		if !h.editors[line] {
+			h.editors[line] = true
+			h.editorList = append(h.editorList, line)
 		}
 	}
 }
@@ -1030,6 +1034,7 @@ func (l *Library) HistoryForCLI(project any, board any, limit float64) (CLIHisto
 		if err != nil {
 			return CLIHistory{}, err
 		}
+		key, _ = claimShown(a, key)
 		f := key + dcSuffix
 		file = &f
 	}
@@ -1061,6 +1066,7 @@ func (l *Library) RestoreForCLI(session string, project, board, at any) (CLIRest
 	if err != nil {
 		return CLIRestored{}, err
 	}
+	key, _ = claimShown(a, key)
 	atS, ok := at.(string)
 	if !ok {
 		return CLIRestored{}, historyErr(locale.Pick("Give the version like this: --at <sha | 30m | 2h | 1d>", "Версию задают так: --at <sha | 30m | 2h | 1d>"))

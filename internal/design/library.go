@@ -49,6 +49,16 @@ type Config struct {
 	LibraryDir, WorkspaceDir, AltWorkspaceDir, WorkspaceConfig string
 	// HistoryDir holds the private history repositories (the data dir when empty).
 	HistoryDir string
+	// KitsDir holds the UI kits installed by version, served at /kit/<id>/<version>/ (design-kits in the data dir
+	// when empty).
+	KitsDir string
+	// KitOrigins are the origins, besides the library server's own loopback ones, that may read kit files from a page
+	// (fonts and stylesheets are CORS requests): the platform hosts that show boards, as `https://host[:port]`.
+	// Empty: only the loopback origins.
+	KitOrigins []string
+	// ReleasesDir is a design-upstream mirror: the releases of the board format a project can be pinned to (none when
+	// empty).
+	ReleasesDir string
 	// Port is the library server's preferred loopback port.
 	Port int
 	// Chrome is the headless browser a check drives; the usual places are looked at when empty.
@@ -59,6 +69,10 @@ type Config struct {
 	ClaudeProjects, CodexSessions string
 	// OwnerEmail is the owner when the runtime's config names none.
 	OwnerEmail string
+	// CanvasKey is the key of project/canvas.json under which the runtime keeps its own data (DefaultCanvasKey when empty).
+	CanvasKey string
+	// EngineFile is the board engine (support.js) a new project gets; the copy shipped with the runtime when empty.
+	EngineFile string
 	Texts      Texts
 	// Log hears what goes wrong in the background.
 	Log func(level, msg string, err error)
@@ -81,6 +95,7 @@ type Library struct {
 	modes    modesState
 	sources  sourcesState
 	texts    sync.Map
+	releases releasesState
 	osUser   func() string
 }
 

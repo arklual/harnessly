@@ -305,9 +305,13 @@ func TestImportCreateAndHistoryMatchGolden(t *testing.T) {
 		t.Errorf("import of a non-zip: %v, want %s", err, g.ImportBroken)
 	}
 
-	if _, err := l.CreateProject("Новый"); err == nil || strings.ReplaceAll(err.Error(), library, "<library>") != g.CreateMissing {
-		t.Errorf("create without template: %v", err)
+	// The golden data is the old runtime's, which refused to create a project without .template/ (g.CreateMissing);
+	// this runtime uses the template it ships instead, so that case is checked by TestCreateWithShippedTemplate.
+	shipped, err := l.CreateProject("Новый")
+	if err != nil {
+		t.Fatalf("create with the shipped template: %v", err)
 	}
+	_ = os.RemoveAll(shipped.Dir)
 	copyDir(t, "testdata/history/template", filepath.Join(library, TemplateDirname))
 	_ = os.Chmod(filepath.Join(library, TemplateDirname, "project", "sub", "x.css"), 0o640)
 	_ = os.Chmod(filepath.Join(library, TemplateDirname, "project", "sub"), 0o750)
@@ -321,7 +325,23 @@ func TestImportCreateAndHistoryMatchGolden(t *testing.T) {
 	if created.ID != g.Create.ID || created.Title != g.Create.Title {
 		t.Errorf("create: %+v", created)
 	}
-	sameLines(t, "created tree", treeOf(t, filepath.Join(library, created.ID)), g.Create.Tree)
+	// Every new project also gets meta/ and the canvas.json built from it, which the old runtime's golden tree
+	// does not have: those lines are checked apart.
+	var tree, model []string
+	for _, line := range treeOf(t, filepath.Join(library, created.ID)) {
+		if strings.Contains(line, " "+MetaDirname) || strings.Contains(line, ProjectDirname+"/"+canvasJSONName) {
+			if strings.HasPrefix(line, "f ") {
+				line = line[:strings.LastIndex(line, " ")]
+			}
+			model = append(model, line)
+			continue
+		}
+		tree = append(tree, line)
+	}
+	sameLines(t, "created tree", tree, g.Create.Tree)
+	if strings.Join(model, ",") != "d 755 meta,d 755 meta/pages,f 644 meta/project.json,f 644 project/canvas.json" {
+		t.Errorf("created model files: %v", model)
+	}
 	if again, err := l.CreateProject("Новый проект"); err != nil || again.ID != g.Create2 {
 		t.Errorf("second create: %+v %v", again, err)
 	}

@@ -161,12 +161,17 @@ it stays with the previous runtime.
 | `RUNTIME_DESIGN_LIBRARY_DIR` | the library folder; unset: `design-artifacts` under `RUNTIME_WORKSPACE_DIR`, else `RUNTIME_WORKSPACE`, else the workspace root of `RUNTIME_WORKSPACE_CONFIG` (default `RUNTIME_SIDE_CHAT_CONFIG`), else the data directory |
 | `RUNTIME_WORKSPACE`, `RUNTIME_WORKSPACE_CONFIG` | the fallbacks above for finding the library |
 | `RUNTIME_DESIGN_HISTORY_DIR` | where the boards' private history repositories live (default the data directory) |
+| `RUNTIME_DESIGN_KITS_DIR` | where UI kits are installed by version (`<dir>/<id>/<version>/`), served by the library server at `/kit/<id>/<version>/<file>`; default `design-kits` in the data folder. Install with `harnessly design kit install` |
+| `RUNTIME_DESIGN_KIT_ORIGINS` | comma-separated origins (`https://host[:port]`) of pages that show boards and may read kit files across origins; the library server's own loopback origins always may, any other origin gets no CORS header. Default empty |
+| `RUNTIME_DESIGN_RELEASES_DIR` | a checkout of a design-upstream mirror: its `releases.json` lists the releases of the board format (Claude Design) with their engines and status; a project with `meta/` gets its release's engine (`"release"` in `meta/project.json`, default `legacy`) as `support.js`, new projects start on the newest stable one, and the panel offers newer stable releases. Unset: every project is served its own `support.js` as before |
 | `RUNTIME_DESIGN_LIBRARY_PORT` | the library server's preferred loopback port |
 | `RUNTIME_DESIGN_CHROME` | the headless browser a check drives (unset: the usual places) |
 | `RUNTIME_CLI_NAME` | the command agents are told to run (`<cli> design check …`, the DevTools hints; default `harnessly`) |
 | `RUNTIME_DESIGN_TAG`, `RUNTIME_DESIGN_HISTORY_EMAIL` | what this runtime writes into shared places (the history's author and markers, a check's temporary profile; default `harnessly-design`) and the history's author address (default `design@localhost`) |
 | `RUNTIME_DESIGN_SHARED_DIR` | the team's shared library on the machines, named in the library's rules file (default `/srv/design`) |
 | `RUNTIME_DESIGN_KIT_GLOBAL`, `RUNTIME_DESIGN_PAGES_GLOBAL`, `RUNTIME_DESIGN_ARGS_GLOBAL` | the window globals of a project's UI kit, its page renderer and the renderer's arguments (default `DesignKit`, `DesignPages`, `__DESIGN_ARGS`) |
+| `RUNTIME_DESIGN_CANVAS_KEY` | the key of a project's `project/canvas.json` under which the runtime keeps its page data (ids, routes); default `harnessly` (see [design pages](design-pages.md)) |
+| `RUNTIME_DESIGN_ENGINE_FILE` | the board engine (`support.js`) a new project gets when the library has no `.template/`; unset: the copy shipped with the runtime |
 | `RUNTIME_PEOPLE` | names a claim shows, by the local part of the owner's address: `local=Name,local2=Name2` |
 
 ### Preview proxy

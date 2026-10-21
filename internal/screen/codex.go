@@ -145,3 +145,32 @@ func CodexStillInBox(screen, text string) bool {
 	probe := jscompat.Slice(collapse(text), codexProbeChars)
 	return probe != "" && strings.Contains(box, probe)
 }
+
+var (
+	claudePastedRE = re(`\[Pasted text #\d+`)
+	claudeImageRE  = re(`\[Image #\d+\]`)
+)
+
+// ClaudeStillInBox: the text on Claude Code's input line (Read's Input, its first line) is this message — a
+// "[Pasted text #n …]" token, or the message's start: the line's first 24 characters, image tokens and whitespace
+// aside, begin the message, or the message's first 24 characters are on the line. An empty line reads as gone.
+func ClaudeStillInBox(input, text string) bool {
+	box := collapse(claudeImageRE.ReplaceAllString(input, " "))
+	if box == "" {
+		return false
+	}
+	if claudePastedRE.MatchString(box) {
+		return true
+	}
+	msg := collapse(text)
+	if msg == "" {
+		return false
+	}
+	// The line starts with the message, or (a wrapped message) the whole line is the message's start, long enough not to
+	// be someone's short draft that happens to begin the same way.
+	probe := jscompat.Slice(msg, codexProbeChars)
+	if strings.HasPrefix(box, probe) {
+		return true
+	}
+	return strings.HasPrefix(msg, box) && utf8.RuneCountInString(box) >= codexProbeChars
+}

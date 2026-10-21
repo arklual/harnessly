@@ -45,6 +45,7 @@ func (a *API) Library(r *http.Request) Answer {
 	}
 	arts := a.L.ListArtifacts()
 	a.L.AttachChecks(arts)
+	a.L.AttachReleases(arts)
 	if a.L.AttachAgents(arts, deref(self)) != nil || a.L.AttachClaims(arts) != nil {
 		return fail()
 	}
@@ -449,9 +450,10 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 			OK        bool   `json:"ok"`
 			Project   string `json:"project"`
 			Board     string `json:"board"`
+			Page      string `json:"page,omitempty"`
 			Refreshed bool   `json:"refreshed"`
 			Since     int64  `json:"since"`
-		}{true, out.Claim.Project, out.Claim.Board, out.Refreshed, out.Claim.Since}, h)
+		}{true, out.Claim.Project, out.Claim.Board, out.Page, out.Refreshed, out.Claim.Since}, h)
 	case "release":
 		pv, bv := Field(body, "project"), Field(body, "board")
 		_, pStr := pv.(string)
@@ -531,7 +533,7 @@ func (a *API) Create(r *http.Request, resolveCwd func(string, []string) (string,
 		}
 		return JSON(r, 500, errorBody(locale.Pick("Could not create the project", "Не удалось создать проект")), h)
 	}
-	res := a.StartProjectDialog(project.ID, a.L.NewProjectPrompt(project.Title, brief), resolveCwd)
+	res := a.StartProjectDialog(project.ID, a.L.NewProjectPrompt(project.Title, brief)+"\n\n"+a.L.PagesHint(project.ID), resolveCwd)
 	if res.TabID == "" {
 		return JSON(r, res.Status, struct {
 			Error string `json:"error"`

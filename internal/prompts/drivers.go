@@ -44,6 +44,8 @@ func (d claudeDriver) Enter() error {
 
 func (d claudeDriver) Sleep(dur time.Duration) { d.s.clock.Sleep(dur) }
 
+func (d claudeDriver) ChatAboutQuestion() bool { return d.s.chatAboutQuestion(d.session) }
+
 // codexDriver types a queued message into a Codex pane: one picture per paste, the text pasted and submitted with its
 // box watched.
 type codexDriver struct {

@@ -21,6 +21,9 @@ var unwatched = map[string]bool{"node_modules": true, ".git": true, ".claims": t
 const maxWatchedDirs = 20000
 
 type rootWatch struct {
+	// asked is the root as the library names it; root is the folder it resolves to, which the watches are on: a walk
+	// does not enter a link, so a root reached through one would otherwise be watched not at all.
+	asked    string
 	root     string
 	w        *fsnotify.Watcher
 	mu       sync.Mutex
@@ -43,7 +46,7 @@ func (l *Library) watching() bool {
 	ws.mu.Lock()
 	defer ws.mu.Unlock()
 	root := l.Root()
-	if ws.cur != nil && ws.cur.root == root {
+	if ws.cur != nil && ws.cur.asked == root {
 		return true
 	}
 	if ws.cur != nil {
@@ -118,7 +121,11 @@ func (l *Library) StopWatching() {
 	}
 }
 
-func startRootWatch(root string, l *Library) (*rootWatch, error) {
+func startRootWatch(asked string, l *Library) (*rootWatch, error) {
+	root, err := filepath.EvalSymlinks(asked)
+	if err != nil {
+		return nil, errors.New("no library folder")
+	}
 	st, err := os.Stat(root)
 	if err != nil || !st.IsDir() {
 		return nil, errors.New("no library folder")
@@ -127,7 +134,7 @@ func startRootWatch(root string, l *Library) (*rootWatch, error) {
 	if err != nil {
 		return nil, err
 	}
-	rw := &rootWatch{root: root, w: w, done: make(chan struct{})}
+	rw := &rootWatch{asked: asked, root: root, w: w, done: make(chan struct{})}
 	if err := rw.addTree(root); err != nil {
 		_ = w.Close()
 		return nil, err
