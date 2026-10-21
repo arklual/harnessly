@@ -157,6 +157,9 @@ func (l *Library) EditBoards(id string, e BoardEdit) ([]Board, error) {
 	if !IsLibraryID(id) {
 		return nil, editErr(locale.Pick("Boards can only be changed in library designs", "Доски можно менять только у макетов библиотеки"))
 	}
+	if l.HasMeta(id) {
+		return l.editPages(id, e)
+	}
 	a := l.ReadArtifact(id)
 	if a == nil {
 		return nil, editErr(locale.Pick("The design is gone", "Макета больше нет"))

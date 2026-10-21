@@ -212,7 +212,7 @@ func isNotEmpty(err error) bool {
 // CreatedProject is a new project of the library.
 type CreatedProject struct{ ID, Title, Dir string }
 
-func (l *Library) copyInto(id, title string, meta *jsvalue.Object) (CreatedProject, error) {
+func (l *Library) copyInto(id, title string, meta *jsvalue.Object, own bool) (CreatedProject, error) {
 	target := l.ArtifactDir(id)
 	if exists(target) {
 		return CreatedProject{}, createConflict(id)
@@ -224,9 +224,11 @@ func (l *Library) copyInto(id, title string, meta *jsvalue.Object) (CreatedProje
 	if err != nil {
 		return CreatedProject{}, err
 	}
-	realTemplate, err := filepath.EvalSymlinks(l.TemplateDir())
-	if err != nil {
-		return CreatedProject{}, err
+	realTemplate := ""
+	if own {
+		if realTemplate, err = filepath.EvalSymlinks(l.TemplateDir()); err != nil {
+			return CreatedProject{}, err
+		}
 	}
 	if err := os.Mkdir(stage, 0o777); err != nil {
 		return CreatedProject{}, err
@@ -240,15 +242,23 @@ func (l *Library) copyInto(id, title string, meta *jsvalue.Object) (CreatedProje
 		if link, err := os.Readlink(viaFd(into, "")); err != nil || link != filepath.Join(realLibrary, stageName) {
 			return createErr(locale.Pick("The new project's folder was replaced while it was being created", "Папка нового проекта подменена во время создания"))
 		}
-		if err := copyTemplate(l.TemplateDir(), into, realTemplate, &copyBudget{bytes: LimitUnpackedBytes, entries: LimitEntries}); err != nil {
+		if own {
+			if err := copyTemplate(l.TemplateDir(), into, realTemplate, &copyBudget{bytes: LimitUnpackedBytes, entries: LimitEntries}); err != nil {
+				return err
+			}
+		} else if err := l.writeShippedTemplate(into); err != nil {
 			return err
 		}
+		created := isoNow()
 		m := meta.Copy()
 		m.Set("v", 1)
 		m.Set("title", title)
-		m.Set("importedAt", isoNow())
+		m.Set("importedAt", created)
 		m.Set("boards", []any{})
-		return writeCreatedMeta(into, m)
+		if err := writeCreatedMeta(into, m); err != nil {
+			return err
+		}
+		return writeNewMeta(viaFd(into, ""), title, created, l.canvasKey(), l.NewProjectsRelease())
 	}()
 	if err != nil {
 		return CreatedProject{}, err
@@ -262,6 +272,9 @@ func (l *Library) copyInto(id, title string, meta *jsvalue.Object) (CreatedProje
 	if st, err := os.Lstat(target); err != nil || !st.IsDir() {
 		return CreatedProject{}, createErr(locale.Pick("The new project's folder was replaced while it was being created", "Папка нового проекта подменена во время создания"))
 	}
+	if _, err := l.WriteDerived(id); err != nil {
+		l.warn("design: the files built from meta/ of a new project were not written", err)
+	}
 	return CreatedProject{ID: id, Title: title, Dir: target}, nil
 }
 
@@ -272,18 +285,22 @@ func (l *Library) CreateProject(title string) (CreatedProject, error) {
 	if err != nil {
 		return CreatedProject{}, err
 	}
-	if err := l.checkTemplate(); err != nil {
-		return CreatedProject{}, err
-	}
-	meta, err := l.readTemplateMeta()
-	if err != nil {
-		return CreatedProject{}, err
+	// Without a template of its own the library gets the one shipped with the runtime.
+	own := l.hasOwnTemplate()
+	meta := jsvalue.NewObject()
+	if own {
+		if err := l.checkTemplate(); err != nil {
+			return CreatedProject{}, err
+		}
+		if meta, err = l.readTemplateMeta(); err != nil {
+			return CreatedProject{}, err
+		}
 	}
 	if err := os.MkdirAll(l.Root(), 0o777); err != nil {
 		return CreatedProject{}, err
 	}
 	for attempt := 1; ; attempt++ {
-		p, err := l.copyInto(SlugifyArtifactID(shown, l.TakenArtifactIDs()), shown, meta)
+		p, err := l.copyInto(SlugifyArtifactID(shown, l.TakenArtifactIDs()), shown, meta, own)
 		var ce *CreateError
 		if err == nil || !errors.As(err, &ce) || !ce.Conflict || attempt >= 3 {
 			return p, err
@@ -330,4 +347,16 @@ func (l *Library) NewProjectPrompt(title, brief string) string {
 		"как это выглядит в живых досках — смотри соседние проекты библиотеки. Каждая новая `*.dc.html` в `project/` появляется",
 		"в библиотеке сама. Когда доски готовы, проверь их: `" + t.CLI + " design check <id> --board \"<файл доски>\"`.",
 	}, "\n")
+}
+
+// PagesHint tells the agent of a new project how its pages are made: the project keeps them in meta/.
+func (l *Library) PagesHint(id string) string {
+	cli := l.cfg.Texts.CLI
+	return locale.Pick(
+		"The project keeps its pages in meta/: make each board with `"+cli+" design page create "+id+" --title \"<Title>\"`, which "+
+			"makes the board file from the template, gives the page a permanent id and prints the file to edit. "+
+			"project/canvas.json is built from meta/: do not edit it.",
+		"Проект хранит страницы в meta/: каждую доску делай командой `"+cli+" design page create "+id+" --title \"<Название>\"` — "+
+			"она сделает файл доски из шаблона, даст странице постоянный номер и напечатает файл, который править. "+
+			"project/canvas.json собирается из meta/: его не правь.")
 }

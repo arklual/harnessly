@@ -7,6 +7,7 @@
 | [Slices](slices.md) | the slices of routes, switching them per machine, the shadow comparison |
 | [Configuration](configuration.md) | every `RUNTIME_*` and `AGENT_*` environment variable |
 | [Deploy](deploy.md) | plain commands, systemd, Docker, docker compose with boards and artifacts, Helm, Argo CD |
+| [Design pages](design-pages.md) | the page model of a design project (meta/), the page commands, the migration, the canvas.json guard |
 | [Integrations](integrations.md) | boards and artifacts beside the conversation, the agents' environment, the agent skills |
 
 Brand assets (wordmarks, the square avatar and the GitHub social preview) are in [brand/](brand).

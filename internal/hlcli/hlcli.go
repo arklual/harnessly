@@ -179,6 +179,10 @@ func (c *cli) run(args []string) error {
 		return c.status()
 	case "api-guide":
 		return c.apiGuide()
+	case "design":
+		return c.design(rest)
+	case "hook":
+		return c.hook(rest)
 	}
 	return usageErr("unknown command %q", cmd)
 }

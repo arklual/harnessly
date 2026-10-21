@@ -129,7 +129,7 @@ func TestEmbeddedTextsFollowTheLocale(t *testing.T) {
 	l := New(Config{Texts: Texts{CLI: "acme-cli", Host: "acme.example", Tag: "acme", KitGlobal: "AcmeKit", SharedDir: "/srv/shared"}})
 	t.Setenv("RUNTIME_LOCALE", "en")
 	guide, script, css := l.Guide(), l.clientScript(), l.text("library.css")
-	mustContain(t, "English guide", guide, "<!-- acme-library-guide v5 -->", "# Claude Design projects: how to edit them",
+	mustContain(t, "English guide", guide, "<!-- acme-library-guide v6 -->", "# Claude Design projects: how to edit them",
 		"`acme-cli design claim <id>", "`window.AcmeKit`", "(on acme.example it is `/srv/shared`)")
 	if cyrillic.MatchString(guide) {
 		t.Errorf("the English guide has Russian text: %s", cyrillic.FindString(guide))
@@ -141,7 +141,7 @@ func TestEmbeddedTextsFollowTheLocale(t *testing.T) {
 	}
 	t.Setenv("RUNTIME_LOCALE", "ru")
 	ruGuide, ruScript := l.Guide(), l.clientScript()
-	mustContain(t, "Russian guide", ruGuide, "<!-- acme-library-guide v5 -->", "# Макеты Claude Design: как их править")
+	mustContain(t, "Russian guide", ruGuide, "<!-- acme-library-guide v6 -->", "# Макеты Claude Design: как их править")
 	mustContain(t, "Russian client script", ruScript, "'Ошибка скрипта'", "'Найти доску'")
 	if l.text("library.css") != css {
 		t.Error("the stylesheet differs between languages")

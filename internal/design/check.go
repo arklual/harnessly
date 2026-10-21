@@ -787,7 +787,7 @@ func (l *Library) StartCheck(ref string, only []string) *CheckReport {
 			return true
 		}
 		for _, o := range only {
-			if o == b.Path || o == b.Title {
+			if o == b.Path || o == b.Title || (b.ID != "" && o == b.ID) {
 				return true
 			}
 		}

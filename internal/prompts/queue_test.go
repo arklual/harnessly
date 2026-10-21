@@ -252,7 +252,8 @@ func TestShortLineTypedWithItsEnter(t *testing.T) {
 		calls []string
 		slept bool
 	}{
-		{item(nil), []string{"line:Как дела"}, false},
+		// The typed line skips the paste's settle; it still waits to see the message leave the input line.
+		{item(nil), []string{"line:Как дела"}, true},
 		{item(func(i *Item) { i.ID = "q-two"; i.Text = "первая\nвторая" }), []string{"text:первая\nвторая", "enter"}, true},
 		{item(func(i *Item) { i.ID = "q-mention"; i.Text = "посмотри @src/lib" }), []string{"text:посмотри @src/lib", "enter"}, true},
 		{item(func(i *Item) { i.ID = "q-pictures"; i.Images = []string{"/u/a.png"} }), []string{"images:/u/a.png", "text: Как дела", "enter"}, true},

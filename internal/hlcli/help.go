@@ -37,6 +37,22 @@ TABS OF THIS WORKSPACE
   harnessly tab result TAB_ID       the tab's visible screen: read what a delegated agent answered
   harnessly tab close TAB_ID        close a tab
 
+DESIGN PROJECTS
+  harnessly design page list <project>        the pages of a design project: id, title, board file
+  harnessly design page create <project> --title TITLE [--file NAME.dc.html] [--route /path] [--variant-of PAGE]
+                                    a new page: a permanent id and a board file made from the project's board template
+  harnessly design page rename <project> <page> [--title TITLE] [--file NAME.dc.html]
+                                    a new title (and file name); the id, and the page's claims, stay
+  harnessly design page remove <project> <page>
+                                    the board file and the page go to the library's .trash/
+  harnessly design kit install ID VERSION TARBALL|URL    install a UI kit version for boards ("help design kit")
+  harnessly design kit list                              the installed kits
+  harnessly design migrate [--dry-run] [--library DIR] [<project>]
+                                    give every project of a library its meta/ (pages with ids); board files untouched
+  harnessly design kit install ID VERSION TARBALL|URL    install a UI kit version for boards ("design kit --help")
+  harnessly design kit list                              the installed kits
+  <page> is a page's id, its file or its title. project/canvas.json is built from meta/: do not edit it by hand.
+
 HTTP API
   harnessly api-guide               the runtime's HTTP API for agents (paths and payloads)
 
@@ -87,6 +103,30 @@ Show or hide the whole right pane for the person.
 
 What you asked the pane for in the last day (and whether the person has seen it) and, when their page is open, which
 tabs the pane has and which is in front.
+`,
+	"design": `harnessly design page list|create|rename|remove, harnessly design migrate
+
+A design project with meta/ keeps one file per page, meta/pages/<id>.json, under a permanent id (a ULID); its
+project/canvas.json and artifact.json are built from meta/ by the runtime. Change the pages with these commands:
+
+  harnessly design page list shop-admin
+  harnessly design page create shop-admin --title "Payouts" --route /payouts
+  harnessly design page create shop-admin --title "Payouts, dark" --variant-of "Payouts"
+  harnessly design page rename shop-admin 01JB8Z6E7XQ4M2N3P5R6S7T8V9 --title "Payouts list"
+  harnessly design page remove shop-admin "Payouts, dark"
+
+design migrate works on the library folder itself, without the runtime: every project without meta/ gets one built
+from what the library shows now (same boards, order, titles, sizes). It writes only meta/, project/canvas.json and
+artifact.json, never a board or an asset, and gives the same ids however often it runs. Use --dry-run first.
+
+  harnessly design migrate --dry-run --library /srv/design
+  harnessly design migrate --library /srv/design
+`,
+	"hook": `harnessly hook design-guard
+
+A Claude Code PreToolUse hook: reads the hook's JSON on stdin and refuses a Write, Edit or shell command that writes
+project/canvas.json of a design project, telling the agent to use "design page". Prints nothing otherwise. See
+docs/design-pages.md for the settings.json entry.
 `,
 	"workspaces": "harnessly workspaces\n\nList the workspaces: id, name and folders. -w takes the id.\n",
 	"api-guide":  "harnessly api-guide\n\nPrint the runtime's HTTP API for agents: the /api/cli routes with their payloads.\n",

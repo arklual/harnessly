@@ -21,7 +21,7 @@ var textFiles embed.FS
 
 const (
 	GuideFile    = "CLAUDE.md"
-	guideVersion = 5
+	guideVersion = 6
 	// DesignArtifactType is the published artifact type of the design tool: its instructions are read, never published to.
 	DesignArtifactType = "https://claude.ai/artifact/QKN21svewxgyPb6SYRqWnd"
 )

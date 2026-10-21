@@ -107,7 +107,9 @@ func (s *Service) PromptQueue(body []byte) Response {
 		if err != nil {
 			return fail(409, err.Error())
 		}
-		return ok(QueueAdded{Item: item, Delivery: s.TakeNewPrompt(tabID, item.ID)})
+		// "now": true is ⌘↵ — into the running turn; without it the message waits for the turn to end (Enter queues).
+		now := string(f["now"]) == "true"
+		return ok(QueueAdded{Item: item, Delivery: s.TakeNewPrompt(tabID, item.ID, now)})
 	}
 	id := f.text("id")
 	if id == "" {
@@ -466,6 +468,20 @@ func (k keyIO) Sleep(d time.Duration)  { k.s.clock.Sleep(d) }
 func (s *Service) AnswerQuestion(body []byte) Response {
 	f := decodeFields(body)
 	session := f.text("session")
+	// {session, chat: true}: «Обсудить в чате» — the dialog is closed by its «Chat about this» row and the person goes
+	// on in the composer.
+	if chat, present := f["chat"]; present && string(chat) == "true" {
+		if session == "" {
+			return fail(400, "session parameter required")
+		}
+		if r, valid := s.rawSession(session, "session parameter required"); !valid {
+			return r
+		}
+		if !s.chatAboutQuestion(session) {
+			return fail(409, "No question on the agent screen")
+		}
+		return ok(OKBody{true})
+	}
 	req, valid := decodeAnswer(f)
 	if session == "" || !valid {
 		return fail(400, "session, questions and choices parameters required")
@@ -497,4 +513,37 @@ func (s *Service) AnswerQuestion(body []byte) Response {
 		return fail(409, "The agent did not take the answer")
 	}
 	return ok(OKBody{true})
+}
+
+const (
+	chatAboutStep  = 120 * time.Millisecond
+	chatAboutMoves = 16
+)
+
+// chatAboutQuestion closes Claude's AskUserQuestion dialog by its «Chat about this» row: the cursor is moved down
+// until it stands on that row, read off the screen after every key (the row's place differs with previews, a free-text
+// row and several options), then Enter. True once the dialog has left the screen.
+func (s *Service) chatAboutQuestion(session string) bool {
+	for moves := 0; ; moves++ {
+		plain, ok := s.cfg.Panes.Capture(session)
+		if !ok {
+			return false
+		}
+		present, selected := screen.ChatAboutRow(plain)
+		if !present {
+			return false
+		}
+		if selected {
+			if s.cfg.Panes.SendRawKeys(session, "Enter") != nil {
+				return false
+			}
+			break
+		}
+		if moves >= chatAboutMoves || s.cfg.Panes.SendRawKeys(session, "Down") != nil {
+			return false
+		}
+		s.clock.Sleep(chatAboutStep)
+	}
+	read := func() (string, bool) { return s.cfg.Panes.Capture(session) }
+	return screen.WaitForQuestionGone(read, s.clock.Sleep)
 }

@@ -29,6 +29,12 @@ type DeliveryDriver interface {
 	Sleep(d time.Duration)
 }
 
+// QuestionCloser is a driver that can close the agent's question dialog by «Chat about this»: a message typed while
+// the agent asks a question is the person's answer in words, not something to hold behind the dialog.
+type QuestionCloser interface {
+	ChatAboutQuestion() bool
+}
+
 // LineTyper is a driver that can type a short line with its Enter right behind it, skipping a paste's settle.
 type LineTyper interface {
 	TypeLine(text string) error
@@ -56,11 +62,25 @@ func Deliver(item Item, d DeliveryDriver, reg *Registry, steer bool, target stri
 		st := screen.Read(styled)
 		view, plain = deliveryScreen(st), st.Plain
 	}
+	// The agent asks a question (its dialog, not a permission prompt) and the person wrote instead of picking: the
+	// dialog is closed by «Chat about this» and the message goes in as the reply.
+	if view != nil && view.Menu && !blank(item.Text) && screen.IsQuestionOnScreen(plain) {
+		if closer, ok := d.(QuestionCloser); ok && closer.ChatAboutQuestion() {
+			view, plain = nil, ""
+			if styled, ok := d.Capture(); ok {
+				st := screen.Read(styled)
+				view, plain = deliveryScreen(st), st.Plain
+			}
+		}
+	}
 	submitter, submits := d.(Submitter)
 	// An earlier try may have left this message's pictures in the box ([Image #1]) before the agent confirmed them, or
 	// (Codex) its text: they are ours, so the box counts as empty and nothing is pasted twice.
 	ownPictures := view != nil && len(item.Images) > 0 && view.Input != "" && imageTokensOnly.MatchString(view.Input)
-	ownText := view != nil && submits && view.Input != "" && screen.CodexStillInBox(plain, item.Text)
+	// Claude: a message an earlier try typed whose Enter was lost sits on the input line; it is ours too, and only its
+	// Enter is pressed again — it is never typed a second time.
+	ownText := view != nil && view.Input != "" && (submits && screen.CodexStillInBox(plain, item.Text) ||
+		!submits && !blank(item.Text) && screen.ClaudeStillInBox(view.Input, item.Text))
 	if view != nil {
 		if ownPictures || ownText {
 			view.Input = ""
@@ -93,11 +113,18 @@ func Deliver(item Item, d DeliveryDriver, reg *Registry, steer bool, target stri
 		}
 		return OutcomeSent
 	}
+	if ownText {
+		if d.Enter() != nil {
+			reg.Release(item.ID)
+			return OutcomeFailed
+		}
+		return confirmLeftBox(item, d, reg)
+	}
 	if typer, ok := d.(LineTyper); ok && len(item.Images) == 0 && SubmitsAsTypedLine(item.Text) {
 		if typer.TypeLine(item.Text) != nil {
 			return OutcomeFailed
 		}
-		return OutcomeSent
+		return confirmLeftBox(item, d, reg)
 	}
 	if !blank(item.Text) {
 		text := item.Text
@@ -112,5 +139,47 @@ func Deliver(item Item, d DeliveryDriver, reg *Registry, steer bool, target stri
 	if d.Enter() != nil {
 		return OutcomeFailed
 	}
-	return OutcomeSent
+	return confirmLeftBox(item, d, reg)
+}
+
+const (
+	confirmPoll      = 150 * time.Millisecond
+	confirmRetry     = 700 * time.Millisecond
+	confirmMaxEnters = 3
+	confirmLimit     = 4000 * time.Millisecond
+)
+
+// confirmLeftBox: a message counts as sent only once it has left Claude Code's input line. The line is read every
+// 150 ms for up to 4 s; while the message is still on it, Enter is pressed again 700 ms after the last one, three
+// Enters in all. Still there after that: not sent — the duplicate claim is let go, so the next try finds the text as
+// its own and presses only its Enter. A screen that cannot be read is not held against the send.
+func confirmLeftBox(item Item, d DeliveryDriver, reg *Registry) Outcome {
+	if blank(item.Text) {
+		return OutcomeSent
+	}
+	enters, sinceEnter, read := 1, time.Duration(0), false
+	for waited := time.Duration(0); waited < confirmLimit; waited += confirmPoll {
+		d.Sleep(confirmPoll)
+		sinceEnter += confirmPoll
+		styled, ok := d.Capture()
+		if !ok {
+			continue
+		}
+		read = true
+		if !screen.ClaudeStillInBox(screen.Read(styled).Input, item.Text) {
+			return OutcomeSent
+		}
+		if sinceEnter >= confirmRetry && enters < confirmMaxEnters {
+			if d.Enter() != nil {
+				break
+			}
+			enters++
+			sinceEnter = 0
+		}
+	}
+	if !read {
+		return OutcomeSent
+	}
+	reg.Release(item.ID)
+	return OutcomeFailed
 }

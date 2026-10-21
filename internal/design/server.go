@@ -35,6 +35,7 @@ const (
 	eventsPath   = "/__lib/events"
 	changesPath  = "/__lib/changes"
 	statePath    = "/__lib/state"
+	kitsPath     = "/__lib/kits"
 	heartbeat    = 20 * time.Second
 	versionParam = "tkv"
 	immutable    = "public, max-age=31536000, immutable"
@@ -298,6 +299,9 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 			Boards []barBoard `json:"boards"`
 		}{a.Title, l.boardsForBar(a)}), head)
 		return
+	case kitsPath:
+		l.serveKitList(w, q, head)
+		return
 	case "/":
 		sendHTML(w, 200, l.indexPage(l.ListArtifacts(), l.Root()), head)
 		return
@@ -320,6 +324,10 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 	}
 	area, _ := at(0)
 	ref, _ := at(1)
+	if area == "kit" {
+		l.serveKit(w, r, segments[1:], port, head)
+		return
+	}
 	if area != "a" || !IsLibraryID(ref) {
 		sendHTML(w, 404, l.notFoundPage(), head)
 		return
@@ -334,6 +342,13 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 		return
 	}
 	if kind == "p" {
+		if to, ok := l.goneBoardRedirect(ref, segments[3:]); ok {
+			h := w.Header()
+			h.Set("Location", to)
+			h.Set("Cache-Control", "no-store")
+			w.WriteHeader(http.StatusFound)
+			return
+		}
 		l.serveFile(w, r, q, ref, segments[3:], head)
 		return
 	}
@@ -437,8 +452,9 @@ func assetMatches(src string) []assetMatch {
 }
 
 // withAssetVersions puts each asset's version into its address (styles.css?tkv=…): such a file is kept for good by
-// the browser, so opening a board again asks only for the page; an edited file gets a new address.
-func withAssetVersions(source, dir, projectRoot string) string {
+// the browser, so opening a board again asks only for the page; an edited file gets a new address. served maps a
+// file to the one actually answered for it (the release's engine for the project's support.js).
+func withAssetVersions(source, dir, projectRoot string, served func(real string) string) string {
 	matches := assetMatches(source)
 	if len(matches) == 0 {
 		return source
@@ -464,6 +480,9 @@ func withAssetVersions(source, dir, projectRoot string) string {
 		real, err := filepath.EvalSymlinks(target)
 		if err != nil || !strings.HasPrefix(real, projectRoot+string(filepath.Separator)) {
 			continue
+		}
+		if served != nil {
+			real = served(real)
 		}
 		if st, err := os.Stat(real); err == nil && st.Mode().IsRegular() {
 			versions[m.url] = FileVersion(st)
@@ -520,8 +539,32 @@ func takesGzip(r *http.Request) bool {
 
 var gzipWord = regexp.MustCompile(`(?i)\bgzip\b`)
 
+// engineSwap maps the project's own support.js to the engine of its release; nil when the project is on its own.
+func (l *Library) engineSwap(id string) func(string) string {
+	engine := l.EngineFor(id)
+	if engine == "" {
+		return nil
+	}
+	own := filepath.Join(l.ProjectDir(id), EngineFile)
+	if real, err := filepath.EvalSymlinks(l.ProjectDir(id)); err == nil {
+		own = filepath.Join(real, EngineFile)
+	}
+	return func(real string) string {
+		if real == own {
+			return engine
+		}
+		return real
+	}
+}
+
 func (l *Library) serveFile(w http.ResponseWriter, r *http.Request, q url.Values, id string, segments []string, head bool) {
 	file := l.ResolveProjectFile(id, segments)
+	// A project on a release gets the release's engine as its support.js, whether or not it keeps a copy of its own.
+	if len(segments) == 1 && segments[0] == EngineFile {
+		if engine := l.EngineFor(id); engine != "" {
+			file = engine
+		}
+	}
 	ext := strings.ToLower(extname(file))
 	typ := ""
 	if file != "" {
@@ -538,7 +581,7 @@ func (l *Library) serveFile(w http.ResponseWriter, r *http.Request, q url.Values
 			sendHTML(w, 404, l.notFoundPage(), head)
 			return
 		}
-		send(w, 200, typ, []byte(withClient(withAssetVersions(jscompat.DecodeUTF8(src), filepath.Dir(file), root), id)), head)
+		send(w, 200, typ, []byte(withClient(withAssetVersions(jscompat.DecodeUTF8(src), filepath.Dir(file), root, l.engineSwap(id)), id)), head)
 		return
 	}
 	st, err := os.Stat(file)
@@ -546,14 +589,20 @@ func (l *Library) serveFile(w http.ResponseWriter, r *http.Request, q url.Values
 		sendHTML(w, 404, l.notFoundPage(), head)
 		return
 	}
+	l.serveStatic(w, r, file, st, typ, ext, cachePolicy(q, ext, FileVersion(st)), head)
+}
+
+// serveStatic sends a file with its version as the ETag and the given Cache-Control, gzipped when it is text a browser
+// takes compressed.
+func (l *Library) serveStatic(w http.ResponseWriter, r *http.Request, file string, st os.FileInfo, typ, ext, cacheControl string, head bool) {
 	version := FileVersion(st)
 	etag := `W/"` + version + `"`
 	h := w.Header()
 	h.Set("ETag", etag)
 	h.Set("Last-Modified", st.ModTime().UTC().Format(http.TimeFormat))
-	h.Set("Cache-Control", cachePolicy(q, ext, version))
+	h.Set("Cache-Control", cacheControl)
 	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("Vary", "Accept-Encoding")
+	h.Add("Vary", "Accept-Encoding")
 	if inm, ok := r.Header["If-None-Match"]; ok && strings.Join(inm, ", ") == etag {
 		w.WriteHeader(304)
 		return
@@ -634,4 +683,24 @@ func (c *gzipCache) get(file string, st os.FileInfo) ([]byte, error) {
 		c.bytes -= len(e.data)
 	}
 	return packed, nil
+}
+
+// goneBoardRedirect: a board page that is no longer there (an agent renamed or removed it) leads to the project's first
+// board, or to the project's page when it has none — a reload of an open board never ends on «no such design». Only
+// board pages of a project that exists are led on; any other missing file stays a 404.
+func (l *Library) goneBoardRedirect(ref string, segments []string) (string, bool) {
+	if len(segments) == 0 || !IsBoardFile(segments[len(segments)-1]) {
+		return "", false
+	}
+	if l.ResolveProjectFile(ref, segments) != "" {
+		return "", false
+	}
+	a := l.ReadArtifact(ref)
+	if a == nil {
+		return "", false
+	}
+	if len(a.Boards) == 0 {
+		return "/a/" + EncodeURIComponent(ref) + "/", true
+	}
+	return BoardHref(ref, a.Boards[0].Path), true
 }

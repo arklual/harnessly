@@ -69,7 +69,7 @@ func TestCodexQueueDelivered(t *testing.T) {
 		}
 	}
 	item, _ := r.svc.Queue().Add("tab-1", "Run the tests", nil)
-	if got := r.svc.TakeNewPrompt("tab-1", item.ID); got != DeliveryQueued {
+	if got := r.svc.TakeNewPrompt("tab-1", item.ID, false); got != DeliveryQueued {
 		t.Fatalf("delivery %s", got)
 	}
 	r.clock.Advance(0)

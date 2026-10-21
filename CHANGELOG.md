@@ -8,6 +8,38 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Design projects get a page model (`docs/design-pages.md`): `meta/project.json` and one `meta/pages/<ULID>.json` per
+  page, with a permanent id. When `meta/` is there it is the truth; `project/canvas.json` (the design tool's v3 index)
+  and `artifact.json` are built from it, and a project without it is read as before. `harnessly design page
+  list|create|rename|remove` (`/api/cli/design/pages`), board claims keyed by the page id (a claim under the old key
+  still holds), `harnessly design migrate [--dry-run]` for a whole library (same listing, no board or asset touched, the
+  same ids on every run), and `harnessly hook design-guard`, a Claude Code hook that refuses hand edits of
+  `project/canvas.json`. The library rules file is v6.
+- A new design project no longer needs `<library>/.template/`: the runtime ships a board template and the board engine
+  (`RUNTIME_DESIGN_ENGINE_FILE` overrides it), and every new project starts with `meta/`.
+- UI kits by version for the design library. A project's boards no longer carry their own 6 MB copy of the kit:
+  a kit is installed once as `<kits>/<id>/<version>/` and the library server answers `/kit/<id>/<version>/<file>` with
+  immutable cache headers (the same path rules as project files: no `..`, no links out of the version's folder), so a
+  board loads `/kit/acme-ds/0.16.0/bundle.r18.js` and a new kit version is a new address. `GET /__lib/kits` lists the
+  installed kits and versions (`?kit=<id>&version=<v>` the files of one). `RUNTIME_DESIGN_KITS_DIR` names the folder
+  (default `design-kits` in the data folder). `harnessly design kit install <id> <version> <tarball-or-url>` unpacks a
+  tarball all or nothing (links, devices and paths outside the kit are refused; the same tarball again does nothing,
+  other content under an installed version needs `--force`) and `harnessly design kit list` shows what is installed.
+  Both work on the folder, the runtime does not have to be up. Kit files are readable across origins only from the
+  library server's own loopback origins and the hosts in `RUNTIME_DESIGN_KIT_ORIGINS` (the origin is echoed back with
+  `Vary: Origin`; any other origin gets no CORS header).
+
+- Releases of the board format. With `RUNTIME_DESIGN_RELEASES_DIR` (a checkout of a design-upstream
+  mirror of Claude Design releases), a project with `meta/` is served the engine of its release (`"release"` in
+  `meta/project.json`, `legacy` when it names none) as `project/support.js`, checked against the mirror's sha256; the
+  boards and the project's own copy are never changed, and the engine's version goes into the board's address so a
+  browser drops the old one. A project without `meta/`, or on a release the mirror lacks, is served its own copy. A new
+  project starts on the newest stable release (or the library's choice). `GET /design/library/releases[?artifact=]`
+  lists the releases and the project's, `POST {artifact, release}` moves a project to a stable release (through the
+  page model's `SetRelease`; a project without `meta/` is asked to migrate first), `POST {newProjects}` sets the
+  release new projects start on; the library listing carries each project's `release` with the `upgrade` on offer.
+  Without the variable nothing changes.
+
 - Agents get the workspace out of the box. A standalone runtime installs agent skills for both Claude Code and Codex
   when it starts: `harnessly` always, `boards` with `RUNTIME_BOARDS_URL`, `artifacts` with `RUNTIME_ARTIFACTS_URL`.
   Claude loads them as a plugin with `--plugin-dir`, Codex from `~/.codex/skills/harnessly`, and the `artifacts`,

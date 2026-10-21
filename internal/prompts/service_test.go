@@ -182,11 +182,21 @@ func TestStartDeliversWhatWaitedThroughARestart(t *testing.T) {
 }
 
 func TestTakeNewPrompt(t *testing.T) {
-	// A working agent gets the message in its running turn now.
+	// Enter (no "now") to a working agent queues: nothing is typed into its turn, the message waits for the turn's end.
 	r := newRig(t, tui(t, "claude-busy-spinner.ansi.txt"), Tab{CliState: StateBusy})
 	r.svc.cfg.ReadTranscript = func(string) ([]string, bool) { return nil, false }
+	waits, _ := r.svc.Queue().Add("tab-1", "после хода", nil)
+	if got := r.svc.TakeNewPrompt("tab-1", waits.ID, false); got != DeliveryQueued || len(queueTexts(r, "tab-1")) != 1 {
+		t.Fatalf("busy, Enter: %s", got)
+	}
+	r.clock.Advance(0)
+	if got := r.panes.sent(); len(got) != 0 {
+		t.Fatalf("busy, Enter typed %v", got)
+	}
+	r.svc.Queue().Take("tab-1", waits.ID)
+	// ⌘↵ ("now") puts it into the running turn.
 	it, _ := r.svc.Queue().Add("tab-1", "и проверь логи", nil)
-	if got := r.svc.TakeNewPrompt("tab-1", it.ID); got != DeliverySteered || len(queueTexts(r, "tab-1")) != 0 {
+	if got := r.svc.TakeNewPrompt("tab-1", it.ID, true); got != DeliverySteered || len(queueTexts(r, "tab-1")) != 0 {
 		t.Fatalf("busy: %s", got)
 	}
 	if got := r.panes.sent(); len(got) == 0 || got[0] != "line:и проверь логи" {
@@ -195,13 +205,13 @@ func TestTakeNewPrompt(t *testing.T) {
 	// A draft in the box keeps it queued.
 	r.panes.setScreen(tui(t, "claude-input-draft.ansi.txt"))
 	it, _ = r.svc.Queue().Add("tab-1", "после черновика", nil)
-	if got := r.svc.TakeNewPrompt("tab-1", it.ID); got != DeliveryQueued || len(queueTexts(r, "tab-1")) != 1 {
+	if got := r.svc.TakeNewPrompt("tab-1", it.ID, false); got != DeliveryQueued || len(queueTexts(r, "tab-1")) != 1 {
 		t.Fatalf("draft: %s", got)
 	}
 	// An agent that is not working takes it from the queue at once.
 	r2 := newRig(t, tui(t, "claude-idle-placeholder.ansi.txt"), Tab{})
 	it, _ = r2.svc.Queue().Add("tab-1", "сразу", nil)
-	if got := r2.svc.TakeNewPrompt("tab-1", it.ID); got != DeliveryQueued {
+	if got := r2.svc.TakeNewPrompt("tab-1", it.ID, false); got != DeliveryQueued {
 		t.Fatalf("idle: %s", got)
 	}
 	r2.clock.Advance(0)
