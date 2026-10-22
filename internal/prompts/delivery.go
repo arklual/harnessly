@@ -49,7 +49,8 @@ type Submitter interface {
 // pasteSettle: Claude Code reads a paste as one block; an Enter right on its heels can land before the block is in.
 const pasteSettle = 250 * time.Millisecond
 
-var imageTokensOnly = regexp.MustCompile(`^` + sp + `*(?:\[Image #\d+\]` + sp + `*)+$`)
+// imageTokensOnly: a box of picture references alone, one wrapped midway included (see imageRef).
+var imageTokensOnly = regexp.MustCompile(`^` + sp + `*(?:\[Image` + sp + `+#\d+\]` + sp + `*)+$`)
 
 // Deliver types one queued message: pictures first (each must show up), then the text and its Enter. The screen decides
 // whether it may happen now; steer ignores a working agent (its turn takes the text) but not a menu or foreign text.
@@ -73,14 +74,15 @@ func Deliver(item Item, d DeliveryDriver, reg *Registry, steer bool, target stri
 			}
 		}
 	}
-	submitter, submits := d.(Submitter)
-	// An earlier try may have left this message's pictures in the box ([Image #1]) before the agent confirmed them, or
-	// (Codex) its text: they are ours, so the box counts as empty and nothing is pasted twice.
-	ownPictures := view != nil && len(item.Images) > 0 && view.Input != "" && imageTokensOnly.MatchString(view.Input)
-	// Claude: a message an earlier try typed whose Enter was lost sits on the input line; it is ours too, and only its
-	// Enter is pressed again — it is never typed a second time.
+	_, submits := d.(Submitter)
+	// An earlier try may have left this message's pictures in the box ([Image #1]) before the agent confirmed them, all
+	// or the first of them, or (Codex) its text: they are ours, so the box counts as empty and only what is missing is
+	// pasted. More pictures than the message has, or text after them that is not the message, are someone else's.
+	ownPictures := view != nil && len(item.Images) > 0 && view.OnlyPictures && view.Pictures <= len(item.Images)
+	// Claude: a message an earlier try typed whose Enter was lost sits in the box, after its pictures when it has them
+	// (they may fill the first line); it is ours too, and only its Enter is pressed again — it is never typed twice.
 	ownText := view != nil && view.Input != "" && (submits && screen.CodexStillInBox(plain, item.Text) ||
-		!submits && !blank(item.Text) && screen.ClaudeStillInBox(view.Input, item.Text))
+		!submits && !blank(item.Text) && screen.ClaudeStillInBox(view.Box, item.Text))
 	if view != nil {
 		if ownPictures || ownText {
 			view.Input = ""
@@ -99,32 +101,44 @@ func Deliver(item Item, d DeliveryDriver, reg *Registry, steer bool, target stri
 	if !reg.Claim(item.ID, route, target, item.Text) {
 		return OutcomeSent
 	}
-	if len(item.Images) > 0 && !ownPictures && !ownText {
-		if !d.PasteImages(item.Images) {
-			reg.Release(item.ID)
+	// A try that failed let nothing reach the agent for sure: its claim is let go on every such branch, so the retry
+	// types the message (or finds it in the box as its own) instead of taking the claim for a send.
+	landed := 0
+	if ownPictures {
+		landed = view.Pictures
+	}
+	out := typeClaimed(item, d, landed, ownText)
+	if out == OutcomeFailed {
+		reg.Release(item.ID)
+	}
+	return out
+}
+
+// typeClaimed types what the box does not have yet: landed pictures of the message are there already.
+func typeClaimed(item Item, d DeliveryDriver, landed int, ownText bool) Outcome {
+	if len(item.Images) > landed && !ownText {
+		if !d.PasteImages(item.Images[landed:]) {
 			return OutcomeFailed
 		}
 	}
-	if submits {
+	if submitter, ok := d.(Submitter); ok {
+		// Nothing reached the agent on a failure: a retry finds the text in the box as its own and only submits it.
 		if !submitter.Submit(item.Text, ownText) {
-			// Nothing reached the agent: a retry finds the text in the box as its own and only submits it.
-			reg.Release(item.ID)
 			return OutcomeFailed
 		}
 		return OutcomeSent
 	}
 	if ownText {
 		if d.Enter() != nil {
-			reg.Release(item.ID)
 			return OutcomeFailed
 		}
-		return confirmLeftBox(item, d, reg)
+		return confirmLeftBox(item, d)
 	}
 	if typer, ok := d.(LineTyper); ok && len(item.Images) == 0 && SubmitsAsTypedLine(item.Text) {
 		if typer.TypeLine(item.Text) != nil {
 			return OutcomeFailed
 		}
-		return confirmLeftBox(item, d, reg)
+		return confirmLeftBox(item, d)
 	}
 	if !blank(item.Text) {
 		text := item.Text
@@ -139,7 +153,7 @@ func Deliver(item Item, d DeliveryDriver, reg *Registry, steer bool, target stri
 	if d.Enter() != nil {
 		return OutcomeFailed
 	}
-	return confirmLeftBox(item, d, reg)
+	return confirmLeftBox(item, d)
 }
 
 const (
@@ -151,9 +165,9 @@ const (
 
 // confirmLeftBox: a message counts as sent only once it has left Claude Code's input line. The line is read every
 // 150 ms for up to 4 s; while the message is still on it, Enter is pressed again 700 ms after the last one, three
-// Enters in all. Still there after that: not sent — the duplicate claim is let go, so the next try finds the text as
-// its own and presses only its Enter. A screen that cannot be read is not held against the send.
-func confirmLeftBox(item Item, d DeliveryDriver, reg *Registry) Outcome {
+// Enters in all. Still there after that: not sent — Deliver lets the duplicate claim go, so the next try finds the text
+// as its own and presses only its Enter. A screen that cannot be read is not held against the send.
+func confirmLeftBox(item Item, d DeliveryDriver) Outcome {
 	if blank(item.Text) {
 		return OutcomeSent
 	}
@@ -166,7 +180,7 @@ func confirmLeftBox(item Item, d DeliveryDriver, reg *Registry) Outcome {
 			continue
 		}
 		read = true
-		if !screen.ClaudeStillInBox(screen.Read(styled).Input, item.Text) {
+		if !screen.ClaudeStillInBox(deliveryScreen(screen.Read(styled)).Box, item.Text) {
 			return OutcomeSent
 		}
 		if sinceEnter >= confirmRetry && enters < confirmMaxEnters {
@@ -180,6 +194,5 @@ func confirmLeftBox(item Item, d DeliveryDriver, reg *Registry) Outcome {
 	if !read {
 		return OutcomeSent
 	}
-	reg.Release(item.ID)
 	return OutcomeFailed
 }

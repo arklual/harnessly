@@ -193,31 +193,44 @@ func TestWaitForImages(t *testing.T) {
 		}, &n
 	}
 	never := func() (string, bool) { t.Fatal("captured"); return "", false }
-	if w := WaitForImages(never, 0, 0, time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 0 {
+	if w := WaitForImages(never, 0, "", time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 0 {
 		t.Errorf("nothing expected: %+v", w)
 	}
 	c, _ := seq("❯ [Image #1] [Image #2]")
-	if w := WaitForImages(c, 2, 0, 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 1 || w.FinalCount != 2 {
+	if w := WaitForImages(c, 2, "", 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 1 || w.FinalCount != 2 {
 		t.Errorf("first look: %+v", w)
 	}
 	c, _ = seq("User: [Image #1]\n❯ [Image #2]")
-	if w := WaitForImages(c, 1, 1, 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 1 {
+	if w := WaitForImages(c, 1, "User: [Image #1]", 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 1 {
 		t.Errorf("baseline: %+v", w)
 	}
 	c, _ = seq("❯ ", "❯ ", "❯ [Image #1]")
-	if w := WaitForImages(c, 1, 0, 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 3 || w.FinalCount != 1 {
+	if w := WaitForImages(c, 1, "", 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 3 || w.FinalCount != 1 {
 		t.Errorf("while polling: %+v", w)
 	}
 	c, n := seq("❯ ")
-	if w := WaitForImages(c, 1, 0, 200*time.Millisecond, 100*time.Millisecond, newFakeClock()); w.Confirmed || w.FinalCount != 0 || *n == 0 {
+	if w := WaitForImages(c, 1, "", 200*time.Millisecond, 100*time.Millisecond, newFakeClock()); w.Confirmed || w.FinalCount != 0 || *n == 0 {
 		t.Errorf("timeout: %+v", w)
 	}
 	c, _ = seq("!", "❯ [Image #1]")
-	if w := WaitForImages(c, 1, 0, 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 2 {
+	if w := WaitForImages(c, 1, "", 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 2 {
 		t.Errorf("unreadable screen retried: %+v", w)
 	}
 	c, _ = seq("❯ [Image #1]", "❯ [Image #1] [Image #2]", "❯ [Image #1] [Image #2] [Image #3]")
-	if w := WaitForImages(c, 3, 0, 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 3 || w.FinalCount != 3 {
+	if w := WaitForImages(c, 3, "", 5*time.Second, 100*time.Millisecond, newFakeClock()); !w.Confirmed || w.Attempts != 3 || w.FinalCount != 3 {
 		t.Errorf("all of several: %+v", w)
+	}
+}
+
+func TestPicturesConfirmedWhenOlderOnesScrollAway(t *testing.T) {
+	// Five pictures wrap the box onto a second line; the history above moves up and its last reference leaves the screen.
+	before := "User: [Image #98] [Image #99] прошлый\n" + strings.Repeat("ответ\n", 20) + "────\n❯ \n────"
+	after := strings.Repeat("ответ\n", 20) + "────\n❯ [Image #100] [Image #101] [Image #102] [Image #103]\n  [Image #104]\n────"
+	screens := []string{before, after}
+	n := 0
+	capture := func() (string, bool) { s := screens[min(n, 1)]; n++; return s, true }
+	res := SendImagePaths(picturePaths(5), true, func(string) error { return nil }, capture, newFakeClock())
+	if !res.Confirmed || res.Attached != 5 {
+		t.Fatalf("%+v", res)
 	}
 }

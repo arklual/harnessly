@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A queued message is delivered or fails visibly, never waits forever: a picture reference the agent's input box
+  wrapped midway (`[Image` / `#104]`) counts as pasted, a retry reads the whole box and finishes its own pictures
+  instead of taking them for someone else's draft, failed tries back off and give up after six with the reason on the
+  message, and Retry and Delete work on it. Every wait of the queue goes to the log.
+- The composer shows the runtime's queue and background tasks from the status socket, and one place picks the machine
+  of a runtime call, so a conversation drawn without a frame gets its Stop and send.
+- The frame of a fleet machine (`?machine=<id>` in its address) sends its API calls and sockets to that machine too;
+  behind a gateway that routes by the parameter they went to the default machine, and a conversation of another machine
+  did not open.
+
 ### Added
 
 - The right pane's browser works without a gateway: a standalone runtime opens the preview itself

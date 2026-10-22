@@ -296,3 +296,95 @@ func TestDeliverPasteErrorFails(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+// failingDriver fails one keystroke step the way a tmux that went away does.
+type failingDriver struct {
+	*recordingDriver
+	lineErr, enterErr error
+}
+
+func (d failingDriver) TypeLine(text string) error {
+	if d.lineErr != nil {
+		return d.lineErr
+	}
+	d.calls = append(d.calls, "line:"+text)
+	return nil
+}
+
+func (d failingDriver) Enter() error {
+	if d.enterErr != nil {
+		return d.enterErr
+	}
+	return d.recordingDriver.Enter()
+}
+
+func TestAFailedKeystrokeLetsTheRetryTypeTheMessage(t *testing.T) {
+	idle := tui(t, "claude-idle-placeholder.ansi.txt")
+	gone := errors.New("tmux gone")
+	cases := []struct {
+		name  string
+		text  string
+		fail  func(*failingDriver)
+		calls []string
+	}{
+		{"line", "Как дела", func(d *failingDriver) { d.lineErr = gone }, []string{"line:Как дела"}},
+		{"paste", "a\nb", func(d *failingDriver) { d.pasteErr = gone }, []string{"text:a\nb", "enter"}},
+		{"enter", "a\nb", func(d *failingDriver) { d.enterErr = gone }, []string{"text:a\nb", "enter"}},
+	}
+	for _, c := range cases {
+		reg := NewRegistry(newFakeClock(), nil)
+		it := item(func(i *Item) { i.Text = c.text })
+		broken := failingDriver{recordingDriver: newDriver(idle)}
+		c.fail(&broken)
+		if got := Deliver(it, broken, reg, false, ""); got != OutcomeFailed {
+			t.Errorf("%s: broken %v", c.name, got)
+			continue
+		}
+		// Nothing reached the agent, so the retry is not a duplicate: it types the message rather than calling it sent.
+		retry := failingDriver{recordingDriver: newDriver(idle)}
+		if got := Deliver(it, retry, reg, false, ""); got != OutcomeSent || !reflect.DeepEqual(retry.calls, c.calls) {
+			t.Errorf("%s: retry %v %v", c.name, got, retry.calls)
+		}
+	}
+}
+
+func wrappedPictureBox(first, second string) string {
+	return strings.Join([]string{"● Готово.", "", strings.Repeat("─", 60), "❯ " + first, "  " + second, strings.Repeat("─", 60), "  ⏵⏵ bypass permissions on"}, "\n")
+}
+
+func TestATryThatLeftSomeOfItsPicturesFinishesThem(t *testing.T) {
+	paths := []string{"/u/a.png", "/u/b.png", "/u/c.png", "/u/d.png", "/u/e.png"}
+	long := "длинный текст\n" + strings.Repeat("x", 2300)
+	cases := []struct {
+		name, screen string
+		calls        []string
+		want         Outcome
+	}{
+		// All five went in on a wrapped box: only the text and its Enter are left.
+		{"all", wrappedPictureBox("[Image #100] [Image #101] [Image #102] [Image #103]", "[Image #104]"),
+			[]string{"text: " + long, "enter"}, OutcomeSent},
+		// Three of five: the last two follow, then the text.
+		{"some", pictureBox("[Image #100] [Image #101] [Image #102]"),
+			[]string{"images:/u/d.png,/u/e.png", "text: " + long, "enter"}, OutcomeSent},
+		// More pictures than the message has are not its own.
+		{"foreign", wrappedPictureBox("[Image #1] [Image #2] [Image #3] [Image #4]", "[Image #5] [Image #6]"), nil, OutcomeBlocked},
+		// Text after the pictures that is not the message is someone else's.
+		{"draft", wrappedPictureBox("[Image #100] [Image #101]", "чужой черновик"), nil, OutcomeBlocked},
+	}
+	for _, c := range cases {
+		d := newDriver(c.screen)
+		d.confirmed = true
+		got := Deliver(item(func(i *Item) { i.Images = paths; i.Text = long }), d, NewRegistry(newFakeClock(), nil), false, "")
+		if got != c.want || !reflect.DeepEqual(d.calls, c.calls) {
+			t.Errorf("%s: %v %q", c.name, got, d.calls)
+		}
+	}
+}
+
+func TestItsOwnTextBehindItsPicturesIsOnlySubmitted(t *testing.T) {
+	d := newDriver(wrappedPictureBox("[Image #100] [Image #101] [Image #102] [Image #103] [Image #104]", "[Pasted text #1 +40 lines]"))
+	got := Deliver(item(func(i *Item) { i.Images = []string{"/u/a.png", "/u/b.png", "/u/c.png", "/u/d.png", "/u/e.png"} }), d, NewRegistry(newFakeClock(), nil), false, "")
+	if got != OutcomeFailed || !reflect.DeepEqual(d.calls, []string{"enter", "enter", "enter"}) {
+		t.Fatalf("%v %q", got, d.calls)
+	}
+}

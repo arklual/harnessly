@@ -23,3 +23,9 @@ func TestClaudeStillInBox(t *testing.T) {
 		}
 	}
 }
+
+func TestClaudeStillInBoxPastAReferenceWrappedMidway(t *testing.T) {
+	if !ClaudeStillInBox("[Image #100] [Image   #101] длинный текст сообщения", "длинный текст сообщения") {
+		t.Error("own text behind a wrapped reference not seen")
+	}
+}

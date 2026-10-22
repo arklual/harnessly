@@ -4,27 +4,84 @@ import { createHandoffTracker, LOCAL_ID_PREFIX, type THandoffEvent } from '@/lib
 import type { IQueuedPrompt } from '@/types/server/hl-prompt-queue';
 
 /**
- * The server's prompt queue as the page sees it: every tab's waiting messages, from the status socket. A
- * message added here shows at once with a local id; the server's update that follows replaces the tab's list.
+ * The server's prompt queue as the page sees it: every tab's messages, from the status socket, so they outlive a
+ * reload and show in every tab of the browser. A message added here shows at once with a local id until the runtime
+ * has it: the server's item with the same client id takes its place.
  */
 interface IPromptQueueStore {
+  /** Every tab's queue as the runtime last told it. */
+  server: Record<string, IQueuedPrompt[]>;
+  /** Messages this page is adding, until the runtime answers. */
+  local: Record<string, IQueuedPrompt[]>;
+  /** What the composer shows: the runtime's queue, then this page's messages it does not have yet. */
   queues: Record<string, IQueuedPrompt[]>;
 }
 
 const EMPTY: IQueuedPrompt[] = [];
 
-export const usePromptQueueStore = create<IPromptQueueStore>(() => ({ queues: {} }));
+export const usePromptQueueStore = create<IPromptQueueStore>(() => ({ server: {}, local: {}, queues: {} }));
+
+/**
+ * The runtime's queue with this page's messages it does not have yet. A runtime that predates client ids answers
+ * without them; its item then stands for a local message with the same text.
+ */
+export const mergeQueue = (
+  server: readonly IQueuedPrompt[],
+  local: readonly IQueuedPrompt[],
+): readonly IQueuedPrompt[] => {
+  if (local.length === 0) return server;
+  const keyed = new Set(server.flatMap((item) => (item.clientId ? [item.clientId] : [])));
+  const unkeyed = server.filter((item) => !item.clientId).map((item) => item.text);
+  const pending = local.filter((item) => {
+    if (item.clientId && keyed.has(item.clientId)) return false;
+    const at = unkeyed.indexOf(item.text);
+    if (at === -1) return true;
+    unkeyed.splice(at, 1);
+    return false;
+  });
+  if (pending.length === 0) return server;
+  return server.length === 0 && pending.length === local.length ? local : [...server, ...pending];
+};
+
+const withTab = (all: Record<string, IQueuedPrompt[]>, tabId: string, items: readonly IQueuedPrompt[]) => {
+  const next = { ...all };
+  if (items.length > 0) next[tabId] = items as IQueuedPrompt[];
+  else delete next[tabId];
+  return next;
+};
+
+/** One tab's lists changed: only its shown queue is built again, the others keep their identity. */
+const changeTab = (
+  state: IPromptQueueStore,
+  tabId: string,
+  change: Partial<Pick<IPromptQueueStore, 'server' | 'local'>>,
+): Partial<IPromptQueueStore> => {
+  const server = change.server ?? state.server;
+  const local = change.local ?? state.local;
+  return {
+    server,
+    local,
+    queues: withTab(state.queues, tabId, mergeQueue(server[tabId] ?? EMPTY, local[tabId] ?? EMPTY)),
+  };
+};
 
 export const syncPromptQueues = (queues: Record<string, IQueuedPrompt[]>): void =>
-  usePromptQueueStore.setState({ queues });
+  usePromptQueueStore.setState((state) => {
+    let shown: Record<string, IQueuedPrompt[]> = {};
+    for (const tabId of new Set([...Object.keys(queues), ...Object.keys(state.local)]))
+      shown = withTab(shown, tabId, mergeQueue(queues[tabId] ?? EMPTY, state.local[tabId] ?? EMPTY));
+    return { server: queues, queues: shown };
+  });
 
 export const setPromptQueue = (tabId: string, items: IQueuedPrompt[]): void =>
-  usePromptQueueStore.setState((state) => {
-    const queues = { ...state.queues };
-    if (items.length > 0) queues[tabId] = items;
-    else delete queues[tabId];
-    return { queues };
-  });
+  usePromptQueueStore.setState((state) =>
+    changeTab(state, tabId, { server: withTab(state.server, tabId, items) }),
+  );
+
+const setLocal = (tabId: string, change: (items: IQueuedPrompt[]) => IQueuedPrompt[]) =>
+  usePromptQueueStore.setState((state) =>
+    changeTab(state, tabId, { local: withTab(state.local, tabId, change(state.local[tabId] ?? EMPTY)) }),
+  );
 
 const handoffTracker = createHandoffTracker();
 const handoffListeners = new Map<string, Set<(event: THandoffEvent) => void>>();
@@ -61,8 +118,8 @@ export const usePromptQueue = (tabId: string | undefined): IQueuedPrompt[] =>
   usePromptQueueStore((state) => (tabId ? (state.queues[tabId] ?? EMPTY) : EMPTY));
 
 type TQueueAction =
-  | { action: 'add'; text: string; images: string[]; now?: boolean }
-  | { action: 'remove' | 'take' | 'steer'; id: string };
+  | { action: 'add'; text: string; images: string[]; clientId: string; now?: boolean }
+  | { action: 'remove' | 'take' | 'steer' | 'retry'; id: string };
 
 /** What the runtime did with a new message: typed it into the running turn, or kept it for the end of the turn. */
 export type TQueueDelivery = 'steered' | 'queued';
@@ -72,12 +129,30 @@ export interface IEnqueued {
   delivery: TQueueDelivery | null;
 }
 
-/** The runtime's words for a message that is no longer queued (the agent took it meanwhile), in both of its languages. */
+/** A refusal of the runtime's queue: its words for the person, and its code for the page when it gives one. */
+export class QueueRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string | null,
+  ) {
+    super(message);
+  }
+}
+
+const NOT_QUEUED = 'not-queued';
+
+/**
+ * A runtime that predates refusal codes says it only in words, in both of its languages; they are looked at only when
+ * the answer has no code.
+ */
 const GONE_FROM_QUEUE = ['The message is no longer in the queue', 'Сообщения уже нет в очереди'];
 
 /** The agent took the message out of the queue before a steer reached it: for ⌘↵ that is a success. */
-export const isGoneFromQueue = (error: unknown): boolean =>
-  error instanceof Error && GONE_FROM_QUEUE.includes(error.message);
+export const isGoneFromQueue = (error: unknown): boolean => {
+  if (error instanceof QueueRequestError && error.code !== null) return error.code === NOT_QUEUED;
+  return error instanceof Error && GONE_FROM_QUEUE.includes(error.message);
+};
 
 const call = async (
   machineId: string | undefined,
@@ -93,8 +168,14 @@ const call = async (
     item?: IQueuedPrompt;
     delivery?: TQueueDelivery;
     error?: string;
+    code?: string;
   };
-  if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);
+  if (!response.ok)
+    throw new QueueRequestError(
+      data.error ?? `HTTP ${response.status}`,
+      response.status,
+      typeof data.code === 'string' ? data.code : null,
+    );
   return data;
 };
 
@@ -121,15 +202,16 @@ export const enqueuePrompt = async (
   payload: () => Promise<{ text: string; images: string[] }>,
   { handoff = true, now = false }: IEnqueueOptions = {},
 ): Promise<IEnqueued> => {
+  const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  // The client id goes with every try of this one message: a repeat the runtime already took is not queued twice.
   const local: IQueuedPrompt = {
-    id: `${LOCAL_ID_PREFIX}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `${LOCAL_ID_PREFIX}${key}`,
+    clientId: `c-${key}`,
     text,
     images: previews,
     createdAt: Date.now(),
   };
-  usePromptQueueStore.setState((state) => ({
-    queues: { ...state.queues, [tabId]: [...(state.queues[tabId] ?? []), local] },
-  }));
+  setLocal(tabId, (items) => [...items, local]);
   try {
     const ready = await payload();
     if (handoff) handoffTracker.own(tabId, ready.text);
@@ -137,6 +219,7 @@ export const enqueuePrompt = async (
       action: 'add',
       text: ready.text,
       images: ready.images,
+      clientId: local.clientId as string,
       ...(now ? { now: true } : {}),
     }).catch((error: unknown) => {
       if (handoff) handoffTracker.disown(tabId, ready.text);
@@ -146,13 +229,7 @@ export const enqueuePrompt = async (
     return { item: answer.item ?? null, delivery: answer.delivery ?? null };
   } finally {
     // The server's update has the real item by now; a failed add leaves nothing behind.
-    usePromptQueueStore.setState((state) => {
-      const rest = (state.queues[tabId] ?? []).filter((item) => item.id !== local.id);
-      const queues = { ...state.queues };
-      if (rest.length > 0) queues[tabId] = rest;
-      else delete queues[tabId];
-      return { queues };
-    });
+    setLocal(tabId, (items) => items.filter((item) => item.id !== local.id));
   }
 };
 
@@ -177,3 +254,8 @@ export const takeQueuedPromptBack = async (
   (await dismissing(tabId, id, () => call(machineId, tabId, { action: 'take', id }))).item ?? null;
 export const steerQueuedPrompt = (machineId: string | undefined, tabId: string, id: string) =>
   call(machineId, tabId, { action: 'steer', id });
+/** Asks again for a message the runtime gave up on; it waits in its place and goes out when the agent can take it. */
+export const retryQueuedPrompt = (machineId: string | undefined, tabId: string, id: string) =>
+  call(machineId, tabId, { action: 'retry', id });
+
+export const isFailedPrompt = (item: IQueuedPrompt): boolean => item.status === 'failed';

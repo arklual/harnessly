@@ -56,11 +56,15 @@ const (
 	DecisionBlocked Decision = "blocked"
 )
 
-// DeliveryScreen is what a delivery reads off the screen; Input is meaningful only with InputLine.
+// DeliveryScreen is what a delivery reads off the screen; Input is meaningful only with InputLine. Box is the whole
+// input box (its wrapped lines too), Pictures the [Image #n] references in it; OnlyPictures: it holds nothing else.
 type DeliveryScreen struct {
-	Busy, Menu bool
-	Input      string
-	InputLine  bool
+	Busy, Menu   bool
+	Input        string
+	InputLine    bool
+	Box          string
+	Pictures     int
+	OnlyPictures bool
 }
 
 // Deliverable decides from the screen: nothing readable or no input line, or a working agent → wait; a menu (it would
@@ -76,7 +80,36 @@ func Deliverable(s *DeliveryScreen) Decision {
 }
 
 func deliveryScreen(st screen.State) *DeliveryScreen {
-	return &DeliveryScreen{Busy: st.Busy, Menu: st.Menu != nil, Input: st.Input, InputLine: st.InputLine}
+	v := &DeliveryScreen{Busy: st.Busy, Menu: st.Menu != nil, Input: st.Input, InputLine: st.InputLine}
+	// The input line reads empty with its placeholder shown; only typed input has a box worth reading.
+	if st.Input != "" {
+		v.Box = inputBoxText(st.Plain)
+		v.Pictures, v.OnlyPictures = CountImageRefs(v.Box), imageTokensOnly.MatchString(v.Box)
+	}
+	return v
+}
+
+var boxRule = regexp.MustCompile(`^` + sp + `*─{3,}` + sp + `*$`)
+
+// inputBoxText is the text of Claude's input box on a plain screen: its input line (❯ at the line's start) and the lines
+// it wraps onto, up to the box's bottom rule, joined by spaces.
+func inputBoxText(plain string) string {
+	lines := strings.Split(plain, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		rest, ok := strings.CutPrefix(lines[i], "❯")
+		if !ok {
+			continue
+		}
+		parts := []string{rest}
+		for _, l := range lines[i+1:] {
+			if boxRule.MatchString(l) {
+				break
+			}
+			parts = append(parts, l)
+		}
+		return strings.Join(parts, " ")
+	}
+	return ""
 }
 
 // MayDeliverQueue: only an agent waiting for a prompt takes the queue — not a working one, not one whose launch is
@@ -90,17 +123,21 @@ type AgentAction string
 
 const (
 	ActionLaunching     AgentAction = "launching"
+	ActionGaveUp        AgentAction = "gave-up"
 	ActionDeliver       AgentAction = "deliver"
 	ActionResume        AgentAction = "resume"
 	ActionUnrecoverable AgentAction = "unrecoverable"
 )
 
-// QueueAgentAction: a launch under way or one that gave up is left alone; a running agent takes the message; a gone one
-// is resumed with its session, and without a session the message cannot go anywhere.
+// QueueAgentAction: a launch under way is waited for; one that gave up will not come up by itself, so its messages are
+// given up too; a running agent takes the message; a gone one is resumed with its session, and without a session the
+// message cannot go anywhere.
 func QueueAgentAction(launching, launchGaveUp, agentRunning, hasSession bool) AgentAction {
 	switch {
-	case launching || launchGaveUp:
+	case launching:
 		return ActionLaunching
+	case launchGaveUp:
+		return ActionGaveUp
 	case agentRunning:
 		return ActionDeliver
 	case hasSession:

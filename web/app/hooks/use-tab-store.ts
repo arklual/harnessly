@@ -34,6 +34,8 @@ interface ITabStore {
   replaceAll: (tabs: Record<string, IStatusEntry>) => void;
   upsert: (tabId: string, entry: IStatusEntry | null) => void;
   patch: (tabId: string, part: Partial<ITabState>) => void;
+  /** The person looked at the finished answer: idle and dismissed here at once (the runtime sends no echo to this page). */
+  markSeen: (tabId: string, at: number) => void;
 }
 
 const useTabStore = create<ITabStore>((set) => ({
@@ -57,7 +59,20 @@ const useTabStore = create<ITabStore>((set) => ({
       if (!cur) return s;
       return { tabs: { ...s.tabs, [tabId]: { ...cur, ...part } } };
     }),
+  markSeen: (tabId, at) =>
+    set((s) => {
+      const cur = s.tabs[tabId];
+      if (cur?.cliState !== 'ready-for-review') return s;
+      return { tabs: { ...s.tabs, [tabId]: { ...cur, cliState: 'idle', dismissedAt: at } } };
+    }),
 }));
+
+/** A finished answer counts as seen when its conversation is on screen: this frame shown and the browser tab visible. */
+export const shouldMarkSeen = (
+  cliState: TCliState | undefined,
+  surfaceVisible: boolean,
+  pageVisible: boolean,
+) => cliState === 'ready-for-review' && surfaceVisible && pageVisible;
 
 /** Tabs that wait for the person (a question, or finished work not yet looked at). */
 export const selectGlobalStatus = (tabs: Record<string, ITabState>) => ({

@@ -21,8 +21,8 @@ type Response struct {
 	Body   any
 }
 
-// ErrorBody is a refusal; Code carries the command runner's error on switch-model, Waits says the agent reads the
-// message at its next step by itself.
+// ErrorBody is a refusal; Code carries the command runner's error on switch-model and names a queue refusal
+// (CodeNotQueued), Waits says the agent reads the message at its next step by itself.
 type ErrorBody struct {
 	Error string `json:"error"`
 	Code  string `json:"code,omitempty"`
@@ -61,10 +61,15 @@ var tabIDRE = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // --- POST /prompt-queue -------------------------------------------------------------------------------------------
 
-// QueueAdded is the answer to add.
+// CodeNotQueued: the message is no longer in the queue (the agent took it, or it was dropped).
+const CodeNotQueued = "not-queued"
+
+// QueueAdded is the answer to add; Repeated: the client id was queued before, Item is that message and nothing new was
+// queued.
 type QueueAdded struct {
 	Item     Item   `json:"item"`
 	Delivery string `json:"delivery"`
+	Repeated bool   `json:"repeated,omitempty"`
 }
 
 // QueueTaken is the answer to remove and take.
@@ -77,13 +82,15 @@ type OKBody struct {
 	OK bool `json:"ok"`
 }
 
-// PromptQueue is `{tabId, action, …}` on a tab's queue: add {text, images} queues a message and hands it to the agent
-// (into the running turn when it works), remove/take {id} take a message out (to drop it or edit it back), steer {id}
-// sends it now. A tab the runtime does not know is refused for add, instead of keeping a message nothing delivers.
+// PromptQueue is `{tabId, action, …}` on a tab's queue: add {text, images, clientId?} queues a message and hands it to
+// the agent (into the running turn when it works), remove/take {id} take a message out (to drop it or edit it back),
+// steer {id} sends it now, retry {id} asks again for a message delivery gave up on. A tab the runtime does not know is
+// refused for add, instead of keeping a message nothing delivers. An add repeating a clientId answers the message it
+// queued.
 func (s *Service) PromptQueue(body []byte) Response {
 	f := decodeFields(body)
 	tabID, action := f.text("tabId"), f.text("action")
-	if !tabIDRE.MatchString(tabID) || !slices.Contains([]string{"add", "remove", "take", "steer"}, action) {
+	if !tabIDRE.MatchString(tabID) || !slices.Contains([]string{"add", "remove", "take", "steer", "retry"}, action) {
 		return fail(400, msgNeedTabAction.String())
 	}
 	if action == "add" {
@@ -103,9 +110,12 @@ func (s *Service) PromptQueue(body []byte) Response {
 		if _, known := s.cfg.Tabs.Tab(tabID); !known {
 			return fail(404, msgNoTab.String())
 		}
-		item, err := s.queue.Add(tabID, f.text("text"), images)
+		item, repeated, err := s.queue.AddOnce(tabID, f.text("clientId"), f.text("text"), images)
 		if err != nil {
 			return fail(409, err.Error())
+		}
+		if repeated {
+			return ok(QueueAdded{Item: item, Delivery: DeliveryQueued, Repeated: true})
 		}
 		// "now": true is ⌘↵ — into the running turn; without it the message waits for the turn to end (Enter queues).
 		now := string(f["now"]) == "true"
@@ -117,14 +127,23 @@ func (s *Service) PromptQueue(body []byte) Response {
 	}
 	if action == "steer" {
 		if r := s.Steer(tabID, id); !r.OK {
-			return fail(r.Status, r.Message)
+			return Response{r.Status, ErrorBody{Error: r.Message, Code: r.Code}}
 		}
 		return ok(OKBody{true})
 	}
+	notQueued := Response{404, ErrorBody{Error: msgNotQueued.String(), Code: CodeNotQueued}}
+	if action == "retry" {
+		item, found := s.Retry(tabID, id)
+		if !found {
+			return notQueued
+		}
+		return ok(QueueTaken{item})
+	}
 	item, found := s.queue.Take(tabID, id)
 	if !found {
-		return fail(404, msgNotQueued.String())
+		return notQueued
 	}
+	s.queue.forget(tabID, item.ClientID)
 	return ok(QueueTaken{item})
 }
 

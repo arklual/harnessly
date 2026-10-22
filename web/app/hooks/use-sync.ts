@@ -1,7 +1,7 @@
 // The runtime's sync socket (/api/sync): refetch the workspaces or a layout when another page or the CLI changed them.
 import { useEffect } from 'react';
 import { ReconnectingSocket } from '@/runtime/socket';
-import { socketUrl } from '@/runtime/base';
+import { homeSocketUrl } from '@/runtime/base';
 import useWorkspaceStore from '@/hooks/use-workspace-store';
 import { useLayoutStore } from '@/hooks/use-layout';
 import useAgentStatus from '@/hooks/use-agent-status';
@@ -14,7 +14,7 @@ export default function useSync(): void {
       if (id) void useLayoutStore.getState().fetchLayout(id, true);
     };
     const sync = new ReconnectingSocket({
-      url: () => socketUrl('/api/sync'),
+      url: () => homeSocketUrl('/api/sync'),
       onOpen: () => {
         void useWorkspaceStore
           .getState()

@@ -5,6 +5,7 @@ import {
   Loader2,
   MoreHorizontal,
   Paperclip,
+  RotateCcw,
   Trash2,
   TriangleAlert,
 } from 'lucide-react';
@@ -12,12 +13,14 @@ import { toast } from 'sonner';
 import { LAYER_ALIGN, TW_MENU_KIND, TwMenuButton, type TTwMenuEntry } from '@/components/agents/ui';
 import { RuntimeMachineContext } from '@/hooks/use-fleet-status';
 import {
+  isFailedPrompt,
   removeQueuedPrompt,
+  retryQueuedPrompt,
   steerQueuedPrompt,
   takeQueuedPromptBack,
   usePromptQueue,
 } from '@/hooks/use-prompt-queue';
-import type { IQueuedPrompt } from '@/types/server/hl-prompt-queue';
+import type { IQueuedPrompt, TQueueFailReason } from '@/types/server/hl-prompt-queue';
 import { t } from '@/lib/i18n';
 
 export type TQueueLaunch = 'starting' | 'failed';
@@ -33,9 +36,22 @@ interface IPromptQueueStackProps {
 const failed = (what: string) => (error: unknown) =>
   toast.error(what, { description: error instanceof Error ? error.message : undefined });
 
+const FAILED_REASON_KEYS: Partial<Record<TQueueFailReason, string>> = {
+  'launch-failed': 'composer.promptQueueStack.failedLaunch',
+  'no-session': 'composer.promptQueueStack.failedNoSession',
+  'no-tab': 'composer.promptQueueStack.failedNoTab',
+  expired: 'composer.promptQueueStack.failedExpired',
+  'not-delivered': 'composer.promptQueueStack.failedNotDelivered',
+  'input-occupied': 'composer.promptQueueStack.failedInputOccupied',
+};
+
+const failedReason = (item: IQueuedPrompt) =>
+  t((item.reason && FAILED_REASON_KEYS[item.reason]) || 'composer.promptQueueStack.failed');
+
 /**
  * Messages waiting for the agent, stacked on the composer the way Codex shows its queue: each one can be
- * steered in now, dropped, or taken back to edit. The server sends the first one when the agent stops.
+ * steered in now, dropped, or taken back to edit. The server sends the first one when the agent stops. One the
+ * server gave up on stays with its reason, to be sent again or deleted.
  */
 const PromptQueueStack = ({ tabId, onEdit, launch = null }: IPromptQueueStackProps) => {
   const machineId = useContext(RuntimeMachineContext);
@@ -86,6 +102,7 @@ const PromptQueueStack = ({ tabId, onEdit, launch = null }: IPromptQueueStackPro
       )}
       {items.map((item) => {
         const local = item.id.startsWith('local-');
+        const gaveUp = isFailedPrompt(item);
         const menu: TTwMenuEntry[] = [
           {
             kind: TW_MENU_KIND.action,
@@ -95,11 +112,25 @@ const PromptQueueStack = ({ tabId, onEdit, launch = null }: IPromptQueueStackPro
           },
         ];
         return (
-          <li key={item.id} className="tw-pqueue-row" aria-busy={busyId === item.id || local || undefined}>
-            <ListEnd className="tw-pqueue-icon" aria-hidden="true" />
+          <li
+            key={item.id}
+            className="tw-pqueue-row"
+            data-state={gaveUp ? 'failed' : undefined}
+            aria-busy={busyId === item.id || local || undefined}
+          >
+            {gaveUp ? (
+              <TriangleAlert className="tw-pqueue-icon" aria-hidden="true" />
+            ) : (
+              <ListEnd className="tw-pqueue-icon" aria-hidden="true" />
+            )}
             <span className="tw-pqueue-text" title={item.text}>
               {item.text.trim() || t('composer.promptQueueStack.images')}
             </span>
+            {gaveUp && (
+              <span className="tw-pqueue-reason" role="status">
+                {failedReason(item)}
+              </span>
+            )}
             {item.images.length > 0 && (
               <span
                 className="tw-pqueue-files"
@@ -109,32 +140,51 @@ const PromptQueueStack = ({ tabId, onEdit, launch = null }: IPromptQueueStackPro
                 {item.images.length}
               </span>
             )}
-            <button
-              type="button"
-              className="tw-pqueue-steer"
-              disabled={local || busyId !== null || launch !== null}
-              title={
-                launch
-                  ? t('composer.promptQueueStack.agentStillStarting')
-                  : t('composer.promptQueueStack.steerHint')
-              }
-              onClick={() =>
-                void run(
-                  item.id,
-                  () => steerQueuedPrompt(machineId, tabId, item.id),
-                  t('composer.promptQueueStack.errorSteer'),
-                )
-              }
-            >
-              <CornerDownRight aria-hidden="true" />
-              Steer
-            </button>
+            {gaveUp ? (
+              <button
+                type="button"
+                className="tw-pqueue-steer"
+                disabled={busyId !== null}
+                title={t('composer.promptQueueStack.retryHint')}
+                onClick={() =>
+                  void run(
+                    item.id,
+                    () => retryQueuedPrompt(machineId, tabId, item.id),
+                    t('composer.promptQueueStack.errorRetry'),
+                  )
+                }
+              >
+                <RotateCcw aria-hidden="true" />
+                {t('composer.promptQueueStack.retry')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="tw-pqueue-steer"
+                disabled={local || busyId !== null || launch !== null}
+                title={
+                  launch
+                    ? t('composer.promptQueueStack.agentStillStarting')
+                    : t('composer.promptQueueStack.steerHint')
+                }
+                onClick={() =>
+                  void run(
+                    item.id,
+                    () => steerQueuedPrompt(machineId, tabId, item.id),
+                    t('composer.promptQueueStack.errorSteer'),
+                  )
+                }
+              >
+                <CornerDownRight aria-hidden="true" />
+                Steer
+              </button>
+            )}
             <button
               type="button"
               className="tw-icon-button tw-pqueue-icon-button"
               disabled={local || busyId !== null}
-              aria-label={t('composer.promptQueueStack.remove')}
-              title={t('composer.promptQueueStack.remove')}
+              aria-label={t(gaveUp ? 'composer.promptQueueStack.delete' : 'composer.promptQueueStack.remove')}
+              title={t(gaveUp ? 'composer.promptQueueStack.delete' : 'composer.promptQueueStack.remove')}
               onClick={() =>
                 void run(
                   item.id,

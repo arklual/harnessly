@@ -42,15 +42,17 @@ func TestBusyAgentWaitsForItsTurnToEnd(t *testing.T) {
 	if len(r.panes.sent()) != 0 || len(r.clock.pending()) != 0 {
 		t.Fatal("a working agent was typed into, or retried without a transition")
 	}
-	// The watchdog looks again; the turn ended meanwhile.
-	r.svc.Start()
+	// The keeper's watchdog looks again; the turn ended meanwhile.
 	r.tabs.set("tab-1", func(tab *Tab) { tab.CliState = StateIdle })
 	r.panes.setScreen(tui(t, "claude-idle-placeholder.ansi.txt"))
-	r.clock.Advance(watchdogEvery)
+	if r.svc.PendingDelivery("tab-1") {
+		t.Fatal("a delivery is pending, the watchdog would skip the tab")
+	}
+	r.svc.Schedule("tab-1", 0)
+	r.clock.Advance(0)
 	if got := r.panes.sent(); !reflect.DeepEqual(got, []string{"line:потом"}) {
 		t.Fatalf("sent %v", got)
 	}
-	r.svc.Stop()
 }
 
 func TestRetriesWhileTheScreenRefuses(t *testing.T) {
@@ -173,7 +175,8 @@ func TestStartDeliversWhatWaitedThroughARestart(t *testing.T) {
 	if sync := r.svc.QueueSync(); sync.Type != "prompt-queue:sync" || len(sync.Queues["tab-1"]) != 1 {
 		t.Fatalf("sync %+v", sync)
 	}
-	r.svc.Start()
+	// The keeper schedules every tab once it has scanned them.
+	r.svc.Schedule("tab-1", settleDelay)
 	r.clock.Advance(settleDelay)
 	if got := r.panes.sent(); !reflect.DeepEqual(got, []string{"line:до перезапуска"}) {
 		t.Fatalf("sent %v", got)

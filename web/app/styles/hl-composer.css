@@ -1077,6 +1077,28 @@
   font-size: 14px;
   color: var(--t-text);
 }
+.tw-pqueue-row[data-state='failed'] .tw-pqueue-icon,
+.tw-pqueue-reason {
+  color: color-mix(in oklab, var(--t-danger) 70%, var(--t-text));
+}
+.tw-pqueue-row[data-state='failed'] .tw-pqueue-text {
+  color: var(--t-text-muted);
+}
+/* The reason takes its own line under the message, so a narrow composer keeps both readable */
+.tw-pqueue-row[data-state='failed'] {
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding-bottom: 4px;
+}
+.tw-pqueue-reason {
+  order: 1;
+  flex: 1 0 100%;
+  padding-left: 23px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
 .tw-pqueue-files {
   display: inline-flex;
   align-items: center;

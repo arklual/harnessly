@@ -196,7 +196,7 @@ describe('isRecordedSince', () => {
 describe('the prompt queue hands a message over to the timeline', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    usePromptQueueStore.setState({ queues: {} });
+    usePromptQueueStore.setState({ server: {}, local: {}, queues: {} });
   });
 
   const steeringServer = (id: string) =>
