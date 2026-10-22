@@ -1,13 +1,11 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CircleHelp, MessageCirclePlus, Pencil, Plus } from 'lucide-react';
+import { MessageCirclePlus, TextQuote } from 'lucide-react';
 import { POPOVER_ATTRIBUTE } from '@/hooks/use-text-selection-annotation';
 import { placePopover, type IPopoverPlacement } from '@/lib/hl-popover-placement';
 import type { ISelectionTarget } from '@/lib/hl-selection-target';
-import { INTENT_LABELS, TEXT_INTENTS, type TTextIntent } from '@/lib/hl-text-annotation';
+import { ANNOTATE, INTENT_LABELS, type TTextIntent } from '@/lib/hl-text-annotation';
 import { t } from '@/lib/i18n';
-
-const INTENT_ICONS: Record<TTextIntent, typeof Plus> = { ask: CircleHelp, add: Plus, fix: Pencil };
 
 interface ITextAnnotationPopoverProps {
   target: ISelectionTarget;
@@ -19,7 +17,7 @@ interface ITextAnnotationPopoverProps {
   onClose: () => void;
 }
 
-/** The pill next to a selected fragment: what to do with it; the comment is typed into the composer afterwards. */
+/** The pill next to a selected fragment: annotate it (its comment is typed in its card) or send it to the side chat. */
 const TextAnnotationPopover = ({
   target,
   compact,
@@ -72,23 +70,15 @@ const TextAnnotationPopover = ({
       }}
     >
       <div className="tw-textsel-actions" role="group" aria-label={t('agents.textAnnotationPopover.actions')}>
-        {TEXT_INTENTS.map((intent, index) => {
-          const Icon = INTENT_ICONS[intent];
-          return (
-            <Fragment key={intent}>
-              {index > 0 && <span className="tw-textsel-sep" aria-hidden="true" />}
-              <button
-                type="button"
-                className="tw-textsel-action"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => onPick(intent)}
-              >
-                <Icon aria-hidden="true" />
-                {INTENT_LABELS[intent]}
-              </button>
-            </Fragment>
-          );
-        })}
+        <button
+          type="button"
+          className="tw-textsel-action"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onPick(ANNOTATE)}
+        >
+          <TextQuote aria-hidden="true" />
+          {INTENT_LABELS[ANNOTATE]}
+        </button>
         <span className="tw-textsel-sep" aria-hidden="true" />
         <button
           type="button"

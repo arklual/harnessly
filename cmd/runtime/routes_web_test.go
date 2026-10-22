@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/ly-solutions/harnessly/internal/gate"
 )
@@ -197,4 +198,33 @@ func TestWebPageOnlyWhereAsked(t *testing.T) {
 	if webConfigFromEnv(true) != nil {
 		t.Fatal("a folder without index.html serves no page")
 	}
+}
+
+func TestWebPageNameAndMark(t *testing.T) {
+	const head = `<link rel="icon" href="./logo.svg" type="image/svg+xml" />` +
+		`<meta name="apple-mobile-web-app-title" content="harnessly" /><title>harnessly</title>`
+	files := fstest.MapFS{"index.html": {Data: []byte(`<!doctype html><html><head>` + head + `</head></html>`)}}
+
+	t.Run("left as built without settings", func(t *testing.T) {
+		t.Setenv("RUNTIME_APP_NAME", "")
+		t.Setenv("RUNTIME_APP_MARK_URL", "")
+		raw, err := newWebConfig(files).page()
+		if err != nil || !strings.Contains(string(raw), head) {
+			t.Fatalf("%v %s", err, raw)
+		}
+	})
+	t.Run("the installation's own", func(t *testing.T) {
+		t.Setenv("RUNTIME_APP_NAME", "Acme & Co")
+		t.Setenv("RUNTIME_APP_MARK_URL", "/agents/icon.svg")
+		raw, err := newWebConfig(files).page()
+		page := string(raw)
+		for _, want := range []string{`<link rel="icon" href="/agents/icon.svg" />`, `content="Acme &amp; Co"`, `<title>Acme &amp; Co</title>`} {
+			if err != nil || !strings.Contains(page, want) {
+				t.Fatalf("no %s in %s (%v)", want, page, err)
+			}
+		}
+		if strings.Contains(page, "logo.svg") || strings.Contains(page, ">harnessly<") {
+			t.Fatalf("built tags left: %s", page)
+		}
+	})
 }

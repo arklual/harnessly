@@ -47,6 +47,8 @@ func CookieTag(t devtools.Target, secret []byte) string {
 var (
 	slotOriginRe   = regexp.MustCompile(`^https://[a-z0-9-]+(\.[a-z0-9-]+)+$`)
 	parentOriginRe = regexp.MustCompile(`^https://[a-z0-9-]+(\.[a-z0-9-]+)*(:\d{1,5})?$`)
+	// localOriginRe is a standalone runtime's slot or page origin: http or https, a host, maybe a port.
+	localOriginRe  = regexp.MustCompile(`^https?://(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$`)
 	targetOriginRe = regexp.MustCompile(`^https?://(?:[a-z0-9_-]+(?:\.[a-z0-9_-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$`)
 )
 
@@ -67,6 +69,10 @@ func isTargetOrigin(v any) (string, bool) {
 	u, ok := weburl.Parse(s)
 	return s, ok && u.Origin() == s && u.Port != "0"
 }
+
+// ParseTarget is a preview target as a request body names it: {kind:"port",port} or {kind:"url",origin} with the origin
+// spelled exactly as the URL parser prints it.
+func ParseTarget(v any) (devtools.Target, bool) { return parseTarget(v) }
 
 func parseTarget(v any) (devtools.Target, bool) {
 	o, ok := v.(*jsvalue.Object)
@@ -119,7 +125,10 @@ func portSlotsOf(v any, t devtools.Target, slot string) (map[string]string, bool
 	return out, true
 }
 
-func parseClaim(payload *jsvalue.Object) (*Claim, bool) {
+func parseClaim(payload *jsvalue.Object, local bool) (*Claim, bool) {
+	originOK := func(re *regexp.Regexp, s string) bool {
+		return re.MatchString(s) || local && localOriginRe.MatchString(s)
+	}
 	sub, ok := field(payload, "sub").(string)
 	if !ok || sub == "" {
 		return nil, false
@@ -129,7 +138,7 @@ func parseClaim(payload *jsvalue.Object) (*Claim, bool) {
 		return nil, false
 	}
 	slot, ok := field(payload, "slotOrigin").(string)
-	if !ok || !slotOriginRe.MatchString(slot) {
+	if !ok || !originOK(slotOriginRe, slot) {
 		return nil, false
 	}
 	slots, ok := portSlotsOf(field(payload, "portSlots"), target, slot)
@@ -139,7 +148,7 @@ func parseClaim(payload *jsvalue.Object) (*Claim, bool) {
 	c := &Claim{Sub: sub, Target: target, SlotOrigin: slot, PortSlots: slots}
 	if raw, present := payload.Get("parentOrigin"); present {
 		parent, ok := raw.(string)
-		if !ok || !parentOriginRe.MatchString(parent) {
+		if !ok || !originOK(parentOriginRe, parent) {
 			return nil, false
 		}
 		c.ParentOrigin = parent
@@ -152,8 +161,13 @@ func field(o *jsvalue.Object, k string) any {
 	return v
 }
 
-// VerifyClaim checks an HS256 claim token with the audience; nil when it does not hold.
+// VerifyClaim checks an HS256 claim token of the fleet gateway with the audience; nil when it does not hold.
 func VerifyClaim(token string, secret []byte, audience string, now time.Time) *Claim {
+	return verifyClaim(token, secret, audience, now, false)
+}
+
+// verifyClaim is VerifyClaim that, when local, also takes a standalone runtime's own slot and page origins.
+func verifyClaim(token string, secret []byte, audience string, now time.Time, local bool) *Claim {
 	if token == "" || len(secret) == 0 {
 		return nil
 	}
@@ -173,7 +187,7 @@ func VerifyClaim(token string, secret []byte, audience string, now time.Time) *C
 	if !ok {
 		return nil
 	}
-	c, ok := parseClaim(obj)
+	c, ok := parseClaim(obj, local)
 	if !ok {
 		return nil
 	}

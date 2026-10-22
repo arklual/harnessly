@@ -18,6 +18,12 @@
   --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Inline code in a message is a chip of its own: the backticks typography draws around it would show next to the chip. */
+.prose :where(code)::before,
+.prose :where(code)::after {
+  content: none;
+}
+
 @utility max-w-content {
   max-width: var(--content-max-width);
 }

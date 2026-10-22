@@ -1347,3 +1347,113 @@
 ::highlight(tw-ultra-6) {
   color: #f783ac;
 }
+
+/* Saved prompts under the composer: a quiet row of chips; a click puts the text into the field. */
+.tw-quick-prompts {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 2px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tw-quick-prompts::-webkit-scrollbar {
+  display: none;
+}
+.tw-quick-prompt {
+  flex: 0 0 auto;
+  max-width: 240px;
+  padding: 4px 12px;
+  overflow: hidden;
+  border: 1px solid var(--t-border-default);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--t-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.tw-quick-prompt:hover {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-quick-prompt:focus-visible {
+  outline: 2px solid var(--t-accent-purple);
+  outline-offset: 1px;
+}
+
+/* The history of sent messages, opened from the «+» menu. */
+.tw-history-popover {
+  --tw-ui-listbox-max-h: min(300px, 40vh);
+  gap: 6px;
+  width: min(380px, var(--tw-ui-layer-max-w));
+  padding: 8px;
+}
+.tw-history-search {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--t-border-default);
+  border-radius: var(--t-radius-lg);
+  background: var(--t-surface);
+  color: var(--t-text);
+  font-size: 13px;
+}
+.tw-history-search:focus-visible {
+  outline: 2px solid var(--t-accent-purple);
+  outline-offset: -1px;
+}
+.tw-history-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tw-history-when {
+  color: var(--t-text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.tw-history-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: var(--t-text-muted);
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    background-color 0.15s;
+}
+.tw-history-remove svg {
+  width: 13px;
+  height: 13px;
+}
+.tw-history-remove:hover,
+.tw-history-remove:focus-visible {
+  background: var(--t-surface-hover);
+  color: var(--t-text);
+}
+.tw-history-list .tw-ui-option:hover .tw-history-remove,
+.tw-history-list .tw-ui-option[data-active] .tw-history-remove,
+.tw-history-remove:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .tw-history-remove {
+    opacity: 1;
+  }
+}
+.tw-history-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 4px;
+  color: var(--t-text-muted);
+  font-size: 13px;
+}

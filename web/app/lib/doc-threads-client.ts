@@ -74,7 +74,7 @@ export const markDocRead = async (slug: string): Promise<void> => {
   await appFetch(`${BASE}/${encodeURIComponent(slug)}/read`, { method: 'POST' });
 };
 
-/** The page of one version when `version` is given (a sha), else the current one. */
+/** The page of one version when `version` is given (its id), else the current one. */
 export const docContentSrc = (slug: string, version: string | null = null): string =>
   prefixAppPath(
     `${BASE}/${encodeURIComponent(slug)}/content${version ? `?v=${encodeURIComponent(version)}` : ''}`,

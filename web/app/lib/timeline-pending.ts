@@ -67,3 +67,21 @@ export const settleStaleQueued = (entries: ITimelineEntry[]): ITimelineEntry[] =
   });
   return changed ? settled : entries;
 };
+
+/**
+ * Whether the transcript already holds the message a row is put up for: a record of it stamped at or after `since`,
+ * whether delivered or waiting in the agent's own queue. Another row of the composer does not count.
+ */
+export const isRecordedSince = (
+  entries: readonly ITimelineEntry[],
+  pending: ITimelineUserMessage,
+  since: number,
+) =>
+  entries.some(
+    (entry) =>
+      entry.type === 'user-message' &&
+      entry.id !== pending.id &&
+      entry.timestamp >= since &&
+      (!entry.pending || !!entry.queued) &&
+      matchesPending(entry, pending),
+  );

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TextQuote } from 'lucide-react';
 import { useHoldTimelinePosition } from '@/components/timeline/timeline-scroll-context';
 import type { TUserSegment } from '@/lib/message-wrappers';
-import { INTENT_LABELS } from '@/lib/hl-text-annotation';
+import { INTENT_CARD_LABELS } from '@/lib/hl-text-annotation';
 import { t } from '@/lib/i18n';
 
 const FROM_LABELS = {
@@ -23,7 +23,7 @@ const TextAnnotationSegment = ({ segment }: { segment: Extract<TUserSegment, { k
         <span
           className="tw-wrapped-annotation-label"
           title={segment.label}
-        >{`#${segment.n} ${INTENT_LABELS[quote.intent]}`}</span>
+        >{`#${segment.n} ${INTENT_CARD_LABELS[quote.intent]}`}</span>
         <button
           type="button"
           className="tw-wrapped-toggle"

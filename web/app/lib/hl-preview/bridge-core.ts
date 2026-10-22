@@ -57,11 +57,15 @@ export const targetCookies = (header: string, tag: string): string => {
     .join('; ');
 };
 
-/** A cookie the target sets, pinned to the slot host: the same rewrite for a Set-Cookie header and for `document.cookie =`. */
-export const prefixSetCookie = (value: string, tag: string): string => {
+/**
+ * A cookie the target sets, pinned to the slot host: the same rewrite for a Set-Cookie header and for `document.cookie =`.
+ * `plain` is a slot served over http (a standalone runtime on a local address), where a Secure cookie is never kept.
+ */
+export const prefixSetCookie = (value: string, tag: string, plain = false): string => {
   const [pair, ...attributes] = value.split(';').map((part) => part.trim());
   const kept = attributes.filter((attr) => !/^(domain|secure|samesite|partitioned)\b/i.test(attr));
-  return [`__t_${tag}_${pair}`, ...kept, 'Secure', 'SameSite=None', 'Partitioned'].join('; ');
+  const scope = plain ? ['SameSite=Lax'] : ['Secure', 'SameSite=None', 'Partitioned'];
+  return [`__t_${tag}_${pair}`, ...kept, ...scope].join('; ');
 };
 
 export const parseParentMessage = (data: unknown): TParentMessage | null => {

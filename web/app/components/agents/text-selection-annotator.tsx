@@ -4,6 +4,7 @@ import TextAnnotationPopover from '@/components/agents/text-annotation-popover';
 import { pickedRanges } from '@/lib/hl-annotation-composer';
 import { addTextAnnotation, useAnnotations } from '@/lib/hl-annotations-store';
 import { OPEN_PANE_TAB_EVENT, addSideChatExcerpt } from '@/lib/hl-side-chat-store';
+import { focusAnnotationComment } from '@/components/agents/text-annotation-chip-row';
 import type { TTextIntent } from '@/lib/hl-text-annotation';
 
 const isCoarsePointer = (): boolean => window.matchMedia('(pointer: coarse)').matches;
@@ -39,7 +40,7 @@ const TextSelectionAnnotator = ({ tabId }: { tabId: string }) => {
 
   const pick = (intent: TTextIntent) => {
     if (!target) return;
-    addTextAnnotation(tabId, {
+    const added = addTextAnnotation(tabId, {
       kind: 'text',
       intent,
       comment: '',
@@ -49,6 +50,7 @@ const TextSelectionAnnotator = ({ tabId }: { tabId: string }) => {
     });
     window.getSelection()?.removeAllRanges();
     close();
+    focusAnnotationComment(tabId, added.id);
   };
 
   const toSideChat = () => {

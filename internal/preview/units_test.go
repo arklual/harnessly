@@ -418,7 +418,7 @@ func TestRewrites(t *testing.T) {
 				got = &s
 			}
 		case "set":
-			s := prefixSetCookie(c.In, "tag")
+			s := prefixSetCookie(c.In, "tag", false)
 			got = &s
 		case "stand":
 			own, session := "", ""

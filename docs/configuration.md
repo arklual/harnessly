@@ -183,7 +183,9 @@ it stays with the previous runtime.
 | `RUNTIME_PREVIEW_PRIVATE_HEADER_PREFIX` | headers only the gateway sets, never passed upstream (default `x-preview-`) |
 | `RUNTIME_PREVIEW_SIGN_IN_HOSTS`, `RUNTIME_PREVIEW_STAND_SESSION_HEADER` | where a feature stand (`RUNTIME_STAND_DOMAIN`) sends a person without a session, comma-separated, and the header carrying the person's stand session |
 | `RUNTIME_PREVIEW_SELF_IPS` | the machine's public addresses no interface carries (behind NAT), comma-separated |
-| `RUNTIME_PREVIEW_BRIDGE_FILE` | the page bridge script injected into previewed pages (unset: those requests go to the previous runtime) |
+| `RUNTIME_PREVIEW_BRIDGE_FILE` | the page bridge script injected into previewed pages (unset: a standalone runtime takes `preview-bridge.js` of its web build, `RUNTIME_WEB_DIR` or the embedded one; a gate sends those requests to the previous runtime) |
+| `RUNTIME_PREVIEW_LISTEN` | standalone only: `host:port` of the first of the 8 preview slot listeners, the other 7 take the next ports (default: the gate's host and the 8 ports after its port, so `8023`–`8030` next to `8022`); `off` turns the preview off. See [the preview without a gateway](deploy.md#the-preview-without-a-gateway) |
+| `RUNTIME_PREVIEW_PUBLIC_ORIGINS` | standalone only: the 8 origins a reverse proxy serves the slots at, comma-separated, in slot order (`https://p1.example.com,...`); needed when the page is opened over https |
 | `RUNTIME_WORKTREES_ROOT` | the git worktrees folder whose dev servers the pane lists (default `~/.worktrees`) |
 
 ### Voice
@@ -226,7 +228,14 @@ the previous runtime the pages are someone else's and the gate leaves those path
 | --- | --- |
 | `RUNTIME_WEB` | `on` serves the page in front of the previous runtime too, `off` never; unset: standalone only |
 | `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page; its files go out gzipped to browsers that accept it |
+Every page variable below is read the same way by `runtime web export <dir>`: it writes the page this runtime would serve
+into `<dir>` (its files and `index.html` with the base and the settings filled in), so a proxy in front of the runtimes
+can serve the same build while the machine behind it is down.
+
+| Variable | Meaning |
+| --- | --- |
 | `RUNTIME_APP_NAME` | the product name the page shows in its titles and brand (default `harnessly`) |
+| `RUNTIME_APP_MARK_URL` | the URL of the product mark the page shows in place of the harnessly one and gives the browser as the tab icon (default: the harnessly mark) |
 | `RUNTIME_LOCALE` | the page's and the API's language: `en` (default) or `ru` |
 | `RUNTIME_WEB_FEATURES` | optional parts of the page, comma separated: `chats` (plain chats through an OpenWebUI next to the runtime), `efficiency` (the team report), `vault` (the password safe), `design` (Claude Design boards); none by default |
 | `RUNTIME_WEB_COPY_FILE` | a JSON file of product copy the page uses instead of its defaults (welcome line, suggested first prompts) |

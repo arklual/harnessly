@@ -115,7 +115,7 @@ func (p *Proxy) serveUpgrade(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if setsCookie {
-			value = prefixSetCookie(value, tag)
+			value = prefixSetCookie(value, tag, strings.HasPrefix(c.SlotOrigin, "http:"))
 		}
 		b.WriteString(name + ": " + value + "\r\n")
 	}

@@ -380,6 +380,7 @@
   "agents.slashCommandPopover.more": "{count} more: refine the query",
   "agents.slashCommandPopover.retry": "Retry",
   "agents.slashCommandPopover.skills": "{provider} skills",
+  "agents.textAnnotationChipRow.commentLabel": "Comment on {label}",
   "agents.textAnnotationChipRow.listLabel": "Fragments from the timeline",
   "agents.textAnnotationChipRow.remove": "Remove from message",
   "agents.textAnnotationChipRow.removeLabel": "Remove {label} from message",

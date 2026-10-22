@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --config vite.bridge.config.ts",
     "typecheck": "tsc -b --pretty",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",

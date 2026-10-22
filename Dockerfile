@@ -60,7 +60,7 @@ ENV HOME=/home/agent \
 USER agent
 WORKDIR /home/agent
 VOLUME ["/home/agent"]
-EXPOSE 8022
+EXPOSE 8022 8023-8030
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8022/api/health >/dev/null || exit 1
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/runtime"]

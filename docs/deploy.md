@@ -291,6 +291,56 @@ artifacts are installed from their own charts.
 
 Secrets stay out of Git in both: create them with External Secrets, Sealed Secrets or SOPS.
 
+## The preview without a gateway
+
+The right pane's browser shows a dev server or a site through the runtime's preview proxy. Behind a gateway the gateway
+gives each page its own origin; a standalone runtime does it itself, with 8 slot listeners next to its own port:
+
+| Slot | Default port (runtime on `8022`) | Shows |
+| --- | --- | --- |
+| 1–6 | `8023`–`8028` | dev server ports; a port the page links to opens under its slot as `/__tk/p/<port>/` |
+| 7–8 | `8029`–`8030` | sites typed as a URL |
+
+Opening a preview (`POST /api/preview/open`, the page does it when you type a port) needs the page's session and hands
+out a one-minute ticket for one slot. The slot trades the ticket for its own cookie and from then on proxies to the
+target: the dev server sees neither the page's cookies nor the slot's. The page itself refuses any request whose
+`Origin` or `Referer` is a slot, terminal and status sockets included, so a previewed page cannot drive the agents.
+
+**On one machine** nothing is to configure: open `http://localhost:8022`, type `5173` (or whatever your dev server
+listens on). `RUNTIME_PREVIEW_LISTEN=127.0.0.1:9100` moves the slots to `9100`–`9107`; `RUNTIME_PREVIEW_LISTEN=off`
+turns the preview off. Slot ports, like the page's port, must be reachable at the same number from the browser: the
+slot's address is the page's host with the slot's port.
+
+**docker compose** publishes `8023`–`8030` on 127.0.0.1 next to `8022`. To move them, set both `HARNESSLY_PREVIEW_PORT`
+(the first) and `HARNESSLY_PREVIEW_PORTS` (the range) in `.env`, for example `9100` and `9100-9107`. The dev server runs
+in the container (a terminal tab), so the preview reaches it at its port there.
+
+**Over https** a page cannot frame a plain-http slot, so the runtime refuses to open one ("set
+RUNTIME_PREVIEW_PUBLIC_ORIGINS") until it knows the slots' https addresses. Give each slot a hostname and list them in
+slot order:
+
+```caddyfile
+p1.example-preview.com {
+	reverse_proxy 127.0.0.1:8023
+}
+# ... p2 to p7 the same way ...
+p8.example-preview.com {
+	reverse_proxy 127.0.0.1:8030
+}
+```
+
+```sh
+RUNTIME_PREVIEW_PUBLIC_ORIGINS=https://p1.example-preview.com,https://p2.example-preview.com,...,https://p8.example-preview.com
+```
+
+Caddy gets a certificate per hostname (or use one wildcard). Prefer a registrable domain of their own for the slots, as
+above: on `localhost` and on subdomains of the page's domain the page and the slots are one site, and a previewed page
+can set a cookie the page also receives (it cannot read the page's cookies or call it, but it can sign you out). With
+compose, keep the published slot ports on 127.0.0.1 and let only Caddy reach them.
+
+The Helm chart does not route the slots yet: the pod listens on `8023`–`8030`, and a Service port and an Ingress host
+per slot, with `RUNTIME_PREVIEW_PUBLIC_ORIGINS` in `extraEnv`, are yours to add.
+
 ## Behind a proxy
 
 The page uses WebSockets (terminals, conversations, the status and sync sockets): give them a long read timeout

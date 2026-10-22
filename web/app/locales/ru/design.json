@@ -13,6 +13,10 @@
   "design.projectPage.openNewTab": "Открыть в новой вкладке",
   "design.projectPage.chatFailed": "Не удалось начать диалог",
   "design.projectPage.openInChat": "Открыть в чате",
+  "design.projectPage.newDialog": "Новый диалог",
+  "design.projectPage.upgrade": "Обновить до выпуска {release}",
+  "design.projectPage.upgradeFailed": "Не удалось обновить проект",
+  "design.projectPage.upgraded": "Проект на выпуске {release}: доски откроются на нём при следующей загрузке.",
   "design.projectPage.noBoards": "В проекте пока нет досок",
   "design.projectPage.noBoardsHint": "Откройте проект в чате и попросите агента нарисовать их: каждая новая доска появится здесь сама.",
   "design.projectPage.boards": "Доски",
@@ -88,6 +92,6 @@
   "design.boardPage.removeComment": "Убрать комментарий {label}",
   "design.boardPage.startChat": "Начать чат",
   "design.boardPage.send": "Отправить",
-  "design.boardPage.sentTo": "Отправлено в «{title}».",
+  "design.boardPage.queuedIn": "Комментарии в очереди «{title}»: агент возьмёт их, когда закончит текущий шаг.",
   "design.boardPage.chatStarted": "Чат запущен."
 }

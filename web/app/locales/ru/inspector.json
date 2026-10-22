@@ -185,7 +185,7 @@
   "inspector.previewIsland.show": "Показать",
   "inspector.previewIsland.searching": "Ищу dev-серверы",
   "inspector.previewIsland.noServers": "Dev-серверов не видно. Когда агент поднимет сервер, он появится здесь и откроется сам.",
-  "inspector.previewFrame.noBridge": "Страница не дала подключить мост (CSP)",
+  "inspector.previewFrame.noBridge": "Выделение ещё не подключилось к странице — нажмите ещё раз или обновите её",
   "inspector.previewFrame.pageLoading": "Страница загружается",
   "inspector.previewFrame.commentPlaceholder": "Что поменять?",
   "inspector.previewFrame.commentLabel": "Комментарий к элементу",

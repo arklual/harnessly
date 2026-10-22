@@ -1,5 +1,13 @@
-/** The product mark: "h." on a dark tile, the same drawing as public/logo.svg. */
-const HlMark = ({ className }: { className?: string }) => (
+import { appConfig } from '@/platform/config';
+
+/** The product mark: the installation's own (RUNTIME_APP_MARK_URL), else "h." on a dark tile, as public/logo.svg. */
+const HlMark = ({ className }: { className?: string }) => {
+  const { markUrl } = appConfig();
+  if (markUrl) return <img className={className} src={markUrl} alt="" aria-hidden="true" />;
+  return <HarnesslyMark className={className} />;
+};
+
+const HarnesslyMark = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 1024 1024" aria-hidden="true" focusable="false">
     <rect width="1024" height="1024" rx="224" fill="#0B0D10" />
     <path

@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { create } from 'zustand';
 import { createSharedResource, type ISharedResource } from '@/lib/shared-resource';
-import { APP_BASE_PATH } from '@/lib/app-path';
+import { prefixAppPath } from '@/lib/app-path';
 import type { IOrganizer, TOrganizerOp } from '@/lib/hl-organizer';
 import useSharedResource from '@/hooks/use-shared-resource';
 import { t } from '@/lib/i18n';
@@ -11,7 +11,7 @@ import { t } from '@/lib/i18n';
  * the fleet gateway sends it to the default machine, while appFetch inside a runtime iframe would pin
  * it to that iframe's machine.
  */
-const ORGANIZER_URL = `${APP_BASE_PATH}/api/platform/organizer`;
+const ORGANIZER_URL = prefixAppPath('/api/platform/organizer');
 
 const POLL = { intervalMs: 10_000, maxBackoffMs: 2 * 60_000 } as const;
 

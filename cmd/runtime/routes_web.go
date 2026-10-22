@@ -23,6 +23,9 @@ type webConfig struct {
 	base, api string
 	// meta is the page config written into <meta name="hl-config"> (web_config.go).
 	meta string
+	// name and mark are the product name and the URL of its mark (RUNTIME_APP_NAME, RUNTIME_APP_MARK_URL) for the
+	// browser's own tags: the tab icon and the name an installed app takes.
+	name, mark string
 	// static keeps the tags and gzipped copies of the page's files.
 	static staticCache
 }
@@ -50,8 +53,18 @@ func webConfigFromEnv(standalone bool) *webConfig {
 		return nil
 	}
 	// The API answers under the page's base too (apiAlias), so one proxy prefix covers both.
+	return newWebConfig(files)
+}
+
+// newWebConfig serves files with the settings of this installation.
+func newWebConfig(files fs.FS) *webConfig {
 	base := appBase()
-	return &webConfig{files: files, base: base, api: base, meta: pageConfigMeta(pageConfigFromEnv())}
+	pc := pageConfigFromEnv()
+	c := &webConfig{files: files, base: base, api: base, meta: pageConfigMeta(pc), name: pc.ProductName}
+	if pc.MarkURL != nil {
+		c.mark = *pc.MarkURL
+	}
+	return c
 }
 
 // appBase is RUNTIME_APP_BASE_PATH as a path prefix: "/agents" by default, "" for the root.
@@ -125,19 +138,38 @@ func (c *webConfig) handler() http.HandlerFunc {
 			}
 		}
 		// Any other path is the page's own route.
-		raw, err := fs.ReadFile(c.files, "index.html")
+		raw, err := c.page()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		raw = bytes.Replace(raw, []byte(`<base href="/" />`), []byte(`<base href="`+html.EscapeString(c.base)+`/" />`), 1)
-		raw = bytes.Replace(raw, []byte(`<meta name="api-base" content="" />`),
-			[]byte(`<meta name="api-base" content="`+html.EscapeString(c.api)+`" />`), 1)
-		raw = bytes.Replace(raw, []byte(`<meta name="platform-api" content="/api/platform" />`),
-			[]byte(`<meta name="platform-api" content="`+html.EscapeString(platformAPI)+`" />`), 1)
-		if c.meta != "" {
-			raw = bytes.Replace(raw, []byte(`<meta name="hl-config" content="{}" />`), []byte(`<meta name="hl-config" content="`+c.meta+`" />`), 1)
-		}
 		serveHTML(w, r, raw)
 	}
+}
+
+// page is index.html with the base, the API prefixes and the page's settings of this installation filled in.
+func (c *webConfig) page() ([]byte, error) {
+	raw, err := fs.ReadFile(c.files, "index.html")
+	if err != nil {
+		return nil, err
+	}
+	raw = bytes.Replace(raw, []byte(`<base href="/" />`), []byte(`<base href="`+html.EscapeString(c.base)+`/" />`), 1)
+	raw = bytes.Replace(raw, []byte(`<meta name="api-base" content="" />`),
+		[]byte(`<meta name="api-base" content="`+html.EscapeString(c.api)+`" />`), 1)
+	raw = bytes.Replace(raw, []byte(`<meta name="platform-api" content="/api/platform" />`),
+		[]byte(`<meta name="platform-api" content="`+html.EscapeString(platformAPI)+`" />`), 1)
+	if c.meta != "" {
+		raw = bytes.Replace(raw, []byte(`<meta name="hl-config" content="{}" />`), []byte(`<meta name="hl-config" content="`+c.meta+`" />`), 1)
+	}
+	if c.mark != "" {
+		raw = bytes.Replace(raw, []byte(`<link rel="icon" href="./logo.svg" type="image/svg+xml" />`),
+			[]byte(`<link rel="icon" href="`+html.EscapeString(c.mark)+`" />`), 1)
+	}
+	if c.name != "" {
+		name := html.EscapeString(c.name)
+		raw = bytes.Replace(raw, []byte(`<meta name="apple-mobile-web-app-title" content="harnessly" />`),
+			[]byte(`<meta name="apple-mobile-web-app-title" content="`+name+`" />`), 1)
+		raw = bytes.Replace(raw, []byte(`<title>harnessly</title>`), []byte(`<title>`+name+`</title>`), 1)
+	}
+	return raw, nil
 }

@@ -94,10 +94,13 @@ export interface IDocDetailResponse {
   threads: IDocThread[];
 }
 
-/** One version of a document: the portal keeps every publish of a slug as a commit. */
+/** One version of a document: every publish of a slug, a commit in a git-backed portal or a version in the artifacts service. */
 export interface IDocVersion {
   /** 1 for the first publish; the current version has the largest number. */
   n: number;
+  /** The artifacts service's opaque id; absent from a git-backed portal, whose id is `sha`. */
+  id?: string;
+  /** The commit hash; the artifacts service repeats its id here. */
   sha: string;
   createdAt: string;
   /** Who published it, as the portal records it (an email, a runtime name); null if unknown. */
