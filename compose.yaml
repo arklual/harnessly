@@ -38,6 +38,9 @@ services:
     pull_policy: ${HARNESSLY_PULL_POLICY:-never}
     environment:
       RUNTIME_GATE_LISTEN: 0.0.0.0:${HARNESSLY_PORT:-8022}
+      # The right pane's browser: 8 preview slots from this port on (docs/deploy.md, "The preview without a gateway").
+      RUNTIME_PREVIEW_LISTEN: 0.0.0.0:${HARNESSLY_PREVIEW_PORT:-8023}
+      RUNTIME_PREVIEW_PUBLIC_ORIGINS: ${HARNESSLY_PREVIEW_PUBLIC_ORIGINS:-}
       RUNTIME_OWNER_NAME: ${HARNESSLY_OWNER_NAME:-}
       # Whoever opens the page first sets the password, unless INIT_PASSWORD is set: then that password signs in
       # to the setup, and only after it can the real one be chosen.
@@ -50,6 +53,7 @@ services:
       RUNTIME_ARTIFACTS_READ_TOKEN: ${ARTIFACTS_VIEWER_TOKEN:-local-artifacts-viewer-token}
     ports:
       - "127.0.0.1:${HARNESSLY_PORT:-8022}:${HARNESSLY_PORT:-8022}"
+      - "127.0.0.1:${HARNESSLY_PREVIEW_PORTS:-8023-8030}:${HARNESSLY_PREVIEW_PORTS:-8023-8030}"
       - "127.0.0.1:${BOARDS_PORT:-8081}:${BOARDS_PORT:-8081}"
       - "127.0.0.1:${ARTIFACTS_PORT:-8082}:${ARTIFACTS_PORT:-8082}"
       # The MinIO console (only listening with the minio profile); MINIO_CONSOLE_PORT moves it when 9001 is taken.

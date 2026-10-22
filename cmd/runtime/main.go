@@ -446,6 +446,12 @@ func runtimePort(cfg gate.Config) int {
 }
 
 func main() {
+	if ran, err := subcommand(os.Args[1:]); ran {
+		if err != nil {
+			fail(err)
+		}
+		return
+	}
 	cfg, err := gate.LoadConfig()
 	if err != nil {
 		fail(err)
@@ -466,12 +472,15 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 	var alone *standalone
+	standaloneSlots = nil
 	if cfg.Standalone() {
+		standaloneSlots = listenPreviewSlots(cfg.Listen, portOf(cfg.Listen))
 		if portOf(cfg.Listen) == 0 {
 			cfg.Listen = ln.Addr().String()
 		}
 		if alone, err = standaloneStart(cfg, configFileOf(cfg), port); err != nil {
 			_ = ln.Close()
+			standaloneSlots.close()
 			return err
 		}
 		defer alone.stop()
@@ -480,6 +489,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	f, err := build(cfg)
 	if err != nil {
 		_ = ln.Close()
+		standaloneSlots.close()
 		return err
 	}
 	if alone != nil {
@@ -489,7 +499,8 @@ func run(ctx context.Context, cfg gate.Config) error {
 	terms := f.terms
 	var handler http.Handler = f
 	if cfg.Standalone() {
-		handler = apiAlias(appBase(), f)
+		handler = standaloneSlots.guard(apiAlias(appBase(), f))
+		standaloneSlots.serve(ctx)
 	}
 	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, ConnContext: gate.ConnContext}
 	go f.WatchSlices(ctx)

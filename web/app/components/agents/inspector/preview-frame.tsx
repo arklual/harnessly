@@ -78,8 +78,10 @@ export type TOpenState = Extract<TPreviewState, { kind: 'open' }>;
 
 const NO_BRIDGE = t('inspector.previewFrame.noBridge');
 const COPIED_MS = 1_500;
-/** A bridge answers the ping after a load well within this; silence means the new document has none. */
+/** A bridge usually answers the ping after a load well within this; till then «Select» says it is not ready. */
 const BRIDGE_WAIT_MS = 1_500;
+/** A heavy page (a board pulling a big kit) answers late: the ping is repeated at these delays after a load. */
+const BRIDGE_PINGS_MS = [400, 1_000, 2_000, 3_500, 5_000] as const;
 
 /** A stand behind the team's sign-in: the runtime showed its wall (`asked`), and the person is signing in elsewhere (`waiting`). */
 const SIGN_IN = { none: 'none', asked: 'asked', waiting: 'waiting' } as const;
@@ -222,6 +224,13 @@ export const PreviewFrame = ({
   const anchorRef = useRef<HTMLDivElement>(null);
   const pickRef = useRef<HTMLButtonElement>(null);
   const bridgeWait = useRef<number | null>(null);
+  const bridgePings = useRef<number[]>([]);
+  /** A load happened: a hello from now on is this document's, however late it comes. */
+  const afterLoad = useRef(false);
+  const stopPings = () => {
+    for (const timer of bridgePings.current) window.clearTimeout(timer);
+    bridgePings.current = [];
+  };
   const bridgeListeners = useRef(new Set<(message: TBridgeMessage) => void>());
   const [loaded, setLoaded] = useState(false);
   const [bridged, setBridged] = useState(false);
@@ -295,10 +304,11 @@ export const PreviewFrame = ({
     if (!message) return;
     for (const listener of bridgeListeners.current) listener(message);
     if (message.type === 'tk:hello') {
-      // Only a hello after the frame's latest load proves this document has a bridge; one before it may be the last page's.
-      if (bridgeWait.current !== null) {
-        window.clearTimeout(bridgeWait.current);
+      // A hello after a load is the document's on screen, however late: a heavy board answers after the first ping.
+      if (afterLoad.current) {
+        if (bridgeWait.current !== null) window.clearTimeout(bridgeWait.current);
         bridgeWait.current = null;
+        stopPings();
         setBridged(true);
       }
       setBridgeNonce(message.nonce);
@@ -316,8 +326,10 @@ export const PreviewFrame = ({
   useEffect(() => {
     const listener = (event: MessageEvent) => onMessage(event);
     window.addEventListener('message', listener);
+    const pings = bridgePings;
     return () => {
       window.removeEventListener('message', listener);
+      for (const timer of pings.current) window.clearTimeout(timer);
       if (bridgeWait.current !== null) window.clearTimeout(bridgeWait.current);
     };
   }, []);
@@ -330,6 +342,8 @@ export const PreviewFrame = ({
    * bridge must answer the ping, or the page is treated as having none.
    */
   const frameLoaded = () => {
+    afterLoad.current = true;
+    stopPings();
     setLoaded(true);
     setPicking(false);
     setOffer(null);
@@ -341,6 +355,9 @@ export const PreviewFrame = ({
       setBridged(false);
     }, BRIDGE_WAIT_MS);
     send({ type: 'tk:ping' });
+    bridgePings.current = BRIDGE_PINGS_MS.map((delay) =>
+      window.setTimeout(() => send({ type: 'tk:ping' }), delay),
+    );
   };
 
   const startSignIn = () => {
@@ -409,7 +426,11 @@ export const PreviewFrame = ({
   useEffect(() => onHighlightRequest(previewKey, (selector) => highlight(selector)), [previewKey]);
 
   const togglePick = () => {
-    if (!bridged) return;
+    if (!bridged) {
+      // The bridge may only have been late: ask again, a hello turns «Select» on.
+      send({ type: 'tk:ping' });
+      return;
+    }
     send({ type: 'tk:pick', on: !picking });
     setPicking(!picking);
   };

@@ -30,6 +30,30 @@ func SignHS256(secret []byte, sub, aud string, ttl time.Duration) string {
 	return signing + "." + b64.EncodeToString(mac.Sum(nil))
 }
 
+// SignPayload signs fields of its own with aud, iat and exp set: valid from now for ttl. A token with an audience is
+// never a page session.
+func SignPayload(secret []byte, aud string, fields map[string]any, ttl time.Duration) string {
+	now := time.Now().Unix()
+	claims := make(map[string]any, len(fields)+3)
+	for k, v := range fields {
+		claims[k] = v
+	}
+	claims["aud"], claims["iat"], claims["exp"] = aud, now, now+int64(ttl/time.Second)
+	payload, _ := json.Marshal(claims)
+	signing := b64.EncodeToString([]byte(`{"alg":"HS256"}`)) + "." + b64.EncodeToString(payload)
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(signing))
+	return signing + "." + b64.EncodeToString(mac.Sum(nil))
+}
+
+// VerifiedAudience is the payload of a token signed with secret, valid now and naming audience; false otherwise.
+func VerifiedAudience(secret []byte, token, audience string, now time.Time) (map[string]any, bool) {
+	if VerifyHS256(secret, token, audience, now) != nil {
+		return nil, false
+	}
+	return VerifiedPayload(secret, token, now)
+}
+
 var errToken = errors.New("invalid token")
 
 // VerifyHS256 accepts a compact HS256 token signed with secret, naming audience, not expired and already valid.

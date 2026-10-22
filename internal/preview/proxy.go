@@ -48,6 +48,9 @@ type Config struct {
 	// Bridge is the page bridge's script; with none the request goes to Fallback (the previous runtime, which has it).
 	Bridge   func() ([]byte, bool)
 	Fallback http.HandlerFunc
+	// LocalOrigins: the claims come from this runtime's own slot listeners (a standalone runtime), whose slot and page
+	// origins may be plain http and carry a port, like http://localhost:8023. The fleet gateway's are always https.
+	LocalOrigins bool
 
 	// Tests: where names point, the address of a port, the CA of an https target, shorter timeouts.
 	Resolve      func(host string) Resolved
@@ -402,7 +405,7 @@ type admission struct {
 
 func (p *Proxy) admit(r *http.Request) admission {
 	token, _ := header(r, p.cfg.ClaimHeader)
-	c := VerifyClaim(token, p.cfg.Secret, p.cfg.Audience, time.Now())
+	c := verifyClaim(token, p.cfg.Secret, p.cfg.Audience, time.Now(), p.cfg.LocalOrigins)
 	if c == nil {
 		return admission{status: 401, text: locale.Pick("The preview session has expired: press \"Reload\" in the preview window", "Сессия превью устарела — нажмите «Перезагрузить» в окне превью")}
 	}

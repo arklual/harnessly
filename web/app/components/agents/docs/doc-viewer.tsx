@@ -34,7 +34,7 @@ import { plainMentions } from '@/lib/doc-mentions';
 import { ShareMenu } from '@/components/agents/docs/doc-share';
 import { DiffPanel, VersionMenu, VersionNotice } from '@/components/agents/docs/doc-versions';
 import type { TDiffState } from '@/components/agents/docs/doc-versions';
-import { currentVersion, findVersion, orderedPair, previousVersion } from '@/lib/doc-versions';
+import { currentVersion, findVersion, orderedPair, previousVersion, versionId } from '@/lib/doc-versions';
 import { isInView, placeCommentButton, placeThread } from '@/lib/doc-placement';
 import type { IBox } from '@/lib/doc-placement';
 import type {
@@ -224,7 +224,7 @@ export interface IDocViewerProps {
   slug: string;
   /** The thread to open and scroll to once the document has placed it. */
   focusThreadId?: string | null;
-  /** The version on screen (a sha); null is the current one. Its owner keeps it: the page in the address, the panel in the tab. */
+  /** The version on screen (its id, a commit hash in a git-backed portal); null is the current one. Its owner keeps it: the page in the address, the panel in the tab. */
   versionSha: string | null;
   onVersionChange: (sha: string | null) => void;
   /** The document told its title; the page names the browser tab with it, the panel its own tab. */
@@ -293,7 +293,7 @@ const DocViewer = ({
   const isBoard = detail?.doc.kind === 'board';
   const hasVersions = detail?.doc.kind === 'artifact';
 
-  // `?v=<sha>` keeps the version in the address; without it the current one is shown.
+  // `?v=<version id>` keeps the version in the address; without it the current one is shown.
   const viewedSha = versionSha;
   const viewed = findVersion(versions ?? [], viewedSha);
   const current = currentVersion(versions ?? []);
@@ -301,7 +301,7 @@ const DocViewer = ({
   const isOld = Boolean(viewed && !viewed.current);
   const versionMissing = Boolean(viewedSha && versions && !viewed);
   // A version that is not in the history is not asked for: the current page is shown with a note instead of the gateway's 404.
-  const contentVersion = viewed?.sha ?? (versions ? null : viewedSha);
+  const contentVersion = viewed ? versionId(viewed) : versions ? null : viewedSha;
   const lockedNote = (isBoard && BOARD_NOTE) || (isOld && OLD_VERSION_NOTE) || null;
 
   useEffect(() => {
@@ -473,7 +473,7 @@ const DocViewer = ({
   }, [startDraft, cancelDraft]);
 
   const pickVersion = (version: IDocVersion | null) => {
-    onVersionChange(version && !version.current ? version.sha : null);
+    onVersionChange(version && !version.current ? versionId(version) : null);
   };
 
   const openDiff = (a: IDocVersion, b: IDocVersion) => {
@@ -483,7 +483,7 @@ const DocViewer = ({
     setDiff(pair);
     setDiffState({ status: 'loading' });
     if (!slug) return;
-    fetchDocDiff(slug, pair.from.sha, pair.to.sha).then(
+    fetchDocDiff(slug, versionId(pair.from), versionId(pair.to)).then(
       (result) => token === diffTokenRef.current && setDiffState({ status: 'ok', diff: result }),
       (err: unknown) =>
         token === diffTokenRef.current &&

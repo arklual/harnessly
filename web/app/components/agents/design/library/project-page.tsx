@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, MessageSquare, Share2 } from 'lucide-react';
+import { ArrowUpCircle, ExternalLink, MessageSquare, MessageSquarePlus, Share2 } from 'lucide-react';
 import {
   BUTTON_SIZE,
   BUTTON_VARIANT,
@@ -11,12 +11,17 @@ import { BackLink, GalleryCard, GalleryGrid, Note } from '@/components/agents/de
 import { ShareButton } from '@/components/agents/design/library/share-button';
 import useDesignLink from '@/hooks/use-design-link';
 import { scopedAppPath } from '@/lib/app-path';
-import { continueDesignDialog } from '@/lib/hl-design-library-client';
+import { continueDesignDialog, upgradeDesignRelease } from '@/lib/hl-design-library-client';
 import type { ILibraryProject } from '@/lib/hl-design-library/fleet';
 import { boardClaimCaption, claimOfBoard } from '@/lib/hl-design-library/home-model';
-import { libraryThumbPath, type ILibraryBoard } from '@/lib/hl-design-library/types';
+import {
+  libraryThumbPath,
+  type ILibraryBoard,
+  type ILibraryProjectRelease,
+} from '@/lib/hl-design-library/types';
 import { OPEN_MODE, chooseOpenMode, readDeviceEnv } from '@/lib/hl-design-link';
 import { openConversation } from '@/lib/hl-open-conversation';
+import { designChatMachine, latestDesignChat } from '@/lib/new-task-machine';
 import { t } from '@/lib/i18n';
 
 interface IProjectPageProps {
@@ -29,6 +34,10 @@ interface IProjectPageProps {
 export const ProjectPage = ({ project, onBack, onOpenBoard }: IProjectPageProps) => {
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
+  /** The release the runtime answered with after "Upgrade": the listing catches up on its next poll. */
+  const [moved, setMoved] = useState<ILibraryProjectRelease | null>(null);
+  const upgradeTo = (moved ?? project.release)?.upgrade ?? null;
   const { share, openFull } = useDesignLink();
   const where = project.machineId ? { machine: project.machineId } : {};
 
@@ -56,16 +65,40 @@ export const ProjectPage = ({ project, onBack, onOpenBoard }: IProjectPageProps)
     ];
   };
 
-  const openChat = async () => {
+  const existing = latestDesignChat(project);
+
+  /** "Open in chat" returns to the latest conversation about the design; with none yet it starts one. */
+  const openChat = () => {
+    if (existing) openConversation(existing.agent.tabId, existing.machineId);
+    else void newChat();
+  };
+
+  /** "New dialog": always a fresh conversation in the design's folder, on the machine picked for new tasks. */
+  const newChat = async () => {
     setOpening(true);
     setError(null);
     try {
-      const { tabId } = await continueDesignDialog(project.machineId, project.id);
-      openConversation(tabId);
+      const machine = designChatMachine(project);
+      const { tabId } = await continueDesignDialog(machine, project.id);
+      openConversation(tabId, machine);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t('design.projectPage.chatFailed'));
     } finally {
       setOpening(false);
+    }
+  };
+
+  /** "Upgrade to release ...": only after the runtime confirms is the project shown on the new release. */
+  const upgrade = async (target: string) => {
+    setUpgrading(true);
+    setError(null);
+    try {
+      const answer = await upgradeDesignRelease(project.machineId, project.id, target);
+      if (answer.project) setMoved(answer.project);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : t('design.projectPage.upgradeFailed'));
+    } finally {
+      setUpgrading(false);
     }
   };
 
@@ -77,17 +110,39 @@ export const ProjectPage = ({ project, onBack, onOpenBoard }: IProjectPageProps)
           <h1 className="tw-dhome-title">{project.title}</h1>
         </div>
         <div className="tw-dhome-actions">
+          {upgradeTo && (
+            <TwButton
+              size={BUTTON_SIZE.md}
+              variant={BUTTON_VARIANT.ghost}
+              icon={<ArrowUpCircle />}
+              pending={upgrading}
+              onClick={() => void upgrade(upgradeTo)}
+            >
+              {t('design.projectPage.upgrade', { release: upgradeTo })}
+            </TwButton>
+          )}
           <ShareButton
             size={BUTTON_SIZE.md}
             location={{ project: project.id, board: null, full: false, ...where }}
             title={project.title}
           />
+          {existing && (
+            <TwButton
+              size={BUTTON_SIZE.md}
+              variant={BUTTON_VARIANT.ghost}
+              icon={<MessageSquarePlus />}
+              pending={opening}
+              onClick={() => void newChat()}
+            >
+              {t('design.projectPage.newDialog')}
+            </TwButton>
+          )}
           <TwButton
             size={BUTTON_SIZE.md}
             variant={BUTTON_VARIANT.secondary}
             icon={<MessageSquare />}
-            pending={opening}
-            onClick={() => void openChat()}
+            pending={opening && !existing}
+            onClick={openChat}
           >
             {t('design.projectPage.openInChat')}
           </TwButton>
@@ -95,6 +150,7 @@ export const ProjectPage = ({ project, onBack, onOpenBoard }: IProjectPageProps)
       </header>
 
       {error && <Note error>{error}</Note>}
+      {moved && <Note>{t('design.projectPage.upgraded', { release: moved.current })}</Note>}
       {project.boards.length === 0 ? (
         <div className="tw-dhome-empty">
           <strong>{t('design.projectPage.noBoards')}</strong>

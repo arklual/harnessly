@@ -26,6 +26,7 @@ import '@/styles/hl-side-chat.css';
 import '@/styles/hl-docs.css';
 import '@/styles/hl-checkpoints.css';
 import '@/styles/hl-gallery.css';
+import '@/styles/hl-timeline-items.css';
 import '@xterm/xterm/css/xterm.css';
 
 import { StrictMode, useEffect, useState, type ComponentType } from 'react';
@@ -44,6 +45,8 @@ import SignIn from '@/components/auth/sign-in';
 import useWorkspaceStore, { type IWorkspaceInitialData } from '@/hooks/use-workspace-store';
 import useConfigStore, { type IConfigInitialData } from '@/hooks/use-config-store';
 import Workspace from '@/pages/workspace';
+import PushBridge from '@/components/agents/push-bridge';
+import { captureInstallPrompt } from '@/hooks/use-install-prompt';
 import DocViewerPage from '@/pages/docs/[slug]';
 
 const Docs = DocViewerPage as unknown as ComponentType<Record<string, unknown>>;
@@ -122,9 +125,13 @@ const App = () => {
     <>
       {pathname === '/docs/[slug]' ? <Docs {...props} /> : <Shell {...props} />}
       <ThemedToaster />
+      <PushBridge />
     </>
   );
 };
+
+// The browser offers the install once and early, long before anyone opens the settings.
+captureInstallPrompt();
 
 const root = document.getElementById('root');
 if (root) {

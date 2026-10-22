@@ -17,6 +17,7 @@ import type { ILaunchChoice } from '@/types/hl-launch';
 import { keepUnansweredMachines } from '@/lib/hl-fleet-list';
 import useSharedResource from '@/hooks/use-shared-resource';
 import { t, locale } from '@/lib/i18n';
+import { prefixAppPath } from '@/lib/app-path';
 
 const SIGN_IN_RETRY_MS = [3_000, 10_000, 30_000, 60_000];
 const SIGN_IN_FAILURES_SHOWN = 3;
@@ -100,7 +101,7 @@ const agentsSource: ISharedResource<IAgentsResponse> = createSharedResource<IAge
   load: async (signal, cause): Promise<IAgentsResponse> => {
     const sample = startLatencySample({ stallAfterMs: POLL.agentsStallMs });
     try {
-      const body = await jsonRequest<IAgentsResponse>('/agents/api/platform/conversations', {
+      const body = await jsonRequest<IAgentsResponse>(prefixAppPath('/api/platform/conversations'), {
         signal,
         headers: cause === 'signal' ? FRESH_LIST_HEADERS : undefined,
       });
@@ -253,7 +254,7 @@ const useHlConversations = () => {
       options: ICreateAgentOptions = {},
     ) => {
       const launch = options.launch ? { model: options.launch.model, effort: options.launch.effort } : {};
-      const item = await jsonRequest<AgentConversation>('/agents/api/platform/conversations', {
+      const item = await jsonRequest<AgentConversation>(prefixAppPath('/api/platform/conversations'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

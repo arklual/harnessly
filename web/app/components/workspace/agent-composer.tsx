@@ -1,9 +1,11 @@
 // The prompt box under an agent conversation. Enter sends, Shift+Enter breaks the line, the round button sends or,
-// while the agent works and the field is empty, stops it. A message typed while the agent works joins its queue.
+// while the agent works and the field is empty, stops it. A message typed while the agent works joins its queue and
+// goes out at the end of the turn; ⌘↵ (Ctrl+↵) puts it into the running turn now.
 // It carries the page's composer parts: slash commands, context chips, picked elements and diff comments,
 // attachments (uploaded to the machine, their paths go into the prompt), dictation and the session's chips.
 import {
   useCallback,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -11,12 +13,14 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from 'react';
-import { Paperclip, Plus } from 'lucide-react';
+import { History, Paperclip, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import PromptEditor, { type PromptEditorHandle } from '@/components/workspace/prompt-editor';
 import ComposerSendButton, { SEND_KIND } from '@/components/agents/composer/composer-send-button';
 import AttachmentChip, { type IAttachmentChip } from '@/components/agents/composer/attachment-chip';
 import PromptQueueStack from '@/components/agents/composer/prompt-queue-stack';
+import MessageHistoryPopover from '@/components/agents/composer/message-history-popover';
+import QuickPromptBar from '@/components/agents/composer/quick-prompt-bar';
 import { ComposerSessionModel, ComposerSessionStatus } from '@/components/agents/composer-session-meta';
 import SlashCommandPopover from '@/components/agents/slash-command-popover';
 import TuiMenuMirror from '@/components/agents/tui-menu-mirror';
@@ -38,9 +42,17 @@ import useSlashCommands, { useSlashExecutor } from '@/hooks/use-slash-commands';
 import useContextPicker from '@/hooks/use-context-picker';
 import useVoiceComposer from '@/hooks/use-voice-composer';
 import useConfigStore from '@/hooks/use-config-store';
-import { enqueuePrompt } from '@/hooks/use-prompt-queue';
+import { RuntimeMachineContext } from '@/hooks/use-fleet-status';
+import { enqueuePrompt, isGoneFromQueue, steerQueuedPrompt } from '@/hooks/use-prompt-queue';
+import useIsMobileDevice from '@/hooks/use-is-mobile-device';
+import useMessageHistory from '@/hooks/use-message-history';
+import useQuickPrompts from '@/hooks/use-quick-prompts';
 import { clearInputDraft, loadInputDraft, saveInputDraft } from '@/hooks/use-web-input';
 import { dictationKeyAction } from '@/lib/dictation-intent';
+import { isMac } from '@/lib/keyboard-shortcuts';
+import { composerRoute, isSendNowKey, sendNowShortcut } from '@/lib/hl-send-shortcut';
+import { takePendingFirstCommand } from '@/lib/hl-pending-command';
+import { historyText, NOT_RECALLING, stepRecall, type IRecall } from '@/lib/hl-message-history';
 import { appendContextBlock } from '@/lib/hl-context-chips';
 import { appendAnnotations } from '@/lib/hl-annotation-format';
 import { commentPlaceholder, composeAnnotationComment } from '@/lib/hl-annotation-composer';
@@ -54,6 +66,8 @@ import { agents } from '@/runtime/endpoints';
 import { t } from '@/lib/i18n';
 
 const MAX_ATTACHMENTS = 20;
+/** How long the first slash command of a new conversation waits for the agent to start before the person is told. */
+const FIRST_COMMAND_WAIT_MS = 60_000;
 
 interface IAttachment extends IAttachmentChip {
   /** The file's path on the machine once uploaded. */
@@ -94,6 +108,8 @@ interface IAgentComposerProps {
   working: boolean;
   /** The agent is not running: nothing may be typed into the bare shell of its tab. */
   stopped?: boolean;
+  /** The agent is up and takes a message (not starting, not working, not asking): the first slash command runs then. */
+  ready?: boolean;
   /** Folder the agent works in: project commands and files are looked up from it. */
   cwd: string | null;
   machineId?: string;
@@ -109,6 +125,7 @@ export default function AgentComposer({
   provider,
   working,
   stopped = false,
+  ready = false,
   cwd,
   machineId,
   onSent,
@@ -116,11 +133,19 @@ export default function AgentComposer({
 }: IAgentComposerProps) {
   const [value, setValue] = useState(() => loadInputDraft(tabId));
   const [sending, setSending] = useState(false);
+  const [firstCommand, setFirstCommand] = useState<string | null>(null);
+  // The shell keys a stored first command by the machine of the conversation it opened.
+  const runtimeMachine = useContext(RuntimeMachineContext);
   const [focusedOnce, setFocusedOnce] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [attachments, setAttachments] = useState<IAttachment[]>([]);
   const [viewing, setViewing] = useState<IAttachmentView | null>(null);
   const editor = useRef<PromptEditorHandle | null>(null);
+  const plusAnchor = useRef<HTMLSpanElement | null>(null);
+  const recall = useRef<IRecall>(NOT_RECALLING);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const history = useMessageHistory(workspaceId);
+  const quickPrompts = useQuickPrompts();
   const fileInput = useRef<HTMLInputElement | null>(null);
   const uploads = useRef(new Map<string, Promise<string>>());
   const annotations = useAnnotations(tabId);
@@ -174,6 +199,35 @@ export default function AgentComposer({
   }, [executor.execute]);
   const contextPicker = useContextPicker({ value, setValue: setValueAndFocus, cwd });
 
+  // The shell stored the first line of a new conversation when it was a slash command; it shows in the field now and
+  // runs once the agent is ready, so the command does not land in a terminal that is still starting.
+  useEffect(() => {
+    const line = takePendingFirstCommand(runtimeMachine, tabId);
+    if (!line) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the command is taken out of session storage once per tab
+    setValue(line);
+    setFirstCommand(line);
+  }, [runtimeMachine, tabId]);
+  useEffect(() => {
+    if (!firstCommand) return;
+    const timer = setTimeout(() => {
+      setFirstCommand(null);
+      toast.info(t('workspace.agentComposer.firstCommandWaiting'));
+    }, FIRST_COMMAND_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [firstCommand]);
+  useEffect(() => {
+    if (!firstCommand || !ready || executor.running) return;
+    const line = firstCommand;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- runs once the agent reports ready, an external event
+    setFirstCommand(null);
+    void executor.execute(line).then((sent) => {
+      if (!sent) return;
+      setValue((current) => (current.trim() === line ? '' : current));
+      clearInputDraft(tabId);
+    });
+  }, [executor, firstCommand, ready, tabId]);
+
   const addFiles = useCallback(
     (files: File[]) => {
       const room = MAX_ATTACHMENTS - attachments.length;
@@ -223,7 +277,8 @@ export default function AgentComposer({
     for (const comment of sentDiff) removeDiffComment(tabId, comment.id);
   };
 
-  const submit = async (override?: string) => {
+  /** `now` is ⌘↵ / Ctrl+↵: to a working agent the message goes into its running turn instead of the end of it. */
+  const submit = async (override?: string, now = false) => {
     const typed = override ?? value;
     const trimmed = typed.trim();
     if (sending || executor.running || stopped) return;
@@ -257,19 +312,39 @@ export default function AgentComposer({
         composed.annotations,
       );
       if (paths.length) text = [text.trim(), paths.map(promptPath).join(' ')].filter(Boolean).join('\n\n');
-      if (working) {
-        await enqueuePrompt(
+      const route = composerRoute({
+        queueOnServer: true,
+        slashLine: false,
+        holding: false,
+        resumable: false,
+        agentWorking: working,
+        now,
+      });
+      if (route !== 'direct') {
+        const { item, delivery } = await enqueuePrompt(
           machineId,
           tabId,
           text,
           attachments.filter((a) => a.kind === 'image').map((a) => a.thumbnail),
           async () => ({ text, images: [] }),
+          { now: route === 'send-now' },
         );
+        // The message is queued either way. The runtime already typed it into the turn when it could; otherwise it is
+        // steered in now, and a message the agent took meanwhile (the queue drained on its own) is a success.
+        if (route === 'send-now' && item && delivery !== 'steered')
+          await steerQueuedPrompt(machineId, tabId, item.id).catch((failure: unknown) => {
+            if (!isGoneFromQueue(failure))
+              toast.error(t('workspace.agentComposer.sendNowFailed'), {
+                description: failure instanceof Error ? failure.message : undefined,
+              });
+          });
       } else {
         onSent?.(text);
         await agents.send(tabId, text, newId());
       }
       forgetSent(composed.annotations, diffComments);
+      void history.addHistory(historyText(typed));
+      recall.current = NOT_RECALLING;
       if (contextPicker.chips.length) contextPicker.clearChips();
       setAttachments([]);
       setValue('');
@@ -301,6 +376,18 @@ export default function AgentComposer({
       icon: <Paperclip />,
       onSelect: () => fileInput.current?.click(),
     },
+    ...(workspaceId
+      ? [
+          {
+            kind: TW_MENU_KIND.action,
+            id: 'history',
+            label: t('workspace.agentComposer.history'),
+            icon: <History />,
+            // The menu hands focus back to its button as it closes; the popover takes it after that.
+            onSelect: () => setTimeout(() => setHistoryOpen(true), 0),
+          } satisfies TTwMenuEntry,
+        ]
+      : []),
     { kind: TW_MENU_KIND.separator, id: 'sep-voice' },
     ...voiceMenu.entries,
   ];
@@ -324,6 +411,27 @@ export default function AgentComposer({
         return;
       }
     }
+    if (
+      (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
+      !event.nativeEvent.isComposing &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey
+    ) {
+      const step = stepRecall(
+        history.entries,
+        recall.current,
+        event.key === 'ArrowUp' ? 'up' : 'down',
+        value,
+      );
+      recall.current = step.recall;
+      if (step.value !== null) {
+        event.preventDefault();
+        setValueAndFocus(step.value);
+        return;
+      }
+    }
     if (event.key === 'Escape' && working && !value.trim()) {
       event.preventDefault();
       stop();
@@ -331,7 +439,7 @@ export default function AgentComposer({
     }
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      void submit();
+      void submit(undefined, isSendNowKey(event));
     }
   };
 
@@ -350,10 +458,17 @@ export default function AgentComposer({
   const hasContent =
     value.trim().length > 0 || attachments.length > 0 || annotations.length > 0 || diffComments.length > 0;
   const showStop = working && !hasContent;
+  const mobileDevice = useIsMobileDevice();
+  // A phone has no ⌘↵: Enter there breaks the line, the round button queues.
+  const sendNowHint = working && !stopped && !mobileDevice ? sendNowShortcut(isMac) : null;
   const placeholder = stopped
     ? t('workspace.agentComposer.stoppedPlaceholder')
     : (commentPlaceholder(annotations) ??
-      (working ? t('workspace.agentComposer.queuedPlaceholder') : t('workspace.agentComposer.placeholder')));
+      (sendNowHint
+        ? t('workspace.agentComposer.queuedShortcutPlaceholder', { shortcut: sendNowHint })
+        : working
+          ? t('workspace.agentComposer.queuedPlaceholder')
+          : t('workspace.agentComposer.placeholder')));
 
   return (
     <div className="tw-agent-composer relative" data-testid="composer">
@@ -423,7 +538,7 @@ export default function AgentComposer({
           <div className="tw-cbar">
             <div className="tw-cbar-start">
               {voiceMenu.dialog}
-              <span className="tw-cplus-anchor" onPointerDown={voiceMenu.refresh}>
+              <span className="tw-cplus-anchor" ref={plusAnchor} onPointerDown={voiceMenu.refresh}>
                 <TwMenuButton
                   items={plusItems}
                   menuLabel={t('workspace.agentComposer.addMenu')}
@@ -452,12 +567,32 @@ export default function AgentComposer({
                 disabled={!showStop && (!hasContent || stopped)}
                 busy={sending}
                 codex={provider === 'codex'}
+                title={
+                  sendNowHint && !showStop
+                    ? t('workspace.agentComposer.sendShortcutTitle', { shortcut: sendNowHint })
+                    : undefined
+                }
                 onClick={showStop ? stop : () => void submit()}
               />
             </div>
           </div>
         )}
       </div>
+      {!stopped && !dictation.phase && <QuickPromptBar prompts={quickPrompts} onSelect={setValueAndFocus} />}
+      <MessageHistoryPopover
+        open={historyOpen}
+        onClose={() => {
+          setHistoryOpen(false);
+          editor.current?.focus();
+        }}
+        anchorRef={plusAnchor}
+        entries={history.entries}
+        isLoading={history.isLoading}
+        isError={history.isError}
+        onFetch={history.fetchHistory}
+        onSelect={setValueAndFocus}
+        onDelete={(id) => void history.deleteHistory(id)}
+      />
       {executor.mirror && (
         <TuiMenuMirror
           mirror={executor.mirror}

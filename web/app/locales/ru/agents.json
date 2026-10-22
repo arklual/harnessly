@@ -392,6 +392,7 @@
   "agents.slashCommandPopover.more": "ещё {count} — уточните запрос",
   "agents.slashCommandPopover.retry": "Повторить",
   "agents.slashCommandPopover.skills": "Навыки {provider}",
+  "agents.textAnnotationChipRow.commentLabel": "Комментарий к {label}",
   "agents.textAnnotationChipRow.listLabel": "Фрагменты из ленты",
   "agents.textAnnotationChipRow.remove": "Убрать из сообщения",
   "agents.textAnnotationChipRow.removeLabel": "Убрать {label} из сообщения",

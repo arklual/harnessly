@@ -43,6 +43,8 @@ export const useTimelineScrollAnchor = (
   toEnd: () => void,
   sessionKey: string | null,
   version: unknown,
+  /** False while the scroller is not on the page (a skeleton stands in); the hook attaches when it appears. */
+  ready = true,
 ) => {
   const anchor = useRef<IScrollAnchor>({ atEnd: true, entryId: null, offset: 0 });
   const correctRef = useRef<() => void>(() => {});
@@ -156,7 +158,7 @@ export const useTimelineScrollAnchor = (
       scroller.removeEventListener('scroll', onScroll);
       for (const gesture of GESTURES) scroller.removeEventListener(gesture, onGesture);
     };
-  }, [scrollRef, contentRef]);
+  }, [scrollRef, contentRef, ready]);
 
   // A render that changed the entries puts the reader back before the frame is painted.
   useLayoutEffect(() => {

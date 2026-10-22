@@ -46,6 +46,7 @@ type previewSet struct {
 	scanner *ports.Scanner
 	logs    *devtools.ServerLogs
 	proxy   *preview.Proxy
+	cfg     preview.Config
 	search  ports.Searcher
 }
 
@@ -66,6 +67,11 @@ func previewHidden(d deps) func() map[int]bool {
 		}
 		for _, addr := range []string{os.Getenv("RUNTIME_GATE_LISTEN"), previewUpstream(d)} {
 			if p := portOf(addr); p > 0 {
+				hidden[p] = true
+			}
+		}
+		if d.Standalone {
+			for _, p := range standaloneSlots.hidden() {
 				hidden[p] = true
 			}
 		}
@@ -156,9 +162,19 @@ func previewOf(d deps) *previewSet {
 	if up := previewUpstream(d); up != "" {
 		cfg.Fallback = previewOldRuntime(up)
 	}
+	if d.Standalone {
+		// A standalone runtime signs its own claims for its own slots, which are plain http on a local host.
+		cfg.LocalOrigins = true
+		if os.Getenv("RUNTIME_PREVIEW_BRIDGE_FILE") == "" {
+			cfg.Bridge = previewBridgeFromWeb()
+		}
+	}
 	s := &previewSet{store: store, api: api, mcp: &devtools.MCP{API: api, Server: env("RUNTIME_MCP_SERVER", "harnessly")}, scanner: scanner,
-		logs: logs, proxy: preview.New(cfg)}
+		logs: logs, proxy: preview.New(cfg), cfg: cfg}
 	previewSets[d.Old] = s
+	if d.Standalone {
+		standaloneSlots.attach(s, secret)
+	}
 	return s
 }
 
@@ -442,6 +458,10 @@ func previewRoutes(d deps) []gate.JSONRoute {
 				Matches []ports.Match `json:"matches"`
 			}{matches}, previewNoStore())
 		}),
+	}
+	if d.Standalone {
+		// Behind the fleet gateway the gateway answers this itself; standalone, the runtime's own slots do.
+		routes = append(routes, previewOpenRoute(d))
 	}
 	return routes
 }

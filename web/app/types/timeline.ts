@@ -199,9 +199,11 @@ export interface ITimelineAskUserQuestion extends IBase {
 
 export interface ITimelineErrorNotice extends IBase {
   type: 'error-notice';
-  severity: 'error' | 'warning' | 'info' | string;
+  severity: 'error' | 'warning' | 'stream-error' | 'guardian-warning' | 'info' | string;
   message: string;
   errorCode?: string;
+  /** A stream error the runtime retries: where the retry stands (`2/5`). */
+  retryStatus?: string;
 }
 
 export interface ITimelineContextCompacted extends IBase {
@@ -229,8 +231,8 @@ export interface ITimelineApprovalRequest extends IBase {
   callId: string;
   command?: string;
   cwd?: string;
-  patches?: unknown;
-  permissions?: unknown;
+  patches?: { path: string; status?: string }[];
+  permissions?: string[];
   status: TToolStatus | string;
 }
 
@@ -245,6 +247,7 @@ export interface ITimelineWebSearch extends IBase {
   callId: string;
   query?: string;
   resultsSummary?: string;
+  resultCount?: number;
   status: TToolStatus;
 }
 
@@ -271,6 +274,10 @@ export interface ITimelineExecCommandStream extends IBase {
   type: 'exec-command-stream';
   callId?: string;
   command: string;
+  /** The command with the shell wrapper stripped, when the runtime could tell. */
+  parsedCommand?: string;
+  durationMs?: number | null;
+  truncated?: boolean;
   cwd?: string;
   stdout?: string;
   stderr?: string;
@@ -311,6 +318,8 @@ export interface IPendingMessageOptions {
   queued?: boolean;
   launch?: boolean;
   attachmentPlaceholder?: string;
+  /** Skip the row when the transcript already holds this message stamped at or after this time. */
+  recordedSince?: number;
 }
 
 /** A slash command typed on the page, shown at once and replaced by the transcript's entry later. */

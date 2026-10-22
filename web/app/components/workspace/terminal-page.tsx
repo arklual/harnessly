@@ -12,8 +12,10 @@ import { collectPanes, useLayoutStore } from '@/hooks/use-layout';
 import useTabStore from '@/hooks/use-tab-store';
 import useTimeline from '@/hooks/use-timeline';
 import usePendingLaunch from '@/hooks/use-pending-launch';
+import useQueueHandoff from '@/hooks/use-queue-handoff';
 import useTimelineSnapshotStore from '@/hooks/use-timeline-snapshot-store';
 import { pendingUserEntry } from '@/lib/timeline-launch';
+import { isRecordedSince } from '@/lib/timeline-pending';
 import { sessionMetaFrom } from '@/lib/session-meta';
 import { parseAppLocation } from '@/lib/hl-conversation-url';
 import { appFetch } from '@/lib/app-path';
@@ -22,15 +24,23 @@ import { TerminalView } from '@/terminal/terminal-view';
 import type { ITab } from '@/types/terminal';
 import type { IPendingMessageOptions, ITimelineEntry, ITimelineUserMessage } from '@/types/timeline';
 
+/** A message the composer put up and the time from which the transcript's record of it counts (else: around its own time). */
+interface IPendingRow {
+  entry: ITimelineUserMessage;
+  since: number | null;
+}
+
 /** A pending message counts as recorded once the transcript has a message with its text from around its time on. */
-const recorded = (pending: ITimelineUserMessage, entries: readonly ITimelineEntry[]) =>
-  entries.some(
-    (e) =>
-      e.type === 'user-message' &&
-      !e.pending &&
-      e.text.trim() === pending.text.trim() &&
-      e.timestamp >= pending.timestamp - 10_000,
-  );
+const recorded = ({ entry, since }: IPendingRow, entries: readonly ITimelineEntry[]) =>
+  since !== null
+    ? isRecordedSince(entries, entry, since)
+    : entries.some(
+        (e) =>
+          e.type === 'user-message' &&
+          !e.pending &&
+          e.text.trim() === entry.text.trim() &&
+          e.timestamp >= entry.timestamp - 10_000,
+      );
 
 const AgentConversation = ({ tab, workspaceId }: { tab: ITab; workspaceId: string }) => {
   const provider = tab.panelType === 'codex-cli' ? 'codex' : 'claude';
@@ -42,17 +52,23 @@ const AgentConversation = ({ tab, workspaceId }: { tab: ITab; workspaceId: strin
   });
   const cliState = status?.cliState ?? 'idle';
   const working = cliState === 'busy';
-  const [pending, setPending] = useState<ITimelineUserMessage[]>([]);
+  const [pending, setPending] = useState<IPendingRow[]>([]);
   const [terminalOpen, setTerminalOpen] = useState(false);
 
   const addPending = useCallback((text: string, options?: IPendingMessageOptions) => {
     const entry = pendingUserEntry(text, options);
     if (!entry) return '';
-    setPending((list) => [...list, entry]);
+    setPending((list) => [...list, { entry, since: options?.recordedSince ?? null }]);
     return entry.id;
   }, []);
+  const removePending = useCallback(
+    (id: string) => setPending((list) => list.filter((row) => row.entry.id !== id)),
+    [],
+  );
+  // A message this page queued and the runtime took out of the queue for the agent shows as a row until the transcript has it.
+  useQueueHandoff(tab.id, undefined, addPending, removePending);
 
-  const shownPending = pending.filter((p) => !recorded(p, timeline.entries));
+  const shownPending = pending.filter((row) => !recorded(row, timeline.entries)).map((row) => row.entry);
   const entries = useMemo(
     () => (shownPending.length ? [...timeline.entries, ...shownPending] : timeline.entries),
     [timeline.entries, shownPending],
@@ -151,6 +167,10 @@ const AgentConversation = ({ tab, workspaceId }: { tab: ITab; workspaceId: strin
           provider={provider}
           working={working}
           stopped={cliState === 'inactive' && !launch}
+          ready={
+            !status?.launchingSince &&
+            (status?.cliState === 'idle' || status?.cliState === 'ready-for-review')
+          }
           cwd={tab.cwd ?? null}
           onSent={(text) => {
             if (!working) addPending(text);

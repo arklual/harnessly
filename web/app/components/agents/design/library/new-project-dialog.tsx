@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { BUTTON_SIZE, BUTTON_VARIANT, DIALOG_SIZE, TwButton, TwDialog } from '@/components/agents/ui';
 import { Note } from '@/components/agents/design/library/library-parts';
 import { currentMachineId } from '@/lib/app-path';
+import { newTaskMachine } from '@/lib/new-task-machine';
 import { DesignRequestError, createDesignProject } from '@/lib/hl-design-library-client';
 import { LIBRARY_LIMITS } from '@/lib/hl-design-library/types';
 import { t } from '@/lib/i18n';
@@ -12,7 +13,7 @@ interface INewProjectDialogProps {
   open: boolean;
   onClose: () => void;
   /** The project exists and its chat runs. */
-  onCreated: (created: { id: string; tabId: string }) => void;
+  onCreated: (created: { id: string; tabId: string; machineId: string | undefined }) => void;
   /** The project exists but its chat did not start: the person can still open it. */
   onCreatedWithoutChat: (id: string) => void;
 }
@@ -44,7 +45,9 @@ export const NewProjectDialog = ({
     setPending(true);
     setError(null);
     try {
-      const created = await createDesignProject(currentMachineId(), { title, brief });
+      // A new project starts on the machine picked for new tasks.
+      const machine = newTaskMachine() ?? currentMachineId();
+      const created = { ...(await createDesignProject(machine, { title, brief })), machineId: machine };
       setTitle('');
       setBrief('');
       onCreated(created);

@@ -65,9 +65,9 @@ const LaunchComposer = ({ tabId, machineId, provider }: ILaunchComposerProps) =>
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hands the held messages over once the tab exists
     setHeld([]);
     for (const text of sending)
-      void enqueuePrompt(machineId, tabId, text, [], async () => ({ text, images: [] })).catch(() =>
-        setValue((current) => (current.trim() ? `${current}\n${text}` : text)),
-      );
+      void enqueuePrompt(machineId, tabId, text, [], async () => ({ text, images: [] }), {
+        handoff: false,
+      }).catch(() => setValue((current) => (current.trim() ? `${current}\n${text}` : text)));
   }, [assigned, held, machineId, tabId]);
 
   const send = () => {
@@ -75,9 +75,9 @@ const LaunchComposer = ({ tabId, machineId, provider }: ILaunchComposerProps) =>
     if (!text || !queues) return;
     change('');
     if (assigned)
-      void enqueuePrompt(machineId, tabId, text, [], async () => ({ text, images: [] })).catch(() =>
-        setValue(text),
-      );
+      void enqueuePrompt(machineId, tabId, text, [], async () => ({ text, images: [] }), {
+        handoff: false,
+      }).catch(() => setValue(text));
     else setHeld((current) => [...current, text]);
   };
 

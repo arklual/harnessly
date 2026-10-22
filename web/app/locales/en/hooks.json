@@ -91,5 +91,12 @@
   "hooks.useHlConversations.signInFailed": "Chat sign-in: {reason}",
   "hooks.useHlConversations.serviceUnavailable": "the service is not available yet",
   "hooks.useHlConversations.historyFailed": "Could not load the history",
-  "hooks.useVoiceInput.noEngine": "Voice input is not available in this browser"
+  "hooks.useVoiceInput.noEngine": "Voice input is not available in this browser",
+  "hooks.useWebPush.workerHangs": "the app's service worker did not start within 15 seconds",
+  "hooks.useWebPush.keyHangs": "the server did not return the notification key within 15 seconds",
+  "hooks.useWebPush.subscribeHangs": "the device did not answer the subscription within 15 seconds",
+  "hooks.useWebPush.registerHangs": "the server did not answer the subscription within 15 seconds",
+  "hooks.useWebPush.notAllowed": "the browser did not allow the subscription ({reason})",
+  "hooks.useWebPush.staleSubscription": "an old subscription was left on this device - press Enable again",
+  "hooks.useWebPush.stillLoading": "the app was still loading - press Enable again"
 }

@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { File as FileIcon, GitPullRequest, MessageSquare, Ticket } from 'lucide-react';
 import { LISTBOX_ACTION, useTwListboxNav, type ITwOption } from '@/components/agents/ui';
-import { appFetch } from '@/lib/app-path';
+import { appFetch, prefixAppPath } from '@/lib/app-path';
 import { jsonRequest } from '@/lib/conversation-loading';
 import type { IIssueMeta, TMrState } from '@/lib/link-meta';
 import { parseAtQuery, removeAtMention } from '@/lib/hl-context-query';
@@ -149,7 +149,7 @@ const useContextPicker = ({
   useEffect(() => {
     if (!open || recentConversations || recent !== null || q.length > 0) return;
     let cancelled = false;
-    jsonRequest<{ conversations: AgentConversation[] }>('/agents/api/platform/conversations')
+    jsonRequest<{ conversations: AgentConversation[] }>(prefixAppPath('/api/platform/conversations'))
       .then((body) => {
         if (cancelled) return;
         const items = body.conversations

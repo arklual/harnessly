@@ -1,6 +1,8 @@
 package preview
 
 import (
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -90,4 +92,11 @@ func bridgeTag(parentOrigin, cookieTag string, devtoolsJSON string, hasDevtools 
 		conditions = ` data-devtools="` + escapeHTML(devtoolsJSON) + `"`
 	}
 	return `<script src="` + BridgePath + `" data-parent="` + escapeHTML(parentOrigin) + `" data-tag="` + escapeHTML(cookieTag) + `"` + conditions + `></script>`
+}
+
+// WritePage answers with one of the runtime's own status pages: a slot listener's refusals look like the proxy's.
+func WritePage(w http.ResponseWriter, status int, text string) {
+	writePageHeaders(w.Header())
+	w.WriteHeader(status)
+	_, _ = io.WriteString(w, statusPage(status, text))
 }

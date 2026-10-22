@@ -181,7 +181,7 @@
   "inspector.previewIsland.show": "Show",
   "inspector.previewIsland.searching": "Looking for dev servers",
   "inspector.previewIsland.noServers": "No dev servers in sight. When the agent starts a server, it shows up here and opens by itself.",
-  "inspector.previewFrame.noBridge": "The page didn't allow the bridge to connect (CSP)",
+  "inspector.previewFrame.noBridge": "Selection hasn't connected to the page yet — press again or reload the page",
   "inspector.previewFrame.pageLoading": "The page is loading",
   "inspector.previewFrame.commentPlaceholder": "What should change?",
   "inspector.previewFrame.commentLabel": "Comment on the element",

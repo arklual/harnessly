@@ -5,31 +5,40 @@ export const MAX_QUOTE = 1200;
 export const MAX_CONTEXT = 120;
 const MAX_LABEL_QUOTE = 40;
 
-export const TEXT_INTENTS = ['ask', 'add', 'fix'] as const;
+/**
+ * A fragment is annotated with its own comment: `note`. `ask`, `add` and `fix` are the choices of the first version,
+ * kept so sent messages still read back.
+ */
+export const TEXT_INTENTS = ['note', 'ask', 'add', 'fix'] as const;
 export type TTextIntent = (typeof TEXT_INTENTS)[number];
+export const ANNOTATE: TTextIntent = 'note';
 
 export const TEXT_ROLES = ['agent', 'user'] as const;
 export type TTextRole = (typeof TEXT_ROLES)[number];
 
 export const INTENT_LABELS: Record<TTextIntent, string> = {
+  note: t('lib.hlTextAnnotation.note'),
   ask: t('lib.hlTextAnnotation.ask'),
   add: t('lib.hlTextAnnotation.add'),
   fix: t('lib.hlTextAnnotation.fix'),
 };
 
 export const INTENT_CARD_LABELS: Record<TTextIntent, string> = {
+  note: t('lib.hlTextAnnotation.noteCard'),
   ask: t('lib.hlTextAnnotation.askCard'),
   add: t('lib.hlTextAnnotation.addCard'),
   fix: t('lib.hlTextAnnotation.fixCard'),
 };
 
 export const INTENT_PLACEHOLDERS: Record<TTextIntent, string> = {
+  note: t('lib.hlTextAnnotation.notePlaceholder'),
   ask: t('lib.hlTextAnnotation.askPlaceholder'),
   add: t('lib.hlTextAnnotation.addPlaceholder'),
   fix: t('lib.hlTextAnnotation.fixPlaceholder'),
 };
 
 const INTENT_DESCRIPTIONS: Record<TTextIntent, string> = {
+  note: 'comment on this fragment',
   ask: 'question about this fragment',
   add: 'addition to this fragment',
   fix: 'correction of this fragment',
@@ -166,14 +175,14 @@ export const formatTextAnnotation = ({ n, intent, comment, quote, source }: ITex
   return stripControlChars(lines.join('\n'));
 };
 
-/** The chip text, the same in the composer and in the sent message: `#1 Ask · «the cache lives five minutes»`. */
+/** The chip text, the same in the composer and in the sent message: `#1 Question · «the cache lives five minutes»`. */
 export const textAnnotationLabel = ({
   n,
   intent,
   quote,
 }: Pick<ITextAnnotation, 'n' | 'intent' | 'quote'>): string => {
   const short = clip(oneLine(quote.quote), MAX_LABEL_QUOTE);
-  return `#${n} ${INTENT_LABELS[intent]} · «${short}»`;
+  return `#${n} ${INTENT_CARD_LABELS[intent]} · «${short}»`;
 };
 
 const isIntent = (value: string | undefined): value is TTextIntent =>

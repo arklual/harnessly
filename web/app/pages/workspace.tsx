@@ -111,6 +111,8 @@ import useActiveAgentTab from '@/hooks/use-active-agent-tab';
 import ColumnResizer from '@/components/agents/column-resizer';
 import AgentNotifier from '@/components/agents/agent-notifier';
 import { OPEN_CONVERSATION_EVENT } from '@/hooks/use-web-push';
+import { setNewTaskMachine, useNewTaskMachine } from '@/lib/new-task-machine';
+import type { IOpenConversationRequest } from '@/lib/hl-open-conversation';
 import {
   boardAddressPort,
   OPEN_BOARD_EVENT,
@@ -233,8 +235,12 @@ const WorkspaceShell = ({
   const { conversations, defaultMachineId, chatReady, setError, refresh, upsertChat } = data;
   useSpeedMarks({ owner, listReady: !data.loading, defaultMachineId });
 
-  const [chosenMachineId, setChosenMachineId] = useState<string>();
-  const machineId = chosenMachineId || defaultMachineId;
+  // The pick outlives a reload; a machine that left the fleet or is down gives way to the home one.
+  const chosenMachineId = useNewTaskMachine();
+  const fleetForChoice = useHlMachines().data?.machines;
+  const chosenUsable =
+    !!chosenMachineId && !!fleetForChoice?.some((m) => m.id === chosenMachineId && m.available !== false);
+  const machineId = (chosenUsable ? chosenMachineId : null) || defaultMachineId;
   const machineWorkspaces = useMemo(
     () => data.workspaces.filter((workspace) => !workspace.machineId || workspace.machineId === machineId),
     [data.workspaces, machineId],
@@ -511,12 +517,22 @@ const WorkspaceShell = ({
   }, [pendingJumpAt, jumpSnapshotKey]);
 
   // A notification can ask for a conversation before the list has loaded; it waits here until it does.
-  const openTab = useCallback((tabId: string) => {
+  const openTab = useCallback((tabId: string, onMachine?: string) => {
     const ref = agentRefOfTab(tabId);
-    if (ref) setPending({ ref, until: Date.now() + OPEN_WAIT_MS });
+    if (ref) {
+      setPending({
+        ref: onMachine && ref.kind === 'agent' ? { ...ref, machineId: onMachine } : ref,
+        until: Date.now() + OPEN_WAIT_MS,
+      });
+    }
   }, []);
   useEffect(() => {
-    const open = (event: Event) => openTab((event as CustomEvent<string>).detail);
+    // A push names the tab alone; the shell's own requests may name its machine too.
+    const open = (event: Event) => {
+      const detail = (event as CustomEvent<string | IOpenConversationRequest>).detail;
+      if (typeof detail === 'string') openTab(detail);
+      else openTab(detail.tabId, detail.machineId);
+    };
     window.addEventListener(OPEN_CONVERSATION_EVENT, open);
     return () => window.removeEventListener(OPEN_CONVERSATION_EVENT, open);
   }, [openTab]);
@@ -1286,7 +1302,7 @@ const WorkspaceShell = ({
       conversations={conversations}
       model={model}
       selectedMachineId={machineId}
-      onSelectMachine={setChosenMachineId}
+      onSelectMachine={setNewTaskMachine}
       loading={data.loading}
       organizerReady={sidebar.organizer !== null}
       organizerError={sidebar.organizerError}

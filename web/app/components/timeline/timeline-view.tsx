@@ -1,17 +1,23 @@
 // The conversation of an agent tab: the person's messages, the agent's turns (one summary line, its replies, the
 // work folded in between) and lone rows, kept pinned to the bottom while new entries arrive; older entries load at
 // the top on demand.
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronUp, MessageSquareDashed } from 'lucide-react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ChevronUp, MessageSquareDashed, RefreshCw } from 'lucide-react';
 import { useStickToBottom } from 'use-stick-to-bottom';
+import TextSelectionAnnotator from '@/components/agents/text-selection-annotator';
+import BackgroundWorkLine from '@/components/timeline/background-work-line';
 import { TurnRow } from '@/components/timeline/turn-row';
+import TaskChecklist from '@/components/timeline/task-checklist';
 import UserMessageItem from '@/components/timeline/user-message-item';
 import { TimelineItemBody } from '@/components/timeline/timeline-entry';
 import ScrollToBottomButton from '@/components/timeline/scroll-to-bottom-button';
 import { TimelineScrollContext } from '@/components/timeline/timeline-scroll-context';
+import { trackFreshRows } from '@/lib/fresh-rows';
 import { groupTimelineItems } from '@/lib/timeline-grouping';
 import { createTurnDeriver, withPendingTurn, type TTurnRow } from '@/lib/timeline-turns';
 import { isLivePhase, type ITurnStatus } from '@/lib/turn-phase';
+import { useTimelineScrollAnchor } from '@/hooks/use-timeline-scroll-anchor';
+import { useTimelineScrollRetention } from '@/hooks/use-timeline-scroll-retention';
 import { useTurnPhase } from '@/hooks/use-turn-phase';
 import type { IPendingLaunch } from '@/lib/hl-pending-launch';
 import type { ITaskItem, ITimelineEntry, TCliState } from '@/types/timeline';
@@ -19,12 +25,15 @@ import { t } from '@/lib/i18n';
 
 type TProvider = 'claude' | 'codex';
 
+const NO_FRESH: ReadonlySet<string> = new Set();
+
 const Rows = memo(function Rows({
   rows,
   provider,
   sessionName,
   tabId,
   live,
+  fresh,
   model,
   awaiting,
 }: {
@@ -33,6 +42,7 @@ const Rows = memo(function Rows({
   sessionName?: string;
   tabId?: string;
   live: ITurnStatus | null;
+  fresh: ReadonlySet<string>;
   model: string | null;
   awaiting: boolean;
 }) {
@@ -42,7 +52,12 @@ const Rows = memo(function Rows({
       {rows.map((row) => {
         if (row.kind === 'user' && row.item.type === 'entry' && row.item.entry.type === 'user-message') {
           return (
-            <div key={row.id} className="px-4 py-1.5" data-entry-id={row.id}>
+            <div
+              key={row.id}
+              className="px-4 py-1.5"
+              data-entry-id={row.id}
+              data-fresh={fresh.has(row.id) || undefined}
+            >
               <UserMessageItem entry={row.item.entry} />
             </div>
           );
@@ -50,7 +65,7 @@ const Rows = memo(function Rows({
         if (row.kind === 'turn') {
           const isLast = row === lastTurn;
           return (
-            <div key={row.id} className="px-4 py-1.5">
+            <div key={row.id} className="px-4 py-1.5" data-entry-id={row.id}>
               <TurnRow
                 turn={row.turn}
                 live={isLast ? live : null}
@@ -58,7 +73,7 @@ const Rows = memo(function Rows({
                 sessionName={sessionName}
                 tabId={tabId}
                 model={model}
-                fresh={false}
+                fresh={fresh.has(row.id)}
                 awaiting={isLast && awaiting}
                 reveal={null}
               />
@@ -66,7 +81,12 @@ const Rows = memo(function Rows({
           );
         }
         return (
-          <div key={row.id} className="px-4 py-1.5" data-entry-id={row.id}>
+          <div
+            key={row.id}
+            className="px-4 py-1.5"
+            data-entry-id={row.id}
+            data-fresh={fresh.has(row.id) || undefined}
+          >
             <TimelineItemBody item={row.item} sessionName={sessionName} tabId={tabId} provider={provider} />
           </div>
         );
@@ -102,6 +122,9 @@ interface ITimelineViewProps {
 export default function TimelineView({
   provider,
   entries,
+  tasks,
+  sessionId = null,
+  wsStatus,
   sessionName,
   tabId,
   initMeta,
@@ -130,17 +153,42 @@ export default function TimelineView({
   const derived = useMemo(() => deriveRows(groupTimelineItems(entries)), [deriveRows, entries]);
   const rows = useMemo(() => (working ? withPendingTurn(derived) : derived), [working, derived]);
   const model = typeof initMeta?.model === 'string' ? initMeta.model : null;
-  const { scrollRef, contentRef, scrollToBottom, isAtBottom } = useStickToBottom({
+  // Content that grows under a reader at the end keeps them at the end in the same frame; a spring would chase every
+  // late picture or code block for half a second and read as the feed scrolling by itself.
+  const { scrollRef, contentRef, scrollToBottom, stopScroll, isAtBottom } = useStickToBottom({
     initial: 'instant',
-    resize: 'smooth',
+    resize: 'instant',
   });
   const [loadingMore, setLoadingMore] = useState(false);
-  const holdPosition = useCallback(() => {}, []);
-  const scrollContext = useMemo(() => ({ holdPosition }), [holdPosition]);
+  // A row the person opens must not drag the view: the pinned spring is stopped before it grows.
+  const scrollContext = useMemo(() => ({ holdPosition: stopScroll }), [stopScroll]);
+  const stayAtEnd = useCallback(() => void scrollToBottom('instant'), [scrollToBottom]);
+  const shown = !isLoading && !(error && entries.length === 0);
+  const [seenRows, setSeenRows] = useState(() =>
+    trackFreshRows(
+      null,
+      sessionId,
+      rows.map((row) => row.id),
+    ),
+  );
+  const nextSeenRows = trackFreshRows(
+    seenRows,
+    sessionId,
+    rows.map((row) => row.id),
+  );
+  if (nextSeenRows !== seenRows) setSeenRows(nextSeenRows);
+  useTimelineScrollRetention(scrollRef, sessionId, stopScroll, shown && rows.length > 0);
+  useTimelineScrollAnchor(scrollRef, contentRef, stayAtEnd, sessionId, rows, shown);
 
-  useEffect(() => {
-    if (!isLoading) void scrollToBottom('instant');
-  }, [isLoading, scrollToBottom]);
+  // An opened conversation is set at its end before the first paint, so it never looks like scrolling down from the top.
+  const scrolledFor = useRef<string | null | undefined>(undefined);
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (!shown || !scroller || entries.length === 0 || scrolledFor.current === sessionId) return;
+    scroller.scrollTop = scroller.scrollHeight;
+    void scrollToBottom('instant');
+    scrolledFor.current = sessionId;
+  }, [shown, entries.length, sessionId, scrollRef, scrollToBottom]);
 
   const loadMore = async () => {
     if (!onLoadMore || loadingMore) return;
@@ -210,12 +258,14 @@ export default function TimelineView({
                 </button>
               </div>
             )}
+            {tasks && tasks.length > 0 && <TaskChecklist tasks={tasks} cliState={cliState} />}
             <Rows
               rows={rows}
               provider={provider}
               sessionName={sessionName}
               tabId={tabId}
               live={working ? status : null}
+              fresh={nextSeenRows.fresh}
               model={model}
               awaiting={awaiting}
             />
@@ -227,9 +277,27 @@ export default function TimelineView({
                 </div>
               </div>
             ) : null}
+            <BackgroundWorkLine tabId={tabId} phase={status.phase} />
             <div className="h-px" />
           </div>
         </div>
+        {tabId && wsStatus === 'connecting' && entries.length > 0 && (
+          <div className="tw-timeline-banner" role="status">
+            <RefreshCw size={11} className="tw-pulse" aria-hidden />
+            {t('timeline.timelineView.reconnecting')}
+          </div>
+        )}
+        {tabId && wsStatus === 'disconnected' && entries.length > 0 && (
+          <div className="tw-timeline-banner" role="status">
+            {t('timeline.timelineView.connectionLost')}
+            {onRetry && (
+              <button type="button" className="tw-fold-toggle" onClick={onRetry}>
+                {t('timeline.timelineView.retry')}
+              </button>
+            )}
+          </div>
+        )}
+        {tabId && <TextSelectionAnnotator tabId={tabId} />}
         <ScrollToBottomButton
           visible={!isAtBottom && entries.length > 0}
           onClick={() => void scrollToBottom('smooth')}
@@ -282,7 +350,7 @@ export const LaunchPreview = ({
     <div className="agent-timeline relative flex h-full flex-col">
       <div className="flex-1 overflow-hidden py-2">
         <div className="mx-auto max-w-content">
-          <Rows rows={rows} provider={provider} live={live} model={null} awaiting={false} />
+          <Rows rows={rows} provider={provider} live={live} fresh={NO_FRESH} model={null} awaiting={false} />
         </div>
       </div>
     </div>

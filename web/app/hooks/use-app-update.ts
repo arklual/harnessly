@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { APP_BASE_PATH } from '@/lib/app-path';
-import { buildIdOfPage, isNewerBuild } from '@/lib/app-update';
+import { entryScriptOf, entryScriptOfPage, isNewerBuild } from '@/lib/app-update';
 import { PUSH_MESSAGE_EVENT } from '@/hooks/use-web-push';
 import type { IPushMessage } from '@/lib/push-message';
 
@@ -8,10 +8,17 @@ const CHECK_EVERY_MS = 10 * 60_000;
 /** Focus, visibility and «online» come in bursts: one look at the server per this long is enough. */
 const MIN_GAP_MS = 60_000;
 
+/** The entry script this page was loaded with; null when the page has none to compare (the dev server). */
 const runningBuild = (): string | null =>
-  typeof window === 'undefined'
+  typeof document === 'undefined'
     ? null
-    : ((window as Window & { __NEXT_DATA__?: { buildId?: string } }).__NEXT_DATA__?.buildId ?? null);
+    : entryScriptOf(
+        Array.from(
+          document.querySelectorAll<HTMLScriptElement>('script[type="module"][src]'),
+          (s) => s.getAttribute('src') ?? '',
+        ),
+        document.baseURI,
+      );
 
 /**
  * Whether the server has a newer build than the page running here. An installed app keeps its page for
@@ -32,7 +39,7 @@ const useAppUpdate = () => {
       headers: { accept: 'text/html' },
     }).catch(() => null);
     if (!response?.ok || !(response.headers.get('content-type') ?? '').includes('text/html')) return;
-    if (isNewerBuild(running, buildIdOfPage(await response.text()))) setAvailable(true);
+    if (isNewerBuild(running, entryScriptOfPage(await response.text(), document.baseURI))) setAvailable(true);
   }, []);
 
   useEffect(() => {

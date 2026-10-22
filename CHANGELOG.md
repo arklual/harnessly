@@ -8,6 +8,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The right pane's browser works without a gateway: a standalone runtime opens the preview itself
+  (`POST /api/preview/open`) in 8 slot listeners next to its port, each an origin of its own, and proxies a dev server or
+  a site there; the page refuses requests coming from a slot. `RUNTIME_PREVIEW_LISTEN` moves or turns off the slots,
+  `RUNTIME_PREVIEW_PUBLIC_ORIGINS` names them behind an https proxy; compose and the image publish `8023`–`8030`. A dev
+  server that is down now says so instead of "preview not supported".
+- `runtime web export <dir>` writes the page this runtime would serve, with this installation's settings filled in, into
+  a folder: a gateway in front of the machines can serve the page itself, also while a machine is down.
+- `RUNTIME_APP_MARK_URL`: an installation's own product mark. The page draws it in place of the harnessly mark, and the
+  runtime puts it into the tab icon and `RUNTIME_APP_NAME` into the title and the installed app's name.
+- The web page catches up with the agents page it was split from: tool calls in the feed expand to their result, stop
+  mark and line diff; cards for plans, questions, Codex steps and runtime notices; the agent's task checklist above the
+  feed; the reader's place held while new rows arrive, new rows marked, model switches shown; message history and quick
+  prompts in the composer, send-now with Ctrl/Cmd+Enter, a slash command from the welcome screen; a message the runtime
+  takes out of the queue stays as a pending row; one Annotate action with a comment per quoted fragment; board comments
+  to a chat wait in its queue; the new-task machine outlives a reload; the document reader takes opaque version ids; a
+  service worker, a manifest and an update check by the entry's hash.
+
 - Design projects get a page model (`docs/design-pages.md`): `meta/project.json` and one `meta/pages/<ULID>.json` per
   page, with a permanent id. When `meta/` is there it is the truth; `project/canvas.json` (the design tool's v3 index)
   and `artifact.json` are built from it, and a project without it is read as before. `harnessly design page
@@ -118,6 +135,9 @@ All notable changes to this project are documented here. The format follows
   command catalog, the design library pages and the prompts it writes for agents, preview pages and limit messages.
 
 ### Fixed
+
+- Platform API calls follow the installation's prefix (`RUNTIME_PLATFORM_API`) instead of a fixed `/api/platform`.
+- Inline code in messages no longer shows the typography plugin's backticks next to its chip.
 
 - A first start of Claude Code or Codex in a new folder no longer hangs at «Starting». Both ask whether to trust the
   folder, and the dialog was only in the terminal, so the agent waited there unseen while the messages sent to it

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { jsonRequest } from '@/lib/conversation-loading';
 import { t } from '@/lib/i18n';
+import { prefixAppPath } from '@/lib/app-path';
 
 export interface ITranscriptSearchHit {
   fileId: string;
@@ -53,7 +54,7 @@ const useTranscriptSearch = (query: string) => {
       if (cancelled || requestId.current !== id) return;
       try {
         const body = await jsonRequest<ISearchResponse>(
-          `/agents/api/platform/search?q=${encodeURIComponent(trimmed)}&limit=${PAGE_SIZE}`,
+          prefixAppPath(`/api/platform/search?q=${encodeURIComponent(trimmed)}&limit=${PAGE_SIZE}`),
         );
         if (cancelled || requestId.current !== id) return;
         setHits(body.hits);

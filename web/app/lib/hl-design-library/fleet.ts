@@ -1,4 +1,10 @@
-import type { ILibraryArtifact, ILibraryResponse } from '@/lib/hl-design-library/types';
+import type { IArtifactAgent, ILibraryArtifact, ILibraryResponse } from '@/lib/hl-design-library/types';
+
+/** A conversation about the project on one of the machines that hold a copy. */
+export interface IProjectChat {
+  machineId: string | undefined;
+  agent: IArtifactAgent;
+}
 
 /**
  * A project of the design library together with the machine it lives on. The library is a folder on a
@@ -10,6 +16,10 @@ export interface ILibraryProject extends ILibraryArtifact {
   machineName: string | null;
   /** Loopback port of that machine's library server. */
   port: number;
+  /** Every machine that holds a copy: a conversation may start on any of them. */
+  machineIds: (string | undefined)[];
+  /** Conversations about it on every machine, newest first. */
+  chats: IProjectChat[];
 }
 
 /** What one machine answered. */
@@ -44,9 +54,21 @@ export const mergeLibraries = (
   const byId = new Map<string, ILibraryProject>();
   for (const { machineId, machineName, data } of libraries) {
     for (const artifact of data.artifacts) {
-      const project: ILibraryProject = { ...artifact, machineId, machineName, port: data.port };
-      const kept = byId.get(project.id);
+      const kept = byId.get(artifact.id);
+      const machineIds = [...(kept?.machineIds ?? []), machineId];
+      const chats = [...(kept?.chats ?? []), ...artifact.agents.map((agent) => ({ machineId, agent }))].sort(
+        (a, b) => (b.agent.lastEventAt ?? 0) - (a.agent.lastEventAt ?? 0),
+      );
+      const project: ILibraryProject = {
+        ...artifact,
+        machineId,
+        machineName,
+        port: data.port,
+        machineIds,
+        chats,
+      };
       if (!kept || preferred(project, kept, pageMachine)) byId.set(project.id, project);
+      else Object.assign(kept, { machineIds, chats });
     }
   }
   return [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt);

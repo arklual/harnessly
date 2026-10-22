@@ -13,6 +13,10 @@
   "design.projectPage.openNewTab": "Open in a new tab",
   "design.projectPage.chatFailed": "Could not start a conversation",
   "design.projectPage.openInChat": "Open in chat",
+  "design.projectPage.newDialog": "New dialog",
+  "design.projectPage.upgrade": "Upgrade to release {release}",
+  "design.projectPage.upgradeFailed": "Could not upgrade the project",
+  "design.projectPage.upgraded": "The project is on release {release}: its boards open on it on the next load.",
   "design.projectPage.noBoards": "The project has no boards yet",
   "design.projectPage.noBoardsHint": "Open the project in chat and ask the agent to draw them: each new board shows up here by itself.",
   "design.projectPage.boards": "Boards",
@@ -86,6 +90,6 @@
   "design.boardPage.removeComment": "Remove comment {label}",
   "design.boardPage.startChat": "Start a chat",
   "design.boardPage.send": "Send",
-  "design.boardPage.sentTo": "Sent to \"{title}\".",
+  "design.boardPage.queuedIn": "Comments are in the queue of \"{title}\": the agent takes them when it finishes the current step.",
   "design.boardPage.chatStarted": "Chat started."
 }

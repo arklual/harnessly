@@ -77,6 +77,37 @@ export interface ILibraryArtifact {
   agents: IArtifactAgent[];
   /** Who holds or is editing which board right now. */
   claims: ILibraryClaim[];
+  /** The Claude Design release the project is on; absent while the machine keeps no mirror of releases. */
+  release?: ILibraryProjectRelease;
+}
+
+/** A project's Claude Design release: its boards get that release's engine as `support.js`. */
+export interface ILibraryProjectRelease {
+  /** The release; `legacy` for a project that still runs the engine it carries. */
+  current: string;
+  /** The project names its release (else its own `support.js` is served). */
+  pinned: boolean;
+  /** The newest stable release after `current`, offered with "Upgrade"; null when the project is on the newest. */
+  upgrade: string | null;
+  /** The folder of the agents' rules for `current`, null when the mirror has none. */
+  skill: string | null;
+}
+
+/** One release of Claude Design on a machine; only a stable one passed the compatibility check. */
+export interface IDesignRelease {
+  release: string;
+  date: string;
+  status: 'stable' | 'beta';
+}
+
+/** GET|POST /api/platform/design/library/releases */
+export interface IDesignReleasesResponse {
+  configured: boolean;
+  releases: IDesignRelease[];
+  newest: string | null;
+  newProjects: string | null;
+  chosen: string | null;
+  project?: ILibraryProjectRelease;
 }
 
 export interface ILibraryCheckSummary {

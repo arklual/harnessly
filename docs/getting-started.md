@@ -49,6 +49,12 @@ data directory, `$HOME/.harnessly` (`AGENT_DATA_DIR`):
 
 A second runtime on the same data directory refuses to start.
 
+The standalone runtime also listens on the 8 ports after its own (`4322`–`4329` here): the slots of the right pane's
+browser. Type a dev server's port into the pane's address bar and its page opens in one of them, on an origin of its
+own, so the page cannot read the harnessly page or its cookies. A dev server that is not running shows "The server on
+port … is not responding" (502); a busy slot port turns the preview off with a warning in the log. Moving or turning
+off the slots, and serving them over https: [the preview without a gateway](deploy.md#the-preview-without-a-gateway).
+
 ## Drive it through the API
 
 Routes under `/api/cli/` take **only** the `cli-token` (the `x-cli-token` header, or the headers named by

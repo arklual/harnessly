@@ -110,9 +110,13 @@ func (p originPattern) next(text string, i int) (originMatch, bool) {
 	return originMatch{}, false
 }
 
+// toWSS is the socket origin of a slot origin: wss for https, ws for a standalone runtime's plain-http slot.
 func toWSS(origin string) string {
 	if strings.HasPrefix(origin, "https:") {
 		return "wss:" + origin[len("https:"):]
+	}
+	if strings.HasPrefix(origin, "http:") {
+		return "ws:" + origin[len("http:"):]
 	}
 	return origin
 }
@@ -225,7 +229,9 @@ func (r *originRewriter) Close() error {
 	return err
 }
 
-func prefixSetCookie(value, tag string) string {
+// prefixSetCookie tags a target's cookie for the slot host. A plain-http slot (a standalone runtime's own, same site as
+// its page) cannot keep Secure or SameSite=None cookies everywhere, so its cookies are Lax there.
+func prefixSetCookie(value, tag string, plain bool) string {
 	parts := strings.Split(value, ";")
 	for i := range parts {
 		parts[i] = jscompat.Trim(parts[i])
@@ -236,6 +242,9 @@ func prefixSetCookie(value, tag string) string {
 			continue
 		}
 		out = append(out, attr)
+	}
+	if plain {
+		return strings.Join(append(out, "SameSite=Lax"), "; ")
 	}
 	return strings.Join(append(out, "Secure", "SameSite=None", "Partitioned"), "; ")
 }
@@ -350,7 +359,7 @@ func (ctx rewriteCtx) rewriteResponseHeaders(h Headers, stands Stands, o headerO
 			if o.stand && stands.isSessionSetCookie(line) {
 				continue
 			}
-			kept = append(kept, prefixSetCookie(line, o.cookieTag))
+			kept = append(kept, prefixSetCookie(line, o.cookieTag, strings.HasPrefix(ctx.slotOrigin, "http:")))
 		}
 		if len(kept) > 0 {
 			out["set-cookie"] = kept

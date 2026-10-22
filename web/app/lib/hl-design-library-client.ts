@@ -4,6 +4,7 @@ import { getDeviceId } from '@/lib/push-device';
 import type { ICheckReport } from '@/types/server/check';
 import type {
   IBoardHistoryResponse,
+  IDesignReleasesResponse,
   ILibraryBoard,
   ILibraryCreateResponse,
   ILibraryImportResponse,
@@ -229,4 +230,12 @@ export const sendBoardToPhone = (
     machineId,
     '/api/platform/design/library/send',
     jsonInit('POST', { ...request, deviceId: getDeviceId() }),
+  );
+
+/** "Upgrade to release ...": the project moves to a stable Claude Design release; the answer is its release now. */
+export const upgradeDesignRelease = (machineId: string | undefined, artifact: string, release: string) =>
+  designRequest<IDesignReleasesResponse>(
+    machineId,
+    '/api/platform/design/library/releases',
+    jsonInit('POST', { artifact, release }),
   );

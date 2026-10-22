@@ -91,5 +91,12 @@
   "hooks.useHlConversations.signInFailed": "Вход в чаты: {reason}",
   "hooks.useHlConversations.serviceUnavailable": "сервис пока недоступен",
   "hooks.useHlConversations.historyFailed": "Не удалось загрузить историю",
-  "hooks.useVoiceInput.noEngine": "Голосовой ввод недоступен в этом браузере"
+  "hooks.useVoiceInput.noEngine": "Голосовой ввод недоступен в этом браузере",
+  "hooks.useWebPush.workerHangs": "служебный воркер приложения не запустился за 15 секунд",
+  "hooks.useWebPush.keyHangs": "сервер не отдал ключ уведомлений за 15 секунд",
+  "hooks.useWebPush.subscribeHangs": "устройство не ответило на подписку за 15 секунд",
+  "hooks.useWebPush.registerHangs": "сервер не ответил на подписку за 15 секунд",
+  "hooks.useWebPush.notAllowed": "браузер не разрешил подписку ({reason})",
+  "hooks.useWebPush.staleSubscription": "на устройстве осталась старая подписка - нажмите «Включить» ещё раз",
+  "hooks.useWebPush.stillLoading": "приложение ещё загружалось - нажмите «Включить» ещё раз"
 }

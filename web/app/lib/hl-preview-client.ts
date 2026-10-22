@@ -5,7 +5,7 @@ import type { IPickedComponent } from '@/lib/hl-preview/bridge-core';
 import type { IPreviewPort } from '@/lib/hl-preview/ports-shared';
 import type { IResolvedMatch } from '@/types/server/resolve';
 
-/** Only the fleet gateway issues slots; a runtime opened directly answers 404. */
+/** The runtime answers 404 to opening a preview: an old runtime without its own slots, or a gateway without the preview. */
 export class PreviewUnavailableError extends Error {
   constructor() {
     super(t('lib.hlPreviewClient.gatewayOnly'));
@@ -109,6 +109,8 @@ const GATEWAY_ERRORS: Record<string, string> = {
   'invalid target': t('lib.hlPreviewClient.invalidTarget'),
   'invalid slot': t('lib.hlPreviewClient.invalidSlot'),
   'invalid path': PATH_ERROR,
+  'preview slots unavailable': t('lib.hlPreviewClient.slotsUnavailable'),
+  'preview slots need https origins': t('lib.hlPreviewClient.slotsNeedHttps'),
 };
 
 const failureText = async (response: Response): Promise<string> => {

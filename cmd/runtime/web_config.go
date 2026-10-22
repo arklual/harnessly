@@ -13,6 +13,7 @@ import (
 // runtime serves index.html (web/app/platform/config.ts reads it). It names services and copy only; no token is in it.
 type pageConfig struct {
 	ProductName        string            `json:"productName"`
+	MarkURL            *string           `json:"markUrl"`
 	Locale             string            `json:"locale"`
 	ArtifactsURL       *string           `json:"artifactsUrl"`
 	BoardsURL          *string           `json:"boardsUrl"`
@@ -70,6 +71,7 @@ func pageConfigFromEnv() pageConfig {
 	}
 	c := pageConfig{
 		ProductName:       env("RUNTIME_APP_NAME", "harnessly"),
+		MarkURL:           optional(os.Getenv("RUNTIME_APP_MARK_URL")),
 		Locale:            env("RUNTIME_LOCALE", "en"),
 		ArtifactsURL:      optional(env("RUNTIME_ARTIFACTS_URL", docsOrigin)),
 		BoardsURL:         optional(env("RUNTIME_BOARDS_URL", docsOrigin)),

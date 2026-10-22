@@ -216,10 +216,10 @@ export const ProjectsGrid = ({
         <NewProjectDialog
           open={creating}
           onClose={() => setCreating(false)}
-          onCreated={({ tabId }) => {
+          onCreated={({ tabId, machineId }) => {
             setCreating(false);
             void onRefresh();
-            openConversation(tabId);
+            openConversation(tabId, machineId);
           }}
           onCreatedWithoutChat={(id) => {
             setCreating(false);

@@ -16,7 +16,9 @@ import { PreviewBody, reopenTarget } from '@/components/agents/inspector/preview
 import useDesignLink from '@/hooks/use-design-link';
 import { annotationLabel, appendAnnotations } from '@/lib/hl-annotation-format';
 import { clearAnnotations, removeAnnotation, useAnnotations } from '@/lib/hl-annotations-store';
-import { continueDesignDialog, messageDesignAgent } from '@/lib/hl-design-library-client';
+import { enqueuePrompt } from '@/hooks/use-prompt-queue';
+import { continueDesignDialog } from '@/lib/hl-design-library-client';
+import { designChatMachine } from '@/lib/new-task-machine';
 import { isBoardFile } from '@/lib/hl-design-library/board-detect';
 import { AGENT_STATE_LABEL, isAgentRunning } from '@/lib/hl-design-library/group';
 import { claimOfBoard, NEW_CHAT, resolveTarget } from '@/lib/hl-design-library/home-model';
@@ -35,6 +37,8 @@ interface IStartedChat {
   tabId: string;
   title: string;
   at: number;
+  /** A new chat starts on the machine picked for new tasks, which may hold another copy of the project. */
+  machine: string | undefined;
 }
 
 interface IBoardPageProps {
@@ -121,6 +125,7 @@ export const BoardPage = ({
 
   const targetTitle = agents.find((agent) => agent.tabId === target)?.title ?? t('design.boardPage.chat');
   const machine = project.machineId;
+  const machineOfTab = (tabId: string) => started.find((chat) => chat.tabId === tabId)?.machine ?? machine;
 
   /** Pessimistic: the comments stay until the runtime has taken them. */
   const sendComments = async () => {
@@ -129,19 +134,33 @@ export const BoardPage = ({
     setDelivery(null);
     try {
       if (target === NEW_CHAT) {
+        const chatMachine = designChatMachine(project);
         const { tabId } = await continueDesignDialog(
-          machine,
+          chatMachine,
           project.id,
           t('design.boardPage.editsPrompt', { title: board.title, path: board.path, blocks }),
         );
         setStarted((chats) => [
           ...chats,
-          { tabId, title: t('design.boardPage.chatTitle', { title: board.title }), at: Date.now() },
+          {
+            tabId,
+            title: t('design.boardPage.chatTitle', { title: board.title }),
+            at: Date.now(),
+            machine: chatMachine,
+          },
         ]);
         setChosen(tabId);
         setDelivery({ kind: 'started', tabId });
       } else {
-        await messageDesignAgent(machine, target, project.id, blocks, { blocks: true });
+        // Like the composer's Enter: the comments wait in the chat's queue for the end of its turn.
+        await enqueuePrompt(machineOfTab(target), target, blocks, [], async () => ({
+          text: t('design.boardPage.editsPrompt', {
+            title: board.title,
+            path: `${project.projectPath}/${board.path}`,
+            blocks,
+          }),
+          images: [],
+        }));
         setDelivery({ kind: 'sent', tabId: target, title: targetTitle });
       }
       clearAnnotations(PREVIEW_KEY);
@@ -244,7 +263,11 @@ export const BoardPage = ({
         <p className="tw-dhome-claim" role="status">
           <span>{t('design.boardPage.claim', { person: claim.person, chat: claim.chatTitle })}</span>
           {claim.local && (
-            <button type="button" className="tw-dlib-link" onClick={() => openConversation(claim.tabId)}>
+            <button
+              type="button"
+              className="tw-dlib-link"
+              onClick={() => openConversation(claim.tabId, machine)}
+            >
               {t('design.boardPage.openChat')}
             </button>
           )}
@@ -308,8 +331,12 @@ export const BoardPage = ({
           )}
           {delivery?.kind === 'sent' && (
             <Note>
-              {t('design.boardPage.sentTo', { title: delivery.title })}{' '}
-              <button type="button" className="tw-dlib-link" onClick={() => openConversation(delivery.tabId)}>
+              {t('design.boardPage.queuedIn', { title: delivery.title })}{' '}
+              <button
+                type="button"
+                className="tw-dlib-link"
+                onClick={() => openConversation(delivery.tabId, machineOfTab(delivery.tabId))}
+              >
                 {t('design.boardPage.openChat')}
               </button>
             </Note>
@@ -317,7 +344,11 @@ export const BoardPage = ({
           {delivery?.kind === 'started' && (
             <Note>
               {t('design.boardPage.chatStarted')}{' '}
-              <button type="button" className="tw-dlib-link" onClick={() => openConversation(delivery.tabId)}>
+              <button
+                type="button"
+                className="tw-dlib-link"
+                onClick={() => openConversation(delivery.tabId, machineOfTab(delivery.tabId))}
+              >
                 {t('design.boardPage.openChat')}
               </button>
             </Note>
