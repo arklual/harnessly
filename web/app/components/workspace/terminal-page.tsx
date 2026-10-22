@@ -1,7 +1,7 @@
 // The agent conversation in the centre of the page: the open workspace's agent tab the page's address names (else
 // the layout's focus), its timeline with the messages just sent, what the agent waits for, the composer and the
 // terminal bar; a plain terminal tab is its terminal. Keeps the workspace's layout loaded.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import TimelineView from '@/components/timeline/timeline-view';
 import AgentComposer from '@/components/workspace/agent-composer';
 import PendingPrompt from '@/components/workspace/pending-prompt';
@@ -9,7 +9,9 @@ import TerminalBar from '@/components/workspace/terminal-bar';
 import SessionEnded from '@/components/workspace/session-ended';
 import useWorkspaceStore from '@/hooks/use-workspace-store';
 import { collectPanes, useLayoutStore } from '@/hooks/use-layout';
-import useTabStore from '@/hooks/use-tab-store';
+import useTabStore, { shouldMarkSeen } from '@/hooks/use-tab-store';
+import { dismissTab } from '@/hooks/use-agent-status';
+import useTerminalSurfaceVisible from '@/hooks/use-terminal-surface-visible';
 import useTimeline from '@/hooks/use-timeline';
 import usePendingLaunch from '@/hooks/use-pending-launch';
 import useQueueHandoff from '@/hooks/use-queue-handoff';
@@ -41,6 +43,12 @@ const recorded = ({ entry, since }: IPendingRow, entries: readonly ITimelineEntr
           e.text.trim() === entry.text.trim() &&
           e.timestamp >= entry.timestamp - 10_000,
       );
+
+const subscribeVisibility = (onChange: () => void) => {
+  document.addEventListener('visibilitychange', onChange);
+  return () => document.removeEventListener('visibilitychange', onChange);
+};
+const pageVisible = () => document.visibilityState === 'visible';
 
 const AgentConversation = ({ tab, workspaceId }: { tab: ITab; workspaceId: string }) => {
   const provider = tab.panelType === 'codex-cli' ? 'codex' : 'claude';
@@ -103,6 +111,14 @@ const AgentConversation = ({ tab, workspaceId }: { tab: ITab; workspaceId: strin
     timeline.initMeta,
     timeline.entries,
   ]);
+
+  // A finished answer on screen is seen: the sidebar's eye goes out. Retried on every status of the tab, so one that
+  // arrived before the status socket opened is marked once the socket brings the tab's state.
+  const surfaceVisible = useTerminalSurfaceVisible();
+  const visible = useSyncExternalStore(subscribeVisibility, pageVisible, () => false);
+  useEffect(() => {
+    if (shouldMarkSeen(status?.cliState, surfaceVisible, visible)) dismissTab(tab.id);
+  }, [tab.id, status, surfaceVisible, visible]);
 
   // A state the runtime could not read after its restart: it is asked to look at the screen again.
   useEffect(() => {

@@ -2,6 +2,7 @@ package prompts
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -17,10 +18,17 @@ const (
 	retryDelay  = 1500 * time.Millisecond
 	// blockedRetry: a menu or foreign text in the box, or an agent not resumed yet, is looked at again this late.
 	blockedRetry = 5 * time.Second
-	// watchdogEvery: a queued message never waits on a missed transition; tabs with a queue are looked at this often.
-	watchdogEvery = 4 * time.Second
 	// steerHandOver: Claude writes a steered message to its transcript and screen within this long after Enter.
 	steerHandOver = 300 * time.Millisecond
+	// noTabGrace: a tab the keeper does not know, or one without its tmux session, this long has its queue given up.
+	noTabGrace = 30 * time.Second
+	// maxDeliveryTries: a message whose typing failed this many times in a row is given up; the tries back off from
+	// retryDelay, doubling up to maxRetryDelay.
+	maxDeliveryTries = 6
+	maxRetryDelay    = 30 * time.Second
+	// occupiedLimit: an agent input box that holds someone else's text this long gives the queue up, so the person sees
+	// why nothing goes out instead of a queue that waits without a word.
+	occupiedLimit = 10 * time.Minute
 	// mirrorKeySettle: the TUI redraws after a mirrored key within this long.
 	mirrorKeySettle = 250 * time.Millisecond
 	// composerIDMax is the longest composer message id kept.
@@ -61,13 +69,20 @@ type Service struct {
 	flights *flights
 	editor  *editor
 
-	mu       sync.Mutex
-	timers   map[string]Timer
-	watchdog Timer
-	running  bool
+	mu     sync.Mutex
+	timers map[string]Timer
+	// missing is since when each tab with a queue was not found; relaunch holds the tabs whose failed launch a retry
+	// asked to try again.
+	missing  map[string]time.Time
+	relaunch map[string]bool
+	// tries counts the failed tries of each message in a row; occupied is since when a tab's box held foreign text;
+	// waits is what each tab's queue last waited on, logged when it changes.
+	tries    map[string]int
+	occupied map[string]time.Time
+	waits    map[string]string
 }
 
-// New builds a Service and loads the queue. Start begins delivering.
+// New builds a Service and loads the queue. The keeper schedules its deliveries and runs the watchdog over them.
 func New(cfg Config) *Service {
 	if cfg.Clock == nil {
 		cfg.Clock = SystemClock{}
@@ -94,7 +109,8 @@ func New(cfg Config) *Service {
 	if cfg.Procs.Environ != nil {
 		procs.Environ = cfg.Procs.Environ
 	}
-	s := &Service{cfg: cfg, clock: cfg.Clock, timers: map[string]Timer{}, flights: newFlights()}
+	s := &Service{cfg: cfg, clock: cfg.Clock, timers: map[string]Timer{}, flights: newFlights(), missing: map[string]time.Time{},
+		relaunch: map[string]bool{}, tries: map[string]int{}, occupied: map[string]time.Time{}, waits: map[string]string{}}
 	s.queue = NewQueue(cfg.QueueFile, cfg.Clock)
 	s.queue.warn = s.warn
 	s.reg = NewRegistry(cfg.Clock, cfg.Log)
@@ -135,58 +151,21 @@ func (s *Service) QueueSync() QueueSync {
 
 // --- scheduling -------------------------------------------------------------------------------------------------
 
-// Start delivers what waited through a restart (700 ms on) and starts the 4 s watchdog.
-func (s *Service) Start() {
-	s.mu.Lock()
-	if s.running {
-		s.mu.Unlock()
-		return
-	}
-	s.running = true
-	s.mu.Unlock()
-	for tabID := range s.queue.All() {
-		s.Schedule(tabID, settleDelay)
-	}
-	s.armWatchdog()
-}
-
-func (s *Service) armWatchdog() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.running {
-		return
-	}
-	s.watchdog = s.clock.AfterFunc(watchdogEvery, func() {
-		for tabID := range s.queue.All() {
-			s.mu.Lock()
-			_, pending := s.timers[tabID]
-			s.mu.Unlock()
-			if !pending {
-				s.Schedule(tabID, 0)
-			}
-		}
-		s.armWatchdog()
-	})
-}
-
-// Stop cancels every pending delivery and the watchdog, and writes the queue file.
+// Stop cancels every pending delivery and writes the queue file.
 func (s *Service) Stop() {
 	s.mu.Lock()
-	s.running = false
 	for id, t := range s.timers {
 		t.Stop()
 		delete(s.timers, id)
-	}
-	if s.watchdog != nil {
-		s.watchdog.Stop()
 	}
 	s.mu.Unlock()
 	s.queue.Flush()
 }
 
-// Schedule delivers the head of a tab's queue after delay, replacing a pending delivery; nothing when the queue is empty.
+// Schedule delivers the head of a tab's queue after delay, replacing a pending delivery; nothing when no message of the
+// queue waits (failed ones wait for the person).
 func (s *Service) Schedule(tabID string, delay time.Duration) {
-	if len(s.queue.List(tabID)) == 0 {
+	if !s.queue.Waiting(tabID) {
 		return
 	}
 	s.mu.Lock()
@@ -230,31 +209,144 @@ func (s *Service) TabRemoved(tabID string) {
 		t.Stop()
 		delete(s.timers, tabID)
 	}
+	delete(s.missing, tabID)
+	delete(s.relaunch, tabID)
+	delete(s.occupied, tabID)
+	delete(s.waits, tabID)
 	s.mu.Unlock()
 	s.queue.Drop(tabID)
 }
 
-// deliverHead brings the tab's agent to take the queue head: a launch under way is waited for, a gone agent resumed (or
-// its launch given up when it has no session), a running one gets the message when it waits for a prompt. Retries
-// continue while the queue holds messages; the watchdog restarts any chain that stopped.
-func (s *Service) deliverHead(tabID string) {
-	tab, ok := s.cfg.Tabs.Tab(tabID)
-	if !ok || tab.Session == "" {
+// Retry asks again for a message delivery gave up on: it waits in its place and goes out now, and a launch that had
+// failed is tried again. False when the tab has no message with that id.
+func (s *Service) Retry(tabID, id string) (Item, bool) {
+	item, ok := s.queue.Retry(tabID, id)
+	if !ok {
+		return Item{}, false
+	}
+	s.mu.Lock()
+	s.relaunch[tabID] = true
+	delete(s.tries, id)
+	delete(s.occupied, tabID)
+	s.mu.Unlock()
+	s.Schedule(tabID, 0)
+	return item, true
+}
+
+// waiting logs what the tab's queue waits on when that changed since the last look: a queue that does not move says
+// why once, not on every retry. "" (sent, emptied) starts over.
+func (s *Service) waiting(tabID, on string, kv ...any) {
+	s.mu.Lock()
+	changed := s.waits[tabID] != on
+	if on == "" {
+		delete(s.waits, tabID)
+	} else {
+		s.waits[tabID] = on
+	}
+	s.mu.Unlock()
+	if changed && on != "" {
+		s.info("queued prompt waits", append([]any{"tabId", tabID, "on", on}, kv...)...)
+	}
+}
+
+// failedTry counts a failed try of the message and says how long to wait before the next one; give up: it was the
+// last.
+func (s *Service) failedTry(id string) (next time.Duration, try int, giveUp bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tries[id]++
+	try = s.tries[id]
+	if try >= maxDeliveryTries {
+		delete(s.tries, id)
+		return 0, try, true
+	}
+	return min(retryDelay<<(try-1), maxRetryDelay), try, false
+}
+
+// boxOccupied: the agent's input box holds text (no menu is open): whose it is the delivery decided, this only says
+// whether waiting can end without the person.
+func (s *Service) boxOccupied(session string) bool {
+	styled, ok := s.cfg.Panes.CaptureStyled(session)
+	if !ok {
+		return false
+	}
+	st := screen.Read(styled)
+	return st.Menu == nil && st.InputLine && !blank(st.Input)
+}
+
+// giveUp fails every message of the tab still waiting: nothing would deliver them, so they stop being retried and the
+// pages show why.
+func (s *Service) giveUp(tabID, reason string) {
+	if n := s.queue.Fail(tabID, reason, nil); n > 0 {
+		s.warn("queued prompts given up", "tabId", tabID, "reason", reason, "count", n)
+	}
+}
+
+// expire fails the tab's messages that waited longer than QueuedLifetime (since they were queued or last retried).
+func (s *Service) expire(tabID string) {
+	limit := s.clock.Now().Add(-QueuedLifetime).UnixMilli()
+	if n := s.queue.Fail(tabID, ReasonExpired, func(it Item) bool { return max(it.CreatedAt, it.RetriedAt) < limit }); n > 0 {
+		s.warn("queued prompts given up", "tabId", tabID, "reason", ReasonExpired, "count", n)
+	}
+}
+
+// tabMissing: a tab with a queue is not found; past noTabGrace its queue is given up, until then it is looked at again.
+func (s *Service) tabMissing(tabID string) {
+	now := s.clock.Now()
+	s.mu.Lock()
+	since, seen := s.missing[tabID]
+	if !seen {
+		s.missing[tabID] = now
+	}
+	s.mu.Unlock()
+	if seen && now.Sub(since) >= noTabGrace {
+		s.mu.Lock()
+		delete(s.missing, tabID)
+		s.mu.Unlock()
+		s.giveUp(tabID, ReasonNoTab)
 		return
 	}
+	s.Schedule(tabID, noTabGrace)
+}
+
+// deliverHead brings the tab's agent to take the queue head: a launch under way is waited for, a gone agent resumed (or
+// its launch given up when it has no session), a running one gets the message when it waits for a prompt. Retries
+// continue while the queue holds messages; the keeper's watchdog restarts any chain that stopped.
+func (s *Service) deliverHead(tabID string) {
+	s.expire(tabID)
+	if !s.queue.Waiting(tabID) {
+		return
+	}
+	tab, ok := s.cfg.Tabs.Tab(tabID)
+	if !ok || tab.Session == "" {
+		s.tabMissing(tabID)
+		return
+	}
+	s.mu.Lock()
+	delete(s.missing, tabID)
+	relaunch := s.relaunch[tabID]
+	delete(s.relaunch, tabID)
+	s.mu.Unlock()
 	running := s.cfg.Agents.Running(tab)
 	hasSession := tab.HasAgentSession || s.cfg.Agents.RecoverSession(tab)
-	switch QueueAgentAction(tab.Launching, tab.LaunchFailed, running, hasSession) {
+	switch QueueAgentAction(tab.Launching, tab.LaunchFailed && !relaunch, running, hasSession) {
 	case ActionLaunching:
+		s.waiting(tabID, "launching")
+		return
+	case ActionGaveUp:
+		s.giveUp(tabID, ReasonLaunchFailed)
 		return
 	case ActionUnrecoverable:
 		s.cfg.Agents.GiveUpLaunch(tabID)
+		s.giveUp(tabID, ReasonNoSession)
 		return
 	case ActionResume:
 		switch r := s.cfg.Agents.Resume(tab); r {
 		case ResumeNoSession:
 			s.cfg.Agents.GiveUpLaunch(tabID)
+			s.giveUp(tabID, ReasonNoSession)
 		case ResumeResumed, ResumeRunning:
+			s.waiting(tabID, "resume", "result", r)
 			s.Schedule(tabID, retryDelay)
 		default:
 			// A shell still starting (a session the machine recreated after a reboot) is busy only for a moment.
@@ -274,22 +366,71 @@ func (s *Service) deliverHead(tabID string) {
 	// message. A shell never gets it: its prompt may look like the agent's and the text would run as a command.
 	ready := MayDeliverQueue(tab.CliState, false) || (tab.CliState == StateUnknown && s.agentInForeground(tab.Session)) ||
 		(tab.CliState == StateNeedsInput && s.questionOnScreen(tab.Session))
+	head := ""
+	if items := s.queue.List(tabID); len(items) > 0 {
+		if i := slices.IndexFunc(items, Item.Waiting); i >= 0 {
+			head = items[i].ID
+		}
+	}
 	outcome := s.Pump(tabID, ready, s.deliveryDriver(tab))
+	if outcome != PumpBlocked {
+		s.mu.Lock()
+		delete(s.occupied, tabID)
+		s.mu.Unlock()
+	}
 	switch outcome {
 	case PumpSent:
 		steps.Mark("enter")
+		s.mu.Lock()
+		delete(s.tries, head)
+		s.mu.Unlock()
+		s.waiting(tabID, "")
 		s.info("queued prompt sent", "tabId", tabID, "steps", steps)
 		return
-	case PumpEmpty, PumpNotReady:
+	case PumpEmpty:
+		s.waiting(tabID, "")
+		return
+	case PumpNotReady:
+		s.waiting(tabID, string(outcome), "cliState", tab.CliState)
 		return
 	case PumpFailed:
-		s.warn("queued prompt did not reach the agent; it stays in the queue", "tabId", tabID)
-	}
-	if outcome == PumpBlocked {
+		next, try, last := s.failedTry(head)
+		if last {
+			s.warn("queued prompt did not reach the agent; given up", "tabId", tabID, "promptId", head, "tries", try)
+			s.queue.Fail(tabID, ReasonNotDelivered, func(it Item) bool { return it.ID == head })
+			s.Schedule(tabID, retryDelay)
+			return
+		}
+		s.warn("queued prompt did not reach the agent; it stays in the queue", "tabId", tabID, "promptId", head, "try", try, "nextMs", next.Milliseconds())
+		s.Schedule(tabID, next)
+		return
+	case PumpBlocked:
+		s.waiting(tabID, string(outcome))
+		if s.boxOccupied(tab.Session) {
+			now := s.clock.Now()
+			s.mu.Lock()
+			since, seen := s.occupied[tabID]
+			if !seen {
+				s.occupied[tabID], since = now, now
+			}
+			s.mu.Unlock()
+			if now.Sub(since) >= occupiedLimit {
+				s.mu.Lock()
+				delete(s.occupied, tabID)
+				s.mu.Unlock()
+				s.giveUp(tabID, ReasonInputOccupied)
+				return
+			}
+		} else {
+			s.mu.Lock()
+			delete(s.occupied, tabID)
+			s.mu.Unlock()
+		}
 		s.Schedule(tabID, blockedRetry)
-	} else {
-		s.Schedule(tabID, retryDelay)
+		return
 	}
+	s.waiting(tabID, string(outcome))
+	s.Schedule(tabID, retryDelay)
 }
 
 // PumpOutcome is one step of sending a tab's queue.
@@ -306,27 +447,31 @@ const (
 )
 
 // Pump sends the head of the tab's queue when ready: under the tab's single flight the head leaves the queue before it
-// is typed and comes back to the head unless it went in, so it is never lost or sent twice. One message per call.
+// is typed and comes back to the head unless it went in, so it is never lost or sent twice. One message per call; the
+// head is the first message still waiting, failed ones are passed over.
 func (s *Service) Pump(tabID string, ready bool, d DeliveryDriver) PumpOutcome {
 	items := s.queue.List(tabID)
-	if len(items) == 0 {
+	i := slices.IndexFunc(items, Item.Waiting)
+	if i < 0 {
 		return PumpEmpty
 	}
 	if !ready {
 		return PumpNotReady
 	}
-	head := items[0]
+	head := items[i]
 	out := PumpEmpty
 	if !s.flights.run(tabID, func() {
-		item, ok := s.queue.Take(tabID, head.ID)
-		if !ok {
-			return
-		}
-		res := Deliver(item, d, s.reg, false, tabID)
-		if res != OutcomeSent {
-			s.queue.Restore(tabID, item)
-		}
-		out = PumpOutcome(res)
+		s.queue.Quietly(tabID, func() {
+			item, ok := s.queue.Take(tabID, head.ID)
+			if !ok {
+				return
+			}
+			res := Deliver(item, d, s.reg, false, tabID)
+			if res != OutcomeSent {
+				s.queue.Restore(tabID, item)
+			}
+			out = PumpOutcome(res)
+		})
 	}) {
 		return PumpInFlight
 	}
@@ -360,6 +505,8 @@ type SteerResult struct {
 	OK      bool
 	Status  int
 	Message string
+	// Code names the refusal for programs (CodeNotQueued), the message being for people.
+	Code string
 }
 
 // Steer sends a queued message now, into the running turn if there is one; a menu or foreign text still stops it and the
@@ -374,7 +521,7 @@ func (s *Service) Steer(tabID, id string) SteerResult {
 	if !s.flights.run(tabID, func() {
 		item, ok := s.queue.Take(tabID, id)
 		if !ok {
-			res = SteerResult{Status: 409, Message: msgNotQueued.String()}
+			res = SteerResult{Status: 409, Message: msgNotQueued.String(), Code: CodeNotQueued}
 			return
 		}
 		steeredAt := s.clock.Now()

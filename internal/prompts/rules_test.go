@@ -87,7 +87,7 @@ func TestQueueAgentAction(t *testing.T) {
 	}{
 		{false, false, true, true, ActionDeliver},
 		{true, false, false, true, ActionLaunching},
-		{false, true, false, true, ActionLaunching},
+		{false, true, false, true, ActionGaveUp},
 		{false, false, false, true, ActionResume},
 		{false, false, false, false, ActionUnrecoverable},
 	}

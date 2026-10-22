@@ -15,12 +15,32 @@ const (
 )
 
 var (
-	imageRef        = regexp.MustCompile(`\[Image #\d+\]`)
+	// imageRef: the box wraps a long line anywhere, a reference too ("[Image" at a line's end, "#104]" next).
+	imageRef        = regexp.MustCompile(`\[Image` + sp + `+#\d+\]`)
+	imageRefSpace   = regexp.MustCompile(sp + `+`)
 	pathSpecialChar = regexp.MustCompile("[ \t\\\\'\"(){}\\[\\]!#$&;`|*?<>~^%]")
 )
 
 // CountImageRefs counts the `[Image #n]` references on a screen.
 func CountImageRefs(screen string) int { return len(imageRef.FindAllStringIndex(screen, -1)) }
+
+// NewImageRefs counts the references on a screen that the earlier one did not have, reference by reference: older ones
+// that scrolled away meanwhile do not hide new ones, and a number shown again after a reset counts once more.
+func NewImageRefs(before, now string) int {
+	seen := map[string]int{}
+	for _, r := range imageRef.FindAllString(before, -1) {
+		seen[imageRefSpace.ReplaceAllString(r, " ")]++
+	}
+	n := 0
+	for _, r := range imageRef.FindAllString(now, -1) {
+		if r = imageRefSpace.ReplaceAllString(r, " "); seen[r] > 0 {
+			seen[r]--
+			continue
+		}
+		n++
+	}
+	return n
+}
 
 // EscapePathForPrompt puts a backslash before the characters an agent's prompt would read specially in a pasted path.
 func EscapePathForPrompt(path string) string { return pathSpecialChar.ReplaceAllString(path, `\$0`) }
@@ -33,20 +53,20 @@ type ImageWait struct {
 	Elapsed    time.Duration
 }
 
-// WaitForImages polls the screen every poll until baseline+expected references show, or timeout passes. A screen that
-// cannot be read is retried.
-func WaitForImages(capture func() (string, bool), expected, baseline int, timeout, poll time.Duration, clock Clock) ImageWait {
+// WaitForImages polls the screen every poll until expected references show that the screen before did not have, or
+// timeout passes; FinalCount is how many did. A screen that cannot be read is retried.
+func WaitForImages(capture func() (string, bool), expected int, before string, timeout, poll time.Duration, clock Clock) ImageWait {
 	start := clock.Now()
 	if expected <= 0 {
-		return ImageWait{Confirmed: true, FinalCount: baseline}
+		return ImageWait{Confirmed: true}
 	}
-	target, deadline := baseline+expected, start.Add(timeout)
-	w := ImageWait{FinalCount: baseline}
+	deadline := start.Add(timeout)
+	w := ImageWait{}
 	for clock.Now().Before(deadline) {
 		w.Attempts++
 		if s, ok := capture(); ok {
-			w.FinalCount = CountImageRefs(s)
-			if w.FinalCount >= target {
+			w.FinalCount = NewImageRefs(before, s)
+			if w.FinalCount >= expected {
 				w.Confirmed = true
 				break
 			}
@@ -104,20 +124,16 @@ func SendImagePaths(paths []string, batch bool, paste func(body string) error, c
 		res.Confirmed, res.Attached, res.Elapsed = true, len(paths), clock.Now().Sub(start)
 		return res
 	}
-	baseline := 0
-	if s, ok := capture(); ok {
-		baseline = CountImageRefs(s)
-	}
-	seen := baseline
+	before, _ := capture()
 	for _, g := range groups {
 		if paste(body(g)) != nil {
-			res.Attached, res.Elapsed = max(0, seen-baseline), clock.Now().Sub(start)
+			res.Elapsed = clock.Now().Sub(start)
 			return res
 		}
-		w := WaitForImages(capture, len(g), seen, imageConfirmBase+imageConfirmPerImage*time.Duration(len(g)-1), imagePoll, clock)
-		seen = w.FinalCount
+		w := WaitForImages(capture, res.Attached+len(g), before, imageConfirmBase+imageConfirmPerImage*time.Duration(len(g)-1), imagePoll, clock)
+		res.Attached = min(w.FinalCount, res.Attached+len(g))
 		if !w.Confirmed {
-			res.Attached, res.Elapsed = max(0, seen-baseline), clock.Now().Sub(start)
+			res.Elapsed = clock.Now().Sub(start)
 			return res
 		}
 	}

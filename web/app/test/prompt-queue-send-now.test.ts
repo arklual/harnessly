@@ -14,7 +14,7 @@ const answer = (status: number, body: unknown) =>
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  usePromptQueueStore.setState({ queues: {} });
+  usePromptQueueStore.setState({ server: {}, local: {}, queues: {} });
 });
 
 const key = (init: Partial<Parameters<typeof isSendNowKey>[0]>) =>
@@ -51,7 +51,14 @@ describe('enqueuePrompt', () => {
     });
     expect(sent).toEqual({ item, delivery: 'steered' });
     const body = JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body));
-    expect(body).toEqual({ tabId: 'tab-1', action: 'add', text: 'hi', images: [], now: true });
+    expect(body).toEqual({
+      tabId: 'tab-1',
+      action: 'add',
+      text: 'hi',
+      images: [],
+      clientId: expect.stringMatching(/^c-/),
+      now: true,
+    });
   });
 
   it('leaves `now` out for Enter and shows the message in the queue until the runtime answers', async () => {

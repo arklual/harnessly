@@ -1,4 +1,5 @@
 import { appBasePath, platformApi } from '@/platform/config';
+import { addressMachineId, currentMachineId } from '@/runtime/machine';
 
 /** Where the runtime serves this page (RUNTIME_APP_BASE_PATH), read once from the page's config. */
 export const APP_BASE_PATH = appBasePath();
@@ -42,39 +43,12 @@ export const stripAppPath = (value: string, basePath = APP_BASE_PATH): string =>
   return value;
 };
 
-/**
- * The machine whose conversation the shell draws itself, without a frame: the shell's page has no `machine`
- * in its address, so its runtime calls — the conversation, its terminal, panel, statuses — go to this machine instead
- * of the home one, as they would inside that machine's frame. The shell's own lists, pins and settings ask the home
- * machine explicitly (`homeAppPath`, `homeFetch`). Unset means the home machine.
- */
-let viewMachine: string | undefined;
-const viewListeners = new Set<(machineId: string | undefined) => void>();
-
-export const viewMachineId = (): string | undefined => viewMachine;
-
-export const setViewMachine = (machineId: string | undefined): void => {
-  if (machineId === viewMachine) return;
-  viewMachine = machineId;
-  for (const listener of viewListeners) listener(machineId);
-};
-
-/** Called after the view machine changed; sockets reconnect to it and stores load its data. */
-export const onViewMachineChange = (listener: (machineId: string | undefined) => void): (() => void) => {
-  viewListeners.add(listener);
-  return () => viewListeners.delete(listener);
-};
-
-export const currentMachineId = (): string | undefined => {
-  if (typeof window === 'undefined') return undefined;
-  return new URLSearchParams(window.location.search).get('machine') || viewMachine;
-};
+export { currentMachineId, onViewMachineChange, setViewMachine, viewMachineId } from '@/runtime/machine';
 
 /** A path of the home machine and the gateway's own lists: never scoped to the machine on screen. */
 export const homeAppPath = (value: string): string => {
-  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('machine'))
-    return scopedAppPath(value);
-  return prefixAppPath(value);
+  const machine = addressMachineId();
+  return machine ? scopedAppPath(value, machine) : prefixAppPath(value);
 };
 
 /** Runtime URLs carry their machine explicitly so open tabs cannot change each other's routing. */

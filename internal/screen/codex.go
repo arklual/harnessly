@@ -148,7 +148,8 @@ func CodexStillInBox(screen, text string) bool {
 
 var (
 	claudePastedRE = re(`\[Pasted text #\d+`)
-	claudeImageRE  = re(`\[Image #\d+\]`)
+	// claudeImageRE: a reference the box wrapped midway too ("[Image" at a line's end, "#104]" next).
+	claudeImageRE = re(`\[Image` + sp + `+#\d+\]`)
 )
 
 // ClaudeStillInBox: the text on Claude Code's input line (Read's Input, its first line) is this message — a

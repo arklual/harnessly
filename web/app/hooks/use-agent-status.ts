@@ -1,14 +1,19 @@
 // The runtime's status socket (/api/status): every tab's state into the tab store, and the page's answers back.
 import { useEffect } from 'react';
 import { ReconnectingSocket } from '@/runtime/socket';
-import { socketUrl } from '@/runtime/base';
+import { homeSocketUrl } from '@/runtime/base';
 import useTabStore from '@/hooks/use-tab-store';
+import { setPromptQueue, syncPromptQueues } from '@/hooks/use-prompt-queue';
+import { setBackgroundTasks, syncBackgroundTasks } from '@/hooks/use-background-tasks';
 import type { IStatusEntry } from '@/types/status';
+import type { IQueuedPrompt } from '@/types/server/hl-prompt-queue';
+import type { IBackgroundTask } from '@/types/server/hl-background';
 
 let socket: ReconnectingSocket | null = null;
 let users = 0;
 
-const onMessage = (raw: string) => {
+/** One message of the status socket, into the store it belongs to. */
+export const onStatusMessage = (raw: string) => {
   let msg: { type?: string; [k: string]: unknown };
   try {
     msg = JSON.parse(raw) as typeof msg;
@@ -33,6 +38,19 @@ const onMessage = (raw: string) => {
         store.patch(msg.tabId, { lastEvent: event, eventSeq: event.seq });
       break;
     }
+    case 'prompt-queue:sync':
+      syncPromptQueues((msg.queues ?? {}) as Record<string, IQueuedPrompt[]>);
+      break;
+    case 'prompt-queue:update':
+      if (typeof msg.tabId === 'string') setPromptQueue(msg.tabId, (msg.items ?? []) as IQueuedPrompt[]);
+      break;
+    case 'background:sync':
+      syncBackgroundTasks((msg.tabs ?? {}) as Record<string, IBackgroundTask[]>);
+      break;
+    case 'background:update':
+      if (typeof msg.tabId === 'string')
+        setBackgroundTasks(msg.tabId, (msg.tasks ?? []) as IBackgroundTask[]);
+      break;
     default:
       window.dispatchEvent(new CustomEvent('hl:status-message', { detail: msg }));
   }
@@ -41,14 +59,17 @@ const onMessage = (raw: string) => {
 const ensureSocket = () => {
   if (socket) return;
   socket = new ReconnectingSocket({
-    url: () => socketUrl('/api/status'),
-    onMessage: (data) => onMessage(String(data)),
+    url: () => homeSocketUrl('/api/status'),
+    onMessage: (data) => onStatusMessage(String(data)),
   });
 };
 
-/** Tells the runtime a finished agent tab has been looked at. */
-export const dismissTab = (tabId: string): void => {
-  socket?.send(JSON.stringify({ type: 'status:tab-dismissed', tabId }));
+/** Tells the runtime a finished agent tab has been looked at; false when the socket is not open (nothing changes). */
+export const dismissTab = (tabId: string): boolean => {
+  if (socket?.send(JSON.stringify({ type: 'status:tab-dismissed', tabId })) !== true) return false;
+  // The runtime answers every page but the one that said it, so this page marks the tab itself.
+  useTabStore.getState().markSeen(tabId, Date.now());
+  return true;
 };
 
 /** Confirms the page applied the runtime's pane intents; false when the socket is not open (the caller posts instead). */

@@ -177,6 +177,19 @@ test("5. the turn renders with the agent's answer and its steps", async () => {
   await expect(timeline.locator('.agent-message').first()).toContainText(reply('hello agent'));
 });
 
+test('5a. a finished answer on screen counts as seen: no eye on its row, after a reload too', async () => {
+  const { sidebar, timeline } = ui(page);
+  // The row is named after the latest message.
+  const row = sidebar.getByRole('link', { name: /second message/ });
+  await expect(agentMessage(timeline, 'second message')).toBeVisible();
+  await expect(row.locator('.tw-orb-done')).toBeVisible();
+  await expect(row.locator('.tw-orb-ready')).toHaveCount(0);
+  await page.reload();
+  await expect(agentMessage(ui(page).timeline, 'second message')).toBeVisible();
+  await expect(row.locator('.tw-orb-done')).toBeVisible();
+  await expect(row.locator('.tw-orb-ready')).toHaveCount(0);
+});
+
 test("6. the terminal bar opens the agent's terminal, which reaches the agent", async () => {
   const { termbarToggle, terminal, timeline } = ui(page);
   await expect(termbarToggle).toHaveAttribute('aria-expanded', 'false');
