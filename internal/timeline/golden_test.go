@@ -247,6 +247,12 @@ func TestGoldenScenario(t *testing.T) {
 	}
 	want := string(raw)
 	got := playScenario(t)
+	if updatingGolden() {
+		if err := os.WriteFile("testdata/golden.json", []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
 	if got != want {
 		if out := os.Getenv("TIMELINE_GOLDEN_GOT"); out != "" {
 			_ = os.WriteFile(out, []byte(got), 0o644)
@@ -275,12 +281,9 @@ func firstDiff(a, b string) string {
 }
 
 func playScenario(t *testing.T) string {
-	n := 0
-	oldID := transcript.NewID
-	transcript.NewID = func() string { n++; return "id" + leftPad(strconv.FormatInt(int64(n), 36), 4) }
 	oldNow := transcript.Now
 	transcript.Now = func() float64 { return float64(fixedNow.UnixMilli()) }
-	t.Cleanup(func() { transcript.NewID, transcript.Now = oldID, oldNow })
+	t.Cleanup(func() { transcript.Now = oldNow })
 
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
@@ -582,7 +585,9 @@ func expandVars(raw []byte, vars map[string]string) []byte {
 	})
 }
 
-var idRE = regexp.MustCompile(`^id[0-9a-z]{4,}$`)
+// idRE is an entry id: the transcript's own ("c:<uuid>#k", "x:<offset>#k"), or the counter's of the golden file's
+// generator ("id0001").
+var idRE = regexp.MustCompile(`^(id[0-9a-z]{4,}|(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$`)
 
 func normalize(logs map[string]*socketLog, effects []any, home string) string {
 	ids := map[string]string{}

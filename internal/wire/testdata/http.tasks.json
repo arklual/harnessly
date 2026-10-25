@@ -1,0 +1,9 @@
+{
+  "http": "tasks",
+  "response": [
+    {"id": "1", "subject": "Read the transcript reader", "status": "completed"},
+    {"id": "2", "subject": "Write the tasks page", "status": "in_progress"},
+    {"id": "3", "subject": "Run the gates", "status": "pending"},
+    {"id": "4", "subject": "Wait for the lead's answer", "status": "blocked"}
+  ]
+}

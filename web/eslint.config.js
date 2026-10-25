@@ -32,4 +32,43 @@ export default tseslint.config(
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    // The new interface stands on its own (spec §6): from the current one only @/platform/{config,router,theme,head},
+    // and none of the libraries it replaces. app/next/legacy is the one bridge to the current interface's pane tools,
+    // and goes when they are written for the new one.
+    files: ['app/next/**/*.{ts,tsx}'],
+    ignores: ['app/next/legacy/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            'zustand',
+            'swr',
+            'sonner',
+            'socket.io-client',
+            'motion',
+            'lucide-react',
+            'react-icons',
+            'cmdk',
+          ].map((name) => ({ name, message: 'The new interface does not use this library (spec §6).' })),
+          patterns: [
+            {
+              regex: '^@/(?!next(/|$)|platform/(config|router|theme|head)$)',
+              message:
+                'The new interface imports only @/next/* and @/platform/{config,router,theme,head} (spec §6).',
+            },
+            {
+              group: ['@kit', '@kit/*'],
+              message: 'The new interface has its own kit in @/next/ui (spec §6).',
+            },
+            {
+              group: ['zustand/*', 'swr/*', 'motion/*', 'react-icons/*', 'socket.io-client/*'],
+              message: 'The new interface does not use this library (spec §6).',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

@@ -1,0 +1,20 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 537,
+  "e": {
+    "type": "background_upsert",
+    "task": {
+      "id": "a7f3e2d1",
+      "conversationId": "tab-k3Jx9QmZ",
+      "kind": "subagent",
+      "title": "Найти точки сборки id",
+      "startedAt": 1792655973000,
+      "endedAt": 1792656000000,
+      "status": "done",
+      "devServer": false,
+      "stoppable": false,
+      "outputPath": null
+    }
+  }
+}

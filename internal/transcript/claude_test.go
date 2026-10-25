@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -15,7 +14,10 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
-// The golden cases are the previous runtime's own parser run on the same bytes (testdata/claude/gen).
+// The golden cases are the previous runtime's own parser run on the same bytes (testdata/claude/gen), ids aside: its
+// random ids became the ones made of the transcript's bytes, and HARNESSLY_UPDATE_GOLDEN=1 rewrote the file;
+// every case had been checked equal id-blind first. The mass runs below (CLAUDE_TRANSCRIPT_MASS) still carry the old
+// counter's ids and cannot pass until the generator is run again.
 
 type claudeGolden struct {
 	Now   float64 `json:"now"`
@@ -40,23 +42,13 @@ type claudeCase struct {
 	JSON   *string `json:"json"`
 }
 
-// claudeDeterministic makes ids a counter (the generator's id0001, id0002, ...) and fixes the clock and the zone.
-func claudeDeterministic(t *testing.T, now float64) func() {
+// claudeDeterministic fixes the clock and the zone. Entry ids need nothing: they come from the transcript's own bytes.
+func claudeDeterministic(t *testing.T, now float64) {
 	t.Helper()
-	oldID, oldNow, oldLocal := NewID, claudeNow, time.Local
-	n := 0
-	NewID = func() string {
-		n++
-		s := strconv.FormatInt(int64(n), 36)
-		if len(s) < 4 {
-			s = strings.Repeat("0", 4-len(s)) + s
-		}
-		return "id" + s
-	}
+	oldNow, oldLocal := claudeNow, time.Local
 	claudeNow = func() float64 { return now }
 	time.Local = time.UTC
-	t.Cleanup(func() { NewID, claudeNow, time.Local = oldID, oldNow, oldLocal })
-	return func() { n = 0 }
+	t.Cleanup(func() { claudeNow, time.Local = oldNow, oldLocal })
 }
 
 func chunkJSON(c Chunk) *jsvalue.Object {
@@ -71,8 +63,7 @@ func chunkJSON(c Chunk) *jsvalue.Object {
 	return o
 }
 
-func runClaudeCase(t *testing.T, c claudeCase, data []byte, path string, reset func()) string {
-	reset()
+func runClaudeCase(t *testing.T, c claudeCase, data []byte, path string) string {
 	write := func(cut *int64) {
 		b := data
 		if cut != nil {
@@ -139,7 +130,7 @@ func checkClaudeGolden(t *testing.T, goldenPath, dir string) {
 	if g.Dir != "" {
 		dir = g.Dir
 	}
-	reset := claudeDeterministic(t, g.Now)
+	claudeDeterministic(t, g.Now)
 	files := map[string][]byte{}
 	load := func(name string) []byte {
 		if b, ok := files[name]; ok {
@@ -169,9 +160,29 @@ func checkClaudeGolden(t *testing.T, goldenPath, dir string) {
 		}
 	}
 	path := filepath.Join(t.TempDir(), "case.jsonl")
+	update := updatingGolden()
+	doc, err := jsvalue.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := doc.(*jsvalue.Object).Array("cases")
 	failed := 0
 	for i, c := range g.Cases {
-		got := runClaudeCase(t, c, load(c.File), path, reset)
+		got := runClaudeCase(t, c, load(c.File), path)
+		if update {
+			if c.Op == "file" && c.Hash == claudeThrowHash && got == "[]" {
+				continue
+			}
+			sum := sha256.Sum256([]byte(got))
+			o := cases[i].(*jsvalue.Object)
+			o.Set("hash", hex.EncodeToString(sum[:]))
+			if jsLength(got) <= claudeKeepJSON {
+				o.Set("json", got)
+			} else {
+				o.Delete("json")
+			}
+			continue
+		}
 		if c.Op == "file" && c.Hash == claudeThrowHash && got == "[]" {
 			// parseJsonlFile rejects where its tail read throws (nothing awaits it); ParseFile is empty there.
 			continue
@@ -193,11 +204,18 @@ func checkClaudeGolden(t *testing.T, goldenPath, dir string) {
 		t.Errorf("case %d %s %s cut=%v from=%v to=%v max=%d before=%d steps=%v:\n%s", i, c.Op, c.File, deref(c.Cut), deref(c.From),
 			deref(c.To), c.Max, c.Before, c.Steps, firstDifference(got, want))
 	}
+	if update {
+		writeGolden(t, goldenPath, doc)
+		return
+	}
 	if failed > 0 {
 		t.Errorf("%d of %d cases differ", failed, len(g.Cases))
 	}
 	t.Logf("%d cases", len(g.Cases))
 }
+
+// claudeKeepJSON is how long (in UTF-16 units) an answer may be to stay in the golden file whole beside its hash.
+const claudeKeepJSON = 1500
 
 var claudeThrowHash = func() string { s := sha256.Sum256([]byte("throw")); return hex.EncodeToString(s[:]) }()
 

@@ -162,9 +162,9 @@ func TestStateGolden(t *testing.T) {
 	}
 	sessionOK := func(r *http.Request) bool { return cookie(r, "good", "agent") }
 	tokenOK := cliTokenFirst(data, headers)
-	old := &gate.OldRuntime{Upstream: "127.0.0.1:18099", DataDir: data, TokenHeaders: headers}
+	cli := &gate.CLIToken{DataDir: data, Headers: headers}
 	d := deps{Home: home, DataDir: data, ConfigFile: filepath.Join(data, "config.json"), WorkspaceRoot: work, Tmux: tm,
-		TokenHeaders: headers, Old: old, SessionOK: sessionOK,
+		TokenHeaders: headers, CLI: cli, SessionOK: sessionOK,
 		APIRefusal: func(r *http.Request) (int, any, http.Header, bool) {
 			if sessionOK(r) || tokenOK(r) {
 				return 0, nil, nil, false

@@ -21,6 +21,8 @@ type cursor struct {
 	size    int64
 	scan    *scan
 	tasks   []Task
+	ended   []Ended
+	team    []Teammate
 	reading sync.Mutex
 }
 
@@ -53,6 +55,29 @@ func inode(st os.FileInfo) uint64 {
 // Read is the background work of a transcript still running. Reads of one transcript take turns: two at once would
 // both consume the same appended lines.
 func (r *Reader) Read(path string) []Task {
+	running, _ := r.ReadAll(path)
+	return running
+}
+
+// ReadAll is Read and the agents that ended, the latest first: a person who comes back to a chat sees what its
+// subagents did, not only the ones still running.
+func (r *Reader) ReadAll(path string) ([]Task, []Ended) {
+	c := r.cursorOf(path)
+	c.reading.Lock()
+	defer c.reading.Unlock()
+	return r.advance(path, c)
+}
+
+// Teammates are the named teammates the transcript started, the latest first, in the state its lead last saw them.
+func (r *Reader) Teammates(path string) []Teammate {
+	c := r.cursorOf(path)
+	c.reading.Lock()
+	defer c.reading.Unlock()
+	r.advance(path, c)
+	return c.team
+}
+
+func (r *Reader) cursorOf(path string) *cursor {
 	r.mu.Lock()
 	if r.cursors == nil {
 		r.cursors = map[string]*cursor{}
@@ -63,9 +88,7 @@ func (r *Reader) Read(path string) []Task {
 		r.cursors[path] = c
 	}
 	r.mu.Unlock()
-	c.reading.Lock()
-	defer c.reading.Unlock()
-	return r.advance(path, c)
+	return c
 }
 
 // Forget drops the cursor of a transcript no tab shows any more.
@@ -75,13 +98,13 @@ func (r *Reader) Forget(path string) {
 	r.mu.Unlock()
 }
 
-func (r *Reader) advance(path string, c *cursor) []Task {
+func (r *Reader) advance(path string, c *cursor) ([]Task, []Ended) {
 	now := r.now()
 	st, err := os.Stat(path)
 	if err != nil {
 		r.Forget(path)
 		*c = cursor{}
-		return []Task{}
+		return []Task{}, nil
 	}
 	if c.scan != nil && c.mtime.Equal(st.ModTime()) && c.size == st.Size() {
 		out := []Task{}
@@ -90,12 +113,12 @@ func (r *Reader) advance(path string, c *cursor) []Task {
 				out = append(out, t)
 			}
 		}
-		return out
+		return out, c.ended
 	}
 	// A rewritten or replaced transcript, or more new text than a cold read takes, starts over from the tail.
 	fromTail := false
 	if c.scan == nil || c.ino != inode(st) || st.Size() < c.offset || st.Size()-c.offset > tailBytes {
-		c.ino, c.offset, c.scan, c.tasks = inode(st), max(0, st.Size()-tailBytes), newScan(), nil
+		c.ino, c.offset, c.scan, c.tasks, c.ended, c.team = inode(st), max(0, st.Size()-tailBytes), newScan(), nil, nil, nil
 		c.mtime, c.size = time.Time{}, 0
 		fromTail = c.offset > 0
 	}
@@ -117,7 +140,9 @@ func (r *Reader) advance(path string, c *cursor) []Task {
 	c.offset += int64(complete)
 	c.mtime, c.size = st.ModTime(), st.Size()
 	c.tasks = r.aliveOnly(c.scan.tasks(now), path)
-	return c.tasks
+	c.ended = c.scan.endedAgents()
+	c.team = c.scan.team.list()
+	return c.tasks, c.ended
 }
 
 func readChunk(path string, from, to int64) []byte {
@@ -131,25 +156,29 @@ func readChunk(path string, from, to int64) []byte {
 	return buf[:n]
 }
 
-// aliveOnly drops shells and monitors whose output file the agent removed: their end never reached the transcript.
-func (r *Reader) aliveOnly(tasks []Task, transcript string) []Task {
+// OutputFile is where the agent writes a shell's or monitor's output: the path its result named, else the folder the
+// agent keeps task output in.
+func (r *Reader) OutputFile(transcript string, t Task) string {
+	if t.Output != nil {
+		return *t.Output
+	}
 	tmp := r.TempDir
 	if tmp == "" {
 		tmp = os.TempDir()
 	}
-	dir := filepath.Join(tmp, "claude-"+strconv.Itoa(r.UID), filepath.Base(filepath.Dir(transcript)),
-		strings.TrimSuffix(filepath.Base(transcript), ".jsonl"), "tasks")
+	return filepath.Join(tmp, "claude-"+strconv.Itoa(r.UID), filepath.Base(filepath.Dir(transcript)),
+		strings.TrimSuffix(filepath.Base(transcript), ".jsonl"), "tasks", t.ID+".output")
+}
+
+// aliveOnly drops shells and monitors whose output file the agent removed: their end never reached the transcript.
+func (r *Reader) aliveOnly(tasks []Task, transcript string) []Task {
 	out := []Task{}
 	for _, t := range tasks {
-		if t.Kind == Wakeup || t.Kind == Agent {
+		if t.Kind == Wakeup || t.Kind == Agent || t.Kind == Workflow {
 			out = append(out, t)
 			continue
 		}
-		file := filepath.Join(dir, t.ID+".output")
-		if t.Output != nil {
-			file = *t.Output
-		}
-		if _, err := os.Stat(file); err == nil {
+		if _, err := os.Stat(r.OutputFile(transcript, t)); err == nil {
 			out = append(out, t)
 		}
 	}

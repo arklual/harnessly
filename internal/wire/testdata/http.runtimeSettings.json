@@ -1,0 +1,4 @@
+{
+  "http": "runtimeSettings",
+  "response": {"idleStop": "2h"}
+}

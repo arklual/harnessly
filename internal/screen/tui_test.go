@@ -77,6 +77,16 @@ func TestIsBusy(t *testing.T) {
 		{"effort applied", fixture(t, "claude-effort-applied.txt"), false},
 		{"model confirmation", fixture(t, "claude-switch-model-confirm.txt"), false},
 		{"codex working", "• Working (3s • esc to interrupt)", true},
+		// Claude 2.1.310 compacting (real captures). At 40 columns the footer has no "esc to interrupt": the
+		// spinner of two words is all that says busy.
+		{"compacting", StripANSI(fixture(t, "claude-2.1.310-compacting.ansi.txt")), true},
+		{"compacting, narrow", StripANSI(fixture(t, "claude-2.1.310-compacting-narrow.ansi.txt")), true},
+		{"compaction hooks", "· Running PreCompact hooks… (1s)\n❯ \n  ⏵⏵ auto mode on (shift+tab to cycle)", true},
+		{"compacted", "✻ Compacting conversation… \n", true},
+		// Output that starts with a glyph of the spinner is not one: too many words, or the ellipsis inside a word.
+		{"bullet that trails off", "* and then the build went on for a while…\n❯ \n", false},
+		{"ellipsis inside a word", "* wait…what\n❯ \n", false},
+		{"done", "✻ Compacted for 48s · done 9:16 PM\n❯ \n", false},
 	}
 	for _, c := range cases {
 		if got := IsBusy(c.plain); got != c.want {
@@ -87,12 +97,17 @@ func TestIsBusy(t *testing.T) {
 
 func TestIsBusyAnywhere(t *testing.T) {
 	var todos []string
-	for i := range 20 {
+	for i := range 40 {
 		todos = append(todos, fmt.Sprintf("  ☐ step %d", i))
 	}
 	screen := "✽ Contemplating… (12s · ↓ 20 tokens)\n" + strings.Join(todos, "\n") + "\n\n╭────╮\n│ > │\n╰────╯\n  ? for shortcuts"
 	if IsBusy(screen) {
 		t.Error("the spinner above a long todo list is within the last lines")
+	}
+	// A todo list of ten, as Claude draws it under the spinner, does not hide it.
+	short := "✽ Contemplating… (12s · ↓ 20 tokens)\n" + strings.Join(todos[:10], "\n") + "\n\n╭────╮\n│ > │\n╰────╯\n  ? for shortcuts"
+	if !IsBusy(short) {
+		t.Error("the spinner over a todo list of ten is not seen")
 	}
 	if !IsBusyAnywhere(screen) {
 		t.Error("the spinner pushed up by a todo list is not seen")

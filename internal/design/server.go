@@ -159,6 +159,26 @@ func HostAllowed(host string, port int) bool {
 	return host == "localhost:"+p || host == "127.0.0.1:"+p || host == "[::1]:"+p
 }
 
+// frameAncestors is the policy of every answer of the library server: a board is framed by the library's own pages, by
+// the platform on this machine (another loopback port) and by the configured platform hosts. A board shown through a
+// preview slot gets the slot's own policy instead (the proxy drops this one and names the apps that opened the slot).
+func (l *Library) frameAncestors() string {
+	sources := []string{"'self'", "http://localhost:*", "http://127.0.0.1:*"}
+	sources = append(sources, l.platformOrigins()...)
+	return "frame-ancestors " + strings.Join(sources, " ")
+}
+
+// platformOrigins are the configured platform hosts that show boards, normalized; what is not an origin is left out.
+func (l *Library) platformOrigins() []string {
+	out := []string{}
+	for _, o := range l.cfg.KitOrigins {
+		if o = NormalizeOrigin(o); o != "" && o != "null" {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
 // search is URLSearchParams.get: the first value, ok false when absent.
 func search(q url.Values, k string) (string, bool) {
 	vs, ok := q[k]
@@ -230,6 +250,8 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 		send(w, 403, "text/plain; charset=utf-8", []byte("Forbidden"), false)
 		return
 	}
+	// Only the platform may frame a board: a page of another site would read it through the board script's messages.
+	w.Header().Set("Content-Security-Policy", l.frameAncestors())
 	head := r.Method == http.MethodHead
 	pathname := r.URL.EscapedPath()
 	if pathname == "" {
@@ -237,6 +259,17 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 	}
 	q := r.URL.Query()
 	id, _ := search(q, "a")
+	switch pathname {
+	case versionPath, eventsPath, statePath, logPath, changesPath, boardsPath:
+		need := RoleView
+		if pathname == statePath || pathname == logPath {
+			need = RoleEdit // they write the live state and log
+		}
+		if IsLibraryID(id) && !l.Can(id, need) {
+			send(w, 404, "application/json", notFoundJSON, head)
+			return
+		}
+	}
 	switch pathname {
 	case "/favicon.ico":
 		w.WriteHeader(204)
@@ -303,7 +336,15 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 		l.serveKitList(w, q, head)
 		return
 	case "/":
-		sendHTML(w, 200, l.indexPage(l.ListArtifacts(), l.Root()), head)
+		sendHTML(w, 200, l.indexPage(l.VisibleTo(l.ListArtifacts()), l.Root()), head)
+		return
+	}
+	if strings.HasPrefix(pathname, hashedPrefix) {
+		l.serveHashed(w, r, pathname, head)
+		return
+	}
+	if strings.HasPrefix(pathname, vendorPrefix) {
+		l.serveVendor(w, r, pathname, head)
 		return
 	}
 	raw := strings.Split(pathname, "/")[1:]
@@ -330,6 +371,9 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 	}
 	if area != "a" || !IsLibraryID(ref) {
 		sendHTML(w, 404, l.notFoundPage(), head)
+		return
+	}
+	if l.refuseBoard(w, ref, head) {
 		return
 	}
 	kind, hasKind := at(2)
@@ -385,10 +429,10 @@ func (l *Library) boardsForBar(a *Artifact) []barBoard {
 	return out
 }
 
-var headTag = regexp.MustCompile(`(?i)<head[^>]*>`)
+var headTag = regexp.MustCompile(`(?i)<head(?:\s[^>]*)?>`)
 
 func withClient(source, id string) string {
-	tag := `<script data-artifact="` + id + `" src="` + scriptPath + `"></script>`
+	tag := resourcesScript() + `<script data-artifact="` + id + `" src="` + scriptPath + `"></script>`
 	if m := headTag.FindString(source); m != "" {
 		return strings.Replace(source, m, m+tag, 1)
 	}
@@ -454,12 +498,13 @@ func assetMatches(src string) []assetMatch {
 // withAssetVersions puts each asset's version into its address (styles.css?tkv=…): such a file is kept for good by
 // the browser, so opening a board again asks only for the page; an edited file gets a new address. served maps a
 // file to the one actually answered for it (the release's engine for the project's support.js).
-func withAssetVersions(source, dir, projectRoot string, served func(real string) string) string {
+func withAssetVersions(source, dir, projectRoot string, served func(real string) string, hx *hashIndex) string {
 	matches := assetMatches(source)
 	if len(matches) == 0 {
 		return source
 	}
 	versions := map[string]string{}
+	hashedURLs := map[string]string{}
 	for _, m := range matches {
 		if _, seen := versions[m.url]; seen || !isProjectURL(m.url) {
 			continue
@@ -485,6 +530,11 @@ func withAssetVersions(source, dir, projectRoot string, served func(real string)
 			real = served(real)
 		}
 		if st, err := os.Stat(real); err == nil && st.Mode().IsRegular() {
+			// a heavy file, hashed after the swap: a release's engine is addressed by its own bytes, not the project copy's
+			if u, ok := hx.urlFor(real, st); ok {
+				hashedURLs[m.url] = u
+				continue
+			}
 			versions[m.url] = FileVersion(st)
 		}
 	}
@@ -493,7 +543,13 @@ func withAssetVersions(source, dir, projectRoot string, served func(real string)
 	for _, m := range matches {
 		v := versions[m.url]
 		b.WriteString(source[last:m.start])
-		if v == "" {
+		if u, ok := hashedURLs[m.url]; ok {
+			frag := ""
+			if i := strings.Index(m.url, "#"); i >= 0 {
+				frag = m.url[i:]
+			}
+			b.WriteString(m.prefix + m.quote + u + frag + m.quote)
+		} else if v == "" {
 			b.WriteString(source[m.start:m.end])
 		} else {
 			parts := strings.Split(m.url, "#")
@@ -581,7 +637,7 @@ func (l *Library) serveFile(w http.ResponseWriter, r *http.Request, q url.Values
 			sendHTML(w, 404, l.notFoundPage(), head)
 			return
 		}
-		send(w, 200, typ, []byte(withClient(withAssetVersions(jscompat.DecodeUTF8(src), filepath.Dir(file), root, l.engineSwap(id)), id)), head)
+		send(w, 200, typ, []byte(withClient(withAssetVersions(jscompat.DecodeUTF8(src), filepath.Dir(file), root, l.engineSwap(id), l.hashed), id)), head)
 		return
 	}
 	st, err := os.Stat(file)

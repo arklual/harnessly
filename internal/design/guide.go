@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/nodejson"
 )
 
 //go:embed texts
@@ -45,7 +46,8 @@ func (l *Library) text(name string) string {
 	}
 	t := l.cfg.Texts
 	out := strings.NewReplacer("{{tag}}", t.Tag, "{{cli}}", t.CLI, "{{host}}", t.Host, "{{shared}}", t.SharedDir,
-		"{{kit}}", t.KitGlobal, "{{pages}}", t.PagesGlobal, "{{args}}", t.ArgsGlobal, "{{app}}", t.AppName).Replace(string(b))
+		"{{kit}}", t.KitGlobal, "{{pages}}", t.PagesGlobal, "{{args}}", t.ArgsGlobal, "{{app}}", t.AppName,
+		"{{hosts}}", string(nodejson.Marshal(l.platformOrigins()))).Replace(string(b))
 	l.texts.Store(key, out)
 	return out
 }

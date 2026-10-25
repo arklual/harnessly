@@ -136,7 +136,7 @@ func stateRoutes(d deps, store *settings.Store, validate func(provider string, m
 	)
 	guide := releaseStatic("RUNTIME_API_GUIDE_FILE", "api-guide.md")
 	// With no guide file a standalone runtime answers with the built-in one.
-	builtIn := d.Old == nil || d.Old.Upstream == ""
+	builtIn := d.Upstream == ""
 	routes = append(routes, gate.JSONRoute{Slice: settings.Slice,
 		Match: func(r *http.Request) bool {
 			return pathIs(r, "/api/cli/api-guide") && ((guide != "" && fileExists(guide)) || builtIn)
@@ -145,7 +145,7 @@ func stateRoutes(d deps, store *settings.Store, validate func(provider string, m
 			if r.Method != http.MethodGet {
 				return stateAnswer(r, http.StatusMethodNotAllowed, errBody("Method not allowed"), http.Header{"Allow": {"GET"}})
 			}
-			if !d.Old.CLITokenOK(r) {
+			if !d.CLI.OK(r) {
 				return stateAnswer(r, http.StatusForbidden, errBody("Forbidden"), nil)
 			}
 			text := []byte(builtInAPIGuide)
@@ -578,7 +578,7 @@ func authRoutes(d deps, store *settings.Store, open func(settings.Handler) func(
 			if r.Method != http.MethodGet {
 				return stateAnswer(r, http.StatusMethodNotAllowed, errBody("Method not allowed"), http.Header{"Allow": {"GET"}})
 			}
-			if !needsSetup() && !d.Old.CLITokenOK(r) && !d.SessionOK(r) {
+			if !needsSetup() && !d.CLI.OK(r) && !d.SessionOK(r) {
 				return stateAnswer(r, http.StatusUnauthorized, errBody("Unauthorized"), nil)
 			}
 			res := d.Tools.Runtime()
@@ -675,7 +675,7 @@ func (c *core) browserTabRoutes(d deps) []gate.JSONRoute {
 			if r.Method != method {
 				return stateAnswer(r, http.StatusMethodNotAllowed, errBody("Method not allowed"), http.Header{"Allow": {method}})
 			}
-			if !d.Old.CLITokenOK(r) {
+			if !d.CLI.OK(r) {
 				return stateAnswer(r, http.StatusForbidden, errBody("Forbidden"), nil)
 			}
 			ws := settings.Query(r, "workspaceId")

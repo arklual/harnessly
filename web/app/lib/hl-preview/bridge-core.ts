@@ -32,7 +32,68 @@ export type TParentMessage =
    */
   | { type: 'tk:fill'; token: string }
   /** Is there a password field, and is the form fit to fill? Asked before a token is minted and after a login: `tk:login-probe`. */
-  | { type: 'tk:probe-login' };
+  | { type: 'tk:probe-login' }
+  /**
+   * The whole set of looks the person is trying on the blocks they picked, by the number `tk:picked` gave each. A block
+   * that is no longer in the set gets back what it had; the answer is `tk:styled`.
+   */
+  | { type: 'tk:styles'; items: IStyleItem[] }
+  /**
+   * The page stands on a canvas (a design): Space held over it (`tk:space`) and a drag with the middle button (`tk:pan`)
+   * are the canvas's, and are told to the parent. The wheel stays the page's: at the end of its scroll nothing moves.
+   */
+  | { type: 'tk:canvas'; on: boolean }
+  /**
+   * The blocks the parent pins its notes to: the bridge keeps telling where each one shows (`tk:anchored`) while the page
+   * scrolls, moves or covers it. An empty set stops it.
+   */
+  | { type: 'tk:anchors'; items: IAnchorItem[] };
+
+/** A block a note is pinned to: by the number `tk:picked` gave it, else by its selector (a page loaded again). */
+export interface IAnchorItem {
+  /** The parent's name for it, given back in `tk:anchored`. */
+  key: string;
+  pick: number | null;
+  selector: string;
+}
+
+/** A box in the page's viewport, in its CSS pixels. */
+export interface IAnchorBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Where a pinned block shows. */
+export interface IAnchorGeometry {
+  /** The whole block. */
+  box: IAnchorBox;
+  /** The part on screen: inside the viewport, the ancestors and from under what the page lays over it; null for none. */
+  shown: IAnchorBox | null;
+  /** Something of the page lies over all of what is left of it. */
+  covered: boolean;
+}
+
+/** What is tried on one picked block; null leaves that property as the page has it. */
+export interface IStyleItem {
+  id: number;
+  /** `#rrggbb`. */
+  background: string | null;
+  /** Pixels. */
+  radius: number | null;
+  /** 0 to 1. */
+  opacity: number | null;
+}
+
+/** What a picked block looks like now, read when it is picked. */
+export interface IBlockLook {
+  /** `#rrggbb`; null for a transparent or unreadable fill. */
+  background: string | null;
+  /** Pixels; null when the page gives it in other units. */
+  radius: number | null;
+  opacity: number;
+}
 
 export type TFillReason =
   'no-form' | 'not-login-form' | 'foreign-action' | 'service-worker' | 'expired' | 'moved' | 'failed';
@@ -68,6 +129,27 @@ export const prefixSetCookie = (value: string, tag: string, plain = false): stri
   return [`__t_${tag}_${pair}`, ...kept, ...scope].join('; ');
 };
 
+const MAX_STYLE_ITEMS = 64;
+const MAX_RADIUS = 1000;
+
+/** The set of looks as the parent sent it: every item is checked, one that is not right drops the whole set. */
+export const parseStyleItems = (value: unknown): IStyleItem[] | null => {
+  if (!Array.isArray(value) || value.length > MAX_STYLE_ITEMS) return null;
+  const items: IStyleItem[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return null;
+    const item = raw as Record<string, unknown>;
+    const { id, background, radius, opacity } = item;
+    if (typeof id !== 'number' || !Number.isInteger(id) || id < 1) return null;
+    if (background !== null && !(typeof background === 'string' && /^#[0-9a-f]{6}$/i.test(background)))
+      return null;
+    if (radius !== null && !(typeof radius === 'number' && radius >= 0 && radius <= MAX_RADIUS)) return null;
+    if (opacity !== null && !(typeof opacity === 'number' && opacity >= 0 && opacity <= 1)) return null;
+    items.push({ id, background, radius, opacity });
+  }
+  return items;
+};
+
 export const parseParentMessage = (data: unknown): TParentMessage | null => {
   if (!data || typeof data !== 'object') return null;
   const message = data as Record<string, unknown>;
@@ -96,7 +178,323 @@ export const parseParentMessage = (data: unknown): TParentMessage | null => {
     return { type: 'tk:fill', token: message.token };
   }
   if (message.type === 'tk:probe-login') return { type: 'tk:probe-login' };
+  if (message.type === 'tk:canvas' && typeof message.on === 'boolean')
+    return { type: 'tk:canvas', on: message.on };
+  if (message.type === 'tk:styles') {
+    const items = parseStyleItems(message.items);
+    return items ? { type: 'tk:styles', items } : null;
+  }
+  if (message.type === 'tk:anchors') {
+    const items = parseAnchorItems(message.items);
+    return items ? { type: 'tk:anchors', items } : null;
+  }
   return null;
+};
+
+const MAX_ANCHORS = 64;
+
+/** The pinned blocks as the parent sent them: one item that is not right drops the whole set. */
+export const parseAnchorItems = (value: unknown): IAnchorItem[] | null => {
+  if (!Array.isArray(value) || value.length > MAX_ANCHORS) return null;
+  const items: IAnchorItem[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return null;
+    const { key, pick, selector } = raw as Record<string, unknown>;
+    if (typeof key !== 'string' || !/^[\w.:~-]{1,64}$/.test(key)) return null;
+    if (pick !== null && !(typeof pick === 'number' && Number.isInteger(pick) && pick >= 1)) return null;
+    if (typeof selector !== 'string' || selector.length > 512) return null;
+    items.push({ key, pick, selector });
+  }
+  return items;
+};
+
+/** The part of `a` inside `b`; null when nothing of it is. */
+export const meetBoxes = (a: IAnchorBox, b: IAnchorBox): IAnchorBox | null => {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const right = Math.min(a.x + a.w, b.x + b.w);
+  const bottom = Math.min(a.y + a.h, b.y + b.h);
+  return right > x && bottom > y ? { x, y, w: right - x, h: bottom - y } : null;
+};
+
+/** What `b` leaves of `a` when it lies over a whole side of it (a sticky bar, a sheet, a sidebar); `a` itself otherwise. */
+export const trimBox = (a: IAnchorBox, b: IAnchorBox): IAnchorBox | null => {
+  const edge = 0.5;
+  let { x, y } = a;
+  let right = a.x + a.w;
+  let bottom = a.y + a.h;
+  if (b.x <= x + edge && b.x + b.w >= right - edge) {
+    if (b.y <= y + edge && b.y + b.h > y) y = b.y + b.h;
+    else if (b.y + b.h >= bottom - edge && b.y < bottom) bottom = b.y;
+  } else if (b.y <= y + edge && b.y + b.h >= bottom - edge) {
+    if (b.x <= x + edge && b.x + b.w > x) x = b.x + b.w;
+    else if (b.x + b.w >= right - edge && b.x < right) right = b.x;
+  }
+  return right > x && bottom > y ? { x, y, w: right - x, h: bottom - y } : null;
+};
+
+/** The element a box hangs from in the page's layout: a slot it is shown in, its parent, a shadow root's host. */
+export const layoutParent = (node: any): any =>
+  node.assignedSlot || node.parentElement || (node.parentNode && node.parentNode.host) || null;
+
+/**
+ * The part of a box its ancestors leave: every ancestor that clips its overflow (hidden, scroll, auto, clip; each axis on
+ * its own) cuts it to its padding box. A fixed box escapes them up to an ancestor that holds fixed boxes (a transform, a
+ * filter, a containment), an absolute one up to a positioned ancestor. The root and the body are the viewport's.
+ */
+export const clipByAncestors = (
+  el: any,
+  box: IAnchorBox,
+  win: any,
+  doc: any,
+  core: any,
+): IAnchorBox | null => {
+  const far = 1e7;
+  const holdsFixed = (style: any) =>
+    (style.transform && style.transform !== 'none') ||
+    (style.filter && style.filter !== 'none') ||
+    (style.perspective && style.perspective !== 'none') ||
+    /paint|layout|strict|content/.test(String(style.contain || ''));
+  let left: IAnchorBox | null = box;
+  let escape = String(win.getComputedStyle(el).position);
+  for (let node = core.layoutParent(el); node && left; node = core.layoutParent(node)) {
+    if (node === doc.documentElement || node === doc.body || node.nodeType !== 1) continue;
+    const style = win.getComputedStyle(node);
+    if (escape === 'fixed' && !holdsFixed(style)) continue;
+    if (escape === 'absolute' && style.position === 'static' && !holdsFixed(style)) continue;
+    escape = String(style.position);
+    const cutX = style.overflowX !== 'visible';
+    const cutY = style.overflowY !== 'visible';
+    if (!cutX && !cutY) continue;
+    const rect = node.getBoundingClientRect();
+    // A scaled ancestor: its client sizes are its own pixels, its rect the viewport's.
+    const kx = node.offsetWidth > 0 ? rect.width / node.offsetWidth : 1;
+    const ky = node.offsetHeight > 0 ? rect.height / node.offsetHeight : 1;
+    left = core.meetBoxes(left, {
+      x: cutX ? rect.left + node.clientLeft * kx : -far,
+      y: cutY ? rect.top + node.clientTop * ky : -far,
+      w: cutX ? node.clientWidth * kx : 2 * far,
+      h: cutY ? node.clientHeight * ky : 2 * far,
+    });
+  }
+  return left;
+};
+
+/**
+ * What the page lays over a block: the points of a grid on its visible part are hit-tested. What answers there and is
+ * neither the block, inside it nor under it (an ancestor) lies over it; taken up to the widest of its ancestors that is
+ * not the block's, it cuts the part off when it spans a whole side. Covered when every point is another's and nothing
+ * can be cut off. A block that lets the pointer through (`pointer-events: none`) is not tested: what is under it answers.
+ */
+export const uncover = (el: any, shown: IAnchorBox, win: any, doc: any, core: any) => {
+  const holds = (outer: any, inner: any) => {
+    for (let node = inner; node; node = core.layoutParent(node)) if (node === outer) return true;
+    return false;
+  };
+  const own = (hit: any) => !hit || holds(el, hit) || holds(hit, el);
+  if (win.getComputedStyle(el).pointerEvents === 'none' || typeof doc.elementFromPoint !== 'function')
+    return { shown, covered: false };
+  const layer = (hit: any) => {
+    let top = hit;
+    for (let node = core.layoutParent(hit); node; node = core.layoutParent(node)) {
+      if (node === doc.body || node === doc.documentElement || holds(node, el)) break;
+      if (win.getComputedStyle(node).pointerEvents === 'none') break;
+      top = node;
+    }
+    return top;
+  };
+  let left: IAnchorBox = shown;
+  for (let round = 0; round < 4; round += 1) {
+    const xs = left.w < 3 ? [left.x + left.w / 2] : [left.x + 1, left.x + left.w / 2, left.x + left.w - 1];
+    const ys = left.h < 3 ? [left.y + left.h / 2] : [left.y + 1, left.y + left.h / 2, left.y + left.h - 1];
+    const hits: any[] = [];
+    for (const y of ys) for (const x of xs) hits.push(doc.elementFromPoint(x, y));
+    const others = [...new Set(hits.filter((hit) => !own(hit)))];
+    if (others.length === 0) return { shown: left, covered: false };
+    let cut = false;
+    for (const other of others) {
+      const rect = layer(other).getBoundingClientRect();
+      const next = core.trimBox(left, { x: rect.left, y: rect.top, w: rect.width, h: rect.height });
+      if (!next) return { shown: null, covered: true };
+      if (next.x !== left.x || next.y !== left.y || next.w !== left.w || next.h !== left.h) cut = true;
+      left = next;
+    }
+    if (!cut) {
+      const all = hits.every((hit) => !own(hit));
+      return all ? { shown: null, covered: true } : { shown: left, covered: false };
+    }
+  }
+  return { shown: left, covered: false };
+};
+
+/** Where a pinned block shows now: its box, what is on screen and whether it is covered. */
+export const anchorGeometry = (el: any, win: any, doc: any, core: any): IAnchorGeometry => {
+  const rect = el.getBoundingClientRect();
+  const box = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+  const root = doc.documentElement;
+  const view = {
+    x: 0,
+    y: 0,
+    w: (root && root.clientWidth) || win.innerWidth,
+    h: (root && root.clientHeight) || win.innerHeight,
+  };
+  const reach = core.clipByAncestors(el, box, win, doc, core);
+  const inView = reach ? core.meetBoxes(reach, view) : null;
+  if (!inView) return { box, shown: null, covered: false };
+  const { shown, covered } = core.uncover(el, inView, win, doc, core);
+  return { box, shown, covered };
+};
+
+/**
+ * The pinned blocks followed: whatever may move one (a scroll of the page or of any scroller in it, a resize, a change of
+ * the DOM, a size a block takes, a transition or an animation running) asks for one look in the next frame, and the
+ * parent hears `tk:anchored` when something changed. `find` gives the element of an item or null.
+ */
+export const installAnchors = (
+  win: any,
+  doc: any,
+  post: (message: Record<string, unknown>) => void,
+  find: (item: IAnchorItem) => any,
+  core: any,
+) => {
+  let items: IAnchorItem[] = [];
+  const found = new Map<string, any>();
+  let frame = 0;
+  let last = '';
+  let running = 0;
+  let busyUntil = 0;
+  const round = (v: number) => Math.round(v * 100) / 100;
+  const pack = (b: IAnchorBox | null) => (b ? [round(b.x), round(b.y), round(b.w), round(b.h)] : null);
+  const Resize = win.ResizeObserver;
+  const Mutation = win.MutationObserver;
+  const sizes = Resize ? new Resize(() => queue()) : null;
+  const changes = Mutation ? new Mutation(() => queue()) : null;
+  const look = () => {
+    frame = 0;
+    if (items.length === 0) return;
+    const root = doc.documentElement;
+    const out: Record<string, unknown>[] = [];
+    for (const item of items) {
+      let el = found.get(item.key);
+      if (!el || !el.isConnected) {
+        el = find(item);
+        if (el) {
+          found.set(item.key, el);
+          sizes?.observe(el);
+        } else found.delete(item.key);
+      }
+      if (!el) {
+        out.push({ key: item.key, box: null, shown: null, covered: false });
+        continue;
+      }
+      let g: IAnchorGeometry | null = null;
+      try {
+        g = core.anchorGeometry(el, win, doc, core);
+      } catch {
+        g = null;
+      }
+      out.push(
+        g
+          ? { key: item.key, box: pack(g.box), shown: pack(g.shown), covered: g.covered }
+          : { key: item.key, box: null, shown: null, covered: false },
+      );
+    }
+    const message = {
+      type: 'tk:anchored',
+      vw: (root && root.clientWidth) || win.innerWidth,
+      vh: (root && root.clientHeight) || win.innerHeight,
+      items: out,
+    };
+    const text = JSON.stringify(message);
+    if (text !== last) {
+      last = text;
+      post(message);
+    }
+    // While something animates, every frame is looked at; a lost end event stops it after a while.
+    if (running > 0 && Date.now() < busyUntil) queue();
+    else running = 0;
+  };
+  const queue = () => {
+    if (!frame && items.length > 0) frame = win.requestAnimationFrame(look);
+  };
+  const start = () => {
+    running += 1;
+    busyUntil = Date.now() + 3000;
+    queue();
+  };
+  const stop = () => {
+    running = Math.max(0, running - 1);
+    queue();
+  };
+  win.addEventListener('scroll', queue, { capture: true, passive: true });
+  win.addEventListener('resize', queue);
+  for (const type of ['transitionrun', 'animationstart']) win.addEventListener(type, start, true);
+  for (const type of ['transitionend', 'transitioncancel', 'animationend', 'animationcancel'])
+    win.addEventListener(type, stop, true);
+  // What moves without a word (a change of the page's own timers' making that no event or observer sees) is caught by a
+  // slow look while there is anything to follow.
+  let slow = 0;
+  return (next: IAnchorItem[]) => {
+    const had = items.length > 0;
+    items = next;
+    found.clear();
+    sizes?.disconnect();
+    changes?.disconnect();
+    win.clearInterval(slow);
+    slow = 0;
+    last = '';
+    if (items.length === 0) {
+      if (had) post({ type: 'tk:anchored', vw: 0, vh: 0, items: [] });
+      return;
+    }
+    slow = win.setInterval(queue, 500);
+    if (doc.documentElement) {
+      sizes?.observe(doc.documentElement);
+      changes?.observe(doc.documentElement, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true,
+      });
+    }
+    queue();
+  };
+};
+
+/** Where Space is the page's own: a field being typed in. */
+export const isTypingTarget = (target: any): boolean =>
+  !!target &&
+  typeof target.closest === 'function' &&
+  target.closest(
+    'input:not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]), textarea, select, [contenteditable]:not([contenteditable="false"])',
+  ) !== null;
+
+/**
+ * Whether the wheel's turn (dx, dy) scrolls something under `target`: an element of it with room left that way (its
+ * overflow lets it scroll), or the document itself when neither the root nor the body hides its overflow.
+ */
+export const scrollsBy = (win: any, doc: any, target: any, dx: number, dy: number): boolean => {
+  const room = (el: any, ok: (axis: 'x' | 'y') => boolean) =>
+    (dy > 0 && ok('y') && el.scrollTop + el.clientHeight < el.scrollHeight - 1) ||
+    (dy < 0 && ok('y') && el.scrollTop > 0) ||
+    (dx > 0 && ok('x') && el.scrollLeft + el.clientWidth < el.scrollWidth - 1) ||
+    (dx < 0 && ok('x') && el.scrollLeft > 0);
+  const root = doc.scrollingElement ?? doc.documentElement;
+  for (let el = target && target.nodeType === 1 ? target : target?.parentElement; el; el = el.parentElement) {
+    if (el === root || el === doc.body) continue;
+    const style = win.getComputedStyle(el);
+    const scrolls = (axis: 'x' | 'y') =>
+      /auto|scroll|overlay/.test(axis === 'y' ? style.overflowY : style.overflowX);
+    if (room(el, scrolls)) return true;
+  }
+  if (!root) return false;
+  const html = win.getComputedStyle(doc.documentElement);
+  const body = doc.body ? win.getComputedStyle(doc.body) : null;
+  const open = (axis: 'x' | 'y') => {
+    const of = (style: any) => (axis === 'y' ? style.overflowY : style.overflowX);
+    return !/hidden|clip/.test(of(html)) && !(body && /hidden|clip/.test(of(body)));
+  };
+  return room(root, open);
 };
 
 export const clip = (text: string, max: number): string =>
@@ -231,6 +629,75 @@ export const pickedMessage = (el: any, win: any, doc: any, core: any) => {
     viewport: { w: win.innerWidth, h: win.innerHeight },
   };
 };
+
+/** `#rrggbb` for a computed color the canvas can read (it also turns `oklch()` and the like into sRGB); null when it is clear or unreadable. */
+export const colorHex = (value: string, doc: any): string | null => {
+  const context = doc.createElement('canvas').getContext('2d');
+  if (!context) return null;
+  context.fillStyle = '#000000';
+  context.fillStyle = value;
+  const read = String(context.fillStyle);
+  if (/^#[0-9a-f]{6}$/i.test(read)) return read.toLowerCase();
+  const rgba = /^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(read);
+  if (!rgba || Number(rgba[4]) === 0) return null;
+  return `#${[rgba[1], rgba[2], rgba[3]].map((part) => Number(part).toString(16).padStart(2, '0')).join('')}`;
+};
+
+/** What the block looks like now: its fill, the corner radius and the opacity. */
+export const readLook = (el: any, win: any, doc: any): IBlockLook => {
+  const style = win.getComputedStyle(el);
+  const radius = /^(\d+(?:\.\d+)?)px$/.exec(String(style.borderTopLeftRadius));
+  const opacity = Number.parseFloat(String(style.opacity));
+  return {
+    background: colorHex(String(style.backgroundColor), doc),
+    radius: radius ? Number(radius[1]) : null,
+    opacity: Number.isFinite(opacity) ? opacity : 1,
+  };
+};
+
+/** The properties each look is written to; `!important` so a rule of the page cannot hide what is tried on. */
+const LOOK_PROPERTIES = {
+  background: ['background-color', 'background-image'],
+  radius: ['border-radius'],
+  opacity: ['opacity'],
+} as const;
+
+export interface IKept {
+  [property: string]: { value: string; priority: string };
+}
+
+/** Puts `item` on the block, keeping in `kept` what the block had before the first time a property is touched. */
+export const applyLook = (el: any, item: IStyleItem, kept: IKept): void => {
+  const inline = el.style;
+  const values = {
+    background: item.background === null ? null : [item.background, 'none'],
+    radius: item.radius === null ? null : [`${item.radius}px`],
+    opacity: item.opacity === null ? null : [String(item.opacity)],
+  };
+  for (const group of ['background', 'radius', 'opacity'] as const) {
+    const wanted = values[group];
+    LOOK_PROPERTIES[group].forEach((property, index) => {
+      if (wanted === null) {
+        if (!(property in kept)) return;
+        const before = kept[property];
+        if (before.value === '') inline.removeProperty(property);
+        else inline.setProperty(property, before.value, before.priority);
+        delete kept[property];
+        return;
+      }
+      if (!(property in kept))
+        kept[property] = {
+          value: inline.getPropertyValue(property),
+          priority: inline.getPropertyPriority(property),
+        };
+      inline.setProperty(property, wanted[index], 'important');
+    });
+  }
+};
+
+/** The block as it was before anything was tried on it. */
+export const restoreLook = (el: any, kept: IKept): void =>
+  applyLook(el, { id: 0, background: null, radius: null, opacity: null }, kept);
 
 /**
  * The DOM accessors the safe relies on, taken from the prototypes before any script of the page runs. A page
@@ -546,6 +1013,73 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
     }, 1500);
   };
 
+  // The blocks the person picked, by number, and what the bridge put on them: the parent tries looks on them (`tk:styles`).
+  const MAX_PICKED = 64;
+  const pickedBlocks = new Map<number, any>();
+  const kept = new Map<any, any>();
+  let pickSeq = 0;
+  const remember = (el: any) => {
+    pickSeq += 1;
+    pickedBlocks.set(pickSeq, el);
+    if (pickedBlocks.size > MAX_PICKED) {
+      const [oldest] = pickedBlocks.keys();
+      const gone = pickedBlocks.get(oldest);
+      if (kept.has(gone)) core.restoreLook(gone, kept.get(gone));
+      kept.delete(gone);
+      pickedBlocks.delete(oldest);
+    }
+    return pickSeq;
+  };
+  const readLookSafely = (el: any) => {
+    try {
+      return core.readLook(el, win, doc);
+    } catch {
+      return null;
+    }
+  };
+  const setStyles = (items: any[]) => {
+    const wanted = new Set<any>();
+    const missing: number[] = [];
+    for (const item of items) {
+      const el = pickedBlocks.get(item.id);
+      if (!el || !el.isConnected) {
+        missing.push(item.id);
+        continue;
+      }
+      wanted.add(el);
+      if (!kept.has(el)) kept.set(el, {});
+      core.applyLook(el, item, kept.get(el));
+    }
+    for (const [el, was] of [...kept]) {
+      if (wanted.has(el)) continue;
+      core.restoreLook(el, was);
+      kept.delete(el);
+    }
+    post({ type: 'tk:styled', gone: missing });
+  };
+
+  // The blocks the parent's notes are pinned to: by number while it is the block its selector names (a number from a page
+  // loaded before may name another block now), else the first that the selector finds.
+  const query = (selector: string) => {
+    try {
+      return selector ? doc.querySelector(selector) : null;
+    } catch {
+      return null;
+    }
+  };
+  const findAnchor = (item: any) => {
+    const el = item.pick === null ? null : pickedBlocks.get(item.pick);
+    if (!el || !el.isConnected) return query(item.selector);
+    let fits = true;
+    try {
+      fits = !item.selector || el.matches(item.selector);
+    } catch {
+      fits = true;
+    }
+    return fits ? el : (query(item.selector) ?? el);
+  };
+  const setAnchors = core.installAnchors(win, doc, post, findAnchor, core);
+
   const nav = () => {
     if (win.location.href === lastUrl) return;
     lastUrl = win.location.href;
@@ -601,7 +1135,11 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       swallow(event);
       const target = deepTarget(event);
       if (!isPage(target)) return;
-      post(core.pickedMessage(target, win, doc, core));
+      post({
+        ...core.pickedMessage(target, win, doc, core),
+        pick: remember(target),
+        look: readLookSafely(target),
+      });
       setPicking(false, true);
     },
     true,
@@ -615,6 +1153,124 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
     },
     true,
   );
+
+  // The page is being scrolled (the document or any scroller in it): the parent narrows its field while it goes and folds a
+  // phone's bars by the direction. One message per 100 ms at most, the last position of a burst follows it.
+  let scrollAt = 0;
+  let scrollTimer = 0;
+  let scrollY = 0;
+  const postScroll = () => {
+    scrollTimer = 0;
+    scrollAt = Date.now();
+    post({ type: 'tk:scroll', y: scrollY });
+  };
+  win.addEventListener(
+    'scroll',
+    (event: any) => {
+      const target = event.target;
+      scrollY = Number(target && target.nodeType === 1 ? target.scrollTop : win.scrollY) || 0;
+      if (scrollTimer) return;
+      const wait = 100 - (Date.now() - scrollAt);
+      if (wait <= 0) postScroll();
+      else scrollTimer = win.setTimeout(postScroll, wait);
+    },
+    { capture: true, passive: true },
+  );
+
+  // The canvas's zoom lives in the parent: a pinch (a wheel with ctrl on a trackpad), ⌘/Ctrl + wheel and Safari's gesture
+  // over this page would zoom the browser's page or nothing. They are taken here and told to the parent as a wheel's delta
+  // at the cursor (`tk:wheel`); the plain wheel stays the page's own scroll.
+  const postWheel = (x: number, y: number, dy: number) => post({ type: 'tk:wheel', x, y, dy });
+  win.addEventListener(
+    'wheel',
+    (event: any) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      postWheel(Number(event.clientX) || 0, Number(event.clientY) || 0, Number(event.deltaY) || 0);
+    },
+    { capture: true, passive: false },
+  );
+  let gestureScale = 1;
+  win.addEventListener(
+    'gesturestart',
+    (event: any) => {
+      event.preventDefault();
+      gestureScale = 1;
+    },
+    { capture: true, passive: false },
+  );
+  win.addEventListener(
+    'gesturechange',
+    (event: any) => {
+      event.preventDefault();
+      const scale = Number(event.scale) || 1;
+      postWheel(
+        Number(event.clientX) || 0,
+        Number(event.clientY) || 0,
+        -Math.log(scale / gestureScale) / 0.01,
+      );
+      gestureScale = scale;
+    },
+    { capture: true, passive: false },
+  );
+
+  // On a canvas (`tk:canvas` from the parent), what moves the canvas is told to the parent instead of being the page's:
+  // Space held (the canvas's hand, which lays a shield over this frame there) and a drag with the middle button. The
+  // wheel stays the page's: at the end of its scroll nothing moves.
+  let canvas = false;
+  let spaceDown = false;
+  let middle: { x: number; y: number } | null = null;
+  const postSpace = (down: boolean) => {
+    if (spaceDown === down) return;
+    spaceDown = down;
+    post({ type: 'tk:space', down });
+  };
+  win.addEventListener(
+    'keydown',
+    (event: any) => {
+      if (!canvas || event.code !== 'Space' || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (core.isTypingTarget(event.target)) return;
+      event.preventDefault();
+      if (!event.repeat) postSpace(true);
+    },
+    true,
+  );
+  win.addEventListener(
+    'keyup',
+    (event: any) => {
+      if (event.code !== 'Space' || !spaceDown) return;
+      event.preventDefault();
+      postSpace(false);
+    },
+    true,
+  );
+  win.addEventListener('blur', () => postSpace(false));
+  const onMiddleDown = (event: any) => {
+    if (!canvas || event.button !== 1) return;
+    // No autoscroll and no paste of the selection: the press is the canvas's.
+    event.preventDefault();
+    if (event.type === 'pointerdown')
+      middle = { x: Number(event.screenX) || 0, y: Number(event.screenY) || 0 };
+  };
+  win.addEventListener('pointerdown', onMiddleDown, true);
+  win.addEventListener('mousedown', onMiddleDown, true);
+  win.addEventListener(
+    'pointermove',
+    (event: any) => {
+      if (!middle) return;
+      // On the screen: the page moves under the pointer with the canvas, its own coordinates would not.
+      const x = Number(event.screenX) || 0;
+      const y = Number(event.screenY) || 0;
+      post({ type: 'tk:pan', dx: x - middle.x, dy: y - middle.y, by: 'drag' });
+      middle = { x, y };
+    },
+    true,
+  );
+  const endMiddle = (event: any) => {
+    if (middle && (event.type !== 'pointerup' || event.button === 1)) middle = null;
+  };
+  win.addEventListener('pointerup', endMiddle, true);
+  win.addEventListener('pointercancel', endMiddle, true);
 
   // A page can dispatch its own MessageEvent naming any source and origin, or patch the getters: only a trusted event,
   // read through the accessors taken now, comes from the parent.
@@ -632,7 +1288,12 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       if (message.type === 'tk:ping') hello();
       else if (message.type === 'tk:highlight') flash(message.selector);
       else if (message.type === 'tk:pick') setPicking(message.on, false);
-      else if (message.type === 'tk:fill') {
+      else if (message.type === 'tk:styles') setStyles(message.items);
+      else if (message.type === 'tk:anchors') setAnchors(message.items);
+      else if (message.type === 'tk:canvas') {
+        canvas = message.on;
+        if (!canvas) postSpace(false);
+      } else if (message.type === 'tk:fill') {
         // No listener of the page sees the token: this one runs first (capture, registered before any script of the page).
         bound.stopImmediately.call(event);
         const result = core.redeemAndFill(win, doc, message.token, nonce, bound, core);
@@ -655,6 +1316,37 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
     },
     true,
   );
+
+  // The page on its way: what state its document is in and how many files it has taken so far go to the parent, which
+  // tells the person what is loading while the page is not there yet (a design's runtime pulls several megabytes
+  // after its document). Said at once, then at most five times a second, and no more once the page has loaded.
+  let taken = 0;
+  let progressTimer = 0;
+  const postProgress = () => {
+    progressTimer = 0;
+    let state = 'loading';
+    try {
+      state = String(doc.readyState);
+    } catch {
+      state = 'loading';
+    }
+    post({ type: 'tk:progress', state, resources: taken });
+  };
+  const queueProgress = () => {
+    if (progressTimer || doc.readyState === 'complete') return;
+    progressTimer = win.setTimeout(postProgress, 200);
+  };
+  try {
+    const Observer = win.PerformanceObserver;
+    new Observer((list: any) => {
+      taken += list.getEntries().length;
+      queueProgress();
+    }).observe({ type: 'resource', buffered: true });
+    doc.addEventListener('readystatechange', queueProgress);
+  } catch {
+    // A page without the observer is simply not reported on: the parent keeps its first words.
+  }
+  postProgress();
 
   // `document` names override its built-ins (`<img name="title">`, `name="querySelectorAll"`): hello must survive a page that does that.
   const hello = () => {

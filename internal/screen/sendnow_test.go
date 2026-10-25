@@ -97,3 +97,46 @@ func TestObserveSendNowPermissionPrompt(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 }
+
+func TestInterruptedLast(t *testing.T) {
+	if !InterruptedLast(StripANSI(fixture(t, "claude-2.1.296-queued-after-escape.ansi.txt"))) {
+		t.Fatal("the stopped turn is not seen")
+	}
+	for _, f := range []string{"claude-queued-after-escape-answered.ansi.txt", "claude-queued-before-escape.ansi.txt", "claude-idle-placeholder.ansi.txt"} {
+		if InterruptedLast(StripANSI(fixture(t, f))) {
+			t.Fatalf("%s: seen as interrupted", f)
+		}
+	}
+	// An interrupt of an earlier turn, with output of a later one after it, is history.
+	if InterruptedLast("  ⎿  Interrupted · What should Claude do instead?\n❯ go on\n● Done.\n") {
+		t.Fatal("an old interrupt counted")
+	}
+}
+
+// Claude 2.1.310: a finished turn ends in its summary above the input box; a turn under way — the spinner read or
+// not — has only the person's message and the work since above it, an older turn's summary further up.
+func TestTurnDoneLast(t *testing.T) {
+	for _, f := range []string{"claude-2.1.310-turn-done.ansi.txt", "claude-2.1.310-turn-done-reply-scrolled.ansi.txt"} {
+		if !TurnDoneLast(StripANSI(fixture(t, f))) {
+			t.Fatalf("%s: the finished turn is not seen", f)
+		}
+	}
+	if !TurnDoneLast("❯ go\n● Bash(make)\n  ⎿  Interrupted · What should Claude do instead?\n\n───\n❯ \n───\n") {
+		t.Fatal("the stopped turn is not seen as over")
+	}
+	// After the stop the next message is at work: the stop mark is above its message.
+	if TurnDoneLast(StripANSI(fixture(t, "claude-2.1.296-queued-after-escape.ansi.txt"))) {
+		t.Fatal("the stop of the turn before counted")
+	}
+	working := StripANSI(fixture(t, "claude-2.1.310-next-turn-under-done.ansi.txt"))
+	if !IsBusy(working) || TurnDoneLast(working) {
+		t.Fatal("the turn under way counted as done")
+	}
+	unread := strings.Replace(working, "* Philosophizing…", "", 1)
+	if IsBusy(strings.Replace(unread, "esc to interrupt", "", 1)) || TurnDoneLast(unread) {
+		t.Fatal("the turn under way, its spinner unread, counted as done")
+	}
+	if TurnDoneLast(StripANSI(fixture(t, "claude-idle-placeholder.ansi.txt"))) {
+		t.Fatal("a screen without a turn counted as done")
+	}
+}

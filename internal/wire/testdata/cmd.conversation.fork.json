@@ -1,0 +1,5 @@
+{
+  "op": "conversation.fork",
+  "body": {"opId": "op-frk1", "id": "tab-k3Jx9QmZ"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1901, "id": "tab-F9kFork01"}
+}

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
@@ -20,6 +21,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/mcpserver"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/preview"
 	"github.com/ly-solutions/harnessly/internal/preview/devtools"
@@ -43,16 +45,20 @@ type previewSet struct {
 	store   *devtools.Store
 	api     *devtools.API
 	mcp     *devtools.MCP
-	scanner *ports.Scanner
-	logs    *devtools.ServerLogs
-	proxy   *preview.Proxy
-	cfg     preview.Config
-	search  ports.Searcher
+	mcpName string
+	// agentTools are the MCP tools besides the DevTools for the agent that calls (delegation, v2_delegate.go): set once
+	// the conversations run, nil before.
+	agentTools atomic.Pointer[func(*http.Request) mcpserver.Toolset]
+	scanner    *ports.Scanner
+	logs       *devtools.ServerLogs
+	proxy      *preview.Proxy
+	cfg        preview.Config
+	search     ports.Searcher
 }
 
 var (
 	previewMu   sync.Mutex
-	previewSets = map[*gate.OldRuntime]*previewSet{}
+	previewSets = map[*gate.CLIToken]*previewSet{}
 )
 
 // previewHidden are the ports never listed nor opened: the platform's own (named by the deployment), this gate's and the
@@ -65,7 +71,7 @@ func previewHidden(d deps) func() map[int]bool {
 				hidden[n] = true
 			}
 		}
-		for _, addr := range []string{os.Getenv("RUNTIME_GATE_LISTEN"), previewUpstream(d)} {
+		for _, addr := range []string{os.Getenv("RUNTIME_GATE_LISTEN"), d.Upstream} {
 			if p := portOf(addr); p > 0 {
 				hidden[p] = true
 			}
@@ -77,13 +83,6 @@ func previewHidden(d deps) func() map[int]bool {
 		}
 		return hidden
 	}
-}
-
-func previewUpstream(d deps) string {
-	if d.Old == nil {
-		return ""
-	}
-	return d.Old.Upstream
 }
 
 // previewBridgeScript reads the page bridge's script from the file the deployment names, again when the file changes.
@@ -128,7 +127,7 @@ func previewOldRuntime(upstream string) http.HandlerFunc {
 func previewOf(d deps) *previewSet {
 	previewMu.Lock()
 	defer previewMu.Unlock()
-	if s := previewSets[d.Old]; s != nil {
+	if s := previewSets[d.CLI]; s != nil {
 		return s
 	}
 	store := devtools.NewStore()
@@ -159,19 +158,20 @@ func previewOf(d deps) *previewSet {
 		Cache:   preview.NewAssetCache(filepath.Join(d.DataDir, "preview-cache"), preview.DefaultMaxTotalBytes, preview.DefaultMaxFileBytes),
 		Bridge:  previewBridgeScript(os.Getenv("RUNTIME_PREVIEW_BRIDGE_FILE")),
 	}
-	if up := previewUpstream(d); up != "" {
-		cfg.Fallback = previewOldRuntime(up)
+	if d.Upstream != "" {
+		cfg.Fallback = previewOldRuntime(d.Upstream)
+	}
+	// With no file named and no previous runtime to ask, the bridge is the one built next to the page's files.
+	if os.Getenv("RUNTIME_PREVIEW_BRIDGE_FILE") == "" && (d.Standalone || d.Upstream == "") {
+		cfg.Bridge = previewBridgeFromWeb()
 	}
 	if d.Standalone {
 		// A standalone runtime signs its own claims for its own slots, which are plain http on a local host.
 		cfg.LocalOrigins = true
-		if os.Getenv("RUNTIME_PREVIEW_BRIDGE_FILE") == "" {
-			cfg.Bridge = previewBridgeFromWeb()
-		}
 	}
-	s := &previewSet{store: store, api: api, mcp: &devtools.MCP{API: api, Server: env("RUNTIME_MCP_SERVER", "harnessly")}, scanner: scanner,
+	s := &previewSet{store: store, api: api, mcp: &devtools.MCP{API: api}, mcpName: env("RUNTIME_MCP_SERVER", "harnessly"), scanner: scanner,
 		logs: logs, proxy: preview.New(cfg), cfg: cfg}
-	previewSets[d.Old] = s
+	previewSets[d.CLI] = s
 	if d.Standalone {
 		standaloneSlots.attach(s, secret)
 	}
@@ -228,7 +228,7 @@ func previewCLIRoute(d deps, path string, methods []string, run func(*http.Reque
 			if berr != nil {
 				return previewBodyRefusal(berr)
 			}
-			if !d.Old.CLITokenOK(r) {
+			if !d.CLI.OK(r) {
 				return answerJSON(r, 403, previewError{"Forbidden"}, nil)
 			}
 			allowed := false
@@ -503,7 +503,7 @@ const previewMCPLimit = 256 * 1024
 
 // serveMCP is the agents' MCP server of the preview DevTools: stateless JSON-RPC over POST, answered as JSON.
 func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
-	if !d.Old.CLITokenOK(r) {
+	if !d.CLI.OK(r) {
 		return answerJSON(r, 403, previewError{"Forbidden"}, nil)
 	}
 	if r.Method != http.MethodPost {
@@ -520,9 +520,15 @@ func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
 	}
 	payload, err := jsvalue.Parse([]byte(jscompat.DecodeUTF8(raw)))
 	if err != nil {
-		return previewBytes(r, 400, devtools.ParseError(), previewNoStore())
+		return previewBytes(r, 400, mcpserver.ParseError(), previewNoStore())
 	}
-	status, body := s.mcp.Handle(payload)
+	srv := &mcpserver.Server{Name: s.mcpName, Sets: []mcpserver.Toolset{s.mcp}}
+	if more := s.agentTools.Load(); more != nil {
+		if set := (*more)(r); set != nil {
+			srv.Sets = append(srv.Sets, set)
+		}
+	}
+	status, body := srv.Handle(r.Context(), payload)
 	if body == nil {
 		return status, nil, previewNoStore()
 	}

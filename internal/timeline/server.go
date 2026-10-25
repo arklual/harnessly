@@ -19,6 +19,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
@@ -236,6 +237,9 @@ func (s *Server) Count() int {
 
 // ServeHTTP takes an upgraded /api/timeline request (the caller checked the session).
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if sameorigin.Refuse(w, r) {
+		return
+	}
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true,
 		CompressionMode: websocket.CompressionContextTakeover, CompressionThreshold: compressFrom})
 	if err != nil {

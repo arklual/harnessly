@@ -1,6 +1,7 @@
 package transcript
 
 import (
+	"fmt"
 	"math"
 	"regexp"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/codemode"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // Codex transcript lines into timeline entries (codex-lines in the previous runtime).
@@ -40,6 +42,9 @@ type codexInFlight struct {
 
 	files []any
 	diff  any
+
+	// line is the byte offset of the transcript line that began the call; a flush names its entries by it.
+	line int64
 }
 
 type codexMessage struct {
@@ -55,6 +60,10 @@ type codexState struct {
 	staleWarnings map[string]bool
 	suppressed    map[string]bool
 	pending       *codexMessage
+
+	// line is where the transcript line being read starts, and synthetic how many call ids it has made up so far.
+	line      int64
+	synthetic int
 }
 
 func newCodexState(imageURL func(string) string) *codexState {
@@ -68,6 +77,7 @@ func newCodexState(imageURL func(string) string) *codexState {
 
 // setInFlight is Map.set: a reused call id keeps its place.
 func (s *codexState) setInFlight(id string, e *codexInFlight) {
+	e.line = s.line
 	if _, ok := s.inFlight[id]; !ok {
 		s.inFlightOrder = append(s.inFlightOrder, id)
 	}
@@ -175,8 +185,23 @@ func (s *codexState) readMessage(rtype string, payload *jsvalue.Object) *codexMe
 	return m
 }
 
+// unsetID holds an entry's place in the key order until the line that made it gives it its id.
+const unsetID = ""
+
+// syntheticCallID is the id of a call the transcript gave none: the line's offset and the count of such ids on that
+// line, so the same bytes make the same one whichever way they are read.
+func (s *codexState) syntheticCallID() string {
+	n := s.synthetic
+	s.synthetic++
+	return fmt.Sprintf("call:%d#%d", s.line, n)
+}
+
+// flushIDBase is where the ids of a flush start counting on a line's offset: past anything one line produces, so a
+// flushed entry never takes the id of an entry of the transcript.
+const flushIDBase = 1000
+
 func codexEntry(typ string, ts float64, pairs ...any) *jsvalue.Object {
-	o := jsvalue.NewObject("id", NewID(), "type", typ, "timestamp", ts)
+	o := jsvalue.NewObject("id", unsetID, "type", typ, "timestamp", ts)
 	for i := 0; i+1 < len(pairs); i += 2 {
 		o.Set(pairs[i].(string), pairs[i+1])
 	}
@@ -354,26 +379,34 @@ func (s *codexState) flushStale(ts float64) []*jsvalue.Object {
 	if len(s.inFlight) == 0 {
 		return out
 	}
+	next := map[int64]int{}
 	for _, id := range s.inFlightOrder {
 		f := s.inFlight[id]
 		if s.staleWarnings[f.callID] {
 			continue
 		}
 		s.staleWarnings[f.callID] = true
-		out = append(out, codexEntry("error-notice", ts, "severity", "warning",
-			"message", "In-flight "+f.kind+" call "+f.callID+" ended without completion"))
+		made := []*jsvalue.Object{codexEntry("error-notice", ts, "severity", "warning",
+			"message", "In-flight "+f.kind+" call "+f.callID+" ended without completion")}
 		switch f.kind {
 		case "exec":
-			out = append(out, buildExecEntry(f, ts, jsvalue.Undefined, jsvalue.Undefined, jsvalue.Undefined, "error"))
+			made = append(made, buildExecEntry(f, ts, jsvalue.Undefined, jsvalue.Undefined, jsvalue.Undefined, "error"))
 		case "web-search":
-			out = append(out, codexEntry("web-search", ts, "callId", f.callID, "query", f.query, "status", "error"))
+			made = append(made, codexEntry("web-search", ts, "callId", f.callID, "query", f.query, "status", "error"))
 		case "mcp":
-			out = append(out, codexEntry("mcp-tool-call", ts, "callId", f.callID, "server", f.server, "tool", f.tool,
+			made = append(made, codexEntry("mcp-tool-call", ts, "callId", f.callID, "server", f.server, "tool", f.tool,
 				"argumentsSummary", f.argsSummary, "status", "error"))
 		case "patch":
-			out = append(out, codexEntry("patch-apply", ts, "callId", f.callID, "files", f.files, "diff", f.diff,
+			made = append(made, codexEntry("patch-apply", ts, "callId", f.callID, "files", f.files, "diff", f.diff,
 				"success", false, "status", "error"))
 		}
+		// A flushed entry has no line of its own: it is named by the line that began its call, counted from
+		// flushIDBase. A re-read of the file never makes it (the transcript does not hold it).
+		for _, e := range made {
+			e.Set("id", wire.OffsetEntryID(f.line, flushIDBase+next[f.line]))
+			next[f.line]++
+		}
+		out = append(out, made...)
 	}
 	s.clearInFlight()
 	return out
@@ -468,7 +501,7 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 	case "web_search_call":
 		callID := safeString(prop(p, "call_id"))
 		if callID == "" {
-			callID = NewID()
+			callID = s.syntheticCallID()
 		}
 		e := codexEntry("web-search", ts, "callId", callID, "query", orUndefined(safeString(prop(p, "query"))),
 			"status", toolStatus(safeString(prop(p, "status"))))
@@ -541,7 +574,7 @@ func (s *codexState) eventMsg(p *jsvalue.Object, ts float64) []*jsvalue.Object {
 	if kind := approvalKind(typ); kind != "" {
 		callID := safeString(prop(p, "call_id"))
 		if callID == "" {
-			callID = NewID()
+			callID = s.syntheticCallID()
 		}
 		var patches, permissions any = jsvalue.Undefined, jsvalue.Undefined
 		if raw, ok := prop(p, "patches").([]any); ok {
@@ -556,8 +589,7 @@ func (s *codexState) eventMsg(p *jsvalue.Object, ts float64) []*jsvalue.Object {
 		if raw, ok := prop(p, "permissions").([]any); ok {
 			permissions = jsvalue.StringArray(jsvalue.Strings(raw))
 		}
-		id := NewID()
-		e := jsvalue.NewObject("id", id, "type", "approval-request", "timestamp", ts, "approvalKind", kind, "callId", callID,
+		e := jsvalue.NewObject("id", unsetID, "type", "approval-request", "timestamp", ts, "approvalKind", kind, "callId", callID,
 			"command", optString(prop(p, "command")), "cwd", optString(prop(p, "cwd")), "patches", patches,
 			"permissions", permissions, "status", "pending")
 		return one(e)
@@ -645,7 +677,7 @@ func (s *codexState) eventMsg(p *jsvalue.Object, ts float64) []*jsvalue.Object {
 		e := codexEntry("ask-user-question", ts)
 		toolUseID := safeString(prop(p, "call_id"))
 		if toolUseID == "" {
-			toolUseID = NewID()
+			toolUseID = s.syntheticCallID()
 		}
 		e.Set("toolUseId", toolUseID)
 		e.Set("questions", []any{jsvalue.NewObject("question", question, "header", "", "options", []any{},
@@ -923,8 +955,10 @@ type codexLinesResult struct {
 	errorCount   int
 }
 
-// parseCodexLines turns lines into entries; offsets, when given, are where each line starts.
-func parseCodexLines(lines []string, s *codexState, offsets []int64) codexLinesResult {
+// parseCodexLines turns lines into entries; offsets are where each line starts (in the file, not in lines). A line's
+// entries are named by its offset plus shift: "x:<offset>#<k>", k counting the entries the line made. shift is what the
+// offsets lack of the bytes the line really starts at, which the previous runtime's count could miss.
+func parseCodexLines(lines []string, s *codexState, offsets []int64, shift int64) codexLinesResult {
 	var r codexLinesResult
 	r.entries = []*jsvalue.Object{}
 	for i, raw := range lines {
@@ -941,7 +975,12 @@ func parseCodexLines(lines []string, s *codexState, offsets []int64) codexLinesR
 			r.errorCount++
 			continue
 		}
+		off := offsets[i]
+		s.line, s.synthetic = off+shift, 0
 		produced := s.processItem(it)
+		for k, e := range produced {
+			e.Set("id", wire.OffsetEntryID(s.line, k))
+		}
 		if r.summary == nil || *r.summary == "" {
 			for _, e := range produced {
 				if e.String("type") == "user-message" {
@@ -950,10 +989,6 @@ func parseCodexLines(lines []string, s *codexState, offsets []int64) codexLinesR
 					break
 				}
 			}
-		}
-		var off int64
-		if offsets != nil && i < len(offsets) {
-			off = offsets[i]
 		}
 		for _, e := range produced {
 			r.entries = append(r.entries, e)

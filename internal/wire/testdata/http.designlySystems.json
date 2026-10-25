@@ -1,0 +1,7 @@
+{
+  "http": "designlySystems",
+  "response": [
+    {"id": "acme-design-system", "label": "Acme Design System", "desc": "Компоненты, токены и правила витрины"},
+    {"id": "kit:acme-ui", "label": "acme-ui", "desc": "UI-кит, версия 1.4.0"}
+  ]
+}

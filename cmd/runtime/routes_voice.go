@@ -35,9 +35,14 @@ func voiceAssetSegments(r *http.Request) ([]string, bool) {
 	return parts[3:], true
 }
 
-func voiceRoutes(d deps) []gate.Route {
-	dictation := voice.New(voice.Config{Socket: env("RUNTIME_VOICE_SOCKET", "/run/harnessly-voice/asr.sock"),
+// newVoice is the machine's dictation: ffmpeg and the recognition service it is set up with.
+func newVoice() *voice.Server {
+	return voice.New(voice.Config{Socket: env("RUNTIME_VOICE_SOCKET", "/run/harnessly-voice/asr.sock"),
 		FFmpeg: os.Getenv("RUNTIME_VOICE_FFMPEG_BIN"), Log: voiceLog})
+}
+
+func voiceRoutes(d deps) []gate.Route {
+	dictation := newVoice()
 	assets := &voice.Assets{CacheDir: filepath.Join(d.DataDir, "voice-assets"), ModelHost: "https://huggingface.co",
 		RuntimeHost: "https://cdn.jsdelivr.net", Log: voiceLog}
 	return []gate.Route{

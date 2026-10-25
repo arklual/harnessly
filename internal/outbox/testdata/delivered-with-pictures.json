@@ -1,0 +1,238 @@
+{
+ "records": [
+  {
+   "message": {
+    "clientId": "01a170d2-4226-7110-a953-4ec030b1c0cc",
+    "conversationId": "tab-dBSEBV",
+    "text": "Посмотри на этот экран: кнопка «Сохранить» уезжает за край, когда открыт список. Поправь от",
+    "attachments": [
+     {
+      "id": "up_5GURGK5YLFFX2MQ4",
+      "name": "CleanShot 2026-10-25 at 5.09.36 AM@2x.png",
+      "kind": "image",
+      "mime": "image/png"
+     }
+    ],
+    "mode": "queue",
+    "kind": "prompt",
+    "createdAt": 1792894190386,
+    "attempts": 0,
+    "state": {
+     "k": "done",
+     "turnId": "c:f4fd65f9-3436-4363-aa41-7d212d95ff49#0"
+    },
+    "rev": 8
+   },
+   "images": [
+    "/home/coder/.harnessly/v2/uploads/up_5GURGK5YLFFX2MQ4.png"
+   ],
+   "typedAt": 1792895137225,
+   "typedOffset": 256716848,
+   "tries": 0,
+   "nextTry": 1792895136291,
+   "waitSince": 1792894190405,
+   "reason": "agent-busy",
+   "blocked": 0,
+   "submitted": false,
+   "enterOnly": false,
+   "endedAt": 1792895173341,
+   "steered": false,
+   "rechecks": 0,
+   "recheckAt": 1792895139725,
+   "carried": false
+  },
+  {
+   "message": {
+    "clientId": "01a170db-b45b-769c-a4ab-0236cf95cf75",
+    "conversationId": "tab-dBSEBV",
+    "text": "Вот четыре макета карточки: выбери, какой ближе к прошлому варианту, и собери его в коде. В",
+    "attachments": [
+     {
+      "id": "up_X6BYL6XCIC2LTTKL",
+      "name": "CleanShot 2026-10-25 at 5.16.39 AM@2x.png",
+      "kind": "image",
+      "mime": "image/png"
+     },
+     {
+      "id": "up_FUFINOOU7HYACFSD",
+      "name": "CleanShot 2026-10-25 at 5.17.15 AM@2x.png",
+      "kind": "image",
+      "mime": "image/png"
+     },
+     {
+      "id": "up_7FUP3QXDXRKP72IS",
+      "name": "CleanShot 2026-10-25 at 5.18.27 AM@2x.png",
+      "kind": "image",
+      "mime": "image/png"
+     },
+     {
+      "id": "up_FVCXZEZXJDWPVS2V",
+      "name": "CleanShot 2026-10-25 at 5.19.02 AM@2x.png",
+      "kind": "image",
+      "mime": "image/png"
+     }
+    ],
+    "mode": "queue",
+    "kind": "prompt",
+    "createdAt": 1792894809460,
+    "attempts": 0,
+    "state": {
+     "k": "done",
+     "turnId": "c:8ecad6cb-a4d7-4866-b4e2-0739fd5a9363#0"
+    },
+    "rev": 9
+   },
+   "images": [
+    "/home/coder/.harnessly/v2/uploads/up_X6BYL6XCIC2LTTKL.png",
+    "/home/coder/.harnessly/v2/uploads/up_FUFINOOU7HYACFSD.png",
+    "/home/coder/.harnessly/v2/uploads/up_7FUP3QXDXRKP72IS.png",
+    "/home/coder/.harnessly/v2/uploads/up_FVCXZEZXJDWPVS2V.png"
+   ],
+   "typedAt": 1792895176679,
+   "typedOffset": 256995051,
+   "tries": 0,
+   "nextTry": 1792895175619,
+   "waitSince": 1792895136308,
+   "reason": "agent-busy",
+   "blocked": 0,
+   "submitted": false,
+   "enterOnly": false,
+   "endedAt": 1792895218139,
+   "steered": false,
+   "rechecks": 0,
+   "recheckAt": 1792895179179,
+   "carried": false
+  },
+  {
+   "message": {
+    "clientId": "01a170dc-1403-7834-b13f-05cf994a9033",
+    "conversationId": "tab-dBSEBV",
+    "text": "Вот длинное описание задачи и скриншот формы. Прочитай всё и скажи, что непонятно, прежде ",
+    "attachments": [
+     {
+      "id": "up_DI6YEQAKBEBGZOLW",
+      "name": "CleanShot 2026-10-25 at 5.20.13 AM@2x.png",
+      "kind": "image",
+      "mime": "image/png"
+     }
+    ],
+    "mode": "queue",
+    "kind": "prompt",
+    "createdAt": 1792894833946,
+    "attempts": 0,
+    "state": {
+     "k": "done",
+     "turnId": "c:dc4de923-f69f-4b40-b34b-b98cc7e00140#0"
+    },
+    "rev": 10
+   },
+   "images": [
+    "/home/coder/.harnessly/v2/uploads/up_DI6YEQAKBEBGZOLW.png"
+   ],
+   "typedAt": 1792895222419,
+   "typedOffset": 258533698,
+   "tries": 0,
+   "nextTry": 1792895220337,
+   "waitSince": 1792895175630,
+   "reason": "agent-busy",
+   "blocked": 0,
+   "submitted": false,
+   "enterOnly": false,
+   "endedAt": 1792895247313,
+   "steered": false,
+   "rechecks": 0,
+   "recheckAt": 1792895224919,
+   "carried": false
+  },
+  {
+   "message": {
+    "clientId": "01a170dc-82c8-7f2c-8397-e070a29956f4",
+    "conversationId": "tab-dBSEBV",
+    "text": "На скриншоте пустой список, хотя записи есть. Найди, где теряются данные, и покажи, что пр",
+    "attachments": [
+     {
+      "id": "up_3HM2BTOGGLM5R4TO",
+      "name": "CleanShot 2026-10-25 at 5.20.43 AM@2x.png",
+      "kind": "image",
+      "mime": "image/png"
+     }
+    ],
+    "mode": "queue",
+    "kind": "prompt",
+    "createdAt": 1792894862307,
+    "attempts": 0,
+    "state": {
+     "k": "done",
+     "turnId": "c:6ae611ed-6814-4bd2-86fe-7d304937df53#0"
+    },
+    "rev": 11
+   },
+   "images": [
+    "/home/coder/.harnessly/v2/uploads/up_3HM2BTOGGLM5R4TO.png"
+   ],
+   "typedAt": 1792895250940,
+   "typedOffset": 259409561,
+   "tries": 0,
+   "nextTry": 1792895249264,
+   "waitSince": 1792895220424,
+   "reason": "agent-busy",
+   "blocked": 0,
+   "submitted": false,
+   "enterOnly": false,
+   "endedAt": 1792895279474,
+   "steered": false,
+   "rechecks": 0,
+   "recheckAt": 1792895253440,
+   "carried": false
+  },
+  {
+   "message": {
+    "clientId": "01a1722f-9735-7006-ad75-bffbd3983ccd",
+    "conversationId": "tab-dBSEBV",
+    "text": "Почему эта строка всё ещё висит в очереди?",
+    "attachments": [
+     {
+      "id": "up_NCTH7JNWHUGI5PBW",
+      "name": "CleanShot 2026-10-25 at 11.31.10 AM@2x.png",
+      "kind": "image",
+      "mime": "image/png"
+     }
+    ],
+    "mode": "steer",
+    "kind": "prompt",
+    "createdAt": 1792917084040,
+    "attempts": 0,
+    "state": {
+     "k": "queued",
+     "position": 1,
+     "reason": "agent-busy",
+     "wait": null
+    },
+    "rev": 6
+   },
+   "images": [
+    "/home/coder/.harnessly/v2/uploads/up_NCTH7JNWHUGI5PBW.png"
+   ],
+   "typedAt": 1792917086067,
+   "typedOffset": 268893661,
+   "tries": 0,
+   "nextTry": 0,
+   "waitSince": 1792917084040,
+   "reason": "",
+   "blocked": 0,
+   "submitted": false,
+   "enterOnly": false,
+   "endedAt": 0,
+   "steered": true,
+   "rechecks": 3,
+   "recheckAt": 1792917088567,
+   "carried": false
+  }
+ ],
+ "items": [
+  "01a1722f-9735-7006-ad75-bffbd3983ccd"
+ ],
+ "paused": null,
+ "rev": 323,
+ "flight": ""
+}

@@ -1,0 +1,5 @@
+{
+  "op": "seen",
+  "body": {"opId": "op-s1", "conversationId": "tab-k3Jx9QmZ", "upTo": 1792656000000},
+  "result": {"r": "refused", "code": "machine-required"}
+}

@@ -280,3 +280,60 @@ func TestCodexTabsReadNoTranscript(t *testing.T) {
 		t.Fatalf("reads %d published %v", reads, pub)
 	}
 }
+
+// An agent that ended is remembered with how and when, the latest first; the one still running is not.
+func TestEndedAgentsAreKept(t *testing.T) {
+	use := func(id, desc string) string {
+		return `{"timestamp":"2026-10-22T10:00:00.000Z","message":{"content":[{"type":"tool_use","id":"` + id + `","name":"Agent","input":{"description":"` + desc + `","run_in_background":true}}]}}`
+	}
+	launched := func(id, agent string) string {
+		return `{"timestamp":"2026-10-22T10:00:01.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"` + id + `","content":[{"type":"text","text":"Async agent launched successfully.\nagentId: ` + agent + ` (internal)"}]}]}}`
+	}
+	notice := func(at, agent, status string) string {
+		return `{"type":"queue-operation","timestamp":"` + at + `","content":"<task-notification>\n<task-id>` + agent + `</task-id>\n<status>` + status + `</status>\n</task-notification>"}`
+	}
+	s := newScan()
+	s.lines([]string{
+		use("u1", "first"), launched("u1", "a1"),
+		use("u2", "second"), launched("u2", "a2"),
+		use("u3", "third"), launched("u3", "a3"),
+		notice("2026-10-22T10:05:00.000Z", "a1", "completed"),
+		notice("2026-10-22T10:06:00.000Z", "a2", "failed"),
+	}, 1)
+	if running := s.tasks(1); len(running) != 1 || running[0].ID != "a3" {
+		t.Fatalf("%+v", running)
+	}
+	ended := s.endedAgents()
+	if len(ended) != 2 || ended[0].ID != "a2" || ended[0].Status != "failed" || ended[1].ID != "a1" || ended[1].Status != "completed" {
+		t.Fatalf("%+v", ended)
+	}
+	if want := Ms(1_792_663_500_000); ended[1].EndedAt != want || ended[1].Label != "first" {
+		t.Fatalf("%+v", ended[1])
+	}
+}
+
+// A Workflow call that started a run in the background is a task until its notification says it is over; then it is
+// remembered as ended, like a background agent. The transcript is a scrubbed copy of a real one.
+func TestAWorkflowRunsUntilItsNotification(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "workflows", "testdata", "conv.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newScan()
+	s.lines(strings.Split(strings.TrimSpace(string(raw)), "\n"), 0)
+	tasks := s.tasks(0)
+	if len(tasks) != 1 {
+		t.Fatalf("%+v", tasks)
+	}
+	if w := tasks[0]; w.ID != "wq7m2kx4d" || w.Kind != Workflow || w.RunID != "wf_3c9e1a7b-5d2" || w.ToolUseID != "toolu_01Checkout" ||
+		w.Label != "Review the checkout flow, then fix what the reviewers found" {
+		t.Fatalf("%+v", w)
+	}
+	ended := s.endedAgents()
+	if len(ended) != 1 || ended[0].ID != "wz5n8rt1c" || ended[0].Kind != Workflow || ended[0].Status != "completed" {
+		t.Fatalf("%+v", ended)
+	}
+	if got := Reconcile(tasks, &Counts{}); len(got) != 1 || got[0].Kind != Workflow {
+		t.Fatalf("the footer does not count workflows: %+v", got)
+	}
+}

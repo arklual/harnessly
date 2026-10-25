@@ -1,0 +1,5 @@
+{
+  "op": "draft.set",
+  "body": {"opId": "op-dr1", "key": "tab-k3Jx9QmZ", "text": "Проверь миграцию и", "rev": 4},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1860, "rev": 4}
+}

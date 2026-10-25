@@ -290,7 +290,7 @@ func TestLaunch(t *testing.T) {
 	}
 
 	got = cfg.Launch("codex")
-	if !slices.Equal(got.Warnings, []string{"~/.codex/models_cache.json не найден: Codex создаёт его при первом запуске"}) || got.Models == nil {
+	if !slices.Equal(got.Warnings, []string{"~/.codex/models_cache.json не найден (Codex создаёт его при первом запуске): показан встроенный список моделей"}) || len(got.Models) != 7 || got.Source != "static" {
 		t.Errorf("empty codex: %+v", got)
 	}
 	write(t, filepath.Join(base, "x/models_cache.json"), `{"fetched_at":"2026-10-01T00:00:00Z","models":[
@@ -307,11 +307,11 @@ func TestLaunch(t *testing.T) {
 	write(t, filepath.Join(base, "x/models_cache.json"), `{"models":[]}`)
 	write(t, filepath.Join(base, "x/config.toml"), "model = ")
 	got = cfg.Launch("codex")
-	if !slices.Equal(got.Warnings, []string{"В ~/.codex/models_cache.json нет доступных моделей", "~/.codex/config.toml не читается — значение «Авто» неизвестно"}) {
+	if !slices.Equal(got.Warnings, []string{"В ~/.codex/models_cache.json нет доступных моделей — показан встроенный список", "~/.codex/config.toml не читается — значение «Авто» неизвестно"}) {
 		t.Errorf("codex warnings: %q", got.Warnings)
 	}
 	raw, _ := json.Marshal(got)
-	if !strings.Contains(string(raw), `"saved":null`) || !strings.HasPrefix(string(raw), `{"provider":"codex","source":"models-cache","fetchedAt":null,"models":[]`) {
+	if !strings.Contains(string(raw), `"saved":null`) || !strings.HasPrefix(string(raw), `{"provider":"codex","source":"static","fetchedAt":null,"models":[{"id":"gpt-5.6-sol"`) {
 		t.Errorf("shape %s", raw)
 	}
 }

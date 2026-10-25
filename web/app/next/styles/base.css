@@ -1,0 +1,104 @@
+/* Base of the new interface: type, box model, focus and a thin scrollbar, all inside .hx-root so the current interface
+   is untouched when both stylesheets are on the page. */
+
+:where(.hx-root) {
+  font-family: var(--hx-font-ui);
+  font-size: var(--hx-text-md);
+  /* The design sets no line height: text runs at the browser's normal one, the page's 1.5 would make every row taller */
+  line-height: normal;
+  color: var(--hx-fg-1);
+  -webkit-font-smoothing: antialiased;
+}
+:where(.hx-root) *,
+:where(.hx-root) *::before,
+:where(.hx-root) *::after {
+  box-sizing: border-box;
+}
+:where(.hx-root) :where(button, input, textarea) {
+  font: inherit;
+  color: inherit;
+}
+:where(.hx-root) :focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+/* A popover or a panel that takes the focus to hold the keys is not a control: no ring around all of it. */
+:where(.hx-root) :where([tabindex='-1']):focus-visible {
+  outline: none;
+}
+
+/* Scrollbar: 6px, translucent, the same in both themes. Chrome and Safari draw the ::-webkit-scrollbar parts (the
+   standard properties would replace them with a wider bar in Chrome); Firefox has only the standard ones. */
+.hx-root ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.hx-root ::-webkit-scrollbar-track,
+.hx-root ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.hx-root ::-webkit-scrollbar-thumb {
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-scrollbar);
+}
+.hx-root ::-webkit-scrollbar-thumb:hover {
+  background: var(--hx-scrollbar-hover);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .hx-root,
+  .hx-root * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--hx-scrollbar) transparent;
+  }
+}
+
+/* Reduced motion is handled once, in motion.css. */
+
+/* Touch targets on the phone: what a finger presses is at least 40–44px, whatever the wide window draws. The
+   small buttons inside a row (×, «…», «+») grow their pressable box, not their glyph; the rest grow outright. Scoped to
+   .hx-root so it outweighs the components' own sizes. */
+@media (max-width: 900px) {
+  .hx-root :is(.hx-head-btn, .hx-hdr__btn) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .hx-root :is(.hx-round, .hx-model) {
+    min-height: 40px;
+  }
+  .hx-root .hx-round {
+    min-width: 40px;
+  }
+  .hx-root :is(.hx-btn, .hx-gate__btn) {
+    min-height: 44px;
+  }
+  .hx-root :is(.hx-work__head, .hx-tool__head, .hx-sysnote__head, .hx-pnote__more) {
+    min-height: 40px;
+  }
+  .hx-root :is(.hx-code__copy, .hx-ask__tab, .hx-dl__tab, .hx-set__seg-item, .hx-tonew, .hx-notechip) {
+    min-height: 36px;
+  }
+  .hx-root :is(.hx-queue__del, .hx-dl-card__pin, .hx-gtabs__add, .hx-ask__min) {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .hx-root :is(.hx-gtab) {
+    min-height: 40px;
+  }
+  .hx-root :is(.hx-item__more, .hx-nav__add, .hx-attach__x, .hx-gtab__x, .hx-tab__x) {
+    position: relative;
+  }
+  .hx-root :is(.hx-item__more, .hx-nav__add, .hx-attach__x, .hx-gtab__x)::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+  }
+}
+
+/* iOS Safari zooms the page in when a field under 16px takes the focus. On a touch screen every field types at 16px
+   or more, whatever a component's own rule says (hence !important); the viewport's maximum-scale=1 keeps the person's
+   own pinch zoom. */
+@media (pointer: coarse) {
+  .hx-root :is(input, textarea, select, [contenteditable='true'], [contenteditable='']) {
+    font-size: max(16px, 1em) !important;
+  }
+}

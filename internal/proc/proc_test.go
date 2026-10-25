@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"math"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"runtime"
@@ -236,5 +237,63 @@ func TestProcsFallbacks(t *testing.T) {
 	p.Children = func(pid int) []int { return map[int][]int{1: {2, 3}, 2: {4}}[pid] }
 	if got := p.WithGrandchildren([]int{2, 3}); !slices.Equal(got, []int{2, 3, 4}) {
 		t.Fatalf("%v", got)
+	}
+}
+
+func TestParseUsage(t *testing.T) {
+	line := "4242 (node (mcp) x) S 4200 4242 4200 0 -1 4194560 1234 0 0 0 150 50 0 0 20 0 11 0 98765 1048576000 2560 18446744073709551615"
+	u, ok := parseUsage(line)
+	if !ok || u.PPID != 4200 || u.Comm != "node (mcp) x" || u.CPU != 2*time.Second || u.RSS != 2560*int64(os.Getpagesize()) {
+		t.Fatalf("%+v %v", u, ok)
+	}
+	if _, ok := parseUsage("4242 (short) S 1"); ok {
+		t.Fatal("a short line read")
+	}
+	if u, ok := UsageOf(os.Getpid()); !ok || u.PPID != os.Getppid() || u.RSS <= 0 {
+		t.Fatalf("this process: %+v %v", u, ok)
+	}
+}
+
+func TestSocketOwner(t *testing.T) {
+	for _, listen := range []string{"127.0.0.1:0", "[::]:0"} {
+		// On [::] (both stacks) the socket accepted from 127.0.0.1 is listed in tcp6 with v4-mapped addresses.
+		ln, err := net.Listen("tcp", listen)
+		if err != nil {
+			t.Skip(listen, err)
+		}
+		defer ln.Close()
+		conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		accepted, err := ln.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer accepted.Close()
+		client := conn.LocalAddr().(*net.TCPAddr).AddrPort()
+		server := conn.RemoteAddr().(*net.TCPAddr).AddrPort()
+		inode, ok := SocketInode(client, server)
+		if !ok {
+			t.Fatalf("%s: no socket %s → %s", listen, client, server)
+		}
+		if !HoldsSocket(os.Getpid(), inode) {
+			t.Fatalf("%s: this process holds the client's end", listen)
+		}
+		if HoldsSocket(1, inode) || HoldsSocket(-1, inode) {
+			t.Fatalf("%s: another process does not", listen)
+		}
+		// The server's end (the accepted socket; on [::] a tcp6 row with v4-mapped addresses) is the same pair the
+		// other way round, another socket.
+		if other, ok := SocketInode(server, client); !ok || other == inode || !HoldsSocket(os.Getpid(), other) {
+			t.Fatalf("%s: the server's end %q, ok %v", listen, other, ok)
+		}
+		if _, ok := SocketInode(netip.AddrPortFrom(netip.MustParseAddr("127.0.0.2"), client.Port()), server); ok {
+			t.Fatalf("%s: another client address does not match", listen)
+		}
+		if _, ok := SocketInode(client, netip.AddrPortFrom(server.Addr(), server.Port()+1)); ok {
+			t.Fatalf("%s: another server port does not match", listen)
+		}
 	}
 }

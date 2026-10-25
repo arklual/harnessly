@@ -535,11 +535,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"3kzOKp-6hxWIp331eUgJJwRiDDg\"",
+    "etag": "\"dGPUWe-aGzVtR7M8-TVnqouslsk\"",
     "cache-control": "no-store",
-    "content-length": "680"
+    "content-length": "683"
    },
-   "answer": "{\"entries\":[{\"id\":\"id0001\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"id0002\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"id0003\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"id0004\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"id0005\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "POST",
@@ -756,11 +756,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"aXrfQethvT9_xiNloHCrK6OxUCQ\"",
+    "etag": "\"dGPUWe-aGzVtR7M8-TVnqouslsk\"",
     "cache-control": "no-store",
-    "content-length": "680"
+    "content-length": "683"
    },
-   "answer": "{\"entries\":[{\"id\":\"id0006\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"id0007\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"id0008\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"id0009\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"id000a\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -777,11 +777,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"m96aHnF0BhS6erEyNO1lUz1owys\"",
+    "etag": "\"LwxSTGNQ5w1mLWq7ZOPY5vlBbf8\"",
     "cache-control": "no-store",
-    "content-length": "113"
+    "content-length": "112"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000b\",\"type\":\"user-message\",\"timestamp\":1792281540000,\"text\":\"Write tests\\nfor the cache\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792281540000,\"text\":\"Write tests\\nfor the cache\"}]}"
   },
   {
    "method": "GET",
@@ -798,11 +798,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"KjEipPXKgJ16PjDy9jkm9IbRP7E\"",
+    "etag": "\"q4mGbqcX2pQW9QLkeV-BULAu6JY\"",
     "cache-control": "no-store",
-    "content-length": "7204"
+    "content-length": "7206"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000c\",\"type\":\"user-message\",\"timestamp\":null,\"text\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"},{\"id\":\"id000d\",\"type\":\"assistant-message\",\"timestamp\":1792270800000,\"markdown\":\"partial answer\",\"stopReason\":null}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:10#0\",\"type\":\"user-message\",\"timestamp\":null,\"text\":\"Long task: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"},{\"id\":\"x:7086#0\",\"type\":\"assistant-message\",\"timestamp\":1792270800000,\"markdown\":\"partial answer\",\"stopReason\":null}]}"
   },
   {
    "method": "GET",
@@ -819,11 +819,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"ynHWnH6cJi0-Myjce_fvqnYjUA4\"",
+    "etag": "\"aADVdmBspb9LuUbaWPcL2qntOV0\"",
     "cache-control": "no-store",
-    "content-length": "88"
+    "content-length": "87"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000e\",\"type\":\"user-message\",\"timestamp\":1792281600000,\"text\":\"x\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792281600000,\"text\":\"x\"}]}"
   },
   {
    "method": "GET",
@@ -840,11 +840,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"7BAR2Fq-F3z5U_wMU4RMLAhP8WQ\"",
+    "etag": "\"JV1GkjXXJvfZZX7Ao0qXj56k4rA\"",
     "cache-control": "no-store",
-    "content-length": "99"
+    "content-length": "98"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000f\",\"type\":\"user-message\",\"timestamp\":1792281600000,\"text\":\"meta is null\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792281600000,\"text\":\"meta is null\"}]}"
   },
   {
    "method": "GET",
@@ -861,11 +861,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"5bUhOEDxcEkID51VsNwp5eevobc\"",
+    "etag": "\"0bBK2vGPKEcy4xz_ZQnU5CXlGCI\"",
     "cache-control": "no-store",
-    "content-length": "128"
+    "content-length": "129"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000g\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"All done\",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:555#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"All done\",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -903,11 +903,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"Mlu-jS7pZWfuli9mRymfaVS4QD4\"",
+    "etag": "\"nplMKP65u53zJ-11b8xtdgut-DY\"",
     "cache-control": "no-store",
-    "content-length": "209"
+    "content-length": "210"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000h\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"second prompt\"},{\"id\":\"id000i\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"ok\",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:98#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"second prompt\"},{\"id\":\"x:191#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"ok\",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -924,11 +924,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"PcRvwkhqpEgpncQpHHzx5I5rMFg\"",
+    "etag": "\"dgVWY2Cu_VAYmWUJ1BCETNtdkhE\"",
     "cache-control": "no-store",
-    "content-length": "103"
+    "content-length": "102"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000j\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"same start as h8\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"same start as h8\"}]}"
   },
   {
    "method": "GET",
@@ -945,11 +945,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"EeIcj-sJ-AV5ZfQM_hh9Q6oYZLE\"",
+    "etag": "\"acxq0st8INQcve1nLHpYwN-7Y70\"",
     "cache-control": "no-store",
-    "content-length": "1045"
+    "content-length": "1053"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000k\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"id000l\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"id000m\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"id000n\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"id000o\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"id000p\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"id000q\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"id000r\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -966,11 +966,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"6SAJcA2dnSCADtIFS2HZVbPE1TM\"",
+    "etag": "\"tlCguw4pfIv2zg5y71GIGanb4Bs\"",
     "cache-control": "no-store",
-    "content-length": "280"
+    "content-length": "281"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000t\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"not a sidechain\"},{\"id\":\"id000u\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"plain\"},{\"id\":\"id000v\",\"type\":\"user-message\",\"timestamp\":1792267202000,\"text\":\"then a sidechain\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"not a sidechain\"},{\"id\":\"x:121#0\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"plain\"},{\"id\":\"x:267#0\",\"type\":\"user-message\",\"timestamp\":1792267202000,\"text\":\"then a sidechain\"}]}"
   },
   {
    "method": "GET",
@@ -988,11 +988,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"EBuHh2eaBDVpgi4Qs90D4vro8i4\"",
+    "etag": "\"acxq0st8INQcve1nLHpYwN-7Y70\"",
     "cache-control": "no-store",
-    "content-length": "1045"
+    "content-length": "1053"
    },
-   "answer": "{\"entries\":[{\"id\":\"id000x\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"id000y\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"id000z\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"id0010\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"id0011\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"id0012\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"id0013\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"id0014\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -1013,11 +1013,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"fHEwGKPdRLKRvZkgrMqrswFkxOg\"",
+    "etag": "\"dGPUWe-aGzVtR7M8-TVnqouslsk\"",
     "cache-control": "no-store",
-    "content-length": "680"
+    "content-length": "683"
    },
-   "answer": "{\"entries\":[{\"id\":\"id0016\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"id0017\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"id0018\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"id0019\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"id001a\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -1034,11 +1034,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"ymXbqJpAubKf6HOdiSD3hgUB9Bo\"",
+    "etag": "\"acxq0st8INQcve1nLHpYwN-7Y70\"",
     "cache-control": "no-store",
-    "content-length": "1045"
+    "content-length": "1053"
    },
-   "answer": "{\"entries\":[{\"id\":\"id001b\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"id001c\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"id001d\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"id001e\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"id001f\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"id001g\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"id001h\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"id001i\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792267200000,\"text\":\"Count the files\"},{\"id\":\"x:174#0\",\"type\":\"thinking\",\"timestamp\":1792267201000,\"thinking\":\"hm\"},{\"id\":\"x:174#1\",\"type\":\"assistant-message\",\"timestamp\":1792267201000,\"markdown\":\"Counting\",\"usage\":{\"input_tokens\":3,\"output_tokens\":5},\"model\":\"claude-x\",\"stopReason\":\"tool_use\"},{\"id\":\"x:174#2\",\"type\":\"tool-call\",\"timestamp\":1792267201000,\"toolUseId\":\"toolu_1\",\"toolName\":\"Bash\",\"summary\":\"$ ls | wc -l\",\"status\":\"success\"},{\"id\":\"x:599#0\",\"type\":\"tool-result\",\"timestamp\":1792267202000,\"toolUseId\":\"toolu_1\",\"isError\":false,\"summary\":\"12\"},{\"id\":\"x:864#0\",\"type\":\"tool-call\",\"timestamp\":1792267203000,\"toolUseId\":\"toolu_2\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/a.go\",\"filePath\":\"/srv/app/a.go\",\"status\":\"success\"},{\"id\":\"x:1138#0\",\"type\":\"tool-result\",\"timestamp\":1792267204000,\"toolUseId\":\"toolu_2\",\"isError\":false,\"summary\":\"package a\"},{\"id\":\"x:1374#0\",\"type\":\"assistant-message\",\"timestamp\":1792267205000,\"markdown\":\"There are 12 files.\",\"stopReason\":\"end_turn\"}]}"
   },
   {
    "method": "GET",
@@ -1055,11 +1055,11 @@
    "status": 200,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",
-    "etag": "\"gwBysfIr7yAzLt1PikWZdYt5CGk\"",
+    "etag": "\"dGPUWe-aGzVtR7M8-TVnqouslsk\"",
     "cache-control": "no-store",
-    "content-length": "680"
+    "content-length": "683"
    },
-   "answer": "{\"entries\":[{\"id\":\"id001k\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"id001l\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"id001m\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"id001n\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"id001o\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
+   "answer": "{\"entries\":[{\"id\":\"x:0#0\",\"type\":\"user-message\",\"timestamp\":1792274400000,\"text\":\"Find the bug\\nin the parser\"},{\"id\":\"x:107#0\",\"type\":\"assistant-message\",\"timestamp\":1792274405000,\"markdown\":\"Looking\",\"stopReason\":\"tool_use\"},{\"id\":\"x:107#1\",\"type\":\"tool-call\",\"timestamp\":1792274405000,\"toolUseId\":\"toolu_a\",\"toolName\":\"Read\",\"summary\":\"Read /srv/app/parser.go\",\"filePath\":\"/srv/app/parser.go\",\"status\":\"success\"},{\"id\":\"x:341#0\",\"type\":\"tool-result\",\"timestamp\":1792281600000,\"toolUseId\":\"toolu_a\",\"isError\":false,\"summary\":\"ok\"},{\"id\":\"x:443#0\",\"type\":\"assistant-message\",\"timestamp\":1792281600000,\"markdown\":\"  Fixed: the loop ran one past the end.  \",\"stopReason\":\"end_turn\"}]}"
   }
  ]
 }

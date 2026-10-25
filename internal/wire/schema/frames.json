@@ -1,0 +1,3566 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://harnessly.dev/schema/v2/frames.json",
+  "title": "harnessly v2 wire",
+  "description": "Frames of /api/v2/socket, bodies and results of POST /api/v2/cmd/<op>, and the v2 HTTP pages. A fixture in internal/wire/testdata is one document of the root: a frame, a command exchange or an HTTP exchange.",
+  "oneOf": [
+    {"$ref": "#/$defs/ClientFrame"},
+    {"$ref": "#/$defs/ServerFrame"},
+    {"$ref": "#/$defs/CmdExchange"},
+    {"$ref": "#/$defs/HttpExchange"}
+  ],
+  "$defs": {
+    "Provider": {"enum": ["claude", "codex"]},
+    "Feature": {
+      "enum": [
+        "queue", "steer", "questions", "permissions", "background", "model", "voice", "files", "checkpoints",
+        "designly", "search", "vault", "push", "terminal", "machine", "apps", "settings", "drafts", "queue-move", "apps-hub", "terminal-stop", "rewind", "fork", "handoff",
+        "auto-continue"
+      ]
+    },
+    "Reach": {"enum": ["online", "unreachable", "unknown"]},
+    "HealthLevel": {"enum": ["ok", "warn", "critical"]},
+    "HealthMetric": {"enum": ["disk", "mem", "cpu"]},
+    "AgentInstallStatus": {"enum": ["ready", "missing", "login-required"]},
+    "Effort": {"enum": ["low", "medium", "high", "xhigh", "max", "ultra"]},
+    "GoalStatus": {"enum": ["active", "paused", "met"]},
+    "Goal": {
+      "type": "object",
+      "required": ["text", "status", "since"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {"type": "string", "minLength": 1},
+        "status": {"$ref": "#/$defs/GoalStatus"},
+        "since": {"type": "integer", "minimum": 0}
+      }
+    },
+    "Recap": {
+      "type": "object",
+      "required": ["text", "at"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {"type": "string", "minLength": 1},
+        "at": {"type": "integer", "minimum": 0}
+      }
+    },
+    "TitleSource": {"enum": ["user", "agent", "first-message"]},
+    "TerminalStopBy": {"enum": ["person", "idle"]},
+    "Launch": {
+      "type": "object",
+      "required": ["id", "prompt"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "prompt": {"type": "string", "maxLength": 200}
+      }
+    },
+    "TerminalStop": {
+      "type": "object",
+      "required": ["at", "by"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "by": {"$ref": "#/$defs/TerminalStopBy"},
+        "idleMs": {"type": "integer", "minimum": 1}
+      }
+    },
+    "RewindMark": {
+      "type": "object",
+      "required": ["at", "afterTurnId", "turns", "files", "undoUntil"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "afterTurnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+        "turns": {"type": "integer", "minimum": 1},
+        "files": {"type": "boolean"},
+        "undoUntil": {"type": "integer", "minimum": 0}
+      }
+    },
+    "FileChange": {"enum": ["restored", "changed", "removed"]},
+    "RewindPlan": {
+      "type": "object",
+      "required": ["entryId", "turns", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "entryId": {"$ref": "#/$defs/TurnId"},
+        "turns": {"type": "integer", "minimum": 1},
+        "files": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["at", "changes", "more"],
+              "additionalProperties": false,
+              "properties": {
+                "at": {"type": "integer", "minimum": 0},
+                "changes": {
+                  "type": "array",
+                  "maxItems": 50,
+                  "items": {
+                    "type": "object",
+                    "required": ["path", "change"],
+                    "additionalProperties": false,
+                    "properties": {"path": {"type": "string", "minLength": 1}, "change": {"$ref": "#/$defs/FileChange"}}
+                  }
+                },
+                "more": {"type": "integer", "minimum": 0}
+              }
+            },
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "IdleStop": {"enum": ["off", "1h", "2h", "6h"]},
+    "OriginKind": {"enum": ["fork", "handoff"]},
+    "OriginVia": {"enum": ["session", "excerpt", "note"]},
+    "HandoffMode": {"enum": ["excerpt", "note"]},
+    "DraftMode": {"enum": ["excerpt", "note", "result"]},
+    "Origin": {
+      "type": "object",
+      "required": ["k", "fromId", "fromTitle", "fromProvider", "fromModel", "via", "at"],
+      "additionalProperties": false,
+      "properties": {
+        "k": {"$ref": "#/$defs/OriginKind"},
+        "fromId": {"$ref": "#/$defs/ConvId"},
+        "fromTitle": {"type": "string"},
+        "fromProvider": {"$ref": "#/$defs/Provider"},
+        "fromModel": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+        "atTurn": {"$ref": "#/$defs/TurnId"},
+        "via": {"$ref": "#/$defs/OriginVia"},
+        "at": {"type": "integer", "minimum": 0}
+      }
+    },
+    "HandoffDraft": {
+      "type": "object",
+      "required": ["mode", "text", "tokens", "turns"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"$ref": "#/$defs/DraftMode"},
+        "text": {"type": "string", "minLength": 1},
+        "tokens": {"type": "integer", "minimum": 0},
+        "turns": {"type": "integer", "minimum": 0}
+      }
+    },
+    "OnOff": {"enum": ["on", "off"]},
+    "RuntimeSettings": {
+      "type": "object",
+      "required": ["idleStop"],
+      "additionalProperties": false,
+      "properties": {
+        "idleStop": {"$ref": "#/$defs/IdleStop"},
+        "limitContinue": {"$ref": "#/$defs/OnOff"},
+        "restartContinue": {"$ref": "#/$defs/OnOff"},
+        "delegation": {"$ref": "#/$defs/DelegationSettings"}
+      }
+    },
+    "DelegationSettings": {
+      "type": "object",
+      "required": ["maxChildren", "anyChat"],
+      "additionalProperties": false,
+      "properties": {
+        "maxChildren": {"type": "integer", "minimum": 1, "maximum": 10},
+        "anyChat": {"type": "boolean"}
+      }
+    },
+    "LimitWindow": {"enum": ["session", "weekly", "other"]},
+    "LimitHold": {
+      "type": "object",
+      "required": ["provider", "window", "at", "resetsAt", "continueAt"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {"$ref": "#/$defs/Provider"},
+        "window": {"$ref": "#/$defs/LimitWindow"},
+        "at": {"type": "integer", "minimum": 0},
+        "resetsAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "continueAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]}
+      }
+    },
+    "AutoContinueWhy": {"enum": ["limit", "restart"]},
+    "AutoContinue": {
+      "type": "object",
+      "required": ["at", "why", "clientId"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "why": {"$ref": "#/$defs/AutoContinueWhy"},
+        "clientId": {"type": "string", "minLength": 1},
+        "own": {"const": true}
+      }
+    },
+    "LimitAction": {"enum": ["now", "cancel", "auto"]},
+    "AgentStateKind": {
+      "enum": [
+        "starting", "working", "waiting-question", "waiting-permission", "ready", "idle", "stopped",
+        "launch-failed", "gone", "unknown"
+      ]
+    },
+    "LaunchStep": {"enum": ["machine", "cli", "project", "prompt"]},
+    "LaunchFailure": {"enum": ["no-process", "exited", "no-prompt-box", "no-session", "cli-missing", "login-required"]},
+    "GoneReason": {"enum": ["tab-closed", "tmux-lost"]},
+    "TurnStatus": {"enum": ["live", "done", "interrupted", "failed"]},
+    "TurnFailureCode": {"enum": ["api-error", "rate-limit", "context-overflow", "agent-exited", "unknown"]},
+    "FileOp": {"enum": ["created", "edited", "read"]},
+    "OutputKind": {"enum": ["artifact", "design", "doc", "mr", "stand"]},
+    "OutputOp": {"enum": ["created", "changed"]},
+    "EntryKind": {
+      "enum": ["user", "say", "think", "tool", "subagent", "answers", "gate", "compaction", "notice", "interrupt", "peer"]
+    },
+    "PeerNoteKind": {"enum": ["message", "done", "idle", "event"]},
+    "SubagentStatus": {"enum": ["running", "done", "failed"]},
+    "NoticeLevel": {"enum": ["info", "warn", "error"]},
+    "AttachmentKind": {"enum": ["image", "file"]},
+    "RefKind": {"enum": ["design", "doc", "board", "file", "mr", "task"]},
+    "MessageMode": {"enum": ["queue", "now", "steer"]},
+    "MessageKind": {"enum": ["prompt", "command"]},
+    "MessageStateKind": {"enum": ["queued", "typing", "in-input", "accepted", "in-turn", "done", "failed", "cancelled"]},
+    "QueueReason": {"enum": ["behind", "agent-busy", "launching", "resuming", "paused", "blocked-menu", "blocked-text"]},
+    "MessageFailure": {
+      "enum": [
+        "upload-failed", "refused", "launch-failed", "agent-gone", "type-failed", "stuck-in-input",
+        "unconfirmed", "expired", "returned-to-input"
+      ]
+    },
+    "PauseReason": {"enum": ["interrupted", "user", "launch-failed", "agent-gone", "limited"]},
+    "GateKind": {"enum": ["question", "permission", "plan"]},
+    "PermissionKind": {"enum": ["tool", "plan"]},
+    "PermissionScope": {"enum": ["once", "always", "deny", "plan-auto", "plan-ask", "revise"]},
+    "GateStateKind": {"enum": ["open", "answering", "answered", "closed"]},
+    "GateCloseReason": {"enum": ["agent-moved-on", "chat-about", "turn-ended", "agent-gone"]},
+    "GateRefusal": {"enum": ["menu-unmatched"]},
+    "BackgroundKind": {"enum": ["subagent", "command", "workflow"]},
+    "BackgroundStatus": {"enum": ["running", "done", "stopped", "failed", "idle"]},
+    "SnapshotMode": {"enum": ["replace", "after"]},
+    "FrameErrorCode": {"enum": ["proto", "bad-channel", "not-found", "too-many-subs", "unauthorized"]},
+    "ClientFrameKind": {"enum": ["hello", "sub", "unsub", "ping"]},
+    "ServerFrameKind": {"enum": ["welcome", "snapshot", "ev", "pong", "error"]},
+    "MachineEventType": {"enum": ["machine_status", "machine_load"]},
+    "ConvsEventType": {"enum": ["conversation_upsert", "conversation_state", "conversation_seen", "conversation_removed", "project_upsert", "favorites_upsert", "draft_upsert"]},
+    "ConvEventType": {
+      "enum": [
+        "turn_started", "step", "entry_update", "entry_replace", "now", "question_asked",
+        "permission_requested", "plan_proposed", "gate_updated", "compaction", "turn_finished",
+        "turn_failed", "queue_changed", "prompt_state", "message_upsert", "background_upsert",
+        "background_removed", "shots_set", "pictures_set", "feed_reset"
+      ]
+    },
+    "CompactionPhase": {"enum": ["started", "finished"]},
+    "Op": {
+      "enum": [
+        "send", "cancel", "retry", "promote", "answer", "decide", "interrupt", "queue.resume", "seen",
+        "conversation.create", "conversation.rename", "conversation.pin", "conversation.move",
+        "conversation.delete", "conversation.restore", "conversation.resume", "model", "bg.stop",
+        "project.create", "favorites.group.create", "favorites.group.rename", "favorites.group.delete",
+        "favorites.group.move", "favorites.place", "goal", "conversation.retitle", "draft.set", "queue.move", "terminal.stop", "rewind", "rewind.undo",
+        "conversation.fork", "conversation.handoff", "conversation.merge",
+        "limit"
+      ]
+    },
+    "PromoteTo": {"enum": ["now", "steer"]},
+    "ResultKind": {"enum": ["accepted", "queued", "refused"]},
+    "RefuseCode": {
+      "enum": [
+        "bad-request", "conflict", "unsupported", "forbidden", "not-found", "machine-required",
+        "machine-offline", "agent-gone", "agent-working", "not-working", "queue-full", "text-too-long",
+        "attachment-missing", "attachment-too-large", "attachment-type", "too-many-attachments", "too-late",
+        "not-failed", "gate-closed", "gate-answered", "option-unknown", "rate-limited", "internal", "timeout"
+      ]
+    },
+    "RetryableRefuseCode": {"enum": ["machine-offline", "rate-limited", "internal", "timeout"]},
+    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "context", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft"]},
+    "Channel": {"type": "string", "pattern": "^(machine|convs|conv:tab-[A-Za-z0-9_-]+)$"},
+    "EntryId": {"type": "string", "pattern": "^((c:[0-9a-f-]+|x:[0-9]+)#[0-9]+|live:(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$"},
+    "TurnId": {"type": "string", "pattern": "^(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+$"},
+    "Wait": {
+      "type": "object",
+      "required": ["slowAt", "deadlineAt"],
+      "additionalProperties": false,
+      "properties": {"slowAt": {"type": "integer", "minimum": 0}, "deadlineAt": {"type": "integer", "minimum": 0}}
+    },
+    "ConvId": {"type": "string", "pattern": "^tab-[A-Za-z0-9_-]+$"},
+    "MachineLoad": {
+      "type": "object",
+      "required": ["at", "cpu", "memUsed", "memTotal", "diskFree", "diskTotal", "busyAgents"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "cpu": {"type": "number", "minimum": 0},
+        "memUsed": {"type": "integer", "minimum": 0},
+        "memTotal": {"type": "integer", "minimum": 0},
+        "diskFree": {"type": "integer", "minimum": 0},
+        "diskTotal": {"type": "integer", "minimum": 0},
+        "busyAgents": {"type": "integer", "minimum": 0}
+      }
+    },
+    "HealthIssue": {
+      "type": "object",
+      "required": ["metric", "level"],
+      "additionalProperties": false,
+      "properties": {
+        "metric": {"$ref": "#/$defs/HealthMetric"},
+        "level": {"enum": ["warn", "critical"]}
+      }
+    },
+    "MachineHealth": {
+      "type": "object",
+      "required": ["level", "since", "issues"],
+      "additionalProperties": false,
+      "properties": {
+        "level": {"$ref": "#/$defs/HealthLevel"},
+        "since": {"type": "integer", "minimum": 0},
+        "issues": {"type": "array", "items": {"$ref": "#/$defs/HealthIssue"}}
+      }
+    },
+    "MachineRuntime": {
+      "type": "object",
+      "required": ["version", "proto", "features"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"type": "string"},
+        "proto": {"type": "integer", "minimum": 0},
+        "features": {"type": "array", "items": {"$ref": "#/$defs/Feature"}}
+      }
+    },
+    "AgentModel": {
+      "type": "object",
+      "required": ["id", "label", "hint", "efforts", "defaultEffort"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "hint": {"type": "string"},
+        "efforts": {"type": "array", "items": {"$ref": "#/$defs/Effort"}},
+        "defaultEffort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
+        "ultracode": {"type": "boolean"}
+      }
+    },
+    "MachineAgent": {
+      "type": "object",
+      "required": ["provider", "version", "status", "models", "canSwitchModel"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {"$ref": "#/$defs/Provider"},
+        "version": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "status": {"$ref": "#/$defs/AgentInstallStatus"},
+        "models": {"type": "array", "items": {"$ref": "#/$defs/AgentModel"}},
+        "canSwitchModel": {"type": "boolean"}
+      }
+    },
+    "Machine": {
+      "type": "object",
+      "required": ["id", "name", "host", "reach", "lastSeenAt", "runtime", "agents"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
+        "host": {"type": "string"},
+        "reach": {"$ref": "#/$defs/Reach"},
+        "lastSeenAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "runtime": {"oneOf": [{"$ref": "#/$defs/MachineRuntime"}, {"type": "null"}]},
+        "agents": {"type": "array", "items": {"$ref": "#/$defs/MachineAgent"}},
+        "load": {"$ref": "#/$defs/MachineLoad"},
+        "health": {"$ref": "#/$defs/MachineHealth"}
+      }
+    },
+    "Project": {
+      "type": "object",
+      "required": ["id", "machineId", "path", "name", "git", "createdAt"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "machineId": {"type": "string", "minLength": 1},
+        "path": {"type": "string"},
+        "name": {"type": "string"},
+        "git": {"type": "boolean"},
+        "createdAt": {"type": "integer", "minimum": 0}
+      }
+    },
+    "Dir": {
+      "type": "object",
+      "required": ["path", "name", "git", "branch", "empty"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "git": {"type": "boolean"},
+        "branch": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "empty": {"type": "boolean"}
+      }
+    },
+    "Terminal": {
+      "type": "object",
+      "required": ["id", "createdAt"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]{6,32}$"},
+        "createdAt": {"type": "integer", "minimum": 0}
+      }
+    },
+    "DesignKind": {"enum": ["site", "slides", "ds"]},
+    "DesignlyCreate": {
+      "type": "object",
+      "required": ["title", "brief", "kind", "provider", "model", "effort", "designSystem"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {"type": "string", "minLength": 1, "maxLength": 200},
+        "brief": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "kind": {"$ref": "#/$defs/DesignKind"},
+        "provider": {"$ref": "#/$defs/Provider"},
+        "model": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
+        "designSystem": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 200}, {"type": "null"}]}
+      }
+    },
+    "DesignlyCreated": {
+      "type": "object",
+      "required": ["id", "title", "conv"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "conv": {"type": "string", "pattern": "^tab-"}
+      }
+    },
+    "DesignBoard": {
+      "type": "object",
+      "required": ["title", "path"],
+      "additionalProperties": false,
+      "properties": {"title": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}}
+    },
+    "DesignArtifact": {
+      "type": "object",
+      "required": ["id", "title", "updatedAt", "kind", "pinned", "cover", "projectPath", "boards", "convs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "updatedAt": {"type": "integer", "minimum": 0},
+        "kind": {"$ref": "#/$defs/DesignKind"},
+        "pinned": {"type": "boolean"},
+        "cover": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "projectPath": {"type": "string"},
+        "boards": {"type": "array", "maxItems": 200, "items": {"$ref": "#/$defs/DesignBoard"}},
+        "convs": {"type": "array", "items": {"type": "string", "pattern": "^tab-"}},
+        "touchedBy": {"type": "array", "items": {"type": "string", "pattern": "^tab-"}},
+        "owner": {"$ref": "#/$defs/DesignOwner"},
+        "role": {"$ref": "#/$defs/DesignRole"}
+      }
+    },
+    "DesignRole": {"enum": ["view", "comment", "edit", "manage", "owner"]},
+    "DesignOwner": {
+      "type": "object",
+      "required": ["name", "me"],
+      "additionalProperties": false,
+      "properties": {"name": {"type": "string", "minLength": 1}, "me": {"type": "boolean"}}
+    },
+    "DesignLibrary": {
+      "type": "object",
+      "required": ["port", "root", "artifacts"],
+      "additionalProperties": false,
+      "properties": {
+        "port": {"type": "integer", "minimum": 0},
+        "root": {"type": "string", "minLength": 1},
+        "artifacts": {"type": "array", "items": {"$ref": "#/$defs/DesignArtifact"}}
+      }
+    },
+    "DesignSystemInfo": {
+      "type": "object",
+      "required": ["id", "label", "desc"],
+      "additionalProperties": false,
+      "properties": {"id": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}, "desc": {"type": "string"}}
+    },
+    "DesignlyPin": {
+      "type": "object",
+      "required": ["id", "pinned"],
+      "additionalProperties": false,
+      "properties": {"id": {"type": "string", "minLength": 1}, "pinned": {"type": "boolean"}}
+    },
+    "DesignlyRefusal": {
+      "type": "object",
+      "required": ["r", "code", "message", "projectId"],
+      "additionalProperties": false,
+      "properties": {
+        "r": {"const": "refused"},
+        "code": {"$ref": "#/$defs/RefuseCode"},
+        "message": {"type": "string", "minLength": 1},
+        "projectId": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+      }
+    },
+    "TaskStatus": {"enum": ["pending", "in_progress", "completed", "blocked"]},
+    "Task": {
+      "type": "object",
+      "required": ["id", "subject", "status"],
+      "additionalProperties": false,
+      "properties": {"id": {"type": "string", "minLength": 1}, "subject": {"type": "string"}, "status": {"$ref": "#/$defs/TaskStatus"}}
+    },
+    "ConvContext": {
+      "type": "object",
+      "required": ["usedTokens", "limitTokens"],
+      "additionalProperties": false,
+      "properties": {
+        "usedTokens": {"type": "integer", "minimum": 0},
+        "limitTokens": {"type": "integer", "minimum": 1}
+      }
+    },
+    "DiskPartID": {"enum": ["workspace", "caches", "agents", "other", "free"]},
+    "MachineDiskPart": {
+      "type": "object",
+      "required": ["id", "bytes"],
+      "additionalProperties": false,
+      "properties": {"id": {"$ref": "#/$defs/DiskPartID"}, "bytes": {"type": "integer", "minimum": 0}}
+    },
+    "MachineDisk": {
+      "type": "object",
+      "required": ["path", "total", "free", "parts", "measuredAt", "partial"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "total": {"type": "integer", "minimum": 0},
+        "free": {"type": "integer", "minimum": 0},
+        "parts": {"type": "array", "items": {"$ref": "#/$defs/MachineDiskPart"}},
+        "measuredAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "partial": {"type": "boolean"}
+      }
+    },
+    "MachineSample": {
+      "type": "object",
+      "required": ["at", "cpu", "mem", "rx", "tx"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "cpu": {"type": "number", "minimum": 0, "maximum": 1},
+        "mem": {"type": "number", "minimum": 0, "maximum": 1},
+        "rx": {"type": "number", "minimum": 0},
+        "tx": {"type": "number", "minimum": 0}
+      }
+    },
+    "MachineProcKind": {"enum": ["service", "agent", "dev", "other"]},
+    "MachineProc": {
+      "type": "object",
+      "required": ["pid", "startTime", "name", "command", "cpu", "rss", "kind", "port", "stuck", "guard"],
+      "additionalProperties": false,
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "startTime": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"},
+        "name": {"type": "string", "minLength": 1},
+        "command": {"type": "string"},
+        "cpu": {"type": "number", "minimum": 0},
+        "rss": {"type": "integer", "minimum": 0},
+        "kind": {"$ref": "#/$defs/MachineProcKind"},
+        "port": {"oneOf": [{"type": "integer", "minimum": 1, "maximum": 65535}, {"type": "null"}]},
+        "stuck": {"type": "boolean"},
+        "guard": {"type": "boolean"}
+      }
+    },
+    "MachineStats": {
+      "type": "object",
+      "required": ["at", "cpu", "cores", "mem", "net", "disk", "history", "procs"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "cpu": {"type": "number", "minimum": 0, "maximum": 1},
+        "cores": {"type": "array", "items": {"type": "number", "minimum": 0, "maximum": 1}},
+        "mem": {
+          "type": "object",
+          "required": ["used", "total"],
+          "additionalProperties": false,
+          "properties": {"used": {"type": "integer", "minimum": 0}, "total": {"type": "integer", "minimum": 0}}
+        },
+        "net": {
+          "type": "object",
+          "required": ["rx", "tx"],
+          "additionalProperties": false,
+          "properties": {"rx": {"type": "number", "minimum": 0}, "tx": {"type": "number", "minimum": 0}}
+        },
+        "disk": {"$ref": "#/$defs/MachineDisk"},
+        "history": {"type": "array", "items": {"$ref": "#/$defs/MachineSample"}},
+        "procs": {"type": "array", "items": {"$ref": "#/$defs/MachineProc"}}
+      }
+    },
+    "AppID": {"enum": ["tracker", "gitlab"]},
+    "AppState": {"enum": ["ready", "off", "failed"]},
+    "AppReason": {"enum": ["not-configured", "no-token", "denied", "unreachable"]},
+    "AppSectionID": {"enum": ["epics", "tasks", "mrs"]},
+    "AppFlag": {"enum": ["review", "conflict", "ci-failed", "no-reviewer", "open"]},
+    "AppTone": {"enum": ["accent", "warn"]},
+    "AppRole": {"enum": ["author", "assignee", "reviewer"]},
+    "AppPipeline": {"enum": ["success", "failed", "running", "pending", "canceled", "skipped", "manual"]},
+    "AppChild": {
+      "type": "object",
+      "required": ["id", "title", "url", "state", "done", "person"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "url": {"type": "string", "pattern": "^https?://[^/]+"},
+        "state": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "done": {"type": "boolean"},
+        "person": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+      }
+    },
+    "AppRef": {
+      "type": "object",
+      "required": ["id", "title", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "url": {"type": "string", "pattern": "^https?://[^/]+"}
+      }
+    },
+    "AppMR": {
+      "type": "object",
+      "required": ["source", "draft", "conflicts", "needsRebase", "ready", "unresolved", "comments", "pipeline", "approvals"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "draft": {"type": "boolean"},
+        "conflicts": {"type": "boolean"},
+        "needsRebase": {"type": "boolean"},
+        "ready": {"type": "boolean"},
+        "unresolved": {"type": "boolean"},
+        "comments": {"type": "integer", "minimum": 0},
+        "pipeline": {"oneOf": [{"$ref": "#/$defs/AppPipeline"}, {"type": "null"}]},
+        "approvals": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["given", "required"],
+              "additionalProperties": false,
+              "properties": {"given": {"type": "integer", "minimum": 0}, "required": {"type": "integer", "minimum": 0}}
+            },
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "AppRow": {
+      "type": "object",
+      "required": [
+        "key", "id", "title", "url", "state", "flag", "tone", "project", "person", "target", "createdAt", "updatedAt",
+        "closedAt", "author", "assignees", "reviewers", "me", "labels", "priority", "kind", "parent", "progress",
+        "children", "mr"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "key": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "url": {"type": "string", "pattern": "^https?://[^/]+"},
+        "state": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "flag": {"oneOf": [{"$ref": "#/$defs/AppFlag"}, {"type": "null"}]},
+        "tone": {"oneOf": [{"$ref": "#/$defs/AppTone"}, {"type": "null"}]},
+        "project": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "person": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "target": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "createdAt": {"type": "integer", "minimum": 0},
+        "updatedAt": {"type": "integer", "minimum": 0},
+        "closedAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "author": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "assignees": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "reviewers": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "me": {"type": "array", "items": {"$ref": "#/$defs/AppRole"}},
+        "labels": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "priority": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "kind": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "parent": {"oneOf": [{"$ref": "#/$defs/AppRef"}, {"type": "null"}]},
+        "progress": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["done", "total"],
+              "additionalProperties": false,
+              "properties": {"done": {"type": "integer", "minimum": 0}, "total": {"type": "integer", "minimum": 0}}
+            },
+            {"type": "null"}
+          ]
+        },
+        "children": {"type": "array", "items": {"$ref": "#/$defs/AppChild"}},
+        "mr": {"oneOf": [{"$ref": "#/$defs/AppMR"}, {"type": "null"}]}
+      }
+    },
+    "AppSection": {
+      "type": "object",
+      "required": ["id", "rows"],
+      "additionalProperties": false,
+      "properties": {"id": {"$ref": "#/$defs/AppSectionID"}, "rows": {"type": "array", "items": {"$ref": "#/$defs/AppRow"}}}
+    },
+    "AppFeed": {
+      "type": "object",
+      "required": ["id", "state", "reason", "host", "me", "sections"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/AppID"},
+        "state": {"$ref": "#/$defs/AppState"},
+        "reason": {"oneOf": [{"$ref": "#/$defs/AppReason"}, {"type": "null"}]},
+        "host": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "me": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "sections": {"type": "array", "items": {"$ref": "#/$defs/AppSection"}}
+      }
+    },
+    "AppsFeed": {
+      "type": "object",
+      "required": ["at", "staleDays", "apps"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "staleDays": {"type": "integer", "minimum": 1},
+        "apps": {"type": "array", "items": {"$ref": "#/$defs/AppFeed"}}
+      }
+    },
+    "AgentOptionKey": {
+      "enum": [
+        "model", "effort", "baseUrl", "fallbackModel", "thinking", "outputStyle", "permissionMode", "sandbox",
+        "projectMcp", "compactWindow", "memory", "keepDays", "hooks", "coauthor", "updates", "summary", "fast",
+        "sandboxMode", "network", "approval", "search", "history", "ultracode"
+      ]
+    },
+    "AgentOptionValue": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 500}, {"type": "boolean"}, {"type": "integer", "minimum": 1}, {"type": "null"}]},
+    "AgentOption": {
+      "type": "object",
+      "required": ["key", "value"],
+      "additionalProperties": false,
+      "properties": {"key": {"$ref": "#/$defs/AgentOptionKey"}, "value": {"$ref": "#/$defs/AgentOptionValue"}}
+    },
+    "AgentRules": {
+      "type": "object",
+      "required": ["allow", "ask", "deny"],
+      "additionalProperties": false,
+      "properties": {
+        "allow": {"type": "array", "maxItems": 200, "items": {"type": "string", "minLength": 1, "maxLength": 300}},
+        "ask": {"type": "array", "maxItems": 200, "items": {"type": "string", "minLength": 1, "maxLength": 300}},
+        "deny": {"type": "array", "maxItems": 200, "items": {"type": "string", "minLength": 1, "maxLength": 300}}
+      }
+    },
+    "AgentEnvVar": {
+      "type": "object",
+      "required": ["key", "value", "secret"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {"type": "string", "pattern": "^[A-Z_][A-Z0-9_]{0,63}$"},
+        "value": {"type": "string", "maxLength": 2000},
+        "secret": {"type": "boolean"}
+      }
+    },
+    "AgentMcpKind": {"enum": ["stdio", "http"]},
+    "AgentMcp": {
+      "type": "object",
+      "required": ["name", "kind", "target", "enabled"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"},
+        "kind": {"$ref": "#/$defs/AgentMcpKind"},
+        "target": {"type": "string", "minLength": 1, "maxLength": 255},
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "AgentAccountMethod": {"enum": ["subscription", "key"]},
+    "AgentAccount": {
+      "type": "object",
+      "required": ["signedIn", "method", "plan", "who"],
+      "additionalProperties": false,
+      "properties": {
+        "signedIn": {"type": "boolean"},
+        "method": {"oneOf": [{"$ref": "#/$defs/AgentAccountMethod"}, {"type": "null"}]},
+        "plan": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 100}, {"type": "null"}]},
+        "who": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 255}, {"type": "null"}]}
+      }
+    },
+    "AgentSettings": {
+      "type": "object",
+      "required": ["provider", "path", "rev", "account", "options", "rules", "env", "mcp"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {"$ref": "#/$defs/Provider"},
+        "path": {"type": "string", "minLength": 1},
+        "rev": {"type": "string", "minLength": 1},
+        "account": {"$ref": "#/$defs/AgentAccount"},
+        "options": {"type": "array", "items": {"$ref": "#/$defs/AgentOption"}},
+        "rules": {"oneOf": [{"$ref": "#/$defs/AgentRules"}, {"type": "null"}]},
+        "env": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/AgentEnvVar"}},
+        "mcp": {"type": "array", "items": {"$ref": "#/$defs/AgentMcp"}}
+      }
+    },
+    "AgentSettingsEdit": {
+      "type": "object",
+      "required": ["rev", "patch"],
+      "additionalProperties": false,
+      "properties": {
+        "rev": {"type": "string", "minLength": 1},
+        "patch": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "options": {"type": "array", "items": {"$ref": "#/$defs/AgentOption"}},
+            "rules": {"$ref": "#/$defs/AgentRules"},
+            "envSet": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "required": ["key", "value"],
+                "additionalProperties": false,
+                "properties": {"key": {"type": "string", "pattern": "^[A-Z_][A-Z0-9_]{0,63}$"}, "value": {"type": "string", "minLength": 1, "maxLength": 2000}}
+              }
+            },
+            "envUnset": {"type": "array", "maxItems": 100, "items": {"type": "string", "pattern": "^[A-Z_][A-Z0-9_]{0,63}$"}},
+            "mcp": {
+              "type": "object",
+              "required": ["name", "enabled"],
+              "additionalProperties": false,
+              "properties": {"name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"}, "enabled": {"type": "boolean"}}
+            }
+          }
+        }
+      }
+    },
+    "MachineStop": {
+      "type": "object",
+      "required": ["pid", "startTime"],
+      "additionalProperties": false,
+      "properties": {"pid": {"type": "integer", "minimum": 2}, "startTime": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"}}
+    },
+    "MachineStopped": {
+      "type": "object",
+      "required": ["stopped", "signal"],
+      "additionalProperties": false,
+      "properties": {"stopped": {"const": true}, "signal": {"enum": ["SIGTERM", "SIGKILL"]}}
+    },
+    "MachineStopReason": {"enum": ["gone", "changed", "foreign", "protected", "not-stoppable", "not-listed", "busy", "failed"]},
+    "MachineRefusal": {
+      "type": "object",
+      "required": ["r", "code", "reason", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "r": {"const": "refused"},
+        "code": {"$ref": "#/$defs/RefuseCode"},
+        "reason": {"$ref": "#/$defs/MachineStopReason"},
+        "message": {"type": "string", "minLength": 1}
+      }
+    },
+    "LegacyTab": {
+      "type": "object",
+      "required": ["tabId", "workspaceId", "sessionName", "jsonlPath", "agentSessionId", "cwd"],
+      "additionalProperties": false,
+      "properties": {
+        "tabId": {"type": "string", "minLength": 1},
+        "workspaceId": {"type": "string"},
+        "sessionName": {"type": "string", "minLength": 1},
+        "jsonlPath": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "agentSessionId": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "cwd": {"type": "string"}
+      }
+    },
+    "OpenTab": {"enum": ["task", "gitlab", "artifacts", "browser"]},
+    "OpenChoice": {
+      "type": "object",
+      "required": ["tab", "target", "label", "detail"],
+      "additionalProperties": false,
+      "properties": {
+        "tab": {"$ref": "#/$defs/OpenTab"},
+        "target": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "detail": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+      }
+    },
+    "OpenTarget": {
+      "type": "object",
+      "required": ["tab", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "tab": {"$ref": "#/$defs/OpenTab"},
+        "target": {"type": "string", "minLength": 1},
+        "choices": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/OpenChoice"}}
+      }
+    },
+    "OpenedRefs": {
+      "type": "object",
+      "required": ["refs"],
+      "additionalProperties": false,
+      "properties": {
+        "refs": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "required": ["ref", "open"],
+            "additionalProperties": false,
+            "properties": {
+              "ref": {"type": "string", "minLength": 1, "maxLength": 512},
+              "open": {"oneOf": [{"$ref": "#/$defs/OpenTarget"}, {"type": "null"}]}
+            }
+          }
+        }
+      }
+    },
+    "FileKind": {"enum": ["file", "directory"]},
+    "FileEntry": {
+      "type": "object",
+      "required": ["name", "path", "kind"],
+      "additionalProperties": false,
+      "properties": {"name": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}, "kind": {"$ref": "#/$defs/FileKind"}}
+    },
+    "DirListing": {
+      "type": "object",
+      "required": ["path", "entries", "truncated"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string"},
+        "entries": {"type": "array", "items": {"$ref": "#/$defs/FileEntry"}},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "FileContent": {
+      "type": "object",
+      "required": ["path", "content", "revision", "bytes"],
+      "additionalProperties": false,
+      "properties": {"path": {"type": "string", "minLength": 1}, "content": {"type": "string"}, "revision": {"type": "string", "minLength": 1}, "bytes": {"type": "integer", "minimum": 0}}
+    },
+    "FileSave": {
+      "type": "object",
+      "required": ["content", "revision"],
+      "additionalProperties": false,
+      "properties": {"content": {"type": "string"}, "revision": {"type": "string", "minLength": 1}}
+    },
+    "FileRefusal": {
+      "type": "object",
+      "required": ["r", "code", "message"],
+      "additionalProperties": false,
+      "properties": {"r": {"const": "refused"}, "code": {"$ref": "#/$defs/RefuseCode"}, "message": {"type": "string", "minLength": 1}}
+    },
+    "Transcript": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {"type": "string"}
+      }
+    },
+    "AgentSession": {
+      "type": "object",
+      "required": ["provider", "sessionId", "title", "cwd", "updatedAt", "turns"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {"$ref": "#/$defs/Provider"},
+        "sessionId": {"type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"},
+        "title": {"type": "string", "minLength": 1},
+        "cwd": {"type": "string", "pattern": "^/"},
+        "updatedAt": {"type": "integer", "minimum": 0},
+        "turns": {"type": "integer", "minimum": 0}
+      }
+    },
+    "Model": {
+      "type": "object",
+      "required": ["id", "effort"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
+        "ultracode": {"type": "boolean"}
+      }
+    },
+    "PendingModel": {
+      "type": "object",
+      "required": ["id", "effort", "since", "applying"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
+        "ultracode": {"type": "boolean"},
+        "since": {"type": "integer", "minimum": 0},
+        "applying": {"type": "boolean"}
+      }
+    },
+    "ModelSwitch": {
+      "type": "object",
+      "required": ["at", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 0},
+        "from": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+        "to": {"$ref": "#/$defs/Model"},
+        "refused": {"$ref": "#/$defs/RefuseCode"}
+      }
+    },
+    "AgentState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["k", "since", "step", "wait"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "starting"},
+            "since": {"type": "integer", "minimum": 0},
+            "step": {"$ref": "#/$defs/LaunchStep"},
+            "wait": {"$ref": "#/$defs/Wait"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "since", "turnId", "compacting"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "working"},
+            "since": {"type": "integer", "minimum": 0},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "compacting": {"type": "boolean"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "since", "questionId"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "waiting-question"},
+            "since": {"type": "integer", "minimum": 0},
+            "questionId": {"type": "string", "pattern": "^q:.+$"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "since", "permissionId"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "waiting-permission"},
+            "since": {"type": "integer", "minimum": 0},
+            "permissionId": {"type": "string", "pattern": "^p:.+$"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "since"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "ready"}, "since": {"type": "integer", "minimum": 0}}
+        },
+        {
+          "type": "object",
+          "required": ["k", "since"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "idle"}, "since": {"type": "integer", "minimum": 0}}
+        },
+        {
+          "type": "object",
+          "required": ["k", "since", "resumable"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "stopped"},
+            "since": {"type": "integer", "minimum": 0},
+            "resumable": {"type": "boolean"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "since", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "launch-failed"},
+            "since": {"type": "integer", "minimum": 0},
+            "reason": {"$ref": "#/$defs/LaunchFailure"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "since", "reason"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "gone"},
+            "since": {"type": "integer", "minimum": 0},
+            "reason": {"$ref": "#/$defs/GoneReason"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "since"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "unknown"}, "since": {"type": "integer", "minimum": 0}}
+        }
+      ]
+    },
+    "TurnFailure": {
+      "type": "object",
+      "required": ["code", "detail", "retryAt"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {"$ref": "#/$defs/TurnFailureCode"},
+        "detail": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "retryAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]}
+      }
+    },
+    "TurnAuthor": {
+      "type": "object",
+      "required": ["provider", "role"],
+      "additionalProperties": false,
+      "properties": {"provider": {"$ref": "#/$defs/Provider"}, "role": {"oneOf": [{"type": "string"}, {"type": "null"}]}}
+    },
+    "TurnFile": {
+      "type": "object",
+      "required": ["path", "op"],
+      "additionalProperties": false,
+      "properties": {"path": {"type": "string"}, "op": {"$ref": "#/$defs/FileOp"}}
+    },
+    "TurnOutput": {
+      "type": "object",
+      "required": ["kind", "op", "title", "ref"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"$ref": "#/$defs/OutputKind"},
+        "op": {"$ref": "#/$defs/OutputOp"},
+        "title": {"type": "string", "minLength": 1},
+        "ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "Turn": {
+      "type": "object",
+      "required": [
+        "id", "author", "startedAt", "endedAt", "durationMs", "toolCount", "stepCount", "status", "failure",
+        "answerEntryId", "files"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/TurnId"},
+        "author": {"$ref": "#/$defs/TurnAuthor"},
+        "startedAt": {"type": "integer", "minimum": 0},
+        "endedAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "durationMs": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "toolCount": {"type": "integer", "minimum": 0},
+        "stepCount": {"type": "integer", "minimum": 0},
+        "status": {"$ref": "#/$defs/TurnStatus"},
+        "failure": {"oneOf": [{"$ref": "#/$defs/TurnFailure"}, {"type": "null"}]},
+        "answerEntryId": {"oneOf": [{"$ref": "#/$defs/EntryId"}, {"type": "null"}]},
+        "files": {"type": "array", "items": {"$ref": "#/$defs/TurnFile"}},
+        "outputs": {"type": "array", "items": {"$ref": "#/$defs/TurnOutput"}}
+      }
+    },
+    "TurnSummary": {
+      "type": "object",
+      "required": ["id", "status", "startedAt", "endedAt", "durationMs", "toolCount", "snippet"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/TurnId"},
+        "status": {"$ref": "#/$defs/TurnStatus"},
+        "startedAt": {"type": "integer", "minimum": 0},
+        "endedAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "durationMs": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "toolCount": {"type": "integer", "minimum": 0},
+        "snippet": {"type": "string", "maxLength": 160},
+        "failure": {"$ref": "#/$defs/TurnFailureCode"}
+      }
+    },
+    "TurnCounts": {
+      "type": "object",
+      "required": ["toolCount", "stepCount"],
+      "additionalProperties": false,
+      "properties": {"toolCount": {"type": "integer", "minimum": 0}, "stepCount": {"type": "integer", "minimum": 0}}
+    },
+    "QueuePause": {
+      "type": "object",
+      "required": ["reason", "at"],
+      "additionalProperties": false,
+      "properties": {"reason": {"$ref": "#/$defs/PauseReason"}, "at": {"type": "integer", "minimum": 0}}
+    },
+    "QueueSummary": {
+      "type": "object",
+      "required": ["count", "paused"],
+      "additionalProperties": false,
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "paused": {"oneOf": [{"$ref": "#/$defs/QueuePause"}, {"type": "null"}]}
+      }
+    },
+    "GateRef": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "additionalProperties": false,
+      "properties": {"kind": {"$ref": "#/$defs/GateKind"}, "id": {"type": "string", "pattern": "^[qp]:.+$"}}
+    },
+    "Conversation": {
+      "type": "object",
+      "required": [
+        "id", "machineId", "projectId", "cwd", "provider", "model", "title", "titleSource", "pinned",
+        "createdAt", "lastActivityAt", "lastPromptAt", "state", "seenAt", "lastTurn", "queue", "gate", "rev"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/ConvId"},
+        "machineId": {"type": "string", "minLength": 1},
+        "projectId": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "cwd": {"type": "string"},
+        "provider": {"$ref": "#/$defs/Provider"},
+        "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+        "title": {"type": "string"},
+        "titleSource": {"$ref": "#/$defs/TitleSource"},
+        "pinned": {"type": "boolean"},
+        "createdAt": {"type": "integer", "minimum": 0},
+        "lastActivityAt": {"type": "integer", "minimum": 0},
+        "lastPromptAt": {"type": "integer", "minimum": 0},
+        "state": {"$ref": "#/$defs/AgentState"},
+        "seenAt": {"type": "integer", "minimum": 0},
+        "lastTurn": {"oneOf": [{"$ref": "#/$defs/TurnSummary"}, {"type": "null"}]},
+        "queue": {"$ref": "#/$defs/QueueSummary"},
+        "gate": {"oneOf": [{"$ref": "#/$defs/GateRef"}, {"type": "null"}]},
+        "goal": {"$ref": "#/$defs/Goal"},
+        "launch": {"$ref": "#/$defs/Launch"},
+        "recap": {"$ref": "#/$defs/Recap"},
+        "pendingModel": {"$ref": "#/$defs/PendingModel"},
+        "modelLog": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/ModelSwitch"}},
+        "bgAgents": {"type": "integer", "minimum": 1},
+        "bgWait": {"$ref": "#/$defs/BgWait"},
+        "terminalStop": {"$ref": "#/$defs/TerminalStop"},
+        "rewinds": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/RewindMark"}},
+        "origin": {"$ref": "#/$defs/Origin"},
+        "limited": {"$ref": "#/$defs/LimitHold"},
+        "autoContinues": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/AutoContinue"}},
+        "parentId": {"$ref": "#/$defs/ConvId"},
+        "rev": {"type": "integer", "minimum": 1}
+      }
+    },
+    "AttachmentRef": {
+      "type": "object",
+      "required": ["id", "name", "kind", "mime"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
+        "kind": {"$ref": "#/$defs/AttachmentKind"},
+        "mime": {"type": "string"}
+      }
+    },
+    "MessageRef": {
+      "type": "object",
+      "required": ["kind", "id", "title", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"$ref": "#/$defs/RefKind"},
+        "id": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "title": {"type": "string", "maxLength": 200},
+        "target": {"type": "string", "maxLength": 4096}
+      }
+    },
+    "ToolOutputTruncated": {
+      "type": "object",
+      "required": ["shown", "total"],
+      "additionalProperties": false,
+      "properties": {"shown": {"type": "integer", "minimum": 0}, "total": {"type": "integer", "minimum": 0}}
+    },
+    "ToolOutput": {
+      "type": "object",
+      "required": ["text", "truncated"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {"type": "string"},
+        "truncated": {"oneOf": [{"$ref": "#/$defs/ToolOutputTruncated"}, {"type": "null"}]}
+      }
+    },
+    "AnswerPair": {
+      "type": "object",
+      "required": ["q", "a"],
+      "additionalProperties": false,
+      "properties": {"q": {"type": "string"}, "a": {"type": "string"}}
+    },
+    "PeerNote": {
+      "type": "object",
+      "required": ["from", "kind", "color", "event", "summary", "sentAt", "agentId", "model", "md"],
+      "additionalProperties": false,
+      "properties": {
+        "from": {"type": "string"},
+        "kind": {"$ref": "#/$defs/PeerNoteKind"},
+        "color": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "event": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "summary": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "sentAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "agentId": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "model": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "md": {"type": "string"}
+      }
+    },
+    "Entry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "text", "attachments", "clientId"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "user"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "text": {"type": "string"},
+            "attachments": {"type": "array", "items": {"$ref": "#/$defs/AttachmentRef"}},
+            "clientId": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "md"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "say"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "md": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "think"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "text": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "toolUseId", "tool", "summary", "ok", "output"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "tool"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "toolUseId": {"type": "string", "minLength": 1},
+            "tool": {"type": "string"},
+            "summary": {"type": "string"},
+            "ok": {"oneOf": [{"type": "boolean"}, {"type": "null"}]},
+            "output": {"oneOf": [{"$ref": "#/$defs/ToolOutput"}, {"type": "null"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "agentId", "agentType", "description", "status", "model", "durationMs", "output"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "subagent"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "agentId": {"type": "string", "minLength": 1},
+            "agentType": {"type": "string"},
+            "description": {"type": "string"},
+            "status": {"$ref": "#/$defs/SubagentStatus"},
+            "model": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+            "durationMs": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+            "output": {"oneOf": [{"$ref": "#/$defs/ToolOutput"}, {"type": "null"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "questionId", "pairs"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "answers"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "questionId": {"type": "string", "pattern": "^q:.+$"},
+            "pairs": {"type": "array", "items": {"$ref": "#/$defs/AnswerPair"}}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "permissionId"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "gate"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "permissionId": {"type": "string", "pattern": "^p:.+$"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "tokensBefore", "tokensAfter", "keep"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "compaction"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "tokensBefore": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+            "tokensAfter": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+            "keep": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "level", "code", "detail"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "notice"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "level": {"$ref": "#/$defs/NoticeLevel"},
+            "code": {"type": "string", "minLength": 1},
+            "detail": {"oneOf": [{"type": "string"}, {"type": "null"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "interrupt"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["t", "id", "turnId", "at", "rev", "peers"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"const": "peer"},
+            "id": {"$ref": "#/$defs/EntryId"},
+            "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1},
+            "peers": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/PeerNote"}}
+          }
+        }
+      ]
+    },
+    "MessageState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["k", "position", "reason", "wait"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "queued"},
+            "position": {"type": "integer", "minimum": 1},
+            "reason": {"$ref": "#/$defs/QueueReason"},
+            "wait": {"oneOf": [{"$ref": "#/$defs/Wait"}, {"type": "null"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "wait"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "typing"}, "wait": {"$ref": "#/$defs/Wait"}}
+        },
+        {
+          "type": "object",
+          "required": ["k", "wait"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "in-input"}, "wait": {"$ref": "#/$defs/Wait"}}
+        },
+        {
+          "type": "object",
+          "required": ["k", "entryId"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "accepted"}, "entryId": {"oneOf": [{"$ref": "#/$defs/EntryId"}, {"type": "null"}]}}
+        },
+        {
+          "type": "object",
+          "required": ["k", "turnId"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "in-turn"}, "turnId": {"$ref": "#/$defs/TurnId"}}
+        },
+        {
+          "type": "object",
+          "required": ["k", "turnId"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "done"}, "turnId": {"$ref": "#/$defs/TurnId"}}
+        },
+        {
+          "type": "object",
+          "required": ["k", "code", "retryable", "at"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "failed"},
+            "code": {"$ref": "#/$defs/MessageFailure"},
+            "retryable": {"type": "boolean"},
+            "at": {"type": "integer", "minimum": 0}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "by"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "cancelled"}, "by": {"const": "user"}}
+        }
+      ]
+    },
+    "Message": {
+      "type": "object",
+      "required": [
+        "clientId", "conversationId", "text", "attachments", "mode", "kind", "createdAt", "attempts",
+        "state", "rev"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "clientId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "text": {"type": "string"},
+        "attachments": {"type": "array", "items": {"$ref": "#/$defs/AttachmentRef"}},
+        "refs": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/MessageRef"}},
+        "mode": {"$ref": "#/$defs/MessageMode"},
+        "kind": {"$ref": "#/$defs/MessageKind"},
+        "auto": {"$ref": "#/$defs/AutoContinueWhy"},
+        "createdAt": {"type": "integer", "minimum": 0},
+        "attempts": {"type": "integer", "minimum": 0},
+        "state": {"$ref": "#/$defs/MessageState"},
+        "rev": {"type": "integer", "minimum": 1}
+      }
+    },
+    "Queue": {
+      "type": "object",
+      "required": ["conversationId", "items", "paused", "rev"],
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "items": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "paused": {"oneOf": [{"$ref": "#/$defs/QueuePause"}, {"type": "null"}]},
+        "rev": {"type": "integer", "minimum": 1}
+      }
+    },
+    "GateState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["k"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "open"}, "refused": {"$ref": "#/$defs/GateRefusal"}}
+        },
+        {
+          "type": "object",
+          "required": ["k", "opId", "wait"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "answering"},
+            "opId": {"type": "string", "minLength": 1},
+            "wait": {"$ref": "#/$defs/Wait"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "at", "byDevice"],
+          "additionalProperties": false,
+          "properties": {
+            "k": {"const": "answered"},
+            "at": {"type": "integer", "minimum": 0},
+            "byDevice": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["k", "reason"],
+          "additionalProperties": false,
+          "properties": {"k": {"const": "closed"}, "reason": {"$ref": "#/$defs/GateCloseReason"}}
+        }
+      ]
+    },
+    "QuestionOption": {
+      "type": "object",
+      "required": ["label", "description", "preview"],
+      "additionalProperties": false,
+      "properties": {
+        "label": {"type": "string"},
+        "description": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "preview": {"oneOf": [{"type": "string"}, {"type": "null"}]}
+      }
+    },
+    "QuestionItem": {
+      "type": "object",
+      "required": ["header", "question", "multi", "options"],
+      "additionalProperties": false,
+      "properties": {
+        "header": {"type": "string"},
+        "question": {"type": "string"},
+        "multi": {"type": "boolean"},
+        "options": {"type": "array", "items": {"$ref": "#/$defs/QuestionOption"}}
+      }
+    },
+    "Question": {
+      "type": "object",
+      "required": ["id", "conversationId", "turnId", "askedAt", "items", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^q:.+$"},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "turnId": {"$ref": "#/$defs/TurnId"},
+        "askedAt": {"type": "integer", "minimum": 0},
+        "items": {"type": "array", "items": {"$ref": "#/$defs/QuestionItem"}},
+        "state": {"$ref": "#/$defs/GateState"}
+      }
+    },
+    "PermissionOption": {
+      "type": "object",
+      "required": ["id", "label", "scope"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string"},
+        "scope": {"$ref": "#/$defs/PermissionScope"}
+      }
+    },
+    "Permission": {
+      "type": "object",
+      "required": [
+        "id", "conversationId", "turnId", "kind", "askedAt", "tool", "command", "cwd", "planMd", "options",
+        "state"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^p:.+$"},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "turnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+        "kind": {"$ref": "#/$defs/PermissionKind"},
+        "askedAt": {"type": "integer", "minimum": 0},
+        "tool": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "command": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "cwd": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "planMd": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "options": {"type": "array", "items": {"$ref": "#/$defs/PermissionOption"}},
+        "state": {"$ref": "#/$defs/GateState"}
+      }
+    },
+    "BgWait": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agents": {"type": "integer", "minimum": 1},
+        "teammates": {"type": "integer", "minimum": 1},
+        "commands": {"type": "integer", "minimum": 1},
+        "monitors": {"type": "integer", "minimum": 1},
+        "workflows": {"type": "integer", "minimum": 1},
+        "command": {"type": "string"},
+        "wakeupAt": {"type": "integer", "minimum": 0}
+      }
+    },
+    "Shot": {
+      "type": "object",
+      "required": ["id", "name", "at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "at": {"type": "number"},
+        "agent": {"type": "string"}
+      }
+    },
+    "Picture": {
+      "type": "object",
+      "required": ["id", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "text": {"type": "string", "pattern": "^/"}
+      }
+    },
+    "BackgroundTask": {
+      "type": "object",
+      "required": [
+        "id", "conversationId", "kind", "title", "startedAt", "endedAt", "status", "devServer", "stoppable",
+        "outputPath"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "kind": {"$ref": "#/$defs/BackgroundKind"},
+        "title": {"type": "string"},
+        "startedAt": {"type": "integer", "minimum": 0},
+        "endedAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "status": {"$ref": "#/$defs/BackgroundStatus"},
+        "devServer": {"type": "boolean"},
+        "stoppable": {"type": "boolean"},
+        "outputPath": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "monitor": {"const": true},
+        "teammate": {"const": true},
+        "model": {"type": "string"},
+        "effort": {"$ref": "#/$defs/Effort"},
+        "role": {"type": "string"},
+        "last": {"type": "string"},
+        "workflow": {"$ref": "#/$defs/WorkflowRun"}
+      }
+    },
+    "WorkflowRun": {
+      "type": "object",
+      "required": ["name", "description", "toolUseId", "phases"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "toolUseId": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "phases": {"type": "array", "items": {"$ref": "#/$defs/WorkflowPhase"}}
+      }
+    },
+    "WorkflowPhase": {
+      "type": "object",
+      "required": ["title", "agents"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {"type": "string"},
+        "agents": {"type": "array", "items": {"$ref": "#/$defs/WorkflowAgent"}}
+      }
+    },
+    "WorkflowAgent": {
+      "type": "object",
+      "required": ["id", "label", "status", "startedAt", "endedAt", "model", "last", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string"},
+        "status": {"$ref": "#/$defs/BackgroundStatus"},
+        "startedAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "endedAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "model": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "last": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "result": {"oneOf": [{"type": "string"}, {"type": "null"}]}
+      }
+    },
+    "NowAction": {
+      "type": "object",
+      "required": ["tool", "summary", "command"],
+      "additionalProperties": false,
+      "properties": {
+        "tool": {"type": "string"},
+        "summary": {"type": "string"},
+        "command": {"oneOf": [{"type": "string"}, {"type": "null"}]}
+      }
+    },
+    "Now": {
+      "type": "object",
+      "required": ["turnId", "thought", "action", "word", "at"],
+      "additionalProperties": false,
+      "properties": {
+        "turnId": {"$ref": "#/$defs/TurnId"},
+        "thought": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "action": {"oneOf": [{"$ref": "#/$defs/NowAction"}, {"type": "null"}]},
+        "word": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+        "at": {"type": "integer", "minimum": 0}
+      }
+    },
+    "Limits": {
+      "type": "object",
+      "required": [
+        "maxQueue", "maxText", "maxAttachments", "maxImageBytes", "maxFileBytes", "slowMs", "cmdBudgetMs",
+        "cmdTimeoutMs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "maxQueue": {"type": "integer", "minimum": 0},
+        "maxText": {"type": "integer", "minimum": 0},
+        "maxAttachments": {"type": "integer", "minimum": 0},
+        "maxImageBytes": {"type": "integer", "minimum": 0},
+        "maxFileBytes": {"type": "integer", "minimum": 0},
+        "slowMs": {"type": "integer", "minimum": 0},
+        "cmdBudgetMs": {"type": "integer", "minimum": 0},
+        "cmdTimeoutMs": {"type": "integer", "minimum": 0}
+      }
+    },
+    "MachineSnapshot": {
+      "type": "object",
+      "required": ["machine"],
+      "additionalProperties": false,
+      "properties": {"machine": {"$ref": "#/$defs/Machine"}}
+    },
+    "ConvsSnapshot": {
+      "type": "object",
+      "required": ["conversations", "projects", "defaultCwd"],
+      "additionalProperties": false,
+      "properties": {
+        "conversations": {"type": "array", "items": {"$ref": "#/$defs/Conversation"}},
+        "projects": {"type": "array", "items": {"$ref": "#/$defs/Project"}},
+        "defaultCwd": {"type": "string"},
+        "favorites": {"$ref": "#/$defs/Favorites"},
+        "drafts": {"type": "array", "items": {"$ref": "#/$defs/Draft"}}
+      }
+    },
+    "DraftKey": {"type": "string", "pattern": "^(tab-[A-Za-z0-9_-]+|new)$"},
+    "Draft": {
+      "type": "object",
+      "required": ["key", "text", "rev", "deviceId", "at"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {"$ref": "#/$defs/DraftKey"},
+        "text": {"type": "string", "maxLength": 20000},
+        "attachments": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/AttachmentRef"}},
+        "refs": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/MessageRef"}},
+        "rev": {"type": "integer", "minimum": 1},
+        "deviceId": {"type": "string", "minLength": 1},
+        "at": {"type": "integer", "minimum": 0}
+      }
+    },
+    "FavGroup": {
+      "type": "object",
+      "required": ["id", "name", "chats"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/FavGroupId"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 60},
+        "chats": {"type": "array", "items": {"type": "string", "pattern": "^tab-[A-Za-z0-9_-]+$"}}
+      }
+    },
+    "Favorites": {
+      "type": "object",
+      "required": ["groups", "loose"],
+      "additionalProperties": false,
+      "properties": {
+        "groups": {"type": "array", "items": {"$ref": "#/$defs/FavGroup"}},
+        "loose": {"type": "array", "items": {"type": "string", "pattern": "^tab-[A-Za-z0-9_-]+$"}}
+      }
+    },
+    "ConvSnapshot": {
+      "type": "object",
+      "required": [
+        "turns", "entries", "beforeTurnId", "queue", "messages", "questions", "permissions", "background",
+        "now"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "turns": {"type": "array", "items": {"$ref": "#/$defs/Turn"}},
+        "entries": {"type": "array", "items": {"$ref": "#/$defs/Entry"}},
+        "beforeTurnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]},
+        "queue": {"$ref": "#/$defs/Queue"},
+        "messages": {"type": "array", "items": {"$ref": "#/$defs/Message"}},
+        "questions": {"type": "array", "items": {"$ref": "#/$defs/Question"}},
+        "permissions": {"type": "array", "items": {"$ref": "#/$defs/Permission"}},
+        "background": {"type": "array", "items": {"$ref": "#/$defs/BackgroundTask"}},
+        "shots": {"type": "array", "maxItems": 30, "items": {"$ref": "#/$defs/Shot"}},
+        "pictures": {"type": "array", "maxItems": 60, "items": {"$ref": "#/$defs/Picture"}},
+        "now": {"oneOf": [{"$ref": "#/$defs/Now"}, {"type": "null"}]}
+      }
+    },
+    "MachineEvent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "reach", "runtime", "agents"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "machine_status"},
+            "reach": {"$ref": "#/$defs/Reach"},
+            "runtime": {"oneOf": [{"$ref": "#/$defs/MachineRuntime"}, {"type": "null"}]},
+            "agents": {"type": "array", "items": {"$ref": "#/$defs/MachineAgent"}},
+            "health": {"$ref": "#/$defs/MachineHealth"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "load"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "machine_load"}, "load": {"$ref": "#/$defs/MachineLoad"}}
+        }
+      ]
+    },
+    "ConvsEvent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "conv"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "conversation_upsert"}, "conv": {"$ref": "#/$defs/Conversation"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "id", "state", "rev"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "conversation_state"},
+            "id": {"$ref": "#/$defs/ConvId"},
+            "state": {"$ref": "#/$defs/AgentState"},
+            "rev": {"type": "integer", "minimum": 1}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "id", "seenAt", "rev"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "conversation_seen"},
+            "id": {"$ref": "#/$defs/ConvId"},
+            "seenAt": {"type": "integer", "minimum": 0},
+            "rev": {"type": "integer", "minimum": 1}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "id"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "conversation_removed"}, "id": {"$ref": "#/$defs/ConvId"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "project"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "project_upsert"}, "project": {"$ref": "#/$defs/Project"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "favorites"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "favorites_upsert"}, "favorites": {"$ref": "#/$defs/Favorites"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "draft"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "draft_upsert"}, "draft": {"$ref": "#/$defs/Draft"}}
+        }
+      ]
+    },
+    "ConvEvent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "turn"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "turn_started"}, "turn": {"$ref": "#/$defs/Turn"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "entry", "counts"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "step"},
+            "entry": {"$ref": "#/$defs/Entry"},
+            "counts": {"oneOf": [{"$ref": "#/$defs/TurnCounts"}, {"type": "null"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "entry"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "entry_update"}, "entry": {"$ref": "#/$defs/Entry"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "oldId", "entry"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "entry_replace"},
+            "oldId": {"$ref": "#/$defs/EntryId"},
+            "entry": {"$ref": "#/$defs/Entry"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "turnId", "thought", "action", "word", "at"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "now"},
+            "turnId": {"$ref": "#/$defs/TurnId"},
+            "thought": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+            "action": {"oneOf": [{"$ref": "#/$defs/NowAction"}, {"type": "null"}]},
+            "word": {"oneOf": [{"type": "string"}, {"type": "null"}]},
+            "at": {"type": "integer", "minimum": 0}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "question"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "question_asked"}, "question": {"$ref": "#/$defs/Question"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "permission"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "permission_requested"}, "permission": {"$ref": "#/$defs/Permission"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "permission"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "plan_proposed"}, "permission": {"$ref": "#/$defs/Permission"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "id", "state"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "gate_updated"},
+            "id": {"type": "string", "pattern": "^[qp]:.+$"},
+            "state": {"$ref": "#/$defs/GateState"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "phase", "entry"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "compaction"},
+            "phase": {"$ref": "#/$defs/CompactionPhase"},
+            "entry": {"$ref": "#/$defs/Entry"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "turn"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "turn_finished"}, "turn": {"$ref": "#/$defs/Turn"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "turn"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "turn_failed"}, "turn": {"$ref": "#/$defs/Turn"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "queue"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "queue_changed"}, "queue": {"$ref": "#/$defs/Queue"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "clientId", "state", "rev"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "prompt_state"},
+            "clientId": {"type": "string", "minLength": 1},
+            "state": {"$ref": "#/$defs/MessageState"},
+            "rev": {"type": "integer", "minimum": 1}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "message"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "message_upsert"}, "message": {"$ref": "#/$defs/Message"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "task"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "background_upsert"}, "task": {"$ref": "#/$defs/BackgroundTask"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "id"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "background_removed"}, "id": {"type": "string", "minLength": 1}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "shots"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "shots_set"},
+            "shots": {"type": "array", "maxItems": 30, "items": {"$ref": "#/$defs/Shot"}}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "pictures"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "pictures_set"},
+            "pictures": {"type": "array", "maxItems": 60, "items": {"$ref": "#/$defs/Picture"}}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "turns", "entries", "beforeTurnId"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "feed_reset"},
+            "turns": {"type": "array", "items": {"$ref": "#/$defs/Turn"}},
+            "entries": {"type": "array", "items": {"$ref": "#/$defs/Entry"}},
+            "beforeTurnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]}
+          }
+        }
+      ]
+    },
+    "ClientFrame": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["f", "proto", "device", "app"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "hello"},
+            "proto": {"const": 2},
+            "device": {"type": "string", "minLength": 1},
+            "app": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "ch"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "sub"},
+            "ch": {"$ref": "#/$defs/Channel"},
+            "epoch": {"type": "string", "minLength": 1},
+            "afterSeq": {"type": "integer", "minimum": 0},
+            "afterEntryId": {"$ref": "#/$defs/EntryId"},
+            "opts": {"type": "object", "additionalProperties": false, "properties": {"load": {"type": "boolean"}}}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "ch"],
+          "additionalProperties": false,
+          "properties": {"f": {"const": "unsub"}, "ch": {"$ref": "#/$defs/Channel"}}
+        },
+        {
+          "type": "object",
+          "required": ["f", "t"],
+          "additionalProperties": false,
+          "properties": {"f": {"const": "ping"}, "t": {"type": "integer", "minimum": 0}}
+        }
+      ]
+    },
+    "ServerFrame": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["f", "proto", "epoch", "serverTime", "machine", "features", "limits"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "welcome"},
+            "proto": {"const": 2},
+            "epoch": {"type": "string", "minLength": 1},
+            "serverTime": {"type": "integer", "minimum": 0},
+            "machine": {"$ref": "#/$defs/Machine"},
+            "features": {"type": "array", "items": {"$ref": "#/$defs/Feature"}},
+            "limits": {"$ref": "#/$defs/Limits"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "ch", "seq", "mode", "data"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "snapshot"},
+            "ch": {"const": "machine"},
+            "seq": {"type": "integer", "minimum": 0},
+            "mode": {"$ref": "#/$defs/SnapshotMode"},
+            "data": {"$ref": "#/$defs/MachineSnapshot"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "ch", "seq", "mode", "data"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "snapshot"},
+            "ch": {"const": "convs"},
+            "seq": {"type": "integer", "minimum": 0},
+            "mode": {"$ref": "#/$defs/SnapshotMode"},
+            "data": {"$ref": "#/$defs/ConvsSnapshot"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "ch", "seq", "mode", "data"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "snapshot"},
+            "ch": {"type": "string", "pattern": "^conv:tab-[A-Za-z0-9_-]+$"},
+            "seq": {"type": "integer", "minimum": 0},
+            "mode": {"$ref": "#/$defs/SnapshotMode"},
+            "data": {"$ref": "#/$defs/ConvSnapshot"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "ch", "seq", "e"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "ev"},
+            "ch": {"const": "machine"},
+            "seq": {"type": "integer", "minimum": 1},
+            "e": {"$ref": "#/$defs/MachineEvent"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "ch", "seq", "e"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "ev"},
+            "ch": {"const": "convs"},
+            "seq": {"type": "integer", "minimum": 1},
+            "e": {"$ref": "#/$defs/ConvsEvent"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "ch", "seq", "e"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "ev"},
+            "ch": {"type": "string", "pattern": "^conv:tab-[A-Za-z0-9_-]+$"},
+            "seq": {"type": "integer", "minimum": 1},
+            "e": {"$ref": "#/$defs/ConvEvent"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["f", "t"],
+          "additionalProperties": false,
+          "properties": {"f": {"const": "pong"}, "t": {"type": "integer", "minimum": 0}}
+        },
+        {
+          "type": "object",
+          "required": ["f", "code"],
+          "additionalProperties": false,
+          "properties": {
+            "f": {"const": "error"},
+            "code": {"$ref": "#/$defs/FrameErrorCode"},
+            "ch": {"$ref": "#/$defs/Channel"}
+          }
+        }
+      ]
+    },
+    "Cmd_send": {
+      "type": "object",
+      "required": ["opId", "clientId", "conversationId", "text", "attachmentIds", "mode", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "clientId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "text": {"type": "string"},
+        "attachmentIds": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "mode": {"$ref": "#/$defs/MessageMode"},
+        "kind": {"$ref": "#/$defs/MessageKind"},
+        "refs": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/MessageRef"}}
+      }
+    },
+    "Cmd_cancel": {
+      "type": "object",
+      "required": ["opId", "conversationId", "clientId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "clientId": {"type": "string", "minLength": 1}
+      }
+    },
+    "Cmd_retry": {
+      "type": "object",
+      "required": ["opId", "conversationId", "clientId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "clientId": {"type": "string", "minLength": 1}
+      }
+    },
+    "Cmd_promote": {
+      "type": "object",
+      "required": ["opId", "conversationId", "clientId", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "clientId": {"type": "string", "minLength": 1},
+        "to": {"$ref": "#/$defs/PromoteTo"}
+      }
+    },
+    "Cmd_answer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["opId", "conversationId", "questionId", "answers"],
+          "additionalProperties": false,
+          "properties": {
+            "opId": {"type": "string", "minLength": 1},
+            "conversationId": {"$ref": "#/$defs/ConvId"},
+            "questionId": {"type": "string", "pattern": "^q:.+$"},
+            "answers": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": ["i", "choices"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "i": {"type": "integer", "minimum": 0},
+                      "choices": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1}
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["i", "choices", "text"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "i": {"type": "integer", "minimum": 0},
+                      "choices": {"type": "array", "items": {"type": "integer", "minimum": 0}, "maxItems": 0},
+                      "text": {"type": "string", "minLength": 1}
+                    }
+                  }
+                ]
+              },
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["opId", "conversationId", "questionId", "chatAbout"],
+          "additionalProperties": false,
+          "properties": {
+            "opId": {"type": "string", "minLength": 1},
+            "conversationId": {"$ref": "#/$defs/ConvId"},
+            "questionId": {"type": "string", "pattern": "^q:.+$"},
+            "chatAbout": {"const": true}
+          }
+        }
+      ]
+    },
+    "Cmd_decide": {
+      "type": "object",
+      "required": ["opId", "conversationId", "permissionId", "optionId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "permissionId": {"type": "string", "pattern": "^p:.+$"},
+        "optionId": {"type": "string", "minLength": 1}
+      }
+    },
+    "Cmd_interrupt": {
+      "type": "object",
+      "required": ["opId", "conversationId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "pauseQueue": {"type": "boolean"}
+      }
+    },
+    "Cmd_queue_resume": {
+      "type": "object",
+      "required": ["opId", "conversationId"],
+      "additionalProperties": false,
+      "properties": {"opId": {"type": "string", "minLength": 1}, "conversationId": {"$ref": "#/$defs/ConvId"}}
+    },
+    "Cmd_seen": {
+      "type": "object",
+      "required": ["opId", "conversationId", "upTo"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "conversationId": {"oneOf": [{"$ref": "#/$defs/ConvId"}, {"const": "all"}]},
+        "upTo": {"type": "integer", "minimum": 0}
+      }
+    },
+    "Cmd_conversation_create": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["opId", "projectId", "provider", "model"],
+          "additionalProperties": false,
+          "properties": {
+            "opId": {"type": "string", "minLength": 1},
+            "projectId": {"type": "string", "minLength": 1},
+            "provider": {"$ref": "#/$defs/Provider"},
+            "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+            "worktree": {"type": "boolean"},
+            "launch": {"$ref": "#/$defs/Launch"},
+            "parentId": {"$ref": "#/$defs/ConvId"},
+            "title": {"type": "string", "minLength": 1, "maxLength": 200},
+            "first": {
+              "type": "object",
+              "required": ["clientId", "text", "attachmentIds"],
+              "additionalProperties": false,
+              "properties": {
+                "clientId": {"type": "string", "minLength": 1},
+                "text": {"type": "string"},
+                "attachmentIds": {"type": "array", "items": {"type": "string", "minLength": 1}}
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["opId", "cwd", "provider", "model"],
+          "additionalProperties": false,
+          "properties": {
+            "opId": {"type": "string", "minLength": 1},
+            "cwd": {"type": "string", "minLength": 1},
+            "provider": {"$ref": "#/$defs/Provider"},
+            "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+            "worktree": {"type": "boolean"},
+            "launch": {"$ref": "#/$defs/Launch"},
+            "parentId": {"$ref": "#/$defs/ConvId"},
+            "title": {"type": "string", "minLength": 1, "maxLength": 200},
+            "first": {
+              "type": "object",
+              "required": ["clientId", "text", "attachmentIds"],
+              "additionalProperties": false,
+              "properties": {
+                "clientId": {"type": "string", "minLength": 1},
+                "text": {"type": "string"},
+                "attachmentIds": {"type": "array", "items": {"type": "string", "minLength": 1}}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Cmd_conversation_rename": {
+      "type": "object",
+      "required": ["opId", "id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "title": {"type": "string"}
+      }
+    },
+    "Cmd_conversation_retitle": {
+      "type": "object",
+      "required": ["opId", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"}
+      }
+    },
+    "Cmd_conversation_pin": {
+      "type": "object",
+      "required": ["opId", "id", "pinned"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "pinned": {"type": "boolean"}
+      }
+    },
+    "Cmd_conversation_move": {
+      "type": "object",
+      "required": ["opId", "id", "projectId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "projectId": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+      }
+    },
+    "Cmd_conversation_delete": {
+      "type": "object",
+      "required": ["opId", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "force": {"type": "boolean"}
+      }
+    },
+    "Cmd_rewind": {
+      "type": "object",
+      "required": ["opId", "id", "entryId", "text", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "entryId": {"$ref": "#/$defs/TurnId"},
+        "text": {"type": "string", "minLength": 1},
+        "files": {"type": "boolean"}
+      }
+    },
+    "Cmd_rewind_undo": {
+      "type": "object",
+      "required": ["opId", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"}
+      }
+    },
+    "Cmd_terminal_stop": {
+      "type": "object",
+      "required": ["opId", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "force": {"type": "boolean"}
+      }
+    },
+    "Cmd_conversation_fork": {
+      "type": "object",
+      "required": ["opId", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "atTurn": {"$ref": "#/$defs/TurnId"}
+      }
+    },
+    "Cmd_conversation_handoff": {
+      "type": "object",
+      "required": ["opId", "id", "provider", "model", "mode", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "provider": {"$ref": "#/$defs/Provider"},
+        "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+        "mode": {"$ref": "#/$defs/HandoffMode"},
+        "text": {"type": "string", "minLength": 1, "maxLength": 90000}
+      }
+    },
+    "Cmd_conversation_merge": {
+      "type": "object",
+      "required": ["opId", "id", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "text": {"type": "string", "minLength": 1, "maxLength": 90000}
+      }
+    },
+    "Cmd_limit": {
+      "type": "object",
+      "required": ["opId", "id", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "action": {"$ref": "#/$defs/LimitAction"}
+      }
+    },
+    "Cmd_conversation_restore": {
+      "type": "object",
+      "required": ["opId", "id"],
+      "additionalProperties": false,
+      "properties": {"opId": {"type": "string", "minLength": 1}, "id": {"$ref": "#/$defs/ConvId"}}
+    },
+    "Cmd_conversation_resume": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["opId", "id"],
+          "additionalProperties": false,
+          "properties": {"opId": {"type": "string", "minLength": 1}, "id": {"$ref": "#/$defs/ConvId"}}
+        },
+        {
+          "type": "object",
+          "required": ["opId", "provider", "sessionId", "cwd"],
+          "additionalProperties": false,
+          "properties": {
+            "opId": {"type": "string", "minLength": 1},
+            "provider": {"$ref": "#/$defs/Provider"},
+            "sessionId": {"type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"},
+            "cwd": {"type": "string", "pattern": "^/"}
+          }
+        }
+      ]
+    },
+    "Cmd_model": {
+      "type": "object",
+      "required": ["opId", "id", "model", "effort"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "model": {"type": "string", "minLength": 1},
+        "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
+        "ultracode": {"type": "boolean"}
+      }
+    },
+    "Cmd_bg_stop": {
+      "type": "object",
+      "required": ["opId", "conversationId", "taskId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "taskId": {"type": "string", "minLength": 1}
+      }
+    },
+    "Cmd_goal": {
+      "type": "object",
+      "required": ["opId", "id", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "text": {"type": "string", "maxLength": 2000, "pattern": "^[^\\r\\n]*$"}
+      }
+    },
+    "Cmd_project_create": {
+      "type": "object",
+      "required": ["opId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1, "maxLength": 120}
+      }
+    },
+    "Cmd_favorites_group_create": {
+      "type": "object",
+      "required": ["opId", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1, "maxLength": 60}
+      }
+    },
+    "Cmd_favorites_group_rename": {
+      "type": "object",
+      "required": ["opId", "id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/FavGroupId"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 60}
+      }
+    },
+    "Cmd_favorites_group_delete": {
+      "type": "object",
+      "required": ["opId", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/FavGroupId"}
+      }
+    },
+    "Cmd_favorites_group_move": {
+      "type": "object",
+      "required": ["opId", "id", "beforeId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/FavGroupId"},
+        "beforeId": {"oneOf": [{"$ref": "#/$defs/FavGroupId"}, {"type": "null"}]}
+      }
+    },
+    "Cmd_favorites_place": {
+      "type": "object",
+      "required": ["opId", "id", "groupId", "beforeId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/ConvId"},
+        "groupId": {"oneOf": [{"$ref": "#/$defs/FavGroupId"}, {"type": "null"}]},
+        "beforeId": {"oneOf": [{"$ref": "#/$defs/ConvId"}, {"type": "null"}]}
+      }
+    },
+    "FavGroupId": {"type": "string", "pattern": "^fg-[A-Za-z0-9]{4,40}$"},
+    "Cmd_queue_move": {
+      "type": "object",
+      "required": ["opId", "conversationId", "clientId", "beforeClientId"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "conversationId": {"$ref": "#/$defs/ConvId"},
+        "clientId": {"type": "string", "minLength": 1},
+        "beforeClientId": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+      }
+    },
+    "Cmd_draft_set": {
+      "type": "object",
+      "required": ["opId", "key", "text", "rev"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "key": {"$ref": "#/$defs/DraftKey"},
+        "text": {"type": "string", "maxLength": 20000},
+        "attachments": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/AttachmentRef"}},
+        "refs": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/MessageRef"}},
+        "rev": {"type": "integer", "minimum": 1}
+      }
+    },
+    "Command": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "send"}, "body": {"$ref": "#/$defs/Cmd_send"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "cancel"}, "body": {"$ref": "#/$defs/Cmd_cancel"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "retry"}, "body": {"$ref": "#/$defs/Cmd_retry"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "promote"}, "body": {"$ref": "#/$defs/Cmd_promote"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "answer"}, "body": {"$ref": "#/$defs/Cmd_answer"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "decide"}, "body": {"$ref": "#/$defs/Cmd_decide"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "interrupt"}, "body": {"$ref": "#/$defs/Cmd_interrupt"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "queue.resume"}, "body": {"$ref": "#/$defs/Cmd_queue_resume"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "seen"}, "body": {"$ref": "#/$defs/Cmd_seen"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.create"}, "body": {"$ref": "#/$defs/Cmd_conversation_create"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.rename"}, "body": {"$ref": "#/$defs/Cmd_conversation_rename"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.pin"}, "body": {"$ref": "#/$defs/Cmd_conversation_pin"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.move"}, "body": {"$ref": "#/$defs/Cmd_conversation_move"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.delete"}, "body": {"$ref": "#/$defs/Cmd_conversation_delete"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.restore"}, "body": {"$ref": "#/$defs/Cmd_conversation_restore"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.resume"}, "body": {"$ref": "#/$defs/Cmd_conversation_resume"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "model"}, "body": {"$ref": "#/$defs/Cmd_model"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "bg.stop"}, "body": {"$ref": "#/$defs/Cmd_bg_stop"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "project.create"}, "body": {"$ref": "#/$defs/Cmd_project_create"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "favorites.group.create"}, "body": {"$ref": "#/$defs/Cmd_favorites_group_create"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "favorites.group.rename"}, "body": {"$ref": "#/$defs/Cmd_favorites_group_rename"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "favorites.group.delete"}, "body": {"$ref": "#/$defs/Cmd_favorites_group_delete"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "favorites.group.move"}, "body": {"$ref": "#/$defs/Cmd_favorites_group_move"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "favorites.place"}, "body": {"$ref": "#/$defs/Cmd_favorites_place"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "goal"}, "body": {"$ref": "#/$defs/Cmd_goal"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.retitle"}, "body": {"$ref": "#/$defs/Cmd_conversation_retitle"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "draft.set"}, "body": {"$ref": "#/$defs/Cmd_draft_set"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "queue.move"}, "body": {"$ref": "#/$defs/Cmd_queue_move"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "terminal.stop"}, "body": {"$ref": "#/$defs/Cmd_terminal_stop"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "rewind"}, "body": {"$ref": "#/$defs/Cmd_rewind"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "rewind.undo"}, "body": {"$ref": "#/$defs/Cmd_rewind_undo"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.fork"}, "body": {"$ref": "#/$defs/Cmd_conversation_fork"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.handoff"}, "body": {"$ref": "#/$defs/Cmd_conversation_handoff"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "conversation.merge"}, "body": {"$ref": "#/$defs/Cmd_conversation_merge"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "limit"}, "body": {"$ref": "#/$defs/Cmd_limit"}}
+        }
+      ]
+    },
+    "CmdResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["r", "ch", "seq"],
+          "additionalProperties": false,
+          "properties": {
+            "r": {"enum": ["accepted", "queued"]},
+            "ch": {"$ref": "#/$defs/Channel"},
+            "seq": {"type": "integer", "minimum": 1},
+            "rev": {"type": "integer", "minimum": 1},
+            "id": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["r", "code"],
+          "additionalProperties": false,
+          "properties": {"r": {"const": "refused"}, "code": {"$ref": "#/$defs/RefuseCode"}}
+        }
+      ]
+    },
+    "CmdExchange": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "send"},
+            "body": {"$ref": "#/$defs/Cmd_send"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "cancel"},
+            "body": {"$ref": "#/$defs/Cmd_cancel"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "retry"},
+            "body": {"$ref": "#/$defs/Cmd_retry"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "promote"},
+            "body": {"$ref": "#/$defs/Cmd_promote"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "answer"},
+            "body": {"$ref": "#/$defs/Cmd_answer"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "decide"},
+            "body": {"$ref": "#/$defs/Cmd_decide"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "interrupt"},
+            "body": {"$ref": "#/$defs/Cmd_interrupt"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "queue.resume"},
+            "body": {"$ref": "#/$defs/Cmd_queue_resume"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "seen"},
+            "body": {"$ref": "#/$defs/Cmd_seen"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.create"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_create"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.rename"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_rename"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.pin"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_pin"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.move"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_move"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.delete"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_delete"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.restore"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_restore"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.resume"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_resume"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "model"},
+            "body": {"$ref": "#/$defs/Cmd_model"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "bg.stop"},
+            "body": {"$ref": "#/$defs/Cmd_bg_stop"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "project.create"},
+            "body": {"$ref": "#/$defs/Cmd_project_create"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "favorites.group.create"},
+            "body": {"$ref": "#/$defs/Cmd_favorites_group_create"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "favorites.group.rename"},
+            "body": {"$ref": "#/$defs/Cmd_favorites_group_rename"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "favorites.group.delete"},
+            "body": {"$ref": "#/$defs/Cmd_favorites_group_delete"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "favorites.group.move"},
+            "body": {"$ref": "#/$defs/Cmd_favorites_group_move"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "favorites.place"},
+            "body": {"$ref": "#/$defs/Cmd_favorites_place"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "goal"},
+            "body": {"$ref": "#/$defs/Cmd_goal"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.retitle"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_retitle"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "draft.set"},
+            "body": {"$ref": "#/$defs/Cmd_draft_set"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "queue.move"},
+            "body": {"$ref": "#/$defs/Cmd_queue_move"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "terminal.stop"},
+            "body": {"$ref": "#/$defs/Cmd_terminal_stop"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "rewind"},
+            "body": {"$ref": "#/$defs/Cmd_rewind"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "rewind.undo"},
+            "body": {"$ref": "#/$defs/Cmd_rewind_undo"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.fork"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_fork"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.handoff"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_handoff"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "conversation.merge"},
+            "body": {"$ref": "#/$defs/Cmd_conversation_merge"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "limit"},
+            "body": {"$ref": "#/$defs/Cmd_limit"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        }
+      ]
+    },
+    "Hello": {
+      "type": "object",
+      "required": ["proto", "version", "features"],
+      "additionalProperties": false,
+      "properties": {
+        "proto": {"type": "integer", "minimum": 0},
+        "version": {"type": "string"},
+        "features": {"type": "array", "items": {"$ref": "#/$defs/Feature"}}
+      }
+    },
+    "TurnsPage": {
+      "type": "object",
+      "required": ["turns", "entries", "beforeTurnId"],
+      "additionalProperties": false,
+      "properties": {
+        "turns": {"type": "array", "items": {"$ref": "#/$defs/Turn"}},
+        "entries": {"type": "array", "items": {"$ref": "#/$defs/Entry"}},
+        "beforeTurnId": {"oneOf": [{"$ref": "#/$defs/TurnId"}, {"type": "null"}]}
+      }
+    },
+    "EntriesPage": {
+      "type": "object",
+      "required": ["turnId", "entries"],
+      "additionalProperties": false,
+      "properties": {"turnId": {"$ref": "#/$defs/TurnId"}, "entries": {"type": "array", "items": {"$ref": "#/$defs/Entry"}}}
+    },
+    "OutputPage": {
+      "type": "object",
+      "required": ["entryId", "output"],
+      "additionalProperties": false,
+      "properties": {"entryId": {"$ref": "#/$defs/EntryId"}, "output": {"$ref": "#/$defs/ToolOutput"}}
+    },
+    "Refusal": {
+      "type": "object",
+      "required": ["r", "code"],
+      "additionalProperties": false,
+      "properties": {"r": {"const": "refused"}, "code": {"$ref": "#/$defs/RefuseCode"}}
+    },
+    "HttpExchange": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "hello"},
+            "response": {"oneOf": [{"$ref": "#/$defs/Hello"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "turns"},
+            "response": {"oneOf": [{"$ref": "#/$defs/TurnsPage"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "entries"},
+            "response": {"oneOf": [{"$ref": "#/$defs/EntriesPage"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "output"},
+            "response": {"oneOf": [{"$ref": "#/$defs/OutputPage"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "upload"},
+            "response": {"oneOf": [{"$ref": "#/$defs/AttachmentRef"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "dirs"},
+            "response": {"oneOf": [{"type": "array", "items": {"$ref": "#/$defs/Dir"}}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "sessions"},
+            "response": {"oneOf": [{"type": "array", "maxItems": 50, "items": {"$ref": "#/$defs/AgentSession"}}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "terminals"},
+            "response": {"oneOf": [{"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/Terminal"}}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "terminal"},
+            "response": {"oneOf": [{"$ref": "#/$defs/Terminal"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "voice"},
+            "response": {"oneOf": [{"$ref": "#/$defs/Transcript"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "designlyCreate"},
+            "response": {"oneOf": [{"$ref": "#/$defs/DesignlyCreated"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "designlyLibrary"},
+            "response": {"oneOf": [{"$ref": "#/$defs/DesignLibrary"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "designlySystems"},
+            "response": {"oneOf": [{"type": "array", "items": {"$ref": "#/$defs/DesignSystemInfo"}}, {"$ref": "#/$defs/DesignlyRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "designlyPin"},
+            "response": {"oneOf": [{"$ref": "#/$defs/DesignlyPin"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "files"},
+            "response": {"oneOf": [{"$ref": "#/$defs/DirListing"}, {"$ref": "#/$defs/FileRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "file"},
+            "response": {"oneOf": [{"$ref": "#/$defs/FileContent"}, {"$ref": "#/$defs/FileRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "tasks"},
+            "response": {"oneOf": [{"type": "array", "items": {"$ref": "#/$defs/Task"}}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "legacy"},
+            "response": {"oneOf": [{"$ref": "#/$defs/LegacyTab"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "open"},
+            "response": {"oneOf": [{"$ref": "#/$defs/OpenTarget"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "openRefs"},
+            "response": {"oneOf": [{"$ref": "#/$defs/OpenedRefs"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "context"},
+            "response": {"oneOf": [{"$ref": "#/$defs/ConvContext"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "machineStats"},
+            "response": {"oneOf": [{"$ref": "#/$defs/MachineStats"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "machineStop"},
+            "response": {"oneOf": [{"$ref": "#/$defs/MachineStopped"}, {"$ref": "#/$defs/MachineRefusal"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "apps"},
+            "response": {"oneOf": [{"$ref": "#/$defs/AppsFeed"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "agentSettings"},
+            "response": {"oneOf": [{"$ref": "#/$defs/AgentSettings"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "runtimeSettings"},
+            "response": {"oneOf": [{"$ref": "#/$defs/RuntimeSettings"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "rewindPlan"},
+            "response": {"oneOf": [{"$ref": "#/$defs/RewindPlan"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "handoffDraft"},
+            "response": {"oneOf": [{"$ref": "#/$defs/HandoffDraft"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        }
+      ]
+    }
+  }
+}

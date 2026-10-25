@@ -28,6 +28,7 @@ A namespace is the first part of a key and names the part of the page it belongs
 | `timeline`                                                                       | the conversation timeline                          |
 | `workspace`, `pages`, `auth`, `hooks`, `primitives`, `ui`                        | the shell, routes, sign-in, hooks and base widgets |
 | `lib`                                                                            | `app/lib` and `app/types`: helpers and data labels |
+| `next`                                                                           | the new interface (`app/next`) and its switch      |
 
 ## Adding a text
 

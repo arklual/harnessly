@@ -1,0 +1,21 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 538,
+  "e": {
+    "type": "background_upsert",
+    "task": {
+      "id": "bktwfrc6l",
+      "conversationId": "tab-k3Jx9QmZ",
+      "kind": "command",
+      "title": "watch the build",
+      "startedAt": 1792655973000,
+      "endedAt": null,
+      "status": "running",
+      "devServer": false,
+      "stoppable": true,
+      "outputPath": "/tmp/claude-1000/x/tasks/bktwfrc6l.output",
+      "monitor": true
+    }
+  }
+}

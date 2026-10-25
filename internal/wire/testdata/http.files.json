@@ -1,0 +1,12 @@
+{
+  "http": "files",
+  "response": {
+    "path": "src",
+    "entries": [
+      {"name": "components", "path": "src/components", "kind": "directory"},
+      {"name": "main.go", "path": "src/main.go", "kind": "file"},
+      {"name": "util.go", "path": "src/util.go", "kind": "file"}
+    ],
+    "truncated": false
+  }
+}

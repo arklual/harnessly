@@ -26,6 +26,14 @@ const PIPELINE: Record<TPipelineStatus, { icon: typeof CheckCircle2; label: stri
   other: { icon: CircleDashed, label: 'CI' },
 };
 
+export const pipelineLabel = (status: TPipelineStatus): string => PIPELINE[status].label;
+
+/** The icon of a status of a pipeline, a stage or a job, in the colour `tw-ci-<status>` gives its parent. */
+export const PipelineIcon = ({ status }: { status: TPipelineStatus }) => {
+  const { icon: Icon } = PIPELINE[status];
+  return <Icon aria-hidden="true" className={cn(status === 'running' && 'tw-inline-spin')} />;
+};
+
 export const PipelineBadge = ({ pipeline }: { pipeline: IPipeline | null }) => {
   if (!pipeline)
     return (
@@ -135,6 +143,9 @@ interface IGitLabTabProps {
 /** Merge requests and pushed branches of the session, each with its latest pipeline. */
 const GitLabTab = ({ paths, jsonlPath, mentioned, onCount, onOpenMr }: IGitLabTabProps) => {
   const [data, setData] = useState<{ pushes: IGitLabPush[]; mrs: IGitLabMr[] } | null>(null);
+  // The last look failed (GitLab not set up on the machine, or not answering): said instead of a spinner for ever,
+  // the next look still goes on its schedule.
+  const [failed, setFailed] = useState(false);
   const request = JSON.stringify({ paths, jsonlPath, mrs: mentioned });
   useEffect(() => {
     let cancelled = false;
@@ -151,11 +162,16 @@ const GitLabTab = ({ paths, jsonlPath, mentioned, onCount, onOpenMr }: IGitLabTa
           const next = (await response.json()) as { pushes: IGitLabPush[]; mrs: IGitLabMr[] };
           if (cancelled) return;
           setData(next);
+          setFailed(false);
           live = [...next.pushes, ...next.mrs].some(
             (item) => item.pipeline && LIVE.includes(item.pipeline.status),
           );
+        } else if (!cancelled) {
+          setFailed(true);
         }
-      } catch {}
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
       if (!cancelled) timer = setTimeout(load, live ? LIVE_POLL_MS : IDLE_POLL_MS);
     };
     void load();
@@ -173,6 +189,7 @@ const GitLabTab = ({ paths, jsonlPath, mentioned, onCount, onOpenMr }: IGitLabTa
     onCount?.(count, live);
   }, [count, live, onCount]);
 
+  if (!data && failed) return <p className="tw-inspector-muted">{t('inspector.gitlabTab.failed')}</p>;
   if (!data)
     return (
       <p className="tw-inspector-muted">

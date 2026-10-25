@@ -1,0 +1,239 @@
+/* Annotating picked words (ui/annotate): a pill «Annotate» over the words that grows into a compact card — the words on a
+   soft plate, a field for the remark, a round arrow. One box: its width, height and corners move together. The card of a
+   block on a design's page (notes.css) wears the same plate and arrow. */
+.hx-annot {
+  --annot-r: 18px;
+  position: fixed;
+  left: var(--ax-pill);
+  top: var(--ay);
+  z-index: 60;
+  box-sizing: border-box;
+  width: var(--aw-pill);
+  height: 36px;
+  overflow: hidden;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--annot-r);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  color: var(--hx-fg-1);
+  text-align: left;
+  translate: 0 0;
+  transform-origin: 50% 100%;
+  animation: hx-annot-in 200ms var(--hx-ease-out) backwards;
+}
+.hx-annot[data-side='above'] {
+  translate: 0 -100%;
+}
+.hx-annot[data-side='below'] {
+  transform-origin: 50% 0;
+}
+.hx-annot[data-expanded='true'] {
+  --annot-r: var(--hx-radius-xl);
+  left: var(--ax-card);
+  width: var(--aw-card);
+  height: calc(var(--ah-card) + 2px);
+}
+.hx-annot[data-morph='true'] {
+  transition:
+    left 280ms var(--hx-m-ease),
+    width 280ms var(--hx-m-ease),
+    height 280ms var(--hx-m-ease),
+    border-radius 280ms var(--hx-m-ease);
+}
+/* Once it is open, a line added to the remark grows the box a little quicker than the morph. */
+.hx-annot[data-expanded='true']:not([data-morph='true']) {
+  transition: height 140ms var(--hx-ease-out);
+}
+.hx-annot[data-state='closing'] {
+  animation: hx-annot-out 180ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+@keyframes hx-annot-in {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+@keyframes hx-annot-out {
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+/* The pill */
+.hx-annot__pill {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  transition: opacity 120ms ease-out;
+}
+.hx-annot[data-expanded='true'] .hx-annot__pill {
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-annot__pillbtn {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--hx-dur-xs);
+}
+.hx-annot__pillbtn:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-annot__pillbtn:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -2px;
+}
+.hx-annot__pilltext {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hx-annot__pilltext .hx-icon {
+  color: var(--hx-accent);
+}
+
+/* The card */
+.hx-annot__card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  width: calc(var(--aw-card) - 2px);
+  padding: 10px 10px 10px 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease-out;
+}
+.hx-annot[data-expanded='true'] .hx-annot__card {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 180ms ease-out 80ms;
+}
+.hx-annot__quote {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 12px 8px 16px;
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-accent-soft);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  line-height: 17px;
+}
+.hx-annot__quote::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--hx-accent);
+}
+.hx-annot__lead {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--hx-radius-sm);
+  background: color-mix(in srgb, var(--hx-accent) 16%, transparent);
+  color: var(--hx-accent);
+  font-family: var(--hx-font-mono);
+  font-size: 11px;
+}
+.hx-annot__words {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.hx-annot__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--hx-space-2);
+  padding-left: 4px;
+}
+.hx-annot__field {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  max-height: 100px;
+  box-sizing: border-box;
+  padding: 6px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  overflow-y: auto;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-md);
+  line-height: 20px;
+}
+.hx-annot__field::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-annot__send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-accent);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform 200ms var(--hx-ease-out),
+    opacity var(--hx-dur-xs),
+    filter var(--hx-dur-xs);
+}
+.hx-annot__send:hover {
+  filter: brightness(1.08);
+}
+.hx-annot__send:active {
+  transform: scale(0.92);
+}
+.hx-annot__send:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+.hx-annot__send:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* The words stay marked in the page while the remark is written (the field has taken the selection). */
+::highlight(hx-annotate) {
+  background-color: var(--hx-accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-annot,
+  .hx-annot[data-state='closing'] {
+    animation-duration: 1ms;
+  }
+  .hx-annot[data-morph='true'],
+  .hx-annot[data-expanded='true']:not([data-morph='true']) {
+    transition-duration: 1ms;
+  }
+}

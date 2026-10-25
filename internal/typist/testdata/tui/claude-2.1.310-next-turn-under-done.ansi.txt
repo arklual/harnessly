@@ -1,0 +1,37 @@
+[38;5;174m ▝▝[39m   [38;5;174m▝▝[39m   [38;5;246m/home/coder/workspace/probe[39m
+
+
+[38;5;246m[48;5;237m❯ [38;5;231msay hi in one word[39m
+
+[38;5;231m[49m●[39m Hi
+
+[38;5;246m✻[39m [38;5;246mBrewed for 8s · done 6:06 PM[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mrun the bash command: sleep 25 ; then reply with the word done[39m
+
+[38;5;211m[49m●[39m [1mBash[0m(sleep 25)
+[38;5;246m  ⎿  [38;5;211mError: Exit code 1[39m
+
+[38;5;114m●[39m [1mBash[0m(sleep 25)
+[38;5;246m  ⎿  Running in the background (↓ to manage)[39m
+
+[38;5;231m●[39m Started it in the background; I'll reply when it finishes.
+
+[38;5;246m✻[39m [38;5;246mBaked for 14s · done 6:15 PM[39m
+
+[38;5;114m●[39m Background command "Wait 25 seconds in background" completed (exit code 0)
+
+[38;5;231m●[39m done
+
+[38;5;246m✻[39m [38;5;246mChurned for 6s · done 6:15 PM[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mwrite a 400-word story about a lighthouse[39m
+
+[38;5;174m[49m*[39m [38;5;174mPhilosophizing… [39m
+[38;5;246m  ⎿  Tip: Use /config to change your default permission mode (including Plan Mode)[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵[39m [38;5;211mbypass[39m [38;5;211mpermissions[39m [38;5;211mon[38;5;246m (shift+tab[39m [38;5;246mto[39m [38;5;246mcycle)[39m [38;5;246m·[39m [38;5;246mesc[39m [38;5;246mto[39m [38;5;246minterrupt[39m
+

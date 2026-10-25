@@ -104,9 +104,10 @@ func execRunner(dir, program string, args ...string) result {
 	return result{stdout: out.String(), stderr: errOut.String(), err: err, timedOut: errors.Is(ctx.Err(), context.DeadlineExceeded)}
 }
 
-// tmux runs `tmux -L socket args…`.
+// tmux runs `tmux -u -L socket args…`. Without -u a runtime started under a C locale gets every tab of a -F format
+// printed as "_", so no pane line parses and every working agent looks gone.
 func (t *Tmux) tmux(socket string, args ...string) result {
-	return t.run("", "tmux", append([]string{"-L", socket}, args...)...)
+	return t.run("", "tmux", append([]string{"-u", "-L", socket}, args...)...)
 }
 
 // on runs a command for a session on the server it lives on.
@@ -126,8 +127,10 @@ func (t *Tmux) Sockets() []string {
 	return []string{t.cfg.Socket, t.cfg.LegacySocket}
 }
 
+// hasOn: a tmux that did not answer in time (a loaded machine) said nothing about the session, so it is not gone.
 func (t *Tmux) hasOn(socket, name string) bool {
-	return t.tmux(socket, "has-session", "-t", "="+name).err == nil
+	r := t.tmux(socket, "has-session", "-t", "="+name)
+	return r.err == nil || r.timedOut
 }
 
 // findLegacy is the server a legacy-named session lives on, probing the last known one first, or "".
@@ -240,6 +243,19 @@ func (t *Tmux) PaneShellName(tabID string, legacy bool) (string, bool) {
 		prefix = t.cfg.LegacyPrefix
 	}
 	return prefix + "shell-" + tabID, true
+}
+
+// OwnShellPrefix is what the sessions of a v2 conversation's own terminals begin with: `<prefix>v2t-<convID>-`.
+func (t *Tmux) OwnShellPrefix(convID string) string { return t.cfg.Prefix + "v2t-" + convID + "-" }
+
+// OwnShellName is the session of one of a v2 conversation's own terminals. Like the pane shell it does not have the
+// workspace form, so the layout never adopts it as a tab.
+func (t *Tmux) OwnShellName(convID, id string) string { return t.OwnShellPrefix(convID) + id }
+
+// OwnShellID is the id of an own terminal from its session name, false for any other session of the conversation.
+func (t *Tmux) OwnShellID(convID, session string) (string, bool) {
+	id, ok := strings.CutPrefix(session, t.OwnShellPrefix(convID))
+	return id, ok && id != "" && !strings.Contains(id, "-")
 }
 
 var workspaceNameRe = regexp.MustCompile(`^(ws-.*?)-(pane-.*?)-(tab-.+)$`)

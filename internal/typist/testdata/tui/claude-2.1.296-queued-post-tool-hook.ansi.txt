@@ -1,0 +1,40 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.296[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mHaiku 5.5 · Claude Max[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/…/claude-1001/-home-agent-workspace-example/bc172ab2-3a5a-46d8-a66f-af070cec5282/scratchpad/case001/work[39m
+
+
+[38;5;246m[48;5;237m❯ [38;5;231mRun the Bash command: echo hello-hook  then say DONE-HOOK[39m
+
+[38;5;246m[49m [39m Echo hello-hook string[38;5;246m · 8s[39m
+[38;5;246m  ⎿  $ echo hello-hook[39m
+
+[38;5;246m[48;5;237m❯ hook queued: say Q-HOOK[39m
+[49m  [38;5;246mctrl+x ctrl+s to send now[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[38;5;174m✢[39m [38;5;216mDoing…[38;5;174m [38;5;246m(running PostToolUse hook · 9s · ↓[39m [38;5;246m18 tokens)[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [2m[39mPress up to edit queued messages[0m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵ bypass permissions on[38;5;246m (shift+tab to cycle) · esc to interrupt · ← for agents[39m

@@ -148,9 +148,8 @@ func commandRoutes(d deps) []gate.JSONRoute {
 
 	return []gate.JSONRoute{
 		{
-			Slice:    "fsread",
-			Match:    func(r *http.Request) bool { return pathIs(r, platformAPI+"/commands") },
-			Volatile: []string{"generatedAt"},
+			Slice: "fsread",
+			Match: func(r *http.Request) bool { return pathIs(r, platformAPI+"/commands") },
 			Compute: func(r *http.Request) (int, any, http.Header) {
 				status, v, h, done := guard(r)
 				if done {

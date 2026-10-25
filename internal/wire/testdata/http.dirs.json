@@ -1,0 +1,9 @@
+{
+  "http": "dirs",
+  "response": [
+    {"path": "/home/coder/workspace/harnessly", "name": "harnessly", "git": true, "branch": "main", "empty": false},
+    {"path": "/home/coder/workspace/acme", "name": "acme", "git": true, "branch": null, "empty": false},
+    {"path": "/home/coder/workspace/notes", "name": "notes", "git": false, "branch": null, "empty": false},
+    {"path": "/home/coder/workspace/new", "name": "new", "git": false, "branch": null, "empty": true}
+  ]
+}

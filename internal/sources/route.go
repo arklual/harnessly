@@ -45,12 +45,15 @@ type index struct {
 	ino       uint64
 	offset    int64
 	collector Collector
+	mentions  Mentions
 	paths     Paths
 }
 
 // Result is what the route answers for a transcript.
 type Result struct {
-	Links     []Link
+	Links []Link
+	// MRs are the merge requests the agent and the person wrote down, oldest first; they are not in Value().
+	MRs       []MRMention
 	WorkPaths []any
 	Size      int64
 }
@@ -116,7 +119,7 @@ func (rt *Route) Read(path, cwd string) (res Result, found, failed bool) {
 	if err := idx.advance(path, st.Size(), rt.parser(path)); err != nil {
 		return Result{}, true, true
 	}
-	return Result{Links: idx.collector.List(), WorkPaths: idx.paths.List(cwd), Size: idx.offset}, true, false
+	return Result{Links: idx.collector.List(), MRs: idx.mentions.List(), WorkPaths: idx.paths.List(cwd), Size: idx.offset}, true, false
 }
 
 func inode(st os.FileInfo) uint64 {
@@ -143,7 +146,7 @@ func (rt *Route) indexFor(path string, st os.FileInfo) *index {
 		}
 	}
 	if idx == nil {
-		idx = &index{ino: inode(st), collector: Collector{Links: rt.Links}}
+		idx = &index{ino: inode(st), collector: Collector{Links: rt.Links}, mentions: Mentions{Links: rt.Links}}
 	}
 	rt.indexes[path] = idx
 	for i, k := range rt.order {
@@ -206,6 +209,7 @@ func (idx *index) advance(path string, size int64, parse parseFunc) error {
 			return parseError{}
 		}
 		idx.collector.Add(entries)
+		idx.mentions.Add(entries)
 		idx.paths.Add(entries)
 		idx.offset += int64(last + 1)
 	}

@@ -1,0 +1,254 @@
+/* A dynamic workflow: its card in the feed (.hx-flow) and its agents in the pane (.hx-flowpane). The card has no box of
+   its own, like a subagent's row: «Workflow · name» as the largest thing, the phases' progress muted beside it and its
+   state; a click opens its agents by height (a grid row between 0fr and 1fr), grouped under each phase's title. */
+.hx-flow {
+  position: relative;
+  padding: 6px 8px;
+  margin: 4px -8px;
+  border-radius: var(--hx-radius-md);
+  transition: background 200ms var(--hx-ease-out);
+}
+.hx-flow:hover,
+.hx-flow:focus-within,
+.hx-flow[data-open='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-flow__row {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: 24px;
+}
+.hx-flow__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-medium);
+  text-align: left;
+}
+button.hx-flow__main {
+  cursor: pointer;
+}
+.hx-flow__icon {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-flow__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-flow__kind {
+  color: var(--hx-fg-2);
+}
+.hx-flow__chev {
+  flex: none;
+  color: var(--hx-fg-3);
+  opacity: 0;
+  transition:
+    transform 280ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
+}
+.hx-flow:hover .hx-flow__chev,
+.hx-flow[data-open='true'] .hx-flow__chev,
+.hx-flow__main:focus-visible .hx-flow__chev {
+  opacity: 1;
+}
+.hx-flow[data-open='true'] .hx-flow__chev {
+  transform: rotate(180deg);
+}
+.hx-flow__progress {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-flow__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+[data-status='run'] > .hx-flow__row > .hx-flow__dot,
+[data-status='run'] > .hx-flow__agent-row > .hx-flow__dot {
+  background: var(--hx-accent);
+  animation: hx-breathe 1.6s var(--hx-ease-in-out) infinite;
+}
+[data-status='done'] > .hx-flow__row > .hx-flow__dot,
+[data-status='done'] > .hx-flow__agent-row > .hx-flow__dot {
+  background: var(--hx-success);
+}
+[data-status='failed'] > .hx-flow__row > .hx-flow__dot,
+[data-status='failed'] > .hx-flow__agent-row > .hx-flow__dot {
+  background: var(--hx-danger);
+}
+/* A workflow at work: its name shimmers, as a working subagent's title does; nothing else spins. */
+.hx-flow[data-status='run'] .hx-flow__name {
+  background: linear-gradient(
+      90deg,
+      var(--hx-fg-2) 0%,
+      var(--hx-fg-2) 35%,
+      var(--hx-fg-1) 50%,
+      var(--hx-fg-2) 65%,
+      var(--hx-fg-2) 100%
+    )
+    0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hx-title-shimmer 2.4s linear infinite;
+}
+
+.hx-flow__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  animation: hx-flow-in 320ms var(--hx-ease-out);
+  transition:
+    grid-template-rows 280ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
+}
+.hx-flow__body[data-state='closing'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes hx-flow-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.hx-flow__fold {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-flow__phases {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  padding: 6px 0 2px 22px;
+}
+.hx-flow__phase-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-flow__phase-title {
+  color: var(--hx-fg-2);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-flow__phase[data-empty='true'] .hx-flow__phase-title {
+  color: var(--hx-fg-3);
+  font-weight: inherit;
+}
+.hx-flow__agent {
+  padding: 3px 0;
+}
+.hx-flow__agent-row {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: 22px;
+}
+.hx-flow__agent-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-flow__agent-meta {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+}
+.hx-flow__open {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-flow__agent:hover .hx-flow__open,
+.hx-flow__open:focus-visible {
+  opacity: 1;
+}
+.hx-flow__open:hover {
+  color: var(--hx-fg-1);
+}
+.hx-flow__agent-line {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A touch screen has no hover: «Открыть» stays in view. */
+@media (hover: none) {
+  .hx-flow__open,
+  .hx-flow__chev {
+    opacity: 1;
+  }
+}
+
+/* The workflows in the pane's tab of subagents: a heading per workflow, the agents' cards under each phase's title. */
+.hx-flowpane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 16px 0 8px;
+}
+.hx-flowpane__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--hx-fg-2);
+}
+.hx-flowpane__progress {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-flowpane__phase {
+  margin-top: 8px;
+}
+.hx-flowpane__phase-title {
+  margin-bottom: 6px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}

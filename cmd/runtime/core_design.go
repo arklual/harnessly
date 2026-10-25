@@ -102,10 +102,9 @@ func (c *core) designRoutes(f *gate.Gate, d deps, sender *push.Sender) []gate.Ro
 		return gate.JSONRoute{Slice: "design", Match: func(r *http.Request) bool { return running() && files.RouteIs(r, path) },
 			Compute: func(r *http.Request) (int, any, http.Header) { return compute(r).Split() }}
 	}
-	library := at(platformAPI+"/design/library", a.Library)
-	library.Volatile = []string{"port"}
-	return f.AsRoutes(library,
+	return f.AsRoutes(at(platformAPI+"/design/library", a.Library),
 		at(platformAPI+"/design/library/message", a.Message),
+		at(platformAPI+"/design/library/log", a.PageLog),
 		at(platformAPI+"/design/library/continue", func(r *http.Request) design.Answer { return a.Continue(r, resolveCwd) }),
 		at(platformAPI+"/design/library/create", func(r *http.Request) design.Answer { return a.Create(r, resolveCwd) }),
 		at("/api/cli/design", a.CLIDesign),

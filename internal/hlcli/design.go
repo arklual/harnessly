@@ -257,10 +257,24 @@ func (c *cli) hook(args []string) error {
 	}
 	raw, err := io.ReadAll(io.LimitReader(in, 4<<20))
 	if err != nil {
+		// An input that cannot be read is refused where the snapshot restricts, an error otherwise.
+		if out := design.GuardHook(nil, design.GuardCLI(), design.GuardEnv{DataDir: c.dataDir(), LibraryDir: c.hookLibraryDir()}); out != nil {
+			_, _ = c.env.Stdout.Write(out)
+			return nil
+		}
 		return err
 	}
-	if out := design.GuardHookAnswer(raw, design.GuardCLI()); out != nil {
+	if out := design.GuardHook(raw, design.GuardCLI(), design.GuardEnv{DataDir: c.dataDir(), LibraryDir: c.hookLibraryDir()}); out != nil {
 		_, _ = c.env.Stdout.Write(out)
 	}
 	return nil
+}
+
+// hookLibraryDir is the library the hook knows from the environment, "" when none is named.
+func (c *cli) hookLibraryDir() string {
+	dir, err := c.libraryDir("")
+	if err != nil {
+		return ""
+	}
+	return dir
 }

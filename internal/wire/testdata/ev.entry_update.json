@@ -1,0 +1,20 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 511,
+  "e": {
+    "type": "entry_update",
+    "entry": {
+      "id": "x:18234#0",
+      "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+      "at": 1792655997000,
+      "rev": 2,
+      "t": "tool",
+      "toolUseId": "toolu_01GoTest",
+      "tool": "Bash",
+      "summary": "go test ./internal/wire/...",
+      "ok": false,
+      "output": {"text": "FAIL\tinternal/wire", "truncated": null}
+    }
+  }
+}

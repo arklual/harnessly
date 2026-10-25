@@ -1,16 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
-	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
@@ -18,11 +14,9 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/catalog"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
-	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/launch"
 	"github.com/ly-solutions/harnessly/internal/locale"
-	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 )
 
@@ -37,9 +31,6 @@ type coreAgents struct {
 	// launcherScript writes the launcher when it is missing; nil leaves it to the old runtime.
 	launcherScript *codex.LauncherScriptConfig
 	codexArgs      codex.LaunchConfig
-	old            *gate.OldRuntime
-	oldAPI         string
-	client         *http.Client
 	// launchOn: the launch slice is on, so conversations start and resume here (set by main); starter and resume are
 	// the core's, set once it exists.
 	launchOn func() bool
@@ -58,8 +49,6 @@ type coreAgentsConfig struct {
 	// EditorScript is the prompt editor script Claude gets as its editor (the prompt service's RUNTIME_PROMPT_EDITOR),
 	// HumanEditorVar the variable it finds the person's editor in.
 	EditorScript, HumanEditorVar string
-	Old                          *gate.OldRuntime
-	OldAPI                       string
 	// Port is the runtime's port (the gate's), for the MCP address Codex is given.
 	Port int
 	// MCP names the runtime's MCP server for Codex; ScriptDataDirs are the home-relative data folders the Codex launcher
@@ -130,9 +119,6 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			ContainerSandbox: c.CodexContainerSandbox,
 			ShellEnvExclude:  []string{c.MCP.TokenEnv},
 		},
-		old:    c.Old,
-		oldAPI: c.OldAPI,
-		client: &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
@@ -170,6 +156,12 @@ func launcherScriptConfig(c coreAgentsConfig) *codex.LauncherScriptConfig {
 // CodexArgs are codex's own arguments, for the launcher script in a pane.
 func (a *coreAgents) CodexArgs(workspaceID, resumeID string, launch *agents.Launch) ([]string, error) {
 	args, _, err := a.codexArgs.RuntimeArgs(workspaceID, resumeID, launch)
+	return args, err
+}
+
+// CodexForkArgs are the arguments of codex on a fork of the session.
+func (a *coreAgents) CodexForkArgs(workspaceID, sessionID string, launch *agents.Launch) ([]string, error) {
+	args, _, err := a.codexArgs.ForkArgs(workspaceID, sessionID, launch)
 	return args, err
 }
 
@@ -304,15 +296,24 @@ func (a *coreAgents) ValidateLaunch(provider string, model, effort any) (*agents
 }
 
 func (a *coreAgents) codexLine(workspaceID, resumeID string, launch *agents.Launch) (string, error) {
+	content, err := a.codexLauncherContent()
+	if err != nil {
+		return "", err
+	}
+	return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content}.LauncherLine(workspaceID, resumeID, launch)
+}
+
+// codexLauncherContent is the Codex launcher script as the pane runs it.
+func (a *coreAgents) codexLauncherContent() ([]byte, error) {
 	content, err := os.ReadFile(a.codexLauncher)
 	if err != nil && a.launcherScript != nil {
 		content, err = codex.LauncherScript(*a.launcherScript), nil
 	}
 	if err != nil {
-		return "", errors.New("the Codex launcher " + a.codexLauncher + " is not written yet (a runtime in front of a previous one leaves it to that one, " +
+		return nil, errors.New("the Codex launcher " + a.codexLauncher + " is not written yet (a runtime in front of a previous one leaves it to that one, " +
 			"or needs RUNTIME_SCRIPT_DATA_DIRS and RUNTIME_MCP_TOKEN_ENV to write it)")
 	}
-	return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content}.LauncherLine(workspaceID, resumeID, launch)
+	return content, nil
 }
 
 // LaunchLine is the line that starts a new conversation.
@@ -331,28 +332,20 @@ func (a *coreAgents) ResumeLine(provider, sessionID, workspaceID string, launch 
 	return a.claude.ResumeCommand(sessionID, workspaceID, launch)
 }
 
-func (a *coreAgents) post(path string, body any) (int, []byte, error) {
-	if a.old == nil || a.old.Upstream == "" {
-		return 0, nil, errors.New("no old runtime")
+// ForkLine is the line that starts the agent on a fork of a session: Codex's `fork`, Claude's `--fork-session`.
+func (a *coreAgents) ForkLine(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
+	if provider == agents.Codex {
+		content, err := a.codexLauncherContent()
+		if err != nil {
+			return "", err
+		}
+		return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content}.ForkLauncherLine(workspaceID, sessionID, launch)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), a.client.Timeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+a.old.Upstream+a.oldAPI+path, bytes.NewReader(nodejson.Marshal(body)))
+	line, err := a.claude.ResumeCommand(sessionID, workspaceID, launch)
 	if err != nil {
-		return 0, nil, err
+		return "", err
 	}
-	req.Header.Set("content-type", "application/json")
-	raw, _ := os.ReadFile(filepath.Join(a.old.DataDir, "cli-token"))
-	for _, h := range a.old.TokenHeaders {
-		req.Header.Set(h, string(bytes.TrimSpace(raw)))
-	}
-	res, err := a.client.Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer res.Body.Close()
-	out, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
-	return res.StatusCode, out, nil
+	return line + " --fork-session", nil
 }
 
 func (a *coreAgents) launching() bool { return a.launchOn != nil && a.launchOn() && a.starter != nil }
@@ -371,6 +364,10 @@ func (l lines) Resume(provider, sessionID, workspaceID string, launch *agents.La
 	return l.a.ResumeLine(provider, sessionID, workspaceID, launch)
 }
 
+func (l lines) Fork(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
+	return l.a.ForkLine(provider, sessionID, workspaceID, launch)
+}
+
 func optionalText(v any) *string {
 	if s, ok := v.(string); ok {
 		return &s
@@ -378,80 +375,31 @@ func optionalText(v any) *string {
 	return nil
 }
 
-// Start starts a conversation: here with the launch slice on, else through the old runtime. A start that fails here
-// (the Codex launcher cannot be written, say) is a 500 whose body says why.
+// Start starts a conversation while the launch slice is on. A start that fails (the Codex launcher cannot be written,
+// say) is a 500 whose body says why.
 func (a *coreAgents) Start(r layoutapi.StartRequest) layoutapi.StartResult {
-	if a.launching() {
-		res, err := a.starter.Start(launch.Options{Provider: r.Provider, WorkspaceID: r.WorkspaceID, Prompt: optionalText(r.Prompt),
-			Launch: r.Launch, TabName: optionalText(r.TabName)})
-		if err != nil {
-			agent.Log("error", "core: the conversation did not start", agent.F{K: "provider", V: r.Provider}, agent.F{K: "error", V: err.Error()})
-			return layoutapi.StartResult{Status: http.StatusInternalServerError,
-				Body: errorJSON(locale.Pick("Could not start the agent: "+err.Error(), "Не удалось запустить агента: "+err.Error()))}
-		}
-		if res.OK {
-			return layoutapi.StartResult{ConversationID: res.ConversationID()}
-		}
-		return layoutapi.StartResult{Status: res.Status, Body: jsvalue.Stringify(res.Body, "")}
+	if !a.launching() {
+		return layoutapi.StartResult{Status: http.StatusServiceUnavailable, Body: errorJSON(locale.Pick("Could not start the agent: the runtime is starting", "Не удалось запустить агента: рантайм запускается"))}
 	}
-	return a.startOld(r)
+	res, err := a.starter.Start(launch.Options{Provider: r.Provider, WorkspaceID: r.WorkspaceID, Prompt: optionalText(r.Prompt),
+		Launch: r.Launch, TabName: optionalText(r.TabName)})
+	if err != nil {
+		agent.Log("error", "core: the conversation did not start", agent.F{K: "provider", V: r.Provider}, agent.F{K: "error", V: err.Error()})
+		return layoutapi.StartResult{Status: http.StatusInternalServerError,
+			Body: errorJSON(locale.Pick("Could not start the agent: "+err.Error(), "Не удалось запустить агента: "+err.Error()))}
+	}
+	if res.OK {
+		return layoutapi.StartResult{ConversationID: res.ConversationID()}
+	}
+	return layoutapi.StartResult{Status: res.Status, Body: jsvalue.Stringify(res.Body, "")}
 }
 
-func (a *coreAgents) startOld(r layoutapi.StartRequest) layoutapi.StartResult {
-	body := map[string]any{"provider": r.Provider, "workspaceId": r.WorkspaceID, "prompt": r.Prompt, "tabName": r.TabName, "launch": nil}
-	if r.Launch != nil {
-		body["launch"] = r.Launch
-	}
-	status, raw, err := a.post("/core/agent-start", body)
-	var answer struct {
-		OK           bool `json:"ok"`
-		Status       int  `json:"status"`
-		Body         json.RawMessage
-		Conversation struct {
-			ID string `json:"id"`
-		} `json:"conversation"`
-	}
-	if err != nil || status != http.StatusOK || json.Unmarshal(raw, &answer) != nil {
-		agent.Log("warn", "core: the old runtime did not start the agent", agent.F{K: "status", V: status})
-		return layoutapi.StartResult{Status: http.StatusBadGateway, Body: errorJSON(locale.Pick("Could not start the agent: the old runtime did not answer", "Не удалось запустить агента: старый рантайм не ответил"))}
-	}
-	if answer.OK && answer.Conversation.ID != "" {
-		return layoutapi.StartResult{ConversationID: answer.Conversation.ID}
-	}
-	if answer.Status == 0 || len(answer.Body) == 0 {
-		return layoutapi.StartResult{Status: http.StatusInternalServerError, Body: errorJSON(locale.Pick("Could not start the agent", "Не удалось запустить агента"))}
-	}
-	return layoutapi.StartResult{Status: answer.Status, Body: answer.Body}
-}
-
-// AutoResume resumes the agents that ran before a restart: here with the launch slice on, else through the old runtime.
-// On a release the gate is up before the old runtime has started, so that call is repeated until it answers.
+// AutoResume resumes the agents that ran before a restart, while the launch slice is on.
 func (a *coreAgents) AutoResume() {
 	if a.launching() && a.resume != nil {
 		a.resume()
-		return
 	}
-	go func() {
-		status := 0
-		for deadline := time.Now().Add(autoResumeWait); ; time.Sleep(autoResumeRetry) {
-			var err error
-			status, _, err = a.post("/core/auto-resume", map[string]any{})
-			if err == nil && status/100 == 2 {
-				return
-			}
-			starting := err != nil || status == http.StatusNotFound || status/100 == 5
-			if !starting || time.Now().After(deadline) {
-				break
-			}
-		}
-		agent.Log("warn", "core: the old runtime did not resume the agents", agent.F{K: "status", V: status})
-	}()
 }
-
-var (
-	autoResumeWait  = 3 * time.Minute
-	autoResumeRetry = 3 * time.Second
-)
 
 // errorJSON is {"error": text} as a body.
 func errorJSON(text string) []byte {

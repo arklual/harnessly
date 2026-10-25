@@ -1,0 +1,10 @@
+{
+  "op": "queue.move",
+  "body": {
+    "opId": "op-qm1",
+    "conversationId": "tab-k3Jx9QmZ",
+    "clientId": "0192b6f1-0000-7000-8000-000000000003",
+    "beforeClientId": "0192b6f1-0000-7000-8000-000000000001"
+  },
+  "result": {"r": "accepted", "ch": "conv:tab-k3Jx9QmZ", "seq": 521}
+}

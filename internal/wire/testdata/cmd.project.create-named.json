@@ -1,0 +1,5 @@
+{
+  "op": "project.create",
+  "body": {"opId": "op-pr2", "path": "/home/coder/workspace/model-gateway-hl", "name": "LLM-платформа"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1850, "id": "p9q8r7s6t5uu"}
+}

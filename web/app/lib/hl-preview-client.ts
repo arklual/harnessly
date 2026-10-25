@@ -1,6 +1,7 @@
 import { t } from '@/lib/i18n';
 import { appHost } from '@/lib/site';
 import { appFetch, scopedAppPath } from '@/lib/app-path';
+import { stampSlot } from '@/next/core/net/preview-stamp';
 import type { IPickedComponent } from '@/lib/hl-preview/bridge-core';
 import type { IPreviewPort } from '@/lib/hl-preview/ports-shared';
 import type { IResolvedMatch } from '@/types/server/resolve';
@@ -153,6 +154,7 @@ export const openPreview = async (
   if (response.status === 404) throw new PreviewUnavailableError();
   if (!response.ok) throw new Error(await failureText(response));
   const opened = (await response.json()) as Omit<IOpenedPreview, 'neighbours'>;
+  stampSlot(slot);
   return {
     ...opened,
     neighbours: target.kind === 'port' ? [...neighbours] : [],

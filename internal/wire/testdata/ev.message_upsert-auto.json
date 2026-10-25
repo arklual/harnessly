@@ -1,0 +1,26 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 537,
+  "e": {
+    "type": "message_upsert",
+    "message": {
+      "clientId": "auto-l-1792663231000",
+      "conversationId": "tab-k3Jx9QmZ",
+      "text": "Продолжай с того места, где остановился",
+      "attachments": [],
+      "mode": "queue",
+      "kind": "prompt",
+      "createdAt": 1792663231000,
+      "attempts": 0,
+      "state": {
+        "k": "queued",
+        "position": 1,
+        "reason": "agent-busy",
+        "wait": null
+      },
+      "rev": 1,
+      "auto": "limit"
+    }
+  }
+}

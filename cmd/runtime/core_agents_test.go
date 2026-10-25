@@ -2,18 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
-	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 )
 
@@ -131,7 +126,7 @@ func TestValidateLaunch(t *testing.T) {
 		{"claude", nil, "high", ""},
 		{"claude", "haiku", "high", "Модель haiku не поддерживает глубину «High»"},
 		{"claude", "gpt-5", nil, "Модель «gpt-5» недоступна для Claude на этой машине"},
-		{"codex", "gpt-5.4", nil, "Модель «gpt-5.4» недоступна для Codex на этой машине"},
+		{"codex", "gpt-4o", nil, "Модель «gpt-4o» недоступна для Codex на этой машине"},
 		{"codex", nil, "xhigh", "Модель по умолчанию не поддерживает глубину «Extra high»"},
 	} {
 		_, got := a.ValidateLaunch(c.provider, c.model, c.effort)
@@ -142,65 +137,5 @@ func TestValidateLaunch(t *testing.T) {
 	l, _ := a.ValidateLaunch("claude", "sonnet", nil)
 	if l == nil || *l.Model != "sonnet" || l.Effort != nil {
 		t.Fatal(l)
-	}
-}
-
-func TestAgentStartGoesToTheOldRuntime(t *testing.T) {
-	var got map[string]any
-	answer := `{"ok":true,"conversation":{"id":"tab-new","title":"x"}}`
-	old := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/internal/core/agent-start" || r.Header.Get("x-tok") != "secret" {
-			w.WriteHeader(404)
-			return
-		}
-		_ = json.NewDecoder(r.Body).Decode(&got)
-		_, _ = w.Write([]byte(answer))
-	}))
-	defer old.Close()
-	data := t.TempDir()
-	_ = os.WriteFile(filepath.Join(data, "cli-token"), []byte("secret\n"), 0o600)
-	a := newCoreAgents(coreAgentsConfig{DataDir: data, Home: t.TempDir(),
-		Old: &gate.OldRuntime{Upstream: strings.TrimPrefix(old.URL, "http://"), DataDir: data, TokenHeaders: []string{"x-tok"}}, OldAPI: "/api/internal"})
-	model := "opus"
-	r := a.Start(layoutapi.StartRequest{Provider: "claude", WorkspaceID: "ws-a", Prompt: "go", Launch: &agents.Launch{Model: &model}, TabName: nil})
-	if r.ConversationID != "tab-new" || got["provider"] != "claude" || got["prompt"] != "go" || got["tabName"] != nil {
-		t.Fatalf("%+v %v", r, got)
-	}
-	if l, _ := got["launch"].(map[string]any); l["model"] != "opus" || l["effort"] != nil {
-		t.Fatal(got["launch"])
-	}
-	answer = `{"ok":false,"status":404,"body":{"error":"Проект не найден"}}`
-	if r := a.Start(layoutapi.StartRequest{Provider: "claude"}); r.Status != 404 || string(r.Body) != `{"error":"Проект не найден"}` {
-		t.Fatalf("%+v", r)
-	}
-	old.Close()
-	if r := a.Start(layoutapi.StartRequest{Provider: "claude"}); r.Status != 502 {
-		t.Fatalf("%+v", r)
-	}
-}
-
-func TestAutoResumeWaitsForTheOldRuntime(t *testing.T) {
-	var calls atomic.Int32
-	done := make(chan struct{})
-	old := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if calls.Add(1) < 3 {
-			w.WriteHeader(http.StatusServiceUnavailable) // still starting
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		close(done)
-	}))
-	defer old.Close()
-	saved := autoResumeRetry
-	autoResumeRetry = 10 * time.Millisecond
-	defer func() { autoResumeRetry = saved }()
-	data := t.TempDir()
-	a := newCoreAgents(coreAgentsConfig{DataDir: data, Home: t.TempDir(),
-		Old: &gate.OldRuntime{Upstream: strings.TrimPrefix(old.URL, "http://"), DataDir: data, TokenHeaders: []string{"x-tok"}}, OldAPI: "/api/internal"})
-	a.AutoResume()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatalf("gave up after %d calls", calls.Load())
 	}
 }

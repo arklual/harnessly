@@ -1,0 +1,141 @@
+/* «Цель сессии»: the dialog that shows and edits the agent's /goal (features/header/goal-dialog.tsx). */
+.hx-goal__state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-goal__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--hx-accent);
+}
+.hx-goal__state[data-status='paused'] .hx-goal__dot {
+  background: var(--hx-warning);
+}
+.hx-goal__state[data-status='met'] .hx-goal__dot {
+  background: var(--hx-success);
+}
+.hx-goal__since {
+  color: var(--hx-fg-3);
+  font-weight: var(--hx-weight-regular, 400);
+}
+.hx-goal__in {
+  width: 100%;
+  min-height: 112px;
+  padding: 10px 14px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 12px;
+  outline: 0;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 15px;
+  line-height: 22px;
+  resize: vertical;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.hx-goal__in:focus {
+  border-color: var(--hx-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-accent) 16%, transparent);
+}
+.hx-goal__note {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 18px;
+}
+.hx-goal__clear {
+  color: var(--hx-danger);
+}
+.hx-goal__clear:hover {
+  color: var(--hx-danger);
+}
+.hx-goal__clear[data-busy='true'] {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* The slim bar over the field (features/composer/goal-bar.tsx): the goal's words and what to do with it. */
+.hx-goalbar .hx-dockstat__line {
+  gap: 10px;
+}
+.hx-goalbar__ic {
+  flex: none;
+  color: var(--hx-accent);
+}
+.hx-goalbar[data-status='paused'] .hx-goalbar__ic {
+  color: var(--hx-warning);
+}
+.hx-goalbar[data-status='met'] .hx-goalbar__ic {
+  color: var(--hx-success);
+}
+.hx-goalbar__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-goalbar__text > b {
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-goalbar__act {
+  flex: none;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  cursor: pointer;
+}
+.hx-goalbar__act:hover:not(:disabled),
+.hx-goalbar__act:focus-visible {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+  outline: none;
+}
+.hx-goalbar__act:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Where the goal was reached, in the feed: a line across with the words in the middle. */
+.hx-goalline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-goalline::before,
+.hx-goalline::after {
+  content: '';
+  flex: 1 1 24px;
+  height: 1px;
+  background: var(--hx-border);
+}
+.hx-goalline::before {
+  order: -2;
+}
+.hx-goalline__ic {
+  order: -1;
+  flex: none;
+  color: var(--hx-success);
+}
+.hx-goalline__text {
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

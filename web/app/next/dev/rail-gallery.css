@@ -1,0 +1,5 @@
+/* The stage the column stands in: .hx-side is absolute and sizes its height by this box. */
+.hx-rail-gallery {
+  position: relative;
+  height: 100vh;
+}

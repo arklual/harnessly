@@ -2,14 +2,12 @@ package subagents
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/transcript"
 )
@@ -73,6 +72,12 @@ func TestRouteAnswersAsTheOldRuntime(t *testing.T) {
 	if err := json.Unmarshal(raw, &golden); err != nil {
 		t.Fatal(err)
 	}
+	update := updatingGolden()
+	doc, err := jsvalue.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := doc.(*jsvalue.Object).Array("requests")
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	layOut(t, root, golden.Files)
 	home := filepath.Join(root, "home")
@@ -91,11 +96,9 @@ func TestRouteAnswersAsTheOldRuntime(t *testing.T) {
 	}
 	rt := &Route{Lister: &Lister{Now: func() time.Time { return now }}, Authorized: func(r *http.Request) bool { return token(r) || session(r) },
 		SessionOK: session, Paths: Paths{ClaudeProjects: filepath.Join(home, ".claude", "projects"), CodexSessions: filepath.Join(home, ".codex", "sessions")}}
-	ids := 0
-	prevID, prevNow := transcript.NewID, transcript.Now
-	transcript.NewID = func() string { ids++; return "id" + fmt.Sprintf("%04s", strconv.FormatInt(int64(ids), 36)) }
+	prevNow := transcript.Now
 	transcript.Now = func() float64 { return float64(golden.Now) }
-	t.Cleanup(func() { transcript.NewID, transcript.Now = prevID, prevNow })
+	t.Cleanup(func() { transcript.Now = prevNow })
 	srv := serve(t, func(r *http.Request) (int, any, http.Header) {
 		if parts, _, _ := files.APIParts(r); len(parts) == 4 && parts[2] == "subagents" {
 			return rt.AnswerTranscript(r, parts[3])
@@ -131,10 +134,17 @@ func TestRouteAnswersAsTheOldRuntime(t *testing.T) {
 			lastEtag = e
 		}
 		where := g.Method + " " + g.Path + " #" + jscompat.Number(float64(i))
+		if update {
+			updateRequest(requests[i].(*jsvalue.Object), g.Answer, scrub(string(body)), body, res.Header.Get("ETag"))
+			continue
+		}
 		if res.StatusCode != g.Status || scrub(string(body)) != g.Answer {
 			t.Fatalf("%s\n got %d %s\nwant %d %s", where, res.StatusCode, scrub(string(body)), g.Status, g.Answer)
 		}
 		checkHeaders(t, where, res, body, g.AnswerHeaders, scrub)
+	}
+	if update && !t.Failed() {
+		writeGolden(t, "testdata/golden.json", doc)
 	}
 }
 

@@ -51,9 +51,16 @@ type Targets struct {
 	ReaderPath                string
 	// GitLabHosts are the GitLab servers whose merge requests and commits a tab shows; the first is named in hints.
 	GitLabHosts []string
+	// GitHubHost is the GitHub whose pull requests, commits and issues the same tab shows ("" is github.com).
+	GitHubHost string
 	// TaskKey matches a key of the tracker; TaskExamples are named in the hint.
 	TaskKey      *regexp.Regexp
 	TaskExamples string
+	// TrackerHosts are the tracker's servers: the page of a task there opens the task tab, as its key does.
+	TrackerHosts []string
+	// DesignRef is the id of the machine's design that a text names (its id, its folder or a file in it, its title),
+	// "" for none; nil: the machine has no design library and "open design" takes no target.
+	DesignRef func(text string) string
 }
 
 func (t Targets) readerPath() string {
@@ -68,6 +75,10 @@ type Command struct {
 	Kind   string // open, show, hide, status
 	Tab    string
 	Target string // "" for none
+	// Auto: the runtime asked, seeing what the agent works on, not the agent; the person may switch these off.
+	Auto bool
+	// Reload: the thing changed, a tab that shows it reloads; nothing opens for it.
+	Reload bool
 }
 
 // JSON is the command as the sync socket carries it.
@@ -77,6 +88,12 @@ func (c Command) JSON() *jsvalue.Object {
 		o.Set("tab", c.Tab)
 		if c.Target != "" {
 			o.Set("target", c.Target)
+		}
+		if c.Auto {
+			o.Set("auto", true)
+		}
+		if c.Reload {
+			o.Set("reload", true)
 		}
 	}
 	return o
@@ -91,9 +108,10 @@ const (
 	doc
 	gitlab
 	task
+	designRef
 )
 
-var targetOf = map[string]targetKind{"browser": port, "files": path, "changes": path, "artifacts": doc, "gitlab": gitlab, "task": task}
+var targetOf = map[string]targetKind{"browser": port, "files": path, "changes": path, "artifacts": doc, "gitlab": gitlab, "task": task, "design": designRef}
 
 func clean(s string) bool { return tmux.StripControlChars(s) == s }
 
@@ -292,15 +310,37 @@ func (t Targets) docTarget(text string) string {
 var (
 	mrPath     = regexp.MustCompile(`^/(.+?)/-/merge_requests/(\d+)`)
 	commitPath = regexp.MustCompile(`^/(.+?)/-/commit/([0-9a-f]{7,40})(?:/|$)`)
+
+	// GitHub: /owner/repo/pull/12 (and its /files, /commits/…), /owner/repo/commit/<sha>, /owner/repo/issues/12.
+	githubName       = `[A-Za-z0-9._-]{1,100}`
+	githubPullPath   = regexp.MustCompile(`^/` + githubName + `/` + githubName + `/pull/[1-9][0-9]{0,8}(?:/.*)?$`)
+	githubIssuePath  = regexp.MustCompile(`^/` + githubName + `/` + githubName + `/issues/[1-9][0-9]{0,8}/?$`)
+	githubCommitPath = regexp.MustCompile(`^/` + githubName + `/` + githubName + `/commits?/[0-9a-fA-F]{7,40}/?$`)
 )
 
-func (t Targets) gitlabTarget(text string) string {
+func (t Targets) githubHost() string {
+	if t.GitHubHost != "" {
+		return strings.ToLower(t.GitHubHost)
+	}
+	return "github.com"
+}
+
+// changeTarget is a link to a merge request or a commit of a GitLab of the deployment, or to a pull request, a commit
+// or an issue of its GitHub: all of them open in the one tab that shows a change through the service's API, as the
+// services refuse frames.
+func (t Targets) changeTarget(text string) string {
 	raw := urlTarget(text)
 	u := httpsURL(raw)
 	if u == nil || u.User != nil || u.Port() != "" {
 		return ""
 	}
 	host := strings.ToLower(u.Hostname())
+	if host == t.githubHost() {
+		if githubPullPath.MatchString(u.Path) || githubIssuePath.MatchString(u.Path) || githubCommitPath.MatchString(u.Path) {
+			return raw
+		}
+		return ""
+	}
 	known := false
 	for _, h := range t.GitLabHosts {
 		known = known || h == host
@@ -317,6 +357,26 @@ func (t Targets) taskTarget(text string) string {
 		return key
 	}
 	return ""
+}
+
+var issuePath = regexp.MustCompile(`^/(?:youtrack/)?issue/([A-Za-z][A-Za-z0-9]*-\d+)(?:/|$)`)
+
+// trackerTask is the key of a task's page on the tracker (https://<tracker>/issue/<key>), "" for any other address.
+func (t Targets) trackerTask(text string) string {
+	u := httpsURL(urlTarget(text))
+	if u == nil || u.User != nil {
+		return ""
+	}
+	host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+	known := false
+	for _, h := range t.TrackerHosts {
+		known = known || h == host
+	}
+	m := issuePath.FindStringSubmatch(u.Path)
+	if !known || m == nil {
+		return ""
+	}
+	return t.taskTarget(m[1])
 }
 
 func nonEmpty(v ...string) []string {
@@ -347,10 +407,16 @@ func (t Targets) hint(tab string, k targetKind) string {
 		if len(t.GitLabHosts) > 0 {
 			first = t.GitLabHosts[0]
 		}
-		return locale.Pick("open gitlab: a link to a GitLab merge request or commit is required (https://"+first+"/…)",
-			"open gitlab: нужна ссылка на merge request или коммит GitLab (https://"+first+"/…)")
+		return locale.Pick("open gitlab: a link to a GitLab merge request or commit (https://"+first+"/…), or to a GitHub pull request, commit or issue (https://"+t.githubHost()+"/…) is required",
+			"open gitlab: нужна ссылка на merge request или коммит GitLab (https://"+first+"/…), либо на pull request, коммит или задачу GitHub (https://"+t.githubHost()+"/…)")
 	case task:
 		return locale.Pick("open task: a tracker task key is required ("+t.TaskExamples+")", "open task: нужен ключ задачи трекера ("+t.TaskExamples+")")
+	case designRef:
+		if t.DesignRef == nil {
+			return locale.Pick("open design: this machine has no design library", "open design: на этой машине нет библиотеки дизайнов")
+		}
+		return locale.Pick("open design: no such design; give its id, its folder or a file in it, or its exact title",
+			"open design: такого дизайна нет; нужен его id, его папка или файл в ней, или точное название")
 	}
 	return locale.Pick("open "+tab+": a path without \"..\" and control characters is required", "open "+tab+": нужен путь без «..» и управляющих символов")
 }
@@ -380,9 +446,13 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 	case doc:
 		c = t.docTarget(text)
 	case gitlab:
-		c = t.gitlabTarget(text)
+		c = t.changeTarget(text)
 	case task:
 		c = t.taskTarget(text)
+	case designRef:
+		if t.DesignRef != nil && clean(text) {
+			c = t.DesignRef(jsvalue.TrimJS(text))
+		}
 	}
 	if c == "" {
 		return Command{}, t.hint(name, k)
@@ -474,4 +544,32 @@ func RateDecision(stamps []int64, now int64, limit int, windowMs int64) (bool, [
 		return false, recent
 	}
 	return true, append(recent, now)
+}
+
+// Classify is the tab a link or a name the agent wrote opens in, by the rules of open: a tracker key is the task tab, a
+// GitLab merge request or commit or a GitHub pull request, commit or issue the gitlab tab, a document or a board of the portal the artifacts tab, and any other
+// http(s) address the browser. "" for what opens nothing. The chat's chips and the pane's links ask it, so the pane has
+// one set of rules for the agent's open command and for what the person clicks.
+func (t Targets) Classify(text string) (tab, target string) {
+	if jscompat.Len(text) > MaxArg {
+		return "", ""
+	}
+	if c := t.taskTarget(text); c != "" {
+		return "task", c
+	}
+	if c := t.trackerTask(text); c != "" {
+		return "task", c
+	}
+	if c := t.changeTarget(text); c != "" {
+		return "gitlab", c
+	}
+	if c := t.docTarget(text); c != "" {
+		return "artifacts", c
+	}
+	if c := urlTarget(text); c != "" {
+		if u, err := url.Parse(c); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil {
+			return "browser", c
+		}
+	}
+	return "", ""
 }

@@ -1,0 +1,197 @@
+/* Tokens of the new interface, from the design's lib/hx/tokens.css and motion.css. Layers: primitives --hx-p-* → roles
+   --hx-* (a theme changes the roles only) → the components' own values in their stylesheets. The theme follows
+   html[data-theme] that platform/theme.tsx sets; the names do not meet the current interface's --t-* and --k-*. */
+
+:root {
+  /* Primitives */
+  --hx-p-white: #ffffff;
+  --hx-p-gray-25: #fbfbfc;
+  --hx-p-gray-50: #f6f6f8;
+  --hx-p-gray-100: #eeeef1;
+  --hx-p-gray-200: #e3e3e8;
+  --hx-p-gray-300: #c9c9d1;
+  --hx-p-gray-400: #9a9aa6;
+  --hx-p-gray-500: #6e6e7a;
+  --hx-p-gray-700: #34343c;
+  --hx-p-gray-800: #1d1d22;
+  --hx-p-gray-850: #17171b;
+  --hx-p-gray-900: #111114;
+  --hx-p-gray-950: #0a0a0c;
+  --hx-p-ink: #0c0e22;
+  --hx-p-violet-400: #9b86ff;
+  --hx-p-violet-500: #7b61ff;
+  --hx-p-blue-400: #6ea8ff;
+  --hx-p-blue-500: #3b82f6;
+  --hx-p-green-500: #22c55e;
+  --hx-p-amber-500: #f59e0b;
+  --hx-p-red-500: #ef4444;
+
+  /* Type: the page already loads Inter and JetBrains Mono */
+  --hx-font-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --hx-font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --hx-text-xs: 12px;
+  --hx-text-sm: 13px;
+  --hx-text-md: 14px;
+  --hx-text-lg: 16px;
+  --hx-text-xl: 20px;
+  --hx-text-2xl: 28px;
+  --hx-weight-regular: 400;
+  --hx-weight-medium: 500;
+  --hx-weight-semibold: 600;
+
+  /* Spacing: a 4px scale */
+  --hx-space-1: 4px;
+  --hx-space-2: 8px;
+  --hx-space-3: 12px;
+  --hx-space-4: 16px;
+  --hx-space-5: 20px;
+  --hx-space-6: 24px;
+  --hx-space-8: 32px;
+  --hx-space-10: 40px;
+
+  /* Radii */
+  --hx-radius-sm: 8px;
+  --hx-radius-md: 12px;
+  --hx-radius-lg: 18px;
+  --hx-radius-xl: 24px;
+  --hx-radius-full: 999px;
+
+  /* Controls */
+  --hx-control-sm: 32px;
+  --hx-control-md: 40px;
+  --hx-control-lg: 48px;
+  --hx-icon-sm: 14px;
+  --hx-icon-md: 18px;
+
+  /* Frame */
+  --hx-sidebar-w: 232px;
+  --hx-header-h: 64px;
+  --hx-feed-max: 760px;
+  /* The column a terminal keeps on a wide window: the composer's, with room for the panel's margins. */
+  --hx-term-col: calc(var(--hx-feed-max) + 120px);
+
+  /* Motion */
+  --hx-dur-xs: 120ms;
+  --hx-dur-sm: 200ms;
+  --hx-dur-md: 360ms;
+  --hx-dur-lg: 560ms;
+  --hx-dur-xl: 720ms;
+  --hx-stagger: 45ms;
+  --hx-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --hx-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --hx-m-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --hx-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* The terminal (the dock under the stage and the own shells of the pane): dark in both themes, as the design draws
+     it. xterm gets these as concrete colours, so its screen, its scrollbar and the box around it are one surface. */
+  --hx-term-bg: #141319;
+  --hx-term-fg: #e6e4ee;
+  --hx-term-dim: #a9a6b8;
+  --hx-term-mute: #8d8a9c;
+  --hx-term-cursor: #f4f3f8;
+  --hx-term-select: #3d3a52;
+  --hx-term-line: rgba(255, 255, 255, 0.06);
+  --hx-term-scrollbar: rgba(255, 255, 255, 0.16);
+  --hx-term-scrollbar-hover: rgba(255, 255, 255, 0.32);
+}
+
+:root,
+html[data-theme='light'] {
+  --hx-bg-backdrop: var(--hx-p-gray-900);
+  --hx-bg-app: var(--hx-p-white);
+  --hx-bg-rail: var(--hx-p-gray-50);
+  --hx-bg-stage: var(--hx-p-gray-25);
+  --hx-bg-raised: var(--hx-p-white);
+  --hx-bg-hover: rgba(12, 14, 34, 0.04);
+  --hx-bg-active: rgba(12, 14, 34, 0.07);
+  --hx-bg-bubble: var(--hx-p-gray-100);
+  --hx-fg-1: var(--hx-p-ink);
+  --hx-fg-2: var(--hx-p-gray-500);
+  --hx-fg-3: var(--hx-p-gray-400);
+  --hx-border: var(--hx-p-gray-100);
+  --hx-border-strong: var(--hx-p-gray-200);
+  --hx-primary: var(--hx-p-ink);
+  --hx-primary-fg: var(--hx-p-white);
+  --hx-accent: var(--hx-p-violet-500);
+  --hx-accent-soft: rgba(123, 97, 255, 0.12);
+  --hx-orb: radial-gradient(
+    circle at 30% 25%,
+    #c8d4ff 0%,
+    var(--hx-p-blue-400) 45%,
+    var(--hx-p-violet-500) 100%
+  );
+  --hx-success: var(--hx-p-green-500);
+  --hx-success-soft: rgba(34, 197, 94, 0.12);
+  --hx-warning: var(--hx-p-amber-500);
+  --hx-warning-soft: rgba(245, 158, 11, 0.14);
+  --hx-danger: var(--hx-p-red-500);
+  --hx-info: var(--hx-p-blue-500);
+  --hx-focus: rgba(123, 97, 255, 0.35);
+  --hx-shadow-sm: 0 1px 2px rgba(12, 14, 34, 0.05);
+  --hx-shadow-md: 0 4px 16px rgba(12, 14, 34, 0.05), 0 1px 2px rgba(12, 14, 34, 0.04);
+  --hx-shadow-overlay: 0 6px 16px rgba(0, 0, 0, 0.16);
+  /* Shell: the page's gradient (the sidebar's background too) around the content window */
+  --hx-shell: linear-gradient(180deg, #f6f5fa 0%, #eeecf5 100%);
+  --hx-shell-hover: rgba(12, 14, 34, 0.04);
+  --hx-shell-active: #ffffff;
+  --hx-bg-window: #ffffff;
+  /* The right pane: set apart from the window by its tone, never by a frame. */
+  --hx-bg-pane: var(--hx-bg-rail);
+  /* The canvas a design stands on (Designly): a neutral a step under the pane, so the page's edges read. */
+  --hx-bg-canvas: var(--hx-p-gray-100);
+  --hx-shadow-window: 0 1px 3px rgba(12, 14, 34, 0.04);
+  --hx-scrollbar: rgba(12, 14, 34, 0.16);
+  --hx-scrollbar-hover: rgba(12, 14, 34, 0.32);
+  --hx-scrim: rgba(12, 14, 34, 0.32);
+}
+
+/* Dark: neutral black, as in the design */
+html[data-theme='dark'] {
+  --hx-bg-backdrop: oklch(0.1 0 0);
+  --hx-bg-app: oklch(0.155 0 0);
+  --hx-bg-rail: oklch(0.13 0 0);
+  --hx-bg-stage: oklch(0.155 0 0);
+  --hx-bg-raised: oklch(0.19 0 0);
+  --hx-bg-hover: oklch(1 0 0 / 0.05);
+  --hx-bg-active: oklch(1 0 0 / 0.09);
+  --hx-bg-bubble: oklch(0.22 0 0);
+  --hx-fg-1: oklch(0.98 0 0);
+  --hx-fg-2: oklch(0.68 0 0);
+  --hx-fg-3: oklch(0.5 0 0);
+  --hx-border: oklch(1 0 0 / 0.08);
+  --hx-border-strong: oklch(1 0 0 / 0.14);
+  --hx-primary: oklch(0.98 0 0);
+  --hx-primary-fg: oklch(0.13 0 0);
+  --hx-accent: oklch(0.72 0.17 285);
+  --hx-accent-soft: oklch(0.55 0.24 285 / 0.16);
+  --hx-success: oklch(0.79 0.18 155);
+  --hx-success-soft: oklch(0.79 0.18 155 / 0.14);
+  --hx-warning-soft: rgba(245, 158, 11, 0.14);
+  --hx-danger: oklch(0.72 0.19 22);
+  --hx-info: var(--hx-p-blue-400);
+  --hx-focus: oklch(0.68 0.24 295 / 0.65);
+  --hx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --hx-shadow-md: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--hx-border);
+  --hx-shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--hx-border);
+  --hx-shell: oklch(0.13 0 0);
+  --hx-shell-hover: oklch(1 0 0 / 0.05);
+  --hx-shell-active: oklch(1 0 0 / 0.08);
+  --hx-bg-window: oklch(0.155 0 0);
+  --hx-bg-pane: var(--hx-bg-raised);
+  --hx-bg-canvas: oklch(0.115 0 0);
+  --hx-shadow-window: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --hx-scrollbar: oklch(1 0 0 / 0.16);
+  --hx-scrollbar-hover: oklch(1 0 0 / 0.3);
+  --hx-scrim: rgba(0, 0, 0, 0.5);
+}
+
+/* The phone reads at arm's length on a small screen: every step of the type scale one pixel up (body 15px), so the
+   secondary lines (times, paths, counts) stay at 13px and above. */
+@media (max-width: 900px) {
+  :root {
+    --hx-text-xs: 13px;
+    --hx-text-sm: 14px;
+    --hx-text-md: 15px;
+    --hx-text-lg: 17px;
+  }
+}

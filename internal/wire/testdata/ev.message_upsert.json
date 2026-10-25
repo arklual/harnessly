@@ -1,0 +1,25 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 536,
+  "e": {
+    "type": "message_upsert",
+    "message": {
+      "clientId": "0192b6f1-0000-7000-8000-000000000005",
+      "conversationId": "tab-k3Jx9QmZ",
+      "text": "Добавь тест на разрыв seq",
+      "attachments": [{"id": "up_01JB8", "name": "screen.png", "kind": "image", "mime": "image/png"}],
+      "mode": "steer",
+      "kind": "prompt",
+      "createdAt": 1792655990000,
+      "attempts": 0,
+      "state": {
+        "k": "queued",
+        "position": 3,
+        "reason": "launching",
+        "wait": {"slowAt": 1792656015000, "deadlineAt": 1792656900000}
+      },
+      "rev": 1
+    }
+  }
+}

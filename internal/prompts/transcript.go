@@ -19,8 +19,9 @@ type Probe struct {
 	// Waiting: the message was queued (queue-operation enqueue) and neither injected (remove) nor started a turn
 	// (dequeue).
 	Waiting bool
-	// Delivered: the message is in the transcript as the person's prompt, written at or after since. Claude Code 2.1.280
-	// records no enqueue for text typed during a turn and shows no queue; this is how its arrival is seen.
+	// Delivered: the message is in the transcript as the person's prompt, or as a `queued_command` attachment (injected
+	// into the running turn, no `user` record), written at or after since. Claude Code 2.1.280 records no enqueue for
+	// text typed during a turn and shows no queue; this is how its arrival is seen.
 	Delivered bool
 }
 
@@ -32,6 +33,12 @@ type transcriptEntry struct {
 	Message   *struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
+	Attachment *struct {
+		Type        string          `json:"type"`
+		CommandMode string          `json:"commandMode"`
+		Prompt      json.RawMessage `json:"prompt"`
+		Timestamp   string          `json:"timestamp"`
+	} `json:"attachment"`
 }
 
 type contentBlock struct {
@@ -123,6 +130,23 @@ func ProbeTranscript(lines []string, text string, sinceMs float64) (Probe, bool)
 			case e.Operation == "remove" && isString:
 				if at := slices.Index(queue, collapse(content)); at >= 0 {
 					queue = slices.Delete(queue, at, at+1)
+				}
+			}
+		case "attachment":
+			// A message that reached the running turn: Claude stamps it with the moment Enter was pressed, a little
+			// before the platform's clock read it as typed.
+			if a := e.Attachment; a != nil && a.Type == "queued_command" && a.CommandMode == "prompt" && wanted != "" {
+				stamp := a.Timestamp
+				if stamp == "" {
+					stamp = e.Timestamp
+				}
+				prompt, ok := promptOf(a.Prompt)
+				at := math.NaN()
+				if stamp != "" {
+					at = jscompat.ParseDate(stamp)
+				}
+				if ok && strings.Contains(collapse(prompt), wanted) && (math.IsNaN(at) || at >= sinceMs-recordSlackMs) {
+					delivered = true
 				}
 			}
 		case "assistant":

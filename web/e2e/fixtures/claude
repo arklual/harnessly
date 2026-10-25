@@ -29,19 +29,64 @@ hook() {
   cmd=$(sed -n 's/^ *"command": "\(.*\)",\{0,1\}$/\1/p' "$settings" | sed 's/\\"/"/g' | grep -- "$1\$" | head -1)
   [ -n "$cmd" ] && eval "$cmd" > /dev/null 2>&1
 }
-json() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+# A JSON string body: backslashes, quotes, tabs and the newlines of a long first message escaped.
+json() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g' | awk 'NR > 1 { printf "\\n" } { printf "%s", $0 }'; }
 now() { date -u +%Y-%m-%dT%H:%M:%S.000Z; }
+# Milliseconds since the epoch, without a process per look (the date of some systems ignores %3N).
+tick() { NOW=$(( ${EPOCHREALTIME/./} / 1000 )); }
+# Lines typed while a turn runs wait in Claude's own queue (an `enqueue` record) and reach the agent at the end of its
+# step as a `queued_command` attachment with a `remove`, no user record; the chord ctrl+x ctrl+s hands the running tool
+# over, so they reach it now. The typed text shows in the box until its Enter, as in the real one.
+held=(); heldat=(); inject_now=0
+wait_for() {
+  local ch rest limit
+  tick; limit=$(( NOW + $1 ))
+  while tick; [ "$NOW" -lt "$limit" ] && [ $inject_now = 0 ]; do
+    IFS= read -rsn1 -t 0.1 ch || continue
+    case "$ch" in
+      $'\e') IFS= read -rsn5 -t 0.05 rest; case "$rest" in "[200~") pasting=1 ;; "[201~") pasting=0 ;; esac ;;
+      $'\x18') ;;
+      $'\x13') inject_now=1 ;;
+      "")
+        if [ $pasting = 1 ]; then buf="$buf"$'\n'; draw
+        elif [ -n "$buf" ]; then
+          held+=("$buf"); heldat+=("$(now)")
+          printf '{"type":"queue-operation","operation":"enqueue","content":"%s","timestamp":"%s","sessionId":"%s"}\n' "$(json "$buf")" "$(now)" "$sid" >> "$transcript"
+          buf=""; draw
+        fi ;;
+      *) buf="$buf$ch"; draw ;;
+    esac
+  done
+}
+deliver_held() {
+  local i
+  for i in "${!held[@]}"; do
+    printf '{"type":"queue-operation","operation":"remove","content":"%s","timestamp":"%s","sessionId":"%s"}\n' "$(json "${held[$i]}")" "$(now)" "$sid" >> "$transcript"
+    printf '{"type":"attachment","attachment":{"type":"queued_command","prompt":"%s","commandMode":"prompt","timestamp":"%s"},"uuid":"q-%s-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$(json "${held[$i]}")" "${heldat[$i]}" "$RANDOM" "$i" "$(now)" "$sid" "$cwd" >> "$transcript"
+  done
+}
 turn() {
   text=$(json "$1"); n=$RANDOM
   printf '{"type":"user","message":{"role":"user","content":"%s"},"uuid":"u-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$text" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
   echo "{\"session_id\":\"$sid\",\"prompt\":\"$text\"}" | hook prompt-submit
-  sleep 1
-  # A message asking for a long task keeps the agent working for a while.
-  case "$1" in *long*) sleep 20 ;; esac
+  held=(); heldat=(); inject_now=0
+  # A message asking for a long task runs a tool for a while: its call stands in the transcript without a result.
+  case "$1" in *long*) long=1 ;; *) long=0 ;; esac
+  if [ $long = 0 ]; then wait_for 1000; fi
   printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_%s","name":"Bash","input":{"command":"ls -la","description":"List files"}}]},"uuid":"t-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
-  sleep 0.5
-  printf '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%s","content":"total 0"}]},"uuid":"r-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  if [ $long = 1 ]; then wait_for 20000; else wait_for 500; fi
+  out='total 0'
+  case "$1" in *references*) out='total 0\nfixtures: https://gitlab.example.test/team/admin/-/merge_requests/502' ;; esac
+  printf '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_%s","content":"%s"}]},"uuid":"r-%s","timestamp":"%s","sessionId":"%s","cwd":"%s"}\n' "$n" "$out" "$n" "$(now)" "$sid" "$cwd" >> "$transcript"
+  deliver_held
   reply="Fake agent reply: $1"
+  for h in "${held[@]}"; do reply="$reply"$'\n\n'"Fake agent reply: $h"; done
+  # Asked for links, it answers with a document and a merge request, as an agent reports its work.
+  # Asked for its references, it names a task, a site and, in a folder of many repositories, merge requests by their
+  # project («model-gateway !104», «harnessly !80» that two projects have) and one that no project has (!999); a
+  # link a tool printed (the grep) does not make a merge request of anyone.
+  case "$1" in *references*) reply="Fake agent reply: ABC-12 is done, notes at https://example.com/notes. Merged model-gateway !104 and harnessly !80, !999 and !502 are typos." ;; esac
+  case "$1" in *links*) reply="Fake agent reply: see [the release notes](https://docs.example.com/notes) and https://gitlab.com/acme/app/-/merge_requests/7" ;; esac
   # Asked to draw, it does what the boards and artifacts skills do with the environment the runtime gave it: a board
   # from a graph and a document of this conversation, and it answers with their links.
   case "$1" in *draw*)
@@ -59,11 +104,34 @@ turn() {
   sleep 0.3
   echo "{\"session_id\":\"$sid\"}" | hook stop
 }
+# A terminal like Claude Code's: an input box under a rule, what is typed shows in it (the tty does not echo), Enter
+# submits it and the box is busy for the turn. A pasted text (bracketed paste) keeps its line breaks, as the real one does.
+rule=$(printf '─%.0s' $(seq 1 80)); buf=""; shown=""; pasting=0; busy=0
+draw() {
+  printf '\033[H\033[2J'
+  printf '  Claude Code v2.1.99\n  fake claude ready %s\n\n' "$sid"
+  [ -n "$shown" ] && printf '%s\n' "$shown"
+  [ $busy = 1 ] && printf '\n✻ Working… (esc to interrupt)\n'
+  printf '\n%s\n❯ %s\n%s\n  ? for shortcuts\n' "$rule" "$buf" "$rule"
+}
+stty -echo 2>/dev/null
 sleep 0.5
 echo "{\"session_id\":\"$sid\"}" | hook session-start
-echo "fake claude ready $sid"
-[ -n "$prompt" ] && turn "$prompt"
-while IFS= read -r line; do
-  line=$(printf '%s' "$line" | sed 's/\x1b\[20[01]~//g' | tr -d '\r')
-  [ -n "$line" ] && turn "$line"
+draw
+run() { busy=1; shown=""; draw; turn "$1"; busy=0; shown="● Fake agent reply: $1"; draw; }
+[ -n "$prompt" ] && run "$prompt"
+while IFS= read -rsn1 ch; do
+  # Ctrl+D ends the session, as it does in the real one.
+  [ "$ch" = $'\004' ] && exit 0
+  if [ "$ch" = $'\e' ]; then
+    IFS= read -rsn5 -t 0.05 rest
+    case "$rest" in "[200~") pasting=1 ;; "[201~") pasting=0 ;; esac
+    continue
+  fi
+  if [ -z "$ch" ]; then
+    if [ $pasting = 1 ]; then buf="$buf"$'\n'; draw; continue; fi
+    if [ -n "$buf" ]; then line="$buf"; buf=""; run "$line"; fi
+    continue
+  fi
+  buf="$buf$ch"; draw
 done

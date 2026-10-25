@@ -17,6 +17,7 @@ licences are kept in `node_modules/<package>/LICENSE`; `pnpm licenses list --pro
 | @git-diff-view/react, @git-diff-view/core                                      | MIT                                                                         |
 | highlight.js, lowlight                                                         | BSD-3-Clause, MIT                                                           |
 | echarts, zrender                                                               | Apache-2.0, BSD-3-Clause                                                    |
+| mermaid and its d3, dagre, cytoscape and khroma dependencies (diagrams)        | MIT, ISC, BSD-3-Clause, Apache-2.0                                          |
 | web-vitals                                                                     | Apache-2.0                                                                  |
 | @huggingface/transformers, onnxruntime-web (speech recognition in the browser) | Apache-2.0, MIT                                                             |
 | react-icons (brand marks from Simple Icons)                                    | MIT (icons CC0-1.0)                                                         |

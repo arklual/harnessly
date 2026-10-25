@@ -117,6 +117,9 @@ func (l launchLines) Launch(provider, ws string, launch *agents.Launch, files []
 func (l launchLines) Resume(provider, sid, ws string, launch *agents.Launch) (string, error) {
 	return l.a.ResumeLine(provider, sid, ws, launch)
 }
+func (l launchLines) Fork(provider, sid, ws string, launch *agents.Launch) (string, error) {
+	return l.a.ForkLine(provider, sid, ws, launch)
+}
 
 type inboxTmux struct{ c *core }
 
@@ -217,6 +220,12 @@ func (c *core) launchRoutes(f *gate.Gate, d deps, isMachineAgent func(*http.Requ
 				return nil, errCoreOff
 			}
 			return c.agents.CodexArgs(ws, resume, l)
+		},
+		CodexForkArgs: func(ws, session string, l *agents.Launch) ([]string, error) {
+			if c.agents == nil {
+				return nil, errCoreOff
+			}
+			return c.agents.CodexForkArgs(ws, session, l)
 		},
 		EvalRuns: filepath.Join(c.cfg.DataDir, "eval", "runs"), EvalRunner: lc.EvalRunner, Node: lc.Node,
 		SideChatRuntime: lc.SideChatRuntime,

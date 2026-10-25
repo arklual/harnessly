@@ -1,0 +1,8 @@
+# Paths of the internal tree that tools/oss-export.sh leaves out of the public one: git pathspecs, one per line,
+# matched as globs from the repository root (a directory drops everything under it). Blank lines and # comments skip.
+
+# Working plans and specs of the team: they name people, machines and dates of the internal work.
+docs/superpowers
+
+# The internal names the leak check refuses; publishing the list would publish the names.
+tools/oss-forbidden.txt

@@ -753,7 +753,7 @@ func (p *Proxy) deliver(w *trackedWriter, r *http.Request, c *Claim, rt *route, 
 	var out io.Writer = pacer
 	var closers []io.Closer
 	if plan.encode != "" {
-		enc := encoderFor(plan.encode, out)
+		enc := encoderFor(plan.encode, out, a.headers.Get("content-type"))
 		out, closers = enc, append(closers, enc)
 	}
 	if bridge {

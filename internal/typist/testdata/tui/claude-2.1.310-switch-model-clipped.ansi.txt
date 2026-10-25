@@ -1,0 +1,14 @@
+
+[38;5;246m[48;5;237m❯ [38;5;231mReply with just the word ok, no tools.[39m
+
+[38;5;231m[49m●[39m ok
+
+[38;5;246m✻[39m [38;5;246mCrunched for 2s · done 9:46 PM[39m
+[38;5;153m▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+[39m   [1m[38;5;220mSwitch model?[0m
+   [38;5;246mYour next response will be slower and use more tokens[39m
+
+   This conversation is cached for the current model. Switching to [1mOpus 5.5[0m means the full history gets re-read on your next message.
+
+   [38;5;153m❯[39m [38;5;246m1. [38;5;153mYes, switch to Opus 5.5[39m
+

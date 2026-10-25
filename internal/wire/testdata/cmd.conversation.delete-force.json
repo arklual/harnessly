@@ -1,0 +1,5 @@
+{
+  "op": "conversation.delete",
+  "body": {"opId": "op-del2", "id": "tab-k3Jx9QmZ", "force": true},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1852}
+}

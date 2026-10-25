@@ -26,6 +26,7 @@ import (
 	"github.com/creack/pty"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/sameorigin"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 )
 
@@ -124,6 +125,9 @@ func queryInt(r *http.Request, name string) int {
 
 // Handle upgrades an already authenticated request for `?session=` and serves it until either side closes.
 func (s *Server) Handle(w http.ResponseWriter, r *http.Request) {
+	if sameorigin.Refuse(w, r) {
+		return
+	}
 	session := r.URL.Query().Get("session")
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true, CompressionMode: websocket.CompressionDisabled})
 	if err != nil {
@@ -510,6 +514,9 @@ func (s *Server) find(session string) *conn {
 	}
 	return nil
 }
+
+// Attached: a page has the session's terminal open now.
+func (s *Server) Attached(session string) bool { return s.find(session) != nil }
 
 // Size is the size the page gave the session's terminal.
 func (s *Server) Size(session string) (cols, rows int, ok bool) {

@@ -1,0 +1,4 @@
+{
+  "http": "hello",
+  "response": {"proto": 2, "version": "1.82.0", "features": ["queue", "steer", "questions", "files"]}
+}

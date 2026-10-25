@@ -311,6 +311,12 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 	case "docs.notify":
 		res, err := a.callRuntime(route("docs/notify"), body(req))
 		return res, nil, err
+	case "design.access":
+		res, err := a.callRuntime(route("design/access"), body(req))
+		return res, nil, err
+	case "design.notify":
+		res, err := a.callRuntime(route("design/notify"), body(req))
+		return res, nil, err
 	case "eval.start":
 		res, err := a.callRuntime(route("eval/start"), body(req))
 		return res, nil, err

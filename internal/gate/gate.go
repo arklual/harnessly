@@ -33,9 +33,7 @@ type Config struct {
 	Version string
 	// CountEvery is how often the paths still handed to the old runtime are logged.
 	CountEvery time.Duration
-	// RecordFile, when set, gets every request through the gate as a JSON line (credentials left out), for replay.
-	RecordFile string
-	// TokenHeaders name the headers that carry a token; their values are never recorded.
+	// TokenHeaders name the headers that carry the runtime's cli-token.
 	TokenHeaders []string
 }
 
@@ -48,7 +46,6 @@ func LoadConfig() (Config, error) {
 		Version:    os.Getenv("AGENT_VERSION"),
 		CountEvery: 10 * time.Minute,
 	}
-	c.RecordFile = os.Getenv("RUNTIME_GATE_RECORD")
 	for _, h := range strings.Split(os.Getenv("RUNTIME_CLI_TOKEN_HEADERS"), ",") {
 		if h = strings.TrimSpace(h); h != "" {
 			c.TokenHeaders = append(c.TokenHeaders, h)
@@ -128,12 +125,8 @@ type Gate struct {
 
 	countMu sync.Mutex
 	counts  map[string]*pathCount
-	shadows shadowStats
 
-	handover *handover
-	recorder *recorder
-	refresh  *SessionRefresh
-	tokens   map[string]bool
+	refresh *SessionRefresh
 	// fallback answers, on a standalone gate, what no route took.
 	fallback http.Handler
 }
@@ -151,20 +144,8 @@ func New(cfg Config, routes ...Route) (*Gate, error) {
 		return nil, err
 	}
 	f := &Gate{cfg: cfg, slices: NewSlices(cfg.DataDir), routes: routes, counts: map[string]*pathCount{},
-		shadows: shadowStats{matched: map[string]int{}, differ: map[string]int{}}, handover: newHandover(), tokens: map[string]bool{},
 		fallback: http.HandlerFunc(notFound)}
 	f.slices.all = cfg.Standalone()
-	for _, h := range cfg.TokenHeaders {
-		f.tokens[strings.ToLower(h)] = true
-	}
-	if cfg.RecordFile != "" {
-		rec, err := newRecorder(cfg.RecordFile)
-		if err != nil {
-			return nil, err
-		}
-		f.recorder = rec
-		agent.Log("info", "recording every request", agent.F{K: "file", V: cfg.RecordFile})
-	}
 	f.proxy = &httputil.ReverseProxy{
 		// A page opens a few dozen requests at once, all to the same old runtime on loopback: keep enough connections
 		// open that none waits for a new one, and pass bodies through as they are (no compression on this hop).
@@ -243,17 +224,12 @@ func (f *Gate) Add(routes ...Route) { f.routes = append(f.routes, routes...) }
 
 func (f *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.withCLIHint(w, r, func(w http.ResponseWriter, r *http.Request) {
-		if f.recorder != nil {
-			f.recorder.wrap(w, r, f.tokens, f.serve)
-			return
-		}
 		f.serve(w, r)
 	})
 }
 
 // serve answers r; true when a Go route did.
 func (f *Gate) serve(w http.ResponseWriter, r *http.Request) bool {
-	r = canonical(r)
 	for _, route := range f.routes {
 		if route.Match(r) && (route.Slice == "" || f.slices.On(route.Slice)) {
 			// A shadow's answer is the old runtime's, which refreshes the session itself.
@@ -269,8 +245,6 @@ func (f *Gate) serve(w http.ResponseWriter, r *http.Request) bool {
 		f.count(r.URL.Path, 0, true)
 		return false
 	}
-	done := f.trackProxied(r)
-	defer done()
 	start := time.Now()
 	f.proxy.ServeHTTP(w, r)
 	// An upgraded socket lasts as long as the page keeps it: only its count says anything.
@@ -314,9 +288,6 @@ func (f *Gate) count(path string, took time.Duration, upgrade bool) {
 // LogCounts writes, and resets, which paths went to the old runtime, how often and how long they took: the day it stays
 // empty the old runtime can go, and until then it shows what the hop costs.
 func (f *Gate) LogCounts() {
-	if matched, differ := f.shadows.take(); len(matched)+len(differ) > 0 {
-		agent.Log("info", "shadow answers compared", agent.F{K: "matched", V: matched}, agent.F{K: "differ", V: differ})
-	}
 	f.countMu.Lock()
 	counts := f.counts
 	f.counts = map[string]*pathCount{}
@@ -368,3 +339,6 @@ func (f *Gate) Proxy(w http.ResponseWriter, r *http.Request) {
 	f.proxy.ServeHTTP(w, r)
 	f.count(r.URL.Path, time.Since(start), false)
 }
+
+// SliceOn is whether a slice is switched on (every one but the shadows on a standalone gate).
+func (f *Gate) SliceOn(slice string) bool { return f.slices.On(slice) }

@@ -1,0 +1,5 @@
+{
+  "op": "conversation.rename",
+  "body": {"opId": "op-t1", "id": "tab-k3Jx9QmZ", "title": "Контракт v2"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1843, "rev": 16}
+}

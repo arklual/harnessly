@@ -1,0 +1,1761 @@
+/* The new interface's sidebar: brand, actions, pinned, projects, day groups, chat rows and their menu,
+   the person and the machine, the rail and the phone drawer. Rules from the design, then the parts it leaves to script. */
+
+/* ── From the design ── */
+.hx-slot-in {
+  animation: hx-slot-in var(--hx-dur-md) var(--hx-ease-out) both;
+}
+.hx-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  min-height: 0;
+  padding: var(--hx-space-4) var(--hx-space-3);
+}
+.hx-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  height: 44px;
+  padding: 0 var(--hx-space-1) 0 var(--hx-space-2);
+}
+.hx-orb {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  flex: none;
+  cursor: pointer;
+  transition: transform var(--hx-dur-md) var(--hx-ease-spring);
+}
+.hx-orb:hover {
+  transform: scale(1.12) rotate(-10deg);
+}
+.hx-brand__name {
+  font-size: var(--hx-text-lg);
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.01em;
+}
+.hx-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-nav__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 33px;
+  padding: 0 var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--hx-dur-sm);
+}
+.hx-nav__item .hx-icon {
+  color: var(--hx-fg-2);
+  transition: transform var(--hx-dur-sm) var(--hx-ease-spring);
+}
+.hx-nav__item:hover {
+  background: var(--hx-shell-hover);
+}
+.hx-nav__item:hover .hx-icon {
+  transform: scale(1.12);
+}
+.hx-nav__item[aria-current='page'] {
+  background: var(--hx-shell-active);
+}
+.hx-nav__label {
+  flex: 1;
+  min-width: 0;
+}
+.hx-nav__chev {
+  color: var(--hx-fg-3);
+  opacity: 0;
+  transition:
+    transform 420ms var(--hx-ease-out),
+    opacity 300ms var(--hx-ease-out);
+}
+.hx-nav__item:hover .hx-nav__chev,
+.hx-project:hover .hx-nav__chev {
+  opacity: 1;
+}
+.hx-nav__group[aria-expanded='true'] .hx-nav__chev {
+  transform: rotate(90deg);
+}
+.hx-nav__add {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--hx-fg-3);
+  opacity: 0;
+  transition:
+    opacity 300ms var(--hx-ease-out),
+    background var(--hx-dur-sm),
+    color var(--hx-dur-sm);
+}
+.hx-group__label:hover .hx-nav__add {
+  opacity: 1;
+}
+.hx-nav__add:hover {
+  background: var(--hx-shell-hover);
+  color: var(--hx-fg-1);
+}
+.hx-nav__kids {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 460ms var(--hx-ease-out);
+}
+.hx-nav__kids > div {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-left: 16px;
+  padding-left: 10px;
+  border-left: 1px solid var(--hx-border-strong);
+}
+.hx-nav__group[aria-expanded='true'] .hx-nav__kids {
+  grid-template-rows: 1fr;
+}
+.hx-nav__kid {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  height: 29px;
+  padding: 0 var(--hx-space-2);
+  border-radius: var(--hx-radius-sm);
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 300ms var(--hx-ease-out),
+    background var(--hx-dur-sm),
+    color var(--hx-dur-sm);
+}
+.hx-nav__kid:hover {
+  background: var(--hx-shell-hover);
+  color: var(--hx-fg-1);
+}
+.hx-nav__kid .hx-item__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-nav__group[aria-expanded='true'] .hx-nav__kid {
+  opacity: 1;
+  transition-delay: calc(60ms + var(--j, 0) * 30ms), 0s, 0s;
+}
+/* The design's --j cascade, by place: the rows come in one after another. */
+.hx-nav__kid:nth-child(2) {
+  --j: 1;
+}
+.hx-nav__kid:nth-child(3) {
+  --j: 2;
+}
+.hx-nav__kid:nth-child(4) {
+  --j: 3;
+}
+.hx-nav__kid:nth-child(5) {
+  --j: 4;
+}
+.hx-nav__kid:nth-child(6) {
+  --j: 5;
+}
+.hx-nav__kid:nth-child(7) {
+  --j: 6;
+}
+.hx-nav__kid:nth-child(8) {
+  --j: 7;
+}
+.hx-nav__kid:nth-child(n + 9) {
+  --j: 8;
+}
+.hx-sidebar__list > .hx-group__label:first-child {
+  padding-top: var(--hx-space-2);
+}
+.hx-sidebar__list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.hx-project__icon {
+  width: 15px;
+  height: 15px;
+  color: var(--hx-fg-3);
+}
+.hx-item.hx-project {
+  gap: 7px;
+}
+.hx-group__label {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-3) var(--hx-space-2) var(--hx-space-1);
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  user-select: none;
+}
+.hx-group__label .hx-group__chev {
+  margin-left: auto;
+  opacity: 0;
+  transition:
+    transform var(--hx-dur-sm) var(--hx-ease-out),
+    opacity var(--hx-dur-sm);
+}
+.hx-group__label:hover .hx-group__chev {
+  opacity: 1;
+}
+.hx-group[aria-expanded='false'] .hx-group__chev {
+  transform: rotate(-90deg);
+  opacity: 1;
+}
+.hx-group__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--hx-dur-md) var(--hx-ease-out),
+    opacity var(--hx-dur-sm);
+}
+.hx-group__body > div {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.hx-group[aria-expanded='false'] .hx-group__body {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.hx-item {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: 30px;
+  padding: 0 var(--hx-space-2);
+  border-radius: var(--hx-radius-sm);
+  color: var(--hx-fg-1);
+  cursor: pointer;
+  font-size: var(--hx-text-sm);
+  transition:
+    background var(--hx-dur-sm),
+    color var(--hx-dur-sm);
+}
+.hx-item:hover {
+  background: var(--hx-shell-hover);
+}
+.hx-item[aria-current='page'] {
+  background: var(--hx-shell-active);
+  box-shadow: var(--hx-shadow-sm);
+}
+/* A chat whose agent has no terminal running is quieter; pointed at or open it reads as any other. */
+.hx-item[data-terminal='off'] {
+  color: var(--hx-fg-3);
+}
+.hx-item[data-terminal='off']:hover,
+.hx-item[data-terminal='off'][aria-current='page'],
+.hx-item[data-terminal='off'][data-menu='true'] {
+  color: var(--hx-fg-1);
+}
+.hx-item__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-item__end {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -4px;
+  flex: none;
+}
+.hx-item__end > * {
+  grid-area: 1 / 1;
+}
+.hx-item__more {
+  opacity: 0;
+  transform: scale(0.8);
+  color: var(--hx-fg-3);
+  transition:
+    opacity 220ms var(--hx-ease-out),
+    transform 260ms var(--hx-ease-out),
+    background 160ms ease-out,
+    color 160ms ease-out;
+}
+.hx-item:hover .hx-item__more {
+  opacity: 1;
+  transform: none;
+}
+.hx-item:hover .hx-item__end:has(.hx-item__more) .hx-chat-status {
+  opacity: 0;
+  transform: scale(0.8);
+}
+.hx-chat-status {
+  transition:
+    opacity 220ms var(--hx-ease-out),
+    transform 260ms var(--hx-ease-out);
+  animation: hx-status-in 420ms var(--hx-ease-out) backwards;
+}
+.hx-chat-status[data-status='none'] {
+  display: none;
+}
+.hx-chat-status[data-status='thinking'] {
+  color: var(--hx-accent);
+  animation: hx-spin 1.1s linear infinite;
+}
+.hx-chat-status[data-status='background'] {
+  color: var(--hx-fg-3);
+  animation: hx-spin 2.4s linear infinite;
+}
+.hx-chat-status[data-status='question'] {
+  color: var(--hx-warning);
+}
+/* A finished answer the person has not read: one accent dot. A read one has no mark at all. */
+.hx-item .hx-chat-status[data-status='done'] {
+  color: var(--hx-accent);
+  -webkit-mask: radial-gradient(circle at center, #000 3.5px, transparent 4px);
+  mask: radial-gradient(circle at center, #000 3.5px, transparent 4px);
+}
+.hx-item[data-status='done'] .hx-item__title {
+  font-weight: var(--hx-weight-medium);
+}
+[data-status='thinking'] > .hx-item__title {
+  background: linear-gradient(
+      90deg,
+      var(--hx-fg-2) 0%,
+      var(--hx-fg-2) 35%,
+      var(--hx-fg-1) 50%,
+      var(--hx-fg-2) 65%,
+      var(--hx-fg-2) 100%
+    )
+    0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hx-title-shimmer 2.4s linear infinite;
+}
+.hx-user {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-2);
+  border-radius: var(--hx-radius-md);
+  transition: background var(--hx-dur-sm);
+}
+.hx-user:hover {
+  background: var(--hx-shell-hover);
+}
+.hx-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-user__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-user__name {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-avatar__sk {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+.hx-user__sk {
+  width: 72px;
+  height: 14px;
+}
+.hx-machine {
+  position: relative;
+  outline: none;
+}
+.hx-machine__chip {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--hx-fg-3);
+  cursor: default;
+  transition:
+    background 240ms var(--hx-ease-out),
+    color 240ms var(--hx-ease-out);
+}
+.hx-machine__chip:hover,
+.hx-machine__chip:focus-visible,
+.hx-machine[data-hover='true'] .hx-machine__chip {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-machine__dot {
+  position: absolute;
+  right: 6px;
+  bottom: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hx-success);
+  box-shadow: 0 0 0 2px var(--hx-bg-window);
+}
+.hx-machine[data-health='warn'] .hx-machine__dot {
+  background: var(--hx-warning);
+}
+.hx-machine[data-health='bad'] .hx-machine__dot {
+  background: var(--hx-danger);
+}
+.hx-machine[data-health='warn'] .hx-machine__dot::after,
+.hx-machine[data-health='bad'] .hx-machine__dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  color: var(--hx-warning);
+  animation: hx-rec-ring 2.2s var(--hx-ease-out) infinite;
+}
+.hx-machine__pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: 300px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--hx-border),
+    0 18px 48px rgba(12, 14, 34, 0.14);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.97);
+  transform-origin: top right;
+  filter: blur(2px);
+  transition:
+    opacity 180ms var(--hx-ease-out),
+    transform 260ms var(--hx-ease-out),
+    filter 260ms var(--hx-ease-out),
+    visibility 0s linear 260ms;
+}
+.hx-machine__pop::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -10px;
+  height: 10px;
+}
+.hx-machine[data-hover='true'] .hx-machine__pop {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  filter: none;
+  transition:
+    opacity 240ms var(--hx-ease-out),
+    transform 420ms var(--hx-ease-out),
+    filter 420ms var(--hx-ease-out),
+    visibility 0s linear;
+}
+.hx-machine__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hx-machine__title {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-machine__issue {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: var(--hx-warning-soft);
+  font-size: var(--hx-text-xs);
+  line-height: 17px;
+  color: var(--hx-fg-1);
+}
+.hx-machine__issue .hx-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--hx-warning);
+}
+.hx-machine__issue b {
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-machine__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+.hx-machine__row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 6px;
+  font-size: var(--hx-text-xs);
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 300ms var(--hx-ease-out);
+}
+.hx-machine[data-hover='true'] .hx-machine__row {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(180ms + var(--j) * 45ms);
+}
+.hx-machine__row > .hx-icon {
+  color: var(--hx-fg-3);
+}
+.hx-machine__label {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-2);
+}
+.hx-machine__bar {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--hx-bg-active);
+  overflow: hidden;
+}
+.hx-machine__bar i {
+  display: block;
+  width: calc(var(--v) * 100%);
+  height: 100%;
+  border-radius: 2px;
+  background: var(--hx-fg-3);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 200ms var(--hx-ease-out);
+}
+.hx-machine[data-hover='true'] .hx-machine__bar i {
+  transform: none;
+  transition: transform 800ms var(--hx-ease-out) calc(240ms + var(--j) * 60ms);
+}
+.hx-machine__val {
+  grid-column: 3;
+  grid-row: 1;
+  color: var(--hx-fg-1);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hx-machine__row[data-tone='warn'] .hx-machine__bar i {
+  background: var(--hx-warning);
+}
+.hx-machine__row[data-tone='warn'] .hx-machine__val,
+.hx-machine__row[data-tone='warn'] > .hx-icon {
+  color: var(--hx-warning);
+}
+.hx-machine__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hx-border);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--hx-fg-3);
+}
+.hx-machine__foot > span {
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .hx-sidebar {
+    display: none;
+  }
+}
+.hx-nav__kid-icon {
+  color: var(--hx-fg-3);
+  transition: color var(--hx-dur-sm);
+}
+.hx-nav__kid:hover .hx-nav__kid-icon {
+  color: var(--hx-fg-1);
+}
+.hx-sidebar {
+  overflow: hidden;
+}
+.hx-sidebar__list {
+  overflow-x: hidden;
+}
+.hx-nav__label,
+.hx-brand__name,
+.hx-user__name {
+  white-space: nowrap;
+}
+.hx-nav__label,
+.hx-brand__name,
+.hx-item__title,
+.hx-user__text,
+.hx-brand__close,
+.hx-nav__item .hx-nav__chev,
+.hx-item__end,
+.hx-group__label > * {
+  transition: opacity 260ms ease 120ms;
+}
+.hx-group__label {
+  position: relative;
+  transition: color 260ms ease 120ms;
+}
+.hx-group__label::before {
+  content: '';
+  position: absolute;
+  left: var(--hx-space-2);
+  top: calc(50% + 4px);
+  width: 18px;
+  height: 1px;
+  background: var(--hx-border-strong);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.hx-brand {
+  transition: padding var(--hx-side-dur) var(--hx-side-ease);
+}
+.hx-brand__mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.hx-brand__open {
+  position: absolute;
+  inset: -5px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease,
+    background var(--hx-dur-sm),
+    color var(--hx-dur-sm);
+}
+.hx-brand__open:hover {
+  background: var(--hx-shell-hover);
+  color: var(--hx-fg-1);
+}
+.hx-orb {
+  transition:
+    transform var(--hx-dur-md) var(--hx-ease-spring),
+    opacity 200ms ease;
+}
+.hx-mono {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 5px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+  font-size: 11px;
+  font-weight: var(--hx-weight-semibold);
+  line-height: 1;
+}
+.hx-pinned > .hx-mono {
+  width: 0;
+  margin-right: calc(-1 * var(--hx-space-2));
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    width var(--hx-side-dur) var(--hx-side-ease),
+    margin var(--hx-side-dur) var(--hx-side-ease),
+    opacity 200ms ease;
+}
+.hx-project__mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 18px;
+  flex: none;
+  transition: width var(--hx-side-dur) var(--hx-side-ease);
+}
+.hx-project__mark > * {
+  grid-area: 1 / 1;
+  transition: opacity 220ms ease;
+}
+.hx-project__mark > .hx-mono {
+  opacity: 0;
+}
+.hx-user {
+  transition:
+    padding var(--hx-side-dur) var(--hx-side-ease),
+    background var(--hx-dur-sm);
+}
+.hx-railtip {
+  position: fixed;
+  left: var(--x, 0);
+  top: var(--y, 0);
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  box-shadow: 0 8px 24px rgba(12, 14, 34, 0.18);
+  font-size: 12px;
+  font-weight: var(--hx-weight-medium);
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-4px, -50%) scale(0.98);
+  transform-origin: left center;
+  transition:
+    opacity 120ms ease,
+    transform 180ms var(--hx-ease-out);
+}
+.hx-railtip[data-show='true'] {
+  opacity: 1;
+  transform: translate(0, -50%) scale(1);
+  transition:
+    opacity 160ms ease 120ms,
+    transform 220ms var(--hx-ease-out) 120ms,
+    top 160ms var(--hx-ease-out);
+}
+.hx-railtip[data-kbd='true'] {
+  padding-right: 6px;
+}
+.hx-railtip__kbd {
+  display: none;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--hx-primary-fg) 16%, transparent);
+  font-family: var(--hx-font-ui);
+  font-size: 11px;
+}
+.hx-railtip[data-kbd='true'] .hx-railtip__kbd {
+  display: inline-grid;
+}
+@media (max-width: 900px) {
+  .hx-railtip {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-brand,
+  .hx-user,
+  .hx-railtip,
+  .hx-pinned > .hx-mono,
+  .hx-project__mark {
+    transition: none;
+  }
+}
+.hx-user {
+  position: relative;
+}
+.hx-user .hx-machine {
+  position: static;
+  flex: none;
+}
+.hx-user .hx-machine__chip {
+  width: 30px;
+  height: 30px;
+}
+.hx-user .hx-machine__dot {
+  right: 4px;
+  bottom: 5px;
+  box-shadow: 0 0 0 2px var(--hx-bg-shell, var(--hx-bg-app));
+}
+.hx-user .hx-machine__pop {
+  top: auto;
+  right: auto;
+  left: 0;
+  bottom: calc(100% + 8px);
+  transform: translateY(6px) scale(0.97);
+  transform-origin: 24px 100%;
+}
+.hx-user .hx-machine__pop::before {
+  top: auto;
+  bottom: -10px;
+}
+.hx-user .hx-machine[data-hover='true'] .hx-machine__pop {
+  transform: none;
+}
+.hx-avatar {
+  position: relative;
+}
+.hx-user .hx-machine__pop {
+  right: 0;
+  width: auto;
+  padding: 12px;
+}
+.hx-sbsk {
+  animation: hx-sk-in 320ms ease 150ms backwards;
+}
+.hx-sbsk {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--hx-space-2);
+}
+.hx-sbsk__label {
+  width: 76px;
+  height: 9px;
+  margin: 18px 0 10px;
+  border-radius: 5px;
+  opacity: 0.7;
+}
+.hx-sbsk__row {
+  width: 80%;
+  height: 12px;
+  margin: 9px 0;
+  border-radius: 6px;
+}
+.hx-sbsk__row:nth-child(3n) {
+  width: 62%;
+}
+.hx-sbsk__row:nth-child(4n) {
+  width: 72%;
+}
+.hx-nav__ic {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+.hx-nav__dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hx-accent);
+  box-shadow: 0 0 0 2px var(--hx-bg-side, var(--hx-bg-app));
+  animation: hx-plus-in 200ms var(--hx-ease-out) backwards;
+}
+.hx-user:hover {
+  background: none;
+}
+.hx-user__open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  margin: calc(-1 * var(--hx-space-2));
+  padding: var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--hx-dur-sm);
+}
+.hx-user__open:hover,
+.hx-user__open[data-popup-open] {
+  background: var(--hx-shell-hover);
+}
+.hx-user__open[aria-current='page'] {
+  background: var(--hx-bg-active);
+}
+.hx-machine__chip {
+  cursor: pointer;
+}
+.hx-machine[data-open='true'] .hx-machine__chip {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-user .hx-machine[data-open='true'] .hx-machine__pop {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  filter: none;
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 320ms var(--hx-ease-out),
+    visibility 0s;
+}
+.hx-machine[data-open='true'] .hx-machine__row {
+  opacity: 1;
+  transform: none;
+}
+.hx-machine[data-open='true'] .hx-machine__bar i {
+  transform: none;
+}
+.hx-machine__more {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.hx-machine[data-open='true'] .hx-machine__more {
+  display: none;
+}
+.hx-user .hx-machine__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-machine__others {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 360ms var(--hx-ease-out);
+}
+.hx-machine[data-open='true'] .hx-machine__others {
+  grid-template-rows: 1fr;
+}
+.hx-machine__others-in {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.hx-machine[data-open='true'] .hx-machine__others-in {
+  opacity: 1;
+  transition-delay: 100ms;
+}
+.hx-machine__others-label {
+  margin-top: 12px;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--hx-border);
+  color: var(--hx-fg-3);
+  font-size: 11px;
+}
+.hx-machine__other {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  width: calc(100% + 12px);
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-machine__other:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-machine__other[aria-disabled='true'] {
+  cursor: default;
+  color: var(--hx-fg-3);
+}
+.hx-machine__other[aria-disabled='true']:hover {
+  background: none;
+}
+.hx-machine__odot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--hx-success);
+}
+.hx-machine__other[data-health='off'] .hx-machine__odot {
+  background: var(--hx-border-strong);
+}
+.hx-machine__oname {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--hx-weight-medium);
+}
+/* What is wrong with the machine, in a word or two; a machine that is fine says nothing, and the busy ring takes the
+   rest of the row. The name gives way first, so this never ends as a letter and an ellipsis. */
+.hx-machine__osub {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--hx-fg-3);
+}
+.hx-machine__osub:empty {
+  display: none;
+}
+.hx-machine__other .hx-machine__ospin {
+  display: none;
+  color: var(--hx-fg-3);
+  animation: hx-spin 800ms linear infinite;
+}
+.hx-machine__other[data-busy='true'] .hx-machine__ospin {
+  display: block;
+}
+.hx-machine__manage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin: 4px -6px 0;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+}
+.hx-machine__manage:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-chat-status:is([data-status='perm'], [data-status='plan']) {
+  color: var(--hx-warning);
+}
+.hx-item__menu {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+}
+.hx-item__menu:hover,
+.hx-item[data-menu='true'] .hx-item__menu {
+  background: color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+  color: var(--hx-fg-1);
+  opacity: 1;
+  transform: none;
+}
+.hx-item[data-menu='true'] .hx-chat-status {
+  opacity: 0;
+}
+.hx-item__rename {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border: 1px solid var(--hx-accent);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: inherit;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-accent) 16%, transparent);
+}
+.hx-nav__kid[data-go='true'] {
+  cursor: pointer;
+}
+.hx-nav__kid[aria-current='page'] {
+  color: var(--hx-fg-1);
+}
+button.hx-nav__add {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.hx-cmenu {
+  position: fixed;
+  top: var(--my);
+  left: var(--mx);
+  z-index: 120;
+  width: 236px;
+  padding: 5px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  transform-origin: 16px 0;
+  animation: hx-dl-pop-in 260ms var(--hx-ease-out) backwards;
+}
+.hx-cmenu[data-ending-style] {
+  animation: hx-dl-pop-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-cmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-cmenu__item > .hx-icon:first-child {
+  color: var(--hx-fg-2);
+}
+.hx-cmenu__item:hover,
+.hx-cmenu__item[data-highlighted] {
+  background: var(--hx-bg-hover);
+}
+.hx-cmenu__item[data-danger='true'],
+.hx-cmenu__item[data-danger='true'] > .hx-icon:first-child {
+  color: var(--hx-danger);
+}
+.hx-cmenu__txt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-cmenu__chev {
+  margin-left: auto;
+  color: var(--hx-fg-3);
+}
+.hx-cmenu__check {
+  margin-left: auto;
+  color: var(--hx-accent);
+  opacity: 0;
+}
+.hx-cmenu__item[aria-checked='true'] .hx-cmenu__check {
+  opacity: 1;
+}
+.hx-cmenu__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--hx-border);
+}
+.hx-cmenu__back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+}
+.hx-cmenu__ask {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px 4px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.hx-cmenu__ask span {
+  color: var(--hx-fg-2);
+}
+.hx-cmenu__row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 4px 4px;
+}
+.hx-cmenu__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.hx-cmenu__btn[data-danger='true'] {
+  background: var(--hx-danger);
+  color: #fff;
+}
+@media (hover: none) {
+  .hx-item__menu {
+    opacity: 1;
+    transform: none;
+  }
+  .hx-item:not([data-status='none']) .hx-item__menu:not(:hover) {
+    opacity: 0;
+  }
+  .hx-item[data-menu='true'] .hx-item__menu {
+    opacity: 1;
+  }
+}
+.hx-user__open[aria-current='page'] {
+  background: var(--hx-bg-active);
+  box-shadow: none;
+}
+.hx-cmenu__term {
+  display: none;
+}
+@media (hover: none) {
+  .hx-machine__pop {
+    filter: none !important;
+  }
+}
+@media (max-width: 900px) {
+  .hx-sidebar {
+    touch-action: pan-y pinch-zoom;
+  }
+  .hx-sidebar {
+    display: flex !important;
+    position: fixed;
+    z-index: 90;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(84vw, 320px);
+    padding-top: calc(var(--hx-space-4) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--hx-space-3) + env(safe-area-inset-bottom));
+    padding-left: calc(var(--hx-space-3) + env(safe-area-inset-left));
+    background: var(--hx-shell);
+    border-radius: 0 20px 20px 0;
+    box-shadow:
+      0 0 0 1px var(--hx-border),
+      0 24px 60px rgba(0, 0, 0, 0.18);
+    transform: translate3d(calc((var(--dw) - 1) * 100% - 1px), 0, 0);
+    transition: transform 340ms var(--hx-m-ease);
+    animation: none !important;
+    visibility: hidden;
+    overscroll-behavior: contain;
+  }
+  .hx-sidebar .hx-sidebar__list {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .hx-brand__open {
+    display: none;
+  }
+  .hx-sidebar :is(.hx-item, .hx-nav__item, .hx-nav__kid) {
+    min-height: 40px;
+  }
+  .hx-cmenu__item.hx-cmenu__term {
+    display: flex;
+  }
+  .hx-cmenu__sep.hx-cmenu__term {
+    display: block;
+  }
+}
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+  .hx-sidebar {
+    transition-duration: 1ms;
+    animation-duration: 1ms;
+  }
+}
+.hx-chat-status[data-status='failed'] {
+  color: var(--hx-danger);
+}
+.hx-chat-status[data-status='stopped'] {
+  color: var(--hx-fg-3);
+}
+.hx-chat-status[data-status='stalled'] {
+  color: var(--hx-warning);
+}
+.hx-machine[data-health='off'] .hx-machine__dot {
+  background: var(--hx-fg-3);
+}
+@keyframes hx-dl-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    filter: blur(4px);
+  }
+}
+@keyframes hx-dl-pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    filter: blur(2px);
+  }
+}
+@keyframes hx-plus-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+}
+@keyframes hx-rec-ring {
+  from {
+    opacity: 0.6;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+@keyframes hx-slot-in {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    max-height: 48px;
+  }
+}
+@keyframes hx-status-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes hx-title-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* ── Sidebar parts the design leaves to its prototype script ── */
+:where(.hx-app)
+  :where(
+    button.hx-item,
+    button.hx-group__label,
+    button.hx-nav__item,
+    button.hx-nav__kid,
+    button.hx-user__open
+  ) {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+/* The title is a button over the whole row; the end cell (status, «…») sits above it. */
+.hx-item {
+  position: relative;
+}
+.hx-item__open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  align-self: stretch;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-item__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.hx-item__open:focus-visible {
+  outline: 0;
+}
+.hx-item__open:focus-visible::after {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -2px;
+}
+.hx-item__end {
+  position: relative;
+  z-index: 1;
+}
+.hx-item__menu:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+.hx-item__end:has(.hx-item__menu:focus-visible) .hx-chat-status {
+  opacity: 0;
+}
+
+/* Waiting for the server: the row dims and its status turns into a spinner. */
+.hx-item[data-busy='true'] {
+  opacity: 0.6;
+}
+.hx-item[data-busy='true'] .hx-item__open {
+  cursor: progress;
+}
+.hx-chat-status[data-status='busy'] {
+  color: var(--hx-fg-3);
+  animation: hx-spin 900ms linear infinite;
+}
+.hx-chat-status[data-status='waiting-machine'] {
+  color: var(--hx-fg-3);
+}
+/* Held on the usage limit: a still clock, quiet — the agent is not at work and nothing waits for the person. */
+.hx-chat-status[data-status='limited'] {
+  color: var(--hx-fg-3);
+}
+
+.hx-group__chev {
+  margin-left: auto;
+  opacity: 0;
+  transition:
+    transform var(--hx-dur-sm) var(--hx-ease-out),
+    opacity var(--hx-dur-sm);
+}
+.hx-group__label:hover .hx-group__chev,
+.hx-group__label:focus-visible .hx-group__chev {
+  opacity: 1;
+}
+.hx-group[aria-expanded='false'] .hx-group__chev {
+  transform: rotate(-90deg);
+}
+.hx-group__label--static {
+  cursor: default;
+}
+.hx-group__label--static:hover .hx-nav__add {
+  opacity: 1;
+}
+.hx-sbsk__group {
+  display: flex;
+  flex-direction: column;
+}
+
+.hx-snote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2);
+  margin: var(--hx-space-2) 0;
+  padding: 0 var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-snote__retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-accent);
+  font: inherit;
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+}
+.hx-snote__retry:hover {
+  text-decoration: underline;
+}
+
+.hx-machine__chip:focus-visible,
+.hx-machine[data-hover='true'] .hx-machine__chip {
+  background: var(--hx-shell-hover);
+}
+.hx-machine__wait {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+
+/* The drawer's own close button: on the phone only, where the rail toggle has no place. */
+.hx-brand__drawer {
+  display: none;
+}
+@media (max-width: 900px) {
+  .hx-brand__drawer {
+    display: inline-flex;
+  }
+  .hx-brand__close {
+    display: none;
+  }
+}
+
+/* The menu's place comes from Base UI; the highlighted item is the one under the pointer or the keys. */
+.hx-cmenu__item[data-highlighted] {
+  outline: 0;
+}
+
+/* The person's name ends in an ellipsis: a long one does not run under the machine chip. */
+.hx-user__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A menu takes the width of its longest item, so «Back to the old interface» reads whole. */
+.hx-cmenu-pos > .hx-cmenu {
+  width: max-content;
+  min-width: 236px;
+  max-width: min(340px, var(--available-width));
+}
+
+/* ── Favorites, groups and the new chat of a project ── */
+
+/* A project's head is a row: the button that folds it, then «+» for a new chat in it. */
+.hx-project__open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  align-self: stretch;
+  gap: 7px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-project__open:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+  border-radius: var(--hx-radius-sm);
+}
+.hx-project__open .hx-nav__chev {
+  margin-left: 0;
+}
+button.hx-project__add {
+  flex: none;
+}
+.hx-project:hover .hx-project__add,
+.hx-project:focus-within .hx-project__add {
+  opacity: 1;
+}
+@media (hover: none) {
+  .hx-project__add {
+    opacity: 1;
+  }
+}
+.hx-app[data-side='closed'] .hx-project__add,
+.hx-app[data-side='closed'] .hx-favgroup .hx-item__end {
+  display: none;
+}
+
+/* The group's head is a project's: the folder, the name, «…» at the end that shows on hover. */
+.hx-favgroup .hx-item__end {
+  margin: -4px -4px -4px 0;
+}
+.hx-favgroup[data-busy='true'] {
+  opacity: 0.6;
+}
+.hx-favs__hint {
+  margin-top: var(--hx-space-1);
+}
+.hx-favs > .hx-nav__group {
+  display: block;
+}
+
+/* Carrying a chat or a group (ui/use-drag, ui.css): the row itself follows the pointer, its neighbours step aside, a
+   place elsewhere (a group, a project, the recent chats) lights up. */
+[data-drag] {
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+}
+.hx-sidebar__list[data-dragging] {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grabbing;
+}
+.hx-sidebar__list[data-dragging] :is(.hx-item, .hx-item__open, .hx-project__open, .hx-group__label) {
+  cursor: grabbing;
+}
+.hx-sidebar__list[data-dragging] .hx-item:hover:not([data-dragging]) {
+  background: none;
+}
+.hx-sidebar__list[data-dragging] .hx-item__more {
+  opacity: 0;
+}
+/* The carried row is a card lifted off the list: the same row on the raised colour, a shadow under it. */
+.hx-sidebar__list [data-dragging='true'] {
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-md);
+}
+
+/* A container takes the drop: the whole project or group, the favorites, the recent chats. */
+.hx-nav__group,
+.hx-favs,
+.hx-recent {
+  position: relative;
+  border-radius: var(--hx-radius-sm);
+  transition:
+    background var(--hx-dur-sm) var(--hx-ease-out),
+    box-shadow var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-nav__group[data-drop-over],
+.hx-favs[data-drop-over],
+.hx-recent[data-drop-over] {
+  background: var(--hx-accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--hx-accent);
+}
+/* A drop between rows: a line where it would land (before or after the row, the group). */
+.hx-item[data-drop-over],
+.hx-nav__group[data-drop-edge] {
+  position: relative;
+}
+.hx-item[data-drop-over][data-drop-edge],
+.hx-nav__group[data-drop-over][data-drop-edge] {
+  background: none;
+  box-shadow: none;
+}
+.hx-item[data-drop-edge]::before,
+.hx-nav__group[data-drop-edge]::before {
+  content: '';
+  position: absolute;
+  left: var(--hx-space-2);
+  right: var(--hx-space-2);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--hx-accent);
+  box-shadow: 0 0 0 3px var(--hx-accent-soft);
+  pointer-events: none;
+  animation: hx-drop-line var(--hx-dur-sm) var(--hx-ease-out) both;
+}
+.hx-item[data-drop-edge='before']::before,
+.hx-nav__group[data-drop-edge='before']::before {
+  top: -1px;
+}
+.hx-item[data-drop-edge='after']::before,
+.hx-nav__group[data-drop-edge='after']::before {
+  bottom: -1px;
+}
+@keyframes hx-drop-line {
+  from {
+    opacity: 0;
+    transform: scaleX(0.4);
+  }
+}
+
+/* The bottom row is quiet: a soft background under the pointer, no ring. The keyboard gets a thin ring, and only the
+   keyboard (a click that leaves the focus on the control draws nothing). */
+:where(.hx-root) .hx-user__open:focus:not(:focus-visible),
+:where(.hx-root) .hx-machine__chip:focus:not(:focus-visible) {
+  outline: none;
+}
+:where(.hx-root) .hx-user__open:focus-visible,
+:where(.hx-root) .hx-machine__chip:focus-visible {
+  outline: 1.5px solid var(--hx-border-strong);
+  outline-offset: 0;
+}
+
+/* The machine's card on the phone: a bottom sheet (.hx-sheet-phone) that is always there and rises when the
+   chip is tapped, its meters and the other machines a finger tall. */
+@media (max-width: 900px) {
+  .hx-machine .hx-machine__pop.hx-sheet-phone {
+    padding: 4px 16px 16px;
+    filter: none;
+    animation: none !important;
+    transform: translate3d(0, calc(100% + 24px), 0) !important;
+    transition:
+      transform 280ms var(--hx-m-ease),
+      opacity 200ms ease,
+      visibility 0s linear 280ms !important;
+  }
+  .hx-machine[data-hover='true'] .hx-machine__pop.hx-sheet-phone {
+    transform: translate3d(0, var(--hx-sheet-dy), 0) !important;
+    transition:
+      transform 420ms var(--hx-m-ease),
+      opacity 200ms ease,
+      visibility 0s linear 0s !important;
+  }
+  .hx-machine[data-hover='true'] .hx-machine__pop.hx-sheet-phone[data-drag='true'] {
+    transition: none !important;
+  }
+  .hx-machine__pop::before {
+    display: none;
+  }
+  .hx-machine__chip {
+    width: 44px;
+    height: 44px;
+  }
+  .hx-machine__title {
+    font-size: var(--hx-text-lg);
+  }
+  .hx-machine__row {
+    min-height: 36px;
+  }
+  .hx-machine__other,
+  .hx-machine__manage {
+    min-height: 48px;
+  }
+}
+
+/* A menu that is a bottom sheet on the phone (ui/menu-panel.tsx): its items a finger tall, their words body-sized. */
+@media (max-width: 900px) {
+  .hx-cmenu.hx-sheet-phone {
+    padding: 0 6px 6px;
+  }
+  .hx-cmenu.hx-sheet-phone .hx-cmenu__item {
+    min-height: 48px;
+    font-size: var(--hx-text-md);
+  }
+}
+
+/* The line under the name (the settings the footer leads to) and the theme's switch beside the machine chip. */
+.hx-user__sub {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-user__theme {
+  flex: none;
+  transition: opacity 260ms ease 120ms;
+}
+
+/* Chats started by one prompt on several models: the prompt names the group, each chat below it is a model. */
+.hx-launch {
+  margin: 6px var(--hx-space-2) 0;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-item[data-launch] {
+  margin-left: 10px;
+}

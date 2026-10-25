@@ -18,6 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/launch"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/oomguard"
 	"github.com/ly-solutions/harnessly/internal/sidechat"
 	"github.com/ly-solutions/harnessly/internal/status"
 )
@@ -34,6 +35,8 @@ type Launch struct {
 	SessionCreated func(session string) int64
 	// CodexArgs are the arguments the Codex launcher gets for codex itself.
 	CodexArgs func(workspaceID, resumeID string, launch *agents.Launch) ([]string, error)
+	// CodexForkArgs are the arguments that start codex on a fork of a session; nil when the runtime cannot fork.
+	CodexForkArgs func(workspaceID, sessionID string, launch *agents.Launch) ([]string, error)
 	// EvalRuns holds eval runs (<runId>/request.json, state.json, stop); EvalRunner is the runner script, run by Node
 	// detached ("" or missing: this release has none).
 	EvalRuns, EvalRunner, Node string
@@ -305,7 +308,8 @@ func (a *api) evalStart(c *call) {
 	if node == "" {
 		node = "node"
 	}
-	cmd := exec.Command(node, a.l.EvalRunner, runID)
+	program, args := oomguard.Unprotected(node, a.l.EvalRunner, runID)
+	cmd := exec.Command(program, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		agent.Log("warn", "eval runner did not start", agent.F{K: "err", V: err.Error()})
@@ -450,12 +454,22 @@ func (a *api) codexLaunchArgs(c *call) {
 		ws = a.d.Store.ActiveWorkspaceID()
 	}
 	resume := c.trimmedField("resumeSessionId")
+	fork := c.trimmedField("forkSessionId")
 	l, ok := c.launchShape()
 	if !ok {
 		c.fail(400, "Invalid model or effort")
 		return
 	}
-	args, err := a.l.CodexArgs(ws, resume, l)
+	var args []string
+	var err error
+	switch {
+	case fork != "" && a.l.CodexForkArgs == nil:
+		err = errors.New("the runtime cannot fork a Codex session")
+	case fork != "":
+		args, err = a.l.CodexForkArgs(ws, fork, l)
+	default:
+		args, err = a.l.CodexArgs(ws, resume, l)
+	}
 	if err != nil {
 		agent.Log("error", "codex launch args build failed", agent.F{K: "err", V: err.Error()})
 		c.fail(500, "Failed to build Codex launch args")

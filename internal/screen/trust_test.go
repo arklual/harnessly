@@ -92,3 +92,22 @@ func TestTrustAcceptKeys(t *testing.T) {
 		t.Errorf("no dialog: got %v", got)
 	}
 }
+
+func TestAFolderClaudeWrapsIsReadWhole(t *testing.T) {
+	// Claude Code 2.1.310 in an 80-column pane: the folder runs onto a second line.
+	got := MatchTrustPrompt(fixture(t, "claude-2.1.310-trust-folder-wrapped.txt"))
+	want := "/home/coder/.cache/showcase-4401/home/.harnessly/design-artifacts/acme-post-4x5"
+	if got == nil || got.FolderPath != want {
+		t.Fatalf("got %+v", got)
+	}
+	boxed := MatchTrustPrompt(lines(
+		"│ /Users/dev/acme/foo                               │",
+		"│                                                   │",
+		"│ Quick safety check: Claude Code may read files    │",
+		"│ ❯ 1. Yes, I trust this folder                     │",
+		"│   2. No, exit                                     │",
+	))
+	if boxed == nil || boxed.FolderPath != "/Users/dev/acme/foo" {
+		t.Fatalf("boxed: %+v", boxed)
+	}
+}

@@ -1,0 +1,14 @@
+{
+  "next.artifacts.docs": "Документы",
+  "next.artifacts.tasks": "Задачи",
+  "next.artifacts.mrs": "Merge requests",
+  "next.artifacts.links": "Прочие ссылки",
+  "next.artifacts.loading": "Собираем артефакты",
+  "next.artifacts.empty": "Здесь появятся документы, доски и задачи, которые агент упомянет в ответах",
+  "next.artifacts.mrOpened": "Открыт",
+  "next.artifacts.mrMerged": "Влит",
+  "next.artifacts.mrClosed": "Закрыт",
+  "next.artifacts.mrDraft": "Черновик",
+  "next.artifacts.someFailed": "Не у всех ссылок прочитались названия",
+  "next.load.artifacts": "Артефакты не загрузились"
+}

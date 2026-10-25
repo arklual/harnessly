@@ -46,7 +46,9 @@ func panelTargets() panel.Targets {
 		ReaderHost:   os.Getenv("RUNTIME_PLATFORM_HOST"),
 		ReaderPath:   env("RUNTIME_DOCS_READER_PATH", appBase()+"/docs/"),
 		GitLabHosts:  splitList(os.Getenv("RUNTIME_GITLAB_HOSTS")),
+		GitHubHost:   strings.TrimSpace(os.Getenv("RUNTIME_GITHUB_HOST")),
 		TaskExamples: os.Getenv("RUNTIME_TASK_EXAMPLES"),
+		TrackerHosts: splitList(os.Getenv("RUNTIME_TRACKER_HOSTS")),
 	}
 	// The servers of an open install: documents and boards each on their own address.
 	integ := integrations.FromEnv(os.Getenv)
@@ -156,6 +158,8 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 	if c.agents == nil {
 		deps.Agents = nil
 	}
+	// "open design <id|path|title>" names a design of this machine's library.
+	deps.Targets.DesignRef = designAPI(d).L.RefOf
 	main, shadow := layoutapi.Routes(deps)
 	routes := []gate.Route{{Slice: "core", Match: main.Match, Handler: main.Handler}}
 	return append(routes, f.AsBodyRoutes(gate.BodyRoute{Slice: "core", Match: shadow.Match, Serve: shadow.Handler.ServeHTTP})...)
@@ -168,7 +172,7 @@ const sessionMaxAge = 7 * 24 * time.Hour
 // carrying the cli-token, are never asked for a session, so theirs is not refreshed either.
 func openOrToken(cliToken func(*http.Request) bool) func(*http.Request, string) bool {
 	open := []string{"/api/auth", "/api/install", "/api/cli/", "/api/status/hook", platformAPI + "/share-read/",
-		platformAPI + "/design/library/import", "/api/health", "/api/manifest"}
+		platformAPI + "/design-public/", platformAPI + "/design/library/import", "/api/health", "/api/manifest"}
 	return func(r *http.Request, p string) bool {
 		for _, o := range open {
 			if strings.HasPrefix(p, o) {

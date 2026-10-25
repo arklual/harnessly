@@ -13,6 +13,7 @@ import (
 // runtime serves index.html (web/app/platform/config.ts reads it). It names services and copy only; no token is in it.
 type pageConfig struct {
 	ProductName        string            `json:"productName"`
+	DesignName         string            `json:"designName"`
 	MarkURL            *string           `json:"markUrl"`
 	Locale             string            `json:"locale"`
 	ArtifactsURL       *string           `json:"artifactsUrl"`
@@ -53,7 +54,8 @@ func optional(v string) *string {
 }
 
 // pageFeatures are the optional parts of the page (RUNTIME_WEB_FEATURES, comma separated): chats (an OpenWebUI next to
-// the runtime), efficiency (the team report), vault (the password safe), design (Claude Design boards).
+// the runtime), efficiency (the team report), vault (the password safe), design (Claude Design boards). Other names,
+// next-ui among them (the switch to the new interface, which is the only interface now), are ignored.
 func pageFeatures(list string) map[string]bool {
 	out := map[string]bool{"chats": false, "efficiency": false, "vault": false, "design": false}
 	for _, name := range splitList(list) {
@@ -71,6 +73,7 @@ func pageConfigFromEnv() pageConfig {
 	}
 	c := pageConfig{
 		ProductName:       env("RUNTIME_APP_NAME", "harnessly"),
+		DesignName:        env("RUNTIME_DESIGN_NAME", "Designly"),
 		MarkURL:           optional(os.Getenv("RUNTIME_APP_MARK_URL")),
 		Locale:            env("RUNTIME_LOCALE", "en"),
 		ArtifactsURL:      optional(env("RUNTIME_ARTIFACTS_URL", docsOrigin)),

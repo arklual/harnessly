@@ -1,0 +1,277 @@
+/* Motion of the new interface, from the design's lib/hx/motion.css. An entrance: .hx-enter + data-enter="left|up|down|
+   fade|scale"; it plays while an ancestor has data-play="1" (AppFrame sets it after the first frame). The delay of a
+   group is data-eb (ms), the place in a cascade data-i, the duration data-ed — attributes, not inline styles. */
+
+[data-play='1'] .hx-enter {
+  animation: var(--hx-enter-name, hx-in-fade) var(--hx-enter-dur, var(--hx-dur-lg)) var(--hx-ease-out)
+    backwards;
+  animation-delay: calc(var(--hx-enter-base, 0ms) + var(--i, 0) * var(--hx-stagger));
+}
+[data-play='0'] .hx-enter {
+  opacity: 0;
+}
+.hx-enter[data-enter='left'] {
+  --hx-enter-name: hx-in-left;
+}
+.hx-enter[data-enter='up'] {
+  --hx-enter-name: hx-in-up;
+}
+.hx-enter[data-enter='down'] {
+  --hx-enter-name: hx-in-down;
+}
+.hx-enter[data-enter='scale'] {
+  --hx-enter-name: hx-in-scale;
+}
+.hx-main.hx-enter {
+  --hx-enter-name: hx-window-in;
+}
+
+/* Group delays and durations of the page, as the design sets them */
+[data-eb='120'] {
+  --hx-enter-base: 120ms;
+}
+[data-eb='160'] {
+  --hx-enter-base: 160ms;
+}
+[data-eb='200'] {
+  --hx-enter-base: 200ms;
+}
+[data-eb='220'] {
+  --hx-enter-base: 220ms;
+}
+[data-eb='300'] {
+  --hx-enter-base: 300ms;
+}
+[data-eb='420'] {
+  --hx-enter-base: 420ms;
+}
+[data-eb='440'] {
+  --hx-enter-base: 440ms;
+}
+[data-eb='480'] {
+  --hx-enter-base: 480ms;
+}
+[data-eb='520'] {
+  --hx-enter-base: 520ms;
+}
+[data-eb='560'] {
+  --hx-enter-base: 560ms;
+}
+[data-eb='820'] {
+  --hx-enter-base: 820ms;
+}
+[data-ed='640'] {
+  --hx-enter-dur: 640ms;
+}
+[data-ed='700'] {
+  --hx-enter-dur: 700ms;
+}
+
+/* The place in a cascade; past 24 the rest come together, the design never staggers a longer list visibly */
+[data-i='1'] {
+  --i: 1;
+}
+[data-i='2'] {
+  --i: 2;
+}
+[data-i='3'] {
+  --i: 3;
+}
+[data-i='4'] {
+  --i: 4;
+}
+[data-i='5'] {
+  --i: 5;
+}
+[data-i='6'] {
+  --i: 6;
+}
+[data-i='7'] {
+  --i: 7;
+}
+[data-i='8'] {
+  --i: 8;
+}
+[data-i='9'] {
+  --i: 9;
+}
+[data-i='10'] {
+  --i: 10;
+}
+[data-i='11'] {
+  --i: 11;
+}
+[data-i='12'] {
+  --i: 12;
+}
+[data-i='13'] {
+  --i: 13;
+}
+[data-i='14'] {
+  --i: 14;
+}
+[data-i='15'] {
+  --i: 15;
+}
+[data-i='16'] {
+  --i: 16;
+}
+[data-i='17'] {
+  --i: 17;
+}
+[data-i='18'] {
+  --i: 18;
+}
+[data-i='19'] {
+  --i: 19;
+}
+[data-i='20'] {
+  --i: 20;
+}
+[data-i='21'] {
+  --i: 21;
+}
+[data-i='22'] {
+  --i: 22;
+}
+[data-i='23'] {
+  --i: 23;
+}
+[data-i='24'] {
+  --i: 24;
+}
+
+@keyframes hx-in-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+@keyframes hx-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes hx-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+@keyframes hx-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes hx-window-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px) scale(0.985);
+  }
+}
+
+/* A new element of the feed or a list plays when it is inserted, without data-play */
+.hx-pop {
+  animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+.hx-pop-right {
+  animation: hx-pop-right var(--hx-dur-md) var(--hx-ease-out) backwards;
+  transform-origin: 100% 100%;
+}
+@keyframes hx-pop-right {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+@keyframes hx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+@keyframes hx-caret {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes hx-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@keyframes hx-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-root *,
+  .hx-root *::before,
+  .hx-root *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* A spinner slows down under reduced motion but never stops: a ring that stands still reads as a hang.
+   Every rule that runs the hx-spin keyframes is listed here; styles/spinners.test.ts keeps the list complete. */
+@media (prefers-reduced-motion: reduce) {
+  .hx-root
+    :is(
+      .hx-spin,
+      .hx-tool__spin,
+      .hx-now__spin,
+      .hx-now__star,
+      .hx-dockstat__step[data-state='active'] .hx-dockstat__mark,
+      .hx-queue__row[data-st='sending'] .hx-queue__ic,
+      .hx-ctx__foot[data-state='live'] .hx-icon,
+      .hx-dl-card[data-state='gen'] .hx-dl-card__gen .hx-icon,
+      .hx-header__busy,
+      .hx-island__spin,
+      .hx-plan__row[data-st='run'] .hx-plan__mark,
+      .hx-set__spin i,
+      .hx-set__btn-spin,
+      .hx-gate__spin,
+      .hx-chat-status[data-status='thinking'],
+      .hx-chat-status[data-status='background'],
+      .hx-chat-status[data-status='busy'],
+      .hx-machine__other .hx-machine__ospin,
+      .hx-browser__reload[data-spin='true'] .hx-icon,
+      .hx-gtab .hx-gtab__ic--working,
+      .hx-gtab[aria-selected='true'] .hx-gtab__ic--working,
+      .hx-gtab .hx-gtab__ic--background,
+      .hx-gtab[aria-selected='true'] .hx-gtab__ic--background
+    ) {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/* A tab in the background: endless animations stand still */
+.hx-root[data-hidden] *,
+.hx-root[data-hidden] *::before,
+.hx-root[data-hidden] *::after {
+  animation-play-state: paused !important;
+}

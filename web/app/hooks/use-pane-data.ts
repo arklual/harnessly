@@ -18,8 +18,11 @@ export const usePaneSources = (mode: 'agent' | 'chat', tab: ITab | null, chatId:
   const entries = snapshot?.entries ?? EMPTY;
   const tasks = snapshot?.tasks ?? EMPTY;
   const jsonlPath = snapshot?.jsonlPath ?? null;
-  const { links, workPaths, complete } = useConversationSources(
-    mode === 'agent' ? jsonlPath : null,
+  // The transcript's links are asked for as soon as the tab names it, not only once the timeline has loaded it: the
+  // runtime's first read of a long transcript takes seconds, and the panel should find the answer ready.
+  const sourcePath = jsonlPath ?? tab?.agentState?.jsonlPath ?? null;
+  const { links, workPaths, complete, failed, reload } = useConversationSources(
+    mode === 'agent' ? sourcePath : null,
     cwd,
     entries,
   );
@@ -34,6 +37,8 @@ export const usePaneSources = (mode: 'agent' | 'chat', tab: ITab | null, chatId:
     workPaths,
     loaded: snapshot !== undefined,
     complete,
+    failed,
+    reload,
   };
 };
 

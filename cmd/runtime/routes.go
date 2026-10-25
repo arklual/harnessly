@@ -21,7 +21,7 @@ type deps struct {
 	Tmux          *tmux.Tmux
 	// TokenHeaders carry the runtime's cli-token, the current name first.
 	TokenHeaders []string
-	Old          *gate.OldRuntime
+	CLI          *gate.CLIToken
 	// SessionOK: the request carries a page session.
 	SessionOK func(*http.Request) bool
 	// Claims are those of the request's session cookie when its token is signed with the pair's secret (any token,
@@ -48,6 +48,8 @@ type deps struct {
 	// machine's first workspace there.
 	CoreRunning    func() bool
 	FirstWorkspace func() error
+	// MachineKit hands the v2's Machine tool what the machine slice looks at the machine with (nil in a test that has none).
+	MachineKit *machineKitRef
 }
 
 // platformAPI is the prefix of the routes the platform's own pages call (peers, commands, file previews…); the

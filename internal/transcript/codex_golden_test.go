@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +12,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
-// The golden file is what the previous runtime's parser answered on the corpus (testdata/codex/gen). CODEX_GOLDEN and
+// The golden file is what the previous runtime's parser answered on the corpus (testdata/codex/gen), ids aside: see
+// claude_test.go. The extra run below (CODEX_GOLDEN) carries the old counter's ids and cannot pass until regenerated. CODEX_GOLDEN and
 // CODEX_GOLDEN_DIR run another such file (gen.mjs mass) over its own folder.
 
 type codexStep struct {
@@ -93,8 +93,6 @@ func keep(s string) string {
 
 func runCodexCase(t *testing.T, c codexCase, dir, work string, opts CodexOptions, now float64) []string {
 	t.Helper()
-	n := 0
-	NewID = func() string { n++; return fmt.Sprintf("id%04d", n) }
 	file := filepath.Join(dir, c.File)
 	subst := func(s string) string {
 		return strings.ReplaceAll(strings.ReplaceAll(s, dir, "$CORPUS"), work, "$WORK")
@@ -165,14 +163,33 @@ func checkCodexGolden(t *testing.T, path, dir string) {
 	if err := json.Unmarshal(b, &g); err != nil {
 		t.Fatal(err)
 	}
-	prevNow, prevID := Now, NewID
-	t.Cleanup(func() { Now, NewID = prevNow, prevID })
+	update := updatingGolden()
+	doc, err := jsvalue.Parse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := doc.(*jsvalue.Object).Array("cases")
+	prevNow := Now
+	t.Cleanup(func() { Now = prevNow })
 	Now = func() float64 { return g.Now }
 	opts := CodexOptions{ImageURL: NewCodexImageURL(g.Uploads, g.Prefix)}
 	dir, _ = filepath.Abs(dir)
 	work := t.TempDir()
 	failed := 0
-	for _, c := range g.Cases {
+	for ci, c := range g.Cases {
+		if update {
+			got := runCodexCase(t, c, dir, work, opts, g.Now)
+			kept := make([]any, len(got))
+			for i := range got {
+				kept[i] = keep(got[i])
+			}
+			if c.Kind == "steps" {
+				cases[ci].(*jsvalue.Object).Set("result", kept)
+			} else {
+				cases[ci].(*jsvalue.Object).Set("result", kept[0])
+			}
+			continue
+		}
 		var want []string
 		if c.Kind == "steps" {
 			if err := json.Unmarshal(c.Result, &want); err != nil {
@@ -199,6 +216,10 @@ func checkCodexGolden(t *testing.T, path, dir string) {
 				break
 			}
 		}
+	}
+	if update {
+		writeGolden(t, path, doc)
+		return
 	}
 	if failed > 0 {
 		t.Errorf("%d of %d cases differ", failed, len(g.Cases))

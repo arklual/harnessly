@@ -1,0 +1,11 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 528,
+  "e": {
+    "type": "prompt_state",
+    "clientId": "0192b6f1-0000-7000-8000-000000000001",
+    "state": {"k": "typing", "wait": {"slowAt": 1792656003000, "deadlineAt": 1792656012000}},
+    "rev": 3
+  }
+}

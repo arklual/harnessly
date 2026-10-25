@@ -30,6 +30,10 @@ type Port struct {
 	Owner      *Owner  `json:"owner"`
 	Kind       string  `json:"kind"`
 	Responding bool    `json:"responding"`
+	// What the page says about itself (a site that answered): its title is the name to show, not the process's.
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Icon        *string `json:"icon,omitempty"`
 }
 
 type Owner struct {
@@ -45,6 +49,10 @@ type Socket struct {
 	HasPID  bool
 	Command string
 }
+
+// internalCommands are the processes of this platform itself: the runtime (its preview slots and gates), the machine
+// agent and the helper that probes it. Their ports are not pages a person opened, so they are never offered.
+var internalCommands = map[string]bool{"runtime": true, "agent": true, "agentprobe": true, "harnessly": true}
 
 var userProcess = regexp.MustCompile(`\("((?:[^"\\]|\\.)*)",pid=(\d+)`)
 
@@ -184,10 +192,16 @@ func headOnce(host string, port int, budget time.Duration) (kind string, ok bool
 		return "", false
 	}
 	_ = res.Body.Close()
-	if strings.Contains(res.Header.Get("Content-Type"), "text/html") {
+	if strings.Contains(res.Header.Get("Content-Type"), "text/html") && isPageStatus(res.StatusCode) {
 		return "site", true
 	}
 	return "api", true
+}
+
+// isPageStatus: a root that answers (also behind a sign-in) is a page; an error page is not — a TLS port that was sent
+// plain HTTP, or a server that has nothing at its root, answer with HTML too.
+func isPageStatus(status int) bool {
+	return status < 400 || status == http.StatusUnauthorized || status == http.StatusForbidden
 }
 
 var probeClient = &http.Client{Transport: &http.Transport{Proxy: nil, DisableKeepAlives: true}, CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -271,8 +285,13 @@ type Scanner struct {
 	SS    func() (string, error)
 	Cwd   func(pid int) string
 	Probe func(port int) (string, bool)
+	// Page reads what a site says about itself; tests give their own.
+	Page func(port int) Page
+	// Self is this process's pid: its sockets are the platform's.
+	Self int
 
 	mu     sync.Mutex
+	pages  map[int]pageEntry
 	scans  map[string]scanEntry
 	probes map[int]probeEntry
 	roots  map[string]rootEntry
@@ -292,6 +311,12 @@ type probeEntry struct {
 	done chan struct{}
 }
 
+type pageEntry struct {
+	at   time.Time
+	pid  int
+	page Page
+}
+
 type rootEntry struct {
 	at   time.Time
 	root string
@@ -303,6 +328,8 @@ const (
 	ssTimeout    = 2 * time.Second
 	gitTimeout   = 2 * time.Second
 	probeTimeout = 800 * time.Millisecond
+	// A page is read again after this long, or at once when another process listens on its port.
+	pageTTL = 30 * time.Second
 )
 
 func RunSS() (string, error) {
@@ -323,6 +350,13 @@ func ProcCwd(pid int) string {
 func (s *Scanner) init() {
 	if s.scans == nil {
 		s.scans, s.probes, s.roots = map[string]scanEntry{}, map[int]probeEntry{}, map[string]rootEntry{}
+		s.pages = map[int]pageEntry{}
+	}
+	if s.Self == 0 {
+		s.Self = os.Getpid()
+	}
+	if s.Page == nil {
+		s.Page = func(port int) Page { return FetchPage(port, pageFetchBudget) }
 	}
 	if s.SS == nil {
 		s.SS = RunSS
@@ -402,12 +436,39 @@ func (s *Scanner) probe(port int) (string, bool) {
 	return kind, ok
 }
 
+// page is what the site on port says about itself, kept for pageTTL while the same process listens.
+func (s *Scanner) page(port, pid int) Page {
+	s.mu.Lock()
+	if e, ok := s.pages[port]; ok && e.pid == pid && time.Since(e.at) < pageTTL {
+		s.mu.Unlock()
+		return e.page
+	}
+	s.mu.Unlock()
+	page := s.Page(port)
+	s.mu.Lock()
+	s.pages[port] = pageEntry{at: time.Now(), pid: pid, page: page}
+	for k, x := range s.pages {
+		if time.Since(x.at) >= pageTTL && k != port {
+			delete(s.pages, k)
+		}
+	}
+	s.mu.Unlock()
+	return page
+}
+
 func (s *Scanner) scan(workPaths []string) ([]Port, error) {
 	out, err := s.SS()
 	if err != nil {
 		return nil, err
 	}
-	ports := Classify(ParseSockets(out), s.Cwd, workPaths, s.Worktrees, s.hidden())
+	var sockets []Socket
+	for _, sock := range ParseSockets(out) {
+		if sock.HasPID && (sock.PID == s.Self || internalCommands[sock.Command]) {
+			continue
+		}
+		sockets = append(sockets, sock)
+	}
+	ports := Classify(sockets, s.Cwd, workPaths, s.Worktrees, s.hidden())
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 8)
 	for i := range ports {
@@ -417,6 +478,23 @@ func (s *Scanner) scan(workPaths []string) ([]Port, error) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			ports[i].Kind, ports[i].Responding = s.probe(ports[i].Port)
+			if ports[i].Kind != "site" {
+				return
+			}
+			pid := 0
+			if ports[i].PID != nil {
+				pid = *ports[i].PID
+			}
+			page := s.page(ports[i].Port, pid)
+			if page.Title != "" {
+				ports[i].Title = &page.Title
+			}
+			if page.Description != "" {
+				ports[i].Description = &page.Description
+			}
+			if page.Icon != "" {
+				ports[i].Icon = &page.Icon
+			}
 		}(i)
 	}
 	wg.Wait()

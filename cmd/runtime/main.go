@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 func env(name, fallback string) string {
@@ -54,9 +54,7 @@ func inheritedEnv() []string {
 }
 
 type terminalBridge struct {
-	old  *gate.OldRuntime
-	api  string
-	core *coreRef // with the core slice on, the Enter clock and the layouts are this process's
+	core *coreRef // the Enter clock and the layouts are the running core's
 }
 
 // coreRef is set once the core exists (it needs the terminal, which needs this bridge).
@@ -75,32 +73,22 @@ func (b terminalBridge) ClaimPrompt(id, session, text string) bool {
 			return svc.ClaimPrompt(id, session, text)
 		}
 	}
-	var res struct {
-		Claimed bool `json:"claimed"`
-	}
-	// Unreachable, the old runtime keeps nothing to compare with: the text is typed, as before there was a check.
-	if !b.old.Post(b.api+"/terminal/claim", map[string]string{"id": id, "session": session, "text": text}, &res) {
-		return true
-	}
-	return res.Claimed
+	// No core yet keeps nothing to compare with: the text is typed, as before there was a check.
+	return true
 }
 
 func (b terminalBridge) PromptEnter(session string) {
 	if c := b.core.running(); c != nil {
 		if svc := c.promptService(); svc != nil {
 			svc.PromptEnter(session)
-			return
 		}
 	}
-	go b.old.Post(b.api+"/terminal/enter", map[string]string{"session": session}, nil)
 }
 
 func (b terminalBridge) ReconcileCwd(session string) {
 	if c := b.core.running(); c != nil {
 		_ = c.store.ReconcileTabCwd(session)
-		return
 	}
-	b.old.Post(b.api+"/terminal/reconcile-cwd", map[string]string{"session": session}, nil)
 }
 
 func isUpgrade(r *http.Request) bool { return strings.EqualFold(r.Header.Get("Upgrade"), "websocket") }
@@ -129,7 +117,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		return nil, err
 	}
 	cookieName := env("RUNTIME_SESSION_COOKIE", "session-token")
-	old := &gate.OldRuntime{Upstream: cfg.Upstream, DataDir: cfg.DataDir, TokenHeaders: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}
+	cli := &gate.CLIToken{DataDir: cfg.DataDir, Headers: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}
 	home, _ := os.UserHomeDir()
 	nice, niceSet := os.LookupEnv("RUNTIME_AGENT_NICE")
 	integ := integrations.FromEnv(os.Getenv)
@@ -163,12 +151,12 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	}
 	ref := &coreRef{}
 	terms := terminal.New(terminal.Config{
-		Tmux: tm, Bridge: terminalBridge{old: old, api: env("RUNTIME_OLD_INTERNAL_API", "/api/internal"), core: ref}, Home: home, Env: inheritedEnv(),
+		Tmux: tm, Bridge: terminalBridge{core: ref}, Home: home, Env: inheritedEnv(),
 	})
 	tmuxNames = tm
 	hooks := hookConfigFromEnv(configFile)
 	pusher := newSharedPusher(cfg.DataDir, hooks)
-	ref.c = newCore(coreConfig{DataDir: cfg.DataDir, Home: home, Tmux: tm, Term: terms, Old: old, OldAPI: env("RUNTIME_OLD_INTERNAL_API", "/api/internal"),
+	ref.c = newCore(coreConfig{DataDir: cfg.DataDir, Home: home, Tmux: tm, Term: terms,
 		MetaKey: os.Getenv("RUNTIME_TAB_META_KEY"), AgentHeader: os.Getenv("RUNTIME_AGENT_TOKEN_HEADER"),
 		CodexbarBin: os.Getenv("RUNTIME_CODEXBAR_BIN"), CodexHome: limits.CodexHome(os.Getenv("CODEX_HOME"), home),
 		Prompts: promptConfigFromEnv(cfg.DataDir),
@@ -178,10 +166,10 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			ClaudeDir: env("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude")), CodexDir: env("CODEX_HOME", filepath.Join(home, ".codex")),
 			DefaultsKey: env("RUNTIME_LAUNCH_DEFAULTS_KEY", "launchDefaults"), Launcher: os.Getenv("RUNTIME_CLAUDE_LAUNCHER"),
 			EditorScript: promptEditorScript(cfg.DataDir), HumanEditorVar: promptHumanEditorVar(),
-			Old: old, OldAPI: env("RUNTIME_OLD_INTERNAL_API", "/api/internal"),
+
 			Port: listenPort(cfg.Listen), MCP: codex.MCP{Server: env("RUNTIME_MCP_SERVER", "harnessly"), TokenEnv: tokenEnv},
 			MCPPath: env("RUNTIME_MCP_PATH", "/api/cli/preview/mcp"), ScriptDataDirs: scriptDirs,
-			TokenHeaders: old.TokenHeaders, SkillsPluginDir: skillsPluginDir(cfg.DataDir), PassServiceEnv: integ.Enabled(),
+			TokenHeaders: cli.Headers, SkillsPluginDir: skillsPluginDir(cfg.DataDir), PassServiceEnv: integ.Enabled(),
 			CodexContainerSandbox: env("RUNTIME_CODEX_SANDBOX", "codex") == "container"}),
 		Launch:     launchConfigFromEnv(home, cfg.DataDir),
 		Timeline:   timelineConfigFromEnv(cfg.DataDir),
@@ -205,7 +193,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	// The old runtime's own calls to what the Go runtime holds.
 	internal := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			if !old.CLITokenOK(r) {
+			if !cli.OK(r) {
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
@@ -278,8 +266,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	// Like the previous runtime's API, every request a Go route answers re-signs a session past half its age.
 	f.RefreshSessions(gate.SessionRefresh{Secret: secret, Cookie: cookieName, MaxAge: sessionMaxAge,
 		Skip: func(r *http.Request, p string) bool {
-			// The old router answered a path it had no route for before asking for a session.
-			return openOrToken(cliTokenFirst(cfg.DataDir, old.TokenHeaders))(r, p) || !oldRouteMatches(r)
+			// The old router answered a path it had no route for before asking for a session; v2 asks for one.
+			return openOrToken(cliTokenFirst(cfg.DataDir, cli.Headers))(r, p) || !oldRouteMatches(r) && !wire.Matches(r)
 		}})
 	sessionOK := func(r *http.Request) bool {
 		c, err := r.Cookie(cookieName)
@@ -287,7 +275,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	}
 	// The old runtime's API lets in a page session or the runtime's cli-token, and refuses anyone else like this.
 	apiRefusal := func(r *http.Request) (int, any, http.Header, bool) {
-		if sessionOK(r) || old.CLITokenOK(r) {
+		if sessionOK(r) || cli.OK(r) {
 			return 0, nil, nil, false
 		}
 		return http.StatusUnauthorized, map[string]string{"error": "Unauthorized"}, http.Header{"Content-Type": {"application/json"}}, true
@@ -299,8 +287,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		Secret:        secret,
 		WorkspaceRoot: env("RUNTIME_WORKSPACE_DIR", home),
 		Tmux:          tm,
-		TokenHeaders:  old.TokenHeaders,
-		Old:           old,
+		TokenHeaders:  cli.Headers,
+		CLI:           cli,
 		SessionOK:     sessionOK,
 		APIRefusal:    apiRefusal,
 		MachineAgent:  machineAgent(secret, cookieName),
@@ -312,6 +300,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		SliceOn:       f.SliceOn,
 		RuntimePort:   runtimePort(cfg),
 		CoreRunning:   func() bool { return ref.running() != nil },
+		MachineKit:    &machineKitRef{},
 		FirstWorkspace: func() error {
 			c := ref.running()
 			if c == nil {
@@ -329,61 +318,23 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			return claims
 		},
 	}
-	f.Add(ref.c.routes(func(r *http.Request) bool { return sessionOK(r) || old.CLITokenOK(r) }, old.CLITokenOK)...)
+	ref.c.v2d = &d
+	f.Add(ref.c.routes(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, cli.OK)...)
 	f.Add(ref.c.promptRoutes(sessionOK, apiRefusal)...)
 	f.Add(ref.c.launchRoutes(f, d, d.MachineAgent)...)
 	f.Add(ref.c.layoutRoutes(f, d)...)
 	f.Add(ref.c.checkpointRoutes(f, d)...)
-	f.Add(ref.c.hookRoutes(cliTokenFirst(cfg.DataDir, old.TokenHeaders), apiRefusal)...)
+	f.Add(ref.c.hookRoutes(cliTokenFirst(cfg.DataDir, cli.Headers), apiRefusal)...)
 	f.Add(ref.c.timelineSocketRoutes(sessionOK)...)
 	f.Add(ref.c.timelineRoutes(f, d)...)
 	f.Add(ref.c.transcriptRoutes(f, d)...)
 	f.Add(ref.c.designRoutes(f, d, pusher)...)
 	startDesign(f, d)
-	// The timeline's sockets close when its slice switches off; the cluster's proxy opens them again, on the old runtime.
-	f.OnSliceChange("timeline", func(on bool) {
-		if !on {
-			ref.c.timeline.Shutdown()
-		}
-	})
-	// The core runs while its slice is on; its shadow runs while only "core-shadow" is, and gives way to the core.
-	var shadowMu sync.Mutex
-	var shadow *coreShadow
-	currentShadow := func() *coreShadow {
-		shadowMu.Lock()
-		defer shadowMu.Unlock()
-		return shadow
-	}
-	settleCore := func() {
-		shadowMu.Lock()
-		defer shadowMu.Unlock()
-		coreOn, shadowOn := f.SliceOn("core"), f.SliceOn("core-shadow")
-		if coreOn || !shadowOn {
-			if shadow != nil {
-				shadow.stop()
-				shadow = nil
-			}
-		}
-		if coreOn {
-			go func() {
-				ref.c.start()
-				// The timeline was switched on before the core it needs: the old runtime's sockets move here now.
-				if f.SliceOn("timeline") {
-					f.CloseProxied("timeline")
-				}
-			}()
-		} else {
-			ref.c.stop()
-			if shadowOn && shadow == nil {
-				shadow = ref.c.startShadow(secret, cookieName, cfg.Upstream)
-			}
-		}
-	}
-	f.Add(ref.c.shadowTees(f, currentShadow)...)
+	// The core runs when its slice is on.
 	ref.c.resumeAtStart.Store(f.SliceOn("core"))
-	f.OnSliceChange("core", func(bool) { settleCore() })
-	f.OnSliceChange("core-shadow", func(bool) { settleCore() })
-	settleCore()
+	if f.SliceOn("core") {
+		go ref.c.start()
+	}
 	f.Add(f.AsRoutes(machineSliceRoutes(d, cfg.Listen, cfg.Upstream, pusher, hooks)...)...)
 	f.Add(voiceRoutes(d)...)
 	for _, group := range routeGroups {
@@ -399,18 +350,16 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(integrationRoutes(d, integ)...)
 	f.Add(docsRoutes(d, integ)...)
 	f.Add(githubRoutes(d, githubFromEnv())...)
+	f.Add(peerRoutes(d, ref.c)...)
+	f.Add(v2Routes(d, ref.c)...)
 	if w := webConfigFromEnv(cfg.Standalone()); w != nil {
 		f.Add(gate.Route{Match: w.matches, Handler: w.handler()})
 	}
-	// Last: what no route above took and the previous runtime had no route for either.
-	f.Add(fallbackRoute(d))
-	// The machine agent's status and sync relays move to the core slice whole: sockets the old runtime holds are closed
-	// when it switches on, and the agent dials again.
-	f.HandOverSockets("core", "/api/status", "/api/sync")
-	f.HandOverSockets("timeline", "/api/timeline")
-	f.HandOverSockets("voice", "/api/voice")
 	if cfg.Standalone() {
-		f.SetFallback(standaloneFallback())
+		f.SetFallback(standaloneFallback(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }))
+	} else {
+		// The old runtime behind the gate does not get an install socket, or a socket of anyone without a session.
+		f.Add(upstreamGuard(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, previewOf(d).proxy.Matches))
 	}
 	return &runtimeGate{Gate: f, terms: terms, core: ref, tmux: tm, home: home}, nil
 }
@@ -502,8 +451,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		handler = standaloneSlots.guard(apiAlias(appBase(), f))
 		standaloneSlots.serve(ctx)
 	}
-	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, ConnContext: gate.ConnContext}
-	go f.WatchSlices(ctx)
+	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		t := time.NewTicker(cfg.CountEvery)
 		defer t.Stop()

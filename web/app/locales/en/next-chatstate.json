@@ -1,0 +1,21 @@
+{
+  "next.rowMenu.goal": "Goal…",
+  "next.goal.title": "Session goal",
+  "next.goal.lead": "The agent works toward it until it decides the goal is met.",
+  "next.goal.label": "What should come out of it",
+  "next.goal.placeholder": "For example: finish the v2 contract so the fixtures are green",
+  "next.goal.note": "Saving types the /goal command into the agent; it waits in the queue like a message. The text is one line.",
+  "next.goal.save": "Save",
+  "next.goal.clear": "Clear goal",
+  "next.goal.failed": "Could not pass the goal to the agent",
+  "next.goal.active": "Active",
+  "next.goal.paused": "Paused",
+  "next.goal.met": "Met",
+  "next.goal.since": "set {when}",
+  "next.goalBar.active": "Goal:",
+  "next.goalBar.paused": "Goal paused:",
+  "next.goalBar.met": "Goal reached:",
+  "next.goalBar.stop": "Stop",
+  "next.goalBar.hide": "Hide",
+  "next.goalBar.reached": "Goal reached: {goal}"
+}

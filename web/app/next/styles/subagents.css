@@ -1,0 +1,238 @@
+/* The subagents of a chat: the list in a turn (.hx-subs) and their cards in the right pane (.hx-subcard). The list has
+   no box of its own: a row is the agent's topic as the largest thing, the model and time muted beside it, and under it
+   a two-line summary; a click opens the report by height (a grid row between 0fr and 1fr). */
+.hx-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0;
+}
+.hx-sub {
+  position: relative;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: var(--hx-radius-md);
+  transition: background 200ms var(--hx-ease-out);
+}
+.hx-sub:hover,
+.hx-sub:focus-within,
+.hx-sub[data-open='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-sub__row {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: 24px;
+}
+.hx-sub__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-medium);
+  text-align: left;
+}
+button.hx-sub__main {
+  cursor: pointer;
+}
+.hx-sub__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-sub__meta {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+}
+.hx-sub__open {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-sub:hover .hx-sub__open,
+.hx-sub__open:focus-visible {
+  opacity: 1;
+}
+.hx-sub__open:hover {
+  color: var(--hx-fg-1);
+}
+.hx-sub__state {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+.hx-sub[data-status='running'] .hx-sub__state {
+  background: var(--hx-accent);
+  animation: hx-breathe 1.6s var(--hx-ease-in-out) infinite;
+}
+.hx-sub[data-status='done'] .hx-sub__state {
+  background: var(--hx-success);
+}
+.hx-sub[data-status='failed'] .hx-sub__state {
+  background: var(--hx-danger);
+}
+/* A working agent's title shimmers; nothing else spins. */
+.hx-sub[data-status='running'] .hx-sub__title {
+  background: linear-gradient(
+      90deg,
+      var(--hx-fg-2) 0%,
+      var(--hx-fg-2) 35%,
+      var(--hx-fg-1) 50%,
+      var(--hx-fg-2) 65%,
+      var(--hx-fg-2) 100%
+    )
+    0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hx-title-shimmer 2.4s linear infinite;
+}
+/* What it said, two lines of plain text; the report takes its place once opened. */
+.hx-sub__sum {
+  display: grid;
+  grid-template-rows: 1fr;
+  width: 100%;
+  padding: 0;
+  margin: 2px 0 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    grid-template-rows 280ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
+}
+.hx-sub__sum-in {
+  display: -webkit-box;
+  min-height: 0;
+  padding-left: 22px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.hx-sub[data-open='true'] .hx-sub__sum {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-sub__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  animation: hx-sub-in 320ms var(--hx-ease-out);
+  transition:
+    grid-template-rows 280ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
+}
+.hx-sub__body[data-state='closing'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes hx-sub-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.hx-sub__fold {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-sub__report {
+  padding: 6px 0 2px 22px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-sub__cut {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+
+/* A subagent's card in the pane. */
+.hx-subcard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+}
+.hx-subcard[data-focus='true'] {
+  border-color: var(--hx-border-strong);
+}
+.hx-subcard__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.hx-subcard__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+.hx-subcard[data-status='run'] .hx-subcard__dot {
+  background: var(--hx-accent);
+  animation: hx-breathe 1.6s var(--hx-ease-in-out) infinite;
+}
+.hx-subcard[data-status='done'] .hx-subcard__dot {
+  background: var(--hx-success);
+}
+.hx-subcard[data-status='failed'] .hx-subcard__dot {
+  background: var(--hx-danger);
+}
+.hx-subcard__last {
+  margin: 4px 0 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+}
+.hx-subcard__last .hx-md {
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+}
+.hx-subcard__last[data-full='true'] {
+  max-height: 60vh;
+  overflow: auto;
+}

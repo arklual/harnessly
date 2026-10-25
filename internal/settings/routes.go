@@ -132,11 +132,8 @@ func Routes(cfg Config) []gate.JSONRoute {
 	route := func(path string, h Handler) gate.JSONRoute {
 		return gate.JSONRoute{Slice: Slice, Match: func(r *http.Request) bool { return pathIs(r, path) }, Compute: Guarded(cfg.APIRefusal, h)}
 	}
-	config := route("/api/config", cfg.config)
-	// A config the previous runtime had not written yet is stamped at the moment of the read.
-	config.Volatile = []string{"updatedAt"}
 	return []gate.JSONRoute{
-		config,
+		route("/api/config", cfg.config),
 		route("/api/keybindings", cfg.keybindings),
 		route("/api/message-history", cfg.messageHistory),
 		route("/api/quick-prompts", cfg.quickPrompts),
@@ -150,7 +147,7 @@ func (cfg Config) allowedFields() []string {
 	return []string{"appTheme", "terminalTheme", "customCSS", "dangerouslySkipPermissions", "claudeShowTerminal", "gitAskProvider",
 		"noteSummaryProvider", "editorUrl", "editorPreset", "authPassword", "notificationsEnabled", "toastOnCompleteEnabled",
 		"toastDuration", "toastPositionDesktop", "toastPositionMobile", "locale", "fontSize", "lineHeight", "lineHeightCustom",
-		"terminalKeyBar", "systemResourcesEnabled", "networkAccess", cfg.LayoutKey, "voiceSettings"}
+		"terminalKeyBar", "systemResourcesEnabled", "networkAccess", cfg.LayoutKey, "voiceSettings", "uiVersion"}
 }
 
 var (
@@ -159,6 +156,9 @@ var (
 	voiceEngines   = []string{"auto", "local", "browser", "server"}
 	voiceLangs     = []string{"ru", "en", "auto"}
 	voiceModes     = []string{"hold", "toggle"}
+	// uiVersions are what the retired interface switch used to save. The page ignores the key now; it is still accepted
+	// (and kept in an existing config) so that a page left open from before does not get an error.
+	uiVersions = []string{"legacy", "next"}
 )
 
 func oneOf(v any, list ...string) bool {
@@ -338,6 +338,7 @@ func (cfg Config) patchConfig(r *http.Request, raw any) (int, any, http.Header) 
 		{"noteSummaryProvider", "noteSummaryProvider must be one of: claude, codex.", func(v any) bool { return oneOf(v, "claude", "codex") }},
 		{"toastPositionDesktop", "toastPositionDesktop is invalid.", func(v any) bool { return oneOf(v, toastPositions...) }},
 		{"toastPositionMobile", "toastPositionMobile is invalid.", func(v any) bool { return oneOf(v, toastPositions...) }},
+		{"uiVersion", "uiVersion must be one of: legacy, next.", func(v any) bool { return oneOf(v, uiVersions...) }},
 		{"toastDuration", "toastDuration must be a number between 1000 and 60000.", func(v any) bool {
 			n, ok := v.(float64)
 			return ok && !math.IsInf(n, 0) && n >= 1000 && n <= 60000

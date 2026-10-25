@@ -21,7 +21,7 @@ import (
 
 var (
 	designMu   sync.Mutex
-	designAPIs = map[*gate.OldRuntime]*design.API{}
+	designAPIs = map[*gate.CLIToken]*design.API{}
 )
 
 // people reads "local=Name,local2=Name2".
@@ -38,22 +38,23 @@ func people(v string) map[string]string {
 func designConfig(d deps) design.Config {
 	port, _ := strconv.Atoi(os.Getenv("RUNTIME_DESIGN_LIBRARY_PORT"))
 	return design.Config{
-		DataDir:         d.DataDir,
-		ConfigFile:      d.ConfigFile,
-		LibraryDir:      os.Getenv("RUNTIME_DESIGN_LIBRARY_DIR"),
-		WorkspaceDir:    os.Getenv("RUNTIME_WORKSPACE_DIR"),
-		AltWorkspaceDir: os.Getenv("RUNTIME_WORKSPACE"),
-		WorkspaceConfig: env("RUNTIME_WORKSPACE_CONFIG", os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")),
-		HistoryDir:      os.Getenv("RUNTIME_DESIGN_HISTORY_DIR"),
-		KitsDir:         os.Getenv("RUNTIME_DESIGN_KITS_DIR"),
-		KitOrigins:      splitList(os.Getenv("RUNTIME_DESIGN_KIT_ORIGINS")),
-		ReleasesDir:     os.Getenv("RUNTIME_DESIGN_RELEASES_DIR"),
-		Port:            port,
-		Chrome:          os.Getenv("RUNTIME_DESIGN_CHROME"),
-		PlatformAPI:     platformAPI,
-		OwnerEmail:      os.Getenv("RUNTIME_OWNER_EMAIL"),
-		CanvasKey:       os.Getenv("RUNTIME_DESIGN_CANVAS_KEY"),
-		EngineFile:      os.Getenv("RUNTIME_DESIGN_ENGINE_FILE"),
+		DataDir:          d.DataDir,
+		AgentTokenHeader: os.Getenv("RUNTIME_AGENT_TOKEN_HEADER"),
+		ConfigFile:       d.ConfigFile,
+		LibraryDir:       os.Getenv("RUNTIME_DESIGN_LIBRARY_DIR"),
+		WorkspaceDir:     os.Getenv("RUNTIME_WORKSPACE_DIR"),
+		AltWorkspaceDir:  os.Getenv("RUNTIME_WORKSPACE"),
+		WorkspaceConfig:  env("RUNTIME_WORKSPACE_CONFIG", os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")),
+		HistoryDir:       os.Getenv("RUNTIME_DESIGN_HISTORY_DIR"),
+		KitsDir:          os.Getenv("RUNTIME_DESIGN_KITS_DIR"),
+		KitOrigins:       splitList(os.Getenv("RUNTIME_DESIGN_KIT_ORIGINS")),
+		ReleasesDir:      os.Getenv("RUNTIME_DESIGN_RELEASES_DIR"),
+		Port:             port,
+		Chrome:           os.Getenv("RUNTIME_DESIGN_CHROME"),
+		PlatformAPI:      platformAPI,
+		OwnerEmail:       os.Getenv("RUNTIME_OWNER_EMAIL"),
+		CanvasKey:        os.Getenv("RUNTIME_DESIGN_CANVAS_KEY"),
+		EngineFile:       os.Getenv("RUNTIME_DESIGN_ENGINE_FILE"),
 		// The transcripts the listing reads to see who works on what: the agents' own folders under the home.
 		ClaudeProjects: filepath.Join(d.Home, ".claude", "projects"),
 		CodexSessions:  filepath.Join(d.Home, ".codex", "sessions"),
@@ -76,15 +77,17 @@ func designConfig(d deps) design.Config {
 func designAPI(d deps) *design.API {
 	designMu.Lock()
 	defer designMu.Unlock()
-	if a := designAPIs[d.Old]; a != nil {
+	if a := designAPIs[d.CLI]; a != nil {
 		return a
 	}
 	a := &design.API{
-		L:           design.New(designConfig(d)),
-		Session:     d.SessionOK,
-		CLIToken:    cliTokenFirst(d.DataDir, d.TokenHeaders),
-		APIRefusal:  d.APIRefusal,
-		PlatformAPI: platformAPI,
+		L:            design.New(designConfig(d)),
+		Session:      d.SessionOK,
+		MachineAgent: d.MachineAgent,
+		CLIToken:     cliTokenFirst(d.DataDir, d.TokenHeaders),
+		APIRefusal:   d.APIRefusal,
+		PlatformAPI:  platformAPI,
+		PublicToken:  designPublic(d.Secret),
 		Log: func(level, msg string, err error) {
 			fields := []agent.F{{K: "module", V: "design-library"}}
 			if err != nil {
@@ -93,7 +96,7 @@ func designAPI(d deps) *design.API {
 			agent.Log(level, msg, fields...)
 		},
 	}
-	designAPIs[d.Old] = a
+	designAPIs[d.CLI] = a
 	return a
 }
 
@@ -103,7 +106,16 @@ func designRoute(path string, compute func(*http.Request) design.Answer) gate.JS
 		Compute: func(r *http.Request) (int, any, http.Header) { return compute(r).Split() }}
 }
 
-func init() { routeGroups = append(routeGroups, designRoutes) }
+func init() {
+	routeGroups = append(routeGroups, designRoutes)
+	bodyRouteGroups = append(bodyRouteGroups, designPublicRoutes)
+}
+
+// designPublicRoutes: the guest links' read of a design, which the platform's gateway makes with a token, no session.
+func designPublicRoutes(d deps) []gate.BodyRoute {
+	a := designAPI(d)
+	return []gate.BodyRoute{{Slice: "design", Match: a.PublicMatch, Serve: a.Public}}
+}
 
 // designRoutes are the library's routes that need neither the tab keeper nor the library server's memory.
 func designRoutes(d deps) []gate.JSONRoute {
@@ -114,11 +126,13 @@ func designRoutes(d deps) []gate.JSONRoute {
 		designRoute(platformAPI+"/design/library/send", a.Send),
 		designRoute("/api/cli/design/pages", a.CLIPages),
 		designRoute(platformAPI+"/design/library/releases", a.Releases),
+		designRoute(platformAPI+"/design/access", a.PostAccess),
+		designRoute(platformAPI+"/design/library/claim", a.ClaimProject),
 	}
 }
 
-// startDesign keeps the library's background (claim keeper, history) running while the slice is on, as the previous
-// runtime ran it from its start.
+// startDesign runs the library's background (claim keeper, history) when the slice is on, as the previous runtime ran
+// it from its start.
 func startDesign(f *gate.Gate, d deps) {
 	a := designAPI(d)
 	// The preview's component lookup leaves the library server alone: this process's once it runs, else the port the
@@ -129,13 +143,20 @@ func startDesign(f *gate.Gate, d deps) {
 		}
 		return a.L.Config().Port
 	}
-	settle := func(on bool) {
-		if on {
-			a.L.StartBackground()
-		} else {
-			a.L.StopBackground()
-		}
+	if f.SliceOn("design") {
+		a.L.WriteRootHint()
+		a.L.StartBackground()
 	}
-	f.OnSliceChange("design", settle)
-	settle(f.SliceOn("design"))
+}
+
+// designPublic is how a guest link's token is checked. The audience and the header follow the design tag, the salt is the
+// share salt, so a deployment that names its design tag and share salt needs no other setting.
+func designPublic(secret []byte) design.PublicConfig {
+	tag := env("RUNTIME_DESIGN_TAG", "harnessly-design")
+	return design.PublicConfig{
+		Secret:   secret,
+		Salt:     env("RUNTIME_SHARE_TOKEN_SALT", "harnessly"),
+		Audience: tag + "-public",
+		Header:   "x-" + tag + "-token",
+	}
 }

@@ -1,0 +1,5 @@
+{
+  "op": "conversation.pin",
+  "body": {"opId": "op-pin1", "id": "tab-k3Jx9QmZ", "pinned": true},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1844, "rev": 17}
+}

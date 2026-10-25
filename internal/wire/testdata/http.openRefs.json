@@ -1,0 +1,20 @@
+{
+  "http": "openRefs",
+  "response": {
+    "refs": [
+      {"ref": "harnessly !80", "open": {"tab": "gitlab", "target": "https://gitlab.example.com/group/harnessly/-/merge_requests/80"}},
+      {
+        "ref": "!12",
+        "open": {
+          "tab": "gitlab",
+          "target": "https://gitlab.example.com/group/project/-/merge_requests/12",
+          "choices": [
+            {"tab": "gitlab", "target": "https://gitlab.example.com/group/project/-/merge_requests/12", "label": "group/project", "detail": "Fix the queue"},
+            {"tab": "gitlab", "target": "https://gitlab.example.com/group/other/-/merge_requests/12", "label": "group/other", "detail": null}
+          ]
+        }
+      },
+      {"ref": "!999", "open": null}
+    ]
+  }
+}

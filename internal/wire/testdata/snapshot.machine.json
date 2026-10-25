@@ -1,0 +1,40 @@
+{
+  "f": "snapshot",
+  "ch": "machine",
+  "seq": 0,
+  "mode": "replace",
+  "data": {
+    "machine": {
+      "id": "runner-2",
+      "name": "Моя ВМ",
+      "host": "runner-2.machines.example.com",
+      "reach": "online",
+      "lastSeenAt": 1792655996000,
+      "runtime": {
+        "version": "1.82.0",
+        "proto": 2,
+        "features": [
+          "queue", "steer", "questions", "permissions", "background", "voice", "files", "checkpoints",
+          "designly", "search", "vault", "push"
+        ]
+      },
+      "agents": [
+        {"provider": "claude", "version": "2.3.1", "status": "ready", "canSwitchModel": true, "models": [
+          {"id": "sonnet", "label": "Sonnet", "hint": "Everyday work", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": "medium"},
+          {"id": "opus", "label": "Opus", "hint": "The strongest", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": null}
+        ]},
+        {"provider": "codex", "version": null, "status": "missing", "canSwitchModel": false, "models": []}
+      ],
+      "load": {
+        "at": 1792656000000,
+        "cpu": 0.37,
+        "memUsed": 6442450944,
+        "memTotal": 16777216000,
+        "diskFree": 41000000000,
+        "diskTotal": 100000000000,
+        "busyAgents": 2
+      },
+      "health": {"level": "ok", "since": 1792650000000, "issues": []}
+    }
+  }
+}

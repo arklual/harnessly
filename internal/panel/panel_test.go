@@ -340,3 +340,95 @@ func TestSeparateDocumentAndBoardServers(t *testing.T) {
 		t.Errorf("a board on the documents port is refused")
 	}
 }
+
+func TestClassifyOpensWhatTheAgentsOpenWould(t *testing.T) {
+	tracked := targets
+	tracked.TrackerHosts = []string{"tracker.example.org"}
+	cases := []struct{ in, tab, target string }{
+		{"PROJ-12", "task", "PROJ-12"},
+		{"https://tracker.example.org/issue/DEMO-7", "task", "DEMO-7"},
+		{"https://tracker.example.org/issue/OTHER-7", "browser", "https://tracker.example.org/issue/OTHER-7"},
+		{"https://tracker.example.org/agiles", "browser", "https://tracker.example.org/agiles"},
+		{"https://gitlab.example.org/g/p/-/merge_requests/5", "gitlab", "https://gitlab.example.org/g/p/-/merge_requests/5"},
+		{"https://gitlab.example.org/g/p/-/commit/abcdef1", "gitlab", "https://gitlab.example.org/g/p/-/commit/abcdef1"},
+		{"https://gitlab.example.org/g/p", "browser", "https://gitlab.example.org/g/p"},
+		{"https://github.com/ly-solutions/harnessly/pull/12", "gitlab", "https://github.com/ly-solutions/harnessly/pull/12"},
+		{"https://github.com/ly-solutions/harnessly/pull/12/files", "gitlab", "https://github.com/ly-solutions/harnessly/pull/12/files"},
+		{"https://github.com/ly-solutions/harnessly/commit/0123abc", "gitlab", "https://github.com/ly-solutions/harnessly/commit/0123abc"},
+		{"https://github.com/ly-solutions/harnessly/issues/7", "gitlab", "https://github.com/ly-solutions/harnessly/issues/7"},
+		{"https://github.com/ly-solutions/harnessly", "browser", "https://github.com/ly-solutions/harnessly"},
+		{"https://github.com/ly-solutions/harnessly/pull/x", "browser", "https://github.com/ly-solutions/harnessly/pull/x"},
+		{"http://github.com/ly-solutions/harnessly/pull/12", "browser", "http://github.com/ly-solutions/harnessly/pull/12"},
+		{"https://github.com:444/ly-solutions/harnessly/pull/12", "browser", "https://github.com:444/ly-solutions/harnessly/pull/12"},
+		{"https://a.example.org/a/plan", "artifacts", "/agents/docs/plan"},
+		{"https://a.example.org/b/flow?k=key1", "artifacts", "https://a.example.org/b/flow?k=key1"},
+		{"https://example.com/x", "browser", "https://example.com/x"},
+		{"PROJX-1", "", ""},
+		{"javascript:alert(1)", "", ""},
+		{"https://user@example.com/", "", ""},
+	}
+	for _, c := range cases {
+		tab, target := tracked.Classify(c.in)
+		if tab != c.tab || target != c.target {
+			t.Errorf("Classify(%q) = %q %q, want %q %q", c.in, tab, target, c.tab, c.target)
+		}
+	}
+}
+
+func TestDesigns(t *testing.T) {
+	refused(t, open("design", "landing"))
+	withLibrary := targets
+	withLibrary.DesignRef = func(text string) string {
+		if text == "landing" || text == "/lib/landing/project/Main.dc.html" || text == "Лендинг" {
+			return "landing"
+		}
+		return ""
+	}
+	for _, in := range []string{"landing", " /lib/landing/project/Main.dc.html ", "Лендинг"} {
+		c, err := withLibrary.Parse(open("design", in))
+		if err != "" || c != (Command{Kind: "open", Tab: "design", Target: "landing"}) {
+			t.Errorf("%q → %+v %q", in, c, err)
+		}
+	}
+	for _, in := range []string{"other", "landing\u001b[201~"} {
+		if c, err := withLibrary.Parse(open("design", in)); err == "" {
+			t.Errorf("accepted %q → %+v", in, c)
+		}
+	}
+	if c, err := withLibrary.Parse(open("design", nil)); err != "" || c != (Command{Kind: "open", Tab: "design"}) {
+		t.Errorf("the library: %+v %q", c, err)
+	}
+}
+
+func TestAutoAndReloadTravel(t *testing.T) {
+	got := string(jsvalue.Stringify(Command{Kind: "open", Tab: "artifacts", Target: "/agents/docs/a", Auto: true, Reload: true}.JSON(), ""))
+	if got != `{"kind":"open","tab":"artifacts","target":"/agents/docs/a","auto":true,"reload":true}` {
+		t.Error(got)
+	}
+	// An agent cannot set them: unknown keys are not passed on.
+	c, ok := parse(t, obj("kind", "open", "tab", "files", "target", "/w/a", "auto", true, "reload", true))
+	if !ok || c.Auto || c.Reload {
+		t.Errorf("%+v", c)
+	}
+}
+
+func TestOpenGitHubChangesInTheGitlabTab(t *testing.T) {
+	for _, link := range []string{
+		"https://github.com/ly-solutions/harnessly/pull/12",
+		"https://github.com/ly-solutions/harnessly/commit/0123abcdef",
+		"https://github.com/ly-solutions/harnessly/issues/7",
+	} {
+		wantOpen(t, open("gitlab", link), "gitlab", link)
+	}
+	for _, link := range []string{"https://github.com/ly-solutions/harnessly", "https://github.com/ly-solutions/harnessly/pulls", "https://gitlab.evil.example/ly/h/pull/1", "https://user@github.com/a/b/pull/1"} {
+		refused(t, open("gitlab", link))
+	}
+	enterprise := targets
+	enterprise.GitHubHost = "git.corp.example"
+	if tab, _ := enterprise.Classify("https://git.corp.example/a/b/pull/3"); tab != "gitlab" {
+		t.Errorf("the deployment's own GitHub is not opened: %q", tab)
+	}
+	if tab, _ := enterprise.Classify("https://github.com/a/b/pull/3"); tab != "browser" {
+		t.Errorf("github.com opened natively though the deployment reads another GitHub: %q", tab)
+	}
+}

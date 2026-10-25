@@ -19,6 +19,8 @@ import (
 type Launch struct {
 	Model  *string `json:"model"`
 	Effort *string `json:"effort"`
+	// Ultracode starts Claude Code in its ultracode mode, beside the effort (the `ultracode` settings key).
+	Ultracode bool `json:"ultracode,omitempty"`
 }
 
 // Efforts are every reasoning level the CLIs know, weakest first.

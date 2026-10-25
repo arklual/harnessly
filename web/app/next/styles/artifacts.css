@@ -1,0 +1,154 @@
+/* The Artifacts tool (features/artifacts): calm rows on the pane's .hx-tv rows, a title that fades in where its bar was,
+   a skeleton of the same rows. Not in the design as such: the design draws two lists, «Документы» and «Задачи и MR». */
+.hx-tv[data-tool='artifacts'] {
+  width: 100%;
+}
+.hx-art {
+  position: relative;
+}
+.hx-art[data-fresh='true'] {
+  animation: hx-art-in 280ms var(--hx-ease-out) backwards;
+}
+.hx-art[data-rest='true'] .hx-tv__name {
+  color: var(--hx-fg-2);
+}
+.hx-art .hx-tv__sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hx-art__text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: hx-fade-in 240ms ease backwards;
+}
+.hx-art__bar {
+  width: 58%;
+  height: 12px;
+  margin: 3px 0;
+  border-radius: 6px;
+}
+.hx-art__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+.hx-art__dot[data-tone='progress'] {
+  background: var(--hx-accent);
+}
+.hx-art__dot[data-tone='review'] {
+  background: var(--hx-warning);
+}
+.hx-art__dot[data-tone='done'] {
+  background: var(--hx-success);
+}
+.hx-art__ava {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.hx-art__ava[data-initials='true'] {
+  display: grid;
+  place-items: center;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+  font-size: 9px;
+  font-weight: var(--hx-weight-semibold);
+}
+
+/* Links that are only addresses fold away; the body leaves with an animation of its own. */
+.hx-art-more__body {
+  display: flex;
+  flex-direction: column;
+  animation: hx-art-fold-in 220ms var(--hx-ease-out) backwards;
+}
+.hx-art-more__body[data-state='closing'] {
+  animation: hx-art-fold-out 180ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+
+/* The skeleton: the same rows with bars in the places of icon, title and line. */
+.hx-art-sk {
+  display: flex;
+  flex-direction: column;
+}
+.hx-art-sk__label {
+  width: 72px;
+  height: 10px;
+  margin: 18px 2px 8px;
+  border-radius: 5px;
+}
+.hx-art-sk__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 8px;
+}
+.hx-art-sk__icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+.hx-art-sk__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.hx-art-sk__name {
+  width: 62%;
+  height: 12px;
+  border-radius: 6px;
+}
+.hx-art-sk__sub {
+  width: 34%;
+  height: 9px;
+  border-radius: 5px;
+}
+.hx-art-sk__row:nth-child(3n + 2) .hx-art-sk__name {
+  width: 48%;
+}
+.hx-art-sk__row:nth-child(3n) .hx-art-sk__name {
+  width: 72%;
+}
+
+/* A list that took the place of its skeleton does not enter a second time (ui/swap.tsx); rows added later still do. */
+.hx-swap:is([data-phase='swapping'], [data-phase='swapped']) .hx-art:not([data-fresh='true']) {
+  animation: none;
+}
+
+@keyframes hx-art-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes hx-art-fold-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes hx-art-fold-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-art,
+  .hx-art__text,
+  .hx-art-more__body {
+    animation: none;
+  }
+}

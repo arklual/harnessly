@@ -1,0 +1,19 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 521,
+  "e": {
+    "type": "compaction",
+    "phase": "started",
+    "entry": {
+      "id": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f16#0",
+      "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+      "at": 1792655976000,
+      "rev": 1,
+      "t": "compaction",
+      "tokensBefore": 182000,
+      "tokensAfter": null,
+      "keep": []
+    }
+  }
+}

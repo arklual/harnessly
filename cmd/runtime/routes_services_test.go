@@ -33,7 +33,7 @@ func TestServiceRoutesThroughTheGate(t *testing.T) {
 	}
 	person := func(r *http.Request) bool { return r.Header.Get("Cookie") == "session-token=ok" }
 	token := func(r *http.Request) bool { return r.Header.Get("x-cli-token") == "ok" }
-	d := deps{Home: home, DataDir: dir, Old: &gate.OldRuntime{}, SessionOK: person,
+	d := deps{Home: home, DataDir: dir, CLI: &gate.CLIToken{}, SessionOK: person,
 		APIRefusal: func(r *http.Request) (int, any, http.Header, bool) {
 			if person(r) || token(r) {
 				return 0, nil, nil, false
@@ -76,6 +76,7 @@ func TestServiceRoutesThroughTheGate(t *testing.T) {
 		{"POST", "/api/platform/link-meta/projects", "", asPerson, 200, `{"keys":[]}`},
 		{"GET", "/api/platform/link-meta?url=https%3A%2F%2Fexample.com%2F", "", asPerson, 400, `{"error":"Unsupported url"}`},
 		{"GET", "/api/platform/gitlab-view?url=x", "", asPerson, 400, `{"error":"Нужна ссылка на merge request или коммит GitLab"}`},
+		{"GET", "/api/platform/change-view?url=x", "", asPerson, 400, `{"error":"Нужна ссылка на merge request, pull request, коммит или задачу"}`},
 		{"POST", "/api/platform/gitlab", `{"paths":[],"mrs":[]}`, append([]string{"Content-Type", "application/json"}, asPerson...), 200, `{"pushes":[],"mrs":[]}`},
 		{"GET", "/api/platform/gitlab", "", asPerson, 405, ""},
 		{"GET", "/api/platform/favicon?host=127.0.0.1", "", asPerson, 400, ""},
@@ -115,7 +116,7 @@ func TestServiceRoutesThroughTheGate(t *testing.T) {
 	// A service the deployment does not name keeps its routes with the old runtime.
 	t.Setenv("RUNTIME_TRACKER_URL", "")
 	t.Setenv("RUNTIME_ORGANIZER_FILE", "")
-	for _, r := range serviceRoutes(deps{Home: home, DataDir: dir, Old: &gate.OldRuntime{}, SessionOK: person, APIRefusal: d.APIRefusal}) {
+	for _, r := range serviceRoutes(deps{Home: home, DataDir: dir, CLI: &gate.CLIToken{}, SessionOK: person, APIRefusal: d.APIRefusal}) {
 		req := httptest.NewRequest("GET", "/api/platform/task", nil)
 		if r.Match(req) {
 			t.Error("the task route is served without a tracker")

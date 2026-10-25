@@ -1,0 +1,260 @@
+/* The new interface's chat header: the title first, then the machine, «⋯», the pane, «В фоне», the bell. */
+
+/* ── From the design ── */
+.hx-header {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  height: 64px;
+  padding: 0 var(--hx-space-4) 0 var(--hx-space-6);
+  flex: none;
+}
+.hx-header__title {
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-medium);
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+.hx-head-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background 240ms var(--hx-ease-out),
+    color 240ms var(--hx-ease-out);
+  animation: hx-in-fade 400ms var(--hx-ease-out) backwards;
+}
+.hx-head-btn:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-head-btn[aria-pressed='true'] {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+@media (max-width: 640px) {
+  .hx-header {
+    padding: 0 var(--hx-space-2) 0 var(--hx-space-4);
+  }
+}
+.hx-bgwrap {
+  position: relative;
+}
+.hx-bg-btn {
+  position: relative;
+  width: auto;
+  min-width: 34px;
+  padding: 0 9px;
+  border-radius: 17px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.hx-bg-btn__n {
+  font-size: 12px;
+  font-weight: var(--hx-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--hx-fg-1);
+}
+.hx-bg-btn__n:empty {
+  display: none;
+}
+.hx-bg-btn[data-run='true'] > .hx-icon {
+  color: var(--hx-accent);
+  animation: hx-bg-breathe 2.2s var(--hx-ease-in-out) infinite;
+}
+/* The chat's «…» is the sidebar row's menu button (as in the design's flows.css, which comes after the header's). */
+.hx-head-btn.hx-item__menu {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.hx-header__more {
+  margin-left: 2px;
+  opacity: 0.6;
+}
+.hx-header__more:hover {
+  opacity: 1;
+}
+.hx-header__rename {
+  width: min(360px, 50vw);
+  flex: none;
+  margin: 0;
+}
+.hx-header__title {
+  min-width: 0;
+}
+.hx-header__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .hx-header__title {
+    justify-content: flex-start;
+  }
+  .hx-header__more {
+    flex: none;
+  }
+}
+.hx-header__menu,
+.hx-header__new,
+.hx-header__bell {
+  display: none;
+}
+.hx-header__end {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+}
+@media (max-width: 900px) {
+  .hx-header {
+    height: calc(52px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) calc(var(--hx-space-2) + env(safe-area-inset-right)) 0
+      calc(var(--hx-space-2) + env(safe-area-inset-left));
+    gap: 2px;
+  }
+  .hx-header > .hx-spacer {
+    display: none;
+  }
+  .hx-header__end {
+    display: contents;
+  }
+  .hx-header__title {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    padding: 0 var(--hx-space-1);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .hx-header__title > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hx-header__menu {
+    display: grid;
+  }
+  .hx-header .hx-head-btn {
+    width: 40px;
+    height: 40px;
+    flex: none;
+  }
+  .hx-header__title {
+    font-size: 16px;
+    font-weight: var(--hx-weight-semibold);
+  }
+  .hx-header__term {
+    display: none;
+  }
+  .hx-header__bell {
+    display: grid;
+    position: relative;
+  }
+  .hx-header__bell[aria-expanded='true'] {
+    background: var(--hx-bg-active);
+    color: var(--hx-fg-1);
+  }
+  .hx-header__dot {
+    position: absolute;
+    top: 9px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--hx-accent);
+    box-shadow: 0 0 0 2px var(--hx-bg-window);
+    animation: hx-plus-in 200ms var(--hx-ease-out) backwards;
+  }
+}
+.hx-headmach {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 2px;
+  border-radius: 8px;
+  color: var(--hx-fg-3);
+  animation: hx-status-in 420ms var(--hx-ease-out) backwards;
+}
+.hx-headmach:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-headmach__dot {
+  position: absolute;
+  right: 4px;
+  bottom: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hx-success);
+  box-shadow: 0 0 0 2px var(--hx-bg-app);
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-headmach[data-health='warn'] .hx-headmach__dot {
+  background: var(--hx-warning);
+}
+.hx-headmach[data-health='bad'] .hx-headmach__dot {
+  background: var(--hx-danger);
+}
+.hx-headmach[data-health='off'] .hx-headmach__dot {
+  background: var(--hx-fg-3);
+}
+@keyframes hx-bg-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ── Header parts the design leaves to its prototype script ── */
+.hx-header__busy {
+  flex: none;
+  color: var(--hx-fg-3);
+  animation: hx-spin 900ms linear infinite;
+}
+.hx-header[data-busy='true'] .hx-header__name {
+  opacity: 0.6;
+}
+.hx-header__rename {
+  flex: 1;
+  max-width: 420px;
+  height: 32px;
+  font-size: var(--hx-text-lg);
+}
+
+/* The phone's header: the chat's name is the largest thing in it and gets the room the buttons leave; every
+   button (the machine's mark too) is a 40px square side by side, the touch box of each reaching the bar's full height. */
+@media (max-width: 900px) {
+  .hx-header {
+    gap: 0;
+  }
+  .hx-header .hx-head-btn,
+  .hx-header .hx-headmach {
+    width: 40px;
+    min-width: 40px;
+    height: 44px;
+    margin: 0;
+  }
+  .hx-header .hx-bg-btn {
+    width: auto;
+    padding: 0 8px;
+  }
+  .hx-header .hx-bg-btn__n {
+    font-size: 14px;
+  }
+  .hx-header__title {
+    font-size: var(--hx-text-lg);
+  }
+}

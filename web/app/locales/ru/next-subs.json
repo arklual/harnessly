@@ -1,0 +1,26 @@
+{
+  "next.subs.general": "Агент",
+  "next.subs.open": "Открыть",
+  "next.subs.showAll": "Показать полностью",
+  "next.subs.collapse": "Свернуть",
+  "next.subs.pane": "Сабагенты",
+  "next.subs.paneHint": "Кого запускал агент и что он вернул",
+  "next.subs.empty": "В этом чате агент никого не запускал",
+  "next.subs.stateRun": "работает",
+  "next.subs.stateDone": "готов",
+  "next.subs.stateFailed": "не удался",
+  "next.subs.waiting": "Ответа пока нет, агент ещё работает",
+  "next.subs.noAnswer": "Агент ничего не вернул",
+  "next.flow.kind": "Workflow",
+  "next.flow.stateRun": "идёт",
+  "next.flow.stateDone": "готов",
+  "next.flow.stateFailed": "ошибка",
+  "next.flow.stateStopped": "остановлен",
+  "next.flow.noPhase": "Без фазы",
+  "next.flow.flowsRun": {
+    "one": "{n} идёт",
+    "few": "{n} идут",
+    "many": "{n} идут",
+    "other": "{n} идут"
+  }
+}

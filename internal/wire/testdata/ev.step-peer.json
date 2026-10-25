@@ -1,0 +1,51 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 512,
+  "e": {
+    "type": "step",
+    "entry": {
+      "id": "c:5b2e8c1d-4a7f-4e3b-9d10-7f6a2c9e1b44#0",
+      "turnId": "c:5b2e8c1d-4a7f-4e3b-9d10-7f6a2c9e1b44#0",
+      "at": 1792656000000,
+      "rev": 1,
+      "t": "peer",
+      "peers": [
+        {
+          "from": "rev-t4",
+          "kind": "done",
+          "color": "yellow",
+          "event": null,
+          "summary": null,
+          "sentAt": 1792655930734,
+          "agentId": null,
+          "model": null,
+          "md": "Spec ❌, quality needs fixes. Full review: `/home/coder/task-4-review.md`\n\n**Findings**\n- **Important:** the retry path drops the error."
+        },
+        {
+          "from": "build-codex-pane",
+          "kind": "message",
+          "color": "blue",
+          "event": null,
+          "summary": "ABC-2656: панель готова",
+          "sentAt": null,
+          "agentId": null,
+          "model": null,
+          "md": "Промежуточный отчёт."
+        },
+        {
+          "from": "Debug stuck delivered queue items",
+          "kind": "message",
+          "color": null,
+          "event": null,
+          "summary": null,
+          "sentAt": null,
+          "agentId": "a68d2e2f655d5c31e",
+          "model": "sonnet",
+          "md": "Root cause found."
+        }
+      ]
+    },
+    "counts": {"toolCount": 0, "stepCount": 0}
+  }
+}

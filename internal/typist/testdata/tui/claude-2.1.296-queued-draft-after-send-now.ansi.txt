@@ -1,0 +1,40 @@
+[38;5;246m✻[39m [38;5;246mSautéed for 1m 3s · done 6:56 PM · 1 shell still running[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mRun exactly this Bash command in the foreground and then say DONE11: python3 -c 'import time; time.sleep(30); [39m
+  [38;5;231mprint("ok11")'[39m
+[49m
+[38;5;211m●[39m [1mBash[0m(python3 -c 'import time; time.sleep(30); print("ok11")')
+[38;5;246m  ⎿  Interrupted · What should Claude do instead?[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mold-code message one: say OLD-ONE[39m
+
+[38;5;246m❯ [38;5;231mold-code message two: say OLD-TWO[39m
+
+[38;5;231m[49m●[39m OLD-ONE
+  OLD-TWO
+
+  The [38;5;153mok11[39m sleep command was rejected, so it didn't run and I haven't said DONE11. I'm waiting for your next
+  instruction.
+
+[38;5;246m✻[39m [38;5;246mCogitated for 3s · done 6:57 PM · 1 shell still running[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mRun exactly this Bash command in the foreground and then say DONE12: python3 -c 'import time; time.sleep(30); [39m
+  [38;5;231mprint("ok12")'[39m
+[49m
+[38;5;114m●[39m [1mBash[0m(python3 -c 'import time; time.sleep(30); print("ok12")')
+[38;5;246m  ⎿  Running in the background (↓ to manage)[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mT1 queued: say Q-T1[39m
+
+[38;5;246m❯ [38;5;231mmy unsent draft[39m
+[49m
+[38;5;174m·[39m [38;5;174mIncubating… [38;5;246m(13s · ↓[39m [38;5;246m131 tokens · [38;5;247mthinking[38;5;246m)[39m
+[38;5;246m  ⎿  Tip: You can control how big a workflow is just by prompting. Ask for a small workflow, cap it with [38;5;153m"use at most 5
+[39m     [38;5;153magents"[38;5;246m, or set a default with [38;5;153mDynamic workflow size[38;5;246m in [38;5;153m/config[38;5;246m.[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵ bypass permissions on[38;5;246m · [38;5;44m1 shell[38;5;246m · esc to interrupt · ← for agents · ↓ to manage[39m
+
+

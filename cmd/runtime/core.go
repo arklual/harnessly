@@ -47,8 +47,6 @@ type coreConfig struct {
 	DataDir, Home string
 	Tmux          *tmux.Tmux
 	Term          *terminal.Server
-	Old           *gate.OldRuntime
-	OldAPI        string
 	MetaKey       string
 	AgentHeader   string
 	CodexbarBin   string
@@ -117,6 +115,10 @@ type core struct {
 	timeline *timeline.Server
 	// reload types plugin and skill reloads into idle Claude tabs (standalone only; nil otherwise).
 	reload *pluginReloader
+	// v2 is the running v2 (conversations' actors and their protocol) while the core runs, nil otherwise; v2d is what it
+	// is built from (set by main before the core starts).
+	v2  atomic.Pointer[v2Live]
+	v2d *deps
 
 	mu      sync.Mutex
 	m       *status.Manager
@@ -132,7 +134,7 @@ func newCore(cfg coreConfig) *core {
 		bg:      &background.Reader{UID: os.Getuid()},
 		claude:  claude.NewDetector(cfg.Home)}
 	c.store = state.New(state.Config{DataDir: cfg.DataDir, Tmux: state.FromTmux(cfg.Tmux), Broadcast: syncBroadcaster{c.sync},
-		Reconciler: reconciler{c}, Prompts: oldPrompts{c}, AgentTokenHeader: cfg.AgentHeader, MetaKey: cfg.MetaKey, Home: cfg.Home})
+		Reconciler: reconciler{c}, Prompts: layoutPrompts{c}, AgentTokenHeader: cfg.AgentHeader, MetaKey: cfg.MetaKey, Home: cfg.Home})
 	publish := func(e *jsvalue.Object) { c.sync.Broadcast(e) }
 	c.panel = panel.NewBridge(publish, c.sync.Hub.Count)
 	c.vault = vault.NewBridge(publish, c.sync.Hub.Count)
@@ -159,25 +161,11 @@ func newCore(cfg coreConfig) *core {
 	return c
 }
 
-// oldPost asks the old runtime for what it still keeps (checkpoints, the workspace prompt text, telemetry); nothing
-// without one.
-func (c *core) oldPost(path string, body any) {
-	if c.cfg.Old == nil || c.cfg.Standalone {
-		return
-	}
-	go c.cfg.Old.Post(c.cfg.OldAPI+"/core/"+path, body, nil)
-}
+// layoutPrompts writes the agents' per-workspace prompt files, from the deployment's templates.
+type layoutPrompts struct{ c *core }
 
-// oldPrompts has the old runtime write the agents' per-workspace prompt files: their text is the platform's own. A
-// standalone core writes them itself, from the deployment's templates.
-type oldPrompts struct{ c *core }
-
-func (p oldPrompts) WriteWorkspacePrompts(ws *jsvalue.Object) {
-	if p.c.cfg.Standalone {
-		p.c.writeWorkspacePrompts(ws.String("id"))
-		return
-	}
-	p.c.oldPost("workspace-prompts", json.RawMessage(jsvalue.Stringify(ws, "")))
+func (p layoutPrompts) WriteWorkspacePrompts(ws *jsvalue.Object) {
+	p.c.writeWorkspacePrompts(ws.String("id"))
 }
 
 func (c *core) writeWorkspacePrompts(ids ...string) {
@@ -191,19 +179,13 @@ func (c *core) writeWorkspacePrompts(ids ...string) {
 	}
 }
 
-// reportMismatch is a tab state the keeper corrected: to the old runtime, which reports it, or, standalone, logged
-// and reported here.
+// reportMismatch is a tab state the keeper corrected: logged and reported.
 func (c *core) reportMismatch(x status.Mismatch) {
 	nullable := func(s string) any {
 		if s == "" {
 			return nil
 		}
 		return s
-	}
-	if !c.cfg.Standalone {
-		c.oldPost("mismatch", map[string]any{"kind": x.Kind, "shown": x.Shown, "actual": nullable(x.Actual), "provider": nullable(x.Provider),
-			"durationMs": x.DurationMs, "unhooked": x.Unhooked})
-		return
 	}
 	actual := x.Actual
 	if actual == "" {
@@ -302,6 +284,11 @@ func (c *core) start() {
 	c.m, c.prompts, c.sleeper = m, svc, sleeper
 	c.mu.Unlock()
 	m.Start(ctx)
+	if c.v2d != nil && v2Enabled() {
+		v := newV2Live(*c.v2d, c)
+		v.start(ctx)
+		c.v2.Store(v)
+	}
 	go c.runLimits(ctx, m)
 	go sleeper.Run(ctx, 0, sleepReport)
 	if c.reload != nil {
@@ -333,6 +320,9 @@ func (c *core) stop() {
 	cancel, svc := c.cancel, c.prompts
 	c.m, c.cancel, c.prompts, c.sleeper = nil, nil, nil, nil
 	c.mu.Unlock()
+	if v := c.v2.Swap(nil); v != nil {
+		v.stop()
+	}
 	if svc != nil {
 		svc.Stop()
 	}

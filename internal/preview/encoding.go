@@ -146,9 +146,23 @@ func (f flushingWriter) Write(b []byte) (int, error) {
 
 func (f flushingWriter) Close() error { return f.enc.Close() }
 
-func encoderFor(coding string, w io.Writer) io.WriteCloser {
+// A design's runtime bundle is several megabytes of script: brotli at 4 spends over a second of the page's first load
+// on it (it goes out of the proxy a second time on every open), at 2 a third of that for a tenth more bytes. Pages and
+// data are small and keep the better level.
+const (
+	brotliPage   = 4
+	brotliBundle = 2
+)
+
+var bundleRe = regexp.MustCompile(`(?i)^(text/(css|javascript)|application/(javascript|x-javascript|wasm))\b`)
+
+func encoderFor(coding string, w io.Writer, contentType string) io.WriteCloser {
 	if coding == "br" {
-		return flushingWriter{brotli.NewWriterLevel(w, 4)}
+		level := brotliPage
+		if bundleRe.MatchString(contentType) {
+			level = brotliBundle
+		}
+		return flushingWriter{brotli.NewWriterLevel(w, level)}
 	}
 	gz, _ := gzip.NewWriterLevel(w, 5)
 	return flushingWriter{gz}

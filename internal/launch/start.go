@@ -24,6 +24,8 @@ type Lines interface {
 	// Launch starts a new conversation; promptFiles go into Claude's system prompt after the workspace's.
 	Launch(provider, workspaceID string, launch *agents.Launch, promptFiles []string) (string, error)
 	Resume(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error)
+	// Fork starts the agent on a fork of a session its CLI makes: a session of its own with the other's history.
+	Fork(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error)
 }
 
 // Keeper is the running tab keeper.
@@ -97,6 +99,8 @@ type Options struct {
 	Env      []EnvEntry
 	// ResumeSessionID reopens a saved session instead (no initial prompt then).
 	ResumeSessionID string
+	// ForkSession starts the agent on a fork of ResumeSessionID instead, a session of its own the agent names.
+	ForkSession bool
 	// PromptFiles are instruction files under DataDir (Claude only).
 	PromptFiles []string
 	// Meta goes into the tab's metadata next to the launch (the conversation's mode).
@@ -300,9 +304,12 @@ func (s *Starter) Start(o Options) (Result, error) {
 		launch = nil
 	}
 	var line string
-	if o.ResumeSessionID != "" {
+	switch {
+	case o.ResumeSessionID != "" && o.ForkSession:
+		line, err = s.cfg.Lines.Fork(o.Provider, o.ResumeSessionID, wsID, launch)
+	case o.ResumeSessionID != "":
 		line, err = s.cfg.Lines.Resume(o.Provider, o.ResumeSessionID, wsID, launch)
-	} else {
+	default:
 		line, err = s.cfg.Lines.Launch(o.Provider, wsID, launch, files)
 	}
 	if err != nil {
@@ -335,7 +342,7 @@ func (s *Starter) Start(o Options) (Result, error) {
 	tabID, session := tab.String("id"), tab.String("sessionName")
 	if k := s.keeper(); k != nil {
 		agentSession := status.Null[string]()
-		if o.ResumeSessionID != "" {
+		if o.ResumeSessionID != "" && !o.ForkSession {
 			agentSession = status.Some(o.ResumeSessionID)
 		}
 		pt, _ := tab.Get("panelType")

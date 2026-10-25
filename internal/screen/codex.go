@@ -154,7 +154,8 @@ var (
 
 // ClaudeStillInBox: the text on Claude Code's input line (Read's Input, its first line) is this message — a
 // "[Pasted text #n …]" token, or the message's start: the line's first 24 characters, image tokens and whitespace
-// aside, begin the message, or the message's first 24 characters are on the line. An empty line reads as gone.
+// aside, begin the message, or the message's first 24 characters are on the line — or, for a message too long for the
+// box, a piece of it at least 24 characters long. An empty line reads as gone.
 func ClaudeStillInBox(input, text string) bool {
 	box := collapse(claudeImageRE.ReplaceAllString(input, " "))
 	if box == "" {
@@ -173,5 +174,39 @@ func ClaudeStillInBox(input, text string) bool {
 	if strings.HasPrefix(box, probe) {
 		return true
 	}
-	return strings.HasPrefix(msg, box) && utf8.RuneCountInString(box) >= codexProbeChars
+	if utf8.RuneCountInString(box) < codexProbeChars {
+		return false
+	}
+	// A long message does not fit the box: Claude shows the rows around the cursor, so the box's first visible row (the
+	// one with ❯) starts in the middle of the message. The box is then a piece of the message, compared without white
+	// space (the box wraps anywhere and joins its rows with spaces).
+	return strings.HasPrefix(msg, box) || strings.Contains(noSpace(msg), noSpace(box))
+}
+
+// SameMessage: a user entry of the transcript is this message — the same text, picture references and white space
+// aside, or (a message long enough not to be a coincidence) the entry carries it whole, as Claude may wrap it.
+func SameMessage(entry, text string) bool {
+	e := noSpace(claudeImageRE.ReplaceAllString(entry, " "))
+	m := noSpace(claudeImageRE.ReplaceAllString(text, " "))
+	if m == "" {
+		return false
+	}
+	return e == m || utf8.RuneCountInString(m) >= codexProbeChars && strings.Contains(e, m)
+}
+
+// ClaudeBoxPieceOf: what is left in Claude's box (picture references aside) is a piece of text, however short — the box
+// being cleared of a message of ours row by row.
+func ClaudeBoxPieceOf(input, text string) bool {
+	box := noSpace(claudeImageRE.ReplaceAllString(input, " "))
+	return box != "" && strings.Contains(noSpace(claudeImageRE.ReplaceAllString(text, " ")), box)
+}
+
+// noSpace drops every white space character.
+func noSpace(s string) string {
+	return strings.Map(func(r rune) rune {
+		if jscompat.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, s)
 }

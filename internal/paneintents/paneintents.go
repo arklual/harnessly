@@ -23,7 +23,7 @@ const (
 	saveDelay = 200 * time.Millisecond
 )
 
-// An intent is `{id, command, createdAt, appliedAt, appliedOn}`: command is `{kind:'open', tab, target?}` or
+// An intent is `{id, command, createdAt, appliedAt, appliedOn}`: command is `{kind:'open', tab, target?, auto?, reload?}` or
 // `{kind:'show'}`, times are epoch milliseconds, appliedAt and appliedOn null until a page first applied it.
 
 func isRecord(v any) (*jsvalue.Object, bool) { o, ok := v.(*jsvalue.Object); return o, ok }
@@ -40,7 +40,14 @@ func isCommand(v any) bool {
 	tab, _ := o.Get("tab")
 	target, has := o.Get("target")
 	_, isStr := target.(string)
-	return kind == "open" && panel.IsTabKind(tab) && (!has || isStr)
+	return kind == "open" && panel.IsTabKind(tab) && (!has || isStr) && optionalBool(o, "auto") && optionalBool(o, "reload")
+}
+
+// optionalBool: the flag is absent or a boolean.
+func optionalBool(o *jsvalue.Object, key string) bool {
+	v, has := o.Get(key)
+	_, isBool := v.(bool)
+	return !has || isBool
 }
 
 // IsIntent says whether a stored value is a well-formed intent.
@@ -324,6 +331,9 @@ func describeCommand(cmd *jsvalue.Object) string {
 		return locale.Pick("show the pane", "показать панель")
 	}
 	s := locale.Pick("open \""+cmd.String("tab")+"\"", "открыть «"+cmd.String("tab")+"»")
+	if reload, _ := cmd.Get("reload"); reload == true {
+		s = locale.Pick("reload \""+cmd.String("tab")+"\"", "обновить «"+cmd.String("tab")+"»")
+	}
 	if t := cmd.String("target"); t != "" {
 		s += " (" + t + ")"
 	}

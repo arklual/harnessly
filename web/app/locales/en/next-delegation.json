@@ -1,0 +1,19 @@
+{
+  "next.sidebar.showDelegated": "Show delegated chats",
+  "next.sidebar.hideDelegated": "Hide delegated chats",
+  "next.delegation.card": "Delegated:",
+  "next.delegation.untitled": "Untitled",
+  "next.delegation.from": "Delegated from “{title}”",
+  "next.delegation.state.starting": "Starting",
+  "next.delegation.state.working": "Working",
+  "next.delegation.state.waiting": "Waiting for you",
+  "next.delegation.state.done": "Done",
+  "next.delegation.state.stopped": "Stopped",
+  "next.delegation.state.failed": "Not running",
+  "next.tool.delegated": "Delegation",
+  "next.settings.delegation.title": "Agents delegating",
+  "next.settings.delegation.hint": "An agent can hand a task to another agent in a new chat, shown under its own chat.",
+  "next.settings.delegation.maxChildren": "Delegated chats per chat",
+  "next.settings.delegation.anyChat": "Write to any chat",
+  "next.settings.delegation.anyChatHint": "Otherwise an agent writes only to the chats it delegated."
+}

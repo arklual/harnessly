@@ -450,7 +450,7 @@ func (s *Server) readRange(fw *fileWatcher, from, to int64) ([]*jsvalue.Object, 
 	}
 	content := decodeUTF8(raw)
 	if s.isCodexPath(fw.path) {
-		return transcript.ParseCodexContent(content, s.d.Codex), true
+		return transcript.ParseCodexContentAt(content, from, s.d.Codex), true
 	}
-	return transcript.ParseContent(content), true
+	return transcript.ParseContentAt(content, from), true
 }

@@ -1,0 +1,21 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 537,
+  "e": {
+    "type": "message_upsert",
+    "message": {
+      "clientId": "0192b6f1-0000-7000-8000-000000000016",
+      "conversationId": "tab-k3Jx9QmZ",
+      "text": "Сверь доску\n\n<attached>\n<ref kind=\"board\" id=\"flow\" title=\"Путь покупателя\"/> Доска «Путь покупателя»: https://docs.example.com/b/flow — прочитай её текстом: `acme-board read https://docs.example.com/b/flow`.\n</attached>",
+      "attachments": [],
+      "refs": [{"kind": "board", "id": "flow", "title": "Путь покупателя", "target": "https://docs.example.com/b/flow"}],
+      "mode": "queue",
+      "kind": "prompt",
+      "createdAt": 1792655990000,
+      "attempts": 0,
+      "state": {"k": "queued", "position": 1, "reason": "behind", "wait": null},
+      "rev": 1
+    }
+  }
+}

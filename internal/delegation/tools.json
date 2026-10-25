@@ -1,0 +1,65 @@
+[
+  {
+    "name": "delegate_task",
+    "description": "Hand a task to another agent in a new chat of this machine that the person sees, nested under this chat, and can open, watch and take over. Use it for another provider or model than yours (e.g. Codex, or a stronger or cheaper model), for long work the person should be able to follow or continue, or work to run beside yours. For a quick subtask of your own kind inside this session, use your own subagents instead. The task must stand alone: the other agent sees nothing of this chat. Returns the chat's id at once; the agent works on it meanwhile — wait_conversation for its answer, or notify: true to be woken with it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "provider": {"type": "string", "enum": ["claude", "codex"], "description": "The agent CLI to run the task."},
+        "model": {"type": "string", "description": "A model id of that provider on this machine (as its model picker names it, e.g. opus or sonnet for Claude); omit for the machine's default. An unknown id is refused with the list of the ones there are."},
+        "effort": {"type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "ultra"], "description": "Reasoning effort; omit for the model's own."},
+        "prompt": {"type": "string", "description": "The task, complete: goal, context, files, what to answer with."},
+        "cwd": {"type": "string", "description": "Absolute folder to work in, inside this chat's folder or one of the machine's projects; omit for this chat's folder."},
+        "title": {"type": "string", "description": "A short name for the chat, as the person sees it in the sidebar."},
+        "notify": {"type": "boolean", "description": "Wake this chat with the result when the other agent finishes a turn (it arrives as a message from that agent). Default false."}
+      },
+      "required": ["provider", "prompt"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "read_conversation",
+    "description": "Read a chat you delegated: the person's and the agent's messages, tool calls in a line each (failed ones with their output), oldest first. Ends with a cursor: pass it as since to read only what came after.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "The chat's id (tab-…)."},
+        "since": {"type": "string", "description": "The cursor of an earlier read."},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 200, "description": "At most this many entries, the latest ones. Default 40."}
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "send_to_conversation",
+    "description": "Give a chat you delegated more work: the message goes into its queue as a message from your agent (never as the person's words) and is typed in when the agent is free.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "The chat's id (tab-…)."},
+        "text": {"type": "string", "description": "The message."}
+      },
+      "required": ["id", "text"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "wait_conversation",
+    "description": "Wait until a chat you delegated finishes what it was last given (or needs the person, or stops), at most timeout_s seconds, and get its last answer. A timeout means it still works: wait again or read it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "The chat's id (tab-…)."},
+        "timeout_s": {"type": "integer", "minimum": 1, "maximum": 600, "description": "How long to wait. Default 120; Codex's calls end at 55."}
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_children",
+    "description": "The chats this chat delegated, with each one's agent, model and state.",
+    "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
+  }
+]

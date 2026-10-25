@@ -34,6 +34,14 @@ type Config struct {
 	// GitLabHosts are the GitLabs links and remotes may point at; the first is the self-hosted one, which reads its
 	// own token.
 	GitLabHosts []string
+	// GitLabAPI is the origin the GitLab API is read from when it is not https://<host> (a stand-in in the browser
+	// tests); empty for the GitLabs themselves.
+	GitLabAPI string
+	// GitHubHost is the GitHub whose pull requests, commits and issues a tab shows ("" is github.com); GitHubAPI the
+	// origin its API is read from when it is not the host's own (a stand-in in tests). GitHubTokenCmd asks for the
+	// person's token (nil is `gh auth token`).
+	GitHubHost, GitHubAPI string
+	GitHubTokenCmd        []string
 	// TrackerURL is the issue tracker's origin (https://tracker.example.com); TrackerHosts the hosts its issue links use.
 	TrackerURL   string
 	TrackerHosts []string
@@ -66,9 +74,11 @@ type Service struct {
 	homes    []string
 
 	gitlab   *gitlabState
+	github   *githubState
 	meta     *linkMetaState
 	tasks    *taskState
 	icons    *iconState
+	apps     *appsState
 	organize sync.Mutex
 }
 
@@ -90,9 +100,11 @@ func New(cfg Config) *Service {
 		follow:   &http.Client{Transport: t, CheckRedirect: followRedirect},
 		noFollow: &http.Client{Transport: t, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
 		gitlab:   newGitlabState(),
+		github:   newGithubState(),
 		meta:     newLinkMetaState(),
 		tasks:    newTaskState(),
 		icons:    newIconState(),
+		apps:     newAppsState(),
 	}
 }
 

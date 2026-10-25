@@ -1,0 +1,4 @@
+{
+  "http": "file",
+  "response": {"path": "src/main.go", "content": "package main\n\nfunc main() {}\n", "revision": "9f2b6c1e0a7d4c35b8e1f60d2a93c7b4e5d8a1f0c6b39e72d4a58f1c0b7e6d93", "bytes": 28}
+}

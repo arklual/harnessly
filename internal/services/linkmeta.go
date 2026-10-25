@@ -18,6 +18,7 @@ import (
 
 const (
 	metaFresh      = 5 * time.Minute
+	metaStale      = 30 * time.Minute
 	metaMissFresh  = time.Minute
 	metaEntries    = 500
 	maxHTML        = 400_000
@@ -396,7 +397,9 @@ func (s *Service) fetchMr(ctx context.Context, t *linkTarget) (any, error) {
 var htmlType = regexp.MustCompile(`text/html`)
 
 func (s *Service) fetchArtifact(ctx context.Context, target string) (any, error) {
-	resp, err := s.fetch(ctx, target, http.Header{"Accept": {"text/html"}}, refuse, serviceTimeout, 0)
+	// Only the head of the page is read for its title: a document can weigh megabytes (pictures inside), and the
+	// answer to the panel waited for all of it. maxHTML counts characters; three bytes cover any of them.
+	resp, err := s.fetch(ctx, target, http.Header{"Accept": {"text/html"}}, refuse, serviceTimeout, 3*maxHTML)
 	if resp == nil {
 		return nil, err
 	}
@@ -504,32 +507,52 @@ func (s *Service) loadMeta(ctx context.Context, t *linkTarget) (any, error) {
 }
 
 // linkMeta is a link's metadata: kept 5 minutes (a miss 1 minute), one request per link in flight, the last good
-// answer kept through a failure.
+// answer kept through a failure. An answer older than that but younger than half an hour is still given at once while
+// the link is read again in the background, so a panel reopened later never waits for the tracker or the document
+// service; only a link not seen for longer waits for its read.
 func (s *Service) linkMeta(ctx context.Context, t *linkTarget) any {
 	key := t.cacheKey()
 	st := s.meta
 	st.mu.Lock()
 	cached, has := st.entries[key]
+	stale := false
 	if has {
 		fresh := metaMissFresh
 		if cached.meta != nil {
 			fresh = metaFresh
 		}
-		if time.Since(cached.at) < fresh {
+		age := time.Since(cached.at)
+		if age < fresh {
 			st.mu.Unlock()
 			return cached.meta
 		}
+		stale = cached.meta != nil && age < metaStale
 	}
-	if call, ok := st.inflight[key]; ok {
-		st.mu.Unlock()
-		<-call.done
+	call, running := st.inflight[key]
+	if !running {
+		call = &metaCall{done: make(chan struct{})}
+		st.inflight[key] = call
+	}
+	st.mu.Unlock()
+	if !running {
+		if stale {
+			go s.loadInto(context.WithoutCancel(ctx), key, t, call, cached)
+			return cached.meta
+		}
+		s.loadInto(context.WithoutCancel(ctx), key, t, call, cached)
 		return call.meta
 	}
-	call := &metaCall{done: make(chan struct{})}
-	st.inflight[key] = call
-	st.mu.Unlock()
+	if stale {
+		return cached.meta
+	}
+	<-call.done
+	return call.meta
+}
 
-	meta, err := s.loadMeta(context.WithoutCancel(ctx), t)
+// loadInto reads a link and settles its call: the answer is remembered, a failure keeps the last good one.
+func (s *Service) loadInto(ctx context.Context, key string, t *linkTarget, call *metaCall, cached metaEntry) {
+	st := s.meta
+	meta, err := s.loadMeta(ctx, t)
 	st.mu.Lock()
 	if err != nil {
 		call.meta = cached.meta
@@ -543,7 +566,6 @@ func (s *Service) linkMeta(ctx context.Context, t *linkTarget) any {
 	delete(st.inflight, key)
 	st.mu.Unlock()
 	close(call.done)
-	return call.meta
 }
 
 func (st *linkMetaState) remember(key string, e metaEntry) {

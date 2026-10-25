@@ -9,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -237,20 +235,6 @@ func TestRoutesStepAsideWithoutWhatTheyNeed(t *testing.T) {
 	if code, _, _ := serve(f, "GET", "/api/manifest", map[string]string{"If-None-Match": h.Get("ETag")}); code != 304 {
 		t.Fatalf("%d", code)
 	}
-}
-
-func TestShadowOfTheSnapshotIgnoresTheMomentsFigures(t *testing.T) {
-	routes := Routes(Config{PlatformAPI: "/api/platform"})
-	vol := routes[0].Volatile
-	if len(vol) == 0 || !strings.HasPrefix(vol[0], "machines.*.") {
-		t.Fatalf("%v", vol)
-	}
-	for _, v := range vol {
-		if strings.Count(v, "*") == 0 {
-			t.Errorf("%s", v)
-		}
-	}
-	_ = strconv.Itoa
 }
 
 // What was read is kept across a restart: the next process starts from it and reads only what was added since.

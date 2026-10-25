@@ -3,6 +3,7 @@ package claude
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -77,6 +78,38 @@ func EditorEnv(humanEditorVar, script string) string {
 	return humanEditorVar + `="${VISUAL:-$EDITOR}" VISUAL=` + agents.ShellQuote(script) + " EDITOR=" + agents.ShellQuote(script)
 }
 
+// UltracodeSettings writes, next to the hooks settings file, a copy of it with `"ultracode": true` (rewritten only when
+// its content changes) and gives its path. Claude Code takes ultracode for the session from this key and never saves
+// it: a session started on it is the only way to start in the mode.
+func UltracodeSettings(hooksPath string) (string, error) {
+	raw, err := os.ReadFile(hooksPath)
+	if err != nil {
+		return "", err
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		return "", err
+	}
+	settings["ultracode"] = true
+	body, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	target := strings.TrimSuffix(hooksPath, ".json") + ".ultracode.json"
+	if have, err := os.ReadFile(target); err == nil && string(have) == string(body) {
+		return target, nil
+	}
+	tmp := target + ".tmp"
+	if err := os.WriteFile(tmp, body, 0o600); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp, target); err != nil {
+		_ = os.Remove(tmp)
+		return "", err
+	}
+	return target, nil
+}
+
 // joinPromptFiles writes the files' trimmed texts, a blank line apart, into one file named by their hash: the bare
 // CLI keeps only the last --append-system-prompt-file.
 func (c LaunchConfig) joinPromptFiles(files []string) (string, error) {
@@ -132,7 +165,16 @@ func (c LaunchConfig) promptFileFlags(workspaceID string, extra []string) ([]str
 // Flags are the launch flags in order: settings, MCP config, skills plugin, system-prompt files, permissions, model and
 // effort.
 func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFiles []string) (string, error) {
-	parts := []string{"--settings " + c.HooksPath, "--mcp-config " + c.MCPConfigPath}
+	settings := c.HooksPath
+	if launch != nil && launch.Ultracode {
+		// Claude Code reads one --settings (the last one given): the mode goes into a copy of the hooks settings.
+		path, err := UltracodeSettings(c.HooksPath)
+		if err != nil {
+			return "", err
+		}
+		settings = path
+	}
+	parts := []string{"--settings " + settings, "--mcp-config " + c.MCPConfigPath}
 	if c.PluginDir != nil {
 		if dir := c.PluginDir(); dir != "" {
 			parts = append(parts, "--plugin-dir "+agents.ShellQuote(dir))

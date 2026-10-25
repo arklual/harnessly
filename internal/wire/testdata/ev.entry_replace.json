@@ -1,0 +1,17 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 512,
+  "e": {
+    "type": "entry_replace",
+    "oldId": "live:c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+    "entry": {
+      "id": "c:7d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6#0",
+      "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+      "at": 1792655999400,
+      "rev": 1,
+      "t": "say",
+      "md": "Готово: **типы**, схема и фикстуры."
+    }
+  }
+}

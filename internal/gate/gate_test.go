@@ -230,7 +230,4 @@ func TestStandaloneGate(t *testing.T) {
 	if rec.Body.String() != "fallback" {
 		t.Fatal("Proxy goes to the fallback")
 	}
-	if (&OldRuntime{DataDir: dir}).Post("/a", nil, nil) {
-		t.Fatal("no old runtime to call")
-	}
 }

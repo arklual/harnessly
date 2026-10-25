@@ -1,0 +1,5 @@
+{
+  "op": "answer",
+  "body": {"opId": "op-a2", "conversationId": "tab-k3Jx9QmZ", "questionId": "q:toolu_01AskQ", "chatAbout": true},
+  "result": {"r": "accepted", "ch": "conv:tab-k3Jx9QmZ", "seq": 520}
+}

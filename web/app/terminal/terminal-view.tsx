@@ -132,7 +132,7 @@ export function TerminalView({ session, focus, className, onRestart }: TerminalV
   }, [focus, state]);
 
   return (
-    <div className={`terminal ${className ?? ''}`} data-state={state} data-testid="terminal">
+    <div className={`terminal-view ${className ?? ''}`} data-state={state} data-testid="terminal">
       <div ref={host} className="terminal__screen" />
       {state === 'connecting' && (
         <div className="terminal__overlay terminal__overlay--soft">

@@ -1,0 +1,5 @@
+{
+  "op": "favorites.group.move",
+  "body": {"opId": "op-fg4", "id": "fg-b8w1c5ze", "beforeId": "fg-9k2m4x7q"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1854}
+}

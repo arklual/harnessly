@@ -1,0 +1,16 @@
+{
+  "http": "rewindPlan",
+  "response": {
+    "entryId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+    "turns": 3,
+    "files": {
+      "at": 1761400000000,
+      "changes": [
+        {"path": "internal/store/migrate.go", "change": "removed"},
+        {"path": "internal/store/store.go", "change": "changed"},
+        {"path": "docs/schema.md", "change": "restored"}
+      ],
+      "more": 0
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "op": "model",
+  "body": {"opId": "op-mod1", "id": "tab-k3Jx9QmZ", "model": "claude-sonnet-5-5", "effort": null},
+  "result": {"r": "queued", "ch": "conv:tab-k3Jx9QmZ", "seq": 520}
+}

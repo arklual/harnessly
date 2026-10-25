@@ -2,6 +2,7 @@ package transcript
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -9,7 +10,11 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/workflows"
 )
+
+// workflowScriptName is what a workflow script's file adds to the workflow's name: «checkout-review-wf_3c9e1a7b-5d2.js».
+var workflowScriptName = regexp.MustCompile(`(-wf_[\w-]+)?\.js$`)
 
 // One transcript line into timeline entries (parseSingleEntry and its helpers in the previous runtime).
 
@@ -59,7 +64,7 @@ const claudeProtocolTags = "local-command-caveat|local-command-stdout|local-comm
 	"command-args|user-prompt-submit-hook|system-reminder"
 
 func init() {
-	for _, tag := range []string{"task-id", "event", "status", "summary", "result", "total_tokens", "tool_uses", "duration_ms"} {
+	for _, tag := range []string{"task-id", "tool-use-id", "event", "status", "summary", "result", "total_tokens", "tool_uses", "duration_ms"} {
 		tagREs[tag] = regexp.MustCompile(`<` + tag + `>([\s\S]*?)</` + tag + `>`)
 	}
 }
@@ -205,9 +210,18 @@ func apiErrorNotice(raw any, ts float64) *jsvalue.Object {
 	if message == "" {
 		message = "API error"
 	}
-	e := obj("id", NewID(), "type", "error-notice", "timestamp", ts, "severity", severity, "message", message)
+	e := obj("id", unsetID, "type", "error-notice", "timestamp", ts, "severity", severity, "message", message)
 	if code != "" {
 		e.Set("errorCode", code)
+	}
+	// A refusal for the plan's usage limit says when the limit resets (unix seconds) and which window it is.
+	if q, ok := get(raw, "quotaLimits").(*jsvalue.Object); ok && code == "rate_limit" && isStr(get(q, "status"), "rejected") {
+		if at, ok := get(q, "resetsAt").(float64); ok && at > 0 {
+			e.Set("limitResetsAt", at*1000)
+			if w, ok := get(q, "rateLimitType").(string); ok {
+				e.Set("limitWindow", w)
+			}
+		}
 	}
 	return e
 }
@@ -233,6 +247,15 @@ func summarizeToolCall(name any, input any) string {
 		return "$ " + cmd
 	case isStr(name, "Grep"), isStr(name, "Glob"):
 		return jsString(name) + ` "` + jsString(coalesce(get(input, "pattern"), "")) + `"`
+	case isStr(name, "Workflow"):
+		// The script's own name, not its first 60 characters: «Workflow checkout-review».
+		if n := workflows.ParseMeta(jsString(coalesce(get(input, "script"), ""))).Name; n != "" {
+			return "Workflow " + n
+		}
+		if p := jsString(coalesce(get(input, "scriptPath"), "")); p != "" {
+			return "Workflow " + workflowScriptName.ReplaceAllString(filepath.Base(p), "")
+		}
+		return "Workflow"
 	}
 	firstVal := ""
 	if ks := keys(input); len(ks) > 0 && ks[0] != "" {
@@ -269,6 +292,54 @@ func summarizeToolResult(content any, isError any) string {
 	return ""
 }
 
+// resultLinksMax is the most links a tool's result hands on: the feed finds among them what the call made (the page an
+// Artifact published, the merge request a command opened).
+const resultLinksMax = 8
+
+var resultLinkRE = regexp.MustCompile("https?://[^\\s\"'<>()\\[\\]{}`]+")
+
+// resultLinks are the links a tool's result names, in order, each once; nil for none and for a failed call.
+func resultLinks(content any, isError any) []any {
+	if truthy(isError) {
+		return nil
+	}
+	var texts []string
+	switch c := content.(type) {
+	case string:
+		texts = append(texts, c)
+	case []any:
+		for _, item := range c {
+			if o, ok := item.(*jsvalue.Object); ok && isStr(get(o, "type"), "text") {
+				texts = append(texts, jsString(coalesce(get(o, "text"), "")))
+			}
+		}
+	}
+	var out []any
+	for _, text := range texts {
+		for _, link := range resultLinkRE.FindAllString(text, -1) {
+			link = strings.TrimRight(link, ".,;:!?*")
+			if len(out) == resultLinksMax {
+				return out
+			}
+			if !slices.Contains(out, any(link)) {
+				out = append(out, link)
+			}
+		}
+	}
+	return out
+}
+
+// artifactPublish is what an Artifact call that publishes a page says of it (the page's file, its title, the address
+// it updates); nil for its other actions.
+func artifactPublish(input any) *jsvalue.Object {
+	action := jsString(coalesce(get(input, "action"), ""))
+	if action != "" && action != "publish" || truthy(get(input, "asset")) {
+		return nil
+	}
+	return obj("file", jsString(coalesce(get(input, "file_path"), "")), "title", jsString(coalesce(get(input, "title"), "")),
+		"url", jsString(coalesce(get(input, "url"), "")))
+}
+
 type claudePrompt struct {
 	text   string
 	images []any
@@ -297,7 +368,7 @@ func splitPromptContent(content []any) claudePrompt {
 }
 
 func slashCommand(ts float64, name, args string) *jsvalue.Object {
-	return obj("id", NewID(), "type", "slash-command", "timestamp", ts, "name", name, "args", args, "origin", "transcript")
+	return obj("id", unsetID, "type", "slash-command", "timestamp", ts, "name", name, "args", args, "origin", "transcript")
 }
 
 // parseCommandProtocol is a slash command record or its output; ok is false when the text is not command protocol.
@@ -325,13 +396,13 @@ func parseCommandProtocol(text string, ts float64) (entries []*jsvalue.Object, o
 			}
 		}
 		output := cleanCommandOutput(strings.Join(parts, "\n"))
-		return []*jsvalue.Object{obj("id", NewID(), "type", "command-output", "timestamp", ts, "output", output,
+		return []*jsvalue.Object{obj("id", unsetID, "type", "command-output", "timestamp", ts, "output", output,
 			"isError", jscompat.Trim(errText) != "")}, true
 	}
 	if m := commandNameRE.FindStringSubmatch(text); m != nil {
 		name := strings.TrimPrefix(m[1], "/")
 		if name == "exit" {
-			return []*jsvalue.Object{obj("id", NewID(), "type", "session-exit", "timestamp", ts)}, true
+			return []*jsvalue.Object{obj("id", unsetID, "type", "session-exit", "timestamp", ts)}, true
 		}
 		args := ""
 		if a := commandArgsRE.FindStringSubmatch(text); a != nil {
@@ -353,7 +424,7 @@ func parseCommandProtocol(text string, ts float64) (entries []*jsvalue.Object, o
 	if output == "" {
 		return []*jsvalue.Object{}, true
 	}
-	return []*jsvalue.Object{obj("id", NewID(), "type", "command-output", "timestamp", ts, "output", output, "isError", isError)}, true
+	return []*jsvalue.Object{obj("id", unsetID, "type", "command-output", "timestamp", ts, "output", output, "isError", isError)}, true
 }
 
 type claudeRunningCommand struct {
@@ -415,7 +486,10 @@ func parseTaskNotification(text string, ts float64) *jsvalue.Object {
 	if !hasResult && hasEvent {
 		result, hasResult = event, true
 	}
-	e := obj("id", NewID(), "type", "task-notification", "timestamp", ts, "taskId", taskID, "status", status, "summary", summary)
+	e := obj("id", unsetID, "type", "task-notification", "timestamp", ts, "taskId", taskID, "status", status, "summary", summary)
+	if use, ok := extractTag(xml, "tool-use-id"); ok && use != "" {
+		e.Set("toolUseId", use)
+	}
 	if hasResult {
 		e.Set("result", result)
 	}
@@ -513,9 +587,9 @@ func (p *claudeParse) assistant(raw any, b *claudeBase, ts float64) []*jsvalue.O
 	for _, c := range msg.content {
 		switch {
 		case isStr(get(c, "type"), "thinking"):
-			entries = append(entries, obj("id", NewID(), "type", "thinking", "timestamp", ts, "thinking", coalesce(get(c, "thinking"), "")))
+			entries = append(entries, obj("id", unsetID, "type", "thinking", "timestamp", ts, "thinking", coalesce(get(c, "thinking"), "")))
 		case isStr(get(c, "type"), "text") && c.Has("text"):
-			e := obj("id", NewID(), "type", "assistant-message", "timestamp", ts, "markdown", get(c, "text"))
+			e := obj("id", unsetID, "type", "assistant-message", "timestamp", ts, "markdown", get(c, "text"))
 			if truthy(msg.usage) && !usageAttached {
 				e.Set("usage", msg.usage)
 				e.Set("model", msg.model)
@@ -550,7 +624,6 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 		if !ok {
 			planText = string(jsvalue.Stringify(plan, "  "))
 		}
-		id := NewID()
 		filePath := any(undef)
 		if s, ok := get(input, "planFilePath").(string); ok {
 			filePath = s
@@ -563,7 +636,7 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 			}
 			allowed = prompts
 		}
-		return obj("id", id, "type", "plan", "timestamp", ts, "toolUseId", toolUseID, "markdown", planText, "filePath", filePath,
+		return obj("id", unsetID, "type", "plan", "timestamp", ts, "toolUseId", toolUseID, "markdown", planText, "filePath", filePath,
 			"allowedPrompts", allowed, "status", "pending")
 	case isStr(toolName, "TaskCreate"):
 		subject, _ := get(input, "subject").(string)
@@ -571,7 +644,7 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 		if _, ok := description.(string); !ok {
 			description = undef
 		}
-		return obj("id", NewID(), "type", "task-progress", "timestamp", ts, "action", "create", "taskId", "", "toolUseId", toolUseID,
+		return obj("id", unsetID, "type", "task-progress", "timestamp", ts, "action", "create", "taskId", "", "toolUseId", toolUseID,
 			"subject", subject, "description", description, "status", "pending")
 	case isStr(toolName, "TaskUpdate"):
 		status := "pending"
@@ -583,7 +656,7 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 		if !ok {
 			taskIDText = jsString(coalesce(taskID, ""))
 		}
-		return obj("id", NewID(), "type", "task-progress", "timestamp", ts, "action", "update", "taskId", taskIDText, "status", status)
+		return obj("id", unsetID, "type", "task-progress", "timestamp", ts, "action", "update", "taskId", taskIDText, "status", status)
 	}
 	if questions, ok := askQuestions(toolName, input); ok {
 		items := make([]any, len(questions))
@@ -605,7 +678,7 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 			}
 			items[i] = obj("question", question, "header", header, "options", opts, "multiSelect", multi, "preview", preview)
 		}
-		return obj("id", NewID(), "type", "ask-user-question", "timestamp", ts, "toolUseId", toolUseID, "questions", items,
+		return obj("id", unsetID, "type", "ask-user-question", "timestamp", ts, "toolUseId", toolUseID, "questions", items,
 			"status", "pending")
 	}
 	summary := summarizeToolCall(toolName, input)
@@ -621,7 +694,7 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 	if isStr(toolName, "SendUserFile") {
 		sent = parseSentFiles(input, b.cwd)
 	}
-	e := obj("id", NewID(), "type", "tool-call", "timestamp", ts, "toolUseId", toolUseID, "toolName", toolName, "summary", summary,
+	e := obj("id", unsetID, "type", "tool-call", "timestamp", ts, "toolUseId", toolUseID, "toolName", toolName, "summary", summary,
 		"filePath", filePath, "diff", diff)
 	if peer != nil {
 		e.Set("peerMessage", peer)
@@ -629,8 +702,31 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 	if sent != nil {
 		e.Set("sentFiles", sent)
 	}
+	if isStr(toolName, "Artifact") {
+		if pub := artifactPublish(input); pub != nil {
+			e.Set("publish", pub)
+		}
+	}
 	e.Set("status", "pending")
+	if isStr(toolName, "Agent") || isStr(toolName, "Task") {
+		e.Set("agent", subagentCall(input))
+	}
 	return e
+}
+
+// subagentCall is what an Agent call says about the agent it starts: its kind, its own name (a teammate has one), the
+// model asked for and whether it runs in the background.
+func subagentCall(input any) *jsvalue.Object {
+	o := obj()
+	for _, f := range [][2]string{{"type", "subagent_type"}, {"name", "name"}, {"model", "model"}, {"description", "description"}} {
+		if v, _ := get(input, f[1]).(string); v != "" {
+			o.Set(f[0], v)
+		}
+	}
+	if get(input, "run_in_background") == true {
+		o.Set("background", true)
+	}
+	return o
 }
 
 func askQuestions(toolName, input any) ([]any, bool) {
@@ -647,7 +743,7 @@ func (p *claudeParse) user(raw any, ts float64) []*jsvalue.Object {
 	}
 	if get(raw, "isMeta") == true {
 		if text, ok := deliveredPeerText(raw); ok {
-			return []*jsvalue.Object{obj("id", NewID(), "type", "user-message", "timestamp", ts, "text", text)}
+			return []*jsvalue.Object{obj("id", unsetID, "type", "user-message", "timestamp", ts, "text", text)}
 		}
 		return nil
 	}
@@ -663,7 +759,7 @@ func (p *claudeParse) user(raw any, ts float64) []*jsvalue.Object {
 			return cmd
 		}
 		if cleaned := stripProtocolTags(content); cleaned != "" {
-			return []*jsvalue.Object{obj("id", NewID(), "type", "user-message", "timestamp", ts, "text", cleaned)}
+			return []*jsvalue.Object{obj("id", unsetID, "type", "user-message", "timestamp", ts, "text", cleaned)}
 		}
 		return nil
 	}
@@ -676,14 +772,14 @@ func (p *claudeParse) user(raw any, ts float64) []*jsvalue.Object {
 				claudeFail("text.startsWith is not a function")
 			}
 			if strings.HasPrefix(text, claudeInterruptPrefix) {
-				return []*jsvalue.Object{obj("id", NewID(), "type", "interrupt", "timestamp", ts)}
+				return []*jsvalue.Object{obj("id", unsetID, "type", "interrupt", "timestamp", ts)}
 			}
 		}
 	}
 	var entries []*jsvalue.Object
 	prompt := splitPromptContent(content)
 	if prompt.text != "" || len(prompt.images) > 0 {
-		e := obj("id", NewID(), "type", "user-message", "timestamp", ts, "text", prompt.text)
+		e := obj("id", unsetID, "type", "user-message", "timestamp", ts, "text", prompt.text)
 		if len(prompt.images) > 0 {
 			e.Set("images", prompt.images)
 		}
@@ -705,14 +801,60 @@ func (p *claudeParse) user(raw any, ts float64) []*jsvalue.Object {
 		} else {
 			summary = summarizeToolResult(get(item, "content"), coalesce(get(item, "is_error"), false))
 		}
-		e := obj("id", NewID(), "type", "tool-result", "timestamp", ts, "toolUseId", get(item, "tool_use_id"),
+		e := obj("id", unsetID, "type", "tool-result", "timestamp", ts, "toolUseId", get(item, "tool_use_id"),
 			"isError", coalesce(get(item, "is_error"), false), "summary", summary)
 		if answers != nil {
 			e.Set("answers", answers)
 		}
+		if links := resultLinks(get(item, "content"), coalesce(get(item, "is_error"), false)); len(links) > 0 {
+			e.Set("links", links)
+		}
+		if a := agentResult(get(raw, "toolUseResult"), get(item, "content")); a != nil {
+			e.Set("agent", a)
+		}
 		entries = append(entries, e)
 	}
 	return entries
+}
+
+// agentResult is what an Agent call's result says about the agent: its id, where it is (async_launched, completed, …)
+// and, for one that ran to the end inside the call, what it returned and for how long. nil for any other tool.
+func agentResult(res any, content any) *jsvalue.Object {
+	r, isObj := res.(*jsvalue.Object)
+	if !isObj {
+		return nil
+	}
+	res = r
+	id, _ := get(res, "agentId").(string)
+	if id == "" {
+		return nil
+	}
+	a := obj("id", id)
+	if st, _ := get(res, "status").(string); st != "" {
+		a.Set("status", st)
+	}
+	if st, _ := a.Get("status"); st == "completed" || st == "failed" {
+		var texts []string
+		parts, _ := get(res, "content").([]any)
+		if parts == nil {
+			parts, _ = content.([]any)
+		}
+		for _, part := range parts {
+			if t, ok := get(part, "text").(string); ok {
+				texts = append(texts, t)
+			}
+		}
+		if len(texts) == 0 {
+			if t, ok := content.(string); ok {
+				texts = append(texts, t)
+			}
+		}
+		a.Set("text", strings.Join(texts, "\n\n"))
+		if d, ok := get(res, "totalDurationMs").(float64); ok {
+			a.Set("durationMs", d)
+		}
+	}
+	return a
 }
 
 func recordOfStrings(v any) *jsvalue.Object {
@@ -735,11 +877,20 @@ func (p *claudeParse) agentGroup(group []claudeRaw, hint *claudeAgentHint) *jsva
 	ts := group[0].base.stamp()
 	var parsed []*jsvalue.Object
 	for _, r := range group {
-		parsed = append(parsed, p.single(r.raw, r.base)...)
+		made := p.single(r.raw, r.base)
+		p.name(r, made...)
+		parsed = append(parsed, made...)
 	}
 	entries := entryArray(mergeToolResults(parsed))
+	e := p.groupEntry(group, hint, ts, entries)
+	// The group itself is the next entry of its first line, after the entries that line made inside it.
+	p.name(group[0], e)
+	return e
+}
+
+func (p *claudeParse) groupEntry(group []claudeRaw, hint *claudeAgentHint, ts float64, entries []any) *jsvalue.Object {
 	if hint != nil {
-		return obj("id", NewID(), "type", "agent-group", "timestamp", ts, "agentType", hint.agentType, "description", hint.description,
+		return obj("id", unsetID, "type", "agent-group", "timestamp", ts, "agentType", hint.agentType, "description", hint.description,
 			"entryCount", len(group), "entries", entries)
 	}
 	description := ""
@@ -767,7 +918,7 @@ scan:
 	if description == "" {
 		description = "Sub-agent"
 	}
-	return obj("id", NewID(), "type", "agent-group", "timestamp", ts, "agentType", "Unknown", "description", description,
+	return obj("id", unsetID, "type", "agent-group", "timestamp", ts, "agentType", "Unknown", "description", description,
 		"entryCount", len(group), "entries", entries)
 }
 

@@ -1,0 +1,5 @@
+{
+  "op": "favorites.group.create",
+  "body": {"opId": "op-fg1", "name": "Контракт"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1851, "id": "fg-9k2m4x7q"}
+}

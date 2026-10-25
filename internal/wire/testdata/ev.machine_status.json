@@ -1,0 +1,20 @@
+{
+  "f": "ev",
+  "ch": "machine",
+  "seq": 501,
+  "e": {
+    "type": "machine_status",
+    "reach": "unreachable",
+    "runtime": null,
+    "agents": [
+      {"provider": "claude", "version": "2.3.1", "status": "ready", "canSwitchModel": true, "models": [
+          {"id": "sonnet", "label": "Sonnet", "hint": "Everyday work", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": "medium"},
+          {"id": "opus", "label": "Opus", "hint": "The strongest", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": null}
+        ]},
+      {"provider": "codex", "version": "0.152.0", "status": "login-required", "canSwitchModel": false, "models": [
+          {"id": "gpt-5.6-sol", "label": "GPT-5.6-Sol", "hint": "", "efforts": ["low", "medium", "high", "xhigh", "max", "ultra"], "defaultEffort": "low"}
+        ]}
+    ],
+    "health": {"level": "critical", "since": 1792655990000, "issues": [{"metric": "disk", "level": "critical"}, {"metric": "cpu", "level": "warn"}]}
+  }
+}

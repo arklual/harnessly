@@ -1,0 +1,5 @@
+{
+  "op": "goal",
+  "body": {"opId": "op-g1", "id": "tab-k3Jx9QmZ", "text": "Довести контракт v2 до конца"},
+  "result": {"r": "queued", "ch": "conv:tab-k3Jx9QmZ", "seq": 521}
+}

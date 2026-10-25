@@ -1,0 +1,170 @@
+{
+  "f": "snapshot",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 0,
+  "mode": "after",
+  "data": {
+    "turns": [
+      {
+        "id": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "author": {"provider": "claude", "role": "lead"},
+        "startedAt": 1792655970000,
+        "endedAt": null,
+        "durationMs": null,
+        "toolCount": 3,
+        "stepCount": 6,
+        "status": "live",
+        "failure": null,
+        "answerEntryId": null,
+        "files": [{"path": "internal/wire/codec.go", "op": "edited"}]
+      }
+    ],
+    "entries": [
+      {
+        "id": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f13#1",
+        "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "at": 1792655973000,
+        "rev": 1,
+        "t": "subagent",
+        "agentId": "a7f3e2d1",
+        "agentType": "Explore",
+        "description": "Найти точки сборки id",
+        "status": "running",
+        "model": null,
+        "durationMs": null,
+        "output": null
+      },
+      {
+        "id": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f14#0",
+        "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "at": 1792655974000,
+        "rev": 1,
+        "t": "answers",
+        "questionId": "q:toolu_01AskQ",
+        "pairs": [{"q": "Куда класть схему?", "a": "internal/wire/schema"}]
+      },
+      {
+        "id": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f15#0",
+        "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "at": 1792655975000,
+        "rev": 1,
+        "t": "gate",
+        "permissionId": "p:toolu_01Bash"
+      },
+      {
+        "id": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f16#0",
+        "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "at": 1792655976000,
+        "rev": 1,
+        "t": "compaction",
+        "tokensBefore": 182000,
+        "tokensAfter": 24000,
+        "keep": ["spec.md", "types.go"]
+      },
+      {
+        "id": "x:20480#2",
+        "turnId": null,
+        "at": 1792655977000,
+        "rev": 1,
+        "t": "notice",
+        "level": "warn",
+        "code": "hooks-missing",
+        "detail": null
+      },
+      {
+        "id": "x:18234#0",
+        "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "at": 1792655997000,
+        "rev": 1,
+        "t": "tool",
+        "toolUseId": "toolu_01GoTest",
+        "tool": "Bash",
+        "summary": "go test ./internal/wire/...",
+        "ok": null,
+        "output": null
+      },
+      {
+        "id": "live:c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "at": 1792655998500,
+        "rev": 1,
+        "t": "say",
+        "md": "Пишу фикстуры"
+      }
+    ],
+    "beforeTurnId": null,
+    "queue": {
+      "conversationId": "tab-k3Jx9QmZ",
+      "items": ["0192b6f1-0000-7000-8000-000000000002", "0192b6f1-0000-7000-8000-000000000001"],
+      "paused": null,
+      "rev": 9
+    },
+    "messages": [
+      {
+        "clientId": "0192b6f1-0000-7000-8000-000000000001",
+        "conversationId": "tab-k3Jx9QmZ",
+        "text": "Добавь тест на разрыв seq",
+        "attachments": [],
+        "mode": "queue",
+        "kind": "prompt",
+        "createdAt": 1792655990000,
+        "attempts": 0,
+        "state": {"k": "queued", "position": 1, "reason": "agent-busy", "wait": null},
+        "rev": 2
+      },
+      {
+        "clientId": "0192b6f1-0000-7000-8000-000000000002",
+        "conversationId": "tab-k3Jx9QmZ",
+        "text": "/compact",
+        "attachments": [],
+        "mode": "now",
+        "kind": "command",
+        "createdAt": 1792655990000,
+        "attempts": 0,
+        "state": {"k": "queued", "position": 2, "reason": "behind", "wait": null},
+        "rev": 2
+      }
+    ],
+    "questions": [],
+    "permissions": [
+      {
+        "id": "p:tab-k3Jx9QmZ:41",
+        "conversationId": "tab-k3Jx9QmZ",
+        "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+        "kind": "tool",
+        "askedAt": 1792655992000,
+        "tool": "Bash",
+        "command": "go test ./internal/wire/...",
+        "cwd": "/home/coder/workspace/harnessly",
+        "planMd": null,
+        "options": [
+          {"id": "1", "label": "Yes", "scope": "once"},
+          {"id": "2", "label": "Yes, and don't ask again for go test", "scope": "always"},
+          {"id": "3", "label": "No, and tell Claude what to do differently", "scope": "deny"}
+        ],
+        "state": {"k": "open"}
+      }
+    ],
+    "background": [
+      {
+        "id": "a7f3e2d1",
+        "conversationId": "tab-k3Jx9QmZ",
+        "kind": "subagent",
+        "title": "Найти точки сборки id",
+        "startedAt": 1792655973000,
+        "endedAt": null,
+        "status": "running",
+        "devServer": false,
+        "stoppable": true,
+        "outputPath": null
+      }
+    ],
+    "now": {
+      "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+      "thought": "Сверяю коды отказов",
+      "action": {"tool": "Bash", "summary": "go test", "command": "go test ./internal/wire/..."},
+      "word": "Пишу фикстуры",
+      "at": 1792655999500
+    }
+  }
+}

@@ -1,0 +1,29 @@
+/* The notices gallery's page (?dev=notifs): buttons that fire made-up events; nothing here is part of the product. */
+.hx-ng {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100vh;
+  padding: 120px 24px 24px;
+  background: var(--hx-bg-stage);
+  color: var(--hx-fg-1);
+  font-family: var(--hx-font-sans, system-ui);
+}
+.hx-ng__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hx-ng__btn {
+  padding: 6px 12px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 8px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.hx-ng__settings {
+  max-width: 640px;
+}

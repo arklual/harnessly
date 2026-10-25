@@ -1,0 +1,6 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 520,
+  "e": {"type": "gate_updated", "id": "p:toolu_01ExitPlan", "state": {"k": "closed", "reason": "agent-moved-on"}}
+}

@@ -36,6 +36,9 @@ func (a *API) releasesAnswer(r *http.Request, project string) Answer {
 		out.Chosen = strOrNil(a.L.ChosenNewProjectsRelease())
 	}
 	if project != "" {
+		if no := a.gate(r, project, RoleView); no != nil {
+			return *no
+		}
 		if !IsLibraryID(project) || a.L.ReadArtifact(project) == nil {
 			return JSON(r, 404, errorBody(locale.Pick("There is no such project", "Такого проекта нет")), h)
 		}
@@ -81,6 +84,9 @@ func (a *API) Releases(r *http.Request) Answer {
 	release, ok2 := strField(body, "release")
 	if !ok1 || !ok2 {
 		return bad
+	}
+	if no := a.gate(r, artifact, RoleEdit); no != nil {
+		return *no
 	}
 	if _, err := a.L.SetProjectRelease(artifact, release); err != nil {
 		return refused(err)

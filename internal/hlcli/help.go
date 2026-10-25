@@ -17,6 +17,7 @@ SHOW THINGS TO THE PERSON
     4400, localhost:4400/path       a dev server on this machine, in the pane's browser
     /home/me/work/report.md         a file (relative paths are taken from the current folder)
     https://<host>/<group>/<project>/-/merge_requests/12   a merge request or commit with its diff (GitLab)
+    https://github.com/<owner>/<repo>/pull/12   a pull request, commit or issue (GitHub), same tab
     PROJ-123                        a tracker task, when the deployment has a tracker
     files|changes|terminal [path]   a tab by kind; other kinds: overview tools browser disk artifacts gitlab
                                     subagents economics plan peers design side-chat gallery task
@@ -36,6 +37,12 @@ TABS OF THIS WORKSPACE
   harnessly tab status TAB_ID       is it alive, what runs in it, is the agent working or waiting
   harnessly tab result TAB_ID       the tab's visible screen: read what a delegated agent answered
   harnessly tab close TAB_ID        close a tab
+
+OTHER AGENTS (this machine and the fleet's other machines)
+  harnessly peers                   the chats you may write to: REF, busy|idle|gone, owner · machine, title
+  harnessly peers send REF TEXT...  a message to that chat's agent ("-" reads it from stdin). Prints "delivered → …",
+                                    or exits 1 with "refused: <reason> — <why>". The other agent reads it as a
+                                    <peer-message> with your machine, owner and chat, and answers by building the same command from its ref.
 
 DESIGN PROJECTS
   harnessly design page list <project>        the pages of a design project: id, title, board file
@@ -78,6 +85,8 @@ closed: each request opens once.
   harnessly open 4400                                              a dev server of this machine (localhost:4400)
   harnessly open ./report.md                                       a file
   harnessly open changes /home/me/work/repo                        the changes tab for a folder
+  harnessly open design landing                                    a design of this machine's library (its id,
+                                                                   its folder or a file in it, or its title)
   harnessly open files                                             a tab by kind, no target
 
 Only the addresses of the workspace's own documents and boards, ports of this machine and feature stands open in the
@@ -127,6 +136,17 @@ artifact.json, never a board or an asset, and gives the same ids however often i
 A Claude Code PreToolUse hook: reads the hook's JSON on stdin and refuses a Write, Edit or shell command that writes
 project/canvas.json of a design project, telling the agent to use "design page". Prints nothing otherwise. See
 docs/design-pages.md for the settings.json entry.
+`,
+	"peers": `harnessly peers [list] | harnessly peers send REF TEXT...
+
+  harnessly peers
+  harnessly peers send dev-department/tab-3f9c "Готово: модель по умолчанию берётся из настроек, выкатил 1.131.0"
+  printf '%s' "$LONG_TEXT" | harnessly peers send runner-2/tab-1a2b -
+
+REF is <machine>/<conversation id> as the list prints it (a bare conversation id is this machine's). A message arrives
+as <peer-message person=… machine=… chat=… ref=…>…</peer-message>: build the answer yourself from its ref, as
+"harnessly peers send <ref> …"; the envelope carries no command to copy. The
+other side decides who may write to it (Settings → Machines → «Связь между агентами»); a refusal says why.
 `,
 	"workspaces": "harnessly workspaces\n\nList the workspaces: id, name and folders. -w takes the id.\n",
 	"api-guide":  "harnessly api-guide\n\nPrint the runtime's HTTP API for agents: the /api/cli routes with their payloads.\n",

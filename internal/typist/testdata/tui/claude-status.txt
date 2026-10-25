@@ -1,0 +1,50 @@
+
+  ⎿  Kept model as Haiku 4.5
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Settings  Status   Config   Usage   Stats
+
+   Version:           2.1.282
+   Session name:      Простой ответ
+   Session ID:        05b02e68-b3aa-4ba0-9a46-e22f6f28f812
+   Session kind:      interactive
+   Peer address:      uds:/tmp/cc-socks/2935469.sock
+   cwd:               /tmp/claude-1001/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad/
+                      pre/work
+   Login method:      Claude Max account
+   Organization:      <redacted-email>'s Organization
+   Email:             <redacted-email>
+   Cloud sessions:    GitHub connected
+
+   Model:             haiku (claude-haiku-4-5-20251001)
+   MCP servers:       16 connected, 69 need auth, 28 failed · /mcp
+   Setting sources:   User settings, Command line arguments
+   Auto mode server:  Disabled
+
+   System diagnostics
+    ⚠ /home/agent/.local/bin/claude was not created by the native installer (it is not a symlink into the versions/
+      directory), so auto-update leaves it untouched.
+
+
+   Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

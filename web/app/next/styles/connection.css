@@ -1,0 +1,133 @@
+/* «Нет связи» — the design's .hx-net: a pill at the top of the window, over everything, in the way of nothing. */
+.hx-net {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  z-index: 9000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 999px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  width: var(--hx-pill-w, auto);
+  transform: translateX(-50%);
+  animation: hx-net-in 320ms var(--hx-ease-out) backwards;
+  transition: width 320ms var(--hx-ease-out);
+}
+/* What the pill says: one state fades in over the last, the pill eases to its width (ui/use-pill-width). */
+.hx-net__in {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  animation: hx-net-swap 260ms var(--hx-ease-out) backwards;
+}
+@keyframes hx-net-swap {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-net,
+  .hx-net__in {
+    animation-duration: 1ms;
+    transition-duration: 1ms;
+  }
+}
+.hx-net:has(.hx-net__now) {
+  padding-right: 5px;
+}
+.hx-net__icon {
+  color: var(--hx-warning);
+  transition: color 240ms ease;
+}
+.hx-net[data-state='retry'] .hx-net__icon {
+  color: var(--hx-fg-3);
+  animation: hx-net-spin 1s linear infinite;
+}
+.hx-net:is([data-state='back'], [data-state='closing']) .hx-net__icon {
+  color: var(--hx-success);
+}
+.hx-net__sub {
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-net__now {
+  height: 26px;
+  margin-left: 4px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-app);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+}
+.hx-net__now:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.hx-net__now:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+.hx-net[data-state='closing'] {
+  animation: hx-net-out 260ms ease forwards;
+  pointer-events: none;
+}
+@keyframes hx-net-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.96);
+  }
+}
+@keyframes hx-net-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.97);
+  }
+}
+@keyframes hx-net-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* «Вышла новая версия»: the same pill, an accent icon, a reload and a way to put it away. */
+.hx-net[data-kind='update'] {
+  padding-right: 4px;
+}
+.hx-net[data-kind='update'] .hx-net__icon {
+  color: var(--hx-accent);
+}
+/* Under «Нет связи» when both are up. */
+.hx-net ~ .hx-net[data-kind='update'] {
+  top: 58px;
+}
+.hx-net__x {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.hx-net__x:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}

@@ -1,0 +1,24 @@
+{
+  "http": "agentSettings",
+  "response": {
+    "provider": "codex",
+    "path": "~/.codex/config.toml",
+    "rev": "03be77a5c19d2e64",
+    "account": {"signedIn": false, "method": null, "plan": null, "who": null},
+    "options": [
+      {"key": "model", "value": "gpt-5.5"},
+      {"key": "effort", "value": "high"},
+      {"key": "baseUrl", "value": "https://llm.example.com"},
+      {"key": "summary", "value": null},
+      {"key": "fast", "value": false},
+      {"key": "sandboxMode", "value": "workspace-write"},
+      {"key": "network", "value": null},
+      {"key": "approval", "value": "on-request"},
+      {"key": "search", "value": "cached"},
+      {"key": "history", "value": true}
+    ],
+    "rules": null,
+    "env": [],
+    "mcp": [{"name": "docs", "kind": "http", "target": "docs.example.com", "enabled": true}]
+  }
+}

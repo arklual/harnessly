@@ -402,7 +402,7 @@
   "lib.hlPaneIntents.waiting": "{when} {what} — ждёт, откроется, когда человек придёт в разговор",
   "lib.hlPanelCommand.badTarget": "open {tab}: цель слишком длинная или не строка",
   "lib.hlPanelCommand.hintDoc": "open artifacts: нужна ссылка на документ (…/a/…) или доску (…/b/…)",
-  "lib.hlPanelCommand.hintGitlab": "open gitlab: нужна ссылка на merge request или коммит GitLab",
+  "lib.hlPanelCommand.hintGitlab": "open gitlab: нужна ссылка на merge request или коммит GitLab, либо на pull request, коммит или задачу GitHub",
   "lib.hlPanelCommand.hintPath": "open {tab}: нужен путь без «..» и управляющих символов",
   "lib.hlPanelCommand.hintPort": "open browser: открывается порт этой машины (4400, localhost:4400/путь) или фича-стенд по адресу стендов; другие внешние адреса агент не открывает",
   "lib.hlPanelCommand.hintTask": "open task: нужен ключ задачи трекера (PROJ-123, DEMO-14, ACME-9)",

@@ -1,0 +1,246 @@
+/* A conversation's context going to another one (features/chat/handoff*.tsx, origin-row.tsx): the card of a handed
+   over context or a fork's result, the line of where a chat came from, the action under an answer, and the sheet
+   that shows the text before it goes. */
+
+/* ── The card in the feed ─────────────────────────── */
+.hx-msg[data-kind='context'] {
+  align-items: stretch;
+}
+.hx-ctx {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  max-width: 88%;
+  padding: 2px 0 2px var(--hx-space-4);
+  border-left: 2px solid color-mix(in srgb, var(--hx-accent) 55%, transparent);
+}
+.hx-ctx__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+  font-size: var(--hx-text-xs);
+}
+.hx-ctx__ic {
+  align-self: center;
+  color: var(--hx-accent);
+}
+.hx-ctx__title {
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-ctx__line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-3);
+}
+.hx-ctx__text {
+  max-height: 14em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  transition: max-height 320ms var(--hx-ease-out);
+}
+.hx-ctx__body[data-open='true'] .hx-ctx__text {
+  max-height: none;
+  mask-image: none;
+}
+.hx-ctx__foot {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 24px;
+  font-size: 12px;
+}
+.hx-ctx__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-ctx__act:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+
+/* ── Where the chat came from: a quiet line like a change of model ─────────── */
+.hx-origin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-origin__ic {
+  flex: none;
+  color: var(--hx-accent);
+}
+.hx-origin__text {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0 6px;
+  min-width: 0;
+}
+.hx-origin__models {
+  color: var(--hx-fg-2);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-origin__models::before,
+.hx-origin__from::before {
+  content: '·';
+  margin-right: 6px;
+}
+.hx-origin__title {
+  color: var(--hx-fg-2);
+}
+.hx-origin__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-weight: var(--hx-weight-medium);
+  text-decoration: underline;
+  text-decoration-color: var(--hx-border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    text-decoration-color 160ms ease;
+}
+.hx-origin__link:hover {
+  color: var(--hx-fg-1);
+  text-decoration-color: currentColor;
+}
+
+/* ── Under a finished answer ─────────────────────────── */
+.hx-turnacts {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+  opacity: 0;
+  transition: opacity 200ms var(--hx-ease-out);
+}
+.hx-turnwrap:hover .hx-turnacts,
+.hx-turnacts:focus-within {
+  opacity: 1;
+}
+.hx-turnacts__btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-turnacts__btn:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+/* No hover on a touch screen: the action stays in sight. */
+@media (hover: none) {
+  .hx-turnacts {
+    opacity: 1;
+  }
+}
+
+/* ── The sheet ─────────────────────────── */
+.hx-modal__box.hx-hsheet-box {
+  width: min(680px, 100%);
+}
+.hx-hsheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  min-height: 0;
+}
+.hx-hsheet__hint {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 18px;
+}
+.hx-hsheet__wait {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-hsheet__sk {
+  display: block;
+  height: 220px;
+  border-radius: 12px;
+}
+.hx-hsheet__fail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--hx-danger) 8%, transparent);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+}
+.hx-hsheet__text {
+  width: 100%;
+  min-height: 260px;
+  max-height: 52dvh;
+  padding: 10px 14px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 12px;
+  outline: 0;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-family: var(--hx-font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  line-height: 20px;
+  resize: vertical;
+  box-sizing: border-box;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.hx-hsheet__text:focus {
+  border-color: var(--hx-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-accent) 16%, transparent);
+}
+.hx-hsheet__size {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-hsheet__size[data-over='true'] {
+  color: var(--hx-danger);
+}
+@media (max-width: 640px) {
+  .hx-hsheet__text {
+    min-height: 200px;
+  }
+}

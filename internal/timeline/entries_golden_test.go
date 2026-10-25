@@ -9,18 +9,18 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
 	"github.com/ly-solutions/harnessly/internal/subagents"
 	"github.com/ly-solutions/harnessly/internal/transcript"
 )
 
 // testdata/entries.json: what the previous runtime's dispatcher and transcript-page handler answered (testdata/entries,
-// under node) on the same files. Entry ids are a counter in both runs.
+// under node) on the same files. Entry ids are the new ones: the golden file is rebuilt by HARNESSLY_UPDATE_GOLDEN=1.
 
 type entriesFile struct {
 	Path    string `json:"path"`
@@ -38,13 +38,11 @@ type entriesRequest struct {
 	Answer        string            `json:"answer"`
 }
 
-// counterIDs makes entry ids the generator's counter (id0001, id0002, ...) and fixes the clock.
-func counterIDs(t *testing.T, now float64) {
-	n := 0
-	prevID, prevNow := transcript.NewID, transcript.Now
-	transcript.NewID = func() string { n++; return "id" + fmt.Sprintf("%04s", strconv.FormatInt(int64(n), 36)) }
+// fixNow fixes the clock; entry ids come from the transcript's own bytes and need nothing.
+func fixNow(t *testing.T, now float64) {
+	prevNow := transcript.Now
 	transcript.Now = func() float64 { return now }
-	t.Cleanup(func() { transcript.NewID, transcript.Now = prevID, prevNow })
+	t.Cleanup(func() { transcript.Now = prevNow })
 }
 
 func TestEntriesAnswerAsTheOldRuntime(t *testing.T) {
@@ -61,6 +59,12 @@ func TestEntriesAnswerAsTheOldRuntime(t *testing.T) {
 	if err := json.Unmarshal(raw, &golden); err != nil {
 		t.Fatal(err)
 	}
+	update := updatingGolden()
+	doc, err := jsvalue.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := doc.(*jsvalue.Object).Array("requests")
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	for _, f := range golden.Files {
 		p := filepath.Join(root, f.Path)
@@ -71,7 +75,7 @@ func TestEntriesAnswerAsTheOldRuntime(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	counterIDs(t, golden.Now)
+	fixNow(t, golden.Now)
 	home := filepath.Join(root, "home")
 	authorized := func(r *http.Request) bool {
 		if c, err := r.Cookie("session-token"); err == nil && c.Value == "good" {
@@ -131,6 +135,10 @@ func TestEntriesAnswerAsTheOldRuntime(t *testing.T) {
 			lastEtag = e
 		}
 		got := strings.ReplaceAll(string(body), root, "$ROOT")
+		if update {
+			updateRequest(requests[i].(*jsvalue.Object), c.Answer, got, body, res.Header.Get("ETag"))
+			continue
+		}
 		if res.StatusCode != c.Status || got != c.Answer {
 			t.Fatalf("%s\n got %d %s\nwant %d %s", where, res.StatusCode, clipText(got), c.Status, clipText(c.Answer))
 		}
@@ -151,6 +159,9 @@ func TestEntriesAnswerAsTheOldRuntime(t *testing.T) {
 				t.Errorf("%s: unexpected %s: %s", where, k, res.Header.Get(k))
 			}
 		}
+	}
+	if update && !t.Failed() {
+		writeGolden(t, "testdata/entries.json", doc)
 	}
 }
 
@@ -179,7 +190,7 @@ func TestEntriesOfGeneratedTranscripts(t *testing.T) {
 	if err := json.Unmarshal(raw, &golden); err != nil {
 		t.Fatal(err)
 	}
-	counterIDs(t, golden.Now)
+	fixNow(t, golden.Now)
 	file := filepath.Join(t.TempDir(), "case.jsonl")
 	failed := 0
 	for i, c := range golden.Cases {

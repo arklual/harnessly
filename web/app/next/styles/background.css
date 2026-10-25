@@ -1,0 +1,733 @@
+/* The chat's right column (.hx-side): Claude's recap of the session, its subagents and the commands left in the background.
+   It stands at the top right of the stage; whether it is on screen is the page's count of room (rail-room.ts) and the
+   right pane being shut, and it comes and goes with a slide and a fade (a short fade only, with reduced motion). */
+.hx-side {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 6;
+  width: 320px;
+  max-height: calc(100% - 200px);
+  overflow: auto;
+  padding: 4px;
+  border-radius: 18px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--hx-border),
+    0 12px 32px rgba(12, 14, 34, 0.08);
+  transform-origin: top right;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(10px) scale(0.97);
+  transition:
+    opacity 200ms cubic-bezier(0.4, 0, 1, 1),
+    transform 200ms cubic-bezier(0.4, 0, 1, 1),
+    visibility 0s linear 200ms;
+}
+.hx-side[data-shown='true'] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity 420ms var(--hx-ease-out),
+    transform 420ms var(--hx-ease-out),
+    visibility 0s linear 0s;
+}
+.hx-stage[data-pane='true'] .hx-side {
+  right: calc(var(--pane-w) + 28px);
+}
+.hx-main__body[data-pdrag='true'] :is(.hx-feed, .hx-dock, .hx-side) {
+  transition: none;
+}
+@container (max-width: 1100px) {
+  .hx-side {
+    box-shadow:
+      0 0 0 1px var(--hx-border),
+      0 18px 48px rgba(12, 14, 34, 0.16);
+  }
+}
+
+/* The recap: «Что сейчас происходит» and under it what Claude wrote, the largest thing in the column. It opens and closes
+   by height (a grid row between 0fr and 1fr) with a fade. */
+.hx-recap {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  animation: hx-recap-in 420ms var(--hx-ease-out);
+  transition:
+    grid-template-rows 300ms cubic-bezier(0.4, 0, 1, 1),
+    opacity 240ms cubic-bezier(0.4, 0, 1, 1);
+}
+.hx-recap[data-state='closing'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes hx-recap-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.hx-recap__clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-recap__body {
+  padding: 12px 12px 10px;
+}
+/* The name of a block of the column (the recap, the pictures, a group): its icon and a stronger weight set it apart from
+   the content under it. */
+.hx-side__ttl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: var(--hx-text-sm);
+  line-height: 18px;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-side__ttl > .hx-icon {
+  color: var(--hx-fg-2);
+}
+.hx-recap__body > .hx-side__ttl {
+  margin-bottom: 6px;
+}
+.hx-recap__text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--hx-fg-1);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+.hx-recap__text[data-open='true'] {
+  display: block;
+  overflow: visible;
+}
+.hx-recap__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-recap__more {
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition: background 200ms var(--hx-ease-out);
+}
+.hx-recap__more:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-recap + .hx-shots,
+.hx-recap + .hx-side__sec {
+  margin-top: 2px;
+  padding-top: 2px;
+  box-shadow: 0 -1px 0 var(--hx-border);
+}
+
+/* A group: one line with its name and how many run, opened into dense rows. */
+.hx-shots + .hx-side__sec,
+.hx-side__sec + .hx-side__sec {
+  margin-top: 2px;
+  padding-top: 2px;
+  box-shadow: 0 -1px 0 var(--hx-border);
+}
+.hx-side__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px 6px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 200ms var(--hx-ease-out);
+}
+.hx-side__head:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-side__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-side__text[data-run='true'] {
+  color: var(--hx-fg-2);
+}
+.hx-side__chev {
+  flex: none;
+  color: var(--hx-fg-3);
+  transition: transform 300ms var(--hx-ease-out);
+}
+.hx-side__sec[aria-expanded='false'] .hx-side__chev {
+  transform: rotate(-90deg);
+}
+.hx-side__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 340ms var(--hx-ease-out);
+}
+.hx-side__sec[aria-expanded='false'] .hx-side__body {
+  grid-template-rows: 0fr;
+}
+.hx-side__clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-side__clip > .hx-bg__row {
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 280ms var(--hx-ease-out),
+    background 220ms var(--hx-ease-out);
+}
+.hx-side__sec[aria-expanded='false'] .hx-side__clip > .hx-bg__row {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* The subagents past the fifth: a grid row between 0fr and 1fr opens them by height, the rows fade with it; «Ещё N» under. */
+.hx-side__rest {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 340ms var(--hx-ease-out);
+}
+.hx-side__rest[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+.hx-side__rest-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-side__rest-clip > .hx-bg__row {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 280ms var(--hx-ease-out),
+    background 220ms var(--hx-ease-out);
+}
+.hx-side__rest[data-open='true'] .hx-side__rest-clip > .hx-bg__row {
+  opacity: 1;
+  transform: none;
+}
+.hx-side__more {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 10px 4px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-side__more:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+}
+.hx-side__more-chev {
+  transition: transform 300ms var(--hx-ease-out);
+}
+.hx-side__more[aria-expanded='true'] .hx-side__more-chev {
+  transform: rotate(180deg);
+}
+
+/* The pictures the agent looked at: a strip of squares under the recap, four to a row. The section opens and closes by
+   height like the recap; «Ещё N» opens the rest the same way. */
+.hx-shots {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  animation: hx-recap-in 420ms var(--hx-ease-out);
+  transition:
+    grid-template-rows 300ms cubic-bezier(0.4, 0, 1, 1),
+    opacity 240ms cubic-bezier(0.4, 0, 1, 1);
+}
+.hx-shots[data-state='closing'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-shots__clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-shots__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 12px 8px;
+}
+.hx-shots__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.hx-shots__sq,
+.hx-shots__sk {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.hx-shots__sq {
+  padding: 0;
+  border: 0;
+  background: var(--hx-bg-active);
+  box-shadow: inset 0 0 0 1px var(--hx-border);
+  cursor: zoom-in;
+  transition:
+    transform 240ms var(--hx-ease-out),
+    box-shadow 200ms var(--hx-ease-out);
+}
+.hx-shots__sq:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px var(--hx-border-strong);
+}
+.hx-shots__sq:active {
+  transform: scale(0.97);
+}
+.hx-shots__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  opacity: 0;
+  transition: opacity 260ms var(--hx-ease-out);
+}
+.hx-shots__sq[data-state='ready'] .hx-shots__img {
+  opacity: 1;
+}
+.hx-shots__sq[data-state='broken'] .hx-shots__img {
+  display: none;
+}
+.hx-shots__gone {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: var(--hx-fg-3);
+}
+.hx-shots__rest {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: -10px;
+  transition:
+    grid-template-rows 340ms var(--hx-ease-out),
+    margin-top 340ms var(--hx-ease-out);
+}
+.hx-shots__rest[data-open='true'] {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+}
+.hx-shots__rest-clip {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 220ms var(--hx-ease-out);
+}
+.hx-shots__rest[data-open='true'] .hx-shots__rest-clip {
+  opacity: 1;
+}
+.hx-shots__more {
+  width: auto;
+  align-self: flex-start;
+  margin: 0 -4px;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+/* A row: the name and the time on one line, under them the model and depth and the last step. */
+.hx-bg__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+  border-radius: 12px;
+}
+.hx-bg__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 6px 8px 6px 12px;
+  border-radius: 12px;
+  color: var(--hx-fg-1);
+}
+button.hx-bg__main {
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 200ms var(--hx-ease-out);
+}
+button.hx-bg__main:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-bg__txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.hx-bg__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.hx-bg__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+}
+/* A named teammate's mark right after its name: quiet, the name stays the loudest. */
+.hx-bg__name:has(+ .hx-bg__mate) {
+  flex: 0 1 auto;
+}
+.hx-bg__mate {
+  flex: none;
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--hx-fg-3);
+}
+.hx-bg__state {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-bg__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+}
+.hx-bg__row[data-status='run'] .hx-bg__dot {
+  position: relative;
+  background: var(--hx-accent);
+}
+.hx-bg__row[data-status='run'] .hx-bg__dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hx-accent) 45%, transparent);
+  animation: hx-bg-pulse 1.8s var(--hx-ease-out) infinite;
+}
+/* An idle teammate: alive and waiting for a message, a ring of the working colour without the pulse. */
+.hx-bg__row[data-status='wait'] .hx-bg__dot {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--hx-accent);
+}
+.hx-bg__row[data-status='done'] .hx-bg__dot {
+  background: var(--hx-success, #2f9e6a);
+}
+.hx-bg__row[data-status='stopped'] .hx-bg__dot {
+  background: var(--hx-warning);
+}
+.hx-bg__sub {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 16px;
+  color: var(--hx-fg-3);
+}
+.hx-bg__on {
+  flex: none;
+  color: var(--hx-fg-2);
+}
+.hx-bg__on + .hx-bg__last::before {
+  content: '·';
+  margin-right: 6px;
+}
+.hx-bg__last {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-bg__stop {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-bg__stop:hover {
+  background: var(--hx-bg-active);
+  color: var(--hx-danger, #d14343);
+}
+@keyframes hx-bg-pulse {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-side,
+  .hx-side[data-shown='true'] {
+    transform: none;
+    transition:
+      opacity 120ms linear,
+      visibility 0s linear 120ms;
+  }
+  .hx-side[data-shown='true'] {
+    transition:
+      opacity 120ms linear,
+      visibility 0s linear 0s;
+  }
+  .hx-side__body,
+  .hx-side__rest,
+  .hx-recap,
+  .hx-shots,
+  .hx-shots__rest,
+  .hx-shots__rest-clip,
+  .hx-shots__sq,
+  .hx-shots__img,
+  .hx-side__chev,
+  .hx-side__more-chev,
+  .hx-side__clip > .hx-bg__row,
+  .hx-side__rest-clip > .hx-bg__row {
+    animation: none;
+    transition-duration: 0.01ms;
+  }
+}
+
+/* «Ждёт N фоновых агентов» under a finished answer: the tail of the live turn, faces of the agents and one line. */
+.hx-wait__faces {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding-left: 6px;
+}
+.hx-wait__face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  padding: 0;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 50%;
+  background: var(--hx-bg-window);
+  box-shadow: 0 0 0 2px var(--hx-bg-window);
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    transform 200ms var(--hx-ease-out),
+    border-color 200ms var(--hx-ease-out);
+}
+.hx-wait__face:hover {
+  z-index: 1;
+  transform: translateY(-2px);
+  border-color: var(--hx-accent);
+}
+.hx-wait__face[data-more='true'] {
+  cursor: default;
+}
+.hx-wait__face[data-more='true']:hover {
+  transform: none;
+  border-color: var(--hx-border-strong);
+}
+.hx-wait__face .hx-agent {
+  width: 12px;
+  height: 12px;
+}
+.hx-wait__face:not([data-more])::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-accent);
+  box-shadow: 0 0 0 2px var(--hx-bg-window);
+  animation: hx-wait-pulse 1.8s ease-in-out infinite;
+}
+.hx-wait__label {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 200ms var(--hx-ease-out),
+    background 200ms var(--hx-ease-out);
+}
+.hx-wait__label:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+@keyframes hx-wait-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-wait__face:not([data-more])::after {
+    animation: none;
+  }
+}
+
+/* The column on the phone: there is no room beside the chat, so it is a bottom sheet over a scrim — the
+   header's button raises it, the scrim or a swipe down folds it. «Что сейчас происходит», the pictures, the subagents
+   and the commands keep their order; rows and their stop buttons are a finger tall, the secondary lines 13px. */
+.hx-side > .hx-sheet__grip {
+  display: none;
+}
+.hx-side__scrim {
+  display: none;
+}
+@media (max-width: 900px) {
+  .hx-side__scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 94;
+    background: var(--hx-scrim);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 280ms var(--hx-m-ease);
+  }
+  .hx-side__scrim[data-shown='true'] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .hx-side,
+  .hx-stage[data-pane='true'] .hx-side {
+    --hx-sheet-dy: 0px;
+    position: fixed;
+    top: auto;
+    left: calc(8px + env(safe-area-inset-left));
+    right: calc(8px + env(safe-area-inset-right));
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 95;
+    width: auto;
+    max-height: 88dvh;
+    padding: 4px 6px 8px;
+    border-radius: 26px;
+    overscroll-behavior: contain;
+    transform: translate3d(0, calc(100% + 24px), 0);
+    transform-origin: 50% 100%;
+    transition:
+      transform 280ms var(--hx-m-ease),
+      opacity 200ms ease,
+      visibility 0s linear 280ms;
+  }
+  .hx-side[data-shown='true'] {
+    transform: translate3d(0, var(--hx-sheet-dy), 0);
+    transition:
+      transform 420ms var(--hx-m-ease),
+      opacity 200ms ease,
+      visibility 0s linear 0s;
+  }
+  .hx-side[data-drag='true'] {
+    transition: none;
+  }
+  .hx-side > .hx-sheet__grip {
+    display: block;
+    position: sticky;
+    top: 0;
+    margin: 4px auto 6px;
+  }
+  .hx-side
+    :is(
+      .hx-bg__state,
+      .hx-bg__on,
+      .hx-bg__last,
+      .hx-side__text,
+      .hx-side__more,
+      .hx-recap__age,
+      .hx-recap__more
+    ) {
+    font-size: 13px;
+  }
+  .hx-side :is(.hx-side__head, .hx-side__more, .hx-recap__more) {
+    min-height: 44px;
+  }
+  .hx-side .hx-bg__stop {
+    width: 40px;
+    height: 40px;
+  }
+}
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+  .hx-side,
+  .hx-side[data-shown='true'] {
+    transition-duration: 1ms;
+  }
+}

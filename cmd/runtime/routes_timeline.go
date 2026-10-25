@@ -51,8 +51,6 @@ func (c *core) timelineRoutes(f *gate.Gate, d deps) []gate.Route {
 			Slice:   "timeline",
 			Match:   func(r *http.Request) bool { return providerLimits != nil && at(r, platformAPI+"/economics") },
 			Compute: econ.Answer,
-			Volatile: []string{"conversation.computedAt", "limits.fiveHour.forecast", "limits.sevenDay.forecast", "limits.extra.*.forecast",
-				"limits.fiveHour.sampledAt", "limits.sevenDay.sampledAt", "limits.extra.*.sampledAt"},
 		},
 		gate.JSONRoute{
 			Slice:   "timeline",
@@ -114,12 +112,24 @@ func (c *core) ultracodeSession(sessionID any) bool {
 			if !jsvalue.Truthy(id) || !sameKey(id, sessionID) {
 				continue
 			}
-			if effort, _ := t.Object(key).Object("launch").Get("effort"); effort == "ultracode" {
+			if c.tabLaunchedUltracode(t) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// tabLaunchedUltracode says whether the tab's remembered launch asked for ultracode.
+func (c *core) tabLaunchedUltracode(t *jsvalue.Object) bool {
+	key := c.cfg.MetaKey
+	if key == "" {
+		return false
+	}
+	launch := t.Object(key).Object("launch")
+	effort, _ := launch.Get("effort")
+	ultra, _ := launch.Get("ultracode")
+	return effort == "ultracode" || ultra == true
 }
 
 // sameKey is how a JavaScript Set compares two JSON values: objects only to themselves.

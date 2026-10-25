@@ -13,6 +13,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
 
 const (
@@ -199,6 +200,9 @@ func (h *Hub) Shutdown() {
 
 // accept upgrades a request and runs the socket until it ends; onMessage gets every text message but the heartbeat.
 func (h *Hub) accept(w http.ResponseWriter, r *http.Request, onOpen func(*Client), onMessage func(*Client, []byte), resync func(*Client)) {
+	if sameorigin.Refuse(w, r) {
+		return
+	}
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify:   true,
 		CompressionMode:      websocket.CompressionContextTakeover,

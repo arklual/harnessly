@@ -30,7 +30,7 @@ func init() {
 
 var (
 	servicesMu  sync.Mutex
-	servicesFor = map[*gate.OldRuntime]*services.Handlers{}
+	servicesFor = map[*gate.CLIToken]*services.Handlers{}
 )
 
 // portalOrigins are the origins of the documents and boards services as the deployment names them; a link on one gets
@@ -51,6 +51,9 @@ func serviceConfig(d deps) services.Config {
 		Home:          d.Home,
 		SecretDirs:    splitList(os.Getenv("RUNTIME_SECRET_CONFIG_DIRS")),
 		GitLabHosts:   splitList(os.Getenv("RUNTIME_GITLAB_HOSTS")),
+		GitLabAPI:     strings.TrimRight(os.Getenv("RUNTIME_GITLAB_API_ORIGIN"), "/"),
+		GitHubHost:    strings.TrimSpace(os.Getenv("RUNTIME_GITHUB_HOST")),
+		GitHubAPI:     strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_GITHUB_API")), "/"),
 		TrackerURL:    os.Getenv("RUNTIME_TRACKER_URL"),
 		TrackerHosts:  splitList(os.Getenv("RUNTIME_TRACKER_HOSTS")),
 		DocsHost:      os.Getenv("RUNTIME_DOCS_HOST"),
@@ -83,11 +86,11 @@ func handlersFor(d deps) (*services.Handlers, services.Config) {
 	servicesMu.Lock()
 	defer servicesMu.Unlock()
 	cfg := serviceConfig(d)
-	if h := servicesFor[d.Old]; h != nil {
+	if h := servicesFor[d.CLI]; h != nil {
 		return h, cfg
 	}
 	h := &services.Handlers{S: services.New(cfg), Session: d.SessionOK}
-	servicesFor[d.Old] = h
+	servicesFor[d.CLI] = h
 	return h, cfg
 }
 
@@ -186,17 +189,18 @@ func serviceRoutes(d deps) []gate.JSONRoute {
 	if len(cfg.GitLabHosts) > 0 {
 		out = append(out,
 			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/gitlab"), Compute: viaMemory(d, h.GitLab)},
-			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/gitlab-view"), Compute: viaMemory(d, h.GitLabView), Shape: true},
+			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/gitlab-view"), Compute: viaMemory(d, h.GitLabView)},
 		)
 	}
+	out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/change-view"), Compute: viaMemory(d, h.ChangeView)})
 	if cfg.TrackerURL != "" && len(cfg.GitLabHosts) > 0 && (cfg.DocsHost != "" || len(cfg.PortalOrigins) > 0) {
 		out = append(out,
-			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/link-meta"), Compute: viaMemory(d, h.LinkMeta), Shape: true},
+			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/link-meta"), Compute: viaMemory(d, h.LinkMeta)},
 			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/link-meta/projects"), Compute: viaMemory(d, h.Projects)},
 		)
 	}
 	if cfg.TrackerURL != "" && cfg.TaskKey != nil {
-		out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/task"), Compute: viaMemory(d, h.Task), Shape: true})
+		out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/task"), Compute: viaMemory(d, h.Task)})
 	}
 	if cfg.OrganizerFile != "" {
 		out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/organizer"), Compute: viaMemory(d, h.Organizer)})

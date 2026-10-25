@@ -77,6 +77,13 @@ type QueueTaken struct {
 	Item Item `json:"item"`
 }
 
+// SteerBody is the answer to steer: {ok: true, outcome} — sent: typed into the running turn, the agent reads it at its
+// next step; delivered: the agent held the message already and nothing was typed.
+type SteerBody struct {
+	OK      bool   `json:"ok"`
+	Outcome string `json:"outcome"`
+}
+
 // OKBody is {ok: true}.
 type OKBody struct {
 	OK bool `json:"ok"`
@@ -126,10 +133,11 @@ func (s *Service) PromptQueue(body []byte) Response {
 		return fail(400, msgNeedID.String())
 	}
 	if action == "steer" {
-		if r := s.Steer(tabID, id); !r.OK {
+		r := s.Steer(tabID, id)
+		if !r.OK {
 			return Response{r.Status, ErrorBody{Error: r.Message, Code: r.Code}}
 		}
-		return ok(OKBody{true})
+		return ok(SteerBody{OK: true, Outcome: r.Outcome})
 	}
 	notQueued := Response{404, ErrorBody{Error: msgNotQueued.String(), Code: CodeNotQueued}}
 	if action == "retry" {
@@ -340,10 +348,15 @@ func (s *Service) CommandScreenKey(body []byte) Response {
 	if cmd := s.cfg.Panes.PaneCurrentCommand(session); cmd == "" || s.cfg.IsShell(cmd) {
 		return fail(409, msgAgentNotRunning.String())
 	}
-	if s.cfg.Panes.SendRawKeys(session, key) != nil {
+	unlock := hold(session)
+	sent := s.cfg.Panes.SendRawKeys(session, key) == nil
+	if sent {
+		s.clock.Sleep(mirrorKeySettle)
+	}
+	unlock()
+	if !sent {
 		return fail(500, msgKeyFailed.String())
 	}
-	s.clock.Sleep(mirrorKeySettle)
 	return s.readMirror(session)
 }
 
@@ -370,7 +383,10 @@ func (s *Service) SendInput(body []byte) Response {
 	if r, valid := s.rawSession(session, "session and input parameters required"); !valid {
 		return r
 	}
-	if s.cfg.Panes.SendRawKeys(session, input) != nil {
+	unlock := hold(session)
+	sent := s.cfg.Panes.SendRawKeys(session, input) == nil
+	unlock()
+	if !sent {
 		return fail(500, "Failed to send input")
 	}
 	return ok(OKBody{true})
@@ -496,7 +512,10 @@ func (s *Service) AnswerQuestion(body []byte) Response {
 		if r, valid := s.rawSession(session, "session parameter required"); !valid {
 			return r
 		}
-		if !s.chatAboutQuestion(session) {
+		unlock := hold(session)
+		chatted := s.chatAboutQuestion(session)
+		unlock()
+		if !chatted {
 			return fail(409, "No question on the agent screen")
 		}
 		return ok(OKBody{true})
@@ -508,6 +527,7 @@ func (s *Service) AnswerQuestion(body []byte) Response {
 	if r, valid := s.rawSession(session, "session, questions and choices parameters required"); !valid {
 		return r
 	}
+	defer hold(session)()
 	before, captured := s.cfg.Panes.Capture(session)
 	if !captured || !screen.IsQuestionOnScreen(before) {
 		s.warn("answer-question: no question on the screen, nothing sent", "session", session)

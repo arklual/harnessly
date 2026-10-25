@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -42,6 +43,8 @@ type Texts struct {
 // Config is what the deployment names.
 type Config struct {
 	DataDir string
+	// AgentTokenHeader carries the token of agent.json to the machine agent's loopback routes.
+	AgentTokenHeader string
 	// ConfigFile is the runtime's config (the owner's address).
 	ConfigFile string
 	// LibraryDir is an explicit library folder; WorkspaceDir (or the workspace root of WorkspaceConfig) holds
@@ -97,6 +100,12 @@ type Library struct {
 	texts    sync.Map
 	releases releasesState
 	osUser   func() string
+	hashed   *hashIndex
+	access   accessState
+	now      func() time.Time           // tests; nil is time.Now
+	emitFn   func(kind, project string) // tests; nil sends to the agent
+	// accessWrite orders snapshot posts so the file on disk is the snapshot in memory.
+	accessWrite sync.Mutex
 }
 
 func New(cfg Config) *Library {
@@ -106,8 +115,9 @@ func New(cfg Config) *Library {
 	if cfg.Texts.Tag == "" {
 		cfg.Texts.Tag = "design"
 	}
-	l := &Library{cfg: cfg, locks: map[string]*sync.Mutex{}}
+	l := &Library{cfg: cfg, locks: map[string]*sync.Mutex{}, hashed: &hashIndex{}}
 	l.live.init()
+	l.loadAccess()
 	return l
 }
 

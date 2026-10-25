@@ -183,6 +183,8 @@ func (c *cli) run(args []string) error {
 		return c.design(rest)
 	case "hook":
 		return c.hook(rest)
+	case "peers", "peer":
+		return c.peers(rest)
 	}
 	return usageErr("unknown command %q", cmd)
 }
@@ -739,6 +741,8 @@ var (
 	portRe     = regexp.MustCompile(`(?i)^(?:(?:https?://)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0)?:)?\d{1,5}(?:/.*)?$`)
 	portalRe   = regexp.MustCompile(`^/[ab]/[\w-]+/?$`)
 	gitlabPath = regexp.MustCompile(`/-/(merge_requests/\d+|commit/[0-9a-f]{7,40})`)
+	// githubPath: a pull request, a commit or an issue of GitHub, which the pane shows through the API like GitLab's.
+	githubPath = regexp.MustCompile(`^/[\w.-]+/[\w.-]+/(pull/[1-9]\d*(/.*)?|issues/[1-9]\d*/?|commits?/[0-9a-fA-F]{7,40}/?)$`)
 )
 
 // resolveOpen turns what the agent typed into the pane's tab kind and target.
@@ -747,13 +751,17 @@ func (c *cli) resolveOpen(args []string) (tab, target string, err error) {
 		return "", "", usageErr("open needs a target: a link, a file, a port or a tab kind")
 	}
 	if isPaneKind(args[0]) && args[0] != "task" {
+		if args[0] == "design" && len(args) > 2 {
+			// A design's title may come unquoted.
+			args = []string{"design", strings.Join(args[1:], " ")}
+		}
 		if len(args) > 2 {
 			return "", "", usageErr("open %s takes at most one target", args[0])
 		}
 		tab = args[0]
 		if len(args) == 2 {
 			target = args[1]
-			if tab == "files" || tab == "changes" || tab == "terminal" {
+			if tab == "files" || tab == "changes" || tab == "terminal" || (tab == "design" && looksLikePath(target)) {
 				target = c.absPath(target)
 			}
 		}
@@ -780,10 +788,17 @@ func (c *cli) resolveOpen(args []string) (tab, target string, err error) {
 			return "artifacts", t, nil
 		case gitlabPath.MatchString(u.Path):
 			return "gitlab", t, nil
+		case strings.EqualFold(u.Hostname(), "github.com") && githubPath.MatchString(u.Path):
+			return "gitlab", t, nil
 		}
 		return "browser", t, nil
 	}
 	return "files", c.absPath(t), nil
+}
+
+// looksLikePath: a design named by its folder or a file in it, not by its id or title.
+func looksLikePath(s string) bool {
+	return strings.HasPrefix(s, "/") || strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../") || strings.HasPrefix(s, "~/")
 }
 
 func (c *cli) absPath(p string) string {

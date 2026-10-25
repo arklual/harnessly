@@ -1,0 +1,5 @@
+{
+  "op": "interrupt",
+  "body": {"opId": "op-i2", "conversationId": "tab-k3Jx9QmZ", "pauseQueue": false},
+  "result": {"r": "accepted", "ch": "conv:tab-k3Jx9QmZ", "seq": 520}
+}

@@ -1,0 +1,1 @@
+{"agentType":"workflow-subagent","isBuiltIn":true,"description":"fix:payments","workflowPhase":"Fix","spawnDepth":1,"requestShape":"foreground","requestNonInteractive":false,"model":"opus"}

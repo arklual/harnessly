@@ -1,6 +1,7 @@
 package transcript
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"strings"
@@ -61,18 +62,29 @@ type codexParse struct {
 
 func splitCodexLines(content string, start int64) ([]string, []int64) {
 	lines := strings.Split(content, "\n")
-	offsets := make([]int64, len(lines))
-	off := start
-	for i, l := range lines {
-		offsets[i] = off
-		off += int64(len(l)) + 1
-	}
-	return lines, offsets
+	return lines, codexLineOffsets(lines, textAt{start: start, firstLine: -1})
 }
 
-func parseCodexWithOffsets(content string, start int64, s *codexState) codexParse {
+// codexLineOffsets is where each of consecutive lines starts, as at places the first.
+func codexLineOffsets(lines []string, at textAt) []int64 {
+	offsets := make([]int64, len(lines))
+	off := at.start
+	for i, l := range lines {
+		offsets[i] = off
+		if i == 0 && at.firstLine >= 0 {
+			off += at.firstLine + 1
+		} else {
+			off += int64(len(l)) + 1
+		}
+	}
+	return offsets
+}
+
+// parseCodexWithOffsets parses content, which starts at start as the previous runtime counted (in decoded text). The
+// ids name a line by the byte it really starts at: exact is where the text really starts.
+func parseCodexWithOffsets(content string, start, exact int64, s *codexState) codexParse {
 	lines, offsets := splitCodexLines(content, start)
-	return codexParse{codexLinesResult: parseCodexLines(lines, s, offsets), lastOffset: start + int64(len(content))}
+	return codexParse{codexLinesResult: parseCodexLines(lines, s, offsets, exact-start), lastOffset: start + int64(len(content))}
 }
 
 // readCodexBytes reads [from, to) as Buffer.alloc + read: bytes past the end of the file stay zero.
@@ -89,24 +101,25 @@ func readCodexBytes(path string, from, to int64) ([]byte, error) {
 	return buf, nil
 }
 
-// readCodexChunk is readChunk: past a start inside the file, the text begins after the first newline.
-func readCodexChunk(path string, from, to int64) (string, int64, error) {
+// readCodexChunk is readChunk: past a start inside the file, the text begins after the first newline. It answers where
+// the text starts twice, as readChunk does: validFrom in the decoded text, start in the file.
+func readCodexChunk(path string, from, to int64) (content string, validFrom, start int64, err error) {
 	if to-from <= 0 {
-		return "", from, nil
+		return "", from, from, nil
 	}
 	b, err := readCodexBytes(path, from, to)
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	raw := decodeUTF8(b)
 	if from == 0 {
-		return raw, 0, nil
+		return raw, 0, 0, nil
 	}
 	nl := strings.IndexByte(raw, '\n')
 	if nl < 0 {
-		return "", to, nil
+		return "", to, to, nil
 	}
-	return raw[nl+1:], from + int64(nl+1), nil
+	return raw[nl+1:], from + int64(nl+1), from + int64(bytes.IndexByte(b, '\n')+1), nil
 }
 
 func readCodexExact(path string, from, to int64) (string, error) {
@@ -188,7 +201,7 @@ func readCodexRange(path string, fromByte, toByte, displayFrom int64, opts Codex
 	if err != nil {
 		return emptyCodexChunk()
 	}
-	r := parseCodexWithOffsets(content, from, newCodexState(opts.ImageURL))
+	r := parseCodexWithOffsets(content, from, from, newCodexState(opts.ImageURL))
 	entries := []*jsvalue.Object{}
 	for i, e := range r.entries {
 		off := from
@@ -223,7 +236,7 @@ func (p *CodexParser) parseAll() ([]*jsvalue.Object, int64) {
 		panic(codexThrow{})
 	}
 	content := decodeUTF8(b)
-	r := parseCodexWithOffsets(content, 0, p.state)
+	r := parseCodexWithOffsets(content, 0, 0, p.state)
 	p.lastOffset = int64(len(content))
 	return r.entries, p.lastOffset
 }
@@ -243,7 +256,7 @@ func (p *CodexParser) ParseTail(maxEntries int) (out Chunk) {
 		if from < 0 {
 			from = 0
 		}
-		content, validFrom, err := readCodexChunk(p.path, from, size)
+		content, validFrom, start, err := readCodexChunk(p.path, from, size)
 		if err != nil {
 			return emptyCodexChunk()
 		}
@@ -255,7 +268,7 @@ func (p *CodexParser) ParseTail(maxEntries int) (out Chunk) {
 			continue
 		}
 		p.state = newCodexState(p.opts.ImageURL)
-		r := parseCodexWithOffsets(content, validFrom, p.state)
+		r := parseCodexWithOffsets(content, validFrom, start, p.state)
 		if len(r.entries) >= maxEntries || from == 0 {
 			p.lastOffset = size
 			p.pending = ""
@@ -298,6 +311,10 @@ func (p *CodexParser) ParseIncremental() (out Incremental) {
 	if _, err := f.ReadAt(buf, p.lastOffset); err != nil && err != io.EOF {
 		return fail
 	}
+	where := textAt{start: p.lastOffset, firstLine: -1}
+	if p.pending != "" {
+		where = pendingAt(f, p.lastOffset, buf)
+	}
 	raw := p.pending + decodeUTF8(buf)
 	segments := strings.Split(raw, "\n")
 	newPending := ""
@@ -312,23 +329,32 @@ func (p *CodexParser) ParseIncremental() (out Incremental) {
 			}
 		}
 	}
-	r := parseCodexLines(segments, p.state, nil)
+	r := parseCodexLines(segments, p.state, codexLineOffsets(segments, where), 0)
 	p.lastOffset = size
 	p.pending = newPending
 	return Incremental{NewEntries: r.entries, NewOffset: size, PendingBuffer: newPending}
 }
 
 // ParseCodexContent is the entries of Codex transcript text (parseCodexContent); nil where the previous runtime threw.
-func ParseCodexContent(content string, opts CodexOptions) (out []*jsvalue.Object) {
+// The text is taken to be a whole file: a line is named by its offset in the text.
+func ParseCodexContent(content string, opts CodexOptions) []*jsvalue.Object {
+	return ParseCodexContentAt(content, 0, opts)
+}
+
+// ParseCodexContentAt is ParseCodexContent of text that starts at byte start of its file, whole lines from a line's
+// start.
+func ParseCodexContentAt(content string, start int64, opts CodexOptions) (out []*jsvalue.Object) {
 	defer recoverCodex(func() { out = nil })
-	return parseCodexLines(strings.Split(content, "\n"), newCodexState(opts.ImageURL), nil).entries
+	lines, offsets := splitCodexLines(content, start)
+	return parseCodexLines(lines, newCodexState(opts.ImageURL), offsets, 0).entries
 }
 
 // ParseCodexContentChecked is ParseCodexContent that tells a throw of the previous runtime's parser from an empty
 // result.
 func ParseCodexContentChecked(content string, opts CodexOptions) (entries []*jsvalue.Object, threw bool) {
 	defer recoverCodex(func() { entries, threw = nil, true })
-	return parseCodexLines(strings.Split(content, "\n"), newCodexState(opts.ImageURL), nil).entries, false
+	lines, offsets := splitCodexLines(content, 0)
+	return parseCodexLines(lines, newCodexState(opts.ImageURL), offsets, 0).entries, false
 }
 
 // ReadCodexTail is readTailCodexEntries.
@@ -362,12 +388,12 @@ func ReadCodexBefore(path string, beforeByte int64, maxEntries int, until int64,
 		if from < 0 {
 			from = 0
 		}
-		content, validFrom, err := readCodexChunk(path, from, current)
+		content, validFrom, exact, err := readCodexChunk(path, from, current)
 		if err != nil {
 			return emptyCodexChunk()
 		}
 		if content != "" {
-			r := parseCodexWithOffsets(content, validFrom, newCodexState(opts.ImageURL))
+			r := parseCodexWithOffsets(content, validFrom, exact, newCodexState(opts.ImageURL))
 			if len(r.entries) >= maxEntries || from == 0 {
 				start := validFrom
 				if from == 0 {

@@ -1,0 +1,3 @@
+{"parentUuid":null,"isSidechain":true,"agentId":"a1c0ffee00000003c","type":"user","message":{"role":"user","content":"[Workflow harness — computed task] The computed task text follows:\n  Review one part of the checkout flow."},"uuid":"a1c0ffee00000003c-0","timestamp":"2026-10-25T10:00:07.000Z"}
+{"type":"api-request","params":{"model":"claude-sonnet-5-5","output_config":{"effort":"medium"}}}
+{"parentUuid":null,"isSidechain":true,"agentId":"a1c0ffee00000003c","type":"assistant","message":{"model":"claude-sonnet-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_a1c0ffee00000003c0","name":"Read","input":{"file_path":"/home/coder/workspace/acme/web/pay/copy.ts"}}],"stop_reason":"tool_use"},"uuid":"a1c0ffee00000003c-1","timestamp":"2026-10-25T10:00:07.000Z"}

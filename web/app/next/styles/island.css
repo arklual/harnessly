@@ -1,0 +1,477 @@
+/* The design's island (.hx-island): the field over the site, its live status and its folded pill — verbatim. */
+.hx-island__row .hx-head-btn[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-island {
+  position: absolute;
+  z-index: 7;
+  left: calc(12px + (100% - 24px) / 2 - 300px);
+  bottom: 32px;
+  width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition:
+    left 560ms var(--site-ease),
+    width 560ms var(--site-ease),
+    bottom 560ms var(--site-ease),
+    opacity 300ms ease,
+    transform 420ms var(--site-ease);
+}
+.hx-site[data-mode='chat'] .hx-island {
+  left: 20px;
+  bottom: 20px;
+  width: calc(var(--site-chat) - 16px);
+}
+.hx-site[data-mode='notes'] .hx-island {
+  opacity: 0;
+  transform: translateY(24px);
+  pointer-events: none;
+}
+.hx-site[data-mode='island'][data-scrolling='true'] .hx-island:not(:focus-within) {
+  left: calc(12px + (100% - 24px) / 2 - 190px);
+  width: 380px;
+  opacity: 0.92;
+}
+.hx-island__box {
+  padding: 6px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 22px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 10px 30px rgba(12, 14, 34, 0.16),
+    0 2px 6px rgba(12, 14, 34, 0.06);
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+.hx-island__box:focus-within {
+  border-color: var(--hx-focus);
+}
+.hx-island__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.hx-island__input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  max-height: 132px;
+  padding: 7px 6px;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-md);
+  line-height: 22px;
+}
+.hx-island__input::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-island__row .hx-round {
+  margin-left: 2px;
+}
+.hx-island__mic[data-rec='true'] {
+  background: color-mix(in srgb, var(--hx-danger) 12%, transparent);
+  color: var(--hx-danger);
+}
+.hx-island__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 4px 6px;
+}
+.hx-island__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin-bottom: -48px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: 0 6px 18px rgba(12, 14, 34, 0.12);
+  font-size: var(--hx-text-sm);
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity 260ms ease,
+    transform 420ms var(--site-ease),
+    margin 420ms var(--site-ease);
+}
+.hx-island__status[data-shown='true'] {
+  margin-bottom: 0;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.hx-island__ic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.hx-island__ic .hx-icon {
+  position: absolute;
+  transition:
+    opacity 240ms ease,
+    transform 320ms var(--site-ease);
+}
+.hx-island__spin {
+  color: var(--hx-accent);
+  animation: hx-spin 1s linear infinite;
+}
+.hx-island__ok {
+  color: var(--hx-success);
+  opacity: 0;
+  transform: scale(0.6);
+}
+.hx-island__status[data-done='true'] .hx-island__spin {
+  opacity: 0;
+}
+.hx-island__status[data-done='true'] .hx-island__ok {
+  opacity: 1;
+  transform: none;
+}
+.hx-island__step {
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-island__dots {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.hx-island__dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+  opacity: 0.3;
+  transition:
+    background 300ms ease,
+    opacity 300ms ease,
+    width 300ms var(--site-ease);
+}
+.hx-island__dots i[data-s='now'] {
+  width: 14px;
+  border-radius: 3px;
+  background: var(--hx-accent);
+  opacity: 1;
+}
+.hx-island__dots i[data-s='done'] {
+  background: var(--hx-success);
+  opacity: 0.8;
+}
+.hx-island__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+}
+.hx-island__act:hover {
+  background: var(--hx-bg-active);
+}
+.hx-island__x {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+}
+.hx-site[data-mode='chat'] .hx-island__act i {
+  display: none;
+}
+@media (max-width: 700px) {
+  .hx-island,
+  .hx-site[data-mode='chat'] .hx-island,
+  .hx-site[data-mode='island'][data-scrolling='true'] .hx-island:not(:focus-within) {
+    left: 16px;
+    width: calc(100% - 32px);
+    bottom: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-island {
+    transition: none;
+    animation: none;
+  }
+}
+.hx-site[data-mode='notes'] .hx-island__box {
+  display: none;
+}
+.hx-site[data-mode='notes']:not([data-run='idle']) .hx-island {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.hx-site[data-mode='notes'][data-run='done'] .hx-island {
+  bottom: 80px;
+}
+.hx-site[data-mode='chat'] .hx-island__dots {
+  display: none;
+}
+.hx-island__box {
+  position: relative;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    opacity 320ms ease,
+    transform 460ms var(--site-ease),
+    translate 420ms var(--site-ease);
+}
+.hx-site[data-resizing='island'] .hx-island__box,
+.hx-site[data-resizing='mini'] .hx-island__mini {
+  transition: none;
+}
+.hx-island__grab {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  z-index: 1;
+  width: 72px;
+  height: 18px;
+  margin-left: -36px;
+  cursor: grab;
+  touch-action: none;
+}
+.hx-island__grab::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 7px;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--hx-fg-3);
+  opacity: 0;
+  transition:
+    opacity 200ms ease,
+    width 300ms var(--site-ease),
+    margin 300ms var(--site-ease);
+}
+.hx-island:hover .hx-island__grab::after {
+  opacity: 0.4;
+}
+.hx-site[data-resizing='island'] .hx-island__grab::after {
+  opacity: 0.6;
+  width: 48px;
+  margin-left: -24px;
+}
+.hx-site[data-mode='chat'] .hx-island__grab {
+  display: none;
+}
+.hx-island__mini {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px 0 10px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: 0 10px 30px rgba(12, 14, 34, 0.18);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: none;
+  transform: translate(-50%, 16px) scale(0.92);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 260ms ease,
+    transform 460ms var(--site-ease),
+    translate 420ms var(--site-ease);
+}
+.hx-island__mini kbd {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: 11px;
+}
+/* A phone has no keyboard to press «/» on: the shortcut is not told. */
+@media (max-width: 900px), (hover: none) {
+  .hx-island__mini kbd {
+    display: none;
+  }
+}
+.hx-island__orb {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.hx-site[data-min='true'] .hx-island__box {
+  opacity: 0;
+  transform: translateY(28px) scale(0.94);
+  pointer-events: none;
+}
+.hx-site[data-min='true'] .hx-island__mini {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+  transition-delay: 80ms;
+}
+.hx-site[data-min='true'][data-mode='island'] .hx-island__status {
+  margin-bottom: 4px;
+}
+.hx-site[data-min='true'][data-mode='island'] .hx-island {
+  bottom: 20px;
+}
+.hx-site[data-mode='chat'] .hx-island__mini {
+  display: none;
+}
+.hx-site .hx-island,
+.hx-site[data-mode='notes']:not([data-run='idle']) .hx-island {
+  pointer-events: none;
+}
+.hx-island__box {
+  pointer-events: auto;
+}
+.hx-site[data-dev='true']:not([data-mode='chat']) .hx-island {
+  bottom: calc(var(--dev-h) + 32px);
+}
+.hx-site[data-resizing='dev'] .hx-island {
+  transition: none;
+}
+.hx-site[data-mode='float'] .hx-island {
+  left: calc(var(--fx) + 8px);
+  bottom: calc(100% - var(--fy) - var(--fh) + 8px);
+  width: calc(var(--fw) - 16px);
+  z-index: 9;
+}
+.hx-site[data-mode='float'] .hx-island__grab,
+.hx-site[data-mode='float'] .hx-island__mini,
+.hx-site[data-mode='float'] .hx-island__dots {
+  display: none;
+}
+.hx-site[data-mode='float'] .hx-island__act i {
+  display: none;
+}
+.hx-site[data-resizing='float'] .hx-island,
+.hx-site[data-resizing='fres'] .hx-island {
+  transition: none;
+}
+@media (max-width: 700px) {
+  .hx-site[data-mode='float'] .hx-island {
+    left: 16px;
+    width: calc(100% - 32px);
+    bottom: 16px;
+  }
+}
+.hx-island__act.hx-tipped {
+  position: relative;
+}
+.hx-site[data-dock='right'][data-mode='chat'] .hx-island {
+  left: calc(100% - 4px - var(--site-chat));
+}
+.hx-site[data-resizing='island'] .hx-island__grab {
+  cursor: grabbing;
+}
+.hx-site[data-resizing='island'] .hx-island__box {
+  transition: none;
+  box-shadow:
+    0 24px 60px rgba(12, 14, 34, 0.26),
+    0 4px 12px rgba(12, 14, 34, 0.1);
+}
+@media (max-width: 900px) {
+  .hx-site[data-mode='chat'] .hx-island {
+    left: 8px;
+    width: calc(100% - 16px);
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+}
+@keyframes hx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ours: the log of a design whose conversation has no turns yet. */
+.hx-site__log-empty {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+/* The folded chat's status: the agent's last line over what it does now. It unfolds by its rows, so a status
+   with the line and one without come and go the same way. */
+.hx-island__status {
+  display: grid;
+  grid-template-rows: 0fr;
+  height: auto;
+  margin-bottom: -8px;
+  padding: 0;
+  border-radius: 20px;
+  transition:
+    opacity 260ms ease,
+    transform 420ms var(--site-ease),
+    margin 420ms var(--site-ease),
+    grid-template-rows 420ms var(--site-ease);
+}
+.hx-island__status[data-shown='true'] {
+  grid-template-rows: 1fr;
+}
+.hx-island__status-in {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.hx-island__now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 6px 0 12px;
+}
+.hx-island__last {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 10px 12px 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.hx-island__last:hover {
+  color: var(--hx-fg-1);
+}

@@ -29,7 +29,7 @@ import '@/styles/hl-gallery.css';
 import '@/styles/hl-timeline-items.css';
 import '@xterm/xterm/css/xterm.css';
 
-import { StrictMode, useEffect, useState, type ComponentType } from 'react';
+import { createElement, lazy, StrictMode, Suspense, useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import dayjs from 'dayjs';
@@ -44,13 +44,19 @@ import { auth } from '@/runtime/endpoints';
 import SignIn from '@/components/auth/sign-in';
 import useWorkspaceStore, { type IWorkspaceInitialData } from '@/hooks/use-workspace-store';
 import useConfigStore, { type IConfigInitialData } from '@/hooks/use-config-store';
-import Workspace from '@/pages/workspace';
 import PushBridge from '@/components/agents/push-bridge';
 import { captureInstallPrompt } from '@/hooks/use-install-prompt';
 import DocViewerPage from '@/pages/docs/[slug]';
 
 const Docs = DocViewerPage as unknown as ComponentType<Record<string, unknown>>;
-const Shell = Workspace as unknown as ComponentType<Record<string, unknown>>;
+// The interface is its own chunk, loaded once the person is signed in.
+const NextShell = lazy(() => import('@/next/entry'));
+// The interface's states on mock data (?dev=<name> opens next/dev/<name>-gallery.tsx).
+const GALLERIES: Record<string, ComponentType> = Object.fromEntries(
+  Object.entries(import.meta.glob<{ default: ComponentType }>('./next/dev/*-gallery.tsx')).map(
+    ([path, load]) => [path.replace(/^.*\/([^/]+)-gallery\.tsx$/, '$1'), lazy(load)],
+  ),
+);
 
 dayjs.extend(relativeTime);
 dayjs.locale(locale());
@@ -112,6 +118,14 @@ const ThemedToaster = () => {
   );
 };
 
+/** The development gallery needs no runtime, so it comes before signing in and loading. */
+const Entry = () => {
+  const { query } = useRouter();
+  const gallery = typeof query.dev === 'string' ? GALLERIES[query.dev] : undefined;
+  if (gallery) return <Suspense fallback={null}>{createElement(gallery)}</Suspense>;
+  return <App />;
+};
+
 const App = () => {
   const { pathname } = useRouter();
   const [phase, reload] = useBootstrap();
@@ -123,7 +137,13 @@ const App = () => {
   const props = ((boot.props as Record<string, unknown> | undefined) ?? boot) as Record<string, unknown>;
   return (
     <>
-      {pathname === '/docs/[slug]' ? <Docs {...props} /> : <Shell {...props} />}
+      {pathname === '/docs/[slug]' ? (
+        <Docs {...props} />
+      ) : (
+        <Suspense fallback={null}>
+          <NextShell owner={typeof props.owner === 'string' ? props.owner : ''} />
+        </Suspense>
+      )}
       <ThemedToaster />
       <PushBridge />
     </>
@@ -138,7 +158,7 @@ if (root) {
   createRoot(root).render(
     <StrictMode>
       <ThemeProvider>
-        <App />
+        <Entry />
       </ThemeProvider>
     </StrictMode>,
   );

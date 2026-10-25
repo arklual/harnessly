@@ -1,0 +1,40 @@
+
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort ultracode off[39m
+[38;5;246m[49m  ⎿  [39mUltracode off. Effort stays high.
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort status[39m
+[38;5;246m[49m  ⎿  [39mCurrent effort level: high (Comprehensive implementation with extensive testing and documentation)
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort ultracode on[39m
+[38;5;246m[49m  ⎿  [39mUltracode on (this session only): dynamic workflows on every task. Effort stays high.
+
+[38;5;246m[48;5;237m❯ [38;5;231mReply with just the word ok, no tools.[39m
+
+[38;5;231m[49m●[39m ok
+
+[38;5;246m✻[39m [38;5;246mCogitated for 7s · done 9:45 PM[39m
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort max[39m
+[38;5;246m[49m  ⎿  [39mSet effort level to max (this session only): Maximum capability with deepest reasoning. May use excessive tokens resulting in long response times or
+     overthinking. Use sparingly for the hardest tasks.
+
+[38;5;246m[48;5;237m❯ [38;5;231mReply with just the word ok, no tools.[39m
+
+[38;5;231m[49m●[39m ok
+
+[38;5;246m✻[39m [38;5;246mCrunched for 2s · done 9:46 PM[39m
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/model opus[39m [49m
+[38;5;246m  ⎿  [39mKept model as [38;5;153mSonnet 5.5[39m
+[38;5;153m▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+[39m   [1mEffort[0m
+
+                                                 Faster                             Smarter
+                                                 [38;5;246m────────────────────────────────────────[1m[39m▲[0m[38;5;246m─[39m      [1m[38;5;147mUltracode [38;5;189m [38;5;147mon[0m
+                                                 [38;5;246mlow[39m     [38;5;246mmedium[39m     [38;5;246mhigh[39m     [38;5;246mxhigh[39m      [1m[38;5;182mm[38;5;210ma[38;5;216mx[0m      [38;5;246mTab to toggle[39m
+                                                 [38;5;246mUltracode: dynamic workflows on every task[39m
+                    [38;5;246mMay use excessive tokens resulting in long response times or overthinking. Use sparingly for the hardest tasks. (~10.2x)[39m
+
+
+   [38;5;246m←/→ to adjust · Enter to confirm · s for this session only · Esc to cancel[39m

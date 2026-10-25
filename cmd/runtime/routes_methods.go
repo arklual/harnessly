@@ -79,7 +79,6 @@ func otherMethodRoutes(d deps) []gate.JSONRoute {
 	forbidden := jsvalue.NewObject("error", "Forbidden")
 	list := []otherMethod{
 		get("fsread", "/api/check-agent"),
-		get("fsread", "/api/check-claude"),
 		{slice: "fsread", match: at("/api/codex/sessions"), methods: []string{http.MethodGet}, allow: "GET",
 			body: jsvalue.NewObject("error", "method-not-allowed"), limit: mb, name: "1mb"},
 		{slice: "fsread", match: at("/api/editor/files"), methods: []string{http.MethodGet}, allow: "GET", body: methodNotAllowedBody,

@@ -1,0 +1,13 @@
+{
+  "op": "send",
+  "body": {
+    "opId": "0192b6f1-0000-7000-8000-000000000006",
+    "clientId": "0192b6f1-0000-7000-8000-000000000006",
+    "conversationId": "tab-k3Jx9QmZ",
+    "text": "Проверь на Safari",
+    "attachmentIds": ["up_01JB8"],
+    "mode": "queue",
+    "kind": "prompt"
+  },
+  "result": {"r": "refused", "code": "machine-offline"}
+}

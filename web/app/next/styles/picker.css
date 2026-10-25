@@ -1,0 +1,602 @@
+/* The agent, model and thinking-depth picker over the field, from the design's components.css («Пилюля» … «Строки
+   выбора»). Entrance and exit are one pair of curves; the height follows the active screen. */
+
+.hx-picker-anchor {
+  position: relative;
+  min-width: 0;
+}
+.hx-model .hx-agent {
+  width: 14px;
+  height: 14px;
+}
+.hx-model[aria-expanded='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-model[aria-busy='true'] {
+  opacity: 0.6;
+  transition: opacity var(--hx-dur-md) var(--hx-ease-out);
+}
+/* Unknown depth: the stops show, the fill and the thumb do not */
+.hx-effort:not([data-p]) .hx-effort__fill,
+.hx-effort:not([data-p]) .hx-effort__thumb {
+  opacity: 0;
+}
+.hx-model .hx-model__chev {
+  transition: transform 420ms var(--hx-ease-out);
+}
+.hx-model[aria-expanded='true'] .hx-model__chev {
+  transform: rotate(180deg);
+}
+
+.hx-picker {
+  position: absolute;
+  left: -4px;
+  bottom: calc(100% + 10px);
+  z-index: 10;
+  width: 252px;
+  box-sizing: content-box;
+  border-radius: 18px;
+  border: 1px solid var(--hx-border-strong);
+  background: var(--hx-bg-raised);
+  overflow: hidden;
+  box-shadow:
+    0 12px 32px rgba(12, 14, 34, 0.1),
+    0 2px 6px rgba(12, 14, 34, 0.04);
+  transform-origin: 24px 100%;
+  transition: height 420ms var(--hx-ease-out);
+  animation: hx-picker-in 380ms var(--hx-ease-out) backwards;
+}
+.hx-picker[data-state='closing'] {
+  animation: hx-picker-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+    filter: blur(4px);
+  }
+}
+@keyframes hx-picker-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+    filter: blur(2px);
+  }
+}
+
+.hx-picker__panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.hx-picker__pane {
+  grid-area: 1 / 1;
+  align-self: start;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  transition:
+    opacity 280ms var(--hx-ease-out),
+    transform 420ms var(--hx-ease-out),
+    visibility 0s;
+}
+.hx-picker__pane[data-active='false'] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 420ms var(--hx-ease-out),
+    visibility 0s 420ms;
+}
+.hx-picker__pane[data-pane='effort'][data-active='false'] {
+  transform: translateX(-28px);
+}
+.hx-picker__pane[data-pane='models'][data-active='false'] {
+  transform: translateX(28px);
+}
+.hx-picker__pane[data-pane='models'] {
+  gap: 6px;
+}
+
+.hx-picker__top {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.hx-picker__center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-hover);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-picker__center:hover {
+  background: var(--hx-bg-active);
+}
+.hx-picker__effort {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-accent);
+}
+.hx-picker__model {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-2);
+  white-space: nowrap;
+}
+.hx-picker__model .hx-agent {
+  width: 12px;
+  height: 12px;
+}
+.hx-picker__hint {
+  text-align: center;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--hx-fg-3);
+}
+.hx-picker__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-picker__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-picker__back:hover {
+  background: var(--hx-bg-hover);
+}
+
+/* The depth slider: five stops, the thumb slides smoothly, without a bounce */
+.hx-effort {
+  --t: 28px;
+  position: relative;
+  height: var(--t);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-active);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+.hx-effort__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--t) + var(--p) * (100% - var(--t)));
+  border-radius: inherit;
+  background: var(--hx-accent);
+  transition: width 460ms var(--hx-ease-out);
+}
+.hx-effort__thumb {
+  position: absolute;
+  top: 3px;
+  left: calc(3px + var(--p) * (100% - var(--t)));
+  width: calc(var(--t) - 6px);
+  height: calc(var(--t) - 6px);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(12, 14, 34, 0.25);
+  pointer-events: none;
+  transition:
+    left 460ms var(--hx-ease-out),
+    transform 300ms var(--hx-ease-out);
+}
+.hx-effort:active .hx-effort__thumb {
+  transform: scale(0.9);
+}
+.hx-effort__stop {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--t);
+  left: calc(var(--k) * (100% - var(--t)));
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.hx-effort__stop::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+  transition:
+    background 300ms var(--hx-ease-out),
+    transform 300ms var(--hx-ease-out);
+}
+.hx-effort__stop[data-on='true']::after {
+  background: rgba(255, 255, 255, 0.7);
+}
+.hx-effort__stop:hover::after {
+  transform: scale(1.5);
+}
+/* The place of the thumb (--p) and of each stop (--k), 0…1 along the track: set by the picker for any number of stops. */
+.hx-effort[data-frozen] {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Agent segments: the backing slides under the chosen one */
+.hx-seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  padding: 2px;
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-active);
+}
+.hx-seg__glider {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: calc(2px + var(--a) * (100% - 4px) / var(--n));
+  width: calc((100% - 4px) / var(--n));
+  border-radius: 6px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-sm);
+  transition: left 420ms var(--hx-ease-out);
+}
+.hx-seg__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition: color var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-seg__item[aria-pressed='true'] {
+  color: var(--hx-fg-1);
+}
+.hx-seg__item .hx-agent {
+  width: 12px;
+  height: 12px;
+  opacity: 0.55;
+  filter: grayscale(1);
+  transition:
+    opacity 420ms var(--hx-ease-out),
+    filter 420ms var(--hx-ease-out);
+}
+.hx-seg__item[aria-pressed='true'] .hx-agent,
+.hx-seg__item:hover .hx-agent {
+  opacity: 1;
+  filter: none;
+}
+
+/* The lists of models: switching the agent slides them sideways, rows do not reappear */
+.hx-carousel {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0 -10px;
+}
+.hx-carousel__track {
+  display: flex;
+  align-items: flex-start;
+  transform: translateX(calc(var(--a) * -100%));
+  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hx-options {
+  flex: 0 0 100%;
+  /* a long description must not widen its list past the carousel */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  transition: opacity 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hx-options__note {
+  padding: 10px var(--hx-space-2) 12px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  white-space: normal;
+}
+.hx-options[data-active='false'] {
+  opacity: 0.25;
+}
+.hx-seg[data-n='1'],
+.hx-carousel__track[data-n='1'] {
+  --n: 1;
+}
+.hx-seg[data-n='2'],
+.hx-carousel__track[data-n='2'] {
+  --n: 2;
+}
+.hx-seg[data-n='3'],
+.hx-carousel__track[data-n='3'] {
+  --n: 3;
+}
+.hx-seg[data-n='4'],
+.hx-carousel__track[data-n='4'] {
+  --n: 4;
+}
+.hx-seg[data-a='0'],
+.hx-carousel__track[data-a='0'] {
+  --a: 0;
+}
+.hx-seg[data-a='1'],
+.hx-carousel__track[data-a='1'] {
+  --a: 1;
+}
+.hx-seg[data-a='2'],
+.hx-carousel__track[data-a='2'] {
+  --a: 2;
+}
+.hx-seg[data-a='3'],
+.hx-carousel__track[data-a='3'] {
+  --a: 3;
+}
+
+/* Rows of the choice */
+.hx-option {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  width: 100%;
+  padding: 6px var(--hx-space-2);
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-option:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-option[aria-selected='true'] {
+  background: var(--hx-bg-active);
+}
+.hx-option__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-option__name {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-option__desc {
+  font-size: 11px;
+  color: var(--hx-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-option__check {
+  color: var(--hx-accent);
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 320ms var(--hx-ease-out),
+    transform 320ms var(--hx-ease-out);
+}
+.hx-option[aria-selected='true'] .hx-option__check {
+  opacity: 1;
+  transform: none;
+}
+/* A model of another agent: a handoff to a new chat, not a switch; the arrow shows on hover and focus. */
+.hx-option__go {
+  color: var(--hx-fg-3);
+  opacity: 0.55;
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-option[data-handoff]:hover .hx-option__go,
+.hx-option[data-handoff]:focus-visible .hx-option__go {
+  color: var(--hx-accent);
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  /* Blur on a phone is raster work every frame: the same motion without it */
+  @keyframes hx-picker-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+    }
+  }
+  .hx-picker__model {
+    min-height: 44px;
+  }
+}
+
+/* Ultracode: a mode beside the depth, not a stop of it. On the pill an accent ring with a slow glow and a mark of its
+   own before the name, so «model · depth» still reads as it did; in the picker a switch under the slider. */
+.hx-model[data-ultracode='true'] {
+  border-color: color-mix(in srgb, var(--hx-accent) 55%, var(--hx-border-strong));
+  box-shadow: 0 0 0 3px var(--hx-accent-soft);
+  animation: hx-ultra-glow 2.8s var(--hx-ease-out) infinite alternate;
+}
+.hx-model .hx-model__ultra {
+  color: var(--hx-accent);
+}
+@keyframes hx-ultra-glow {
+  from {
+    box-shadow: 0 0 0 2px var(--hx-accent-soft);
+  }
+  to {
+    box-shadow:
+      0 0 0 3px var(--hx-accent-soft),
+      0 0 14px var(--hx-accent-soft);
+  }
+}
+.hx-picker__ultra {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 8px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-picker__ultra:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-picker__ultra[data-on='true'] {
+  background: var(--hx-accent-soft);
+}
+.hx-picker__ultra .hx-switch {
+  grid-column: 3;
+  grid-row: 1;
+  margin-top: -2px;
+}
+.hx-picker__ultra-ic {
+  grid-column: 1;
+  grid-row: 1;
+  /* On the first line: the name's line is 20px tall, the icon 16px. */
+  margin-top: 2px;
+  color: var(--hx-fg-3);
+  transition: color var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-picker__ultra[data-on='true'] .hx-picker__ultra-ic {
+  color: var(--hx-accent);
+}
+/* The name and the hint sit straight in the row's grid: the hint runs under the name and the switch. */
+.hx-picker__ultra-text {
+  display: contents;
+}
+.hx-picker__ultra-name {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  line-height: 20px;
+  color: var(--hx-fg-1);
+}
+.hx-picker__ultra-hint {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--hx-fg-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A turn of the switch the agent has not confirmed: said under the name, in the accent. */
+.hx-picker__ultra[data-pending='true'] .hx-picker__ultra-hint {
+  color: var(--hx-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-model[data-ultracode='true'] {
+    animation: none;
+  }
+}
+
+/* On the phone the picker stays the popover over the pill (the design's mobile.css keeps it one): its rows a finger
+   tall, the depth's stops easy to hit. */
+@media (max-width: 900px) {
+  .hx-picker .hx-option {
+    min-height: 44px;
+  }
+  .hx-picker__center {
+    min-height: 44px;
+  }
+  .hx-picker__ultra {
+    min-height: 48px;
+  }
+  .hx-picker__ultra-hint {
+    font-size: 13px;
+    line-height: 17px;
+    white-space: normal;
+  }
+}
+
+/* Several models for one prompt (a beta function): a box before each model; Shift or the box adds it to the set. */
+.hx-option-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.hx-option-row > .hx-option {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hx-option__box {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    border-color 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-option__box[aria-checked='true'] {
+  border-color: var(--hx-accent);
+  background: var(--hx-accent);
+  color: var(--hx-bg-app);
+}
+.hx-option__box:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hx-option-row[data-multi] .hx-option__check {
+  display: none;
+}
+.hx-model__more {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+@media (pointer: coarse) {
+  .hx-option__box {
+    width: 32px;
+    height: 32px;
+  }
+}

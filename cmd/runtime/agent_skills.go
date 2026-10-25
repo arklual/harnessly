@@ -112,6 +112,13 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("Show the person what they should look at: after you publish a document or draw a board, or when a dev server is running, " +
 		"`harnessly open` it. Start another agent only with `tab create --prompt`; a `claude` or `codex` command typed into a shell tab " +
 		"starts it without the workspace's hooks.\n\n")
+	b.WriteString("## How your answers render\n\n")
+	b.WriteString("The conversation draws two fenced blocks instead of showing them as code: a block marked `mermaid` becomes a diagram " +
+		"(flowchart, sequence, state, ER, gantt), and a block marked `html` becomes a page in a sandboxed frame, with a toggle to its source. " +
+		"Use them when a picture or a small page explains better than text. The page is one self-contained file: inline CSS, " +
+		"images as `data:` URIs; it has no network access and your scripts do not run in it. Keep a diagram to what fits on a screen. " +
+		"A link to a document or board alone on its line shows as a card.\n\n")
+	b.WriteString(delegationPromptText(agentName))
 	if integ.ArtifactsURL != "" || integ.BoardsURL != "" {
 		b.WriteString("## Documents and boards\n\n")
 		if integ.ArtifactsURL != "" {
@@ -135,4 +142,21 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	}
 	b.WriteString(". Read a skill before its first use in a conversation.\n")
 	return b.String()
+}
+
+// delegationPromptText is when to hand work to another agent through the MCP server's delegation tools, and when to keep
+// it in the agent's own session.
+func delegationPromptText(agentName string) string {
+	own := "Your own subagents (the Agent tool) stay the way for a quick subtask of your own kind inside this session: " +
+		"a search, a review, a parallel edit whose result only you need."
+	if agentName == "Codex" {
+		own = "Work you can finish yourself in a few steps stays in this session."
+	}
+	return "## Delegating to another agent\n\n" +
+		"The `harnessly` MCP server has `delegate_task`: it starts another agent — Claude Code or Codex, any model of this machine — " +
+		"in a new chat the person sees nested under this one, and `read_conversation`, `send_to_conversation`, `wait_conversation` " +
+		"and `list_children` follow it up. Use it when the work wants another provider or model than yours, runs long and the person " +
+		"should be able to watch it, or is work the person may take over. " + own + " " +
+		"A delegated agent sees nothing of this chat: give it the whole task. Pass `notify: true` to be woken with its answer, " +
+		"or `wait_conversation` for it; check what it reports before you build on it.\n\n"
 }

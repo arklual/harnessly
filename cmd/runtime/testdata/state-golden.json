@@ -1511,7 +1511,7 @@
   },
   {
    "method": "PATCH",
-   "path": "/agents/api/config/",
+   "path": "/agents/api/config",
    "query": [],
    "headers": {
     "x-cli-token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -5062,25 +5062,6 @@
    },
    "body": "{}",
    "at": 1792400631000,
-   "status": 405,
-   "answerHeaders": {
-    "content-type": "application/json; charset=utf-8",
-    "etag": "\"iziTnYcqoJggpt2KVA8fS_so0II\"",
-    "allow": "GET",
-    "content-length": "30"
-   },
-   "answer": "{\"error\":\"Method not allowed\"}"
-  },
-  {
-   "method": "PUT",
-   "path": "/api/check-claude",
-   "query": [],
-   "headers": {
-    "cookie": "session-token=good",
-    "content-type": "application/json"
-   },
-   "body": "{}",
-   "at": 1792400632000,
    "status": 405,
    "answerHeaders": {
     "content-type": "application/json; charset=utf-8",

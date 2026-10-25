@@ -1,5 +1,5 @@
-// The person's settings the agents page reads: terminal font and line height, voice input. Stored by the runtime
-// (GET/PATCH /api/config); the page keeps a copy and writes changes back.
+// The person's settings the agents page reads: terminal font and line height, voice input.
+// Stored by the runtime (GET/PATCH /api/config); the page keeps a copy and writes changes back.
 import { create } from 'zustand';
 import { appFetch } from '@/lib/app-path';
 import { DEFAULT_VOICE_SETTINGS, mergeVoiceSettings, type IVoiceSettings } from '@/lib/voice-settings';

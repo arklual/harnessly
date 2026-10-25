@@ -1,0 +1,11 @@
+{
+  "f": "ev",
+  "ch": "convs",
+  "seq": 504,
+  "e": {
+    "type": "conversation_state",
+    "id": "tab-k3Jx9QmZ",
+    "state": {"k": "working", "since": 1792656000000, "turnId": null, "compacting": true},
+    "rev": 13
+  }
+}

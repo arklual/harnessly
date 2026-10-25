@@ -1,0 +1,21 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 524,
+  "e": {
+    "type": "turn_finished",
+    "turn": {
+      "id": "c:51aa0c3e-1111-4c2d-9e8f-000000000001#0",
+      "author": {"provider": "claude", "role": null},
+      "startedAt": 1792655100000,
+      "endedAt": 1792655160000,
+      "durationMs": 60000,
+      "toolCount": 2,
+      "stepCount": 5,
+      "status": "interrupted",
+      "failure": null,
+      "answerEntryId": null,
+      "files": []
+    }
+  }
+}

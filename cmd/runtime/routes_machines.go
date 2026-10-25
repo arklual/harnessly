@@ -122,6 +122,10 @@ func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, ho
 		PanePIDs:    panePIDs,
 		RuntimePIDs: runtimePIDs,
 	})
+	stopper := newStopper(load, runtimePIDs, panePIDs)
+	if d.MachineKit != nil {
+		d.MachineKit.set(newMachineKit(d, load, stopper))
+	}
 	appName := os.Getenv("RUNTIME_APP_NAME")
 	// In front of the old runtime the machine is up while the old runtime is; alone, while this process answers.
 	var alive func() bool
@@ -145,11 +149,12 @@ func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, ho
 			ReleaseFile:     releaseFile,
 			Alive:           alive,
 		},
-		ManifestFile:   releaseStatic("RUNTIME_MANIFEST_FILE", "manifest.json"),
-		MachineAgent:   d.MachineAgent,
-		DocsReaderPath: env("RUNTIME_DOCS_READER_PATH", "/agents/docs/"),
-		Log:            machinesLog,
-	}), stopRoute(d, newStopper(load, runtimePIDs, panePIDs)))
+		ManifestFile:     releaseStatic("RUNTIME_MANIFEST_FILE", "manifest.json"),
+		MachineAgent:     d.MachineAgent,
+		DocsReaderPath:   env("RUNTIME_DOCS_READER_PATH", "/agents/docs/"),
+		DesignReaderPath: env("RUNTIME_DESIGN_READER_PATH", "/agents/design/"),
+		Log:              machinesLog,
+	}), stopRoute(d, stopper))
 }
 
 func machinesLog(level, msg string, kv ...any) {

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	neturl "net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -259,6 +261,25 @@ func (s *service) releaseNotice(r *http.Request, body any) (int, any, http.Heade
 // docsNotify: the machine agent passes on a new comment or answer in a document of this runtime's person; it is
 // pushed to the devices the person watches from, or to all of them.
 func (s *service) docsNotify(r *http.Request, body any) (int, any, http.Header) {
+	return s.agentNotify(r, body, s.cfg.DocsReaderPath, "doc")
+}
+
+// designNotify is docsNotify for the design library: an access request or its answer, leading into the library.
+func (s *service) designNotify(r *http.Request, body any) (int, any, http.Header) {
+	return s.agentNotify(r, body, s.cfg.DesignReaderPath, "design")
+}
+
+// hasDotDotSegment: some path segment is exactly "..". A file named a..b is not a traversal.
+func hasDotDotSegment(v string) bool {
+	for _, seg := range strings.FieldsFunc(v, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if seg == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *service) agentNotify(r *http.Request, body any, readerPath, kind string) (int, any, http.Header) {
 	if !s.cfg.MachineAgent(r) {
 		return answer(r, http.StatusForbidden, errorBody("Forbidden"), nil)
 	}
@@ -273,18 +294,24 @@ func (s *service) docsNotify(r *http.Request, body any) (int, any, http.Header) 
 		return push.Clip(v, max)
 	}
 	url, _ := getOr(body, "url").(string)
-	if !strings.HasPrefix(url, s.cfg.DocsReaderPath) {
+	if decoded, err := neturl.PathUnescape(url); err != nil || hasDotDotSegment(decoded) {
+		url = ""
+	}
+	if !strings.HasPrefix(url, readerPath) || hasDotDotSegment(url) || !strings.HasPrefix(path.Clean(url), strings.TrimSuffix(readerPath, "/")+"/") {
 		url = ""
 	}
 	title, detail := text("title", 120), text("body", 240)
 	if url == "" || title == "" {
+		if kind == "design" {
+			return answer(r, 400, errorBody(locale.Pick("The title and a url inside the design library are required", "Нужны title и url внутри библиотеки макетов")), nil)
+		}
 		return answer(r, 400, errorBody(locale.Pick("The document title and url are required", "Нужны title и url документа")), nil)
 	}
 	tag := text("tag", 120)
 	if tag == "" {
 		tag = url
 	}
-	msg := push.Message{Kind: "doc", Title: title, Body: detail, ConversationTitle: title, Detail: detail, Provider: "claude",
+	msg := push.Message{Kind: kind, Title: title, Body: detail, ConversationTitle: title, Detail: detail, Provider: "claude",
 		Tag: s.cfg.TagPrefix + tag, At: s.now().UnixMilli(), URL: url}
 	sent := 0
 	for _, sub := range push.SelectTargets(s.cfg.Push.Store.Subscriptions(), s.cfg.Push.Store.Visible()) {

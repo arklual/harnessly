@@ -1,0 +1,19 @@
+{
+  "next.sidebar.showDelegated": "Показать поручения",
+  "next.sidebar.hideDelegated": "Скрыть поручения",
+  "next.delegation.card": "Поручено:",
+  "next.delegation.untitled": "Без названия",
+  "next.delegation.from": "Поручено из «{title}»",
+  "next.delegation.state.starting": "Запускается",
+  "next.delegation.state.working": "Работает",
+  "next.delegation.state.waiting": "Ждёт ответа",
+  "next.delegation.state.done": "Готово",
+  "next.delegation.state.stopped": "Остановлен",
+  "next.delegation.state.failed": "Не работает",
+  "next.tool.delegated": "Поручение",
+  "next.settings.delegation.title": "Поручения агентам",
+  "next.settings.delegation.hint": "Агент может поручить задачу другому агенту в новом чате — он появится под своим чатом.",
+  "next.settings.delegation.maxChildren": "Поручений на один чат",
+  "next.settings.delegation.anyChat": "Писать в любые чаты",
+  "next.settings.delegation.anyChatHint": "Без этого агент пишет только в чаты, которые поручил сам."
+}

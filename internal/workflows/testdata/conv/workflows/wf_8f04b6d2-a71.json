@@ -1,0 +1,66 @@
+{
+ "runId": "wf_8f04b6d2-a71",
+ "timestamp": "2026-10-25T09:20:00.000Z",
+ "taskId": "wz5n8rt1c",
+ "script": "export const meta = {\n  name: 'pricing-research',\n  description: 'Research how three competitors price their plans',\n  phases: [{ title: 'Research', detail: 'one researcher per competitor' }],\n}\n",
+ "scriptPath": "/home/coder/.claude/projects/-home-coder-workspace-acme/0f6c2a51-2d1e-4b7a-9c3e-5a8d7e6f1b20/workflows/scripts/pricing-research-wf_8f04b6d2-a71.js",
+ "result": {
+  "results": []
+ },
+ "agentCount": 2,
+ "logs": [
+  "2/2 done"
+ ],
+ "durationMs": 1194000,
+ "summary": "Research how three competitors price their plans",
+ "workflowName": "pricing-research",
+ "status": "completed",
+ "startTime": 1792918806000,
+ "phases": [
+  {
+   "title": "Research",
+   "detail": "one researcher per competitor"
+  }
+ ],
+ "defaultModel": "claude-opus-5-5",
+ "workflowProgress": [
+  {
+   "type": "workflow_phase",
+   "index": 1,
+   "title": "Research"
+  },
+  {
+   "type": "workflow_agent",
+   "index": 1,
+   "label": "research:first",
+   "phaseIndex": 1,
+   "phaseTitle": "Research",
+   "agentId": "a2beef0000000001e",
+   "model": "claude-sonnet-5-5",
+   "state": "done",
+   "startedAt": 1792918807000,
+   "queuedAt": 1792918806900,
+   "attempt": 1,
+   "lastToolName": "StructuredOutput",
+   "lastToolSummary": "Plans start at $9",
+   "promptPreview": "You research one competitor."
+  },
+  {
+   "type": "workflow_agent",
+   "index": 2,
+   "label": "research:second",
+   "phaseIndex": 1,
+   "phaseTitle": "Research",
+   "agentId": "a2beef0000000002f",
+   "model": "claude-sonnet-5-5",
+   "state": "done",
+   "startedAt": 1792918807100,
+   "queuedAt": 1792918806900,
+   "attempt": 1,
+   "lastToolName": "StructuredOutput",
+   "promptPreview": "You research one competitor."
+  }
+ ],
+ "totalTokens": 120000,
+ "totalToolCalls": 40
+}

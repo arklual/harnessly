@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/ly-solutions/harnessly/internal/oomguard"
 )
 
 // The variables a pane shell keeps from the environment (plus every LC_*); everything else, the runtime's own secrets
@@ -139,6 +141,8 @@ func (t *Tmux) CreateSession(name string, cols, rows int, cwd string) error {
 		program = "nice"
 		args = append([]string{"-n", strconv.Itoa(t.cfg.Nice), "tmux"}, args...)
 	}
+	// The server this may start, and every pane on it, is what the OOM killer should take before the runtime.
+	program, args = oomguard.Unprotected(program, args...)
 	if r := t.run(cwd, program, args...); r.err != nil {
 		return r.err
 	}

@@ -1,0 +1,1 @@
+{"agentType":"workflow-subagent","isBuiltIn":true,"description":"research:first","workflowPhase":"Research","spawnDepth":1,"requestShape":"foreground","requestNonInteractive":false,"model":"sonnet"}

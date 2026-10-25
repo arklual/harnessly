@@ -1,0 +1,82 @@
+/* ── A chat held on its usage limit: the card at the end of the feed, and the quiet line where it went on ── */
+.hx-limitfold {
+  --hx-fold-ms: 320ms;
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: hx-limit-in var(--hx-fold-ms) var(--hx-ease-out) backwards;
+  transition: grid-template-rows var(--hx-fold-ms) var(--hx-ease-out);
+}
+.hx-limitfold[data-state='closing'] {
+  grid-template-rows: 0fr;
+  pointer-events: none;
+}
+.hx-limitfold__in {
+  min-height: 0;
+  overflow: hidden;
+  /* Room for the buttons' focus rings, which the clip would cut; the gap under a turn is the same. */
+  padding: 2px 2px var(--hx-space-6);
+  transition: opacity var(--hx-fold-ms) var(--hx-ease-out);
+}
+.hx-limitfold[data-state='closing'] .hx-limitfold__in {
+  opacity: 0;
+}
+.hx-limit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--hx-space-2) var(--hx-space-3);
+  padding: var(--hx-space-3) var(--hx-space-4);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+}
+.hx-limit__ic {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-limit__text {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hx-limit__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+}
+.hx-limit__note {
+  flex: 1 0 100%;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-xs);
+}
+.hx-autoline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 2px 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-autoline__ic {
+  flex: none;
+}
+.hx-autoline__text {
+  min-width: 0;
+}
+@keyframes hx-limit-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-limitfold,
+  .hx-limitfold__in {
+    animation-duration: 1ms;
+    transition-duration: 1ms;
+  }
+}

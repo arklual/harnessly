@@ -1,0 +1,5 @@
+{
+  "op": "model",
+  "body": {"opId": "op-mod3", "id": "tab-k3Jx9QmZ", "model": "opus", "effort": "medium", "ultracode": true},
+  "result": {"r": "accepted", "ch": "convs", "seq": 524, "rev": 9}
+}

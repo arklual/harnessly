@@ -48,14 +48,12 @@ it stays with the previous runtime.
 | --- | --- |
 | `RUNTIME_GATE_LISTEN` | the runtime's port, e.g. `127.0.0.1:8022` |
 | `RUNTIME_GATE_UPSTREAM` | the previous runtime on its inner port; empty runs the runtime [standalone](#standalone-runtime) |
-| `RUNTIME_GATE_RECORD` | a file that gets every request through the gate as a JSON line, credentials left out (unset: none) |
 | `RUNTIME_GATE_COUNT_SECONDS` | how often the paths still handed to the previous runtime are logged (default 600) |
 | `AGENT_DATA_DIR` | the data directory holding `state-mode.json` (default `~/.harnessly`) |
 | `AGENT_VERSION` | version the gate reports |
 | `AGENT_CONFIG`, `AGENT_SECRET_FILE` | where the pair's secret is, to check page session cookies |
 | `RUNTIME_SESSION_COOKIE` | session cookie name (`session-token`) |
 | `RUNTIME_CLI_TOKEN_HEADERS` | headers carrying the runtime's `cli-token` between the gate and the previous runtime |
-| `RUNTIME_OLD_INTERNAL_API` | prefix of the previous runtime's internal routes the slices call |
 | `RUNTIME_PLATFORM_API` | prefix of the routes the platform's own pages call (default `/api/platform`) |
 | `RUNTIME_ACCESS_HOST` | the previous runtime's `HOST`: who may call the hook and agent routes (unset: the config's `networkAccess`; `HOST` itself is still read) |
 | `INIT_PASSWORD` | an initial password (4 characters or more) that guards the first-run setup: while no password is set, the page asks for it before it lets anyone choose one, and sign-in with it works until the real one is chosen. Unset, whoever opens the page first chooses the password ([deploy](deploy.md#the-first-visit)) |
@@ -121,8 +119,10 @@ it stays with the previous runtime.
 
 | Variable | Meaning |
 | --- | --- |
-| `RUNTIME_STAND_DOMAIN`, `RUNTIME_DOCS_HOST`, `RUNTIME_PLATFORM_HOST`, `RUNTIME_DOCS_READER_PATH` | what an agent may open in its right pane: feature stands, published documents and boards, the platform's reader |
-| `RUNTIME_GITLAB_HOSTS`, `RUNTIME_TASK_KEY_RE`, `RUNTIME_TASK_EXAMPLES` | GitLab servers (comma-separated) and the tracker's task keys a pane tab may show |
+| `RUNTIME_STAND_DOMAIN`, `RUNTIME_DOCS_HOST`, `RUNTIME_PLATFORM_HOST`, `RUNTIME_DOCS_READER_PATH` | what an agent may open in its right pane: feature stands, published documents and boards, the platform's reader ; a turn's cards for the stands and published pages it made are told by the same hosts |
+| `RUNTIME_BOARDS_CLI` | the boards CLI an agent reads a board with (`<cli> read <link>`), named on a board a message points at (unset: only the link) |
+| `RUNTIME_GITLAB_HOSTS`, `RUNTIME_TASK_KEY_RE`, `RUNTIME_TASK_EXAMPLES` | GitLab servers (comma-separated) and the tracker's task keys a pane tab may show; a `!12` in a chat opens a merge request only of these servers, which are asked with the tokens below whether it exists |
+| `RUNTIME_GITLAB_API_ORIGIN` | for tests: the origin the GitLab API is read from instead of `https://<host>` |
 | `RUNTIME_TRACKER_URL`, `RUNTIME_TRACKER_HOSTS`, `RUNTIME_TRACKER_KEYS` | the issue tracker's origin, the hosts its issue links use (comma-separated) and its project keys (comma-separated; unset: the alternatives of `RUNTIME_TASK_KEY_RE` when it is the plain `^(KEY\|KEY)-…` form), by which the conversation sources tell issues apart |
 | `RUNTIME_ICON_USER_AGENT` | the User-Agent of site icon requests |
 | `RUNTIME_ORGANIZER_FILE` | the person's organizer (projects, which project a conversation belongs to, pins), a JSON file (unset: those routes stay with the previous runtime) |
@@ -162,7 +162,7 @@ it stays with the previous runtime.
 | `RUNTIME_WORKSPACE`, `RUNTIME_WORKSPACE_CONFIG` | the fallbacks above for finding the library |
 | `RUNTIME_DESIGN_HISTORY_DIR` | where the boards' private history repositories live (default the data directory) |
 | `RUNTIME_DESIGN_KITS_DIR` | where UI kits are installed by version (`<dir>/<id>/<version>/`), served by the library server at `/kit/<id>/<version>/<file>`; default `design-kits` in the data folder. Install with `harnessly design kit install` |
-| `RUNTIME_DESIGN_KIT_ORIGINS` | comma-separated origins (`https://host[:port]`) of pages that show boards and may read kit files across origins; the library server's own loopback origins always may, any other origin gets no CORS header. Default empty |
+| `RUNTIME_DESIGN_KIT_ORIGINS` | comma-separated origins (`https://host[:port]`) of pages that show boards: they may read kit files across origins, frame the library server's pages (its `frame-ancestors` names them besides itself and loopback) and talk to the board script; the library server's own loopback origins always may, any other origin gets no CORS header. Boards shown through a preview slot get the slot's own `frame-ancestors`. Default empty |
 | `RUNTIME_DESIGN_RELEASES_DIR` | a checkout of a design-upstream mirror: its `releases.json` lists the releases of the board format (Claude Design) with their engines and status; a project with `meta/` gets its release's engine (`"release"` in `meta/project.json`, default `legacy`) as `support.js`, new projects start on the newest stable one, and the panel offers newer stable releases. Unset: every project is served its own `support.js` as before |
 | `RUNTIME_DESIGN_LIBRARY_PORT` | the library server's preferred loopback port |
 | `RUNTIME_DESIGN_CHROME` | the headless browser a check drives (unset: the usual places) |
@@ -235,9 +235,10 @@ can serve the same build while the machine behind it is down.
 | Variable | Meaning |
 | --- | --- |
 | `RUNTIME_APP_NAME` | the product name the page shows in its titles and brand (default `harnessly`) |
+| `RUNTIME_DESIGN_NAME` | the design tool's name in the page's texts: sidebar, pane, tab, hints (default `Designly`) |
 | `RUNTIME_APP_MARK_URL` | the URL of the product mark the page shows in place of the harnessly one and gives the browser as the tab icon (default: the harnessly mark) |
 | `RUNTIME_LOCALE` | the page's and the API's language: `en` (default) or `ru` |
-| `RUNTIME_WEB_FEATURES` | optional parts of the page, comma separated: `chats` (plain chats through an OpenWebUI next to the runtime), `efficiency` (the team report), `vault` (the password safe), `design` (Claude Design boards); none by default |
+| `RUNTIME_WEB_FEATURES` | optional parts of the page, comma separated: `chats` (plain chats through an OpenWebUI next to the runtime), `efficiency` (the team report), `vault` (the password safe), `design` (Claude Design boards); none by default. Unknown names, including the retired `next-ui`, are ignored |
 | `RUNTIME_WEB_COPY_FILE` | a JSON file of product copy the page uses instead of its defaults (welcome line, suggested first prompts) |
 | `RUNTIME_PEOPLE` | `login=Name` pairs, comma separated: display names of the people of this installation (greeting, statistics, mentions) |
 | `RUNTIME_PANE_HOSTS` | extra hosts whose pages the side pane's browser tab may open |

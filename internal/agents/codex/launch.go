@@ -96,8 +96,22 @@ func invalidID(id string) error { return errors.New("Invalid codex session ID fo
 // MCP server, hook trust and update check off (their dialogs are invisible to the web composer), the workspace's
 // instructions, permissions, model and effort. ConfigParseError reports an unreadable config.toml.
 func (c LaunchConfig) RuntimeArgs(workspaceID, resumeID string, launch *agents.Launch) (args []string, configParseError bool, err error) {
-	if resumeID != "" && !agents.IsUUID(resumeID) {
-		return nil, false, invalidID(resumeID)
+	return c.runtimeArgs(workspaceID, "resume", resumeID, launch)
+}
+
+// ForkArgs are RuntimeArgs that start codex on a fork of the session (`codex fork <id>`): a session of its own that
+// begins with the other's history.
+func (c LaunchConfig) ForkArgs(workspaceID, sessionID string, launch *agents.Launch) (args []string, configParseError bool, err error) {
+	if sessionID == "" {
+		return nil, false, invalidID(sessionID)
+	}
+	return c.runtimeArgs(workspaceID, "fork", sessionID, launch)
+}
+
+// runtimeArgs start codex on session by verb (resume, fork), or anew when session is "".
+func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *agents.Launch) (args []string, configParseError bool, err error) {
+	if session != "" && !agents.IsUUID(session) {
+		return nil, false, invalidID(session)
 	}
 	var hookArgs []string
 	if c.Hooks != nil {
@@ -114,8 +128,8 @@ func (c LaunchConfig) RuntimeArgs(workspaceID, resumeID string, launch *agents.L
 	if c.MCP.URL == "" {
 		return nil, false, errors.New("Runtime port is unknown")
 	}
-	if resumeID != "" {
-		args = append(args, "resume", resumeID)
+	if session != "" {
+		args = append(args, verb, session)
 	}
 	args = append(args, hookArgs...)
 	args = append(args, MCPArgs(c.MCP)...)
@@ -152,8 +166,20 @@ func (c LaunchConfig) shellEnvArgs() []string {
 // LauncherLine is what is typed into the pane: `node '<launcher>' [--workspace-id …] [--resume-session-id …]
 // [--model …] [--effort …]`. The launcher script is written first when it differs.
 func (c LaunchConfig) LauncherLine(workspaceID, resumeID string, launch *agents.Launch) (string, error) {
-	if resumeID != "" && !agents.IsUUID(resumeID) {
-		return "", invalidID(resumeID)
+	return c.launcherLine(workspaceID, "--resume-session-id", resumeID, launch)
+}
+
+// ForkLauncherLine is the LauncherLine of a fork of the session: `--fork-session-id <id>`.
+func (c LaunchConfig) ForkLauncherLine(workspaceID, sessionID string, launch *agents.Launch) (string, error) {
+	if sessionID == "" {
+		return "", invalidID(sessionID)
+	}
+	return c.launcherLine(workspaceID, "--fork-session-id", sessionID, launch)
+}
+
+func (c LaunchConfig) launcherLine(workspaceID, flag, session string, launch *agents.Launch) (string, error) {
+	if session != "" && !agents.IsUUID(session) {
+		return "", invalidID(session)
 	}
 	if err := EnsureLauncher(c.LauncherScript, c.LauncherContent); err != nil {
 		return "", err
@@ -162,8 +188,8 @@ func (c LaunchConfig) LauncherLine(workspaceID, resumeID string, launch *agents.
 	if workspaceID != "" {
 		parts = append(parts, "--workspace-id", agents.ShellQuote(workspaceID))
 	}
-	if resumeID != "" {
-		parts = append(parts, "--resume-session-id", agents.ShellQuote(resumeID))
+	if session != "" {
+		parts = append(parts, flag, agents.ShellQuote(session))
 	}
 	flags, err := LauncherFlags(launch)
 	if err != nil {
@@ -217,7 +243,7 @@ const readTrim = (filePath) => {
 };
 
 const parseArgs = (argv) => {
-  const result = { workspaceId: null, resumeSessionId: null, model: null, effort: null, prompt: null };
+  const result = { workspaceId: null, resumeSessionId: null, forkSessionId: null, model: null, effort: null, prompt: null };
   for (let i = 0; i < argv.length; i += 1) {
     const item = argv[i];
     const next = argv[i + 1];
@@ -231,6 +257,9 @@ const parseArgs = (argv) => {
       i += 1;
     } else if (item.startsWith('--resume-session-id=')) {
       result.resumeSessionId = item.slice('--resume-session-id='.length);
+    } else if (item === '--fork-session-id' && next) {
+      result.forkSessionId = next;
+      i += 1;
     } else if (item === '--model' && next) {
       result.model = next;
       i += 1;
@@ -302,7 +331,7 @@ main().catch((err) => {
 `))
 
 // LauncherScript is the Node script the pane runs: it asks the runtime for codex's arguments (POST LaunchArgsPath
-// with {workspaceId, resumeSessionId, model, effort}), appends the prompt, and runs codex with the token in TokenEnv,
+// with {workspaceId, resumeSessionId, forkSessionId, model, effort}), appends the prompt, and runs codex with the token in TokenEnv,
 // mirroring its exit.
 func LauncherScript(c LauncherScriptConfig) []byte {
 	var b strings.Builder

@@ -1,6 +1,6 @@
 import { isPlainClick } from '@/lib/image-link';
 import { paneDocTargetOf } from '@/lib/hl-doc-path';
-import { gitlabRefOf } from '@/lib/hl-gitlab-ref';
+import { changeTitleOf, gitlabRefOf } from '@/lib/hl-gitlab-ref';
 import { taskKeyOf } from '@/lib/hl-task';
 import { OPEN_PANE_TAB_EVENT, type IPaneTabRequest } from '@/lib/hl-pane-tabs';
 import { encodePath } from '@/lib/hl-preview-client';
@@ -36,12 +36,16 @@ export const localServerOf = (href: string): ILocalServer | null => {
 
 /**
  * Where a link opens inside the right panel: a document or a board of the documents and boards services in the reader, a merge
- * request or a commit of GitLab as its diff, a task of the tracker as its card, a feature stand or
+ * request or a commit of GitLab, a pull request, a commit or an issue of GitHub as its diff, a task of the tracker as its card, a feature stand or
  * a dev server of the machine in the browser tab. Null for everything else: it stays a link to a new browser tab.
  */
 export const paneRequestOf = (href: string, label: string | null = null): IPaneTabRequest | null => {
   const doc = paneDocTargetOf(href);
   if (doc) return { kind: 'artifacts', target: doc, title: label };
+  // A GitHub issue is a change like a pull request: the tab shows it through the API, as it does for GitLab.
+  const change = gitlabRefOf(href);
+  if (change?.provider === 'github')
+    return { kind: 'gitlab', target: href, title: changeTitleOf(change, SHORT_SHA) };
   const task = taskKeyOf(href);
   if (task) return { kind: 'task', target: task, title: task };
   const stand = standUrlOf(href);
@@ -49,14 +53,7 @@ export const paneRequestOf = (href: string, label: string | null = null): IPaneT
   const local = localServerOf(href);
   if (local)
     return { kind: 'browser', target: `localhost:${local.port}${local.path === '/' ? '' : local.path}` };
-  const ref = gitlabRefOf(href);
-  if (!ref) return null;
-  const repo = ref.project.split('/').at(-1);
-  return {
-    kind: 'gitlab',
-    target: href,
-    title: ref.kind === 'mr' ? `${repo} !${ref.iid}` : `${repo} ${ref.sha.slice(0, SHORT_SHA)}`,
-  };
+  return change ? { kind: 'gitlab', target: href, title: changeTitleOf(change, SHORT_SHA) } : null;
 };
 
 /** True when a panel on this page took the tab. A page without a panel (a shared read, a report) takes nothing. */

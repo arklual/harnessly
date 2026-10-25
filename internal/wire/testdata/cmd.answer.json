@@ -1,0 +1,10 @@
+{
+  "op": "answer",
+  "body": {
+    "opId": "op-a1",
+    "conversationId": "tab-k3Jx9QmZ",
+    "questionId": "q:toolu_01AskQ",
+    "answers": [{"i": 0, "choices": [0]}, {"i": 1, "choices": [], "text": "и HTTP-страницы"}]
+  },
+  "result": {"r": "accepted", "ch": "conv:tab-k3Jx9QmZ", "seq": 520}
+}

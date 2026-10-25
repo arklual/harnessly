@@ -13,10 +13,6 @@ import (
 // DefaultWait is how long a request waits for a report being built before it is answered with the progress.
 const DefaultWait = 20 * time.Second
 
-// Volatile are the fields of an answer that differ between two runtimes reading the same transcripts at different
-// moments: when each built its report, and how far a pass still running has got.
-var Volatile = []string{"generatedAt", "collecting", "runtimes.*.report.generatedAt", "runtimes.*.report.collecting"}
-
 // Route answers GET <platform API>/stats: this runtime's usage report, alone (?shape=report) or as a team of one
 // runtime. ?wait=0 does not wait for a report being built.
 type Route struct {

@@ -1,0 +1,13 @@
+/* The gallery of the right pane's tab of a change: a pane of the usual width on the window's background. */
+.hx-gallery-change {
+  display: flex;
+  width: 600px;
+  height: 100vh;
+  padding: 12px;
+  box-sizing: border-box;
+  background: var(--hx-bg-window);
+}
+.hx-gallery-change > * {
+  flex: 1;
+  min-width: 0;
+}

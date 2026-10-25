@@ -1,0 +1,409 @@
+/* Messages between agents: another agent's card in the feed (the design's .hx-msg[data-peer] — on the left, a line
+   down its side, an author line), our agent's message as a step, and Settings → Machines → «Связь между агентами». */
+
+/* ── Another agent's message ─────────────────────────── */
+.hx-msg[data-kind='peer'] {
+  align-items: stretch;
+}
+.hx-peer-msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  max-width: 88%;
+  padding: 2px 0 2px var(--hx-space-4);
+  border-left: 2px solid var(--hx-border-strong);
+}
+.hx-peer-msg[data-delivery='failed'] {
+  border-left-color: color-mix(in srgb, var(--hx-danger) 60%, transparent);
+}
+.hx-peer-msg__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+  font-size: var(--hx-text-xs);
+}
+.hx-peer-msg__ic {
+  align-self: center;
+  color: var(--hx-fg-3);
+}
+.hx-peer-msg__who {
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-peer-msg__where {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-3);
+}
+.hx-peer-msg__by {
+  padding: 0 6px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+.hx-peer-msg__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-1);
+}
+.hx-peer-msg__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  max-height: 11em;
+  overflow: hidden;
+  font-size: var(--hx-text-md);
+  line-height: 22px;
+  color: var(--hx-fg-1);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+.hx-peer-msg__body[data-open='true'] .hx-peer-msg__text {
+  max-height: none;
+  mask-image: none;
+}
+.hx-peer-msg__text > p {
+  margin: 0;
+}
+.hx-peer-msg__more {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+}
+.hx-peer-msg__more:hover {
+  color: var(--hx-fg-1);
+}
+.hx-peer-msg__foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-height: 24px;
+  font-size: 12px;
+}
+.hx-peer-msg__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--hx-fg-3);
+}
+.hx-peer-msg[data-delivery='failed'] .hx-peer-msg__state:first-child {
+  color: var(--hx-danger);
+}
+.hx-peer-msg__state[data-tone='ok'] {
+  color: var(--hx-success);
+}
+.hx-peer-msg__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-peer-msg__act:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-peer-msg__act:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-peer-msg__act:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.hx-peer-msg__act[data-tone='primary'] {
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+}
+.hx-peer-msg__act[data-tone='primary']:hover {
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  opacity: 0.9;
+}
+.hx-peer-msg__act > .hx-spin {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+}
+
+/* The answer typed in the card: in and out with a short slide. */
+.hx-peer-reply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  padding: var(--hx-space-2);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+  animation: hx-peer-reply-in 220ms var(--hx-ease-out);
+}
+.hx-peer-reply[data-state='closing'] {
+  animation: hx-peer-reply-out 180ms var(--hx-ease-out) forwards;
+}
+@keyframes hx-peer-reply-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes hx-peer-reply-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.hx-peer-reply__input {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+}
+.hx-peer-reply__input:focus-visible {
+  outline: 2px solid var(--hx-focus);
+}
+.hx-peer-reply__err {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--hx-danger);
+}
+.hx-peer-reply__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* ── Our agent's message to another agent: a step of the work ── */
+.hx-peer-out {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hx-peer-out__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 28px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 240ms var(--hx-ease-out);
+}
+.hx-peer-out__head:disabled {
+  cursor: default;
+}
+.hx-peer-out__head:not(:disabled):hover {
+  background: var(--hx-bg-hover);
+}
+.hx-peer-out__ic {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-peer-out__label {
+  flex: none;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+.hx-peer-out__to {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-1);
+}
+.hx-peer-out__state {
+  flex: none;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-peer-out[data-tone='ok'] .hx-peer-out__state {
+  color: var(--hx-success);
+}
+.hx-peer-out[data-tone='fail'] .hx-peer-out__state,
+.hx-peer-out[data-tone='fail'] .hx-peer-out__ic {
+  color: var(--hx-danger);
+}
+.hx-peer-out__text {
+  margin: 0 0 4px 22px;
+  padding-left: 10px;
+  border-left: 2px solid var(--hx-border);
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+  color: var(--hx-fg-2);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.hx-peer-out[aria-expanded='true'] .hx-peer-out__text {
+  display: block;
+}
+
+/* ── Settings → Machines → «Связь между агентами» ────── */
+.hx-peers-set__who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 16px;
+}
+.hx-peers-set__who + .hx-peers-set__who,
+.hx-peers-set__add {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-peers-set__ic {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-peers-set__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-peers-set__name {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-peers-set__sub {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-peers-set__add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+}
+.hx-peers-set__input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+.hx-peers-set__input:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 0;
+}
+.hx-peers-log {
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+  animation: hx-peer-reply-in 220ms var(--hx-ease-out) backwards;
+}
+.hx-peers-log + .hx-peers-log {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-peers-log__ic {
+  flex: none;
+  margin-top: 2px;
+  color: var(--hx-fg-3);
+}
+.hx-peers-log[data-state='refused'] .hx-peers-log__ic {
+  color: var(--hx-danger);
+}
+.hx-peers-log__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-peers-log__line {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-1);
+}
+.hx-peers-log__route {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-peers-log__when {
+  flex: none;
+  margin-left: auto;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-peers-log__text {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-peers-log__why {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-peer-reply,
+  .hx-peer-reply[data-state='closing'],
+  .hx-peers-log {
+    animation-duration: 1ms;
+  }
+}
+
+@media (max-width: 640px) {
+  .hx-peer-msg {
+    max-width: 100%;
+  }
+  .hx-peers-set__add {
+    flex-wrap: wrap;
+  }
+}

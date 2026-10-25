@@ -55,10 +55,16 @@ func hookConfigFromEnv(configFile string) hookConfig {
 type keeperRef struct{ c *core }
 
 func (k keeperRef) HandleProviderEvent(p, s string, ev agents.Event, at *float64) bool {
-	if m := k.c.manager(); m != nil {
-		return m.HandleProviderEvent(p, s, ev, at)
+	m := k.c.manager()
+	if m == nil {
+		return false
 	}
-	return false
+	handled := m.HandleProviderEvent(p, s, ev, at)
+	// v2's conversation of the session hears the hook too.
+	if v := k.c.v2.Load(); v != nil {
+		v.hook(s, ev)
+	}
+	return handled
 }
 
 func (k keeperRef) ApplyHookMeta(p, s string, meta status.HookMeta) (string, string, bool) {
@@ -106,15 +112,13 @@ func (k keeperRef) SynthesizeEvent(session, event string) {
 	}
 }
 
-// codexSink hands the session a Codex SessionStart names to whichever runtime holds the timeline.
+// codexSink hands the session a Codex SessionStart names to the timeline.
 type codexSink struct{ c *core }
 
-func (s codexSink) CodexSession(session string, info agents.SessionInfo, clear bool) {
+func (s codexSink) CodexSession(session string, info agents.SessionInfo, _ bool) {
 	if s.c.timelineOn() {
 		s.c.timeline.CodexSessionInfo(session, info)
-		return
 	}
-	s.c.oldPost("codex-session", map[string]any{"tmuxSession": session, "sessionInfo": info, "clearSession": clear})
 }
 
 // FindTab is a layout tab by id, with its workspace (coreapi.TabLookup).
@@ -207,13 +211,8 @@ func (c *core) newHookAPI() *coreapi.Config {
 			l := c.tabLaunch(session)
 			return &l
 		},
-		KillTree:   func(pid int) int { return proc.KillTree(pid, 3*time.Second, 150*time.Millisecond, nil) },
-		Visibility: c.visibility(),
-		MirrorVisibility: func(id string, visible bool) {
-			if c.cfg.Old != nil && !c.cfg.Standalone {
-				c.cfg.Old.Post("/api/push/visibility", map[string]any{"deviceId": id, "visible": visible}, nil)
-			}
-		},
+		KillTree:           func(pid int) int { return proc.KillTree(pid, 3*time.Second, 150*time.Millisecond, nil) },
+		Visibility:         c.visibility(),
 		SessionProcessPath: platformAPI + "/session-process",
 		Log:                coreLog,
 	}

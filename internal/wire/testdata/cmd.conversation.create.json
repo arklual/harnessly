@@ -1,0 +1,11 @@
+{
+  "op": "conversation.create",
+  "body": {
+    "opId": "op-n1",
+    "projectId": "p7k2m9x4q1aa",
+    "provider": "claude",
+    "model": {"id": "claude-opus-5-5", "effort": "medium"},
+    "first": {"clientId": "0192b6f1-0000-7000-8000-000000000007", "text": "Начни с §9", "attachmentIds": []}
+  },
+  "result": {"r": "accepted", "ch": "convs", "seq": 1842, "id": "tab-N3wConv01"}
+}

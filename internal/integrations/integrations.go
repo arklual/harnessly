@@ -183,6 +183,51 @@ func (c Config) BoardSignIn(ctx context.Context, who User, next string) (string,
 	return out.URL, nil
 }
 
+// Board is one whiteboard of the boards server as the page lists it.
+type Board struct {
+	Slug      string `json:"slug"`
+	Title     string `json:"title"`
+	URL       string `json:"url"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// BoardsMax is how many boards the list gives the page, the newest first as the server orders them.
+const BoardsMax = 200
+
+// ListBoards is the boards of the server (GET /b/api/boards with the runtime's token).
+func (c Config) ListBoards(ctx context.Context) ([]Board, error) {
+	if c.BoardsURL == "" {
+		return nil, ErrNotConfigured
+	}
+	var out struct {
+		Boards []struct {
+			Slug      string `json:"slug"`
+			Title     string `json:"title"`
+			URL       string `json:"url"`
+			UpdatedAt string `json:"updatedAt"`
+		} `json:"boards"`
+	}
+	if err := c.call(ctx, http.MethodGet, c.BoardsURL+"/b/api/boards", c.BoardsToken, nil, &out); err != nil {
+		return nil, err
+	}
+	boards := make([]Board, 0, min(len(out.Boards), BoardsMax))
+	for _, b := range out.Boards {
+		if b.Slug == "" || len(boards) == BoardsMax {
+			continue
+		}
+		u := b.URL
+		if u == "" {
+			u = c.BoardsURL + "/b/" + url.PathEscape(b.Slug)
+		}
+		title := b.Title
+		if title == "" {
+			title = b.Slug
+		}
+		boards = append(boards, Board{Slug: b.Slug, Title: title, URL: u, UpdatedAt: b.UpdatedAt})
+	}
+	return boards, nil
+}
+
 // Document is one entry of a conversation's documents.
 type Document struct {
 	Slug      string `json:"slug"`

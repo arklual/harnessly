@@ -1,0 +1,5 @@
+{
+  "op": "conversation.merge",
+  "body": {"opId": "op-mrg1", "id": "tab-F9kFork01", "text": "Done: the draft route answers excerpts and notes. Files: internal/handoff/excerpt.go."},
+  "result": {"r": "queued", "ch": "conv:tab-k3Jx9QmZ", "seq": 640, "id": "tab-k3Jx9QmZ"}
+}

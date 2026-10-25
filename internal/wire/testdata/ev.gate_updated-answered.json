@@ -1,0 +1,10 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 519,
+  "e": {
+    "type": "gate_updated",
+    "id": "q:toolu_01AskQ",
+    "state": {"k": "answered", "at": 1792656000000, "byDevice": "dev-01JB7Q3W8E"}
+  }
+}

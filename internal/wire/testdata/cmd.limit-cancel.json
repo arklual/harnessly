@@ -1,0 +1,5 @@
+{
+  "op": "limit",
+  "body": {"opId": "op-lim2", "id": "tab-k3Jx9QmZ", "action": "cancel"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 90}
+}

@@ -57,7 +57,12 @@ type access struct {
 	token string
 }
 
-func (s *Service) gitlabBase(host string) string { return "https://" + host + "/api/v4" }
+func (s *Service) gitlabBase(host string) string {
+	if s.cfg.GitLabAPI != "" {
+		return s.cfg.GitLabAPI + "/api/v4"
+	}
+	return "https://" + host + "/api/v4"
+}
 
 // api is one GitLab read: null for any failure, the error only where the previous runtime threw (a body that is not
 // JSON). A renamed project answers its old path with a redirect to /projects/<id>, followed within the API.
@@ -668,8 +673,82 @@ func jsSlice(v any, n int) (string, error) {
 	return jscompat.Slice(s, n), nil
 }
 
+// MergeRequestInfo is a merge request GitLab gave: where it lives now (a renamed project answers under its new path)
+// and what it is called.
+type MergeRequestInfo struct {
+	URL   string
+	Title string
+	// UpdatedAt is when it last changed, as GitLab wrote it (RFC 3339); "" when it did not say.
+	UpdatedAt string
+}
+
+// MergeRequest asks the GitLab at host, with its own token, for the merge request numbered iid of a project path.
+// false for any "no": the merge request or the project is not there, the token cannot see it, there is no token, the
+// GitLab is not reachable or is not one of the deployment's. The answers are shared with the tab that shows it.
+func (s *Service) MergeRequest(ctx context.Context, host, project string, iid int) (MergeRequestInfo, bool) {
+	if iid < 1 || project == "" || !s.isGitlabHost(host) {
+		return MergeRequestInfo{}, false
+	}
+	token := s.gitlabToken(host)
+	if token == "" {
+		return MergeRequestInfo{}, false
+	}
+	a := &access{host: host, token: token}
+	item, err := s.api(ctx, a, "/projects/"+files.EncodeURIComponent(project)+"/merge_requests/"+strconv.Itoa(iid))
+	if err != nil || !truthy(item) {
+		return MergeRequestInfo{}, false
+	}
+	if got, ok := opt(item, "iid").(float64); !ok || int(got) != iid {
+		return MergeRequestInfo{}, false
+	}
+	web, _ := opt(item, "web_url").(string)
+	if s.mrRefOf(web) == nil {
+		return MergeRequestInfo{}, false
+	}
+	title, _ := opt(item, "title").(string)
+	updated, _ := opt(item, "updated_at").(string)
+	return MergeRequestInfo{URL: web, Title: title, UpdatedAt: updated}, true
+}
+
+// projectsFound is how many projects a search for a name reads.
+const projectsFound = 20
+
+// ProjectPaths are the paths (group/sub/project) of the projects of the GitLab at host whose last segment is name,
+// as its search finds them with the host's own token; nil for any "no". The answer is shared like the rest.
+func (s *Service) ProjectPaths(ctx context.Context, host, name string) []string {
+	if !s.isGitlabHost(host) || name == "" || strings.ContainsAny(name, "/?&#% ") {
+		return nil
+	}
+	token := s.gitlabToken(host)
+	if token == "" {
+		return nil
+	}
+	a := &access{host: host, token: token}
+	list, err := s.api(ctx, a, "/projects?simple=true&search="+files.EncodeURIComponent(name)+"&per_page="+strconv.Itoa(projectsFound))
+	rows, ok := list.([]any)
+	if err != nil || !ok {
+		return nil
+	}
+	var out []string
+	for _, row := range rows {
+		slug, _ := opt(row, "path").(string)
+		full, _ := opt(row, "path_with_namespace").(string)
+		if full != "" && strings.EqualFold(slug, name) {
+			out = append(out, full)
+		}
+	}
+	return out
+}
+
 // GitLabView is what a tab shows of a merge request or a commit; nil when GitLab does not give it to this token.
 func (s *Service) GitLabView(ctx context.Context, raw string) (*jsvalue.Object, error) {
+	return s.gitlabView(ctx, raw, nil)
+}
+
+// gitlabExtra adds to a finished view what the richer change view carries; it sees the item GitLab answered with.
+type gitlabExtra func(view *jsvalue.Object, item any, a *access, project any, ref *mrRef)
+
+func (s *Service) gitlabView(ctx context.Context, raw string, extra gitlabExtra) (*jsvalue.Object, error) {
 	ref := s.gitlabRefOf(raw)
 	if ref == nil {
 		return nil, nil
@@ -735,12 +814,16 @@ func (s *Service) GitLabView(ctx context.Context, raw string) (*jsvalue.Object, 
 		if err != nil {
 			return nil, err
 		}
-		return obj("kind", "mr", "url", opt(item, "web_url"), "host", ref.host, "project", project, "ref", "!"+str(opt(item, "iid")),
+		view := obj("kind", "mr", "url", opt(item, "web_url"), "host", ref.host, "project", project, "ref", "!"+str(opt(item, "iid")),
 			"title", opt(item, "title"), "description", description, "author", orNull(opt(opt(item, "author"), "name")),
 			"at", orNull(opt(item, "updated_at")), "state", opt(item, "state"), "draft", truthy(opt(item, "draft")),
 			"sourceBranch", orNull(opt(item, "source_branch")), "targetBranch", orNull(opt(item, "target_branch")),
 			"pipeline", pipelineOf(opt(item, "head_pipeline")), "diff", diff,
-			"truncated", cut || list == nil || total > float64(count) || strings.HasSuffix(changesText, "+")), nil
+			"truncated", cut || list == nil || total > float64(count) || strings.HasSuffix(changesText, "+"))
+		if extra != nil {
+			extra(view, item, a, project, ref)
+		}
+		return view, nil
 	}
 	msg := opt(item, "message")
 	if nullish(msg) {
@@ -771,10 +854,14 @@ func (s *Service) GitLabView(ctx context.Context, raw string) (*jsvalue.Object, 
 	if err != nil {
 		return nil, err
 	}
-	return obj("kind", "commit", "url", opt(item, "web_url"), "host", ref.host, "project", project, "ref", short,
+	view := obj("kind", "commit", "url", opt(item, "web_url"), "host", ref.host, "project", project, "ref", short,
 		"title", title, "description", description, "author", orNull(opt(item, "author_name")), "at", orNull(opt(item, "created_at")),
 		"state", nil, "draft", false, "sourceBranch", nil, "targetBranch", nil, "pipeline", pipelineOf(opt(item, "last_pipeline")),
-		"diff", diff, "truncated", cut || list == nil || count >= viewFiles), nil
+		"diff", diff, "truncated", cut || list == nil || count >= viewFiles)
+	if extra != nil {
+		extra(view, item, a, project, ref)
+	}
+	return view, nil
 }
 
 // sliceFrom is s.slice(n) in UTF-16 units.

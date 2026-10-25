@@ -53,6 +53,9 @@ type Codex struct {
 	Installed  bool    `json:"installed"`
 	Version    *string `json:"version"`
 	BinaryPath *string `json:"binaryPath"`
+	// LoggedIn is what `codex login status` says (exit 0); a probe that ran out of time counts as signed in, as it
+	// does not prove the opposite.
+	LoggedIn bool `json:"loggedIn"`
 }
 
 // Result is the runtime's preflight answer.
@@ -353,7 +356,10 @@ func (c *Checker) probeCodex(path string) Codex {
 	if err != nil {
 		return Codex{}
 	}
-	r := Codex{Installed: true, Version: Version(out)}
+	r := Codex{Installed: true, Version: Version(out), LoggedIn: true}
+	if _, err := run("codex", env, path, "login", "status"); err != nil && !errors.Is(err, errTimedOut) {
+		r.LoggedIn = false
+	}
 	if where, err := run("which", env, path, "codex"); err == nil {
 		if w := jscompat.Trim(where); w != "" {
 			r.BinaryPath = &w

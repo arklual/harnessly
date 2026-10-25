@@ -1,0 +1,288 @@
+/* An open design in the right pane (data-variant='pane' of .hx-site): the same browser as the site's page, without its
+   frame, strip and chat, with the pager of the pages at its foot. */
+.hx-pane__body:has(> .hx-site[data-variant='pane']) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hx-site[data-variant='pane'] {
+  display: flex;
+  container-type: inline-size;
+  padding: 0;
+  transition: none;
+  animation: hx-dl-in 420ms var(--site-ease) backwards;
+}
+.hx-site[data-variant='pane'] .hx-site__view {
+  flex: 1;
+}
+.hx-site[data-variant='pane'] .hx-browser {
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.hx-site[data-variant='pane'] .hx-browser__bar {
+  height: 44px;
+  padding: 0 6px;
+}
+.hx-site[data-variant='pane'] .hx-browser__addr {
+  margin: 0 4px;
+}
+/* The pane is narrow: the address keeps the page's name, the path and the tool's words give way. */
+.hx-site[data-variant='pane'] .hx-browser__path {
+  display: none;
+}
+/* The device keeps the pill's room under it (site-view's DOCK_ROOM). */
+.hx-site[data-variant='pane'] .hx-vparea:not([data-dev='fill']) {
+  padding-bottom: calc(24px + 64px);
+}
+/* A phone has no pill (site-view's dockShown): the device keeps only the area's own margin. */
+@media (max-width: 900px) {
+  .hx-site[data-variant='pane'] .hx-vparea:not([data-dev='fill']) {
+    padding-bottom: 24px;
+  }
+}
+@container (max-width: 520px) {
+  .hx-site[data-variant='pane'] .hx-browser__tool-label {
+    display: none;
+  }
+}
+
+/* The pager of the pages, the canvas's zoom and the switch of the live settings: one floating pill at the foot of the
+   page; a device keeps room above it (site-view's DOCK_ROOM), so it never sits on the case. */
+.hx-pdock {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 8;
+  max-width: calc(100% - 24px);
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.hx-pdock__pill {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+}
+.hx-pdock__pill .hx-head-btn[aria-disabled='true'] {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.hx-pdock__pill .hx-head-btn[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-pdock__pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+.hx-pdock__pages:hover,
+.hx-pdock__pages[aria-expanded='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-pdock__name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-pdock__n {
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-pdock__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.hx-pdock__group + .hx-pdock__group {
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid var(--hx-border);
+}
+.hx-pdock__pill .hx-head-btn {
+  width: 30px;
+  height: 30px;
+}
+/* A narrow pane: the page's name gives way to its number. */
+@container (max-width: 420px) {
+  .hx-pdock__name {
+    display: none;
+  }
+}
+.hx-pdock__menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+}
+/* The pages' list (page-picker.tsx): a quiet search, rows with an icon, the name and the path as a muted word, the
+   current page ticked, the one the arrows stand on lit; it scrolls inside its height. */
+.hx-pgpick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(380px, calc(100dvh - 140px));
+  padding: 6px;
+  outline: none;
+}
+.hx-pgpick__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-3);
+  transition: background 200ms ease;
+}
+.hx-pgpick__search:focus-within {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+.hx-pgpick__search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+.hx-pgpick__search input::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-pgpick__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.hx-pgpick__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  min-height: 38px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.hx-pgpick__row[data-active='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-pgpick__ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-3);
+}
+.hx-pgpick__row[aria-selected='true'] .hx-pgpick__ic {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-pgpick__name {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-pgpick__meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-pgpick__check {
+  flex: none;
+  color: var(--hx-accent);
+  opacity: 0;
+}
+.hx-pgpick__row[aria-selected='true'] .hx-pgpick__check {
+  opacity: 1;
+}
+.hx-pgpick__empty {
+  padding: 14px 10px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  text-align: center;
+}
+@media (max-width: 900px) {
+  .hx-pgpick.hx-sheet-phone {
+    translate: none;
+    width: auto;
+    max-height: 90dvh;
+    padding-top: 22px;
+  }
+  .hx-pgpick__row {
+    min-height: 48px;
+  }
+  .hx-pgpick__search {
+    height: 42px;
+  }
+}
+
+/* The chat «Поверх» or «Снизу» in the pane: the full view's window and field over the design. The column
+   of the docked chat has no room here, so the chat is out of the flow unless it is the window; the field and its pill
+   stand above the pager. */
+.hx-site[data-variant='pane']:not([data-mode='float']) .hx-site__chat {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.hx-site[data-variant='pane'] .hx-island,
+.hx-site[data-variant='pane'][data-mode][data-min] .hx-island {
+  left: max(12px, calc(50% - 300px));
+  bottom: 64px;
+  width: min(600px, calc(100% - 24px));
+}
+.hx-site[data-variant='pane'][data-mode='island'] .hx-vparea:not([data-dev='fill']) {
+  padding-bottom: calc(24px + 64px + 64px);
+}

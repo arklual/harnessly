@@ -1,0 +1,95 @@
+/* A design's note that went with a message (features/designly/note-chip.tsx): the chip under the bubble, the line in
+   the queue's row. The number is the page's pin (.hx-npin in notes.css) in small. */
+
+.hx-notechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(100%, 360px);
+  height: 28px;
+  padding: 0 10px 0 4px;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm) ease-out,
+    border-color var(--hx-dur-sm) ease-out;
+}
+.hx-notechip:hover:not(:disabled) {
+  background: var(--hx-bg-hover);
+  border-color: var(--hx-border-strong);
+}
+.hx-notechip:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-notechip:disabled {
+  cursor: default;
+}
+.hx-notechip__n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--hx-accent);
+  color: #fff;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.hx-notechip__page {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-notechip__text,
+.hx-notechip__hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-notechip__text {
+  color: var(--hx-fg-2);
+}
+.hx-notechip__hint {
+  color: var(--hx-fg-3);
+}
+
+.hx-noteline {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+.hx-noteline .hx-icon {
+  margin-right: 3px;
+  vertical-align: -2px;
+  color: var(--hx-accent);
+}
+.hx-noteline__n {
+  margin-right: 4px;
+  font-weight: var(--hx-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--hx-fg-1);
+}
+.hx-noteline:not(:first-child) {
+  margin-left: 10px;
+}
+/* Under a bubble the chips stand in a row of their own and wrap. */
+.hx-msg-user__notes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 100%;
+}

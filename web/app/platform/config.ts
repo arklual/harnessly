@@ -40,6 +40,8 @@ export interface IAppConfig {
   uploadHeaderPrefix: string;
   /** Product name in titles. */
   productName: string;
+  /** The design tool's name in the page's texts, `{design}` (RUNTIME_DESIGN_NAME). */
+  designName: string;
   /** The product's mark as an image URL (RUNTIME_APP_MARK_URL); none: the harnessly mark. */
   markUrl: string | null;
   /** Key of the page layout in the runtime's config (RUNTIME_LAYOUT_KEY). */
@@ -71,6 +73,7 @@ const DEFAULTS: IAppConfig = {
   taskKeyPattern: '[A-Z][A-Z0-9]{1,9}-\\d{1,6}',
   gitlabHosts: ['gitlab.com'],
   productName: 'harnessly',
+  designName: 'Designly',
   markUrl: null,
   speedPosthogHost: null,
   speedPosthogKey: null,

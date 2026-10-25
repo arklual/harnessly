@@ -97,6 +97,26 @@ func integrationRoutes(d deps, c integrations.Config) []gate.Route {
 			}),
 		},
 		{
+			// The boards to attach to a message: listed with the runtime's token, which never reaches the page.
+			Match: func(r *http.Request) bool { return pathIs(r, "/api/integrations/boards") },
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if refused(w, r) {
+					return
+				}
+				if r.Method != http.MethodGet {
+					w.Header().Set("Allow", "GET")
+					write(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+					return
+				}
+				boards, err := c.ListBoards(r.Context())
+				if err != nil {
+					failed(w, "boards", err)
+					return
+				}
+				write(w, 200, map[string]any{"boards": boards})
+			}),
+		},
+		{
 			Match: func(r *http.Request) bool { return pathIs(r, "/api/integrations/artifacts/documents") },
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if refused(w, r) {

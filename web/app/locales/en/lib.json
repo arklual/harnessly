@@ -390,7 +390,7 @@
   "lib.hlPaneIntents.waiting": "{when} {what}: waiting, opens when the person comes to the conversation",
   "lib.hlPanelCommand.badTarget": "open {tab}: the target is too long or not a string",
   "lib.hlPanelCommand.hintDoc": "open artifacts: needs a link to a document (…/a/…) or a board (…/b/…)",
-  "lib.hlPanelCommand.hintGitlab": "open gitlab: needs a link to a GitLab merge request or commit",
+  "lib.hlPanelCommand.hintGitlab": "open gitlab: needs a link to a GitLab merge request or commit, or to a GitHub pull request, commit or issue",
   "lib.hlPanelCommand.hintPath": "open {tab}: needs a path without \"..\" or control characters",
   "lib.hlPanelCommand.hintPort": "open browser: opens a port of this machine (4400, localhost:4400/path) or a feature stand at the stands' address; the agent doesn't open other external addresses",
   "lib.hlPanelCommand.hintTask": "open task: needs a tracker task key (PROJ-123, DEMO-14, ACME-9)",

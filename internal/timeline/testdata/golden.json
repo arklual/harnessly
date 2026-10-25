@@ -147,13 +147,13 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-10",
+      "id": "entry-1",
       "type": "user-message",
       "timestamp": 1792321200000,
       "text": "Start a new task"
      },
      {
-      "id": "entry-11",
+      "id": "entry-2",
       "type": "assistant-message",
       "timestamp": 1792321201000,
       "markdown": "Sure.",
@@ -189,13 +189,13 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-12",
+      "id": "entry-1",
       "type": "user-message",
       "timestamp": 1792317600000,
       "text": "Fix the parser in the acme project"
      },
      {
-      "id": "entry-13",
+      "id": "entry-2",
       "type": "assistant-message",
       "timestamp": 1792317602000,
       "markdown": "Looking at the parser now.",
@@ -206,7 +206,7 @@
       "model": "model-a"
      },
      {
-      "id": "entry-14",
+      "id": "entry-3",
       "type": "tool-call",
       "timestamp": 1792317603000,
       "toolUseId": "toolu_1",
@@ -215,7 +215,7 @@
       "status": "success"
      },
      {
-      "id": "entry-15",
+      "id": "entry-4",
       "type": "tool-result",
       "timestamp": 1792317604000,
       "toolUseId": "toolu_1",
@@ -223,7 +223,7 @@
       "summary": "2 lines"
      },
      {
-      "id": "entry-16",
+      "id": "entry-5",
       "type": "assistant-message",
       "timestamp": 1792317605000,
       "markdown": "Found parser.go — editing it.",
@@ -234,7 +234,7 @@
       "model": "model-a"
      },
      {
-      "id": "entry-17",
+      "id": "entry-6",
       "type": "tool-call",
       "timestamp": 1792317606000,
       "toolUseId": "toolu_2",
@@ -249,7 +249,7 @@
       "status": "success"
      },
      {
-      "id": "entry-18",
+      "id": "entry-7",
       "type": "tool-result",
       "timestamp": 1792317607000,
       "toolUseId": "toolu_2",
@@ -257,13 +257,13 @@
       "summary": "The file was updated."
      },
      {
-      "id": "entry-19",
+      "id": "entry-8",
       "type": "user-message",
       "timestamp": 1792317630000,
       "text": "A line written in two parts"
      },
      {
-      "id": "entry-20",
+      "id": "entry-9",
       "type": "user-message",
       "timestamp": 1792317660000,
       "text": "Now run the tests, please — все тесты"
@@ -313,13 +313,13 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-21",
+      "id": "entry-1",
       "type": "user-message",
       "timestamp": 1792317600000,
       "text": "Fix the parser in the acme project"
      },
      {
-      "id": "entry-22",
+      "id": "entry-2",
       "type": "assistant-message",
       "timestamp": 1792317602000,
       "markdown": "Looking at the parser now.",
@@ -330,7 +330,7 @@
       "model": "model-a"
      },
      {
-      "id": "entry-23",
+      "id": "entry-3",
       "type": "tool-call",
       "timestamp": 1792317603000,
       "toolUseId": "toolu_1",
@@ -339,7 +339,7 @@
       "status": "success"
      },
      {
-      "id": "entry-24",
+      "id": "entry-4",
       "type": "tool-result",
       "timestamp": 1792317604000,
       "toolUseId": "toolu_1",
@@ -347,7 +347,7 @@
       "summary": "2 lines"
      },
      {
-      "id": "entry-25",
+      "id": "entry-5",
       "type": "assistant-message",
       "timestamp": 1792317605000,
       "markdown": "Found parser.go — editing it.",
@@ -358,7 +358,7 @@
       "model": "model-a"
      },
      {
-      "id": "entry-26",
+      "id": "entry-6",
       "type": "tool-call",
       "timestamp": 1792317606000,
       "toolUseId": "toolu_2",
@@ -373,7 +373,7 @@
       "status": "success"
      },
      {
-      "id": "entry-27",
+      "id": "entry-7",
       "type": "tool-result",
       "timestamp": 1792317607000,
       "toolUseId": "toolu_2",
@@ -381,13 +381,13 @@
       "summary": "The file was updated."
      },
      {
-      "id": "entry-28",
+      "id": "entry-8",
       "type": "user-message",
       "timestamp": 1792317630000,
       "text": "A line written in two parts"
      },
      {
-      "id": "entry-29",
+      "id": "entry-9",
       "type": "user-message",
       "timestamp": 1792317660000,
       "text": "Now run the tests, please — все тесты"
@@ -453,13 +453,13 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-30",
+      "id": "entry-1",
       "type": "user-message",
       "timestamp": 1792317600000,
       "text": "Fix the parser in the acme project"
      },
      {
-      "id": "entry-31",
+      "id": "entry-2",
       "type": "assistant-message",
       "timestamp": 1792317602000,
       "markdown": "Looking at the parser now.",
@@ -470,7 +470,7 @@
       "model": "model-a"
      },
      {
-      "id": "entry-32",
+      "id": "entry-3",
       "type": "tool-call",
       "timestamp": 1792317603000,
       "toolUseId": "toolu_1",
@@ -479,7 +479,7 @@
       "status": "success"
      },
      {
-      "id": "entry-33",
+      "id": "entry-4",
       "type": "tool-result",
       "timestamp": 1792317604000,
       "toolUseId": "toolu_1",
@@ -487,7 +487,7 @@
       "summary": "2 lines"
      },
      {
-      "id": "entry-34",
+      "id": "entry-5",
       "type": "assistant-message",
       "timestamp": 1792317605000,
       "markdown": "Found parser.go — editing it.",
@@ -498,7 +498,7 @@
       "model": "model-a"
      },
      {
-      "id": "entry-35",
+      "id": "entry-6",
       "type": "tool-call",
       "timestamp": 1792317606000,
       "toolUseId": "toolu_2",
@@ -513,7 +513,7 @@
       "status": "success"
      },
      {
-      "id": "entry-36",
+      "id": "entry-7",
       "type": "tool-result",
       "timestamp": 1792317607000,
       "toolUseId": "toolu_2",
@@ -521,7 +521,7 @@
       "summary": "The file was updated."
      },
      {
-      "id": "entry-37",
+      "id": "entry-8",
       "type": "user-message",
       "timestamp": 1792317630000,
       "text": "A line written in two parts"
@@ -563,13 +563,13 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-38",
+      "id": "entry-1",
       "type": "user-message",
       "timestamp": 1792321200000,
       "text": "Start a new task"
      },
      {
-      "id": "entry-39",
+      "id": "entry-2",
       "type": "assistant-message",
       "timestamp": 1792321201000,
       "markdown": "Sure.",
@@ -624,13 +624,13 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-40",
+      "id": "entry-10",
       "type": "user-message",
       "timestamp": 1792317601500,
       "text": "List the files"
      },
      {
-      "id": "entry-41",
+      "id": "entry-11",
       "type": "assistant-message",
       "timestamp": 1792317604000,
       "markdown": "There is one file."
@@ -671,13 +671,13 @@
     "type": "timeline:append",
     "entries": [
      {
-      "id": "entry-42",
+      "id": "entry-12",
       "type": "user-message",
       "timestamp": 1792317660000,
       "text": "Thanks"
      },
      {
-      "id": "entry-43",
+      "id": "entry-13",
       "type": "assistant-message",
       "timestamp": 1792317661000,
       "markdown": "You are welcome."
@@ -712,7 +712,7 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-44",
+      "id": "entry-14",
       "type": "user-message",
       "timestamp": 1792321201000,
       "text": "A second Codex session"
@@ -759,13 +759,13 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-45",
+      "id": "entry-1",
       "type": "user-message",
       "timestamp": 1792321200000,
       "text": "Start a new task"
      },
      {
-      "id": "entry-46",
+      "id": "entry-2",
       "type": "assistant-message",
       "timestamp": 1792321201000,
       "markdown": "Sure.",
@@ -850,13 +850,13 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-47",
+      "id": "entry-1",
       "type": "user-message",
       "timestamp": 1792314000000,
       "text": "An old conversation"
      },
      {
-      "id": "entry-48",
+      "id": "entry-2",
       "type": "assistant-message",
       "timestamp": 1792314001000,
       "markdown": "Still on disk.",
@@ -912,7 +912,7 @@
     "type": "timeline:init",
     "entries": [
      {
-      "id": "entry-49",
+      "id": "entry-1",
       "type": "user-message",
       "timestamp": 1792324800000,
       "text": "Hello from a starting agent"

@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	busyTailLines  = 12
+	// Claude draws its todo list between the spinner and the input box: a list of ten pushes the spinner 20 lines up.
+	busyTailLines  = 30
 	menuScanLines  = 25
 	panelHintLines = 20
 	panelLines     = 30
@@ -15,8 +16,11 @@ const (
 
 var (
 	escToInterruptRE = re(`(?i)esc to interrupt`)
-	// Claude: "✽ Contemplating… (2s · ↓ 20 tokens)" while working, "✻ Baked for 5s" (no ellipsis) when done.
-	claudeSpinnerRE = re(`^[·✢✳✶✻✽*]` + sp + `+` + nsp + `+…`)
+	// Claude: "✽ Contemplating… (2s · ↓ 20 tokens)" while working, "✻ Baked for 5s" (no ellipsis) when done. The verb
+	// may be a few words — "✻ Compacting conversation… (2s)", "· Running PreCompact hooks…" — and a narrow pane or a
+	// draft in the box drops "esc to interrupt" from the footer, so the spinner alone must say busy. At most four
+	// words and the ellipsis at a word's end: a line of output that starts with "* " and trails off is longer.
+	claudeSpinnerRE = re(`^[·✢✳✶✻✽*]` + sp + `+` + nsp + `+(?: ` + nsp + `+){0,3}…(?:` + sp + `|$)`)
 )
 
 func busyLine(line string) bool {
@@ -275,3 +279,82 @@ func CountEffortSet(plain string) int { return len(effortSetRE.FindAllStringInde
 
 // CountKept counts Claude's "Kept model"/"Kept effort" lines; a new one means the change was declined.
 func CountKept(plain string) int { return len(keptRE.FindAllStringIndex(plain, -1)) }
+
+var (
+	confirmFocusRE = re(`^` + sp + `*[❯›>]` + sp + `+(\d+)\.` + sp + `*(` + nsp + `+)`)
+	ultracodeOnRE  = re(`Ultracode on \(`)
+	ultracodeOffRE = re(`Ultracode off\.`)
+	// "/effort ultracode on" on a model or a setup that cannot run it: «Ultracode isn't available on claude-haiku-4-5.
+	// Valid options are: …», «Ultracode needs dynamic workflows enabled (see /config). …».
+	ultracodeRefusedRE = re(`Ultracode isn['’]t available on|Ultracode needs dynamic workflows`)
+)
+
+// ConfirmFocus reads the focused answer of Claude's "Switch model?"/"Change effort level?" from the lines under its
+// title: seen is whether a focused numbered answer is on screen, yes whether it is "1. Yes…". It does not need the
+// whole menu: in a short pane (a terminal docked under the chat) Claude's dialog is cut at the bottom and "2. No, go
+// back" is not drawn, but its focused first answer is.
+func ConfirmFocus(plain string) (seen, yes bool) {
+	lines := tail(trimEndLines(plain), menuScanLines)
+	title := -1
+	for i, line := range lines {
+		if launchConfirmRE.MatchString(line) {
+			title = i
+		}
+	}
+	if title < 0 {
+		return false, false
+	}
+	for _, line := range lines[title+1:] {
+		m := confirmFocusRE.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		return true, m[1] == "1" && strings.HasPrefix(m[2], "Yes")
+	}
+	return false, false
+}
+
+// CountUltracode counts Claude's answers to "/effort ultracode on" ("Ultracode on (this session only): …") or, with
+// on false, to "/effort ultracode off" ("Ultracode off. Effort stays high.").
+func CountUltracode(plain string, on bool) int {
+	if on {
+		return len(ultracodeOnRE.FindAllStringIndex(plain, -1))
+	}
+	return len(ultracodeOffRE.FindAllStringIndex(plain, -1))
+}
+
+// CountUltracodeRefused counts Claude's refusals of "/effort ultracode on".
+func CountUltracodeRefused(plain string) int {
+	return len(ultracodeRefusedRE.FindAllStringIndex(plain, -1))
+}
+
+// LastEcho is the answer Claude printed under the last echo of a command line («❯ /model opus» then «⎿  Set model to
+// Opus 5.5 …»): the answer's first line, without its «⎿». ok is false when the command's echo is not on the screen.
+// Counting answer lines alone misleads in a short pane, where an older answer scrolls off as the new one comes.
+func LastEcho(plain, line string) (answer string, ok bool) {
+	lines := trimEndLines(plain)
+	at := -1
+	for i, l := range lines {
+		if m := echoRE.FindStringSubmatch(l); m != nil && strings.TrimSpace(m[1]) == line {
+			at = i
+		}
+	}
+	if at < 0 {
+		return "", false
+	}
+	for _, l := range lines[at+1:] {
+		if blank(l) {
+			continue
+		}
+		if m := answerRE.FindStringSubmatch(l); m != nil {
+			return m[1], true
+		}
+		return "", true
+	}
+	return "", true
+}
+
+var (
+	echoRE   = re(`^❯` + sp + `(.+)$`)
+	answerRE = re(`^` + sp + `*⎿` + sp + `+(.*)$`)
+)

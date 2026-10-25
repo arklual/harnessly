@@ -37,6 +37,22 @@ func pathIn(lines []string, pattern *regexp.Regexp) string {
 	return ""
 }
 
+// wrappedTail is the rest of a folder Claude wraps at the pane's width: the lines right under it, up to the blank one,
+// each a single run of path characters (Claude 2.1.310 prints the folder bare, not in a box).
+func wrappedTail(lines []string) string {
+	var tail strings.Builder
+	for _, line := range lines {
+		t := trim(line)
+		if !wrapRunRE.MatchString(t) {
+			break
+		}
+		tail.WriteString(t)
+	}
+	return tail.String()
+}
+
+var wrapRunRE = re(`^[^` + spBody + `│/][^` + spBody + `│]*$`)
+
 var trustSpecs = []trustSpec{
 	{
 		agent: "claude",
@@ -59,7 +75,7 @@ var trustSpecs = []trustSpec{
 			}
 			for i := anchor - 1; i >= max(0, anchor-6); i-- {
 				if m := absPathRE.FindStringSubmatch(lines[i]); m != nil && jscompat.Len(m[1]) > 1 {
-					return trim(m[1])
+					return trim(m[1]) + wrappedTail(lines[i+1:anchor])
 				}
 			}
 			return ""

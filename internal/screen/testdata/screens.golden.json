@@ -2882,5 +2882,89 @@
    "/model": false,
    "Explain this codebase": false
   }
+ },
+ {
+  "busy": true,
+  "busyAnywhere": true,
+  "choice": {
+   "focusedIndex": 0,
+   "options": []
+  },
+  "codexComposer": false,
+  "codexUpdate": null,
+  "confirm": false,
+  "effortSet": 0,
+  "hasPermission": false,
+  "input": "",
+  "kept": 0,
+  "launchedPromptBox": true,
+  "menu": null,
+  "modelSet": 0,
+  "name": "claude-2.1.310-compacting.ansi.txt",
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.310\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /home/coder/workspace/app\n❯ Say hi in five words.\n● Hello there, friendly helper!\n✻ Crunched for 2s · done 9:16 PM\n❯ /compact\n✻ Compacting conversation… (2s · ↓ 155 tokens)\n  ⎿  Tip: Use /config to change your default permission mode (including Plan Mode)\n❯ \n  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt",
+  "permission": {
+   "focusedIndex": 0,
+   "options": []
+  },
+  "plan": [],
+  "promptBox": true,
+  "question": false,
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "stillInBox": {
+   "/model": false,
+   "Also add the word DELTA.": false,
+   "Explain this codebase": false,
+   "half-typed": false,
+   "my unsent draft": false
+  },
+  "trust": null
+ },
+ {
+  "busy": true,
+  "busyAnywhere": true,
+  "choice": {
+   "focusedIndex": 0,
+   "options": []
+  },
+  "codexComposer": false,
+  "codexUpdate": null,
+  "confirm": false,
+  "effortSet": 0,
+  "hasPermission": false,
+  "input": "",
+  "kept": 0,
+  "launchedPromptBox": true,
+  "menu": null,
+  "modelSet": 0,
+  "name": "claude-2.1.310-compacting-narrow.ansi.txt",
+  "panelHints": 0,
+  "panelSnapshot": " ▐▛███▛█   Claude Code v2.1.310\n▝▜██████▀  Haiku 5.5 · Claude Max\n ▝▝   ▝▝   /…/workspace/app\n❯ Say hi in five words.\n● Hello there, friend, nice to meet you!\n✻ Sautéed for 1s · done 9:18 PM\n❯ /compact\n✢ Compacting conversation… (2s)\n  ⎿  Tip: Use /memory to view and manage\n     Claude memory\n❯ \n  ⏵⏵ auto mode on (shift+tab to cycle)",
+  "permission": {
+   "focusedIndex": 0,
+   "options": []
+  },
+  "plan": [],
+  "promptBox": true,
+  "question": false,
+  "queued": false,
+  "sendNow": {
+   "input": "",
+   "menu": false,
+   "queued": false
+  },
+  "stillInBox": {
+   "/model": false,
+   "Also add the word DELTA.": false,
+   "Explain this codebase": false,
+   "half-typed": false,
+   "my unsent draft": false
+  },
+  "trust": null
  }
 ]

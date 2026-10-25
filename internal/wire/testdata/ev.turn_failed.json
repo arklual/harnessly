@@ -1,0 +1,21 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 525,
+  "e": {
+    "type": "turn_failed",
+    "turn": {
+      "id": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+      "author": {"provider": "claude", "role": "lead"},
+      "startedAt": 1792655970000,
+      "endedAt": 1792655999000,
+      "durationMs": 29000,
+      "toolCount": 3,
+      "stepCount": 6,
+      "status": "failed",
+      "failure": {"code": "rate-limit", "detail": "API Error: 429 rate_limit_error", "retryAt": 1792656060000},
+      "answerEntryId": null,
+      "files": [{"path": "internal/wire/codec.go", "op": "edited"}]
+    }
+  }
+}

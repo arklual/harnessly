@@ -22,14 +22,11 @@ func (c *core) checkpointStore() *checkpoints.Store {
 		Namespace: env("RUNTIME_CHECKPOINT_NAMESPACE", "harnessly"), TmpTag: env("RUNTIME_CHECKPOINT_TMP_TAG", "hs")}
 }
 
-// turnEnd snapshots a tab's folder once its agent's turn ended: here while the timeline slice runs, else by the old
-// runtime, which keeps the checkpoints then.
+// turnEnd snapshots a tab's folder once its agent's turn ended, while the timeline slice runs.
 func (c *core) turnEnd(tabID, cwd string) {
 	if c.timelineOn() {
 		c.checkpointStore().SnapshotTurnEnd(tabID, cwd)
-		return
 	}
-	c.oldPost("turn-end", map[string]string{"tabId": tabID, "cwd": cwd})
 }
 
 // checkpointRoutes: GET (shadowed under "timeline-shadow") and POST of the checkpoints route, while the core runs.

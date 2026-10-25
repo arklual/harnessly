@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { appFetch } from '@/lib/app-path';
 import { collectArtifacts, collectWorkPaths, type IArtifactLink } from '@/lib/hl-artifacts';
 import type { IConversationSources } from '@/types/server/hl-conversation-sources';
@@ -10,6 +10,8 @@ const MAX_CACHED = 32;
 
 // Reopening a conversation in this tab shows its sources at once, the runtime refreshes them underneath.
 const cache = new Map<string, IConversationSources>();
+// The transcripts this page already asked about: the first ask goes at once, only the later ones wait for a burst to end.
+const asked = new Set<string>();
 
 const remember = (key: string, value: IConversationSources) => {
   cache.delete(key);
@@ -62,6 +64,10 @@ export interface IConversationSourcesView {
   workPaths: string[];
   /** The whole transcript is covered, not only the loaded part of the timeline. */
   complete: boolean;
+  /** The runtime did not answer the last ask; what the loaded timeline shows is all there is. */
+  failed: boolean;
+  /** Asks the runtime again (the retry after a failure). */
+  reload: () => void;
 }
 
 /**
@@ -76,40 +82,53 @@ const useConversationSources = (
 ): IConversationSourcesView => {
   const key = jsonlPath ? `${jsonlPath}\n${cwd ?? ''}` : null;
   const [loaded, setLoaded] = useState<{ key: string; value: IConversationSources } | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [round, setRound] = useState(0);
   const activity = entries.length;
 
   useEffect(() => {
     if (!key || !jsonlPath) return;
     let cancelled = false;
-    const timer = setTimeout(
-      () => {
-        void requestSources(key, jsonlPath, cwd).then((value) => {
-          if (cancelled || !value) return;
-          remember(key, value);
-          setLoaded({ key, value });
-        });
-      },
-      cache.has(key) || activity === 0 ? 0 : REFETCH_DELAY_MS,
-    );
+    const delay = cache.has(key) || activity === 0 || !asked.has(key) ? 0 : REFETCH_DELAY_MS;
+    const timer = setTimeout(() => {
+      asked.add(key);
+      void requestSources(key, jsonlPath, cwd).then((value) => {
+        if (cancelled) return;
+        if (!value) {
+          setFailure(key);
+          return;
+        }
+        remember(key, value);
+        setLoaded({ key, value });
+        setFailure(null);
+      });
+    }, delay);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [key, jsonlPath, cwd, activity]);
+  }, [key, jsonlPath, cwd, activity, round]);
+  const reload = useCallback(() => {
+    setFailure(null);
+    setRound((n) => n + 1);
+  }, []);
 
   const local = useMemo(
     () => ({ links: collectArtifacts(entries), workPaths: collectWorkPaths(entries, cwd) }),
     [entries, cwd],
   );
   const server = key ? (loaded?.key === key ? loaded.value : (cache.get(key) ?? null)) : null;
+  const failed = key !== null && failure === key;
   return useMemo(() => {
-    if (!server) return { ...local, complete: false };
+    if (!server) return { ...local, complete: false, failed, reload };
     return {
       links: mergeLinks(server.links, local.links),
       workPaths: mergePaths(server.workPaths, local.workPaths),
       complete: true,
+      failed,
+      reload,
     };
-  }, [server, local]);
+  }, [server, local, failed, reload]);
 };
 
 export default useConversationSources;

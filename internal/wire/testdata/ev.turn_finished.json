@@ -1,0 +1,25 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 523,
+  "e": {
+    "type": "turn_finished",
+    "turn": {
+      "id": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+      "author": {"provider": "claude", "role": "lead"},
+      "startedAt": 1792655970000,
+      "endedAt": 1792655999500,
+      "durationMs": 29500,
+      "toolCount": 3,
+      "stepCount": 6,
+      "status": "done",
+      "failure": null,
+      "answerEntryId": "c:7d1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6#0",
+      "files": [{"path": "internal/wire/codec.go", "op": "edited"}],
+      "outputs": [
+        {"kind": "artifact", "op": "created", "title": "Разбор кодека", "ref": "https://docs.example.com/a/codec"},
+        {"kind": "mr", "op": "created", "title": "harnessly !80", "ref": "https://gitlab.example.com/ly/harnessly/-/merge_requests/80"}
+      ]
+    }
+  }
+}

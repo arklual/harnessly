@@ -135,10 +135,9 @@ func (c *core) transcriptRoutes(f *gate.Gate, d deps) []gate.Route {
 	var routes []gate.JSONRoute
 	for name, answer := range pages.Routes() {
 		routes = append(routes, gate.JSONRoute{
-			Slice:    "transcripts",
-			Match:    func(r *http.Request) bool { return apiPathIs(r, "/api/stats/"+name) },
-			Compute:  answer,
-			Volatile: []string{"computedAt"},
+			Slice:   "transcripts",
+			Match:   func(r *http.Request) bool { return apiPathIs(r, "/api/stats/"+name) },
+			Compute: answer,
 		})
 	}
 	return append(c.shareRoutes(f, d), f.AsRoutes(append(routes,
@@ -153,10 +152,9 @@ func (c *core) transcriptRoutes(f *gate.Gate, d deps) []gate.Route {
 			Compute: counts.Answer,
 		},
 		gate.JSONRoute{
-			Slice:    "transcripts",
-			Match:    func(r *http.Request) bool { return apiPathIs(r, platformAPI+"/stats") },
-			Compute:  usage.Answer,
-			Volatile: usagereport.Volatile,
+			Slice:   "transcripts",
+			Match:   func(r *http.Request) bool { return apiPathIs(r, platformAPI+"/stats") },
+			Compute: usage.Answer,
 		},
 	)...)...)
 }

@@ -112,6 +112,13 @@ type evDocReply struct {
 	Resolve  bool   `json:"resolve"`
 }
 
+// evDesign: this runtime made a project ("design.created") or holds the owner file of one the cluster has no row for
+// ("design.claim").
+type evDesign struct {
+	Event   string `json:"event"`
+	Project string `json:"project"`
+}
+
 type evRelay struct {
 	Event   string          `json:"event"`
 	Message json.RawMessage `json:"message"`

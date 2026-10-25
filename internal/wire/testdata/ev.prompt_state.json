@@ -1,0 +1,16 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 527,
+  "e": {
+    "type": "prompt_state",
+    "clientId": "0192b6f1-0000-7000-8000-000000000001",
+    "state": {
+      "k": "queued",
+      "position": 1,
+      "reason": "blocked-menu",
+      "wait": {"slowAt": 1792656003000, "deadlineAt": 1792656900000}
+    },
+    "rev": 3
+  }
+}

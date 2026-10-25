@@ -1,0 +1,1266 @@
+/* The design's edits on the page: the annotation card (.hx-note.hx-ann), the pins on the page (.hx-npin, .hx-lasso), the
+   strip over the field (.hx-anns) — annotate.css and the pins of components.css verbatim — and the bar that sends them. */
+.hx-note {
+  position: absolute;
+  z-index: 8;
+  left: var(--nx);
+  top: calc(var(--ny) + 12px);
+  width: 300px;
+  padding: 10px 10px 8px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  animation: hx-dl-pop-in 300ms var(--hx-ease-out) backwards;
+  transform-origin: 16px 0;
+}
+.hx-note[data-side='end'] {
+  translate: -100% 0;
+  transform-origin: calc(100% - 16px) 0;
+}
+.hx-notesbar {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 48px;
+  padding: 0 6px 0 18px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  translate: -50% 0;
+  transition:
+    opacity 300ms ease,
+    transform 420ms var(--site-ease);
+}
+.hx-notesbar[data-shown='false'] {
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+}
+.hx-notesbar__text {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+}
+.hx-notesbar__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 10px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-accent);
+  color: #fff;
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition:
+    opacity 240ms ease,
+    transform 240ms var(--site-ease);
+}
+.hx-notesbar__send[data-on='false'] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.hx-note[data-state='closing'] {
+  animation: hx-dl-pop-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-notesbar {
+  transition:
+    opacity 300ms ease,
+    transform 420ms var(--site-ease),
+    bottom 460ms var(--site-ease);
+}
+.hx-notesbar__send {
+  white-space: nowrap;
+}
+@keyframes hx-dl-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    filter: blur(4px);
+  }
+}
+@keyframes hx-dl-pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    filter: blur(2px);
+  }
+}
+@keyframes hx-pin-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+/* harnessly — аннотации: карточка с комментарием и свойствами элемента, пометки в документе, плашка «N аннотаций» в поле ввода */
+
+/* ── Карточка ── */
+.hx-note.hx-ann {
+  width: 344px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--hx-fg-1) 10%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--hx-bg-raised) 94%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+  box-shadow:
+    0 28px 64px -16px rgba(8, 10, 24, 0.42),
+    0 4px 14px rgba(8, 10, 24, 0.14),
+    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+  text-align: left;
+}
+.hx-ann__plate {
+  padding: 10px 10px 0;
+}
+.hx-ann__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 14px 4px 10px;
+}
+.hx-ann__tune {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 240ms var(--hx-ease-out);
+}
+.hx-ann__tune:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 11%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-ann__tune:active {
+  transform: scale(0.94);
+}
+.hx-ann__tune[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-ann__n {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: 4px 4px 0 2px;
+  border-radius: 50% 50% 50% 5px;
+  background: var(--hx-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-ann__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  max-height: 132px;
+  padding: 7px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 15px;
+  line-height: 20px;
+  field-sizing: content;
+}
+.hx-ann__input::placeholder {
+  color: var(--hx-fg-3);
+}
+
+/* Свойства: раскрываются по высоте, без прыжка */
+.hx-ann__props {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 340ms var(--hx-ease-out),
+    opacity 220ms ease;
+}
+.hx-ann[data-tune='true'] .hx-ann__props {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.hx-ann__props-in {
+  min-height: 0;
+  overflow: hidden;
+  margin: 0 8px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--hx-fg-1) 4%, transparent);
+}
+.hx-ann[data-tune='true'] .hx-ann__props-in {
+  margin-top: 6px;
+}
+.hx-ann__el {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+}
+.hx-ann__target {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-ann__reset {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    opacity 200ms ease,
+    background 160ms ease;
+}
+.hx-ann__reset:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-ann__reset[data-on='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-ann__grid {
+  max-height: min(320px, 46vh);
+  padding: 4px 0 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.hx-ann__prop {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 8px 0 12px;
+}
+.hx-ann__label {
+  position: relative;
+  color: var(--hx-fg-2);
+  font-size: 13px;
+  transition: color 160ms ease;
+}
+.hx-ann__prop[data-changed='true'] .hx-ann__label {
+  color: var(--hx-fg-1);
+}
+.hx-ann__prop[data-changed='true'] .hx-ann__label::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--hx-accent);
+  translate: 0 -50%;
+}
+
+/* Общий вид полей справа */
+.hx-ann__field,
+.hx-ann__val,
+.hx-ann__step,
+.hx-ann__seg {
+  justify-self: end;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--hx-fg-1) 10%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--hx-bg-app) 70%, transparent);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13px;
+}
+.hx-ann__field {
+  width: 100%;
+  max-width: 188px;
+  padding: 0 11px;
+  outline: 0;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.hx-ann__field:focus {
+  border-color: var(--hx-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-accent) 18%, transparent);
+}
+.hx-ann__val {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 188px;
+  padding: 0 11px 0 7px;
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+.hx-ann__val .hx-ann__vtext {
+  font-family: inherit;
+  font-size: 13px;
+}
+.hx-ann__val:hover,
+.hx-ann__val[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--hx-fg-1) 22%, transparent);
+}
+.hx-ann__vtext {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.hx-ann__sw {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--sw);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hx-fg-1) 18%, transparent);
+}
+.hx-ann__sw[data-none='true'],
+.hx-ann__swb[data-none='true'] {
+  background:
+    linear-gradient(135deg, transparent 44%, var(--hx-danger) 44% 56%, transparent 56%), var(--hx-bg-app);
+}
+.hx-ann__sws {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px 12px 10px;
+  animation: hx-ann-sws 260ms var(--hx-ease-out) backwards;
+}
+@keyframes hx-ann-sws {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.hx-ann__sws[data-state='closing'] {
+  animation: hx-ann-sws-out 160ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+@keyframes hx-ann-sws-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+/* The block is gone from the page: the look cannot be shown on it */
+.hx-ann__hint {
+  padding: 8px 12px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  line-height: 16px;
+}
+.hx-ann__swb {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: var(--sw);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hx-fg-1) 18%, transparent);
+  cursor: pointer;
+  transition:
+    transform 200ms var(--hx-ease-out),
+    box-shadow 160ms ease;
+}
+.hx-ann__swb:hover {
+  transform: scale(1.12);
+}
+.hx-ann__swb[aria-checked='true'] {
+  box-shadow:
+    0 0 0 2px var(--hx-bg-raised),
+    0 0 0 4px var(--hx-fg-1);
+}
+
+/* Непрозрачность: свой ползунок, заполнение слева акцентом */
+.hx-ann__range {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+  width: 100%;
+  max-width: 188px;
+}
+.hx-ann__range input {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  margin: 0;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--hx-accent) var(--v),
+    color-mix(in srgb, var(--hx-fg-1) 14%, transparent) var(--v)
+  );
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.hx-ann__range input::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  -webkit-appearance: none;
+  appearance: none;
+  transition: transform 160ms ease;
+}
+.hx-ann__range input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.hx-ann__range input:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+.hx-ann__range .hx-ann__vtext {
+  width: 36px;
+  text-align: right;
+}
+
+.hx-ann__step {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 3px;
+}
+.hx-ann__step button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-ann__step button:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 8%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-ann__step .hx-ann__vtext {
+  min-width: 46px;
+  text-align: center;
+}
+.hx-ann__seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+}
+.hx-ann__seg button {
+  height: 26px;
+  padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--fw);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-ann__seg button[aria-checked='true'] {
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* Низ: отменить слева, голос и «в сообщение» справа */
+.hx-ann__foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 10px;
+}
+.hx-ann__cancel {
+  height: 34px;
+  padding: 0 15px;
+  border: 1px solid color-mix(in srgb, var(--hx-fg-1) 12%, transparent);
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.hx-ann__cancel:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 6%, transparent);
+}
+.hx-ann__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-ann__icon:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-ann__foot > .hx-ann__icon:nth-child(2):hover {
+  color: var(--hx-danger);
+}
+.hx-ann__mic[data-rec='true'] {
+  color: var(--hx-danger);
+  animation: hx-ann-rec 1s ease-in-out infinite;
+}
+@keyframes hx-ann-rec {
+  50% {
+    background: color-mix(in srgb, var(--hx-danger) 16%, transparent);
+  }
+}
+.hx-ann__ok {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hx-accent);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform 200ms var(--hx-ease-out),
+    opacity 160ms ease;
+}
+.hx-ann__ok:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.hx-ann__ok:hover {
+  opacity: 0.88;
+}
+.hx-ann__ok:active {
+  transform: scale(0.92);
+}
+
+/* ── Документ: любой заголовок и абзац можно пометить, правки свойств видны сразу ── */
+.hx-annel {
+  position: relative;
+  border-radius: 10px;
+  background: var(--ann-bg, transparent);
+  opacity: var(--ann-o, 1);
+  outline: 1.5px solid transparent;
+  outline-offset: 5px;
+  transition:
+    background 220ms ease,
+    opacity 220ms ease,
+    outline-color 160ms ease,
+    padding 220ms var(--hx-ease-out),
+    margin 220ms var(--hx-ease-out);
+}
+.hx-annel[data-bg='true'] {
+  margin: 0 -12px 12px;
+  padding: 8px 12px;
+}
+.hx-annel[data-bg='true'] > :is(h1, h2, p) {
+  margin: 0;
+}
+.hx-annel .hx-tabdoc__title {
+  color: var(--ann-c, inherit);
+  font-size: var(--ann-fs, 32px);
+  font-weight: var(--ann-fw, 700);
+  line-height: 1.2;
+  transition:
+    color 200ms ease,
+    font-size 220ms var(--hx-ease-out);
+}
+.hx-annel .hx-tabdoc__h {
+  color: var(--ann-c, inherit);
+  font-size: var(--ann-fs, 18px);
+  font-weight: var(--ann-fw, 600);
+  line-height: 1.35;
+  transition:
+    color 200ms ease,
+    font-size 220ms var(--hx-ease-out);
+}
+.hx-annel .hx-tabdoc__p {
+  color: var(--ann-c, var(--hx-fg-2));
+  font-size: var(--ann-fs, 15px);
+  font-weight: var(--ann-fw, 400);
+  line-height: 1.6;
+  transition:
+    color 200ms ease,
+    font-size 220ms var(--hx-ease-out);
+}
+.hx-tabdoc[data-pick='true'] .hx-annel {
+  cursor: pointer;
+}
+.hx-tabdoc[data-pick='true'] .hx-annel:hover {
+  outline-color: color-mix(in srgb, var(--hx-accent) 70%, transparent);
+}
+.hx-tabdoc[data-pick='true'] .hx-annel::after {
+  content: attr(data-tag);
+  position: absolute;
+  top: -14px;
+  right: -4px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--hx-accent);
+  color: #fff;
+  font-family: var(--hx-font-mono);
+  font-size: 10px;
+  line-height: 16px;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity 140ms ease,
+    transform 200ms var(--hx-ease-out);
+  pointer-events: none;
+}
+.hx-tabdoc[data-pick='true'] .hx-annel:hover::after {
+  opacity: 1;
+  transform: none;
+}
+.hx-annel[data-state='noted'] {
+  outline: 1.5px dashed color-mix(in srgb, var(--hx-accent) 60%, transparent);
+}
+.hx-annel[data-state='sel'] {
+  z-index: 6;
+  outline: 2px solid var(--hx-accent);
+}
+.hx-annel[data-state='sel']::after {
+  display: none;
+}
+.hx-npin__dot.hx-annel__pin {
+  position: absolute;
+  top: 2px;
+  left: -38px;
+  width: 22px;
+  height: 22px;
+  animation: hx-pin-in 360ms var(--site-ease) backwards;
+}
+.hx-annel .hx-note {
+  left: var(--nx);
+  top: calc(var(--ny) + 14px);
+  cursor: default;
+}
+
+/* ── Скриншот страницы: живой предпросмотр поверх блока ── */
+.hx-site__doc {
+  container-type: inline-size;
+}
+.hx-npin__patch {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--p-r) * 100cqw / var(--pw));
+  animation: hx-ann-patch 260ms ease backwards;
+}
+@keyframes hx-ann-patch {
+  from {
+    opacity: 0;
+  }
+}
+.hx-npin__patch[data-kind='btn'] {
+  background: var(--p-under);
+}
+.hx-npin__patch[data-kind='btn'] .hx-npin__ptext {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: var(--p-bg);
+  color: var(--p-c);
+  font-size: calc(var(--p-fs) * 100cqw / var(--pw));
+  font-weight: var(--p-fw);
+  opacity: var(--p-o);
+  transition:
+    background 200ms ease,
+    color 200ms ease,
+    opacity 200ms ease;
+}
+.hx-npin__patch:is([data-kind='box'], [data-kind='box-tint'])::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--hx-bg-app);
+  opacity: calc(1 - var(--p-o));
+  transition: opacity 200ms ease;
+}
+.hx-npin__patch[data-kind='box-tint']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--p-bg);
+  opacity: 0.38;
+  transition: background 200ms ease;
+}
+
+/* ── Плашка «N аннотаций» в поле ввода и список над полем ── */
+.hx-anns {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  max-width: 100%;
+}
+.hx-anns__chip {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 3px 0 0;
+  border: 1px solid color-mix(in srgb, var(--hx-fg-1) 12%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--hx-fg-1) 4%, transparent);
+  color: var(--hx-fg-1);
+  animation: hx-attach-in 320ms var(--hx-ease-out) backwards;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+.hx-anns__chip[data-open='true'] {
+  border-color: color-mix(in srgb, var(--hx-accent) 55%, transparent);
+  background: var(--hx-accent-soft);
+}
+.hx-anns__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hx-anns__main > .hx-icon:first-child {
+  color: var(--hx-accent);
+}
+.hx-anns__chev {
+  color: var(--hx-fg-3);
+  transition: transform 280ms var(--hx-ease-out);
+}
+.hx-anns__chip[data-open='true'] .hx-anns__chev {
+  transform: rotate(180deg);
+}
+.hx-anns__x {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+}
+.hx-anns__x:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 8%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-anns__list {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: -8px;
+  z-index: 40;
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(360px, 52vh);
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--hx-fg-1) 10%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--hx-bg-raised) 95%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+  box-shadow:
+    0 24px 56px -14px rgba(8, 10, 24, 0.4),
+    0 3px 10px rgba(8, 10, 24, 0.12);
+  transform-origin: 24px 100%;
+  animation: hx-anns-in 320ms var(--hx-ease-out) backwards;
+  scrollbar-width: thin;
+}
+.hx-anns__list[data-state='closing'] {
+  animation: hx-anns-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-anns-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+    filter: blur(4px);
+  }
+}
+@keyframes hx-anns-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+    filter: blur(2px);
+  }
+}
+.hx-anns__item {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 14px;
+  transition: background 160ms ease;
+  animation: hx-anns-item 360ms var(--hx-ease-out) backwards;
+  animation-delay: calc(var(--i) * 30ms);
+}
+@keyframes hx-anns-item {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.hx-anns__item:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 5%, transparent);
+}
+.hx-anns__item + .hx-anns__item {
+  margin-top: 2px;
+}
+.hx-anns__thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 40px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--hx-fg-1) 7%, transparent);
+  color: var(--hx-fg-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hx-fg-1) 10%, transparent);
+}
+.hx-anns__thumb[data-img='true'] {
+  background: var(--img) var(--bp) / var(--bs) auto no-repeat;
+}
+.hx-anns__n {
+  position: absolute;
+  bottom: -5px;
+  left: -5px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--hx-bg-raised);
+  border-radius: 50% 50% 50% 4px;
+  background: var(--hx-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: var(--hx-weight-semibold);
+  box-sizing: content-box;
+}
+.hx-anns__body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 1px;
+}
+.hx-anns__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.hx-anns__tag {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--hx-fg-1) 14%, transparent);
+  border-radius: 6px;
+  color: var(--hx-fg-2);
+  font-family: var(--hx-font-mono);
+  font-size: 11px;
+  line-height: 16px;
+}
+.hx-anns__target {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-anns__text {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: 14px;
+  line-height: 20px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.hx-anns__diffs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.hx-anns__diff {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--hx-fg-1) 6%, transparent);
+  color: var(--hx-fg-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.hx-anns__diff .hx-ann__sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.hx-anns__acts {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.hx-anns__item:hover .hx-anns__acts,
+.hx-anns__item:focus-within .hx-anns__acts {
+  opacity: 1;
+}
+.hx-anns__act {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-anns__act:hover {
+  background: color-mix(in srgb, var(--hx-fg-1) 8%, transparent);
+  color: var(--hx-fg-1);
+}
+.hx-anns__act[data-danger='true']:hover {
+  color: var(--hx-danger);
+}
+@media (hover: none) {
+  .hx-anns__acts {
+    opacity: 1;
+  }
+}
+
+/* Телефон: карточка во всю ширину, свойства — колонкой покороче */
+@media (max-width: 600px) {
+  .hx-note.hx-ann {
+    width: min(344px, calc(100vw - 24px));
+  }
+  .hx-ann__prop {
+    grid-template-columns: 100px minmax(0, 1fr);
+  }
+  .hx-ann__sws {
+    padding-left: 12px;
+  }
+  .hx-npin__dot.hx-annel__pin {
+    top: -10px;
+    left: -10px;
+  }
+  .hx-annel .hx-note.hx-ann {
+    left: -8px;
+    width: calc(100% + 16px);
+    max-width: 344px;
+  }
+  .hx-anns__list {
+    left: -4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-ann__props,
+  .hx-annel,
+  .hx-anns__list,
+  .hx-anns__item {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Список растягивается по ширине поля ввода, а не плашки */
+.hx-island__box .hx-anns,
+.hx-composer .hx-anns {
+  position: static;
+}
+.hx-island__box .hx-anns__list,
+.hx-composer .hx-anns__list {
+  left: 0;
+  right: 0;
+  width: auto;
+  transform-origin: 32px 100%;
+}
+.hx-island__chips:not(:has(.hx-anns)) {
+  display: none;
+}
+
+/* ── Метки на странице ── */
+/* The pin rides its block: the box is the whole block (--x/--y/--w/--h, written by the page's word on every scroll), the
+   frame is cut to what is on screen (--ct/--cr/--cb/--cl), the number stands at the visible part's corner (--mkx/--mky). */
+.hx-npin {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  translate: var(--x) var(--y);
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+.hx-npin__frame {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  outline: 1.5px dashed color-mix(in srgb, var(--hx-accent) 85%, transparent);
+  outline-offset: 2px;
+  clip-path: inset(var(--ct, -6px) var(--cr, -6px) var(--cb, -6px) var(--cl, -6px));
+  animation: hx-npin-in 320ms var(--site-ease) backwards;
+  transition:
+    outline-color 200ms ease,
+    background 200ms ease,
+    opacity 160ms ease;
+}
+.hx-npin__mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: var(--mkx, 0) var(--mky, 0);
+}
+.hx-npin[data-place='hidden'] {
+  opacity: 0;
+}
+.hx-npin[data-place='hidden'] .hx-npin__dot {
+  pointer-events: none;
+}
+.hx-npin[data-region='true'] .hx-npin__frame {
+  border-radius: 6px;
+  outline-offset: 0;
+  background: color-mix(in srgb, var(--hx-accent) 10%, transparent);
+}
+.hx-npin[data-open='true'] .hx-npin__frame {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--hx-accent);
+}
+@keyframes hx-npin-in {
+  from {
+    outline-color: transparent;
+  }
+}
+.hx-npin__dot {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 4px;
+  background: var(--hx-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: var(--hx-weight-semibold);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  pointer-events: auto;
+  animation: hx-pin-in 360ms var(--site-ease) backwards;
+  transition: transform 200ms var(--site-ease);
+}
+.hx-npin__dot:hover {
+  transform: scale(1.12);
+}
+.hx-npin__dot[data-static='true'] {
+  position: static;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  box-shadow: none;
+  cursor: default;
+  animation: none;
+}
+.hx-npin__tip {
+  position: absolute;
+  top: -12px;
+  left: 18px;
+  width: max-content;
+  max-width: 260px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font-size: 12px;
+  line-height: 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 160ms ease,
+    transform 220ms var(--site-ease);
+}
+.hx-npin__dot:hover + .hx-npin__tip {
+  opacity: 1;
+  transform: none;
+}
+.hx-npin[data-open='true'] .hx-npin__tip {
+  display: none;
+}
+/* Рамка выделения области */
+.hx-lasso {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  translate: var(--x) var(--y);
+  border: 1.5px solid var(--hx-accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--hx-accent) 12%, transparent);
+  clip-path: inset(var(--ct, -6px) var(--cr, -6px) var(--cb, -6px) var(--cl, -6px));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+.hx-lasso[data-on='true'] {
+  opacity: 1;
+  transition: none;
+}
+.hx-lasso[data-on='true'][data-place='hidden'] {
+  opacity: 0;
+}
+
+/* The pins ride the page's viewport (so they scale with it) in a layer of their own that lets the page take the clicks. */
+.hx-vp {
+  position: relative;
+}
+.hx-site__pins {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* What leaves goes with an animation: a removed pin, the strip when the last note goes, a removed row of the list. */
+.hx-npin[data-state='closing'] {
+  animation: hx-npin-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-npin-out {
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+.hx-anns[data-gone='true'] {
+  animation: hx-anns-gone 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-anns-gone {
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.hx-anns__item[data-leaving='true'] {
+  animation: hx-anns-item-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-anns-item-out {
+  to {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+/* Development gallery (?dev=designly): the card over a block of a page. */
+.hx-gallery-dl {
+  min-height: 100dvh;
+  background: var(--hx-bg-stage);
+}
+.hx-gallery-dl__page {
+  position: relative;
+  width: 520px;
+  height: 520px;
+  margin: 0 auto;
+  padding: 24px 40px;
+}
+.hx-gallery-dl__cta {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 12px;
+  background: var(--hx-accent);
+  color: #fff;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-gallery-dl__site {
+  height: 100dvh;
+}

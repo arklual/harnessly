@@ -1,0 +1,151 @@
+/* The machine's own verdict on its disk, memory and CPU (internal/machines/health.go): the banner at the top of the
+   sidebar while it is critical, the critical tone of its dot, of the other machines' dots and of its card's lines. */
+
+.hx-health {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  animation: hx-health-in 360ms var(--hx-ease-out) both;
+  transition:
+    grid-template-rows 220ms var(--hx-ease-out),
+    opacity 160ms var(--hx-ease-out);
+}
+.hx-health[data-state='closing'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.hx-health__in {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-health__box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 4px 8px 10px;
+  border-radius: var(--hx-radius-sm);
+  background: color-mix(in oklab, var(--hx-danger) 8%, transparent);
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+}
+.hx-health__ic {
+  flex: none;
+  margin-top: 1px;
+  color: var(--hx-danger);
+}
+.hx-health__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.hx-health__text {
+  color: var(--hx-fg-1);
+  overflow-wrap: anywhere;
+}
+.hx-health__more {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition: color 160ms var(--hx-ease-out);
+}
+.hx-health__more:hover,
+.hx-health__more:focus-visible {
+  color: var(--hx-fg-1);
+}
+.hx-health__close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: -3px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-health__close:hover,
+.hx-health__close:focus-visible {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+/* The rail has no room for a line: its dot says it. */
+.hx-app[data-side='closed'] .hx-health {
+  display: none;
+}
+@keyframes hx-health-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-health {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* The dot of the machine and of the other machines. */
+.hx-machine[data-health='critical'] .hx-machine__dot {
+  background: var(--hx-danger);
+}
+.hx-machine[data-health='critical'] .hx-machine__dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  color: var(--hx-danger);
+  animation: hx-rec-ring 2.2s var(--hx-ease-out) infinite;
+}
+.hx-machine__other[data-health='warn'] .hx-machine__odot {
+  background: var(--hx-warning);
+}
+.hx-machine__other[data-health='critical'] .hx-machine__odot {
+  background: var(--hx-danger);
+}
+
+/* A line of the card past its line: the bar and the value in its tone, the reason under them. */
+.hx-machine__row[data-tone='critical'] .hx-machine__bar i {
+  background: var(--hx-danger);
+}
+.hx-machine__row[data-tone='critical'] .hx-machine__val,
+.hx-machine__row[data-tone='critical'] > .hx-icon {
+  color: var(--hx-danger);
+}
+.hx-machine__why {
+  grid-column: 2 / -1;
+  grid-row: 3;
+  margin-top: -2px;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--hx-fg-2);
+}
+
+/* The header's machine (it shows only when something is wrong) and the folded rail's avatar. */
+.hx-headmach[data-health='critical'] .hx-headmach__dot {
+  background: var(--hx-danger);
+}
+.hx-app[data-side='closed'] .hx-user[data-health='critical'] .hx-avatar::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--hx-danger);
+  box-shadow: 0 0 0 2px var(--hx-bg-app);
+}

@@ -1,0 +1,2174 @@
+/* The field under the feed and what stacks on it (features/composer), after the design's components.css, states.css,
+   flows.css and mobile.css: bars (machine silent, limit used up), the queue, the field with its attachments, the «+»
+   menu or sheet, the model pill and the recording bar. Scoped to the dock: the home page's .hx-composer in shell.css
+   draws another field. */
+
+/* A field takes its look from its own width, not the window's: a narrow column (a design's chat, the side chat, a chat
+   in the right pane, a narrow window) gets the phone's field — see «A narrow field» below. */
+.hx-composer,
+.hx-dl__composer {
+  container: hx-field / inline-size;
+}
+.hx-dock .hx-composer {
+  --hx-composer-h: 124px;
+  position: relative;
+  display: block;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  border-radius: 28px;
+  background: var(--hx-bg-raised);
+  border: 1px solid var(--hx-border-strong);
+  box-shadow: var(--hx-shadow-md);
+  transition:
+    border-color var(--hx-dur-sm),
+    background var(--hx-dur-md),
+    box-shadow var(--hx-dur-md);
+}
+.hx-dock .hx-composer::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 4px var(--hx-accent-soft);
+  opacity: 0;
+  transition: opacity var(--hx-dur-md);
+  pointer-events: none;
+}
+.hx-dock .hx-composer:focus-within {
+  border-color: var(--hx-focus);
+}
+.hx-dock .hx-composer:focus-within::after {
+  opacity: 1;
+}
+/* Files held over the window: the field takes them (design lib/hx components.css, verbatim). */
+.hx-composer[data-mode='drop'] {
+  border-color: transparent;
+}
+.hx-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hx-space-2);
+  border: 1.5px dashed color-mix(in srgb, var(--hx-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--hx-bg-raised) 72%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--hx-accent);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-medium);
+  pointer-events: none;
+  animation: hx-drop-in 180ms var(--hx-ease-out) backwards;
+}
+.hx-drop .hx-icon {
+  animation: hx-drop-nudge 1.4s var(--hx-ease-in-out) infinite;
+}
+@keyframes hx-drop-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-drop-nudge {
+  50% {
+    transform: translateY(-2px);
+  }
+}
+.hx-dock .hx-composer[data-rec='true'] {
+  border-color: color-mix(in srgb, var(--hx-accent) 42%, var(--hx-border-strong));
+}
+/* While it listens the halo around the field breathes with the voice: --hx-voice (0..1) is written by the wave. */
+.hx-dock .hx-composer[data-rec='true']::after {
+  opacity: calc(0.4 + var(--hx-voice, 0) * 0.6);
+  transition: opacity 140ms linear;
+}
+.hx-composer__layer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-4);
+  min-height: var(--hx-composer-h);
+  padding: var(--hx-space-4) var(--hx-space-4) var(--hx-space-3) var(--hx-space-5);
+}
+.hx-composer__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  color: var(--hx-fg-3);
+}
+/* The field grows with its text (its height is set from scrollHeight) up to 40% of the screen, then scrolls. It stands in a
+   box of its own so the layer that shows the dictated words can lie over it, glyph for glyph. */
+.hx-dock .hx-composer__field {
+  position: relative;
+  display: flex;
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: var(--hx-text-lg);
+  line-height: 26px;
+}
+.hx-dock .hx-composer__input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 26px;
+  /* Up to 40% of the screen and 320 px, then the text scrolls inside the field; the chips and the bar do not. */
+  max-height: min(40dvh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+}
+/* Listening: the field's own text is clear and the layer over it shows the same words, the fresh ones fading in. */
+.hx-dock .hx-composer[data-rec='true'] .hx-composer__input {
+  color: transparent;
+  caret-color: var(--hx-accent);
+}
+.hx-dock .hx-voice-mirror {
+  position: absolute;
+  inset: 0;
+  padding-right: var(--hx-sb, 0px);
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: none;
+}
+.hx-voice-word {
+  display: inline-block;
+}
+.hx-voice-word[data-fresh='true'] {
+  animation: hx-voice-word 760ms var(--hx-ease-out) backwards;
+}
+.hx-dock .hx-composer__input::placeholder {
+  color: var(--hx-fg-3);
+  transition: color var(--hx-dur-sm) ease-out;
+}
+.hx-composer[data-lifting='true'] .hx-composer__input::placeholder {
+  color: transparent;
+  transition: none;
+}
+.hx-composer__limit {
+  margin-top: calc(-1 * var(--hx-space-2));
+  font-size: var(--hx-text-xs);
+  color: var(--hx-danger);
+}
+.hx-dock .hx-composer__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-1);
+  min-width: 0;
+  margin-top: auto;
+}
+
+/* «+»: a menu over the field; on a phone a sheet with tiles. */
+.hx-plus-btn__ic {
+  transition: transform 200ms var(--hx-ease-out);
+}
+.hx-plus-btn[aria-expanded='true'] .hx-plus-btn__ic,
+.hx-plus-btn[data-popup-open] .hx-plus-btn__ic {
+  transform: rotate(45deg);
+}
+.hx-plus {
+  width: 248px;
+  padding: 4px;
+  border-radius: var(--hx-radius-md);
+  border: 1px solid var(--hx-border-strong);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  outline: 0;
+}
+.hx-plus__pane {
+  display: flex;
+  flex-direction: column;
+}
+.hx-plus__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.hx-plus__item:hover,
+.hx-plus__item:focus-visible {
+  background: var(--hx-bg-hover);
+  outline: none;
+}
+.hx-plus__item > .hx-icon:first-child {
+  color: var(--hx-fg-2);
+}
+.hx-plus__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-plus__hint {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-plus__chev {
+  color: var(--hx-fg-3);
+}
+.hx-plus__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--hx-border);
+}
+.hx-plus__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 2px 6px;
+}
+.hx-plus__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 84px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 200ms ease-out,
+    transform 200ms var(--hx-ease-out);
+}
+.hx-plus__tile:active {
+  transform: scale(0.97);
+}
+.hx-plus__tile > .hx-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--hx-fg-2);
+}
+.hx-plus-sheet .hx-plus__item {
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 14px;
+  font-size: 15px;
+}
+
+/* The agent and model pill. */
+.hx-model {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* In a crowded bar (the window over a site) the pill gives way to a point, but never to an icon without its name:
+     the others in the bar give way first. */
+  flex: 0 1 auto;
+  min-width: 72px;
+  max-width: 100%;
+  height: 34px;
+  padding: 0 10px 0 var(--hx-space-3);
+  overflow: hidden;
+  border-radius: var(--hx-radius-full);
+  border: 1px solid var(--hx-border-strong);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-model:hover:not(:disabled) {
+  background: var(--hx-bg-hover);
+}
+.hx-model:disabled {
+  cursor: default;
+}
+.hx-model__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-model__effort {
+  color: var(--hx-fg-3);
+  font-weight: var(--hx-weight-regular);
+}
+.hx-model__chev {
+  color: var(--hx-fg-3);
+}
+
+/* Attachments in the field: a bar runs while one uploads, a failed one says why. */
+.hx-composer__row .hx-attach {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  height: 32px;
+  max-width: 240px;
+  overflow: hidden;
+  padding: 0 var(--hx-space-2) 0 4px;
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-active);
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-1);
+  animation: hx-attach-in var(--hx-dur-md) var(--hx-ease-spring) backwards;
+}
+.hx-composer__row .hx-attach__thumb {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-accent);
+}
+.hx-composer__row .hx-attach__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-attach__x {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+}
+.hx-attach__x:hover {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-attach__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--hx-accent);
+  transform-origin: left;
+  transform: scaleX(0);
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-attach[data-status='uploading'] .hx-attach__bar {
+  opacity: 1;
+  animation: hx-attach-up 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.hx-attach[data-status='ready'] .hx-attach__bar {
+  transform: scaleX(1);
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+.hx-attach[data-status='uploading'] .hx-attach__thumb {
+  opacity: 0.55;
+}
+.hx-composer__row .hx-attach[data-status='error'] {
+  max-width: min(320px, 100%);
+  height: auto;
+  min-height: 32px;
+  padding-block: 4px;
+  background: color-mix(in srgb, var(--hx-danger) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hx-danger) 28%, transparent);
+}
+.hx-attach[data-status='error'] .hx-attach__thumb {
+  background: transparent;
+  color: var(--hx-danger);
+}
+.hx-attach[data-status='error'] .hx-attach__name {
+  flex: 0 1 auto;
+  max-width: 7em;
+  color: var(--hx-fg-2);
+}
+/* The reason may be a sentence: it wraps in a narrow field instead of being cut off. */
+.hx-attach__err {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-xs);
+  line-height: 1.3;
+}
+
+/* Recording: the bar in place of the controls — cancel, a pill with a live dot and the time, the wave, stop, send. Calm:
+   the colours are the design's accent and blue, and only the dot is warm; each piece comes in after the one before it. */
+.hx-recbar {
+  gap: var(--hx-space-2);
+  animation: hx-recbar-in 360ms var(--hx-ease-out) backwards;
+}
+.hx-recbar[data-state='closing'] {
+  animation: hx-recbar-out 180ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+.hx-recbar > * {
+  animation: hx-rec-pop 420ms var(--hx-ease-out) backwards;
+}
+.hx-recbar > :nth-child(2) {
+  animation-delay: 50ms;
+}
+.hx-recbar > :nth-child(3) {
+  animation: hx-wave-reveal 620ms var(--hx-ease-out) 90ms backwards;
+}
+.hx-recbar > :nth-child(4) {
+  animation-delay: 150ms;
+}
+.hx-recbar > :nth-child(5) {
+  animation-delay: 200ms;
+}
+.hx-recbar__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+}
+.hx-recbar__dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  color: var(--hx-danger);
+  background: currentColor;
+  transform: scale(calc(1 + var(--hx-voice, 0) * 0.4));
+  transition: transform 120ms linear;
+}
+.hx-recbar__dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  opacity: 0;
+  animation: hx-rec-ring 2.2s var(--hx-ease-out) infinite;
+}
+.hx-recbar__time {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+.hx-round.hx-recbar__stop {
+  color: var(--hx-fg-2);
+}
+.hx-round.hx-recbar__stop:hover {
+  color: var(--hx-fg-1);
+  background: var(--hx-bg-hover);
+}
+/* The wave is a canvas (features/composer/recording.tsx); its ends fade out. */
+.hx-wave {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0 var(--hx-space-2);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 94%, transparent);
+}
+.hx-wave__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* The controls come back after a recording the way the recording bar came: from a little below, fading in. */
+.hx-dock .hx-composer__bar[data-back='true'] {
+  animation: hx-bar-back 300ms var(--hx-ease-out) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-recbar,
+  .hx-recbar > *,
+  .hx-recbar > :nth-child(3),
+  .hx-dock .hx-composer__bar[data-back='true'],
+  .hx-voice-word[data-fresh='true'] {
+    animation: none;
+  }
+  .hx-recbar__dot::after {
+    animation: none;
+  }
+  .hx-recbar__dot {
+    transform: none;
+    transition: none;
+  }
+  .hx-dock .hx-composer[data-rec='true']::after {
+    opacity: 0.7;
+    transition: none;
+  }
+}
+
+/* ── Bars over the field: machine silent, limit used up ── */
+.hx-dockbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0 18px;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--hx-border-strong);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background: linear-gradient(var(--hx-bg-hover), var(--hx-bg-hover)), var(--hx-bg-raised);
+  animation: hx-dockbar-in 360ms var(--hx-ease-out) backwards;
+}
+.hx-dockbar[data-state='closing'] {
+  animation: hx-dockbar-out 240ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+.hx-dockbar + .hx-qfold .hx-queue {
+  border-radius: 0;
+}
+.hx-dockbar__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.hx-dockbar__ic {
+  flex: none;
+  color: var(--hx-warning);
+}
+.hx-dockbar[data-tone='quiet'] .hx-dockbar__ic {
+  color: var(--hx-fg-3);
+}
+.hx-dockbar__text {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+}
+.hx-dockbar__title {
+  flex: none;
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-dockbar__sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-3);
+}
+.hx-dockbar__sub::before {
+  content: '·';
+  margin-right: 6px;
+}
+.hx-dockbar__chev {
+  display: none;
+  flex: none;
+  color: var(--hx-fg-3);
+  transition: transform 260ms var(--hx-ease-out);
+}
+.hx-dockbar__acts {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+
+/* ── What the server holds back and does by itself: a model change that waits, the steps of a start ── */
+.hx-dockstat {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin: 0 18px;
+  border: 1px solid var(--hx-border-strong);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background: linear-gradient(var(--hx-bg-hover), var(--hx-bg-hover)), var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  animation: hx-dockstat-in 360ms var(--hx-ease-out) backwards;
+}
+.hx-dockstat[data-state='closing'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    grid-template-rows 240ms var(--hx-ease-out),
+    opacity 200ms ease-out;
+}
+.hx-dockstat__clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-dockstat__line,
+.hx-dockstat__steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  margin: 0;
+  padding: 3px 14px;
+  list-style: none;
+  line-height: 20px;
+}
+.hx-dockstat__steps {
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+.hx-dockstat__ic,
+.hx-dockstat__mark {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-dockstat__line > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-dockstat__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--hx-fg-3);
+  transition: color 240ms var(--hx-ease-out);
+}
+.hx-dockstat__step + .hx-dockstat__step::before {
+  content: '→';
+  margin-right: 2px;
+  color: var(--hx-fg-3);
+  opacity: 0.6;
+}
+.hx-dockstat__step[data-state='active'] {
+  color: var(--hx-fg-1);
+}
+.hx-dockstat__step[data-state='active'] .hx-dockstat__mark {
+  color: var(--hx-accent);
+  animation: hx-spin 1s linear infinite;
+}
+.hx-dockstat__step[data-state='done'] {
+  color: var(--hx-fg-2);
+}
+.hx-dockstat__step[data-state='done'] .hx-dockstat__mark {
+  color: var(--hx-success);
+}
+.hx-dockstat + .hx-qfold .hx-queue {
+  border-radius: 0;
+}
+@keyframes hx-dockstat-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-dockstat,
+  .hx-dockstat__step[data-state='active'] .hx-dockstat__mark {
+    animation: none;
+  }
+}
+
+/* ── Queue: what waits to go to the agent ── */
+/* The stack opens and closes by its height (a grid row 0fr → 1fr: no height is animated, no size is guessed), and so does
+   every row in it: a new message rises out of the field, one that goes folds away and the rest settle. */
+.hx-qfold {
+  --hx-fold-ms: 320ms;
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: hx-fold-in var(--hx-fold-ms) var(--hx-ease-out) backwards;
+  transition: grid-template-rows var(--hx-fold-ms) var(--hx-ease-out);
+}
+.hx-qfold[data-state='closing'] {
+  grid-template-rows: 0fr;
+  pointer-events: none;
+}
+.hx-qfold__in {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-queue {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0 18px;
+  padding: 2px 6px 6px;
+  border: 1px solid var(--hx-border-strong);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background: linear-gradient(var(--hx-bg-hover), var(--hx-bg-hover)), var(--hx-bg-raised);
+  /* A long queue scrolls inside itself and does not push the chat off the screen. */
+  max-height: min(40dvh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.hx-queue__slot {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--hx-fold-ms) var(--hx-ease-out);
+}
+.hx-queue__slot[data-fresh='true'] {
+  animation: hx-fold-in var(--hx-fold-ms) var(--hx-ease-out) backwards;
+}
+.hx-queue__slot[data-leaving='true'] {
+  grid-template-rows: 0fr;
+}
+/* The last row goes with the whole stack, which folds as one. */
+.hx-qfold[data-state='closing'] .hx-queue__slot[data-leaving='true'] {
+  grid-template-rows: 1fr;
+}
+.hx-queue__clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-queue__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 4px 0 10px;
+  border-radius: 12px;
+  animation: hx-queue-in var(--hx-fold-ms) var(--hx-ease-out) backwards;
+  transition:
+    opacity 200ms ease-in,
+    transform 200ms ease-in;
+}
+.hx-queue__slot + .hx-queue__slot .hx-queue__row {
+  box-shadow: inset 0 1px 0 var(--hx-border);
+  border-radius: 0;
+}
+.hx-queue__row[data-leaving='true'] {
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+}
+/* The words of a message that was just sent: a copy of them lifts out of the field while the row opens (composer.tsx). */
+.hx-composer__ghost {
+  position: absolute;
+  z-index: 3;
+  left: var(--ghost-x);
+  top: var(--ghost-y);
+  width: var(--ghost-w);
+  max-height: min(40dvh, 320px);
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-lg);
+  line-height: 26px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+.hx-queue__ic {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+/* The grip carries a row to another place (use-drag): it takes the room of the status icon and a little more to be
+   hit; the row itself follows the pointer and the others step aside for it (ui/use-drag, ui.css). */
+.hx-queue__grip {
+  flex: none;
+  width: 24px;
+  height: 28px;
+  margin: 0 -4px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: default;
+  transition:
+    background 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-queue__grip[data-drag] {
+  cursor: grab;
+}
+.hx-queue__grip[data-drag]:hover {
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+}
+.hx-queue__grip:focus-visible {
+  outline: 1.5px solid var(--hx-border-strong);
+  outline-offset: 0;
+}
+.hx-queue[data-dragging] {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grabbing;
+}
+.hx-queue[data-dragging] :is(.hx-queue__grip, .hx-queue__del) {
+  cursor: grabbing;
+}
+.hx-queue__slot[data-dragging='true'] {
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-md);
+}
+/* Dropped, and the runtime has not answered yet: the row waits where it was. */
+.hx-queue__row[data-moving='true'] {
+  opacity: 0.6;
+}
+.hx-queue__slot[data-drop-edge]::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  z-index: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--hx-accent);
+  box-shadow: 0 0 0 3px var(--hx-accent-soft);
+  pointer-events: none;
+  animation: hx-drop-line var(--hx-dur-sm) var(--hx-ease-out) both;
+}
+.hx-queue__slot[data-drop-edge='before']::before {
+  top: -1px;
+}
+.hx-queue__slot[data-drop-edge='after']::before {
+  bottom: -1px;
+}
+.hx-queue__main {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.hx-queue__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-1);
+}
+.hx-queue__note {
+  flex: none;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  white-space: nowrap;
+}
+.hx-queue__row:is([data-st='paused'], [data-st='limit'], [data-st='sending']) .hx-queue__text {
+  color: var(--hx-fg-2);
+}
+.hx-queue__row[data-st='sending'] .hx-queue__ic {
+  animation: hx-spin 1s linear infinite;
+}
+.hx-queue__row[data-st='failed'] .hx-queue__ic,
+.hx-queue__row[data-st='failed'] .hx-queue__note {
+  color: var(--hx-danger);
+}
+.hx-queue__files {
+  flex: none;
+  display: flex;
+  gap: 4px;
+}
+.hx-queue__file {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--hx-bg-raised);
+  box-shadow: inset 0 0 0 1px var(--hx-border);
+  color: var(--hx-accent);
+}
+.hx-queue__steer {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-queue__steer:hover {
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+}
+.hx-queue__del {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-queue__del > * {
+  grid-area: 1 / 1;
+}
+.hx-queue__del:hover {
+  background: var(--hx-bg-raised);
+  color: var(--hx-danger);
+}
+.hx-queue__del[data-act='edit']:hover {
+  color: var(--hx-fg-1);
+}
+.hx-queue__del[data-busy='true'] > .hx-icon {
+  opacity: 0;
+}
+.hx-queue__steer:disabled,
+.hx-queue__del:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.hx-queue__steer > .hx-spin,
+.hx-queue__del > .hx-spin {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+/* Stacked layers over the field: only the top one keeps its rounded corners. */
+.hx-ask + .hx-dockbar,
+.hx-ask + .hx-qfold .hx-queue,
+.hx-dockbar + .hx-dockbar {
+  border-radius: 0;
+}
+
+/* A narrow field, on a phone or in a narrow column of a wide window, is the phone's field: lower, with tighter paddings;
+   the bar keeps «+», the model pill with its name, the microphone and one main button — the context ring goes, the
+   limits come only when a window runs low. The one place of these rules: a phone's field is narrow too. */
+@container hx-field (max-width: 580px) {
+  .hx-composer__layer {
+    --hx-composer-h: 96px;
+    gap: var(--hx-space-2);
+    padding: var(--hx-space-3) var(--hx-space-2) var(--hx-space-2) var(--hx-space-4);
+  }
+  .hx-dock .hx-composer__bar {
+    gap: 4px;
+  }
+  .hx-dock .hx-composer__field {
+    font-size: 16px;
+    line-height: 22px;
+  }
+  .hx-dock .hx-composer__input {
+    min-height: 22px;
+  }
+  .hx-model {
+    height: 32px;
+    padding: 0 12px 0 10px;
+    border-color: var(--hx-border);
+  }
+  .hx-model__effort,
+  .hx-model__chev {
+    display: none;
+  }
+  .hx-dock .hx-composer__bar .hx-round {
+    flex: none;
+  }
+  .hx-composer__bar .hx-ctx,
+  .hx-composer__bar .hx-lim:not(:has([data-level='low'], [data-level='out'])) {
+    display: none;
+  }
+}
+@media (pointer: coarse) {
+  .hx-plus__item {
+    min-height: 44px;
+  }
+}
+/* A phone's box is rounder (a field cannot query its own width for its own corners). */
+@media (max-width: 900px) {
+  .hx-dock .hx-composer {
+    border-radius: 22px;
+  }
+
+  /* On a phone a bar is one line; a tap opens its explanation and actions. */
+  .hx-dockbar {
+    margin: 0 14px;
+    padding: 4px 6px 4px 12px;
+  }
+  .hx-dockbar__line {
+    min-height: 32px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hx-dockbar__title {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hx-dockbar__sub,
+  .hx-dockbar__acts {
+    display: none;
+  }
+  .hx-dockbar__chev {
+    display: block;
+    margin-left: auto;
+  }
+  .hx-dockbar[data-open='true'] .hx-dockbar__chev {
+    transform: rotate(180deg);
+  }
+  .hx-dockbar[data-open='true'] .hx-dockbar__text {
+    flex-direction: column;
+    gap: 0;
+  }
+  .hx-dockbar[data-open='true'] .hx-dockbar__title {
+    white-space: normal;
+  }
+  .hx-dockbar[data-open='true'] .hx-dockbar__sub {
+    display: block;
+    white-space: normal;
+  }
+  .hx-dockbar[data-open='true'] .hx-dockbar__sub::before {
+    content: none;
+  }
+  .hx-dockbar[data-open='true'] .hx-dockbar__acts {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    padding: 2px 0 6px;
+    animation: hx-sk-in 220ms ease backwards;
+  }
+  .hx-queue {
+    margin: 0 14px;
+  }
+  .hx-queue__main {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .hx-queue__note {
+    white-space: normal;
+    line-height: 16px;
+  }
+}
+
+@keyframes hx-recbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes hx-recbar-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes hx-rec-ring {
+  from {
+    opacity: 0.6;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+@keyframes hx-rec-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+@keyframes hx-wave-reveal {
+  from {
+    opacity: 0;
+    clip-path: inset(0 50% 0 50% round 8px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 8px);
+  }
+}
+@keyframes hx-bar-back {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@keyframes hx-voice-word {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+    filter: blur(2.5px);
+    color: var(--hx-accent);
+  }
+  55% {
+    color: var(--hx-accent);
+  }
+}
+@keyframes hx-attach-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6) translateY(8px);
+  }
+}
+@keyframes hx-attach-up {
+  to {
+    transform: scaleX(0.9);
+  }
+}
+@keyframes hx-queue-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+/* Opens by its height from nothing; the grid row is the only thing that changes size. */
+@keyframes hx-fold-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+@keyframes hx-dockbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes hx-dockbar-out {
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* The start page: the dock stands in the middle of the stage under the greeting; in a chat the feed owns it. */
+.hx-stage[data-phase='home'] > .hx-dock {
+  position: absolute;
+  left: var(--hx-space-8);
+  right: var(--hx-space-8);
+  bottom: var(--hx-space-5);
+  max-width: calc(var(--hx-feed-max) + 120px);
+  margin: 0 auto;
+  z-index: 2;
+  transform: translateY(calc(-50cqh + 50% + var(--hx-space-5) + 40px));
+}
+.hx-hello__busy {
+  margin-top: 10px;
+  text-align: center;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+@media (max-width: 900px) {
+  .hx-stage[data-phase='home'] > .hx-dock {
+    left: calc(var(--hx-space-3) + env(safe-area-inset-left));
+    right: calc(var(--hx-space-3) + env(safe-area-inset-right));
+    bottom: calc(var(--hx-space-2) + max(env(safe-area-inset-bottom), var(--hx-kb, 0px)));
+  }
+  /* As in the design, the field stays under the greeting on a phone too, and goes down over the keyboard when it opens */
+  .hx-stage[data-phase='home'] > .hx-dock[data-keyboard='open'] {
+    transform: none;
+  }
+}
+
+/* Between the start page and a chat the field travels, as the design's one dock does (720 ms): down to the feed's
+   bottom when a chat opens from the greeting, up under the greeting on the way back. Not on the first entrance. */
+.hx-stage[data-arrive='home'] .hx-chat > .hx-dock:not([data-keyboard='open']) {
+  animation: hx-dock-down var(--hx-dur-xl) var(--hx-ease-in-out) backwards;
+}
+@keyframes hx-dock-down {
+  from {
+    transform: translateY(calc(-50cqh + 50% + var(--hx-space-5) + 40px));
+  }
+}
+/* Only from a chat: from Designly the field flies in and the dock is already in its place (the design's one dock does
+   not move there). */
+[data-play='done'] .hx-stage[data-phase='home'][data-back='chat'] > .hx-dock:not([data-keyboard='open']) {
+  animation: hx-dock-up var(--hx-dur-xl) var(--hx-ease-in-out) backwards;
+}
+@keyframes hx-dock-up {
+  from {
+    transform: none;
+  }
+}
+[data-play='done'] .hx-stage[data-phase='home'] .hx-hello {
+  animation: hx-hello-back var(--hx-dur-lg) var(--hx-ease-out) backwards;
+}
+@keyframes hx-hello-back {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.98);
+  }
+}
+
+/* A picture fills its square (the design's thumb as a background image). */
+.hx-queue__file[data-pic='true'] {
+  overflow: hidden;
+  background: var(--hx-bg-hover);
+}
+.hx-queue__file > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* The context ring and its card (the design's .hx-ctx, lib/hx/components.css), verbatim. */
+.hx-ctx {
+  position: relative;
+  flex: none;
+  outline: none;
+}
+.hx-ctx__chip {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  cursor: default;
+  outline: none;
+  transition: background 220ms var(--hx-ease-out);
+}
+.hx-ctx__chip:hover,
+.hx-ctx__chip:focus-visible,
+.hx-ctx[data-open='true'] .hx-ctx__chip {
+  background: var(--hx-bg-hover);
+}
+.hx-ctx__ring {
+  --c: var(--hx-accent);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--c) calc(var(--p) * 1%),
+    color-mix(in srgb, var(--hx-fg-3) 28%, transparent) 0
+  );
+  -webkit-mask: radial-gradient(circle, transparent 4.6px, #000 5px);
+  mask: radial-gradient(circle, transparent 4.6px, #000 5px);
+  transition: --p 600ms var(--hx-ease-out);
+}
+.hx-ctx[data-tone='warn'] .hx-ctx__ring {
+  --c: var(--hx-warning);
+}
+/* Карточка: как у машины — открывается при наведении (задержку и путь курсора ведёт ui/use-hover-intent.ts) */
+.hx-ctx__pop {
+  position: absolute;
+  right: -8px;
+  bottom: calc(100% + 10px);
+  z-index: 40;
+  width: 316px;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--hx-border),
+    0 18px 48px rgba(12, 14, 34, 0.14);
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px) scale(0.97);
+  transform-origin: bottom right;
+  filter: blur(2px);
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    transform 220ms var(--hx-ease-out),
+    filter 160ms var(--hx-ease-out),
+    visibility 0s linear 220ms;
+}
+.hx-ctx__pop::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -12px;
+  height: 12px;
+}
+.hx-ctx[data-open='true'] .hx-ctx__pop {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  filter: none;
+  transition:
+    opacity 240ms var(--hx-ease-out),
+    transform 420ms var(--hx-ease-out),
+    filter 420ms var(--hx-ease-out),
+    visibility 0s linear;
+}
+.hx-ctx__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.hx-ctx__title {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-3);
+}
+.hx-ctx__pct {
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.hx-ctx[data-tone='warn'] .hx-ctx__pct {
+  color: var(--hx-warning);
+}
+.hx-ctx__compact {
+  position: relative;
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    background 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out),
+    transform 200ms var(--hx-ease-out);
+}
+.hx-ctx__compact:hover {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-ctx__compact:active {
+  transform: scale(0.94);
+}
+.hx-ctx__compact[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-3);
+}
+.hx-ctx__used {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-ctx__bar {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin: 12px 0 10px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--hx-fg-3) 16%, transparent);
+}
+.hx-ctx__bar > i {
+  flex: none;
+  width: var(--w);
+  min-width: 3px;
+  height: 100%;
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 700ms var(--hx-ease-out);
+}
+.hx-ctx__bar > i:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.hx-ctx__bar > i:last-of-type {
+  border-radius: 0 4px 4px 0;
+}
+.hx-ctx[data-open='true'] .hx-ctx__bar > i {
+  transform: none;
+  transition-delay: 260ms;
+}
+.hx-ctx__limit {
+  position: absolute;
+  left: 95%;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--hx-fg-3);
+  opacity: 0.5;
+}
+.hx-ctx [data-k='sys'] {
+  background: #8c8aa0;
+}
+.hx-ctx [data-k='mcp'] {
+  background: #2e9e96;
+}
+.hx-ctx [data-k='mem'] {
+  background: #d99a2b;
+}
+.hx-ctx [data-k='msg'] {
+  background: var(--hx-accent);
+}
+.hx-ctx [data-k='free'] {
+  background: color-mix(in srgb, var(--hx-fg-3) 22%, transparent);
+}
+.hx-ctx__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.hx-ctx__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  font-size: 12.5px;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    transform 260ms var(--hx-ease-out);
+}
+.hx-ctx[data-open='true'] .hx-ctx__row {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(240ms + var(--j) * 40ms);
+}
+.hx-ctx__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 2px;
+}
+.hx-ctx__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-2);
+}
+.hx-ctx__val {
+  flex: none;
+  color: var(--hx-fg-1);
+  font-variant-numeric: tabular-nums;
+}
+.hx-ctx__foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hx-border);
+  font-size: 12px;
+  color: var(--hx-fg-3);
+}
+.hx-ctx__foot[data-state='live'] .hx-icon {
+  color: var(--hx-accent);
+  animation: hx-spin 900ms linear infinite;
+}
+.hx-ctx__foot[data-state='done'] .hx-icon {
+  color: var(--hx-success);
+}
+@property --p {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+/* The rows' cascade by place (the design's --j). */
+.hx-ctx__row[data-j='0'] {
+  --j: 0;
+}
+.hx-ctx__row[data-j='1'] {
+  --j: 1;
+}
+
+/* An uploaded picture fills its square in the field too. */
+.hx-composer__row .hx-attach__thumb[data-pic='true'] {
+  overflow: hidden;
+}
+.hx-composer__row .hx-attach__thumb > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Attachments sit on their own line above the text, the field takes the whole line under them. */
+.hx-composer__row:has(.hx-attach) .hx-composer__field {
+  flex-basis: 100%;
+}
+
+/* The prompts over the field (the design's .hx-ph, flows.css): earlier messages and quick prompts. */
+.hx-ph {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: min(380px, 50vh);
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 18px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  transform-origin: 50% 100%;
+  animation: hx-anns-in 260ms var(--hx-ease-out) backwards;
+  scrollbar-width: thin;
+}
+.hx-ph[data-state='closing'] {
+  animation: hx-anns-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-ph__label {
+  padding: 8px 10px 4px;
+  color: var(--hx-fg-3);
+  font-size: 11.5px;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-ph__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 6px 0 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  animation: hx-gate-in 260ms var(--hx-ease-out) backwards;
+  animation-delay: calc(var(--j) * 18ms);
+}
+.hx-ph__row:hover,
+.hx-ph__row[aria-selected='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-ph__row > .hx-icon {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-ph__name {
+  flex: none;
+  color: var(--hx-accent);
+  font-family: var(--hx-font-mono);
+  font-size: 12.5px;
+}
+.hx-ph__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-ph__name + .hx-ph__text {
+  color: var(--hx-fg-2);
+}
+.hx-ph__x {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  opacity: 0;
+}
+.hx-ph__row:hover .hx-ph__x {
+  opacity: 1;
+}
+.hx-ph__x:hover {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-ph__empty {
+  padding: 20px;
+  color: var(--hx-fg-3);
+  font-size: 13px;
+  text-align: center;
+}
+.hx-ph__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--hx-border);
+  color: var(--hx-fg-3);
+  font-size: 12px;
+}
+.hx-ph__foot kbd {
+  margin-right: 4px;
+  font: inherit;
+}
+.hx-ph__save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hx-ph__save:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-ph__nm {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--hx-accent);
+  border-radius: 8px;
+  color: var(--hx-accent);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+}
+.hx-ph__nm input {
+  width: 90px;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+}
+@media (hover: none) {
+  .hx-ph__x {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-ph__row {
+    animation: none;
+  }
+}
+/* The palette over the field that «/» (and «$», «@») opens: settings, commands, skills, MCP servers, files. It sits over
+   the composer, never over the text being typed; the rows come in one after another by their place (--j). */
+.hx-slash {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: min(380px, 50vh);
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 18px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  transform-origin: 50% 100%;
+  animation: hx-anns-in 260ms var(--hx-ease-out) backwards;
+  scrollbar-width: thin;
+}
+.hx-slash[data-state='closing'] {
+  animation: hx-anns-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-slash__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px 4px;
+  color: var(--hx-fg-1);
+  font-size: 13px;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-slash__note {
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  font-weight: var(--hx-weight-regular);
+}
+.hx-slash__label {
+  padding: 8px 10px 4px;
+  color: var(--hx-fg-3);
+  font-size: 11.5px;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-slash__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  animation: hx-gate-in 260ms var(--hx-ease-out) backwards;
+  animation-delay: calc(var(--j, 0) * 18ms);
+}
+.hx-slash__row:hover,
+.hx-slash__row[aria-selected='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-slash__row > .hx-icon {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-slash__name {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--hx-accent);
+  font-family: var(--hx-font-mono);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-slash__hit {
+  background: none;
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-slash__arg {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+}
+.hx-slash__desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-2);
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-slash__row > .hx-slash__now {
+  color: var(--hx-accent);
+}
+.hx-slash__src {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-size: 11.5px;
+}
+.hx-slash[data-frozen] .hx-slash__row {
+  cursor: default;
+  opacity: 0.55;
+}
+.hx-slash__empty,
+.hx-slash__more {
+  padding: 12px 10px;
+  color: var(--hx-fg-3);
+  font-size: 12.5px;
+}
+.hx-slash__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--hx-border);
+  color: var(--hx-fg-3);
+  font-size: 12px;
+}
+.hx-slash__foot kbd {
+  margin-right: 4px;
+  font: inherit;
+}
+@media (max-width: 640px) {
+  .hx-slash__src {
+    display: none;
+  }
+  .hx-slash__name {
+    max-width: none;
+  }
+  .hx-slash__foot span:not(:first-child) {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-slash__row {
+    animation: none;
+  }
+}
+@keyframes hx-anns-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+    filter: blur(4px);
+  }
+}
+@keyframes hx-anns-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+    filter: blur(2px);
+  }
+}
+
+/* The system pickers of «+»: in the page (iOS reports a choice only for an input that is), out of sight and of the tab order. */
+.hx-plus__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Before the chat is known the field is already there, so the page does not jump when it becomes usable. */
+.hx-composer[data-quiet] {
+  opacity: 0.7;
+}
+
+.hx-composer[data-quiet] .hx-composer__bar {
+  pointer-events: none;
+}
+
+/* The command palette on the phone: it stays over the field — typing goes on in the field, the keyboard stays
+   up and the list narrows as the person types, so it is no sheet — but its rows are a finger tall, its words readable,
+   and the keyboard's hints (↑ ↓ Tab Esc) go. */
+@media (max-width: 900px) {
+  .hx-slash {
+    max-height: min(56dvh, 440px);
+    padding: 6px 4px;
+    border-radius: 20px;
+  }
+  .hx-slash__row {
+    min-height: 48px;
+    gap: 12px;
+    padding: 0 12px;
+  }
+  .hx-slash__name {
+    font-size: 14px;
+  }
+  .hx-slash__desc {
+    font-size: var(--hx-text-sm);
+  }
+  .hx-slash__label,
+  .hx-slash__arg,
+  .hx-slash__note,
+  .hx-slash__empty,
+  .hx-slash__more {
+    font-size: 13px;
+  }
+  .hx-slash__head {
+    font-size: var(--hx-text-sm);
+  }
+  .hx-slash__foot {
+    display: none;
+  }
+}
+
+/* «+» in a chat: groups with a quiet label, and the picker of a place in the same panel. */
+.hx-plus__group {
+  display: flex;
+  flex-direction: column;
+}
+.hx-plus__label {
+  padding: 6px 10px 2px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-plus .hx-plus__pane {
+  animation: hx-pick-back 160ms var(--hx-ease-out) backwards;
+}
+.hx-plus .hx-plus__pane[data-sub='true'] {
+  animation-name: hx-pick-in;
+}
+.hx-plus.hx-plus--pick {
+  width: min(360px, calc(100vw - 32px));
+}
+.hx-pick__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 4px 0 0;
+}
+.hx-pick__back {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-pick__back:hover,
+.hx-pick__back:focus-visible {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  outline: none;
+}
+.hx-pick__title {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+}
+.hx-pick__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  margin: 4px 2px 6px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--hx-border);
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-3);
+  transition: border-color 160ms var(--hx-ease-out);
+}
+.hx-pick__search:focus-within {
+  border-color: var(--hx-border-strong);
+}
+.hx-pick__search > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+.hx-pick__search > input::-webkit-search-cancel-button {
+  display: none;
+}
+.hx-pick__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hx-pick__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-pick__row[aria-selected='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-pick__thumb {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+.hx-pick[data-kind='design'] .hx-pick__thumb {
+  width: 44px;
+  aspect-ratio: 4 / 3;
+  height: auto;
+}
+.hx-pick__thumb > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+.hx-pick__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hx-pick__name,
+.hx-pick__hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-pick__name {
+  font-size: var(--hx-text-sm);
+}
+.hx-pick__hint {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-pick__check {
+  flex: none;
+  color: var(--hx-accent);
+}
+.hx-pick__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 72px;
+  padding: 12px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  text-align: center;
+}
+.hx-plus-sheet .hx-pick__list {
+  max-height: 56vh;
+}
+.hx-plus-sheet .hx-pick__row {
+  min-height: 52px;
+}
+.hx-plus-sheet .hx-pick__search {
+  height: 44px;
+}
+@media (pointer: coarse) {
+  .hx-pick__row {
+    min-height: 48px;
+  }
+}
+@keyframes hx-pick-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+@keyframes hx-pick-back {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+/* A place attached to the message: the chip opens it in the pane, × takes it out, and it leaves softly. */
+.hx-refchip__open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.hx-refchip__open:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.hx-refchip .hx-attach__thumb {
+  color: var(--hx-fg-2);
+}
+.hx-refchip[data-ref='design'] .hx-attach__thumb[data-pic='true'] {
+  width: 32px;
+  height: 24px;
+  max-width: none;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 5px;
+}
+.hx-refchip .hx-attach__thumb > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+.hx-refchip[data-leaving] {
+  pointer-events: none;
+  animation: hx-ref-out 160ms ease-out forwards;
+}
+.hx-msg-user__refs .hx-refchip:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-refline .hx-icon {
+  color: var(--hx-fg-3);
+}
+@keyframes hx-ref-out {
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-plus .hx-plus__pane,
+  .hx-refchip[data-leaving] {
+    animation: none;
+  }
+}
+
+/* A stashed draft in «+»: the row that brings it back and the cross that forgets it. */
+.hx-stash__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.hx-stash__row > .hx-pick__row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hx-stash__x {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+}
+.hx-stash__x:hover,
+.hx-stash__x:focus-visible {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  outline: none;
+}
+.hx-plus__item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hx-plus__item:disabled:hover {
+  background: transparent;
+}

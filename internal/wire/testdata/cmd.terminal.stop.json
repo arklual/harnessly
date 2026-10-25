@@ -1,0 +1,5 @@
+{
+  "op": "terminal.stop",
+  "body": {"opId": "op-ts1", "id": "tab-k3Jx9QmZ"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 88}
+}

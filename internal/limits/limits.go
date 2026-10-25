@@ -279,3 +279,19 @@ func tsOf(d Data) float64 {
 	}
 	return orZero(d["ts"])
 }
+
+// ExhaustedReset is when the windows of an entry that ran out reset (unix seconds), the latest of them: what the limits
+// say a chat held on its usage limit waits for. 0 when no window is at its limit, or none resets after now.
+func ExhaustedReset(d Data, now float64) float64 {
+	var reset float64
+	for _, k := range []string{"five_hour", "seven_day"} {
+		w, ok := object(d[k])
+		if !ok || !(num(w["used_percentage"]) >= 100) {
+			continue
+		}
+		if r := num(w["resets_at"]); r > now && r > reset {
+			reset = r
+		}
+	}
+	return reset
+}

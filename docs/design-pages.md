@@ -107,3 +107,47 @@ A new project is a copy of `<library>/.template/` when the library has one, else
 tool's board engine (Anthropic's dc-runtime, shipped as is; `RUNTIME_DESIGN_ENGINE_FILE` points at another build). Every
 new project gets `meta/` with release `legacy`; a template's own `meta/project.json` settings (release, kits, tailwind)
 are kept, its pages never are.
+
+## Speed
+
+How fast a board loads is measured, not guessed:
+
+```
+CHROME_BIN=<chromium> node web/scripts/board-load.mjs <board url> [--runs 3] [--cookie name=value] [--verbose]
+```
+
+`<board url>` is a board of the library server, `http://127.0.0.1:<port>/a/<project>/p/<board>`. Each run opens a fresh
+headless Chromium (the `@playwright/test` of `web/`; `CHROME_BIN` names a Chromium when the one Playwright expects is not
+installed) and loads the board twice in one context: cold (empty cache), then warm (the cache the first load filled).
+It prints `cold <ms> warm <ms> requests <n> bytes <n>`: the time until the board's frame, nested iframes included, holds
+more than 300 elements; and what the warm load asked the network for (answers from the cache are not counted). After the
+runs: the cold load's totals, every address it fetched with a body more than once, and bodies of one size at two
+addresses (one bundle downloaded twice).
+
+Measure on a runtime of its own, never on the person's: a standalone runtime (`web/e2e/runtime.ts` shows the
+environment) with `RUNTIME_DESIGN_LIBRARY_DIR` on a copy of the project and `RUNTIME_DESIGN_LIBRARY_PORT` on a free port
+outside the runtime's own block of ports (it takes nine above its listen port). The library server starts with the first
+`GET /api/platform/design/library?lite=1` made with a page session. The wrapper board is measured by its library
+address, which skips the preview slot.
+
+Targets: warm load <= 2 s, warm bytes <= 300 KB, no bundle downloaded twice when cold.
+
+Numbers of 25.10.2026, the `acme-admin` copy, the board «Выплаты - Выплата» (a wrapper around the page
+`lib/page.html?id=payout-detail`), headless Chromium on a shared machine at load average 8-14 on 12 cores, medians of
+10 runs. Before is `main` at f876279, after is this branch:
+
+| | before | after |
+|---|---|---|
+| cold, ms | 6687 | 6401 |
+| warm, ms | 6500 | 5121 (best 4755) |
+| warm requests / bytes | 33 / 62 KB | 31 / 64 KB |
+| cold requests / bytes | 58 / 3.30 MB | 57 / 2.14 MB |
+| `_ds_bundle.js` (1.17 MB) cold | twice, under two addresses | once, `/__h/<hash>/` |
+| React, ReactDOM cold | from unpkg.com | from `/__vendor/` |
+
+The bytes and the double download are fixed; the warm time is not: it is still 2.5 times the target. The network is
+not what it waits for (the whole warm load is over the wire in about 0.1 s per step): the load goes through three
+steps one after another: the wrapper's runtime boots (about 1.2 s before it opens the page's iframe), the page's scripts
+start (about 1.1 s later), and `pages.js`, the design system bundle and React render (about 2 s), most of it script
+execution (`pages.js` 0.9 s, `_ds_bundle.js` 0.6 s, `react.js` 0.3 s of the profile) and the rest waiting between steps.
+What is left to the board's own boot, not to what the library serves.

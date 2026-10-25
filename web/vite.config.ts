@@ -36,5 +36,8 @@ export default defineConfig({
     environment: 'node',
     include: ['app/**/*.test.{ts,tsx}', 'kit/**/*.test.{ts,tsx}'],
     css: false,
+    // The default cache lives in node_modules, which a worktree shares with the checkout it links to; a transformed
+    // module (import.meta.glob of the locales above all) cached by another worktree then shows that one's files here.
+    fsModuleCachePath: fileURLToPath(new URL('./.vitest-cache', import.meta.url)),
   },
 });

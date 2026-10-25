@@ -1,0 +1,42 @@
+{
+  "f": "welcome",
+  "proto": 2,
+  "epoch": "ep-01JB7Q0000",
+  "serverTime": 1792656000000,
+  "machine": {
+    "id": "runner-2",
+    "name": "Моя ВМ",
+    "host": "runner-2.machines.example.com",
+    "reach": "online",
+    "lastSeenAt": 1792655996000,
+    "runtime": {
+      "version": "1.82.0",
+      "proto": 2,
+      "features": [
+        "queue", "steer", "questions", "permissions", "background", "voice", "files", "checkpoints",
+        "designly", "search", "vault", "push"
+      ]
+    },
+    "agents": [
+      {"provider": "claude", "version": "2.3.1", "status": "ready", "canSwitchModel": true, "models": [
+          {"id": "sonnet", "label": "Sonnet", "hint": "Everyday work", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": "medium"},
+          {"id": "opus", "label": "Opus", "hint": "The strongest", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": null}
+        ]},
+      {"provider": "codex", "version": null, "status": "missing", "canSwitchModel": false, "models": []}
+    ]
+  },
+  "features": [
+    "queue", "steer", "questions", "permissions", "background", "voice", "files", "checkpoints", "designly",
+    "search", "vault", "push"
+  ],
+  "limits": {
+    "maxQueue": 20,
+    "maxText": 100000,
+    "maxAttachments": 20,
+    "maxImageBytes": 10485760,
+    "maxFileBytes": 52428800,
+    "slowMs": 3000,
+    "cmdBudgetMs": 10000,
+    "cmdTimeoutMs": 12000
+  }
+}

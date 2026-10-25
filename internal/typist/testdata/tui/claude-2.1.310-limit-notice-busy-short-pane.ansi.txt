@@ -1,0 +1,12 @@
+
+[38;5;246m[48;5;237m❯ [38;5;231mRun exactly this bash command in the foreground: python3 -c 'import time; time.sleep(40)'[39m
+
+[38;5;246m[49m●[39m Sleeping 40 seconds in the foreground[38;5;246m · 3s[39m
+[38;5;246m  ⎿  $ python3 -c 'import time; time.sleep(40)'[39m
+
+[38;5;174m·[39m [38;5;180mBaking…[38;5;174m [38;5;246m(9s · ↓[39m [38;5;246m220 tokens · thought for 1s)[39m
+                                                  [38;5;246mYou've used 75% of your weekly limit · resets Oct 28, 5am (UTC)[39m
+[38;5;244m─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵ bypass permissions on[38;5;246m (shift+tab to cycle)[39m

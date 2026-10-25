@@ -19,6 +19,8 @@ type API struct {
 	L *Library
 	// Session: the request carries a page session. CLIToken: it carries the runtime's cli-token.
 	Session, CLIToken func(*http.Request) bool
+	// MachineAgent: the request is the machine agent's own (the access snapshot is taken from nobody else).
+	MachineAgent func(*http.Request) bool
 	// APIRefusal is the dispatcher's answer to a caller with neither; refused false for anyone else.
 	APIRefusal func(*http.Request) (status int, body any, h http.Header, refused bool)
 	// PlatformAPI prefixes the platform's routes.
@@ -31,7 +33,9 @@ type API struct {
 	Push func(PushRequest) []int
 	// AppBase is the platform pages' mount point (a pushed board's link).
 	AppBase string
-	Log     func(level, msg string, err error)
+	// PublicToken checks the tokens of the public read (design-public).
+	PublicToken PublicConfig
+	Log         func(level, msg string, err error)
 }
 
 // Answer is a route's answer: status, value (JSON, gate.Raw, or nil for no body) and headers.

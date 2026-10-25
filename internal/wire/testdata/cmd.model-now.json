@@ -1,0 +1,5 @@
+{
+  "op": "model",
+  "body": {"opId": "op-mod2", "id": "tab-Vr7pL2aa", "model": "claude-opus-5-5", "effort": "low"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1853, "rev": 4}
+}

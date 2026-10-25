@@ -1,0 +1,5 @@
+{
+  "op": "project.create",
+  "body": {"opId": "op-pr1", "path": "/home/coder/workspace/model-gateway-hl"},
+  "result": {"r": "refused", "code": "forbidden"}
+}

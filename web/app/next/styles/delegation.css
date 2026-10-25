@@ -1,0 +1,218 @@
+/* ── Delegated chats: the card under the turn that started one, the way back in the child's header, the rows under
+   the parent in the sidebar ────── */
+
+.hx-delegs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--hx-space-2);
+}
+.hx-deleg {
+  width: min(100%, 560px);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-2) var(--hx-space-3);
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-window);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 160ms ease;
+}
+.hx-deleg:hover {
+  box-shadow:
+    0 0 0 1px var(--hx-border-strong),
+    var(--hx-shadow-sm);
+}
+.hx-deleg:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-deleg__ic {
+  flex: none;
+  color: var(--hx-accent);
+}
+.hx-deleg__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+}
+.hx-deleg__label {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-deleg__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+}
+.hx-deleg__model {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--hx-fg-3);
+}
+.hx-deleg__model::before {
+  content: '· ';
+}
+.hx-deleg__state {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-deleg__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.hx-deleg[data-tone='run'] .hx-deleg__state {
+  color: var(--hx-accent);
+}
+.hx-deleg[data-tone='run'] .hx-deleg__dot {
+  animation: hx-deleg-pulse 1.6s var(--hx-ease-in-out) infinite;
+}
+.hx-deleg[data-tone='ok'] .hx-deleg__state {
+  color: var(--hx-success);
+}
+.hx-deleg[data-tone='warn'] .hx-deleg__state {
+  color: var(--hx-warning);
+}
+.hx-deleg[data-tone='fail'] .hx-deleg__state {
+  color: var(--hx-danger);
+}
+.hx-deleg__go {
+  flex: none;
+  color: var(--hx-fg-3);
+  transition: transform var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-deleg:hover .hx-deleg__go {
+  transform: translateX(2px);
+}
+@keyframes hx-deleg-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (max-width: 600px) {
+  .hx-deleg__model {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-deleg[data-tone='run'] .hx-deleg__dot {
+    animation: none;
+  }
+}
+
+/* The child's header: the parent's name before the title, the way back to it. */
+.hx-header__parent {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  margin-right: 2px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm),
+    color var(--hx-dur-sm);
+}
+.hx-header__parent:hover {
+  background: var(--hx-shell-hover);
+  color: var(--hx-fg-1);
+}
+.hx-header__parent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-header__parent-sep {
+  flex: none;
+}
+
+/* The sidebar: a chat's delegated chats under it, folded by the chevron after its title. */
+.hx-tree {
+  display: flex;
+  flex-direction: column;
+}
+.hx-tree__kids {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 360ms var(--hx-ease-out);
+}
+.hx-tree__kids > div {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin-left: 14px;
+  padding-left: 6px;
+  border-left: 1px solid var(--hx-border-strong);
+}
+.hx-tree[aria-expanded='true'] > .hx-tree__kids {
+  grid-template-rows: 1fr;
+}
+.hx-item--delegated {
+  min-height: 28px;
+  font-size: var(--hx-text-sm);
+}
+.hx-item__fold {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 300ms var(--hx-ease-out),
+    transform 360ms var(--hx-ease-out),
+    background var(--hx-dur-sm);
+}
+.hx-item:hover .hx-item__fold,
+.hx-item__fold:focus-visible,
+.hx-item__fold[aria-expanded='false'] {
+  opacity: 1;
+}
+.hx-item__fold[aria-expanded='true'] {
+  transform: rotate(90deg);
+}
+.hx-item__fold:hover {
+  background: var(--hx-shell-hover);
+  color: var(--hx-fg-1);
+}
+@media (hover: none) {
+  .hx-item__fold {
+    opacity: 1;
+  }
+}

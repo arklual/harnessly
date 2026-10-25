@@ -1,0 +1,40 @@
+[38;5;231m●[39m [1mThe Last Keeper[0m
+
+  For forty-one years, Marguerite Olsen climbed the one hundred and twelve steps of the Breakwater Point lighthouse
+  every evening at dusk. She knew each step by its sound: the seventh creaked, the thirtieth rang hollow, and the
+  ninety-fourth had a chip on its edge she'd learned to step past without looking.
+
+  The Coast Guard had automated the light in 1989. A man in a pressed uniform came out with a clipboard and a box of
+  electronics and told her, kindly, that she was no longer needed. The lamp would turn itself on. The fog signal would
+  sound by itself. She could stay in the keeper's cottage, he said, as long as she liked.
+
+  So she stayed, and she kept climbing.
+
+  The sensor turned the lamp on at dusk, but it didn't wipe the salt off the lens, so Marguerite did. It didn't notice
+  when gulls nested in the gallery railing, or when rust started creeping under the paint on the north window. It didn't
+  know that the Pelletier boy took his father's skiff out past the shoals on nights he shouldn't, or that old Ambrose
+  Tull, who'd been half-blind since the war, still fished by the light's rhythm, counting four seconds dark and one
+  second bright.
+
+  On the night of the November storm, the power went out across the whole peninsula. The backup generator coughed twice
+  and died. Marguerite was already halfway up the stairs when the light went black.
+
+  She'd kept the old kerosene lamp. Nobody had asked her to, and nobody had told her not to. She carried it up the last
+  steps, her knees aching, the wind screaming through the gaps in the glass. She lit it with shaking hands and set it in
+  the old cradle behind the lens, and the great prism took the small flame and threw it miles out over the water.
+
+  She turned the lens by hand all night: four seconds dark, one second bright.
+
+  At dawn, the Pelletier boy's skiff limped into the harbor with a cracked hull and the boy shivering at the tiller. He
+  told everyone he'd been lost in the black until he saw the light, faint but steady, and followed it home.
+
+  The Coast Guard sent a new generator the next week. The man with the clipboard came too, and this time he took off his
+  hat when he knocked on her door.
+
+[38;5;246m✻[39m [38;5;246mCogitated for 15s · done 6:16 PM[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m❯ 
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;211m⏵⏵[39m [38;5;211mbypass[39m [38;5;211mpermissions[39m [38;5;211mon[38;5;246m (shift+tab[39m [38;5;246mto[39m [38;5;246mcycle)[39m
+

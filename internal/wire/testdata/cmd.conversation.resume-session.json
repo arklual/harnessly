@@ -1,0 +1,5 @@
+{
+  "op": "conversation.resume",
+  "body": {"opId": "op-rsm2", "provider": "claude", "sessionId": "d4618428-ad72-4227-8e97-f77e8c0f8c17", "cwd": "/home/coder/workspace/harnessly"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1852, "id": "tab-R7sSession1"}
+}

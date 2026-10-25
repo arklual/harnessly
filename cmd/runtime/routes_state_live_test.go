@@ -18,8 +18,7 @@ import (
 )
 
 // The routes of the state slice that read the running machine, through the whole gate: tmux, the core's agents and
-// layouts, the release's files, the machine agent's notifications and the answers to what the old runtime had no route
-// for.
+// layouts, the release's files and the machine agent's notifications.
 func TestStateSliceOnTheWholeGate(t *testing.T) {
 	g := newLiveGate(t)
 	do := func(method, path, body string, header map[string]string) (int, http.Header, string) {
@@ -54,23 +53,6 @@ func TestStateSliceOnTheWholeGate(t *testing.T) {
 		_ = req.Write(conn)
 		line, _ := bufio.NewReader(conn).ReadString('\n')
 		return strings.TrimSpace(line)
-	}
-
-	// Nothing the old runtime had no route for reaches it: a page, an unknown API path, an unknown socket, the setup
-	// shell.
-	for _, p := range []string{"/", "/agents/workspace", "/api/nothing", "/agents/api/x/y/z"} {
-		if code, h, body := do("GET", p, "", nil); code != 404 || body != `{"error":"Not found"}` || h.Get("Content-Type") != "application/json" {
-			t.Errorf("%s: %d %s %s", p, code, h.Get("Content-Type"), body)
-		}
-	}
-	if line := socket("/api/install?command=claude", nil); line != "HTTP/1.1 404 Not Found" {
-		t.Errorf("install socket: %s", line)
-	}
-	if line := socket("/api/elsewhere", nil); line != "HTTP/1.1 401 Unauthorized" {
-		t.Errorf("unknown socket without a session: %s", line)
-	}
-	if line := socket("/agents/api/elsewhere", map[string]string{"Cookie": g.cookie}); line != "HTTP/1.1 404 Not Found" {
-		t.Errorf("unknown socket: %s", line)
 	}
 
 	// tmux: the sessions, one session's pane.
@@ -157,7 +139,7 @@ func TestStateSliceOnTheWholeGate(t *testing.T) {
 	if code, _, _ := do("GET", "/api/cli/api-guide", "", nil); code != 403 {
 		t.Errorf("api guide without the token: %d", code)
 	}
-	if code, _, body := do("GET", "/api/manifest/", "", nil); code != 200 || body != `{"name":"Acme"}` {
+	if code, _, body := do("GET", "/api/manifest", "", nil); code != 200 || body != `{"name":"Acme"}` {
 		t.Errorf("manifest: %d %s", code, body)
 	}
 
@@ -176,8 +158,47 @@ func TestStateSliceOnTheWholeGate(t *testing.T) {
 		t.Errorf("docs notify by GET: %d", code)
 	}
 
+	// The design library's notification and access snapshot: only from the agent; a notification only into the library.
+	if code, _, body := do("POST", platformAPI+"/design/notify", `{"url":"/agents/design/p1","title":"A","body":"b"}`, agentCookie); code != 200 || body != `{"sent":0}` {
+		t.Errorf("design notify: %d %s", code, body)
+	}
+	if code, _, body := do("POST", platformAPI+"/design/notify", `{"url":"/agents/docs/a","title":"A"}`, agentCookie); code != 400 {
+		t.Errorf("design notify into the documents: %d %s", code, body)
+	}
+	for _, url := range []string{"/agents/design/../docs/a", "/agents/design/%2e%2e/x"} {
+		if code, _, body := do("POST", platformAPI+"/design/notify", `{"url":"`+url+`","title":"A"}`, agentCookie); code != 400 || !strings.Contains(body, "библиотеки") {
+			t.Errorf("design notify %s: %d %s", url, code, body)
+		}
+	}
+	if code, _, body := do("POST", platformAPI+"/design/notify", `{"url":"/agents/design/a..b","title":"A"}`, agentCookie); code != 200 {
+		t.Errorf("design notify with dots inside a name: %d %s", code, body)
+	}
+	if code, _, body := do("POST", platformAPI+"/docs/notify", `{"url":"/agents/docs/a..b","title":"A"}`, agentCookie); code != 200 {
+		t.Errorf("docs notify with dots inside a name: %d %s", code, body)
+	}
+	if code, _, body := do("POST", platformAPI+"/docs/notify", `{"url":"/agents/docs/x/../a","title":"A"}`, agentCookie); code != 400 {
+		t.Errorf("docs notify traversal: %d %s", code, body)
+	}
+	if code, _, body := do("POST", platformAPI+"/design/notify", `{"url":"/agents/design/p1","title":"A"}`, page); code != 403 || body != `{"error":"Forbidden"}` {
+		t.Errorf("design notify from a page: %d %s", code, body)
+	}
+	snap := `{"enforce":true,"at":"2026-10-20T09:00:00Z","projects":{},"team":{}}`
+	if code, _, body := do("POST", platformAPI+"/design/access", snap, page); code != 403 {
+		t.Errorf("design access from a page: %d %s", code, body)
+	}
+	if code, _, body := do("POST", platformAPI+"/design/access", snap, agentCookie); code != 200 || body != `{"ok":true}` {
+		t.Errorf("design access from the agent: %d %s", code, body)
+	}
+	future := `{"enforce":true,"at":"` + time.Now().Add(10*time.Minute).UTC().Format(time.RFC3339) + `","projects":{},"team":{}}`
+	if code, _, body := do("POST", platformAPI+"/design/access", future, agentCookie); code != 200 {
+		t.Errorf("design access from the future: %d %s", code, body)
+	}
+	if _, err := os.Stat(filepath.Join(g.data, "design-access.json")); err != nil {
+		t.Errorf("snapshot not kept: %v", err)
+	}
+
 	// The settings the page reads, through the gate.
-	if code, _, body := do("PATCH", "/agents/api/config/", `{"acmeLayout":{"left":1000}}`, page); code != 200 || body != `{"ok":true}` {
+	if code, _, body := do("PATCH", "/agents/api/config", `{"acmeLayout":{"left":1000}}`, page); code != 200 || body != `{"ok":true}` {
 		t.Errorf("config: %d %s", code, body)
 	}
 	if code, _, body := do("GET", "/api/config", "", page); code != 200 || !strings.Contains(body, `"acmeLayout":{"left":480,"collapsed":false}`) {

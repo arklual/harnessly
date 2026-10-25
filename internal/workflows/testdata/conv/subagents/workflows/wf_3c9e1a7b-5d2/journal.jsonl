@@ -1,0 +1,8 @@
+{"type":"launched"}
+{"type":"started","key":"v2:01","agentId":"a1c0ffee00000001a","label":"review:payments","phase":"Review"}
+{"type":"started","key":"v2:02","agentId":"a1c0ffee00000002b","label":"review:forms","phase":"Review"}
+{"type":"started","key":"v2:03","agentId":"a1c0ffee00000003c","label":"review:copy","phase":"Review"}
+{"type":"result","key":"v2:01","agentId":"a1c0ffee00000001a","result":{"findings":["form reads status too early"],"summary":"Two places read the widget answer without checking its status."}}
+{"type":"failed","key":"v2:03","agentId":"a1c0ffee00000003c"}
+{"type":"result","key":"v2:02","agentId":"a1c0ffee00000002b","result":"The form posts `orderId` while the widget sends `order_id`.\n\nDetails follow."}
+{"type":"started","key":"v2:04","agentId":"a1c0ffee00000004d","label":"fix:payments","phase":"Fix"}

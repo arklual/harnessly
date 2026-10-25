@@ -77,7 +77,7 @@ func TestEnglishWarningsAndFolderErrors(t *testing.T) {
 	if got := cfg.Launch("claude"); got.Models[0].Hint != "alias: the latest Fable model" {
 		t.Errorf("claude model hint: %q", got.Models[0].Hint)
 	}
-	if got := cfg.Launch("codex"); !slices.Equal(got.Warnings, []string{"~/.codex/models_cache.json not found: Codex creates it on its first run"}) {
+	if got := cfg.Launch("codex"); !slices.Equal(got.Warnings, []string{"~/.codex/models_cache.json not found (Codex creates it on its first run): the built-in model list is shown"}) {
 		t.Errorf("codex warnings: %q", got.Warnings)
 	}
 	write(t, filepath.Join(base, "x/models_cache.json"), `{"models":[{"slug":"gpt-5","visibility":"list","default_reasoning_level":"high","supported_reasoning_levels":[{"effort":"high"}]}]}`)

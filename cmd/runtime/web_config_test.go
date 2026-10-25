@@ -17,7 +17,7 @@ func TestPageConfigFromEnv(t *testing.T) {
 		"RUNTIME_TASK_KEY_RE":         "^(ABC|DEF)-[0-9]{1,6}$",
 		"RUNTIME_GITLAB_HOSTS":        "gitlab.example.com,gitlab.com",
 		"RUNTIME_PEOPLE":              "ada=Ada,bob=Bob",
-		"RUNTIME_WEB_FEATURES":        "efficiency, vault, unknown",
+		"RUNTIME_WEB_FEATURES":        "efficiency, vault, next-ui, unknown",
 		"RUNTIME_STAND_DOMAIN":        ".preview.example.com",
 		"RUNTIME_ARTIFACTS_URL":       "",
 		"RUNTIME_SPEED_POSTHOG_HOST":  "",
@@ -25,11 +25,12 @@ func TestPageConfigFromEnv(t *testing.T) {
 		"RUNTIME_WEB_COPY_FILE":       "",
 		"RUNTIME_LAYOUT_KEY":          "",
 		"RUNTIME_LAUNCH_DEFAULTS_KEY": "",
+		"RUNTIME_DESIGN_NAME":         "",
 	} {
 		t.Setenv(k, v)
 	}
 	c := pageConfigFromEnv()
-	if c.ProductName != "Acme" || c.Locale != "ru" || c.LayoutKey != "layout" || c.LaunchDefaultsKey != "launchDefaults" {
+	if c.ProductName != "Acme" || c.DesignName != "Designly" || c.Locale != "ru" || c.LayoutKey != "layout" || c.LaunchDefaultsKey != "launchDefaults" {
 		t.Fatalf("%+v", c)
 	}
 	if c.ArtifactsURL == nil || *c.ArtifactsURL != "https://docs.example.com" || c.BoardsURL == nil || *c.BoardsURL != "https://boards.example.com" {
@@ -41,7 +42,7 @@ func TestPageConfigFromEnv(t *testing.T) {
 	if c.TrackerIssueURL == nil || *c.TrackerIssueURL != "https://tracker.example.com/issue/{key}" || c.TaskKeyPattern != "(ABC|DEF)-[0-9]{1,6}" {
 		t.Fatalf("tracker %v %q", c.TrackerIssueURL, c.TaskKeyPattern)
 	}
-	if !c.Features["efficiency"] || !c.Features["vault"] || c.Features["chats"] || c.Features["design"] || len(c.Features) != 4 {
+	if !c.Features["efficiency"] || !c.Features["vault"] || c.Features["next-ui"] || c.Features["chats"] || c.Features["design"] || len(c.Features) != 4 {
 		t.Fatalf("features %v", c.Features)
 	}
 	if c.People["ada"] != "Ada" || len(c.GitlabHosts) != 2 || c.SpeedPosthogHost != nil {

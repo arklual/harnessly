@@ -43,6 +43,10 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 		a.docRoute(w, r)
 		return
 	}
+	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == "/design/event" {
+		a.designEventRoute(w, r)
+		return
+	}
 	if a.localToken != "" && r.Method == http.MethodPost && (r.URL.RequestURI() == "/state/commit" || r.URL.RequestURI() == "/state/patch") {
 		a.stateRoute(w, r)
 		return

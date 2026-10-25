@@ -133,16 +133,16 @@ func TestPreviewDevtoolsGolden(t *testing.T) {
 		t.Fatal(err)
 	}
 	secret := []byte(g.Secret)
-	oldRT := &gate.OldRuntime{DataDir: dir, TokenHeaders: []string{"x-acme-token"}}
+	cli := &gate.CLIToken{DataDir: dir, Headers: []string{"x-acme-token"}}
 	sessionOK := func(r *http.Request) bool {
 		c, err := r.Cookie("session-token")
 		// The page session in the goldens was signed when they were taken: it is checked at the goldens' clock, not
 		// today's, or the test fails once that session expires.
 		return err == nil && agent.VerifySession(secret, c.Value, time.UnixMilli(g.Start)) == nil
 	}
-	d := deps{Home: home, DataDir: dir, Old: oldRT, SessionOK: sessionOK, Tmux: tmux.New(tmux.Names{Socket: "hs-test-preview", Prefix: "hs-"}),
+	d := deps{Home: home, DataDir: dir, CLI: cli, SessionOK: sessionOK, Tmux: tmux.New(tmux.Names{Socket: "hs-test-preview", Prefix: "hs-"}),
 		APIRefusal: func(r *http.Request) (int, any, http.Header, bool) {
-			if sessionOK(r) || oldRT.CLITokenOK(r) {
+			if sessionOK(r) || cli.OK(r) {
 				return 0, nil, nil, false
 			}
 			return 401, map[string]string{"error": "Unauthorized"}, http.Header{"Content-Type": {"application/json"}}, true
@@ -295,7 +295,7 @@ func TestPreviewProxyThroughTheGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := deps{Home: home, DataDir: dir, Old: &gate.OldRuntime{DataDir: dir}, SessionOK: func(*http.Request) bool { return false },
+	d := deps{Home: home, DataDir: dir, CLI: &gate.CLIToken{DataDir: dir}, SessionOK: func(*http.Request) bool { return false },
 		APIRefusal: func(*http.Request) (int, any, http.Header, bool) { return 401, nil, nil, true }}
 	s := previewOf(d)
 	f.Add(f.AsBodyRoutes(previewBodyRoutes(d)...)...)

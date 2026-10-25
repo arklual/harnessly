@@ -71,7 +71,7 @@ func TestRuntime(t *testing.T) {
 	}
 	script(t, bin, "tmux", `echo "tmux 3.4"`)
 	script(t, bin, "git", `exit 1`)
-	script(t, bin, "codex", `echo "codex-cli 0.147.0"`)
+	script(t, bin, "codex", `if [ "$1" = login ]; then echo "Not logged in"; exit 1; fi; echo "codex-cli 0.147.0"`)
 	script(t, bin, "which", `echo "  /opt/codex/bin/codex "`)
 	if err := os.MkdirAll(filepath.Join(home, ".local", "bin"), 0o755); err != nil {
 		t.Fatal(err)
@@ -92,6 +92,9 @@ func TestRuntime(t *testing.T) {
 	if !r.Codex.Installed || *r.Codex.Version != "0.147.0" || *r.Codex.BinaryPath != "/opt/codex/bin/codex" {
 		t.Fatalf("codex %+v", r.Codex)
 	}
+	if r.Codex.LoggedIn {
+		t.Fatalf("codex is not signed in: %+v", r.Codex)
+	}
 	// Kept for half a minute.
 	script(t, bin, "git", `echo "git version 2.43.0"`)
 	if r2 := c.Runtime(); r2.Git.Installed {
@@ -107,5 +110,28 @@ func TestShellPathFallsBack(t *testing.T) {
 	c := &Checker{Env: []string{"PATH=/fallback"}, Shell: "/nonexistent/shell"}
 	if got := c.shellPath(); got != "/fallback" {
 		t.Fatal(got)
+	}
+}
+
+func TestCodexLogin(t *testing.T) {
+	home, bin := t.TempDir(), t.TempDir()
+	script(t, bin, "which", `echo /opt/codex/bin/codex`)
+	for name, tc := range map[string]struct {
+		body string
+		want bool
+	}{
+		"signed in":  {`if [ "$1" = login ]; then echo "Logged in using ChatGPT"; exit 0; fi; echo "codex-cli 0.152.0"`, true},
+		"signed out": {`if [ "$1" = login ]; then echo "Not logged in"; exit 1; fi; echo "codex-cli 0.152.0"`, false},
+		"timed out":  {`if [ "$1" = login ]; then sleep 5; fi; echo "codex-cli 0.152.0"`, true},
+	} {
+		script(t, bin, "codex", tc.body)
+		saved := cmdTimeout
+		cmdTimeout = 500 * time.Millisecond
+		c := &Checker{Home: home, Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + home}}
+		got := c.probeCodex(c.getenv("PATH"))
+		cmdTimeout = saved
+		if !got.Installed || got.LoggedIn != tc.want {
+			t.Errorf("%s: %+v", name, got)
+		}
 	}
 }

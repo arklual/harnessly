@@ -30,6 +30,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/sameorigin"
 )
 
 const (
@@ -131,6 +132,9 @@ type session struct {
 
 // ServeHTTP upgrades the request and serves one dictation until either side closes.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if sameorigin.Refuse(w, r) {
+		return
+	}
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true, CompressionMode: websocket.CompressionDisabled})
 	if err != nil {
 		return
@@ -186,7 +190,9 @@ func (ss *session) loop() {
 	defer func() {
 		ss.finish(nil)
 		close(ss.out)
-		_ = ss.ws.CloseNow()
+		if ss.ws != nil {
+			_ = ss.ws.CloseNow()
+		}
 	}()
 	for ev := range ss.events {
 		switch ev.kind {

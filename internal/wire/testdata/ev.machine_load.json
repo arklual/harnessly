@@ -1,0 +1,17 @@
+{
+  "f": "ev",
+  "ch": "machine",
+  "seq": 502,
+  "e": {
+    "type": "machine_load",
+    "load": {
+      "at": 1792656000000,
+      "cpu": 0.37,
+      "memUsed": 6442450944,
+      "memTotal": 16777216000,
+      "diskFree": 41000000000,
+      "diskTotal": 100000000000,
+      "busyAgents": 2
+    }
+  }
+}

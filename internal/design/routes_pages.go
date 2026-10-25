@@ -25,6 +25,9 @@ func (a *API) CLIPages(r *http.Request) Answer {
 	}
 	if r.Method == http.MethodGet {
 		project, _ := Query(r, "project")
+		if no := a.gate(r, project, RoleView); no != nil {
+			return *no
+		}
 		list, err := a.L.ListPages(project)
 		if err != nil {
 			return refuse(err)
@@ -40,6 +43,9 @@ func (a *API) CLIPages(r *http.Request) Answer {
 	}
 	body := Fields(raw)
 	project, _ := strField(body, "project")
+	if no := a.gate(r, project, RoleEdit); no != nil {
+		return *no
+	}
 	page, _ := strField(body, "page")
 	optional := func(k string) *string {
 		if s, ok := strField(body, k); ok {

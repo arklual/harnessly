@@ -1,0 +1,5 @@
+{
+  "op": "bg.stop",
+  "body": {"opId": "op-b1", "conversationId": "tab-k3Jx9QmZ", "taskId": "bash_3"},
+  "result": {"r": "accepted", "ch": "conv:tab-k3Jx9QmZ", "seq": 520}
+}

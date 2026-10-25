@@ -1,0 +1,160 @@
+/* The agent's terminal (the design's .hx-term): its real CLI session, pulled up from under the stage. */
+.hx-term {
+  --term-ease: cubic-bezier(0.45, 0, 0.2, 1);
+  flex: none;
+  height: 0;
+  overflow: hidden;
+  transition: height 460ms var(--term-ease);
+}
+.hx-term[data-open='true'] {
+  height: var(--term-h);
+}
+/* The open pane lies over the right of the window: the panel steps aside for it as the feed and the composer do. */
+.hx-main__body:has(.hx-stage[data-pane='true']) .hx-term {
+  padding-right: calc(var(--pane-w) + 12px);
+}
+.hx-term[data-drag='true'] {
+  transition: none;
+  user-select: none;
+}
+.hx-term__inner {
+  height: calc(var(--term-h) - 10px);
+  /* The panel keeps the composer's column: centred and no wider than it, so on a wide window it does not run
+     across the whole stage. */
+  width: min(100% - 20px, var(--hx-term-col));
+  margin: 0 auto 10px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: var(--hx-term-bg);
+  color: var(--hx-term-fg);
+  box-shadow:
+    0 0 0 1px var(--hx-term-line),
+    0 -12px 32px rgba(12, 14, 34, 0.1);
+  opacity: 0;
+  transform: translateY(24px) scale(0.985);
+  transform-origin: bottom center;
+  transition:
+    opacity 300ms ease 80ms,
+    transform 460ms var(--term-ease);
+}
+.hx-term[data-open='true'] .hx-term__inner {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 300ms ease 60ms,
+    transform 460ms var(--term-ease);
+}
+.hx-term__grip {
+  flex: none;
+  height: 12px;
+  display: grid;
+  place-items: center;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.hx-term__grip span {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  transition:
+    background 200ms var(--hx-ease-out),
+    width 300ms var(--hx-ease-out);
+}
+.hx-term__grip:hover span,
+.hx-term[data-drag='true'] .hx-term__grip span {
+  width: 48px;
+  background: rgba(255, 255, 255, 0.34);
+}
+.hx-term__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px 4px 16px;
+  font-size: var(--hx-text-sm);
+}
+.hx-term__head > .hx-icon {
+  color: var(--hx-term-dim);
+}
+.hx-term__title {
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-term__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  color: var(--hx-term-mute);
+}
+.hx-term__session {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-term-line);
+  font-size: 11.5px;
+  color: var(--hx-term-dim);
+}
+.hx-term__session .hx-agent {
+  width: 12px;
+  height: 12px;
+}
+.hx-term__btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-term-dim);
+  cursor: pointer;
+  transition:
+    background 200ms var(--hx-ease-out),
+    color 200ms var(--hx-ease-out);
+}
+.hx-term__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.hx-term__btn .hx-tip {
+  background: #f4f3f8;
+  color: var(--hx-term-bg);
+}
+.hx-term__body {
+  flex: 1;
+  min-height: 0;
+  /* One even margin around the screen (the head above has its own air). It is a margin, not a padding: the fit measures
+     the width and the height of the box xterm sits in, and a padding would be counted in as room for more columns.
+     xterm scrolls its screen itself, the box does not scroll: a box that did would take the wheel at the end of the
+     history and drag the screen by pixels. */
+  margin: 0 12px 12px;
+  overflow: hidden;
+  font-family: var(--hx-font-mono);
+  cursor: text;
+}
+@media (max-width: 900px) {
+  .hx-header__term {
+    display: none;
+  }
+  .hx-main__body:has(.hx-stage[data-pane='true']) .hx-term {
+    padding-right: 0;
+  }
+}
+/* xterm draws the session in the body; the design's lines were a picture of it. xterm is given the box's own colour
+   (--hx-term-bg) as its theme, so the screen and the box are one surface, with no strip of another black. */
+.hx-term__body .xterm {
+  height: 100%;
+  overscroll-behavior: contain;
+}
+.hx-term__body .xterm-viewport {
+  background: transparent !important;
+}

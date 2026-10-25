@@ -1,0 +1,4 @@
+{
+  "http": "open",
+  "response": {"tab": "gitlab", "target": "https://gitlab.example.com/group/project/-/merge_requests/12"}
+}

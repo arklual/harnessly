@@ -1,0 +1,11 @@
+{
+  "http": "apps",
+  "response": {
+    "at": 1792814793153,
+    "staleDays": 5,
+    "apps": [
+      {"id": "tracker", "state": "off", "reason": "no-token", "host": "tracker.example.com", "me": null, "sections": []},
+      {"id": "gitlab", "state": "failed", "reason": "unreachable", "host": "gitlab.example.com", "me": null, "sections": []}
+    ]
+  }
+}

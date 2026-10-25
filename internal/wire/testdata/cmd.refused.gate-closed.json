@@ -1,0 +1,5 @@
+{
+  "op": "decide",
+  "body": {"opId": "op-d1", "conversationId": "tab-k3Jx9QmZ", "permissionId": "p:tab-k3Jx9QmZ:41", "optionId": "1"},
+  "result": {"r": "refused", "code": "gate-closed"}
+}

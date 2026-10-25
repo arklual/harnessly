@@ -1,0 +1,6 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 521,
+  "e": {"type": "gate_updated", "id": "p:toolu_01ReadOutside", "state": {"k": "open", "refused": "menu-unmatched"}}
+}

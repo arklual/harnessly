@@ -1,0 +1,9 @@
+{
+  "http": "handoffDraft",
+  "response": {
+    "mode": "excerpt",
+    "text": "### The person (first request)\nAdd a fork to the chat menu.\n\n### Claude\nDone: the menu has «Ответвить».",
+    "tokens": 31,
+    "turns": 1
+  }
+}

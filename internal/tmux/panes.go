@@ -209,3 +209,9 @@ func leadingInt(s string) int64 {
 	}
 	return n
 }
+
+// Attached is how many tmux clients have the session open now (a person's `tmux attach`, a page's terminal); 0 when
+// tmux does not say.
+func (t *Tmux) Attached(name string) int {
+	return int(leadingInt(t.display(name, "#{session_attached}")))
+}

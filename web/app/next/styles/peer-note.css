@@ -1,0 +1,253 @@
+/* What other agents' sessions wrote (a `peer` entry): a compact card per message on the left, in the sender's color —
+   a dot, the name, what kind of message, when; the body folded to about six lines. */
+
+.hx-msg[data-kind='peer-note'] {
+  align-items: stretch;
+}
+.hx-pnotes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  min-width: 0;
+  max-width: 88%;
+}
+.hx-pnote {
+  --hx-pnote-c: var(--hx-fg-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 14px 10px 12px;
+  border: 1px solid var(--hx-border);
+  border-left: 3px solid color-mix(in srgb, var(--hx-pnote-c) 70%, transparent);
+  border-radius: var(--hx-radius-md);
+  background: color-mix(in srgb, var(--hx-pnote-c) 5%, var(--hx-bg-raised));
+}
+.hx-pnote[data-color='red'] {
+  --hx-pnote-c: var(--hx-p-red-500);
+}
+.hx-pnote[data-color='blue'] {
+  --hx-pnote-c: var(--hx-p-blue-500);
+}
+.hx-pnote[data-color='green'] {
+  --hx-pnote-c: var(--hx-p-green-500);
+}
+.hx-pnote[data-color='yellow'] {
+  --hx-pnote-c: var(--hx-p-amber-500);
+}
+.hx-pnote[data-color='purple'] {
+  --hx-pnote-c: var(--hx-p-violet-500);
+}
+.hx-pnote[data-color='orange'] {
+  --hx-pnote-c: #f97316;
+}
+.hx-pnote[data-color='pink'] {
+  --hx-pnote-c: #ec4899;
+}
+.hx-pnote[data-color='cyan'] {
+  --hx-pnote-c: #06b6d4;
+}
+html[data-theme='dark'] .hx-pnote {
+  background: color-mix(in srgb, var(--hx-pnote-c) 7%, var(--hx-bg-raised));
+}
+
+.hx-pnote__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--hx-text-xs);
+  line-height: 18px;
+}
+.hx-pnote__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-pnote-c);
+}
+.hx-pnote__who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+button.hx-pnote__who {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+.hx-pnote__who--link {
+  cursor: pointer;
+  transition: color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-pnote__who--link:hover {
+  color: var(--hx-accent);
+  text-decoration: underline;
+}
+.hx-pnote__who--link:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.hx-pnote__model {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-pnote__kind {
+  flex: none;
+  color: var(--hx-fg-2);
+}
+.hx-pnote__at {
+  flex: none;
+  margin-left: auto;
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+.hx-pnote__sum {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+  overflow-wrap: anywhere;
+}
+
+.hx-pnote__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.hx-pnote__text {
+  max-height: 132px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  mask-image: linear-gradient(to bottom, #000 65%, transparent);
+  transition: max-height var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-pnote__body[data-open='true'] .hx-pnote__text {
+  max-height: none;
+  mask-image: none;
+}
+.hx-pnote__text .hx-md {
+  font-size: var(--hx-text-sm);
+}
+/* A long path wraps inside the card rather than running out of it. */
+.hx-pnote__text .hx-ref {
+  height: auto;
+  min-height: 22px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.hx-pnote__more {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  transition: color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-pnote__more:hover {
+  color: var(--hx-fg-1);
+}
+.hx-pnote__more:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (max-width: 640px) {
+  .hx-pnotes {
+    max-width: 100%;
+  }
+}
+
+/* ── The harness's note: one quiet line, its details under a fold ── */
+.hx-sysnote {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 88%;
+}
+.hx-sysnote__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  line-height: 18px;
+  text-align: left;
+}
+button.hx-sysnote__head {
+  cursor: pointer;
+  transition: color var(--hx-dur-sm) var(--hx-ease-out);
+}
+button.hx-sysnote__head:hover {
+  color: var(--hx-fg-2);
+}
+button.hx-sysnote__head:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.hx-sysnote__ic {
+  flex: none;
+}
+.hx-sysnote__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-sysnote__chev {
+  flex: none;
+  transition: transform var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-sysnote[data-open='true'] .hx-sysnote__chev {
+  transform: rotate(90deg);
+}
+.hx-sysnote__more {
+  margin-left: 22px;
+  padding-left: 10px;
+  border-left: 1px solid var(--hx-border-strong);
+  font-size: var(--hx-text-xs);
+  line-height: 18px;
+  color: var(--hx-fg-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: hx-sysnote-in 180ms var(--hx-ease-out);
+}
+.hx-sysnote__more[data-state='closing'] {
+  animation: hx-sysnote-out 160ms var(--hx-ease-out) forwards;
+}
+@keyframes hx-sysnote-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+@keyframes hx-sysnote-out {
+  to {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-sysnote__more,
+  .hx-sysnote__more[data-state='closing'] {
+    animation-duration: 1ms;
+  }
+}

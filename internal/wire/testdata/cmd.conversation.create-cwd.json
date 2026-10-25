@@ -1,0 +1,5 @@
+{
+  "op": "conversation.create",
+  "body": {"opId": "op-n2", "cwd": "/home/coder", "provider": "codex", "model": null},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1851, "id": "tab-N3wConv02"}
+}

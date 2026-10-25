@@ -1,0 +1,12 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 540,
+  "e": {
+    "type": "pictures_set",
+    "pictures": [
+      {"id": "a1b2c3d4e5f6", "text": "/tmp/claude-1001/-home-coder-workspace/3f1d2a9e/scratchpad/checkout.png"},
+      {"id": "0c1d2e3f4a5b", "text": "/home/coder/.harnessly/uploads/unknown/unknown/1792894270382-e2af4dde-image.png"}
+    ]
+  }
+}

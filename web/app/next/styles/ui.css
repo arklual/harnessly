@@ -1,0 +1,1109 @@
+/* The small primitives of the new interface (next/ui), after the design's components.css, mobile.css and motion.css:
+   icon, buttons, hint, spinner, skeleton, segmented choice, switch, bottom sheet and toasts. */
+
+/* A ring that turns while a control waits; it shows only inside [data-busy]. */
+.hx-spin {
+  display: none;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  animation: hx-spin 900ms linear infinite;
+}
+[data-busy='true'] > .hx-spin {
+  display: inline-block;
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+.hx-btn {
+  --h: var(--hx-control-md);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hx-space-2);
+  height: var(--h);
+  padding: 0 var(--hx-space-4);
+  border-radius: var(--hx-radius-full);
+  border: 1px solid var(--hx-border-strong);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform var(--hx-dur-xs) var(--hx-ease-out),
+    background var(--hx-dur-sm),
+    box-shadow var(--hx-dur-sm),
+    border-color var(--hx-dur-sm),
+    opacity var(--hx-dur-sm);
+}
+.hx-btn:hover {
+  background: var(--hx-bg-hover);
+  border-color: var(--hx-p-gray-300);
+}
+.hx-btn:active {
+  transform: scale(0.97);
+}
+.hx-btn:focus-visible,
+.hx-round:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+.hx-btn[data-variant='primary'] {
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  border-color: transparent;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    var(--hx-shadow-sm);
+}
+.hx-btn[data-variant='primary']:hover {
+  box-shadow: 0 6px 18px rgba(12, 14, 34, 0.22);
+  transform: translateY(-1px);
+}
+.hx-btn[data-variant='primary']:active {
+  transform: scale(0.97);
+}
+.hx-btn[data-variant='ghost'] {
+  background: transparent;
+  border-color: transparent;
+  color: var(--hx-fg-2);
+}
+.hx-btn[data-variant='ghost']:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-btn[data-variant='danger'] {
+  background: var(--hx-danger);
+  border-color: transparent;
+  color: #fff;
+}
+.hx-btn[data-size='sm'] {
+  --h: var(--hx-control-sm);
+  padding: 0 var(--hx-space-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-btn[data-size='lg'] {
+  --h: var(--hx-control-lg);
+  padding: 0 var(--hx-space-5);
+}
+.hx-btn[data-block] {
+  width: 100%;
+}
+.hx-btn[data-shape='icon'] {
+  width: var(--h);
+  padding: 0;
+}
+.hx-btn .hx-icon {
+  transition: transform var(--hx-dur-sm) var(--hx-ease-spring);
+}
+.hx-btn:hover .hx-icon[data-wiggle] {
+  transform: rotate(-12deg) scale(1.1);
+}
+.hx-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+/* Waiting: the text stays (the width holds), the ring shows beside it and the button takes no second click. */
+.hx-btn[data-busy='true'] {
+  cursor: progress;
+  opacity: 1;
+}
+.hx-btn[data-busy='true'] > .hx-btn__text {
+  opacity: 0.7;
+}
+
+.hx-round {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--hx-border-strong);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition:
+    transform var(--hx-dur-sm) var(--hx-ease-spring),
+    background var(--hx-dur-sm),
+    color var(--hx-dur-sm),
+    box-shadow var(--hx-dur-sm),
+    opacity var(--hx-dur-sm);
+}
+.hx-round > * {
+  grid-area: 1 / 1;
+}
+.hx-round:hover {
+  color: var(--hx-fg-1);
+  transform: scale(1.06);
+}
+.hx-round:active {
+  transform: scale(0.94);
+}
+.hx-round[data-variant='accent'] {
+  background: var(--hx-accent);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--hx-accent) 40%, transparent);
+}
+.hx-round[data-variant='ghost'] {
+  border-color: transparent;
+  background: transparent;
+}
+.hx-round[data-variant='ghost']:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-round[data-size='sm'] {
+  width: 32px;
+  height: 32px;
+}
+.hx-round:disabled {
+  opacity: 0.4;
+  transform: none;
+  cursor: default;
+  box-shadow: none;
+}
+.hx-round[data-busy='true'] {
+  cursor: progress;
+  opacity: 1;
+}
+.hx-round[data-busy='true'] > .hx-icon {
+  opacity: 0;
+}
+
+/* ── Hint (ui/tooltip.tsx): placed by placeFloating, top first, below when there is no room ── */
+.hx-tip-pos {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  translate: var(--x, 0) var(--y, 0);
+  pointer-events: none;
+}
+.hx-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  box-shadow: 0 8px 24px rgba(12, 14, 34, 0.18);
+  font-size: 12px;
+  font-weight: var(--hx-weight-medium);
+  line-height: 18px;
+  white-space: nowrap;
+}
+.hx-tip:has(kbd) {
+  padding-right: 6px;
+}
+.hx-tip-pos > .hx-tip {
+  transform-origin: 50% 100%;
+  animation: hx-tip-in 260ms var(--hx-ease-out) backwards;
+}
+.hx-tip-pos > .hx-tip[data-side='bottom'] {
+  transform-origin: 50% 0;
+  animation-name: hx-tip-in-below;
+}
+.hx-tip-pos > .hx-tip[data-state='closing'] {
+  animation: hx-tip-out 140ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+.hx-tip-pos > .hx-tip[data-side='bottom'][data-state='closing'] {
+  animation-name: hx-tip-out-below;
+}
+@keyframes hx-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@keyframes hx-tip-in-below {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+@keyframes hx-tip-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@keyframes hx-tip-out-below {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+.hx-tip kbd {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--hx-primary-fg) 16%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--hx-primary-fg) 10%, transparent);
+  font-family: var(--hx-font-ui);
+  font-size: 11px;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-tip kbd:first-of-type {
+  margin-left: 4px;
+}
+@media (hover: none) {
+  .hx-tip-pos {
+    display: none;
+  }
+}
+
+/* ── Popover (Base UI): the popup's own class draws it; the entry and the exit are shared ── */
+.hx-pop-pos {
+  z-index: 50;
+}
+.hx-pop-pos > * {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 180ms var(--hx-ease-out),
+    transform 180ms var(--hx-ease-out);
+}
+.hx-pop-pos > [data-starting-style],
+.hx-pop-pos > [data-ending-style] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+}
+.hx-pop-pos > [data-ending-style] {
+  transition-duration: 160ms;
+  transition-timing-function: ease-in;
+}
+
+/* A hover card kept inside the window by useFitInViewport (ui/use-hover-intent.ts): a shift, a scroll when too tall */
+.hx-hover-fit {
+  translate: var(--hover-dx, 0px) 0;
+}
+.hx-hover-fit[data-fit-tall] {
+  max-height: var(--hover-max-h);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* A hint that shows on hover of its own parent (.hx-tipped), no portal: sidebar and header buttons. */
+.hx-tipped {
+  position: relative;
+}
+.hx-tipped > .hx-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px 5px 10px;
+  border-radius: 9px;
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  box-shadow: 0 8px 24px rgba(12, 14, 34, 0.18);
+  font-size: 12px;
+  font-weight: var(--hx-weight-medium);
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px) scale(0.98);
+  transition:
+    opacity 140ms var(--hx-ease-out),
+    transform 200ms var(--hx-ease-out);
+}
+.hx-tipped > .hx-tip:not(:has(kbd)) {
+  padding-right: 10px;
+}
+.hx-tipped > .hx-tip[data-align='start'] {
+  left: 0;
+  transform: translate(0, 4px) scale(0.98);
+}
+.hx-tipped > .hx-tip[data-align='end'] {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px) scale(0.98);
+}
+.hx-tipped > .hx-tip kbd {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--hx-primary-fg) 16%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--hx-primary-fg) 10%, transparent);
+  font-family: var(--hx-font-ui);
+  font-size: 11px;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-tipped > .hx-tip kbd:first-of-type {
+  margin-left: 4px;
+}
+.hx-tipped > .hx-tip em {
+  margin: 0 2px 0 6px;
+  font-style: normal;
+  font-weight: var(--hx-weight-regular);
+  color: color-mix(in srgb, var(--hx-primary-fg) 60%, transparent);
+}
+.hx-tipped:hover > .hx-tip,
+.hx-tipped:focus-visible > .hx-tip {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  transition:
+    opacity 180ms var(--hx-ease-out) 450ms,
+    transform 260ms var(--hx-ease-out) 450ms;
+}
+.hx-tipped:hover > .hx-tip[data-align],
+.hx-tipped:focus-visible > .hx-tip[data-align] {
+  transform: none;
+}
+.hx-tipped[aria-expanded='true'] > .hx-tip {
+  display: none;
+}
+.hx-tipped > .hx-tip[data-pos='below'] {
+  bottom: auto;
+  top: calc(100% + 10px);
+}
+/* ui/css-tips.ts: no room on the hint's side flips it (it never covers its control), and slides it into the window */
+.hx-tipped > .hx-tip {
+  translate: var(--tip-dx, 0px) 0;
+}
+.hx-tipped > .hx-tip[data-flip='bottom'] {
+  bottom: auto;
+  top: calc(100% + 10px);
+}
+.hx-tipped > .hx-tip[data-flip='top'] {
+  top: auto;
+  bottom: calc(100% + 10px);
+}
+/* Coming from a hint that was showing: the next one is there at once, the row reads as one */
+.hx-root[data-tips-warm] .hx-tipped:hover > .hx-tip {
+  transition-delay: 0ms;
+}
+
+/* ── Skeleton ────────────────────────────────────────── */
+.hx-sk {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--hx-bg-active);
+  animation: hx-sk-in 320ms ease backwards;
+}
+.hx-sk::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 260%;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    color-mix(in srgb, var(--hx-bg-raised) 60%, transparent) 50%,
+    transparent 65%
+  );
+  transform: translateX(-80%);
+  animation: hx-sk-sweep 1.7s linear infinite;
+}
+
+/* ── Segmented choice ────────────────────────────────── */
+.hx-segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--hx-radius-sm);
+  background: var(--hx-bg-active);
+}
+.hx-segmented > button {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 280ms var(--hx-ease-out),
+    color 280ms var(--hx-ease-out),
+    box-shadow 280ms var(--hx-ease-out);
+}
+.hx-segmented > button[aria-checked='true'] {
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  box-shadow: var(--hx-shadow-sm);
+}
+.hx-segmented > button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* ── Switch ──────────────────────────────────────────── */
+.hx-switch {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-active);
+  cursor: pointer;
+  transition: background 220ms ease;
+}
+.hx-switch i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 280ms var(--hx-m-ease);
+}
+.hx-switch[aria-checked='true'] {
+  background: var(--hx-accent);
+}
+.hx-switch[aria-checked='true'] i {
+  transform: translateX(14px);
+}
+
+/* ── Bottom sheet (phone) ────────────────────────────── */
+/* ui/sheet.tsx. .hx-sheet is the sheet everywhere; .hx-sheet-phone is a popover that becomes the same sheet only below
+   the phone breakpoint (its wide look stays its own). As tall as the content up to 90% of the screen; the content
+   scrolls inside, the grip stays. */
+.hx-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 94;
+  background: var(--hx-scrim);
+  animation: hx-fade-in 280ms var(--hx-m-ease) backwards;
+  transition: opacity 280ms var(--hx-m-ease);
+}
+.hx-sheet-scrim[data-state='closing'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-sheet {
+  --hx-sheet-dy: 0px;
+  position: fixed;
+  left: calc(8px + env(safe-area-inset-left));
+  right: calc(8px + env(safe-area-inset-right));
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  max-height: 90dvh;
+  overflow: hidden;
+  padding: 6px 8px 8px;
+  border-radius: 26px;
+  border: 1px solid var(--hx-border-strong);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  outline: none;
+  font-size: var(--hx-text-md);
+  transform: translate3d(0, var(--hx-sheet-dy), 0);
+  animation: hx-msheet-in 420ms var(--hx-m-ease) backwards;
+  transition: transform 280ms var(--hx-m-ease);
+}
+.hx-sheet.hx-sheet--pop {
+  position: fixed;
+  top: auto;
+  width: auto;
+  max-width: none;
+  height: auto;
+  margin: 0;
+}
+.hx-sheet__body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hx-sheet[data-drag='true'],
+.hx-sheet-phone[data-drag='true'] {
+  transition: none;
+}
+.hx-sheet[data-state='closing'] {
+  animation: hx-msheet-out 280ms var(--hx-m-ease) forwards;
+  pointer-events: none;
+}
+.hx-sheet__grip {
+  flex: none;
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: 2px auto 10px;
+  border-radius: 3px;
+  background: var(--hx-border-strong);
+}
+/* The grip of a popover that is a sheet only on the phone. */
+:not(.hx-sheet) > .hx-sheet__grip {
+  display: none;
+}
+@media not all and (max-width: 900px) {
+  .hx-sheet-scrim[data-phone='true'] {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .hx-sheet-phone {
+    --hx-sheet-dy: 0px;
+    position: fixed !important;
+    top: auto !important;
+    left: calc(8px + env(safe-area-inset-left)) !important;
+    right: calc(8px + env(safe-area-inset-right)) !important;
+    bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    z-index: 95 !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: 90dvh !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-sizing: border-box;
+    border-radius: 26px;
+    border: 1px solid var(--hx-border-strong);
+    background: var(--hx-bg-raised);
+    box-shadow: var(--hx-shadow-overlay);
+    transform: translate3d(0, var(--hx-sheet-dy), 0) !important;
+    transform-origin: 50% 100%;
+    /* The rise and the fall move `translate`: an animation cannot override the important transform the drag needs. */
+    animation: hx-msheet-rise 420ms var(--hx-m-ease) backwards !important;
+    transition: transform 280ms var(--hx-m-ease) !important;
+  }
+  .hx-sheet-phone[data-state='closing'],
+  .hx-sheet-phone[data-ending-style] {
+    animation: hx-msheet-fall 280ms var(--hx-m-ease) forwards !important;
+    pointer-events: none;
+  }
+  .hx-sheet-phone[data-drag='true'] {
+    transition: none !important;
+  }
+  .hx-sheet-phone > .hx-sheet__grip {
+    display: block;
+    position: sticky;
+    top: 0;
+    margin: 6px auto 6px;
+  }
+  /* A positioner of Base UI holding a sheet: the sheet places itself, the positioner only stops moving it. */
+  .hx-sheet-pos {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    z-index: 95 !important;
+    transform: none !important;
+    width: 100% !important;
+  }
+}
+
+/* ── Toasts ──────────────────────────────────────────── */
+.hx-toasts {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 200;
+  width: min(380px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+/* A notice's place in the stack: it opens as the notice comes and folds as it leaves, so the stack never jumps. */
+.hx-toast-slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  padding-bottom: 8px;
+  animation: hx-toast-slot-in 360ms var(--hx-ease-out) backwards;
+  transition:
+    grid-template-rows 260ms var(--hx-ease-out),
+    padding-bottom 260ms var(--hx-ease-out);
+}
+.hx-toast-slot[data-leaving='true'] {
+  grid-template-rows: 0fr;
+  padding-bottom: 0;
+}
+.hx-toast-slot__clip {
+  min-height: 0;
+}
+@keyframes hx-toast-slot-in {
+  from {
+    grid-template-rows: 0fr;
+    padding-bottom: 0;
+  }
+}
+.hx-toast {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  animation: hx-toast-in 360ms var(--hx-ease-out) backwards;
+  transition:
+    opacity 220ms ease-in,
+    transform 220ms ease-in;
+}
+.hx-toast[data-leaving='true'] {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+}
+.hx-toast__icon {
+  color: var(--hx-fg-3);
+}
+.hx-toast[data-tone='error'] .hx-toast__icon {
+  color: var(--hx-danger);
+}
+.hx-toast[data-tone='success'] .hx-toast__icon {
+  color: var(--hx-success);
+}
+.hx-toast__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-toast__desc {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-toast__action {
+  flex: none;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-app);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  line-height: 16px;
+  cursor: pointer;
+}
+.hx-toast__action:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+
+/* On the phone the notices stand above the chat's field (and the safe area under it), never over the field or the
+   header, as wide as the screen allows; the newest is the lowest, nearest the thumb, and a swipe sideways takes it away. */
+@media (max-width: 900px) {
+  .hx-toasts {
+    top: auto;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    width: calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+  .hx-root:has(.hx-dock .hx-composer) .hx-toasts {
+    bottom: calc(132px + env(safe-area-inset-bottom));
+  }
+  .hx-toast {
+    min-height: 52px;
+    border-radius: 16px;
+    touch-action: pan-y;
+    transform: translateX(var(--hx-toast-dx, 0px));
+    animation-name: hx-toast-up;
+  }
+  .hx-toast[data-drag='true'] {
+    transition: none;
+  }
+  .hx-toast[data-leaving='true'] {
+    transform: translate(var(--hx-toast-dx, 0px), 8px) scale(0.98);
+  }
+  .hx-toast__action {
+    min-height: 36px;
+    padding: 0 14px;
+    font-size: var(--hx-text-sm);
+  }
+}
+@keyframes hx-toast-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-sk::after {
+    animation: none;
+  }
+}
+
+@keyframes hx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hx-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-sk-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-sk-sweep {
+  from {
+    transform: translateX(-80%);
+  }
+  to {
+    transform: translateX(18.46%);
+  }
+}
+@keyframes hx-check {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+@keyframes hx-msheet-in {
+  from {
+    transform: translate3d(0, 110%, 0);
+  }
+}
+@keyframes hx-msheet-out {
+  to {
+    transform: translate3d(0, 110%, 0);
+  }
+}
+@keyframes hx-msheet-rise {
+  from {
+    translate: 0 110%;
+  }
+}
+@keyframes hx-msheet-fall {
+  to {
+    translate: 0 110%;
+  }
+}
+@keyframes hx-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+}
+
+/* A picture's square is a button that opens it full size. */
+button[data-pic='true'] {
+  padding: 0;
+  border: 0;
+  font: inherit;
+  cursor: zoom-in;
+}
+button[data-pic='true']:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 1px;
+}
+
+/* The picture full size over a scrim: it grows from a little smaller in 240 ms and shrinks out in 200 ms. */
+.hx-imgview {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+  background: var(--hx-scrim);
+  backdrop-filter: blur(6px);
+  outline: 0;
+  cursor: zoom-out;
+  /* Pinch, pan and the double tap are ours (ui/use-image-zoom.ts). */
+  touch-action: none;
+  animation: hx-in-fade 240ms var(--hx-ease-out) backwards;
+  transition: opacity 200ms ease-in;
+}
+.hx-imgview[data-state='closing'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-imgview__img {
+  max-width: 100%;
+  max-height: calc(100dvh - 120px);
+  border-radius: var(--hx-radius-md);
+  box-shadow: var(--hx-shadow-overlay);
+  object-fit: contain;
+  animation: hx-in-scale 240ms var(--hx-ease-out) backwards;
+  transition: transform 200ms ease-in;
+}
+.hx-imgview__img {
+  cursor: zoom-in;
+}
+.hx-imgview[data-zoomed] .hx-imgview__img {
+  cursor: grab;
+}
+.hx-imgview__img[data-ease] {
+  transition:
+    transform 200ms ease-in,
+    translate 180ms var(--hx-ease-out),
+    scale 180ms var(--hx-ease-out);
+}
+.hx-imgview[data-state='closing'] .hx-imgview__img {
+  transform: scale(0.96);
+}
+.hx-imgview__name {
+  position: absolute;
+  left: 24px;
+  right: 72px;
+  bottom: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-1);
+}
+.hx-imgview__cap {
+  position: absolute;
+  left: 24px;
+  right: 72px;
+  bottom: 38px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--hx-fg-2);
+}
+.hx-imgview__x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  box-shadow: var(--hx-shadow-overlay);
+  cursor: pointer;
+}
+.hx-imgview__x:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-imgview__pos {
+  color: var(--hx-fg-3);
+}
+/* The neighbours: a round button on each side, over the scrim. */
+.hx-imgview__step {
+  position: absolute;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--hx-bg-raised) 88%, transparent);
+  color: var(--hx-fg-1);
+  box-shadow: var(--hx-shadow-overlay);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    background var(--hx-dur-sm),
+    transform 160ms var(--hx-ease-out);
+}
+.hx-imgview__step[data-dir='prev'] {
+  left: 16px;
+}
+.hx-imgview__step[data-dir='next'] {
+  right: 16px;
+}
+.hx-imgview__step:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-imgview__step:active {
+  transform: translateY(-50%) scale(0.94);
+}
+/* On a touch screen a zoomed picture is the whole stage: the side buttons step aside so a pinch that starts at
+   the edge reaches the picture (a swipe steps again once it is fitted). */
+@media (pointer: coarse) {
+  .hx-imgview__step {
+    transition:
+      background var(--hx-dur-sm),
+      transform 160ms var(--hx-ease-out),
+      opacity 160ms var(--hx-ease-out);
+  }
+  .hx-imgview[data-zoomed] .hx-imgview__step {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* ── Load failed: why, and «Повторить» (ui/load-failed.tsx) ── */
+.hx-lf {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hx-space-3);
+  color: var(--hx-fg-2);
+  animation: hx-sk-in 300ms ease backwards;
+}
+.hx-lf__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--hx-danger);
+}
+.hx-lf__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-lf__title {
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-lf__reason {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-lf[data-size='page'] {
+  flex-direction: column;
+  max-width: 360px;
+  margin: var(--hx-space-10) auto 0;
+  text-align: center;
+}
+.hx-lf[data-size='page'] .hx-lf__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--hx-bg-active);
+}
+.hx-lf[data-size='pane'] {
+  flex-direction: column;
+  padding: 28px 12px;
+  text-align: center;
+}
+.hx-lf[data-size='inline'] {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  padding: var(--hx-space-2) 0;
+  font-size: var(--hx-text-sm);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-lf {
+    animation: none;
+  }
+}
+
+/* ── Swap: a skeleton and its content on one spot (ui/swap.tsx) ── */
+.hx-swap {
+  position: relative;
+}
+.hx-swap[data-phase='swapping'] > .hx-swap__sk {
+  position: absolute;
+  inset: 0 0 auto;
+  pointer-events: none;
+  animation: hx-swap-out 240ms ease forwards;
+}
+.hx-swap[data-phase='swapping'] > .hx-swap__content {
+  animation: hx-swap-in 240ms ease backwards;
+}
+/* A content that loads where it will stand (a frame): in place, unseen, until the crossfade brings it. */
+.hx-swap__content[data-held='true'] {
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes hx-swap-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-swap-out {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-swap[data-phase='swapping'] > .hx-swap__sk {
+    display: none;
+  }
+  .hx-swap[data-phase='swapping'] > .hx-swap__content {
+    animation: none;
+  }
+}
+
+/* A picture that did not load is a button on its own square: «Повторить» asks it again (ui/attachment-thumb.tsx). */
+:is(.hx-attach__thumb, .hx-queue__file)[data-broken='true'] {
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: var(--hx-danger);
+  cursor: pointer;
+}
+:is(.hx-attach__thumb, .hx-queue__file)[data-broken='true']:hover {
+  background: var(--hx-bg-hover);
+}
+
+/* ── A row carried by hand (ui/use-drag) ──
+   The list says it is carrying (`data-dragging="<kind>"`) and holds the drag until the new order has come
+   (`data-drag-held`). The carried row (`data-dragging="true"`) moves by a transform written once a frame, so it has no
+   easing of its own until it is let go (`data-drag-settle`); its neighbours (`data-drag-shift`) ease aside. The boxes
+   around it (`data-drag-host`) let it out of their clip and over what follows them. While it is carried nothing under
+   the pointer hovers, tips or opens: the list alone takes the pointer. */
+.hx-root {
+  --hx-drag-ms: 180ms;
+}
+[data-drag-held][data-dragging] {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+[data-drag-held][data-dragging] * {
+  pointer-events: none;
+}
+[data-drag-held] [data-dragging='true'] {
+  position: relative;
+  z-index: 5;
+  transition: none;
+  will-change: transform;
+}
+[data-drag-held] [data-drag-shift],
+[data-drag-held] [data-dragging='true'][data-drag-settle] {
+  transition: transform var(--hx-drag-ms, 180ms) var(--hx-ease-out);
+}
+/* Without its clip a box in a grid or a flex would grow to its longest line: it keeps its width, the rows their «…». */
+[data-drag-held] [data-drag-host] {
+  position: relative;
+  z-index: 5;
+  min-width: 0;
+  overflow: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-drag-held] [data-drag-shift],
+  [data-drag-held] [data-dragging='true'][data-drag-settle] {
+    transition: none;
+  }
+}

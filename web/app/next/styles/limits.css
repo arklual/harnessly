@@ -1,0 +1,206 @@
+/* What is left of the agent's subscription, by the model pill: the chip («5ч 94% нед 81%») and its card. The card's
+   gauge is the design's .hx-gauge of the Economics tool (lib/hx/components.css); the design has no chip, so the chip is
+   built from the pill's and the context ring's pieces. A window's colour is how much is left: plenty, low, out. */
+
+.hx-lim {
+  position: relative;
+  flex: none;
+  min-width: 0;
+}
+.hx-lim__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-lim__chip:hover,
+.hx-lim__chip[aria-expanded='true'] {
+  background: var(--hx-bg-hover);
+}
+.hx-lim__chip > .hx-icon {
+  color: var(--hx-fg-3);
+}
+.hx-lim__win {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.hx-lim__win small {
+  color: var(--hx-fg-3);
+  font-size: inherit;
+  font-weight: var(--hx-weight-regular);
+}
+.hx-lim__win[data-level='low'] {
+  color: var(--hx-warning);
+}
+.hx-lim__win[data-level='out'] {
+  color: var(--hx-danger);
+}
+
+/* The card: opens over the field like the picker's, and leaves with its own exit */
+.hx-lim__pop {
+  position: absolute;
+  left: -4px;
+  bottom: calc(100% + 10px);
+  z-index: 40;
+  box-sizing: border-box;
+  width: 288px;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    0 0 0 1px var(--hx-border),
+    0 18px 48px rgba(12, 14, 34, 0.14);
+  transform-origin: 24px 100%;
+  animation: hx-lim-in 380ms var(--hx-ease-out) backwards;
+}
+.hx-lim__pop[data-state='closing'] {
+  animation: hx-lim-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-lim-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+    filter: blur(4px);
+  }
+}
+@keyframes hx-lim-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+    filter: blur(2px);
+  }
+}
+.hx-lim__title {
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-lim__note,
+.hx-lim__foot {
+  margin: 8px 0 0;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+
+/* The design's gauge: label and what is left, a meter, the reset, and the forecast under it */
+.hx-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 2px;
+}
+.hx-gauge__top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+.hx-gauge__top b {
+  font-weight: var(--hx-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--hx-fg-1);
+}
+.hx-gauge[data-level='low'] .hx-gauge__top b {
+  color: var(--hx-warning);
+}
+.hx-gauge[data-level='out'] .hx-gauge__top b {
+  color: var(--hx-danger);
+}
+.hx-gauge__sub {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-gauge__fc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-2);
+}
+.hx-gauge__fc small {
+  font-size: inherit;
+  color: var(--hx-fg-3);
+}
+.hx-gauge__fc[data-tone='warning'] > span {
+  color: var(--hx-warning);
+}
+.hx-gauge__fc[data-tone='danger'] > span {
+  color: var(--hx-danger);
+}
+
+/* The meter is what is left: --fill; the tick is what the forecast leaves at the reset: --mark */
+.hx-lim__meter {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--hx-bg-active);
+}
+.hx-lim__meter i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, 0%);
+  border-radius: inherit;
+  background: var(--hx-success);
+  transition: width 500ms var(--hx-ease-out);
+}
+.hx-gauge[data-level='low'] .hx-lim__meter i {
+  background: var(--hx-warning);
+}
+.hx-gauge[data-level='out'] .hx-lim__meter i {
+  background: var(--hx-danger);
+}
+.hx-lim__meter u {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: var(--mark, 0%);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--hx-fg-3);
+  opacity: 0.6;
+  text-decoration: none;
+  transition: left 500ms var(--hx-ease-out);
+}
+
+@media (max-width: 900px) {
+  /* On a phone the chip keeps the window with the least left, and the card spans the field */
+  .hx-lim {
+    position: static;
+  }
+  .hx-lim__chip {
+    height: 32px;
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .hx-lim__win:not([data-least]):not(:only-of-type) {
+    display: none;
+  }
+  .hx-lim__pop {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    transform-origin: 50% 100%;
+  }
+  @keyframes hx-lim-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+    }
+  }
+}

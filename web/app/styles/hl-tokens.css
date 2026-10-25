@@ -71,7 +71,7 @@
   --t-sticky-footer-bg: oklch(from var(--t-surface) l c h / 72%);
   --t-sticky-footer-border: oklch(from var(--t-border) l c h / 50%);
 
-  /* ── Added for legalize company redesign ── */
+  /* ── Added for payments company redesign ── */
 
   /* text + surface variants */
   --t-text-primary: oklch(0.145 0 0);
@@ -362,7 +362,7 @@
   --t-shadow-overlay: 0 0.375rem 1rem oklch(0 0 0 / 36%);
   --t-shadow-popover: 0 1.125rem 3rem oklch(0 0 0 / 48%), 0 0 0 0.0625rem var(--t-border-default);
 
-  /* ── Added for legalize company redesign ── */
+  /* ── Added for payments company redesign ── */
 
   --t-text-primary: oklch(1 0 0);
   --t-text-faint: oklch(1 0 0 / 0.28);

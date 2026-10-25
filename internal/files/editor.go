@@ -355,3 +355,65 @@ func WriteProjectFile(root, relative, content, revision string, loneSurrogate bo
 	}
 	return Object{{"path", relative}, {"content", content}, {"revision", revisionOf(realRoot, target, data)}, {"bytes", len(data)}}, nil
 }
+
+// SaveProjectFile saves a file of a tab's project over the revision the page opened, whole or not at all: the text goes
+// to a temporary file beside it, which takes the file's mode and replaces it by a rename. What leaves the project is
+// refused as for reading, and so is a file the person cannot write.
+func SaveProjectFile(root, relative, content, revision string) (Object, *EditorError) {
+	realRoot, target, err := resolveInProject(root, relative)
+	if err != nil {
+		return nil, editorFail(err)
+	}
+	data := []byte(content)
+	if ee := checkText(data); ee != nil {
+		return nil, ee
+	}
+	defer writeLocks.lock(target)()
+	f, err := openNoFollow(target, syscall.O_RDONLY)
+	if err != nil {
+		return nil, editorFail(err)
+	}
+	defer f.Close()
+	current, ee := readBounded(f)
+	if ee != nil {
+		return nil, ee
+	}
+	if revisionOf(realRoot, target, current) != revision {
+		return nil, errChanged()
+	}
+	st, err := f.Stat()
+	if err != nil {
+		return nil, editorFail(err)
+	}
+	if st.Mode().Perm()&0o200 == 0 {
+		return nil, errNoAccess()
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".hx-save-*")
+	if err != nil {
+		return nil, editorFail(err)
+	}
+	done := false
+	defer func() {
+		if !done {
+			_ = tmp.Close()
+			_ = os.Remove(tmp.Name())
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		return nil, editorFail(err)
+	}
+	if err := tmp.Chmod(st.Mode().Perm()); err != nil {
+		return nil, editorFail(err)
+	}
+	if err := tmp.Sync(); err != nil {
+		return nil, editorFail(err)
+	}
+	if err := tmp.Close(); err != nil {
+		return nil, editorFail(err)
+	}
+	if err := os.Rename(tmp.Name(), target); err != nil {
+		return nil, editorFail(err)
+	}
+	done = true
+	return Object{{"path", relative}, {"content", content}, {"revision", revisionOf(realRoot, target, data)}, {"bytes", len(data)}}, nil
+}

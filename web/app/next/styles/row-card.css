@@ -1,0 +1,102 @@
+/* The card beside a sidebar row (features/sidebar/row-card.tsx): calm, compact, to the right of the sidebar. */
+.hx-rowcard {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 130;
+  width: 288px;
+  translate: var(--x, 0) var(--y, 0);
+  pointer-events: none;
+}
+.hx-rowcard[data-glide='true'] {
+  transition: translate 220ms var(--hx-ease-out);
+}
+.hx-rowcard__box {
+  display: grid;
+  gap: 6px;
+  padding: 11px 13px 12px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  transform-origin: left top;
+  animation: hx-rowcard-in 240ms var(--hx-ease-out) backwards;
+}
+.hx-rowcard[data-state='closing'] .hx-rowcard__box {
+  animation: hx-rowcard-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+/* The pointer can reach the card (it stays while it travels there, see row-card.tsx); not while it leaves. */
+.hx-rowcard[data-state='open'] .hx-rowcard__box {
+  pointer-events: auto;
+}
+.hx-rowcard__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.hx-rowcard__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--hx-fg-3);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+.hx-rowcard__ico {
+  flex: none;
+}
+.hx-rowcard__meta[data-status='thinking'] .hx-rowcard__ico,
+.hx-rowcard__meta[data-status='background'] .hx-rowcard__ico,
+.hx-rowcard__meta[data-status='done'] .hx-rowcard__ico {
+  color: var(--hx-accent);
+}
+.hx-rowcard__meta:is([data-status='question'], [data-status='perm'], [data-status='plan']) .hx-rowcard__ico {
+  color: var(--hx-warning);
+}
+.hx-rowcard__meta[data-status='failed'] .hx-rowcard__ico {
+  color: var(--hx-danger);
+}
+.hx-rowcard__time {
+  margin-left: auto;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.hx-rowcard__text {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+@keyframes hx-rowcard-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.98);
+  }
+}
+@keyframes hx-rowcard-out {
+  to {
+    opacity: 0;
+    transform: translateX(-4px) scale(0.985);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-rowcard__box,
+  .hx-rowcard[data-state='closing'] .hx-rowcard__box {
+    animation-duration: 1ms;
+  }
+  .hx-rowcard[data-glide='true'] {
+    transition: none;
+  }
+}

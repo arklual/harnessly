@@ -1,6 +1,7 @@
 package design
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -112,6 +113,33 @@ func (l *Library) ContinueInstructions(a *Artifact) string {
 		"- После правки коротко напиши, что поменял и на какой доске.",
 		"",
 	}, "\n")
+}
+
+// AttachedLine is what a chat outside the design's folder reads when the person attaches the design to a message: where
+// the project and its boards are, and the rules a design dialog works by (the file PrepareDialog wrote).
+func (l *Library) AttachedLine(a *Artifact, rules string) string {
+	title, dir := plain(a.Title, 120), l.ArtifactDir(a.ID)
+	board := ""
+	if len(a.Boards) > 0 && a.Boards[0].Path != "" {
+		board = plain(a.Boards[0].Path, 200)
+	}
+	cli := l.cfg.Texts.CLI
+	if !locale.Russian() {
+		line := "Design \"" + title + "\" of the library (id " + a.ID + ", " + boardsLabel(len(a.Boards)) + "): the folder " + dir +
+			", the boards are in " + filepath.Join(dir, ProjectDirname)
+		if board != "" {
+			line += " (the first: " + board + ")"
+		}
+		return line + ". Before you change it, read the rules " + rules + "; pages are made and renamed with `" + cli +
+			" design page … " + a.ID + "`. The person sees it in the pane beside this chat."
+	}
+	line := "Дизайн «" + title + "» из библиотеки (id " + a.ID + ", " + strconv.Itoa(len(a.Boards)) + " досок): папка " + dir +
+		", доски — в " + filepath.Join(dir, ProjectDirname)
+	if board != "" {
+		line += " (первая: " + board + ")"
+	}
+	return line + ". Прежде чем менять, прочитай правила " + rules + "; страницы заводи и переименовывай командой `" + cli +
+		" design page … " + a.ID + "`. Человек видит его в панели рядом с этим чатом."
 }
 
 // ContinuePrompt is the dialog's first message: what the person asked, or to introduce the design and wait.
@@ -228,3 +256,23 @@ func AgentBlockMessage(a *Artifact, blocks string) string {
 	}
 	return locale.Pick("About the design \""+flatten(a.Title)+"\" (files: "+flatten(a.ProjectPath)+"):\n", "По макету «"+flatten(a.Title)+"» (файлы: "+flatten(a.ProjectPath)+"):\n") + strings.Join(lines, "\n")
 }
+
+// PrepareDialog readies a conversation about a project of the library started by the caller: the library's guide, and
+// the project's instructions as a file under the data dir (the one place the launcher takes system-prompt files
+// from). It gives the project, the instructions' file and their text. ErrGone: the project is not in the library.
+func (l *Library) PrepareDialog(id string) (art *Artifact, file, text string, err error) {
+	if !IsLibraryID(id) {
+		return nil, "", "", ErrGone
+	}
+	if art = l.ReadArtifact(id); art == nil {
+		return nil, "", "", ErrGone
+	}
+	_ = l.EnsureGuide()
+	if file, err = l.writeContinueInstructions(art); err != nil {
+		return nil, "", "", err
+	}
+	return art, file, l.ContinueInstructions(art), nil
+}
+
+// ErrGone: the project of the library is not there.
+var ErrGone = errors.New("design: the project is gone")

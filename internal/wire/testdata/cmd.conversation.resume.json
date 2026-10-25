@@ -1,0 +1,5 @@
+{
+  "op": "conversation.resume",
+  "body": {"opId": "op-rsm1", "id": "tab-k3Jx9QmZ"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1848}
+}

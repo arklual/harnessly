@@ -99,7 +99,7 @@ const files = [
   `${P}/automations/rules/index`, `${P}/automations/rules/[id]`, `${P}/automations/runs/index`, `${P}/automations/token`,
   `${P}/net-events`, `${P}/gateway-ping`, 'stats/daily-report/cache', 'react-scan',
   'auth/login', 'auth/logout', 'auth/setup', 'auth/preflight', 'tailscale/status', 'tailscale/serve',
-  'check-agent', 'check-claude', 'codex/sessions', 'editor/files', 'editor/file', 'git/branch', 'git/status', 'git/sync',
+  'check-agent', 'codex/sessions', 'editor/files', 'editor/file', 'git/branch', 'git/status', 'git/sync',
   'layout/commit-diff', 'layout/diff', 'layout/file-content', 'layout/git-log', 'timeline/sessions', 'preflight/runtime',
   `${P}/changes`, `${P}/context-files`, 'uploads/[...path]', 'uploads/cleanup', 'upload-file', 'upload-image',
   `${P}/machine/stop`, 'voice/assets/[...path]', `${P}/file-preview`, `${P}/memory-note`,
@@ -185,7 +185,7 @@ const steps = [
   req('POST', '/api/config', [], S, '{}'),
   req('DELETE', '/api/config', [], ses),
   req('HEAD', '/api/config', [], ses),
-  req('PATCH', '/agents/api/config/', [], { ...tok, ...json }, J({ terminalKeyBar: 'never' })),
+  req('PATCH', '/agents/api/config', [], { ...tok, ...json }, J({ terminalKeyBar: 'never' })),
   file('config.json', '[1,"x"]'),
   req('GET', '/api/config', [], ses),
   file('config.json', '"ab"'),
@@ -344,7 +344,7 @@ const steps = [
 
   // other methods of the routes the other slices answer
   ...[
-    ['/api/check-agent', ['POST', 'HEAD', 'DELETE']], ['/api/check-claude', ['PUT']], ['/api/codex/sessions', ['POST']],
+    ['/api/check-agent', ['POST', 'HEAD', 'DELETE']], ['/api/codex/sessions', ['POST']],
     ['/api/editor/files', ['POST']], ['/api/editor/file', ['POST', 'DELETE', 'HEAD']], ['/api/git/branch', ['POST']],
     ['/api/git/status', ['DELETE']], ['/api/layout/commit-diff', ['PUT']], ['/api/layout/diff', ['POST']],
     ['/api/layout/file-content', ['PATCH']], ['/api/layout/git-log', ['POST']], ['/api/timeline/sessions', ['DELETE']],

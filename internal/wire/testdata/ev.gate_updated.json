@@ -1,0 +1,10 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 518,
+  "e": {
+    "type": "gate_updated",
+    "id": "p:tab-k3Jx9QmZ:41",
+    "state": {"k": "answering", "opId": "op-7Hq2", "wait": {"slowAt": 1792656003000, "deadlineAt": 1792656010000}}
+  }
+}

@@ -1,0 +1,40 @@
+
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort ultracode[39m
+[38;5;246m[49m  ⎿  [39mUltracode on (this session only): dynamic workflows on every task. Effort stays high.
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort ultracode off[39m
+[38;5;246m[49m  ⎿  [39mUltracode off. Effort stays high.
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort status[39m
+[38;5;246m[49m  ⎿  [39mCurrent effort level: high (Comprehensive implementation with extensive testing and documentation)
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort ultracode on[39m
+[38;5;246m[49m  ⎿  [39mUltracode on (this session only): dynamic workflows on every task. Effort stays high.
+
+[38;5;246m[48;5;237m❯ [38;5;231mReply with just the word ok, no tools.[39m
+
+[38;5;231m[49m●[39m ok
+
+[38;5;246m✻[39m [38;5;246mCogitated for 7s · done 9:45 PM[39m
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort max[39m
+[38;5;246m[49m  ⎿  [39mSet effort level to max (this session only): Maximum capability with deepest reasoning. May use excessive tokens resulting in long response times or
+     overthinking. Use sparingly for the hardest tasks.
+
+[38;5;246m[48;5;237m❯ [38;5;231mReply with just the word ok, no tools.[39m
+
+[38;5;231m[49m●[39m ok
+
+[38;5;246m✻[39m [38;5;246mCrunched for 2s · done 9:46 PM[39m
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/model opus[39m [49m
+[38;5;246m  ⎿  [39mKept model as [38;5;153mSonnet 5.5[39m
+
+[38;5;246m[48;5;237m❯[39m [38;5;231m/effort[39m
+[38;5;246m[49m  ⎿  [39mCancelled
+                                                                                                                                   [38;5;246m◈ max · ultracode · /effort[39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m [38;5;147multrac[1mo[38;5;189md[38;5;147me[0m [38;5;244m─
+[39m❯ 
+[38;5;244m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;147m⏵⏵ accept edits on[38;5;246m (shift+tab to cycle)[39m

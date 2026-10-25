@@ -1,0 +1,21 @@
+{
+  "next.rowMenu.goal": "Цель…",
+  "next.goal.title": "Цель сессии",
+  "next.goal.lead": "Агент работает к ней, пока не решит, что она достигнута.",
+  "next.goal.label": "Что должно получиться",
+  "next.goal.placeholder": "Например: довести контракт v2 до конца, чтобы фикстуры были зелёными",
+  "next.goal.note": "Сохранение отправит агенту команду /goal — она встанет в очередь, как сообщение. Текст — одной строкой.",
+  "next.goal.save": "Сохранить",
+  "next.goal.clear": "Убрать цель",
+  "next.goal.failed": "Не удалось передать цель агенту",
+  "next.goal.active": "Активна",
+  "next.goal.paused": "На паузе",
+  "next.goal.met": "Достигнута",
+  "next.goal.since": "задана {when}",
+  "next.goalBar.active": "Цель:",
+  "next.goalBar.paused": "Цель на паузе:",
+  "next.goalBar.met": "Цель достигнута:",
+  "next.goalBar.stop": "Остановить",
+  "next.goalBar.hide": "Скрыть",
+  "next.goalBar.reached": "Цель достигнута: {goal}"
+}

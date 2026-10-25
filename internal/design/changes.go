@@ -172,11 +172,11 @@ func (l *Library) serveEvents(w http.ResponseWriter, r *http.Request, id string,
 		case <-r.Context().Done():
 			return
 		case b := <-out:
-			if !write(b) {
+			if !l.Can(id, RoleView) || !write(b) {
 				return
 			}
 		case <-beat.C:
-			if !write([]byte(": beat\n\n")) {
+			if !l.Can(id, RoleView) || !write([]byte(": beat\n\n")) {
 				return
 			}
 		}

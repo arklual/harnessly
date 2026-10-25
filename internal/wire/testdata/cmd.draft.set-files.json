@@ -1,0 +1,5 @@
+{
+  "op": "draft.set",
+  "body": {"opId": "op-dr3", "key": "tab-k3Jx9QmZ", "text": "", "attachments": [{"id": "up_01JB8", "name": "CleanShot 2026-10-24.png", "kind": "image", "mime": "image/png"}], "rev": 5},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1862, "rev": 5}
+}

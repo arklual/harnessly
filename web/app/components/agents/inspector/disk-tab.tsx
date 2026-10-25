@@ -633,7 +633,7 @@ const DiskTab = ({ cwd }: { cwd: string | null }) => {
               items={uploadMenu}
               menuLabel={t('inspector.diskTab.upload')}
               align={LAYER_ALIGN.end}
-              className="tw-ui-button tw-disk-upload"
+              className="tw-ui-button tw-disk-upload-button"
               data-variant="primary"
               data-size="sm"
             >
@@ -645,7 +645,7 @@ const DiskTab = ({ cwd }: { cwd: string | null }) => {
             <TwButton
               size={BUTTON_SIZE.sm}
               variant={BUTTON_VARIANT.primary}
-              className="tw-disk-upload"
+              className="tw-disk-upload-button"
               icon={<Upload />}
               aria-disabled
               aria-describedby={hintId}

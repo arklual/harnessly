@@ -208,3 +208,42 @@ func TestCLIVaultAndResult(t *testing.T) {
 	r.want(<-done, 200, `{"status":"logged-in","message":"Вошёл"}`)
 	r.want(r.do("s", "POST", "/api/platform/vault-result", `{"id":"`+id+`","status":"denied","message":"x"}`), 404, `{"error":"Просьба уже закрыта или не найдена"}`)
 }
+
+// "open design" names a design of the machine's library; the intent is kept once and a page applies it once.
+func TestCLIPanelOpensADesignOnce(t *testing.T) {
+	r := panelRig(t)
+	r.sync.clients = 0
+	r.deps.Targets.DesignRef = func(text string) string {
+		if text == "landing" || text == "/lib/landing/project/Main.dc.html" {
+			return "landing"
+		}
+		return ""
+	}
+	a := r.ask(`{"session":"` + agentSession + `","command":{"kind":"open","tab":"design","target":"/lib/landing/project/Main.dc.html"}}`)
+	r.want(a, 200, "*")
+	if o := a.json(t); o.String("message") != "Вкладка «design» (landing): записано за разговором, откроется, когда человек придёт в разговор" {
+		t.Fatal(a.body)
+	}
+	a = r.ask(`{"session":"` + agentSession + `","command":{"kind":"open","tab":"design","target":"nothing"}}`)
+	if a.status != 400 || !strings.Contains(a.body, "open design") {
+		t.Fatal(a.body)
+	}
+	intents := r.deps.Intents.List("tab-1")
+	if len(intents) != 1 || string(jsvalue.Stringify(intents[0].Object("command"), "")) != `{"kind":"open","tab":"design","target":"landing"}` {
+		t.Fatal(intents)
+	}
+	id := intents[0].String("id")
+	first := r.do("s", "POST", "/api/platform/pane-intents", `{"tabId":"tab-1","ids":["`+id+`"],"device":"desktop"}`)
+	r.want(first, 200, "*")
+	at, _ := r.deps.Intents.List("tab-1")[0].Number("appliedAt")
+	time.Sleep(2 * time.Millisecond)
+	r.do("s", "POST", "/api/platform/pane-intents", `{"tabId":"tab-1","ids":["`+id+`"],"device":"phone"}`)
+	again := r.deps.Intents.List("tab-1")[0]
+	if at2, _ := again.Number("appliedAt"); at2 != at || again.String("appliedOn") != "desktop" {
+		t.Fatal(jsvalue.Stringify(again, ""))
+	}
+	got := r.do("s", "GET", "/api/platform/pane-intents?tabId=tab-1", "")
+	if got.status != 200 || !strings.Contains(got.body, `"target":"landing"`) || !strings.Contains(got.body, `"appliedOn":"desktop"`) {
+		t.Fatal(got.body)
+	}
+}

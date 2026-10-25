@@ -1,0 +1,5 @@
+{
+  "op": "rewind",
+  "body": {"opId": "op-rw1", "id": "tab-k3Jx9QmZ", "entryId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0", "text": "Сделай то же, но без миграции", "files": true},
+  "result": {"r": "queued", "ch": "conv:tab-k3Jx9QmZ", "seq": 610}
+}

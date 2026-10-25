@@ -1,0 +1,5 @@
+{
+  "op": "terminal.stop",
+  "body": {"opId": "op-ts2", "id": "tab-k3Jx9QmZ", "force": true},
+  "result": {"r": "refused", "code": "agent-gone"}
+}

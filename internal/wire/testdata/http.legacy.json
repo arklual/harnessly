@@ -1,0 +1,11 @@
+{
+  "http": "legacy",
+  "response": {
+    "tabId": "tab-mowEAg",
+    "workspaceId": "ws-cFbEgH",
+    "sessionName": "pt-ws-cFbEgH-pane-1-tab-mowEAg",
+    "jsonlPath": "/home/coder/.claude/projects/-home-coder-workspace/0b8c7f3e-2d4a-4c55-9f8e-1a2b3c4d5e6f.jsonl",
+    "agentSessionId": "0b8c7f3e-2d4a-4c55-9f8e-1a2b3c4d5e6f",
+    "cwd": "/home/coder/workspace"
+  }
+}

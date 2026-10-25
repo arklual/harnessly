@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -444,11 +445,14 @@ func (s *previewSlots) open(d deps, r *http.Request, body any) (int, any, http.H
 // previewSession is a slot cookie's (or a ticket's) content.
 type previewSession struct {
 	sub, origin, app string
-	slot             int
-	target           devtools.Target
-	targetJSON       any
-	portSlots        any
-	cleared          bool
+	// apps are the other pages the same person entered this slot from (a stand beside the product: one site, one
+	// partitioned cookie). Each of them may frame the slot, not only the last.
+	apps       []string
+	slot       int
+	target     devtools.Target
+	targetJSON any
+	portSlots  any
+	cleared    bool
 }
 
 func previewSessionOf(p map[string]any) (*previewSession, bool) {
@@ -484,12 +488,28 @@ func previewSessionOf(p map[string]any) (*previewSession, bool) {
 		return nil, false
 	}
 	s.cleared, _ = p["cleared"].(bool)
+	if list, ok := p["apps"].([]any); ok {
+		for _, a := range list {
+			if app, ok := a.(string); ok && previewOriginRe.MatchString(app) && app != s.app && len(s.apps) < previewAppsKept {
+				s.apps = append(s.apps, app)
+			}
+		}
+	}
 	return s, true
 }
 
+// previewAppsKept is how many other pages a slot's cookie remembers.
+const previewAppsKept = 3
+
+// framers are the pages that may frame the slot: the one that entered last, then the others it remembers.
+func (s *previewSession) framers() []string { return append([]string{s.app}, s.apps...) }
+
+// drives says whether a request from origin comes from one of the slot's pages.
+func (s *previewSession) drives(origin string) bool { return slices.Contains(s.framers(), origin) }
+
 func (s *previewSession) fields() map[string]any {
 	return map[string]any{"sub": s.sub, "slot": s.slot, "target": s.targetJSON, "origin": s.origin, "portSlots": s.portSlots,
-		"app": s.app, "cleared": s.cleared}
+		"app": s.app, "apps": s.apps, "cleared": s.cleared}
 }
 
 // slotCookie is the name of a slot's cookie: one host carries every slot (ports share cookies), so the port is in it.
@@ -569,7 +589,7 @@ func (s *previewSlots) slotHandler(slot int) http.Handler {
 			return
 		}
 		// Only the slot itself and the app drive a slot: a sibling slot is another target, maybe an external site.
-		if from != "" && from != own && from != sess.app {
+		if from != "" && from != own && !sess.drives(from) {
 			previewDeny(w, 403, locale.Pick("A request from another address", "Запрос с чужого адреса"))
 			return
 		}
@@ -605,6 +625,15 @@ func (s *previewSlots) enter(w http.ResponseWriter, r *http.Request, slot int, s
 		h.Set("Clear-Site-Data", `"cache", "storage"`)
 	}
 	ticket.cleared = true
+	// Only a named person's own earlier pages of the same target carry over: the anonymous "user" of a machine without
+	// sign-in, or another target, starts the list again.
+	if previous != nil && previous.sub == ticket.sub && ticket.sub != "user" && previous.target == ticket.target {
+		for _, app := range previous.framers() {
+			if app != ticket.app && !slices.Contains(ticket.apps, app) && len(ticket.apps) < previewAppsKept {
+				ticket.apps = append(ticket.apps, app)
+			}
+		}
+	}
 	secure := strings.HasPrefix(ticket.origin, "https:")
 	cookie := &http.Cookie{Name: s.slotCookie(slot, secure), Value: agent.SignPayload(secret, previewSlotAudience, ticket.fields(), previewSlotTTL),
 		Path: "/", HttpOnly: true, MaxAge: int(previewSlotTTL / time.Second), SameSite: http.SameSiteLaxMode}
@@ -615,11 +644,13 @@ func (s *previewSlots) enter(w http.ResponseWriter, r *http.Request, slot int, s
 	h.Set("Location", path)
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Robots-Tag", "noindex, nofollow")
-	h.Set("Content-Security-Policy", previewFrameAncestors(ticket.app))
+	h.Set("Content-Security-Policy", previewFrameAncestors(ticket.framers()...))
 	w.WriteHeader(http.StatusFound)
 }
 
-func previewFrameAncestors(app string) string { return "frame-ancestors " + app + " 'self'" }
+func previewFrameAncestors(apps ...string) string {
+	return "frame-ancestors " + strings.Join(apps, " ") + " 'self'"
+}
 
 // forward hands the request to the preview proxy with a claim for the slot's target, as the gateway would.
 func (s *previewSlots) forward(w http.ResponseWriter, r *http.Request, set *previewSet, secret []byte, sess *previewSession) {
@@ -656,7 +687,7 @@ func (s *previewSlots) forward(w http.ResponseWriter, r *http.Request, set *prev
 		u.RawPath = cfg.Path + r.URL.RawPath
 	}
 	out.URL = &u
-	set.proxy.ServeHTTP(&slotWriter{ResponseWriter: w, frame: previewFrameAncestors(sess.app)}, out)
+	set.proxy.ServeHTTP(&slotWriter{ResponseWriter: w, frame: previewFrameAncestors(sess.framers()...)}, out)
 }
 
 // slotWriter puts the slot's own headers on what the proxy answers: no shared cache, no indexing, framed only by the

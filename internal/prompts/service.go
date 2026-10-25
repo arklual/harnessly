@@ -10,6 +10,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/screen"
 	"github.com/ly-solutions/harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/typist"
 )
 
 const (
@@ -314,6 +315,9 @@ func (s *Service) tabMissing(tabID string) {
 // continue while the queue holds messages; the keeper's watchdog restarts any chain that stopped.
 func (s *Service) deliverHead(tabID string) {
 	s.expire(tabID)
+	// what the agent's transcript already holds (steered, sent now, typed into its own box) leaves the queue
+	// before anything is typed — on every look, so a working agent's queue is cleaned by the keeper's watchdog too.
+	s.dropRecorded(tabID)
 	if !s.queue.Waiting(tabID) {
 		return
 	}
@@ -446,6 +450,24 @@ const (
 	PumpInFlight PumpOutcome = "in-flight"
 )
 
+// hold takes the pane's lock — the one v2's typist takes before it types into the same box — and returns what lets it
+// go. Every Legacy writer of an agent's pane holds it for the whole of what it does there: a paste, a wait and its
+// Enter must not be cut by another writer's keys. A session of "" has no pane: nothing is held.
+func hold(session string) func() {
+	if session == "" {
+		return func() {}
+	}
+	return typist.Lock(session)
+}
+
+// holdTab is hold for the pane of a tab.
+func (s *Service) holdTab(tabID string) func() {
+	if tab, ok := s.cfg.Tabs.Tab(tabID); ok {
+		return hold(tab.Session)
+	}
+	return func() {}
+}
+
 // Pump sends the head of the tab's queue when ready: under the tab's single flight the head leaves the queue before it
 // is typed and comes back to the head unless it went in, so it is never lost or sent twice. One message per call; the
 // head is the first message still waiting, failed ones are passed over.
@@ -466,7 +488,14 @@ func (s *Service) Pump(tabID string, ready bool, d DeliveryDriver) PumpOutcome {
 			if !ok {
 				return
 			}
+			unlock := s.holdTab(tabID)
 			res := Deliver(item, d, s.reg, false, tabID)
+			unlock()
+			// A try that broke after the text went in (Enter lost, tmux gone) may still have reached the agent: it is
+			// not put back to be typed a second time.
+			if res == OutcomeFailed && s.isRecorded(tabID, item) {
+				res = OutcomeSent
+			}
 			if res != OutcomeSent {
 				s.queue.Restore(tabID, item)
 			}
@@ -500,9 +529,18 @@ func (s *Service) TakeNewPrompt(tabID, id string, now bool) string {
 	return DeliveryQueued
 }
 
+// Steer outcomes: sent is typed into the running turn now (the agent reads it at its next step); delivered, the agent
+// held it already and nothing was typed.
+const (
+	SteerSent      = "sent"
+	SteerDelivered = "delivered"
+)
+
 // SteerResult is how a steer ended.
 type SteerResult struct {
-	OK      bool
+	OK bool
+	// Outcome is SteerSent or SteerDelivered when OK.
+	Outcome string
 	Status  int
 	Message string
 	// Code names the refusal for programs (CodeNotQueued), the message being for people.
@@ -524,14 +562,25 @@ func (s *Service) Steer(tabID, id string) SteerResult {
 			res = SteerResult{Status: 409, Message: msgNotQueued.String(), Code: CodeNotQueued}
 			return
 		}
+		// the agent holds it already (a repeated press, or it was typed into its own box): a second copy is not typed.
+		if s.isRecorded(tabID, item) {
+			s.info("steered prompt already with the agent", "tabId", tabID, "promptId", item.ID)
+			res = SteerResult{OK: true, Outcome: SteerDelivered}
+			return
+		}
 		steeredAt := s.clock.Now()
+		unlock := hold(tab.Session)
+		defer unlock()
 		out := Deliver(item, s.deliveryDriver(tab), s.reg, true, tabID)
+		if out == OutcomeFailed && s.isRecorded(tabID, item) {
+			out = OutcomeSent
+		}
 		if out == OutcomeSent {
 			s.info("steered prompt sent", "tabId", tabID, "enterMs", s.clock.Now().Sub(steeredAt).Milliseconds())
 			if tab.Provider != ProviderCodex {
 				s.handOverSteered(tabID, tab.Session, item.Text, steeredAt)
 			}
-			res = SteerResult{OK: true}
+			res = SteerResult{OK: true, Outcome: SteerSent}
 			return
 		}
 		s.queue.Restore(tabID, item)
@@ -572,7 +621,9 @@ func (s *Service) SendNow(tabID, text string) (SendNowResult, bool) {
 			res = SendNowResult{OK: true, Outcome: "delivered"}
 			return
 		}
+		unlock := hold(tab.Session)
 		res = SendQueuedNow(text, s.sendNowDriver(tabID, tab.Session), s.clock, 0)
+		unlock()
 		if !(res.OK && res.Outcome == "sent") {
 			s.reg.Release(id)
 		}
@@ -616,6 +667,7 @@ func (s *Service) TypePrompt(tabID, text string, submit bool, messageID string, 
 	if !s.reg.Claim(messageID, RoutePromptText, tabID, text) {
 		return ViaDuplicate, nil
 	}
+	defer hold(tab.Session)()
 	if codex {
 		sent := SubmitCodex(text, false, s.codexDriver(tab.Session), s.clock)
 		steps.Mark("enter")
@@ -641,6 +693,7 @@ func (s *Service) TypePrompt(tabID, text string, submit bool, messageID string, 
 
 // SubmitText types a text into a Claude pane the composer's way (its editor, or a paste) and submits it.
 func (s *Service) SubmitText(session, text string) error {
+	defer hold(session)()
 	_, err := s.editor.submitPromptText(session, text, nil)
 	return err
 }
@@ -652,7 +705,10 @@ func (s *Service) Interrupt(tabID string) bool {
 	if !ok || tab.Session == "" {
 		return false
 	}
-	if s.cfg.Panes.SendRawKeys(tab.Session, "Escape") != nil {
+	unlock := hold(tab.Session)
+	sent := s.cfg.Panes.SendRawKeys(tab.Session, "Escape") == nil
+	unlock()
+	if !sent {
 		return false
 	}
 	s.cfg.Events.Interrupted(tabID, tab.Session)
@@ -696,7 +752,9 @@ func (s *Service) RunCommand(in RunInput) RunResult {
 			go s.cfg.Events.RecheckStuck(tab.ID)
 		}
 	}()
+	unlock := hold(in.Session)
 	r := RunCommandLine(in, commandDriver{s}, s.clock)
+	unlock()
 	body, ok := r.Body.(*RunBody)
 	if r.Status != 200 || !ok {
 		return r

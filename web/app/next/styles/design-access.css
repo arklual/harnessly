@@ -1,0 +1,734 @@
+/* «Поделиться» and the request for access of Designly (features/designly/access): a calm dialog of one field,
+   a list of people and one row of general access, menus for roles and terms, views that slide in for the rare things;
+   a card for a person with no place in the project. Tokens of the neighbouring designly sheets. */
+
+/* The frame: the dialog on a wide window, the bottom sheet on the phone */
+.hx-acc {
+  width: min(520px, 100%);
+}
+.hx-acc .hx-modal__head,
+.hx-acc-sheet .hx-modal__head {
+  align-items: center;
+  gap: 2px;
+  padding: 16px 12px 4px 24px;
+}
+.hx-acc .hx-modal__title,
+.hx-acc-sheet .hx-modal__title {
+  overflow: hidden;
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-acc-body {
+  gap: 16px;
+  padding: 12px 24px 8px;
+}
+.hx-acc-foot {
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 16px;
+}
+.hx-acc-foot__left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -4px;
+}
+.hx-acc-foot__gear {
+  width: 32px;
+  height: 32px;
+  animation: none;
+}
+.hx-acc-sheet .hx-modal__head {
+  padding: 4px 4px 4px 14px;
+}
+.hx-acc-sheet .hx-modal__body {
+  overflow: visible;
+  padding: 10px 14px 4px;
+}
+.hx-acc-sheet .hx-acc-foot {
+  padding: 12px 6px 4px 10px;
+}
+
+/* The main view and the views that slide over it in the same place: the main one steps aside, the other comes from
+   the right and leaves back there. */
+.hx-acc-views {
+  display: grid;
+  min-width: 0;
+}
+.hx-acc-view {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  min-width: 0;
+  transition:
+    opacity 240ms var(--hx-ease-out),
+    translate 280ms var(--hx-ease-out),
+    visibility 0s linear 0s;
+}
+.hx-acc-views[data-sub='true'] > .hx-acc-view--main {
+  opacity: 0;
+  translate: -24px 0;
+  visibility: hidden;
+  transition:
+    opacity 180ms cubic-bezier(0.4, 0, 1, 1),
+    translate 280ms var(--hx-ease-out),
+    visibility 0s linear 280ms;
+}
+.hx-acc-view--sub {
+  gap: 14px;
+  animation: hx-acc-slide 300ms var(--hx-ease-out) backwards;
+}
+.hx-acc-view--sub[data-state='closing'] {
+  opacity: 0;
+  translate: 24px 0;
+  transition:
+    opacity 200ms cubic-bezier(0.4, 0, 1, 1),
+    translate 220ms cubic-bezier(0.4, 0, 1, 1);
+  pointer-events: none;
+}
+.hx-acc-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -8px;
+}
+.hx-acc-back .hx-head-btn {
+  width: 32px;
+  height: 32px;
+  animation: none;
+}
+.hx-acc-back__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-acc-stack {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.hx-acc-sec {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.hx-acc-sec__title {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: 12.5px;
+  font-weight: var(--hx-weight-medium);
+}
+
+/* The one field: the person, and the role at its right end */
+.hx-acc-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.hx-acc-field {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 42px;
+  padding: 0 4px 0 14px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 12px;
+  background: var(--hx-bg-app);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.hx-acc-field:focus-within {
+  border-color: var(--hx-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-accent) 16%, transparent);
+}
+.hx-acc-field[data-bad] {
+  border-color: var(--hx-danger);
+}
+.hx-acc-field .hx-acc-find {
+  position: static;
+  flex: 1;
+}
+.hx-acc-field__in {
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 14px;
+}
+.hx-acc-field__in::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-acc-add__go {
+  height: 42px;
+  animation: hx-acc-pop-in 220ms var(--hx-ease-out) backwards;
+}
+.hx-acc-add__go[data-state='closing'] {
+  opacity: 0;
+  scale: 0.94;
+  transition:
+    opacity 160ms cubic-bezier(0.4, 0, 1, 1),
+    scale 160ms cubic-bezier(0.4, 0, 1, 1);
+  pointer-events: none;
+}
+.hx-acc-add__err {
+  flex-basis: 100%;
+}
+.hx-acc-find {
+  position: relative;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.hx-acc-hits {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 5;
+  padding: 4px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  animation: hx-acc-in 200ms var(--hx-ease-out) backwards;
+}
+.hx-acc-hits[data-state='closing'] {
+  opacity: 0;
+  translate: 0 -4px;
+  transition:
+    opacity 160ms cubic-bezier(0.4, 0, 1, 1),
+    translate 160ms cubic-bezier(0.4, 0, 1, 1);
+  pointer-events: none;
+}
+.hx-acc-hit {
+  gap: 10px;
+}
+.hx-acc-hit .hx-acc-av {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+/* A role (or a level) from its menu: quiet words with a chevron, no frame */
+.hx-acc-role {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: 13.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-acc-role:hover:not(:disabled),
+.hx-acc-role[aria-expanded='true'] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-acc-role:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hx-acc-role .hx-icon {
+  color: var(--hx-fg-3);
+}
+.hx-acc-role__short {
+  display: none;
+}
+.hx-acc-role__term {
+  color: var(--hx-fg-3);
+}
+.hx-acc-role__term::before {
+  content: '· ';
+}
+
+/* The menus: roles, terms, the levels, «…». They open from inside the dialog, so they stand above it. */
+.hx-pop-pos:has(> .hx-acc-pop) {
+  z-index: 150;
+}
+.hx-acc-pop {
+  min-width: 220px;
+  padding: 5px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 14px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+}
+.hx-acc-pop--more {
+  min-width: 260px;
+}
+.hx-acc-pop--wide {
+  width: 320px;
+}
+.hx-acc-menu {
+  display: grid;
+}
+.hx-acc-mi {
+  display: flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms var(--hx-ease-out);
+}
+.hx-acc-mi:hover:not(:disabled),
+.hx-acc-mi:focus-visible {
+  background: var(--hx-bg-hover);
+  outline: 0;
+}
+.hx-acc-mi:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hx-acc-mi[data-danger='true'] {
+  color: var(--hx-danger);
+}
+.hx-acc-mi--two {
+  min-height: 48px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.hx-acc-mi--sub {
+  min-height: 32px;
+  padding-left: 34px;
+}
+.hx-acc-mi__text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.hx-acc-mi__desc {
+  color: var(--hx-fg-3);
+  white-space: normal;
+  font-size: 12px;
+  line-height: 16px;
+}
+.hx-acc-mi__icon {
+  color: var(--hx-fg-2);
+}
+.hx-acc-mi__aside {
+  color: var(--hx-fg-3);
+  font-size: 12.5px;
+}
+.hx-acc-mi__chev {
+  color: var(--hx-fg-3);
+  transition: rotate 240ms var(--hx-ease-out);
+}
+.hx-acc-mi[aria-expanded='true'] .hx-acc-mi__chev {
+  rotate: 180deg;
+}
+.hx-acc-mi__check {
+  color: var(--hx-accent);
+  opacity: 0;
+  transition: opacity 200ms var(--hx-ease-out);
+}
+.hx-acc-mi[aria-checked='true'] .hx-acc-mi__check {
+  opacity: 1;
+}
+.hx-acc-mi__box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 5px;
+  color: transparent;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-acc-mi[aria-checked='true'] .hx-acc-mi__box {
+  border-color: transparent;
+  background: var(--hx-accent);
+  color: #fff;
+}
+.hx-acc-mi__sep {
+  display: block;
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--hx-border);
+}
+
+/* A question before a dangerous thing: in the «…» menu, or in the hand-over view */
+.hx-acc-ask-box {
+  display: grid;
+  gap: 4px;
+  max-width: 300px;
+  padding: 8px 10px 4px;
+  animation: hx-acc-in 220ms var(--hx-ease-out) backwards;
+}
+.hx-acc-stack .hx-acc-ask-box {
+  max-width: none;
+  padding: 12px 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+}
+.hx-acc-ask-box__q {
+  margin: 0;
+  font-size: 14px;
+  font-weight: var(--hx-weight-medium);
+  overflow-wrap: anywhere;
+}
+.hx-acc-ask-box__lead {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+.hx-acc-ask-box__do {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+/* Rows of people, requests and links */
+.hx-acc-rows {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-acc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 0;
+  animation: hx-acc-in 260ms var(--hx-ease-out) backwards;
+}
+.hx-acc-row[data-leaving] {
+  opacity: 0;
+  translate: 0 -4px;
+  transition:
+    opacity 180ms cubic-bezier(0.4, 0, 1, 1),
+    translate 180ms cubic-bezier(0.4, 0, 1, 1);
+  pointer-events: none;
+}
+.hx-acc-av {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+  font-size: 13px;
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-acc-av[data-tone='team'] {
+  background: color-mix(in srgb, var(--hx-accent) 16%, transparent);
+  color: var(--hx-accent);
+}
+.hx-acc-row__who {
+  display: grid;
+  flex: 1;
+  gap: 1px;
+  min-width: 0;
+}
+.hx-acc-row__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.hx-acc-row__nm {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-acc-row__sub {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-acc-tag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+  font-size: 11.5px;
+  line-height: 16px;
+}
+.hx-acc-row__fixed {
+  flex: none;
+  padding-right: 10px;
+  color: var(--hx-fg-3);
+  font-size: 13.5px;
+}
+.hx-acc-req {
+  flex-wrap: wrap;
+}
+.hx-acc-req {
+  row-gap: 4px;
+}
+.hx-acc-req__do {
+  display: flex;
+  flex-wrap: wrap;
+  flex-basis: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.hx-acc-gen__pick {
+  justify-self: start;
+  height: 26px;
+  margin-left: -8px;
+  padding-left: 8px;
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-medium);
+}
+
+/* The link settings' form */
+.hx-acc-new {
+  display: grid;
+  gap: 8px;
+}
+.hx-acc-new__opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.hx-acc-new__opts .hx-acc-role {
+  height: 36px;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+}
+.hx-acc-new__go {
+  justify-self: end;
+}
+.hx-acc-in {
+  height: 36px;
+  font-size: 14px;
+}
+.hx-acc-in--num {
+  flex: 1 1 110px;
+  width: auto;
+  min-width: 0;
+}
+.hx-acc-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background 160ms var(--hx-ease-out);
+}
+.hx-acc-pick:hover:not(:disabled) {
+  background: var(--hx-bg-hover);
+}
+.hx-acc-pick:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hx-acc-pick__pre {
+  color: var(--hx-fg-3);
+}
+.hx-acc-date {
+  width: 100%;
+  height: 34px;
+  margin: 2px 0;
+  padding: 0 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: 8px;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  font: inherit;
+}
+.hx-acc-made {
+  display: flex;
+  gap: 8px;
+  animation: hx-acc-in 260ms var(--hx-ease-out) backwards;
+}
+.hx-acc-made .hx-acc-in {
+  flex: 1;
+  min-width: 0;
+}
+
+.hx-acc-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 36px;
+  font-size: 14px;
+}
+.hx-acc-msg {
+  height: auto;
+  padding: 10px 14px;
+  line-height: 20px;
+  resize: none;
+}
+.hx-acc-ask {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.hx-acc-ask .hx-acc-msg {
+  width: 100%;
+}
+.hx-acc-note {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: 13.5px;
+  line-height: 20px;
+}
+.hx-acc-note--quiet {
+  color: var(--hx-fg-3);
+}
+
+/* The terms unfold inside the role menu */
+.hx-acc-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms var(--hx-ease-out);
+}
+.hx-acc-fold[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+.hx-acc-fold__in {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The access history */
+.hx-acc-log {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.hx-acc-log li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--hx-fg-2);
+}
+.hx-acc-log time {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-acc-sk {
+  display: block;
+  height: 14px;
+  border-radius: 6px;
+}
+
+/* A card in place of the design: no place in it, or a link being taken */
+.hx-acc-card {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 14px;
+  width: min(420px, calc(100% - 32px));
+  margin: auto;
+  padding: 28px;
+  border: 1px solid var(--hx-border);
+  border-radius: 20px;
+  background: var(--hx-bg-raised);
+  animation: hx-acc-in 340ms var(--hx-ease-out) backwards;
+}
+.hx-acc-card__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.01em;
+}
+.hx-acc-card__lead {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: 14px;
+}
+.hx-acc-card .hx-acc-ask {
+  width: 100%;
+}
+
+/* The phone: the roles in their short words, so the addresses keep their room */
+@media (max-width: 600px) {
+  .hx-acc-row .hx-acc-role__text {
+    display: none;
+  }
+  .hx-acc-row .hx-acc-role__short {
+    display: inline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-acc-view,
+  .hx-acc-view--sub {
+    animation: none;
+    translate: none;
+  }
+}
+
+@keyframes hx-acc-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+@keyframes hx-acc-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
+}
+@keyframes hx-acc-slide {
+  from {
+    opacity: 0;
+    translate: 24px 0;
+  }
+}
+
+/* «Ссылка без входа» above the invite links */
+.hx-acc-guest {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hx-border);
+}

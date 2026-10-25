@@ -1,0 +1,25 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 517,
+  "e": {
+    "type": "plan_proposed",
+    "permission": {
+      "id": "p:toolu_01ExitPlan",
+      "conversationId": "tab-k3Jx9QmZ",
+      "turnId": null,
+      "kind": "plan",
+      "askedAt": 1792655993000,
+      "tool": "ExitPlanMode",
+      "command": null,
+      "cwd": null,
+      "planMd": "1. Схема\n2. Go\n3. TS\n4. Фикстуры",
+      "options": [
+        {"id": "1", "label": "Yes, and auto-accept edits", "scope": "plan-auto"},
+        {"id": "2", "label": "Yes, and manually approve edits", "scope": "plan-ask"},
+        {"id": "3", "label": "No, keep planning", "scope": "revise"}
+      ],
+      "state": {"k": "open"}
+    }
+  }
+}

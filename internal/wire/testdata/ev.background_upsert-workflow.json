@@ -1,0 +1,53 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 612,
+  "e": {
+    "type": "background_upsert",
+    "task": {
+      "id": "w8kq2zt4p",
+      "conversationId": "tab-k3Jx9QmZ",
+      "kind": "workflow",
+      "title": "Review and fix the checkout flow",
+      "startedAt": 1792895000000,
+      "endedAt": null,
+      "status": "running",
+      "devServer": false,
+      "stoppable": false,
+      "outputPath": null,
+      "workflow": {
+        "name": "checkout-review",
+        "description": "Review and fix the checkout flow",
+        "toolUseId": "toolu_01Workflow",
+        "phases": [
+          {
+            "title": "Review",
+            "agents": [
+              {
+                "id": "a1b2c3d4e5f600001",
+                "label": "review:payments",
+                "status": "done",
+                "startedAt": 1792895001000,
+                "endedAt": 1792895300000,
+                "model": "claude-sonnet-5-5",
+                "last": "StructuredOutput",
+                "result": "Two places read the widget answer without checking its status."
+              },
+              {
+                "id": "a1b2c3d4e5f600002",
+                "label": "review:forms",
+                "status": "running",
+                "startedAt": 1792895001000,
+                "endedAt": null,
+                "model": "claude-sonnet-5-5",
+                "last": "Read · web/app/pay/form.ts",
+                "result": null
+              }
+            ]
+          },
+          {"title": "Fix", "agents": []}
+        ]
+      }
+    }
+  }
+}

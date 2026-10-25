@@ -54,9 +54,7 @@ func sessionRoutes(d deps) []gate.JSONRoute {
 	return []gate.JSONRoute{
 		{
 			Slice: "fsread",
-			// The old runtime's check-claude was the same handler under its first name.
-			Match:    func(r *http.Request) bool { return getAt(r, "/api/check-agent") || getAt(r, "/api/check-claude") },
-			Volatile: []string{"checkedAt"},
+			Match: func(r *http.Request) bool { return getAt(r, "/api/check-agent") },
 			Compute: guard(func(r *http.Request) (int, any, http.Header) {
 				s := query(r, "session")
 				if !s.Truthy() {

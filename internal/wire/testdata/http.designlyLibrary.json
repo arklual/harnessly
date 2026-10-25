@@ -1,0 +1,20 @@
+{
+  "http": "designlyLibrary",
+  "response": {
+    "port": 4466,
+    "root": "/srv/design-library",
+    "artifacts": [
+      {
+        "id": "lending-dlya-kofeini", "title": "Лендинг для кофейни", "updatedAt": 1790096400000, "kind": "site", "pinned": true,
+        "cover": "lending-dlya-kofeini/.thumbs/cover.png", "projectPath": "/srv/design-library/lending-dlya-kofeini/project",
+        "boards": [{"title": "Главная", "path": "Главная.dc.html"}, {"title": "Меню", "path": "Меню.dc.html"}],
+        "convs": ["tab-k3Jx9QmZ"], "touchedBy": ["tab-Hk2p7Wq1"], "owner": {"name": "Пётр", "me": true}
+      },
+      {
+        "id": "pitch-q4", "title": "Питч Q4", "updatedAt": 1790010000000, "kind": "slides", "pinned": false,
+        "cover": null, "projectPath": "/srv/design-library/pitch-q4/project", "boards": [], "convs": [],
+        "owner": {"name": "Олег", "me": false}
+      }
+    ]
+  }
+}

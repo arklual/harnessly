@@ -52,3 +52,44 @@ func ObserveSendNow(styled string) SendNowFrame {
 	s := Read(styled)
 	return SendNowFrame{Input: s.Input, InputLine: s.InputLine, Menu: s.Menu != nil, Queued: QueueInPromptBox(styled)}
 }
+
+// interruptedRE is Claude's mark under a turn the person stopped.
+var interruptedRE = re(`Interrupted` + sp + `·` + sp + `What should Claude do instead\?`)
+
+// InterruptedLast: the newest turn on a plain screen ended by the person's stop — Claude's «Interrupted · What should
+// Claude do instead?» comes after the last line of the agent's output (● …); the turn's summary, a spinner and the
+// prompt lines below it do not count.
+func InterruptedLast(plain string) bool {
+	lines := strings.Split(plain, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		switch l := strings.TrimSpace(lines[i]); {
+		case interruptedRE.MatchString(l):
+			return true
+		case strings.HasPrefix(l, "● "):
+			return false
+		}
+	}
+	return false
+}
+
+// turnDoneRE is Claude's summary under a finished turn: "✻ Brewed for 8s · done 6:06 PM", "✻ Worked for 1m 3s".
+var turnDoneRE = re(`^[·✢✳✶✻✽*]` + sp + `+` + nsp + `+(?: ` + nsp + `+){0,2} for \d+[hms]`)
+
+// TurnDoneLast: Claude says on a plain screen that its newest turn is over — the turn's summary or the stop mark lies
+// between the person's last message (❯ …) and the input box. A turn waiting on the model shows neither, spinner or
+// not, so a quiet screen without them is still a turn at work.
+func TurnDoneLast(plain string) bool {
+	lines := strings.Split(plain, "\n")
+	box := len(lines) - 1
+	for ; box >= 0 && !strings.HasPrefix(lines[box], "❯"); box-- {
+	}
+	for i := box - 1; i >= 0; i-- {
+		switch l := strings.TrimSpace(lines[i]); {
+		case turnDoneRE.MatchString(l) || interruptedRE.MatchString(l):
+			return true
+		case strings.HasPrefix(lines[i], "❯"):
+			return false
+		}
+	}
+	return false
+}

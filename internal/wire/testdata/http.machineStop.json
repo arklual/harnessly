@@ -1,0 +1,4 @@
+{
+  "http": "machineStop",
+  "response": {"stopped": true, "signal": "SIGTERM"}
+}

@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -258,6 +259,20 @@ func copyDir(t *testing.T, from, to string) {
 	t.Helper()
 	if out, err := exec.Command("cp", "-r", from, to).CombinedOutput(); err != nil {
 		t.Fatal(err, string(out))
+	}
+	// cp keeps the modes of the checkout, which git does not record (only the exec bit) and so follow the umask of
+	// whoever checked it out; the goldens want what a umask-022 checkout gives.
+	err := filepath.WalkDir(to, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.Type()&os.ModeSymlink != 0 {
+			return err
+		}
+		if d.IsDir() {
+			return os.Chmod(p, 0o755)
+		}
+		return os.Chmod(p, 0o644)
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -1,0 +1,240 @@
+/* The chat's file as an editor (.hx-fed): the box under the crumbs that fills the pane — a bar, the text, the status
+   row — and the colours of the code in it. The text itself is CodeMirror's, themed in features/pane/editor/setup.ts. */
+:root,
+html[data-theme='light'] {
+  --hx-syn-keyword: #7b3fe4;
+  --hx-syn-string: #0b7a53;
+  --hx-syn-number: #b45309;
+  --hx-syn-comment: #8b8b98;
+  --hx-syn-func: #2563eb;
+  --hx-syn-type: #0e7490;
+  --hx-syn-prop: #b4236a;
+  --hx-syn-tag: #c2410c;
+  --hx-syn-op: #6e6e7a;
+  --hx-syn-link: #2563eb;
+}
+html[data-theme='dark'] {
+  --hx-syn-keyword: #b69cff;
+  --hx-syn-string: #7fd6a8;
+  --hx-syn-number: #f0b36a;
+  --hx-syn-comment: #7b7b88;
+  --hx-syn-func: #7db4ff;
+  --hx-syn-type: #6fd3e6;
+  --hx-syn-prop: #f58ab4;
+  --hx-syn-tag: #ff9d7a;
+  --hx-syn-op: #a0a0ac;
+  --hx-syn-link: #7db4ff;
+}
+
+/* A file open in the pane takes the whole body, edge to edge. */
+.hx-tv[data-tool='disk'][data-file='true'] {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 12px 0 0;
+}
+.hx-tv[data-tool='disk'][data-file='true'] > .hx-disk {
+  min-height: 0;
+}
+.hx-tv[data-file='true'] .hx-disk__crumbs {
+  padding: 2px 16px 8px;
+}
+.hx-fed {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--hx-border);
+}
+.hx-fed__bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--hx-border);
+}
+.hx-fed__main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.hx-fed__main > .hx-code {
+  height: 100%;
+}
+.hx-fed__host {
+  position: absolute;
+  inset: 0;
+}
+.hx-fed__host .cm-editor {
+  height: 100%;
+}
+.hx-fed[data-kind='markdown'] .cm-scroller {
+  font-family: var(--hx-font-ui);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.hx-fed[data-kind='markdown'] .cm-content {
+  max-width: 760px;
+}
+
+/* The rendered page lies over the text and fades with it. */
+.hx-fed__page {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 20px 24px 48px;
+  background: var(--hx-bg-app);
+  animation: hx-fade-in var(--hx-dur-sm) var(--hx-ease-out) backwards;
+}
+.hx-fed__page[data-state='closing'] {
+  animation: hx-fed-out var(--hx-dur-sm) ease forwards;
+}
+@keyframes hx-fed-out {
+  to {
+    opacity: 0;
+  }
+}
+.hx-fed__doc {
+  max-width: 760px;
+  margin: 0 auto;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.hx-fed__doc :is(h1, h2, h3) {
+  margin-top: 8px;
+  letter-spacing: -0.01em;
+}
+.hx-fed__doc h1 {
+  font-size: 26px;
+}
+.hx-fed__doc h2 {
+  font-size: 21px;
+}
+.hx-fed__doc h3 {
+  font-size: 17px;
+}
+.hx-fed__doc a {
+  color: var(--hx-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hx-fed__doc .hx-md__pre {
+  padding: 12px 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: var(--hx-bg-rail);
+  font-family: var(--hx-font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+.hx-fed__doc .hx-md__pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+.hx-fed__doc input[type='checkbox'] {
+  margin-right: 8px;
+  accent-color: var(--hx-accent);
+}
+.hx-fed__doc li:has(> input[type='checkbox']) {
+  list-style: none;
+  margin-left: -22px;
+}
+
+/* A refusal of the save, in its own words, with what can be done about it. */
+.hx-fed__notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--hx-border);
+  background: var(--hx-warning-soft);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  animation: hx-in-up var(--hx-dur-sm) var(--hx-ease-out) backwards;
+}
+.hx-fed__notice[data-kind='error'] {
+  background: color-mix(in srgb, var(--hx-danger) 12%, transparent);
+}
+.hx-fed__notice[data-state='closing'] {
+  animation: hx-fed-out var(--hx-dur-sm) ease forwards;
+}
+.hx-fed__notice > .hx-icon {
+  flex: none;
+  color: var(--hx-warning);
+}
+.hx-fed__notice[data-kind='error'] > .hx-icon {
+  color: var(--hx-danger);
+}
+.hx-fed__notice-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+/* The status row of an IDE: language, cursor, the text against the disk. */
+.hx-fed__foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--hx-border);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  white-space: nowrap;
+}
+.hx-fed__lang {
+  color: var(--hx-fg-2);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-fed__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hx-fed__state::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-fg-3);
+  transition: background var(--hx-dur-sm) ease;
+}
+.hx-fed__state[data-state='dirty'] {
+  color: var(--hx-fg-1);
+}
+.hx-fed__state[data-state='dirty']::before {
+  background: var(--hx-warning);
+}
+.hx-fed__state[data-state='saving']::before {
+  background: var(--hx-accent);
+  animation: hx-fed-pulse 900ms ease-in-out infinite;
+}
+.hx-fed__state[data-state='saved']::before {
+  background: var(--hx-success);
+}
+@keyframes hx-fed-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-fed__state[data-state='saving']::before {
+    animation: none;
+  }
+}
+
+/* A tab with text not yet saved. */
+.hx-tab[data-dirty] .hx-tab__name::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--hx-warning);
+}

@@ -25,11 +25,13 @@ regexes = ['''^eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]*)?$''']
 # - 0123456789abcdef x4 is the hook token of the hooksetup tests;
 # - s3cret-for-golden and k3y-Fixture-7781 are the fixture secrets the golden generators feed the old runtime;
 # - 13b2048f...71ff55 is the asset cache key the preview golden derives from fixture inputs (a hash, not a secret).
+# - glpat-abcdefgh12345678 is the made-up GitLab token the agent config tests copy between files (too short for a real
+#   one), tok_12345678 the made-up Designly invite token of the page's tests.
 [[allowlists]]
 description = "Known fixture values in tests and golden test data"
 targetRules = ["generic-api-key"]
 condition = "AND"
-paths = ['''(?:^|/)(?:[^/]+_test\.go|testdata/.+)$''']
+paths = ['''(?:^|/)(?:[^/]+_test\.go|[^/]+\.test\.tsx?|testdata/.+)$''']
 regexes = [
   '''^dGhlIHNhbXBsZSBub25jZQ==$''',
   '''^BTBZMqHH6r4Tts7J_aSIgg$''',
@@ -38,4 +40,6 @@ regexes = [
   '''^s3cret-for-golden$''',
   '''^k3y-Fixture-7781$''',
   '''^13b2048f7d6b0de7660fa170f8f2cdde48a57ff7a3447cf88eeeef942671ff55$''',
+  '''^glpat-abcdefgh12345678$''',
+  '''^tok_12345678$''',
 ]

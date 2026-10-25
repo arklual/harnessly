@@ -1,0 +1,5 @@
+{"type":"launched"}
+{"type":"started","key":"v2:11","agentId":"a2beef0000000001e","label":"research:first","phase":"Research"}
+{"type":"started","key":"v2:12","agentId":"a2beef0000000002f","label":"research:second","phase":"Research"}
+{"type":"result","key":"v2:11","agentId":"a2beef0000000001e","result":{"headline":"Plans start at $9 per seat.","table_md":"| a | b |"}}
+{"type":"result","key":"v2:12","agentId":"a2beef0000000002f","result":{"headline":"Usage-based, no seats."}}

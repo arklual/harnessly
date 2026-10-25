@@ -103,10 +103,9 @@ func TestCoreHooksPushSleepAndKill(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"networkAccess":"localhost"}`), 0o600)
 	_ = os.WriteFile(filepath.Join(dir, "cli-token"), []byte("ok"), 0o600)
 
-	// The old runtime and a push service.
-	oldRT, pushSvc := &recorder{}, &recorder{code: http.StatusCreated}
-	oldSrv, pushSrv := httptest.NewServer(oldRT), httptest.NewServer(pushSvc)
-	defer oldSrv.Close()
+	// A push service.
+	pushSvc := &recorder{code: http.StatusCreated}
+	pushSrv := httptest.NewServer(pushSvc)
 	defer pushSrv.Close()
 	devKey, _ := ecdh.P256().GenerateKey(rand.Reader)
 	auth := make([]byte, 16)
@@ -117,9 +116,8 @@ func TestCoreHooksPushSleepAndKill(t *testing.T) {
 
 	sleepNames := sleep.EnvNames{IdleMin: "HS_TEST_SLEEP_IDLE_MIN", PressureMin: "HS_TEST_SLEEP_PRESSURE_MIN"}
 	c := newCore(coreConfig{DataDir: dir, Home: home, Tmux: tm, Term: terminal.New(terminal.Config{Tmux: tm, Home: home}), MetaKey: "meta",
-		Old:    &gate.OldRuntime{Upstream: strings.TrimPrefix(oldSrv.URL, "http://"), DataDir: dir, TokenHeaders: []string{"x-cli-token"}},
-		OldAPI: "/api/internal", Prompts: promptConfigFromEnv(dir),
-		Hooks: hookConfig{ConfigFile: filepath.Join(dir, "config.json"), PushSubject: "mailto:ops@example.org", PushTagPrefix: "app:", Sleep: sleepNames}})
+		Prompts: promptConfigFromEnv(dir),
+		Hooks:   hookConfig{ConfigFile: filepath.Join(dir, "config.json"), PushSubject: "mailto:ops@example.org", PushTagPrefix: "app:", Sleep: sleepNames}})
 	_ = os.WriteFile(filepath.Join(dir, "state-mode.json"), []byte(`{"goSlices":["core"]}`), 0o600)
 	f, err := gate.New(gate.Config{Listen: "127.0.0.1:0", Upstream: "127.0.0.1:1", DataDir: dir, CountEvery: time.Hour})
 	if err != nil {
@@ -195,30 +193,17 @@ func TestCoreHooksPushSleepAndKill(t *testing.T) {
 		t.Fatalf("push body %s %v", plain, err)
 	}
 
-	// A Codex SessionStart reaches the old runtime's timeline.
+	// A Codex SessionStart is taken.
 	if code, _ := post("/api/status/hook?provider=codex&tmuxSession="+shSession, `{"hook_event_name":"SessionStart","session_id":"12345678-aaaa-bbbb-cccc-1234567890ab","cwd":"/w","source":"clear"}`); code != 204 {
 		t.Fatalf("codex hook %d", code)
 	}
-	sent := oldRT.waitFor(t, "/api/internal/core/codex-session")
-	var sink struct {
-		TmuxSession  string         `json:"tmuxSession"`
-		SessionInfo  map[string]any `json:"sessionInfo"`
-		ClearSession bool           `json:"clearSession"`
-	}
-	if json.Unmarshal(sent.body, &sink) != nil || sink.TmuxSession != shSession || sink.SessionInfo["sessionId"] != "12345678-aaaa-bbbb-cccc-1234567890ab" ||
-		sink.SessionInfo["status"] != "running" || !sink.ClearSession || sent.header.Get("x-cli-token") != "ok" {
-		t.Fatalf("codex session %s", sent.body)
-	}
 
-	// Visibility goes to the sender and to the old runtime.
+	// Visibility goes to the sender.
 	if code, body := post("/api/push/visibility", `{"deviceId":"d1","visible":true}`); code != 200 || body != `{"ok":true}` {
 		t.Fatalf("visibility %d %s", code, body)
 	}
 	if v := c.push.Store.Visible(); !v["d1"] {
 		t.Fatal("not marked visible")
-	}
-	if g := oldRT.waitFor(t, "/api/push/visibility"); string(g.body) != `{"deviceId":"d1","visible":true}` {
-		t.Fatalf("%s", g.body)
 	}
 
 	// The access rule comes from the config (an explicit HOST wins).

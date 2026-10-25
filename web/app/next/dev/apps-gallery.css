@@ -1,0 +1,16 @@
+/* The Apps gallery's frame (?dev=apps): the screen in the window the shell gives it; nothing here is part of the product. */
+.hx-gallery-apps {
+  display: flex;
+  height: 100dvh;
+  background: var(--hx-bg-stage);
+}
+.hx-gallery-apps .hx-main {
+  flex: 1;
+  margin: 10px;
+}
+@media (max-width: 900px) {
+  .hx-gallery-apps .hx-main {
+    margin: 0;
+    border-radius: 0;
+  }
+}

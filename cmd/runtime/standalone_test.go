@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -225,8 +226,7 @@ func TestStandaloneLockAsThePreviousRuntime(t *testing.T) {
 	}
 }
 
-// A corrected tab state: in front of the old runtime it goes there; alone it is reported to the deployment's endpoint,
-// as the old runtime reported it.
+// A corrected tab state is reported to the deployment's endpoint, as the old runtime reported it.
 func TestMismatchReport(t *testing.T) {
 	got := make(chan string, 4)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -235,16 +235,9 @@ func TestMismatchReport(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	dir := t.TempDir()
-	_ = os.WriteFile(filepath.Join(dir, "cli-token"), []byte("tok"), 0o600)
 	ms := 1499.6
 	x := status.Mismatch{Kind: "stuck-settled", Shown: "busy", Provider: "claude", DurationMs: &ms}
-	front := &core{cfg: coreConfig{Old: &gate.OldRuntime{Upstream: strings.TrimPrefix(srv.URL, "http://"), DataDir: dir, TokenHeaders: []string{"x-tok"}}, OldAPI: "/api/internal"}}
-	front.reportMismatch(x)
-	if body := <-got; body != `/api/internal/core/mismatch {"actual":null,"durationMs":1499.6,"kind":"stuck-settled","provider":"claude","shown":"busy","unhooked":false}` {
-		t.Fatal(body)
-	}
-	alone := &core{cfg: coreConfig{Standalone: true, Old: front.cfg.Old, Telemetry: telemetry.New(telemetry.Config{URL: srv.URL + "/batch/", Key: "k",
+	alone := &core{cfg: coreConfig{Standalone: true, Telemetry: telemetry.New(telemetry.Config{URL: srv.URL + "/batch/", Key: "k",
 		Common: jsvalue.NewObject("app", "ai"), DistinctID: func() string { return "ann@example.org" }, Delay: 10 * time.Millisecond})}}
 	alone.reportMismatch(x)
 	body := <-got
@@ -252,16 +245,12 @@ func TestMismatchReport(t *testing.T) {
 		!strings.HasSuffix(body, `"properties":{"app":"ai","kind":"stuck-settled","shown":"busy","actual":null,"provider":"claude","duration_ms":1500,"unhooked":false,"distinct_id":"ann@example.org","$process_person_profile":false}}]}`) {
 		t.Fatal(body)
 	}
-	select {
-	case extra := <-got:
-		t.Fatalf("alone, nothing goes to the old runtime: %s", extra)
-	case <-time.After(100 * time.Millisecond):
-	}
 }
 
-// Alone, a request no route takes: an old route is unavailable, anything else not found, a socket path refused.
+// Alone, a request no route takes: an old route is unavailable, anything else not found, a socket path refused (and
+// unauthorized without a session or the cli-token).
 func TestStandaloneFallback(t *testing.T) {
-	h := standaloneFallback()
+	h := standaloneFallback(func(r *http.Request) bool { return r.Header.Get("x-cli-token") == "ok" })
 	get := func(p string) (int, string, string) {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest("GET", p, nil))
@@ -275,7 +264,8 @@ func TestStandaloneFallback(t *testing.T) {
 	}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
-	for p, want := range map[string]string{"/api/timeline": "HTTP/1.1 503 Service Unavailable", "/agents/api/elsewhere": "HTTP/1.1 404 Not Found"} {
+	for p, want := range map[string]string{"/api/timeline": "HTTP/1.1 503 Service Unavailable", "/agents/api/elsewhere?token": "HTTP/1.1 404 Not Found",
+		"/agents/api/elsewhere": "HTTP/1.1 401 Unauthorized", "/api/install": "HTTP/1.1 404 Not Found"} {
 		conn, err := net.Dial("tcp", strings.TrimPrefix(srv.URL, "http://"))
 		if err != nil {
 			t.Fatal(err)
@@ -283,11 +273,78 @@ func TestStandaloneFallback(t *testing.T) {
 		req, _ := http.NewRequest("GET", srv.URL+p, nil)
 		req.Header.Set("Connection", "Upgrade")
 		req.Header.Set("Upgrade", "websocket")
+		if req.URL.RawQuery == "token" {
+			req.Header.Set("x-cli-token", "ok")
+		}
 		_ = req.Write(conn)
 		line, _ := bufio.NewReader(conn).ReadString('\n')
 		conn.Close()
 		if strings.TrimSpace(line) != want {
 			t.Errorf("%s: %q", p, line)
 		}
+	}
+}
+
+// In front of the old runtime, a socket upgrade no route took does not reach it unless a page session or the cli-token
+// stands behind it, and the first-run install shell never does (security review).
+func TestUpstreamGuardRefusesBeforeProxying(t *testing.T) {
+	var reached atomic.Int32
+	guard := upstreamGuard(func(r *http.Request) bool { return r.Header.Get("x-cli-token") == "ok" },
+		func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, "/preview/") })
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if guard.Match(r) {
+			guard.Handler.ServeHTTP(w, r)
+			return
+		}
+		reached.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	line := func(method, path string, upgrade bool, header map[string]string) string {
+		conn, err := net.Dial("tcp", strings.TrimPrefix(srv.URL, "http://"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		req, _ := http.NewRequest(method, srv.URL+path, nil)
+		if upgrade {
+			req.Header.Set("Connection", "Upgrade")
+			req.Header.Set("Upgrade", "websocket")
+		}
+		for k, v := range header {
+			req.Header.Set(k, v)
+		}
+		_ = req.Write(conn)
+		l, _ := bufio.NewReader(conn).ReadString('\n')
+		return strings.TrimSpace(l)
+	}
+	ok := map[string]string{"x-cli-token": "ok"}
+	for _, c := range []struct {
+		path   string
+		header map[string]string
+		want   string
+		proxy  bool
+	}{
+		{"/api/install?command=claude", nil, "HTTP/1.1 404 Not Found", false},
+		{"/agents/api/install", nil, "HTTP/1.1 404 Not Found", false},
+		{"/api/install", ok, "HTTP/1.1 404 Not Found", false},
+		{"/agents/api/install", ok, "HTTP/1.1 404 Not Found", false},
+		{"/api/elsewhere", nil, "HTTP/1.1 401 Unauthorized", false},
+		{"/agents/api/elsewhere", nil, "HTTP/1.1 401 Unauthorized", false},
+		{"/api/elsewhere", ok, "HTTP/1.1 200 OK", true},
+		{"/preview/hmr", nil, "HTTP/1.1 200 OK", true},
+	} {
+		before := reached.Load()
+		if got := line("GET", c.path, true, c.header); got != c.want {
+			t.Errorf("%s %v: %q, want %q", c.path, c.header, got, c.want)
+		}
+		if proxied := reached.Load() != before; proxied != c.proxy {
+			t.Errorf("%s %v: proxied %v, want %v", c.path, c.header, proxied, c.proxy)
+		}
+	}
+	// A plain request is the old runtime's own business.
+	before := reached.Load()
+	if got := line("GET", "/api/install", false, nil); got != "HTTP/1.1 200 OK" || reached.Load() != before+1 {
+		t.Errorf("plain request: %q", got)
 	}
 }

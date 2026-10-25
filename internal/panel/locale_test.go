@@ -30,7 +30,7 @@ func TestEnglishRefusals(t *testing.T) {
 	for tab, want := range map[string]string{
 		"browser":   "open browser: opens a port of this machine (4400, localhost:4400/path) or a feature stand https://<slug>.preview.example.org; the agent does not open other external addresses",
 		"artifacts": "open artifacts: a link to a document or a board of a.example.org is required (https://a.example.org/a/… or /b/…)",
-		"gitlab":    "open gitlab: a link to a GitLab merge request or commit is required (https://gitlab.example.org/…)",
+		"gitlab":    "open gitlab: a link to a GitLab merge request or commit (https://gitlab.example.org/…), or to a GitHub pull request, commit or issue (https://github.com/…) is required",
 	} {
 		if _, err := targets.Parse(open(tab, "not a target")); err != want {
 			t.Errorf("%s hint: %q", tab, err)

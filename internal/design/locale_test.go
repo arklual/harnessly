@@ -134,7 +134,7 @@ func TestEmbeddedTextsFollowTheLocale(t *testing.T) {
 	if cyrillic.MatchString(guide) {
 		t.Errorf("the English guide has Russian text: %s", cyrillic.FindString(guide))
 	}
-	mustContain(t, "English client script", script, "'Script error'", "'Find a board'", "'Copied'")
+	mustContain(t, "English client script", script, "'Script error'", "'Find a board'", "'Copied'", "'· ' + pair[1]", "'Desktop'", "'Phone'")
 	// The suffix of a phone board's title is compared with the titles of existing boards, so it stays Russian.
 	if without := strings.ReplaceAll(script, " · Мобильная", ""); cyrillic.MatchString(without) {
 		t.Errorf("the English client script has Russian text: %s", cyrillic.FindString(without))
@@ -142,7 +142,7 @@ func TestEmbeddedTextsFollowTheLocale(t *testing.T) {
 	t.Setenv("RUNTIME_LOCALE", "ru")
 	ruGuide, ruScript := l.Guide(), l.clientScript()
 	mustContain(t, "Russian guide", ruGuide, "<!-- acme-library-guide v6 -->", "# Макеты Claude Design: как их править")
-	mustContain(t, "Russian client script", ruScript, "'Ошибка скрипта'", "'Найти доску'")
+	mustContain(t, "Russian client script", ruScript, "'Ошибка скрипта'", "'Найти доску'", "'Десктоп'", "'Телефон'")
 	if l.text("library.css") != css {
 		t.Error("the stylesheet differs between languages")
 	}

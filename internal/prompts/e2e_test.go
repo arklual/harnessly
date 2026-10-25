@@ -127,8 +127,10 @@ func (f *fakeTUI) sendNow() {
 	for _, q := range f.queue {
 		f.record(map[string]any{"type": "queue-operation", "operation": "remove", "content": q, "timestamp": isoNow()})
 	}
+	// Claude Code 2.1.310 injects a message typed mid-turn as an attachment, with no user record.
 	for _, q := range f.queue {
-		f.record(map[string]any{"type": "user", "timestamp": isoNow(), "message": map[string]any{"role": "user", "content": q}})
+		f.record(map[string]any{"type": "attachment", "timestamp": isoNow(), "attachment": map[string]any{
+			"type": "queued_command", "prompt": q, "commandMode": "prompt", "timestamp": isoNow()}})
 		f.history = append(f.history, q)
 		f.logLine("delivered:" + strconv.Quote(q))
 	}

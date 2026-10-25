@@ -1,0 +1,5 @@
+{
+  "op": "rewind.undo",
+  "body": {"opId": "op-rw2", "id": "tab-k3Jx9QmZ"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 611}
+}

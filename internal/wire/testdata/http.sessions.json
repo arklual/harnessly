@@ -1,0 +1,7 @@
+{
+  "http": "sessions",
+  "response": [
+    {"provider": "claude", "sessionId": "d4618428-ad72-4227-8e97-f77e8c0f8c17", "title": "Починить гонку в очереди", "cwd": "/home/coder/workspace/harnessly", "updatedAt": 1790096400000, "turns": 14},
+    {"provider": "codex", "sessionId": "0199c1f2-7a4b-7c33-9d0e-5b6a1e2f3c44", "title": "Почему падает сборка", "cwd": "/home/coder/workspace/acme", "updatedAt": 1790010000000, "turns": 3}
+  ]
+}

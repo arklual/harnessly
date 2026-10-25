@@ -1,0 +1,5 @@
+{
+  "op": "favorites.place",
+  "body": {"opId": "op-fg5", "id": "tab-k3Jx9QmZ", "groupId": "fg-9k2m4x7q", "beforeId": "tab-s2Qwai"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1855}
+}

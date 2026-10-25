@@ -250,3 +250,41 @@ func NewestChild(parent int) int {
 	}
 	return best
 }
+
+// clockTick is the unit of the CPU times in /proc/<pid>/stat (USER_HZ, 100 on every Linux the runtime runs on).
+const clockTick = 10 * time.Millisecond
+
+// Usage is what /proc/<pid>/stat says of a process: its parent, its name, the processor time it has used (user and
+// system) and its resident memory.
+type Usage struct {
+	PPID int
+	Comm string
+	CPU  time.Duration
+	RSS  int64
+}
+
+// UsageOf reads a process's Usage; false when it is gone or unreadable.
+func UsageOf(pid int) (Usage, bool) {
+	raw, err := os.ReadFile(dir(pid) + "/stat")
+	if err != nil {
+		return Usage{}, false
+	}
+	return parseUsage(string(raw))
+}
+
+func parseUsage(s string) (Usage, bool) {
+	open, end := strings.IndexByte(s, '('), strings.LastIndexByte(s, ')')
+	if open < 0 || end < open {
+		return Usage{}, false
+	}
+	fields := strings.Fields(s[end+1:])
+	if len(fields) < 22 {
+		return Usage{}, false
+	}
+	ppid, _ := strconv.Atoi(fields[1])
+	utime, _ := strconv.ParseInt(fields[11], 10, 64)
+	stime, _ := strconv.ParseInt(fields[12], 10, 64)
+	rss, _ := strconv.ParseInt(fields[21], 10, 64)
+	return Usage{PPID: ppid, Comm: s[open+1 : end], CPU: time.Duration(utime+stime) * clockTick,
+		RSS: rss * int64(os.Getpagesize())}, true
+}

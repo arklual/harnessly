@@ -1,0 +1,24 @@
+{
+  "next.subs.general": "Agent",
+  "next.subs.open": "Open",
+  "next.subs.showAll": "Show all",
+  "next.subs.collapse": "Collapse",
+  "next.subs.pane": "Subagents",
+  "next.subs.paneHint": "Who the agent started and what they returned",
+  "next.subs.empty": "The agent has not started anyone in this chat",
+  "next.subs.stateRun": "working",
+  "next.subs.stateDone": "done",
+  "next.subs.stateFailed": "failed",
+  "next.subs.waiting": "No answer yet, the agent is still working",
+  "next.subs.noAnswer": "The agent returned nothing",
+  "next.flow.kind": "Workflow",
+  "next.flow.stateRun": "running",
+  "next.flow.stateDone": "done",
+  "next.flow.stateFailed": "failed",
+  "next.flow.stateStopped": "stopped",
+  "next.flow.noPhase": "No phase",
+  "next.flow.flowsRun": {
+    "one": "{n} running",
+    "other": "{n} running"
+  }
+}

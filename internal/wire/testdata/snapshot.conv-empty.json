@@ -1,0 +1,17 @@
+{
+  "f": "snapshot",
+  "ch": "conv:tab-Vr7pL2aa",
+  "seq": 0,
+  "mode": "replace",
+  "data": {
+    "turns": [],
+    "entries": [],
+    "beforeTurnId": null,
+    "queue": {"conversationId": "tab-Vr7pL2aa", "items": [], "paused": null, "rev": 1},
+    "messages": [],
+    "questions": [],
+    "permissions": [],
+    "background": [],
+    "now": null
+  }
+}

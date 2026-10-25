@@ -134,11 +134,11 @@ func TestCommandsGoToTheServerTheSessionLivesOn(t *testing.T) {
 		}
 	}
 	_ = tm.SendRawKeys("od-ws-a-pane-b-tab-old", "Enter")
-	if got := f.last(); !reflect.DeepEqual(got, []string{"-L", "old", "send-keys", "-t", "od-ws-a-pane-b-tab-old", "Enter"}) {
+	if got := f.last(); !reflect.DeepEqual(got, []string{"-u", "-L", "old", "send-keys", "-t", "od-ws-a-pane-b-tab-old", "Enter"}) {
 		t.Errorf("send went %q", got)
 	}
 	_ = tm.SendRawKeys("od-ws-a-pane-b-tab-restarted", "Enter")
-	if got := f.last(); !reflect.DeepEqual(got, []string{"-L", "main", "send-keys", "-t", "od-ws-a-pane-b-tab-restarted", "Enter"}) {
+	if got := f.last(); !reflect.DeepEqual(got, []string{"-u", "-L", "main", "send-keys", "-t", "od-ws-a-pane-b-tab-restarted", "Enter"}) {
 		t.Errorf("send went %q", got)
 	}
 	// A legacy name found nowhere would be started on the current server.
@@ -302,7 +302,7 @@ func TestBracketedPasteFramesText(t *testing.T) {
 	}
 	var seq [][]string
 	for _, c := range f.calls {
-		seq = append(seq, c.args[2:])
+		seq = append(seq, c.args[3:])
 	}
 	want := [][]string{
 		{"copy-mode", "-q", "-t", "nw-s"},
@@ -341,7 +341,7 @@ func TestLiteralThenEnter(t *testing.T) {
 	if got := typed(f); !reflect.DeepEqual(got, []string{"/rename Привет"}) {
 		t.Fatalf("%q", got)
 	}
-	if !reflect.DeepEqual(f.last()[2:], []string{"send-keys", "-t", "nw-s", "Enter"}) || !reflect.DeepEqual(f.sleeps, []time.Duration{50 * time.Millisecond}) {
+	if !reflect.DeepEqual(f.last()[3:], []string{"send-keys", "-t", "nw-s", "Enter"}) || !reflect.DeepEqual(f.sleeps, []time.Duration{50 * time.Millisecond}) {
 		t.Fatalf("enter %q sleeps %v", f.last(), f.sleeps)
 	}
 	f.reset()
@@ -363,7 +363,7 @@ func TestKeyVariants(t *testing.T) {
 	_ = tm.SendKeysSeparated("nw-s", "hello")
 	var seq []string
 	for _, c := range f.calls {
-		seq = append(seq, strings.Join(c.args[2:], " "))
+		seq = append(seq, strings.Join(c.args[3:], " "))
 	}
 	want := []string{
 		"copy-mode -q -t nw-s", "send-keys -t nw-s C-x C-s",
@@ -445,7 +445,7 @@ func TestCreateSessionCommandLine(t *testing.T) {
 	if c.program != "nice" || c.dir != "/work" || !reflect.DeepEqual(c.args, want) {
 		t.Fatalf("%s in %s: %q", c.program, c.dir, c.args)
 	}
-	if got := f.calls[1].args; !reflect.DeepEqual(got, []string{"-L", "main", "source-file", "/app/tmux.conf"}) {
+	if got := f.calls[1].args; !reflect.DeepEqual(got, []string{"-u", "-L", "main", "source-file", "/app/tmux.conf"}) {
 		t.Fatalf("then %q", got)
 	}
 	f.reset()
@@ -467,7 +467,7 @@ func TestApplyConfigAndKillServerTouchEveryServer(t *testing.T) {
 		got = append(got, strings.Join(c.args, " "))
 	}
 	slices.Sort(got)
-	want := []string{"-L main kill-server", "-L main source-file /c", "-L old kill-server", "-L old source-file /c"}
+	want := []string{"-u -L main kill-server", "-u -L main source-file /c", "-u -L old kill-server", "-u -L old source-file /c"}
 	if !reflect.DeepEqual(got, want) || len(f.servers) != 0 {
 		t.Fatalf("%q", got)
 	}
@@ -535,6 +535,26 @@ func TestSessionNames(t *testing.T) {
 	}
 }
 
+func TestOwnShellNames(t *testing.T) {
+	tm := New(fakeNames)
+	name := tm.OwnShellName("tab-k3Jx9QmZ", "mh3k9x2a1bc")
+	if name != "nw-v2t-tab-k3Jx9QmZ-mh3k9x2a1bc" {
+		t.Fatal(name)
+	}
+	if id, ok := tm.OwnShellID("tab-k3Jx9QmZ", name); !ok || id != "mh3k9x2a1bc" {
+		t.Fatalf("%s %v", id, ok)
+	}
+	for _, other := range []string{"nw-v2t-tab-other-mh3k9x2a1bc", "nw-v2t-tab-k3Jx9QmZ-", "nw-v2t-tab-k3Jx9QmZ-a-b", "nw-shell-tab-k3Jx9QmZ"} {
+		if id, ok := tm.OwnShellID("tab-k3Jx9QmZ", other); ok {
+			t.Errorf("%s read as terminal %s", other, id)
+		}
+	}
+	// It is not a tab of the layout, nor a conversation's pane shell.
+	if _, _, _, ok := tm.ParseSessionName(name); ok || tm.TabOf(name) != "" {
+		t.Fatal("an own terminal looks like a tab")
+	}
+}
+
 func TestResolveExistingDir(t *testing.T) {
 	home := t.TempDir()
 	tm := NewConfig(Config{Names: fakeNames, Home: home})
@@ -576,7 +596,7 @@ func TestCaptureAtWidth(t *testing.T) {
 	if _, ok := tm.CaptureAtWidth(wide, "nw-s", 120, 50); !ok {
 		t.Fatal("capture failed")
 	}
-	if got := f.last()[2:]; !reflect.DeepEqual(got, []string{"capture-pane", "-p", "-S", "-50", "-t", "nw-s"}) || len(wide.log) != 0 {
+	if got := f.last()[3:]; !reflect.DeepEqual(got, []string{"capture-pane", "-p", "-S", "-50", "-t", "nw-s"}) || len(wide.log) != 0 {
 		t.Fatalf("wide terminal: %q %q", got, wide.log)
 	}
 
@@ -586,7 +606,7 @@ func TestCaptureAtWidth(t *testing.T) {
 	if want := []string{"pause", "resize 120x60", "resize 40x60", "resume"}; !reflect.DeepEqual(narrow.log, want) {
 		t.Fatalf("narrow: %q", narrow.log)
 	}
-	if got := f.last()[2:]; !reflect.DeepEqual(got, []string{"capture-pane", "-p", "-t", "nw-s"}) || !reflect.DeepEqual(f.sleeps, []time.Duration{300 * time.Millisecond, 300 * time.Millisecond}) {
+	if got := f.last()[3:]; !reflect.DeepEqual(got, []string{"capture-pane", "-p", "-t", "nw-s"}) || !reflect.DeepEqual(f.sleeps, []time.Duration{300 * time.Millisecond, 300 * time.Millisecond}) {
 		t.Fatalf("narrow capture %q sleeps %v", got, f.sleeps)
 	}
 
@@ -600,7 +620,7 @@ func TestCaptureAtWidth(t *testing.T) {
 	for _, term := range []Terminal{nil, &fakeTerminal{}, &fakeTerminal{cols: 40, rows: 20, open: true, paused: true}} {
 		f.reset()
 		_, _ = tm.CaptureAtWidth(term, "nw-s", 120, 50)
-		if got := f.last()[2:]; !reflect.DeepEqual(got, []string{"capture-pane", "-p", "-t", "nw-s"}) || len(f.sleeps) != 0 {
+		if got := f.last()[3:]; !reflect.DeepEqual(got, []string{"capture-pane", "-p", "-t", "nw-s"}) || len(f.sleeps) != 0 {
 			t.Fatalf("no terminal: %q %v", got, f.sleeps)
 		}
 	}

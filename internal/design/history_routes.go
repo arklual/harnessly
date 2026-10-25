@@ -27,6 +27,13 @@ func (a *API) History(r *http.Request) Answer {
 		return *refused
 	}
 	a.startBackground()
+	need := RoleEdit
+	if r.Method == http.MethodGet {
+		need = RoleView
+	}
+	if no := a.gateAny(r, historyTarget(r, body), need); no != nil {
+		return *no
+	}
 	var err error
 	if r.Method == http.MethodGet {
 		var snaps []BoardSnapshot
@@ -99,6 +106,9 @@ func (a *API) CLIHistory(r *http.Request) Answer {
 		if p, ok := Query(r, "project"); ok {
 			project = p
 		}
+		if no := a.gateAny(r, project, RoleView); no != nil {
+			return *no
+		}
 		var out CLIHistory
 		if out, err = a.L.HistoryForCLI(project, board, limit); err == nil {
 			return JSON(r, http.StatusOK, out, h)
@@ -118,6 +128,9 @@ func (a *API) CLIHistory(r *http.Request) Answer {
 				return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("Invalid session of the agent's tab", "Непонятная сессия вкладки агента")), h)
 			}
 			session = s
+		}
+		if no := a.gateAny(r, Field(body, "project"), RoleEdit); no != nil {
+			return *no
 		}
 		var res CLIRestored
 		if res, err = a.L.RestoreForCLI(session, Field(body, "project"), Field(body, "board"), Field(body, "at")); err == nil {
@@ -221,6 +234,7 @@ func (a *API) Import(r *http.Request) Answer {
 	if err != nil {
 		return JSON(r, http.StatusInternalServerError, errorBody(locale.Pick("Could not upload the project", "Не удалось загрузить проект")), h)
 	}
+	a.L.AnnounceNew(res.ID)
 	return JSON(r, http.StatusCreated, struct {
 		ID     string `json:"id"`
 		Title  string `json:"title"`

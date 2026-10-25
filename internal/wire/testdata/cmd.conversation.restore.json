@@ -1,0 +1,5 @@
+{
+  "op": "conversation.restore",
+  "body": {"opId": "op-res1", "id": "tab-Vr7pL2aa"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1847}
+}

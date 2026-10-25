@@ -43,7 +43,7 @@ func (a *API) Library(r *http.Request) Answer {
 	if v, ok := Query(r, "lite"); ok && v == "1" {
 		return JSON(r, 200, libraryResponse{Port: port, Root: a.L.Root(), SelfTabID: self, Artifacts: []*Artifact{}}, h)
 	}
-	arts := a.L.ListArtifacts()
+	arts := a.L.VisibleTo(a.L.ListArtifacts())
 	a.L.AttachChecks(arts)
 	a.L.AttachReleases(arts)
 	if a.L.AttachAgents(arts, deref(self)) != nil || a.L.AttachClaims(arts) != nil {
@@ -77,6 +77,9 @@ func (a *API) Boards(r *http.Request) Answer {
 	action, ok2 := strField(body, "action")
 	if !ok1 || !ok2 || !BoardActions[action] {
 		return bad
+	}
+	if no := a.gate(r, artifact, RoleEdit); no != nil {
+		return *no
 	}
 	e := BoardEdit{Action: action}
 	if Has(body, "path") {
@@ -116,6 +119,11 @@ func (a *API) Locate(r *http.Request) Answer {
 	if !ok || jscompat.Len(p) > 2048 || (Has(body, "text") && (!isText || jscompat.Len(txt) > 2000)) {
 		return JSON(r, 400, errorBody("invalid request"), h)
 	}
+	if ref, _, ok := ParsePagePath(p); ok {
+		if no := a.gate(r, ref, RoleView); no != nil {
+			return *no
+		}
+	}
 	return JSON(r, 200, struct {
 		Matches []Match `json:"matches"`
 	}{a.L.Locate(p, txt)}, h)
@@ -141,6 +149,9 @@ func (a *API) Message(r *http.Request) Answer {
 	}
 	if !ok1 || !ok2 || !IsLibraryID(artifact) || !ok3 || jscompat.Trim(txt) == "" || jscompat.Len(txt) > max {
 		return JSON(r, 400, errorBody(locale.Pick("An empty message or an unknown design", "Пустое сообщение или неизвестный макет")), h)
+	}
+	if no := a.gate(r, artifact, RoleEdit); no != nil {
+		return *no
 	}
 	if a.Terminal == nil {
 		return JSON(r, 503, errorBody("the tab keeper is not running"), h)
@@ -229,6 +240,9 @@ func (a *API) Send(r *http.Request) Answer {
 	if !okID || !IsLibraryID(id) || board == "" || !titleOK || !deviceOK {
 		return JSON(r, 400, errorBody("invalid request"), h)
 	}
+	if no := a.gate(r, id, RoleView); no != nil {
+		return *no
+	}
 	art := a.L.ReadArtifact(id)
 	if art == nil {
 		return JSON(r, 404, errorBody(locale.Pick("The design is gone", "Макета больше нет")), h)
@@ -290,6 +304,9 @@ func (a *API) Continue(r *http.Request, resolveCwd func(string, []string) (strin
 	if !ok {
 		return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 	}
+	if no := a.gate(r, id, RoleEdit); no != nil {
+		return *no
+	}
 	prompt, isPrompt := strField(body, "prompt")
 	if Has(body, "prompt") && (!isPrompt || jscompat.Len(prompt) > 12000) {
 		return JSON(r, 400, errorBody(locale.Pick("The task is too long", "Задача слишком длинная")), h)
@@ -301,6 +318,26 @@ func (a *API) Continue(r *http.Request, resolveCwd func(string, []string) (strin
 	return JSON(r, 201, struct {
 		TabID string `json:"tabId"`
 	}{res.TabID}, h)
+}
+
+// PageLog is GET ?artifact=: what the open pages of the design logged (errors, rejections, long tasks, slow loads), for the
+// site's DevTools; the same record an agent reads with `design logs`.
+func (a *API) PageLog(r *http.Request) Answer {
+	if _, no := a.Guard(r, http.MethodGet); no != nil {
+		return *no
+	}
+	h := noStore()
+	id := QueryString(r, "artifact")
+	if !IsLibraryID(id) {
+		return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
+	}
+	if no := a.gate(r, id, RoleView); no != nil {
+		return *no
+	}
+	return JSON(r, 200, struct {
+		Artifact string         `json:"artifact"`
+		Entries  []LiveLogEntry `json:"entries"`
+	}{id, a.L.LiveLog(id)}, h)
 }
 
 type cliArtifact struct {
@@ -324,6 +361,9 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 		if !IsLibraryID(id) {
 			return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 		}
+		if no := a.gate(r, id, RoleView); no != nil {
+			return *no
+		}
 		return JSON(r, 200, struct {
 			Artifact string         `json:"artifact"`
 			Entries  []LiveLogEntry `json:"entries"`
@@ -334,13 +374,16 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 		if !IsLibraryID(id) {
 			return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 		}
+		if no := a.gate(r, id, RoleView); no != nil {
+			return *no
+		}
 		return JSON(r, 200, struct {
 			Artifact string       `json:"artifact"`
 			Shown    *DesignState `json:"shown"`
 		}{id, a.L.State(id)}, h)
 	}
 	if r.Method == http.MethodGet {
-		arts := a.L.ListArtifacts()
+		arts := a.L.VisibleTo(a.L.ListArtifacts())
 		list := make([]cliArtifact, 0, len(arts))
 		for _, x := range arts {
 			list = append(list, cliArtifact{ID: x.ID, Title: x.Title, Boards: len(x.Boards), ProjectPath: x.ProjectPath})
@@ -357,6 +400,9 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 	artifact, ok := strField(body, "artifact")
 	if !ok || !IsLibraryID(artifact) {
 		return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
+	}
+	if no := a.gate(r, artifact, RoleEdit); no != nil {
+		return *no
 	}
 	if Has(body, "control") {
 		c := ParseControl(Field(body, "control"))
@@ -411,10 +457,14 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 		if p, ok := Query(r, "project"); ok && p != "" {
 			project = p
 		}
+		if no := a.gateAny(r, project, RoleView); no != nil {
+			return *no
+		}
 		lines, err := a.L.WhoHolds(project)
 		if err != nil {
 			return refuse(err)
 		}
+		lines = a.L.visibleClaims(lines)
 		return JSON(r, 200, struct {
 			Claims []ClaimLine `json:"claims"`
 		}{lines}, h)
@@ -434,6 +484,9 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 		board, okB := strField(body, "board")
 		if !okP || !okB {
 			return JSON(r, 400, errorBody(locale.Pick("A project and a board are required: "+cli+" design claim <project> <board>", "Нужны проект и доска: "+cli+" design claim <проект> <доска>")), h)
+		}
+		if no := a.gate(r, project, RoleEdit); no != nil {
+			return *no
 		}
 		out, err := a.L.ClaimForChat(session, project, board)
 		if err != nil {
@@ -533,6 +586,7 @@ func (a *API) Create(r *http.Request, resolveCwd func(string, []string) (string,
 		}
 		return JSON(r, 500, errorBody(locale.Pick("Could not create the project", "Не удалось создать проект")), h)
 	}
+	a.L.AnnounceNew(project.ID)
 	res := a.StartProjectDialog(project.ID, a.L.NewProjectPrompt(project.Title, brief)+"\n\n"+a.L.PagesHint(project.ID), resolveCwd)
 	if res.TabID == "" {
 		return JSON(r, res.Status, struct {

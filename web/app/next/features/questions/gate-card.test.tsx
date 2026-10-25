@@ -1,0 +1,66 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import GateCard from '@/next/features/questions/gate-card';
+import type { Permission } from '@/next/features/questions/types';
+
+afterEach(cleanup);
+
+const permission = (state: Permission['state']): Permission => ({
+  id: 'p:toolu_read',
+  kind: 'tool',
+  askedAt: 0,
+  tool: 'Read',
+  command: 'Read /etc/hostname',
+  cwd: null,
+  planMd: null,
+  options: [
+    { id: '1', label: 'Yes', scope: 'once' },
+    { id: '3', label: 'No', scope: 'deny' },
+  ],
+  state,
+});
+
+describe('GateCard', () => {
+  it('titles the permission of a file read as a read, not as a command', () => {
+    render(
+      <GateCard
+        permission={permission({ k: 'open' })}
+        device="d1"
+        decided={null}
+        onDecide={() => Promise.resolve()}
+      />,
+    );
+    expect(screen.getByText('Allow reading the file?')).toBeTruthy();
+  });
+
+  it('says a decision the machine could not match goes to the terminal, and opens it', () => {
+    const onOpenTerminal = vi.fn();
+    render(
+      <GateCard
+        permission={permission({ k: 'open', refused: 'menu-unmatched' })}
+        device="d1"
+        decided={null}
+        onDecide={() => Promise.resolve()}
+        onOpenTerminal={onOpenTerminal}
+      />,
+    );
+    expect(screen.getByRole('status').textContent).toContain('decide in the terminal');
+    fireEvent.click(screen.getByText('Open the terminal'));
+    expect(onOpenTerminal).toHaveBeenCalledOnce();
+    // The options stay: a decision may still be taken again from the page.
+    expect(screen.getByText('Yes')).toBeTruthy();
+  });
+
+  it('says nothing of the terminal on an open gate', () => {
+    render(
+      <GateCard
+        permission={permission({ k: 'open' })}
+        device="d1"
+        decided={null}
+        onDecide={() => Promise.resolve()}
+      />,
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});

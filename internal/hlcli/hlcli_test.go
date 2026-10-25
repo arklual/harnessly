@@ -49,6 +49,14 @@ func (f *fakeRuntime) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case r.URL.Path == "/api/cli/peers":
+		_, _ = w.Write([]byte(`{"chats":[{"ref":"dev-department/tab-rsk","title":"Модель по умолчанию","machine":"dev-department",` +
+			`"machineName":"dev-department","owner":"Иван","state":"busy"}],"errors":["no-relay"]}`))
+	case r.URL.Path == "/api/cli/peers/send" && body["to"] == "dev-department/tab-blocked":
+		_, _ = w.Write([]byte(`{"id":"pm_1","state":"refused","reason":"blocked"}`))
+	case r.URL.Path == "/api/cli/peers/send":
+		_, _ = w.Write([]byte(`{"id":"pm_1","state":"delivered","to":{"ref":"dev-department/tab-rsk","title":"Модель по умолчанию",` +
+			`"machineName":"dev-department","owner":"Иван","state":"busy"}}`))
 	case r.URL.Path == "/api/cli/workspaces":
 		_, _ = w.Write([]byte(`{"workspaces":[{"id":"ws-1","name":"Work","directories":["/home/a/work"]}]}`))
 	case r.URL.Path == "/api/cli/tabs" && r.Method == "GET":
@@ -125,6 +133,10 @@ func TestOpenSendsTheDetectedTabFromTheOwnSession(t *testing.T) {
 		{"4400", "browser", "4400"},
 		{"localhost:3000/app", "browser", "localhost:3000/app"},
 		{"https://gitlab.example.com/g/p/-/merge_requests/12", "gitlab", "https://gitlab.example.com/g/p/-/merge_requests/12"},
+		{"https://github.com/ly-solutions/harnessly/pull/12", "gitlab", "https://github.com/ly-solutions/harnessly/pull/12"},
+		{"https://github.com/ly-solutions/harnessly/commit/0123abc", "gitlab", "https://github.com/ly-solutions/harnessly/commit/0123abc"},
+		{"https://github.com/ly-solutions/harnessly/issues/7", "gitlab", "https://github.com/ly-solutions/harnessly/issues/7"},
+		{"https://github.com/ly-solutions/harnessly", "browser", "https://github.com/ly-solutions/harnessly"},
 		{"PROJ-123", "task", "PROJ-123"},
 		{"/home/a/work/report.md", "files", "/home/a/work/report.md"},
 		{"notes/todo.md", "files", "/home/a/work/notes/todo.md"},
@@ -333,5 +345,53 @@ func TestHelp(t *testing.T) {
 	}
 	if r := runWith(t, t.TempDir(), nil, ""); r.code != 0 || r.out != helpText {
 		t.Errorf("no args prints the help")
+	}
+}
+
+func TestOpenDesign(t *testing.T) {
+	f := newFake(t)
+	cases := []struct {
+		args   []string
+		target string
+	}{
+		{[]string{"design", "landing"}, "landing"},
+		{[]string{"design", "./designs/landing/project/Main.dc.html"}, "/home/a/work/designs/landing/project/Main.dc.html"},
+		{[]string{"design", "Лендинг", "весна"}, "Лендинг весна"},
+	}
+	for _, c := range cases {
+		r := f.run(t, "hs-me", append([]string{"open"}, c.args...)...)
+		if r.code != 0 {
+			t.Fatalf("%v: exit %d: %s", c.args, r.code, r.errs)
+		}
+		cmd := f.last().Body["command"].(map[string]any)
+		if cmd["tab"] != "design" || cmd["target"] != c.target {
+			t.Errorf("%v: sent %+v", c.args, cmd)
+		}
+	}
+}
+
+func TestPeersListAndSend(t *testing.T) {
+	f := newFake(t)
+	r := f.run(t, "hs-me", "peers")
+	if r.code != 0 || !strings.Contains(r.out, "dev-department/tab-rsk\tbusy\tИван · dev-department\tМодель по умолчанию") ||
+		!strings.Contains(r.out, "! no-relay") {
+		t.Fatalf("list: %+v", r)
+	}
+	r = f.run(t, "hs-me", "peers", "send", "dev-department/tab-rsk", "готово,", "выкатил")
+	if r.code != 0 || !strings.Contains(r.out, "delivered → Иван · dev-department · Модель по умолчанию (dev-department/tab-rsk)") {
+		t.Fatalf("send: %+v", r)
+	}
+	if c := f.last(); c.Body["session"] != "hs-me" || c.Body["text"] != "готово, выкатил" {
+		t.Fatalf("the runtime is told the sender's session and the text: %+v", c.Body)
+	}
+	if r := f.run(t, "hs-me", "peers", "send", "dev-department/tab-rsk", "-"); r.code != 0 || f.last().Body["text"] != "piped text" {
+		t.Fatalf("stdin: %+v", r)
+	}
+	r = f.run(t, "hs-me", "peers", "send", "dev-department/tab-blocked", "x")
+	if r.code != 1 || !strings.Contains(r.errs, "refused: blocked — the other side blocked this machine or its owner") {
+		t.Fatalf("a refusal says why and exits 1: %+v", r)
+	}
+	if r := f.run(t, "hs-me", "peers", "send", "only-ref"); r.code != 2 {
+		t.Fatalf("usage: %+v", r)
 	}
 }

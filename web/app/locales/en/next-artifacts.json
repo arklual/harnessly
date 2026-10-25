@@ -1,0 +1,14 @@
+{
+  "next.artifacts.docs": "Documents",
+  "next.artifacts.tasks": "Tasks",
+  "next.artifacts.mrs": "Merge requests",
+  "next.artifacts.links": "Other links",
+  "next.artifacts.loading": "Gathering artifacts",
+  "next.artifacts.empty": "Documents, boards and tasks the agent mentions in its answers will appear here",
+  "next.artifacts.mrOpened": "Open",
+  "next.artifacts.mrMerged": "Merged",
+  "next.artifacts.mrClosed": "Closed",
+  "next.artifacts.mrDraft": "Draft",
+  "next.artifacts.someFailed": "Some links did not give their titles",
+  "next.load.artifacts": "Artifacts did not load"
+}

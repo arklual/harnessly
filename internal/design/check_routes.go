@@ -56,6 +56,13 @@ func (a *API) Check(r *http.Request) Answer {
 	if !IsLibraryID(artifact) {
 		return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
 	}
+	need := RoleEdit
+	if r.Method == http.MethodGet {
+		need = RoleView
+	}
+	if no := a.gate(r, artifact, need); no != nil {
+		return *no
+	}
 	if r.Method == http.MethodGet {
 		v, _ := a.L.ReadCheckReport(artifact)
 		return JSON(r, http.StatusOK, jsvalue.NewObject("report", reportValue(v)), h)
@@ -178,6 +185,9 @@ func (a *API) Shot(w http.ResponseWriter, r *http.Request) {
 	if !a.imageGuard(w, r) {
 		return
 	}
+	if a.denyImage(w, QueryString(r, "artifact")) {
+		return
+	}
 	file := a.L.checkShotPath(QueryString(r, "artifact"), QueryString(r, "file"))
 	var data []byte
 	if file != "" {
@@ -203,6 +213,9 @@ func (a *API) Thumb(w http.ResponseWriter, r *http.Request) {
 	board := ParseBoardPath(QueryString(r, "board"))
 	if !IsLibraryID(artifact) || board == "" {
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if a.denyImage(w, artifact) {
 		return
 	}
 	var ans ThumbAnswer

@@ -153,3 +153,145 @@ func stringify(v any) []byte {
 	}
 	return jsvalue.Stringify(v, "")
 }
+
+// A merge request is there when its GitLab gives it to the host's own token: the project path is escaped, a renamed
+// project answers under its new path, and every kind of "no" is false.
+func TestMergeRequestAsksTheGitLabWithItsToken(t *testing.T) {
+	var asked []string
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.EscapedPath()+" "+r.Header.Get("Private-Token"))
+		switch r.URL.EscapedPath() {
+		case "/api/v4/projects/team%2Fapp/merge_requests/80":
+			_, _ = w.Write([]byte(`{"iid":80,"title":"Fix the queue","web_url":"https://gitlab.example.com/team/app-new/-/merge_requests/80"}`))
+		case "/api/v4/projects/team%2Fapp/merge_requests/81":
+			_, _ = w.Write([]byte(`{"iid":7,"web_url":"https://gitlab.example.com/team/app/-/merge_requests/7"}`))
+		case "/api/v4/projects/team%2Fapp/merge_requests/82":
+			_, _ = w.Write([]byte(`{"iid":82,"web_url":"https://elsewhere.example/team/app/-/merge_requests/82"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer api.Close()
+	t.Setenv("GITLAB_SELF_TOKEN", "self-token")
+	s := New(Config{GitLabHosts: []string{"gitlab.example.com"}, GitLabAPI: api.URL})
+	ctx := context.Background()
+	info, ok := s.MergeRequest(ctx, "gitlab.example.com", "team/app", 80)
+	if !ok || info.Title != "Fix the queue" || info.URL != "https://gitlab.example.com/team/app-new/-/merge_requests/80" {
+		t.Fatalf("%+v %v", info, ok)
+	}
+	if len(asked) != 1 || asked[0] != "/api/v4/projects/team%2Fapp/merge_requests/80 self-token" {
+		t.Fatalf("asked %q", asked)
+	}
+	for name, c := range map[string]struct {
+		host, project string
+		iid           int
+	}{
+		"missing":          {"gitlab.example.com", "team/app", 99},
+		"another number":   {"gitlab.example.com", "team/app", 81},
+		"another server":   {"gitlab.example.com", "team/app", 82},
+		"not our GitLab":   {"other.example.com", "team/app", 80},
+		"no project":       {"gitlab.example.com", "", 80},
+		"no such number":   {"gitlab.example.com", "team/app", 0},
+		"unreadable group": {"gitlab.example.com", "nobody/nothing", 1},
+	} {
+		if _, ok := s.MergeRequest(ctx, c.host, c.project, c.iid); ok {
+			t.Errorf("%s: found", name)
+		}
+	}
+	t.Setenv("GITLAB_SELF_TOKEN", "")
+	if _, ok := New(Config{GitLabHosts: []string{"gitlab.example.com"}, GitLabAPI: api.URL}).MergeRequest(ctx, "gitlab.example.com", "team/app", 80); ok {
+		t.Error("found without a token")
+	}
+}
+
+// The GitLab's search is read with the host's token and only the projects whose last segment is the name count.
+func TestProjectPathsKeepsTheProjectsCalledSo(t *testing.T) {
+	var asked []string
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.RequestURI()+" "+r.Header.Get("Private-Token"))
+		_, _ = w.Write([]byte(`[{"path":"harnessly","path_with_namespace":"harnessly/harnessly"},{"path":"harnessly-docs","path_with_namespace":"harnessly/harnessly-docs"},{"path":"Harnessly","path_with_namespace":"old/Harnessly"}]`))
+	}))
+	defer api.Close()
+	t.Setenv("GITLAB_SELF_TOKEN", "self-token")
+	s := New(Config{GitLabHosts: []string{"gitlab.example.com"}, GitLabAPI: api.URL})
+	got := s.ProjectPaths(context.Background(), "gitlab.example.com", "harnessly")
+	if len(got) != 2 || got[0] != "harnessly/harnessly" || got[1] != "old/Harnessly" {
+		t.Fatalf("%q", got)
+	}
+	if len(asked) != 1 || asked[0] != "/api/v4/projects?simple=true&search=harnessly&per_page=20 self-token" {
+		t.Fatalf("asked %q", asked)
+	}
+	for _, c := range []struct{ host, name string }{{"other.example.com", "harnessly"}, {"gitlab.example.com", ""}, {"gitlab.example.com", "a/b"}, {"gitlab.example.com", "a&b"}} {
+		if got := s.ProjectPaths(context.Background(), c.host, c.name); got != nil {
+			t.Errorf("%+v: %q", c, got)
+		}
+	}
+}
+
+func TestArtifactTitleIsReadFromTheHeadOnly(t *testing.T) {
+	var sent atomic.Int64
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte("<html><head><title>План выката</title><meta name=\"description\" content=\"Что едет\"></head><body>"))
+		chunk := make([]byte, 64<<10)
+		for i := 0; i < 128; i++ { // 8 MB of body behind the head
+			n, err := w.Write(chunk)
+			sent.Add(int64(n))
+			if err != nil {
+				return
+			}
+		}
+	}))
+	defer srv.Close()
+	s := New(Config{Transport: tlsTo(srv)})
+	meta, err := s.fetchArtifact(context.Background(), "https://docs.example.com/a/plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opt(meta, "title") != "План выката" || opt(meta, "description") != "Что едет" {
+		t.Fatalf("meta = %v", meta)
+	}
+	if sent.Load() >= 8<<20 {
+		t.Fatalf("the whole page went through (%d bytes): only its head was needed", sent.Load())
+	}
+}
+
+// An answer past its five minutes is given at once and read again behind: a panel reopened later does not wait.
+func TestLinkMetaOldAnswerIsGivenAtOnceAndRefreshed(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := hits.Add(1)
+		w.Header().Set("Content-Type", "text/html")
+		if n > 1 {
+			time.Sleep(300 * time.Millisecond)
+		}
+		_, _ = w.Write([]byte("<head><title>Версия " + string(rune('0'+n)) + "</title></head>"))
+	}))
+	defer srv.Close()
+	s := New(Config{Transport: tlsTo(srv)})
+	target := &linkTarget{kind: "artifact", url: "https://docs.example.com/a/plan"}
+	if got := opt(s.linkMeta(context.Background(), target), "title"); got != "Версия 1" {
+		t.Fatalf("first = %v", got)
+	}
+	s.meta.mu.Lock()
+	for k, e := range s.meta.entries {
+		e.at = e.at.Add(-metaFresh - time.Minute)
+		s.meta.entries[k] = e
+	}
+	s.meta.mu.Unlock()
+	began := time.Now()
+	if got := opt(s.linkMeta(context.Background(), target), "title"); got != "Версия 1" {
+		t.Fatalf("old = %v", got)
+	}
+	if took := time.Since(began); took > 150*time.Millisecond {
+		t.Fatalf("the old answer waited for the read: %s", took)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if opt(s.linkMeta(context.Background(), target), "title") == "Версия 2" {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("the link was not read again behind the old answer")
+}

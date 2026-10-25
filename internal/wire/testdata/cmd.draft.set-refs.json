@@ -1,0 +1,5 @@
+{
+  "op": "draft.set",
+  "body": {"opId": "op-dr4", "key": "tab-k3Jx9QmZ", "text": "Глянь", "refs": [{"kind": "mr", "id": "https://gitlab.example.com/team/harnessly/-/merge_requests/42", "title": "!42", "target": "https://gitlab.example.com/team/harnessly/-/merge_requests/42"}], "rev": 6},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1863, "rev": 6}
+}

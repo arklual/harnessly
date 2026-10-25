@@ -53,6 +53,8 @@ type ClaudeMeta struct {
 	TurnCount      int    `json:"turnCount"`
 
 	lastMs int64
+	// cwd and title are what the other lists do not need: where the session ran and the agent's name for it.
+	cwd, title string
 }
 
 // scan is what the complete lines of a transcript have given so far: live transcripts grow by tens of megabytes, so
@@ -64,6 +66,9 @@ type scan struct {
 	hasStarted   bool
 	firstMessage string
 	turns        int
+	// cwd is the working folder the first line that names one gave; title the agent's own name for the session, the
+	// last one it wrote.
+	cwd, title string
 }
 
 // ClaudeLister lists the transcripts of a working folder, remembering how far it read each.
@@ -188,6 +193,8 @@ func (l *ClaudeLister) meta(path string) *ClaudeMeta {
 		FirstMessage:   whole.firstMessage,
 		TurnCount:      whole.turns,
 		lastMs:         lastMs,
+		cwd:            whole.cwd,
+		title:          whole.title,
 	}
 }
 
@@ -244,6 +251,11 @@ var (
 	notTurn     = [][]byte{[]byte(`"isMeta":true`), []byte(`"isMeta": true`), []byte(`"isCompactSummary":true`)}
 )
 
+var (
+	cwdKey     = []byte(`"cwd"`)
+	aiTitleKey = []byte(`"ai-title"`)
+)
+
 func containsAny(line []byte, subs [][]byte) bool {
 	for _, s := range subs {
 		if bytes.Contains(line, s) {
@@ -263,6 +275,23 @@ func (s *scan) line(line []byte) {
 					s.startedAt, s.hasStarted = iso, true
 				}
 			}
+		}
+	}
+	if s.cwd == "" && bytes.Contains(line, cwdKey) {
+		var e struct {
+			Cwd string `json:"cwd"`
+		}
+		if json.Unmarshal(line, &e) == nil {
+			s.cwd = e.Cwd
+		}
+	}
+	if bytes.Contains(line, aiTitleKey) {
+		var e struct {
+			Type    string `json:"type"`
+			AITitle string `json:"aiTitle"`
+		}
+		if json.Unmarshal(line, &e) == nil && e.Type == "ai-title" && strings.TrimSpace(e.AITitle) != "" {
+			s.title = strings.TrimSpace(e.AITitle)
 		}
 	}
 	if !containsAny(line, humanOrUser) || containsAny(line, notTurn) {

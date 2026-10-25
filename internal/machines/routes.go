@@ -48,8 +48,10 @@ type Config struct {
 	MachineAgent func(*http.Request) bool
 	// DocsReaderPath is where the platform's document reader lives: a document notification must lead there.
 	DocsReaderPath string
-	Log            func(level, msg string, kv ...any)
-	Now            func() time.Time
+	// DesignReaderPath is where the design library lives: a design notification must lead there.
+	DesignReaderPath string
+	Log              func(level, msg string, kv ...any)
+	Now              func() time.Time
 }
 
 // Health is the probe's answer: the app's name, and the release's version and commit.
@@ -195,13 +197,7 @@ func Routes(cfg Config) []gate.JSONRoute {
 		return jr
 	}
 	machines := route(cfg.PlatformAPI+"/machines", false, s.machines)
-	// The snapshot carries the load figures, the uptime and forecasts made from a moment's spend: the shadow compares
-	// the rest.
-	machines.Volatile = []string{"machines.*.cpuPct", "machines.*.memUsedPct", "machines.*.uptimeSec",
-		"machines.*.limits.*.fiveHour.forecast", "machines.*.limits.*.sevenDay.forecast", "machines.*.limits.*.extra.*.forecast",
-		"machines.*.limits.*.fiveHour.sampledAt", "machines.*.limits.*.sevenDay.sampledAt", "machines.*.limits.*.extra.*.sampledAt"}
 	load := route(cfg.PlatformAPI+"/machine/load", false, s.machineLoad)
-	load.Volatile = []string{"at", "cpu", "mem", "top", "level", "reason", "disk.usedPct"}
 	health := route("/api/health", true, s.health)
 	health.Match = func(r *http.Request) bool {
 		return pathIs(r, "/api/health") && (cfg.Health.Alive == nil || cfg.Health.Alive())
@@ -221,6 +217,9 @@ func Routes(cfg Config) []gate.JSONRoute {
 	}
 	if cfg.MachineAgent != nil && cfg.DocsReaderPath != "" {
 		routes = append(routes, sending(cfg.PlatformAPI+"/docs/notify", s.docsNotify))
+	}
+	if cfg.MachineAgent != nil && cfg.DesignReaderPath != "" {
+		routes = append(routes, sending(cfg.PlatformAPI+"/design/notify", s.designNotify))
 	}
 	return routes
 }

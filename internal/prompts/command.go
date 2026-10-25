@@ -239,15 +239,21 @@ func RunCommandLine(in RunInput, d CommandDriver, clock Clock) RunResult {
 		elapsed := clock.Now().Sub(startedAt)
 		confirm := screen.IsLaunchConfirm(s.Plain)
 
-		if changes && confirm && s.Menu != nil && answeredAt == nil {
+		// A short pane cuts the question at the bottom («2. No, go back» is not drawn, no menu is read): its focused
+		// first answer is read from the lines under its title.
+		seen, yes := screen.ConfirmFocus(s.Plain)
+		if changes && confirm && (s.Menu != nil || seen) && answeredAt == nil {
 			// Picking the model in the web is the consent to re-read the history without cache; "1. Yes" is focused.
-			if s.Menu.YesFocused() {
+			if s.Menu.YesFocused() || yes {
 				if err := d.SendKey(in.Session, "Enter"); err != nil {
 					return menuBody(s.Menu)
 				}
 				now := clock.Now()
 				answeredAt = &now
 				continue
+			}
+			if s.Menu == nil {
+				continue // drawn up to its focused answer only; the whole menu is not there to show
 			}
 			return menuBody(s.Menu)
 		}

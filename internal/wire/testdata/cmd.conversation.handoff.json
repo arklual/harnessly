@@ -1,0 +1,12 @@
+{
+  "op": "conversation.handoff",
+  "body": {
+    "opId": "op-hnd1",
+    "id": "tab-k3Jx9QmZ",
+    "provider": "codex",
+    "model": {"id": "gpt-5.5-codex", "effort": "high"},
+    "mode": "note",
+    "text": "## Goal\nShip the v2 handoff.\n\n## Next steps\n- Wire the draft route"
+  },
+  "result": {"r": "accepted", "ch": "convs", "seq": 1910, "id": "tab-H2oHand01"}
+}

@@ -1,0 +1,35 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 515,
+  "e": {
+    "type": "question_asked",
+    "question": {
+      "id": "q:toolu_01AskQ",
+      "conversationId": "tab-k3Jx9QmZ",
+      "turnId": "c:3f1d2a9e-7c41-4b8e-9a51-0d6c2b7e8f10#0",
+      "askedAt": 1792655991000,
+      "items": [
+        {
+          "header": "Схема",
+          "question": "Куда класть схему?",
+          "multi": false,
+          "options": [
+            {"label": "internal/wire/schema", "description": "рядом с типами", "preview": null},
+            {"label": "docs/", "description": null, "preview": "docs/v2/frames.json"}
+          ]
+        },
+        {
+          "header": "Фикстуры",
+          "question": "Какие фикстуры нужны?",
+          "multi": true,
+          "options": [
+            {"label": "события", "description": null, "preview": null},
+            {"label": "команды", "description": null, "preview": null}
+          ]
+        }
+      ],
+      "state": {"k": "open"}
+    }
+  }
+}

@@ -6,8 +6,53 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Designly: «Ссылки» is one screen with one form. «Кто откроет» chooses between a link for anyone without sign-in and an
+  invite for the signed-in; one list shows both kinds, each marked, and a made link is copied at once. A link without
+  sign-in carries the look the owner gave the design (device, browser bars, fit, lock, page) so a guest opens it the
+  same way.
+- Designly: a link without sign-in. «Настройки ссылок» of the share dialog has a «Ссылка без входа» block above the invite
+  links: a name, «Может смотреть» or «Может комментировать», a term (1 hour to 30 days, or none); making a link copies
+  it at once, and a menu extends it by 7 days, changes what it allows or revokes it. The runtime answers the gateway
+  at `design-public/<project>` (the board list, the project files, `support.js` of the project's release) for a
+  60-second token only; hidden files, paths out of the project and symlinks out of it are not served.
+
 ### Fixed
 
+- A message with a picture Claude does not show as «[Image #1]» in 8 s (5 s before) no longer fails try after try: it goes
+  with the picture's path as text, path and text under one Enter, and Claude reads the file by its path.
+- A picture's path no longer stays in the agent's input line. Claude can read a big picture after the typist gave up on
+  it, and the path then landed as plain text, holding up the next message as «text in the terminal's input line». A
+  box that holds only picture paths the harness pasted is cleared before the next message. A try whose text stays in
+  the box is typed again, backing off, up to 10 tries (6 before) before the message fails, Enter is pressed again up
+  to 10 times for a message the agent did not take, and a Stop whose Escape did not go in is pressed again.
+- A turn waiting on a slow model is no longer marked done. 15 s of silence with the box up and no spinner read ended
+  the turn while Claude was still waiting for the reply (96 s seen), so Stop was refused as «not working» and a model
+  switch hit the box. A Claude turn the transcript keeps open now ends on silence only when the screen says it ended
+  (its summary «✻ Brewed for 8s», or the stop mark), or after 10 minutes of silence; the Stop hook and the transcript
+  end it as before.
+- A message typed into the terminal no longer stays there unsent. A long line typed under load, its Enter taken into
+  the text as a newline as the agent's step ended, read as sent because the box looked empty before the agent drew it;
+  the message then showed «in the agent's queue» for half an hour while its text sat in the input line, and every
+  message after it waited on that text until it expired. The typist now counts a message sent only once the box stayed
+  free of it for 600 ms, a message typed into the turn is looked for in the box while it waits, and its own text there
+  gets its Enter again (or fails it, the box cleared); a message held by someone else's text says «the terminal's
+  input line holds text». A steered message the person pulled back by stopping the turn (Claude returns it to the box
+  for editing) is not Entered again: it shows «back in the terminal's input line», to retry or remove.
+- A message sent while the agent works is never lost and does not jump: it stands once in the stack over the
+  field — «sending» at once, with a pencil (back into the field) and a bin — until the agent has it, then once in the
+  feed at its place; a message typed into the turn (⌃↵) stands in the stack «the agent reads it after the current step»
+  and, once read, among the turn's steps and under its fold (it used to vanish when the agent read it). The live
+  indicator is never over the person's last message, «not confirmed» no longer shows for a message that only waited in
+  the queue, a queued message keeps its reason instead of swinging between «agent busy» and «behind», and a message to
+  a free agent whose screen still draws the last turn's spinner is typed within 300 ms of the screen freeing, not 1.5 s.
+- A message sent during a rollout (the runtime or the machine restarting, a gateway's 502/503, a lost answer, a dropped
+  socket) is no longer «not sent: the machine refused it»: the road failing is not a refusal. The bubble
+  waits, quietly and without red («waiting for the machine»), and goes by itself with the same client id — after 1, 2, 4 …
+  30 s, at once when the socket is back, after a reload too — and the runtime answers a repeat with what it answered
+  before, so it never lands twice. Red «not sent» with its reason in words («the message is too long», «the queue is
+  full») is only for what the runtime refused on the merits; the page has no «not confirmed» of its own any more.
 - A queued message is delivered or fails visibly, never waits forever: a picture reference the agent's input box
   wrapped midway (`[Image` / `#104]`) counts as pasted, a retry reads the whole box and finishes its own pictures
   instead of taking them for someone else's draft, failed tries back off and give up after six with the reason on the
@@ -20,6 +65,65 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Chats branch and hand over. «Ответвить» in a chat's menu, or the fork mark under a finished answer, opens a new chat
+  with the history up to that turn (Claude's session is copied and resumed; Codex forks its whole session at the last
+  turn, or starts from an excerpt); the new chat says where it branched off and links back. «Влить обратно» has the
+  fork's agent write a short result, editable before it goes, and sends it into the original chat's queue. A model of
+  the other agent in the field's picker hands the chat over: a preview of an excerpt (the first request, the latest
+  turns, key command results, within the new model's window) or of a note the agent writes, editable, starts a new
+  chat in the same folder; the old chat stays as it is, and the new one shows «Передача контекста · A → B».
+
+- Going on from an earlier message in the new interface. A message of the person's offers «Edit and continue from
+  here» on hover (a long press on the phone) and becomes an editor in place; sending asks «Conversation only» or
+  «Conversation and files» — the folder back to the snapshot taken after the turn before, with the files that would
+  change listed, disabled when there is none. The turns from that message on fold into «Rewound N turns», which opens
+  to show them read only, and «Undo» takes the rewind back for 10 s. The runtime forks the agent's transcript before
+  the message into a new session (Claude Code and Codex both resume it as their own) and resumes the chat there, so
+  the old branch stays whole; an agent at work is stopped first, and the first message of a chat has nothing to go on
+  from.
+- The agent's answer draws what it writes: a `mermaid` block is a diagram (themed, a click opens it full size, the
+  source copies), an `html` block is a page in a sandboxed frame that has no access to the page, its cookies or the
+  network, with a toggle to its source and a full-size view, and a link to the installation's own document or board,
+  alone in its paragraph, is a card. The agents' built-in prompts say so. The diagram renderer loads with the first
+  diagram, not with the page.
+- Chats that stop on the agent's usage limit go on by themselves when it resets, and chats a restart cut short go on
+  once their agent is back. The feed ends with a calm card «Лимит Claude исчерпан · продолжу автоматически в
+  18:00 (через 2 ч 14 мин)» with «Продолжить сейчас» and «Не продолжать»; what the person sends meanwhile waits for the
+  reset («Отправится после сброса лимита в 18:00») and goes first. The sidebar shows a quiet clock on held chats, and the
+  feed marks where the work went on («Продолжил после сброса лимита», «Прервано перезапуском · продолжил
+  автоматически»). Settings → General has both switches, on by default (command `limit`, feature `auto-continue`).
+- Designly: who sees a design. A new design is personal; the owner opens it to the team (view, comment
+  or edit), gives a person a role for an hour, a day, a week, a month, to a date or for good, takes it back one by one,
+  makes a link for a logged-in colleague (up to 7 days, a number of uses) and sees the access log. A colleague without
+  access asks for it from the page and the owner gets a push to allow for a term or refuse. The platform keeps the
+  rights; the runtime gets a snapshot per person and hides closed projects everywhere — the library, its pages and
+  files, the CLI and the agent's tools answer as if the project were not there. Projects made before stay open to the
+  team; an ownerless one can be taken. Without the platform nothing changes.
+- Boards load faster: React and Babel are served by the runtime instead of unpkg, the design's heavy files get
+  hashed addresses cached for good, and a page switch inside a design moves the frame without a new slot login.
+
+- Chat terminals can be ended and stop by themselves when idle. «Завершить терминал» in the chat's menus
+  (sidebar, header «…», the phone sheet) asks first, then kills the chat's tmux session and everything under it; the
+  chat and its history stay and the next message resumes the agent (command `terminal.stop`, feature `terminal-stop`).
+  The runtime also stops a terminal that has stood idle for the window of «Останавливать простаивающие терминалы»
+  (off, 1 h, 2 h by default, 6 h; `GET/PUT /api/v2/runtime-settings`): only when the agent is idle with no background
+  work, gate, queue or viewer, nothing but the agent and its helpers runs in the pane, the pane's screen has not changed
+  and the tree has used next to no CPU. The feed says «Терминал остановлен: 2 ч без работы»; chats without a running terminal
+  are dimmed in the sidebar and the rail.
+- The «More → Apps» screen is a left list of the connected apps with the chosen one open as a page on the right, and it
+  scales to many apps: the tracker page lists all the epics and tasks assigned to the person (the list used to
+  keep only the task-card keys, 8 epics and the stale ones of anyone), an epic opens into its subtasks with progress, and
+  both are searched, filtered by status, tag, type and epic, sorted and grouped; the GitLab page shows the pipeline,
+  approvals, draft, conflicts, open threads, author, assignee, labels and how long a request stands still, with filters by
+  state, author, assignee, project, pipeline and condition and a search; each page has its own settings kept in the
+  browser, and «To chat» still takes rows into a new chat as mentions. Wire: the feature `apps-hub`; the sections are
+  `epics`/`tasks` and `mrs`, and a row carries the fields above (see internal/wire/README.md, item 47).
+- The messages waiting in the queue over the field can be put in another order: the grip on the left of a row
+  carries it (the mouse, or a finger after it rests; ↑ ↓ with the grip focused move it a place at a time), a line shows
+  where it would land, and the order changes when the runtime has said so — the other rows then slide to their places.
+  Wire: `queue.move {opId, conversationId, clientId, beforeClientId | null}` and the feature `queue-move` (only a queued
+  message moves; a place across a message sent «now» is `refused{conflict}`, a message already typed `refused{too-late}`);
+  a runtime without it draws no grip. A long queue now scrolls inside itself instead of pushing the chat off the screen.
 - The right pane's browser works without a gateway: a standalone runtime opens the preview itself
   (`POST /api/preview/open`) in 8 slot listeners next to its port, each an origin of its own, and proxies a dev server or
   a site there; the page refuses requests coming from a slot. `RUNTIME_PREVIEW_LISTEN` moves or turns off the slots,

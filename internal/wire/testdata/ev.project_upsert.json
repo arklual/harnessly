@@ -1,0 +1,1 @@
+{"f": "ev", "ch": "convs", "seq": 507, "e": {"type": "project_upsert", "project": {"id": "p3d8w5n6r2bb", "machineId": "runner-2", "path": "/home/coder/workspace/acme", "name": "acme", "git": true, "createdAt": 1792656100000}}}

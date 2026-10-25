@@ -24,6 +24,9 @@ type Model struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 	Hint  string `json:"hint"`
+	// Description is what the CLI itself says the model is for (Codex's models_cache.json), "" when it says nothing;
+	// it is not in the Legacy answer.
+	Description string `json:"-"`
 	// Efforts the model accepts; empty means the effort flag is not offered.
 	Efforts       []string `json:"efforts"`
 	DefaultEffort *string  `json:"defaultEffort"`
@@ -32,7 +35,7 @@ type Model struct {
 // LaunchOptions: what this machine can start an agent CLI with, the CLI's default and the remembered choice.
 type LaunchOptions struct {
 	Provider string `json:"provider"`
-	// Source: "static" for Claude, "models-cache" for Codex.
+	// Source: "static" for Claude and for Codex without a usable cache (the built-in list), "models-cache" for Codex.
 	Source string `json:"source"`
 	// FetchedAt is when Codex last refreshed its model list.
 	FetchedAt  *string  `json:"fetchedAt"`
@@ -68,6 +71,14 @@ func claudeModels() []Model {
 		{ID: "sonnet", Label: "Sonnet", Hint: locale.Pick("alias: the latest Sonnet model", "псевдоним: последняя модель Sonnet"), Efforts: all()},
 		{ID: "haiku", Label: "Haiku", Hint: locale.Pick("no reasoning depth to choose", "без выбора глубины"), Efforts: []string{}},
 	}
+}
+
+// stringOrEmpty: a string, trimmed, "" otherwise.
+func stringOrEmpty(v any) string {
+	if p := stringOrNil(v); p != nil {
+		return *p
+	}
+	return ""
 }
 
 // stringOrNil: a non-blank string, trimmed.
@@ -166,7 +177,8 @@ func parseCodexModels(raw string) (codexModels, error) {
 		if def != nil {
 			hint = slug + locale.Pick(" · default ", " · по умолчанию ") + *def
 		}
-		out.models = append(out.models, Model{ID: slug, Label: label, Hint: hint, Efforts: efforts, DefaultEffort: def})
+		out.models = append(out.models, Model{ID: slug, Label: label, Hint: hint, Description: stringOrEmpty(m["description"]),
+			Efforts: efforts, DefaultEffort: def})
 	}
 	if f, ok := data["fetched_at"].(string); ok {
 		out.fetchedAt = &f
@@ -212,19 +224,20 @@ func (c LaunchConfig) Launch(provider string) LaunchOptions {
 		models, state := readParsed(filepath.Join(c.CodexDir, "models_cache.json"), parseCodexModels)
 		switch {
 		case state == fileMissing:
-			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json not found: Codex creates it on its first run", "~/.codex/models_cache.json не найден: Codex создаёт его при первом запуске"))
+			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json not found (Codex creates it on its first run): the built-in model list is shown", "~/.codex/models_cache.json не найден (Codex создаёт его при первом запуске): показан встроенный список моделей"))
 		case state == fileBroken:
-			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json cannot be read", "~/.codex/models_cache.json не читается"))
+			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json cannot be read: the built-in model list is shown", "~/.codex/models_cache.json не читается — показан встроенный список моделей"))
 		case len(models.models) == 0:
-			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json has no available models", "В ~/.codex/models_cache.json нет доступных моделей"))
+			warnings = append(warnings, locale.Pick("~/.codex/models_cache.json has no available models: the built-in model list is shown", "В ~/.codex/models_cache.json нет доступных моделей — показан встроенный список"))
 		}
 		def, cfgState := readParsed(filepath.Join(c.CodexDir, "config.toml"), parseCodexDefault)
 		if cfgState == fileBroken {
 			warnings = append(warnings, locale.Pick("~/.codex/config.toml cannot be read: the value of \"Auto\" is unknown", "~/.codex/config.toml не читается — значение «Авто» неизвестно"))
 		}
 		out = LaunchOptions{Provider: "codex", Source: "models-cache", FetchedAt: models.fetchedAt, Models: models.models, CliDefault: def}
-		if out.Models == nil {
-			out.Models = []Model{}
+		if len(out.Models) == 0 {
+			// No usable cache: the built-in list, so the machine's Codex is not left without a model to pick.
+			out.Source, out.FetchedAt, out.Models = "static", nil, codexBuiltinModels()
 		}
 	}
 	out.Warnings = warnings

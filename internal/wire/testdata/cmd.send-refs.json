@@ -1,0 +1,19 @@
+{
+  "op": "send",
+  "body": {
+    "opId": "0192b6f1-0000-7000-8000-000000000016",
+    "clientId": "0192b6f1-0000-7000-8000-000000000016",
+    "conversationId": "tab-k3Jx9QmZ",
+    "text": "Сверь макет с разбором",
+    "attachmentIds": [],
+    "mode": "queue",
+    "kind": "prompt",
+    "refs": [
+      {"kind": "design", "id": "landing", "title": "Лендинг", "target": ""},
+      {"kind": "doc", "id": "pay-razbor", "title": "Разбор оплаты", "target": "https://docs.example.com/a/pay-razbor"},
+      {"kind": "file", "id": "web/app/main.tsx", "title": "main.tsx", "target": "web/app/main.tsx"},
+      {"kind": "task", "id": "ABC-3156", "title": "ABC-3156", "target": "https://tracker.example.com/issue/ABC-3156"}
+    ]
+  },
+  "result": {"r": "queued", "ch": "conv:tab-k3Jx9QmZ", "seq": 521}
+}

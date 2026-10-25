@@ -1,0 +1,5 @@
+{
+  "op": "favorites.group.delete",
+  "body": {"opId": "op-fg3", "id": "fg-9k2m4x7q"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1853}
+}

@@ -1,0 +1,14 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 526,
+  "e": {
+    "type": "queue_changed",
+    "queue": {
+      "conversationId": "tab-k3Jx9QmZ",
+      "items": ["0192b6f1-0000-7000-8000-000000000002", "0192b6f1-0000-7000-8000-000000000001"],
+      "paused": {"reason": "interrupted", "at": 1792656000000},
+      "rev": 10
+    }
+  }
+}

@@ -248,16 +248,54 @@ func mismatchTelemetry(configFile string) *telemetry.Queue {
 		Log: machinesLog})
 }
 
+// slicedSockets are the socket paths a slice answers: while it is not up yet they are unavailable.
+var slicedSockets = map[string]bool{"/api/terminal": true, "/api/timeline": true, "/api/sync": true, "/api/status": true, "/api/voice": true}
+
+// upstreamGuard is the last route of a gate in front of the old runtime: a socket upgrade no route above took is
+// refused here, before the proxy hands it on, unless it comes from a page session or with the cli-token. The install
+// socket of the first-run setup (a shell for anyone during setup) is never handed on. skip is what the proxy may take
+// on its own (the preview's sockets). An authorized socket of a sliced path whose slice is off, and every plain request,
+// still go to the old runtime, which answers them itself.
+func upstreamGuard(authed, skip func(*http.Request) bool) gate.Route {
+	return gate.Route{
+		Match: func(r *http.Request) bool {
+			if !isUpgrade(r) || skip(r) {
+				return false
+			}
+			return pathIs(r, "/api/install") || !authed(r)
+		},
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			status := "HTTP/1.1 404 Not Found\r\n\r\n"
+			if !pathIs(r, "/api/install") {
+				status = "HTTP/1.1 401 Unauthorized\r\n\r\n"
+			}
+			if hj, ok := w.(http.Hijacker); ok {
+				if conn, _, err := hj.Hijack(); err == nil {
+					_, _ = conn.Write([]byte(status))
+					_ = conn.Close()
+					return
+				}
+			}
+			w.WriteHeader(http.StatusNotFound)
+		}),
+	}
+}
+
 // standaloneFallback answers, with no old runtime behind the gate, what no route took: a route the old runtime had that
 // is not answered here (or not yet: the core still starting) is unavailable, as a machine that is down looks to the
-// cluster, which answers from what it keeps; anything else is the old runtime's "Not found".
-func standaloneFallback() http.Handler {
+// cluster, which answers from what it keeps; anything else is the old runtime's "Not found". A socket of another path
+// is refused, unauthorized to a caller with neither a page session nor the cli-token; the install socket of the
+// old first-run setup (a shell for anyone during setup) is never served.
+func standaloneFallback(authed func(*http.Request) bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isUpgrade(r) {
 			status := "HTTP/1.1 404 Not Found\r\n\r\n"
 			p := strings.TrimPrefix(r.URL.Path, "/agents")
-			if slicedSockets[p] {
+			switch {
+			case slicedSockets[p]:
 				status = "HTTP/1.1 503 Service Unavailable\r\n\r\n"
+			case p != "/api/install" && !authed(r):
+				status = "HTTP/1.1 401 Unauthorized\r\n\r\n"
 			}
 			if hj, ok := w.(http.Hijacker); ok {
 				if conn, _, err := hj.Hijack(); err == nil {

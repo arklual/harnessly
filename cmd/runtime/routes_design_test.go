@@ -32,7 +32,7 @@ func TestDesignRoutesThroughTheGate(t *testing.T) {
 	}
 	person := func(r *http.Request) bool { return r.Header.Get("Cookie") == "session-token=ok" }
 	token := func(r *http.Request) bool { return r.Header.Get("x-cli-token") == "ok" }
-	d := deps{Home: home, DataDir: dir, Old: &gate.OldRuntime{}, SessionOK: person, TokenHeaders: []string{"x-cli-token"},
+	d := deps{Home: home, DataDir: dir, CLI: &gate.CLIToken{}, SessionOK: person, TokenHeaders: []string{"x-cli-token"},
 		APIRefusal: func(r *http.Request) (int, any, http.Header, bool) {
 			if person(r) || token(r) {
 				return 0, nil, nil, false

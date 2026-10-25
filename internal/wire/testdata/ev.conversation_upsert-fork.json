@@ -1,0 +1,50 @@
+{
+  "f": "ev",
+  "ch": "convs",
+  "seq": 611,
+  "e": {
+    "type": "conversation_upsert",
+    "conv": {
+      "id": "tab-F9kFork01",
+      "machineId": "runner-2",
+      "projectId": null,
+      "cwd": "/home/coder/workspace/harnessly",
+      "provider": "claude",
+      "model": {
+        "id": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "title": "Контракт v2",
+      "titleSource": "agent",
+      "pinned": false,
+      "createdAt": 1792652400000,
+      "lastActivityAt": 1792655999000,
+      "lastPromptAt": 1792655999000,
+      "state": {
+        "k": "idle",
+        "since": 1792663200000
+      },
+      "seenAt": 1792655999000,
+      "lastTurn": null,
+      "queue": {
+        "count": 0,
+        "paused": null
+      },
+      "gate": null,
+      "rev": 2,
+      "origin": {
+        "k": "fork",
+        "fromId": "tab-s4Qrea",
+        "fromTitle": "Контракт v2",
+        "fromProvider": "claude",
+        "fromModel": {
+          "id": "claude-opus-5-5",
+          "effort": "high"
+        },
+        "atTurn": "c:7f3e0c2a-5b1d-4e8f-9a6c-2d4b8e1f0a37#0",
+        "via": "session",
+        "at": 1792663200000
+      }
+    }
+  }
+}

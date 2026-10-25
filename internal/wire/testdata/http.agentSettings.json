@@ -1,0 +1,36 @@
+{
+  "http": "agentSettings",
+  "response": {
+    "provider": "claude",
+    "path": "~/.claude/settings.json",
+    "rev": "9f2c41d07ab3e815",
+    "account": {"signedIn": true, "method": "subscription", "plan": "Max", "who": "person@example.com"},
+    "options": [
+      {"key": "model", "value": "opus"},
+      {"key": "effort", "value": "high"},
+      {"key": "baseUrl", "value": null},
+      {"key": "fallbackModel", "value": null},
+      {"key": "thinking", "value": true},
+      {"key": "outputStyle", "value": null},
+      {"key": "permissionMode", "value": "bypassPermissions"},
+      {"key": "sandbox", "value": null},
+      {"key": "projectMcp", "value": null},
+      {"key": "compactWindow", "value": 400000},
+      {"key": "memory", "value": true},
+      {"key": "keepDays", "value": 90},
+      {"key": "hooks", "value": true},
+      {"key": "coauthor", "value": false},
+      {"key": "updates", "value": null},
+      {"key": "ultracode", "value": true}
+    ],
+    "rules": {"allow": ["Bash(npm run *)", "WebFetch(domain:docs.example.com)"], "ask": [], "deny": ["Read(./.env)", "mcp__tracker"]},
+    "env": [
+      {"key": "BASH_DEFAULT_TIMEOUT_MS", "value": "120000", "secret": false},
+      {"key": "GITLAB_TOKEN", "value": "••••c7f2", "secret": true}
+    ],
+    "mcp": [
+      {"name": "angular-cli", "kind": "stdio", "target": "npx", "enabled": true},
+      {"name": "tracker", "kind": "http", "target": "tracker.example.com", "enabled": false}
+    ]
+  }
+}

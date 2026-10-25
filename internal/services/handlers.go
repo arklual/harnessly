@@ -209,6 +209,39 @@ func (h *Handlers) GitLabView(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, 200, view)
 }
 
+// ChangeView: GET ?url=, a merge request, pull request, commit or issue of GitLab or GitHub with its checks, discussion
+// and diff. A GitHub link that cannot be read answers a card with the reason (200), so the tab is never empty.
+func (h *Handlers) ChangeView(w http.ResponseWriter, r *http.Request) {
+	if _, ok := readBody(w, r); !ok {
+		return
+	}
+	if !h.Session(r) {
+		writeJSON(w, r, 403, errorBody("Forbidden"))
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		writeEmpty(w, 405)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	url, _ := queryString(r, "url")
+	if !h.S.IsChangeRef(url) {
+		writeJSON(w, r, 400, errorBody(locale.Pick("A link to a merge request, pull request, commit or issue is required", "Нужна ссылка на merge request, pull request, коммит или задачу")))
+		return
+	}
+	view, err := h.S.ChangeView(r.Context(), url)
+	if err != nil {
+		failed(w)
+		return
+	}
+	if view == nil {
+		writeJSON(w, r, 404, errorBody(locale.Pick("GitLab did not return this object", "GitLab не отдал этот объект")))
+		return
+	}
+	writeJSON(w, r, 200, view)
+}
+
 // LinkMeta: GET ?url= (a tracker issue, a merge request, a published document) or ?key= (a bare task key).
 func (h *Handlers) LinkMeta(w http.ResponseWriter, r *http.Request) {
 	if _, ok := readBody(w, r); !ok {

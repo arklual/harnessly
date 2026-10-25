@@ -1,0 +1,29 @@
+{
+  "f": "ev",
+  "ch": "convs",
+  "seq": 611,
+  "e": {
+    "type": "conversation_upsert",
+    "conv": {
+      "id": "tab-s4Qrea",
+      "machineId": "runner-2",
+      "projectId": null,
+      "cwd": "/home/coder/workspace/harnessly",
+      "provider": "claude",
+      "model": {"id": "claude-opus-5-5", "effort": "high"},
+      "title": "Контракт v2",
+      "titleSource": "agent",
+      "pinned": false,
+      "createdAt": 1792652400000,
+      "lastActivityAt": 1792655999000,
+      "lastPromptAt": 1792655999000,
+      "state": {"k": "stopped", "since": 1792663200000, "resumable": true},
+      "seenAt": 1792655999000,
+      "lastTurn": null,
+      "queue": {"count": 0, "paused": null},
+      "gate": null,
+      "terminalStop": {"at": 1792663200000, "by": "idle", "idleMs": 7200000},
+      "rev": 9
+    }
+  }
+}

@@ -1,0 +1,368 @@
+package typist
+
+import (
+	"errors"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/wire"
+)
+
+// Message is what one try types: pictures (absolute paths) before the text.
+type Message struct {
+	Text   string
+	Images []string
+	// Steer types into a working agent: its turn takes the text (Claude queues it until the next step). A menu or
+	// foreign text still stops it.
+	Steer bool
+	// HandOver: the running tool is one Claude can hand to the background (Bash, an MCP call), so a steered message
+	// goes in now by Claude's chord instead of waiting for the tool to end.
+	HandOver bool
+	// HandOverOK, when set, is asked right before the chord: the tool may have ended while the text was typed, and then
+	// the chord would cut the model's answer short instead of handing a call over. Nil: go ahead.
+	HandOverOK func() bool
+	// EnterOnly: a restart found the text in the box; only its Enter is pressed, and a box without it types nothing.
+	EnterOnly bool
+	// Leftovers are the picture paths the harness pasted for its messages (this one's and earlier ones'). Claude reads
+	// a big picture late: a paste the typist gave up on lands after it, as path text, and is ours to clear.
+	Leftovers []string
+}
+
+// Outcome is how one try ended.
+type Outcome string
+
+const (
+	// Sent: the text left the input box (or the screen could not be read to say otherwise) — not yet accepted.
+	Sent Outcome = "sent"
+	// Wait: no input line or a working agent; nothing was typed.
+	Wait Outcome = "wait"
+	// BlockedMenu, BlockedText: a menu or someone else's text; nothing was typed.
+	BlockedMenu Outcome = "blocked-menu"
+	BlockedText Outcome = "blocked-text"
+	// Failed: a paste or a key did not go in, or a picture did not show up. Nothing reached the agent for sure: the
+	// next try finds what did reach the box as its own and types only the rest.
+	Failed Outcome = "failed"
+	// Stuck: typed, Entered three times, still in the box.
+	Stuck Outcome = "stuck"
+)
+
+// Result is one try: its outcome, the screen it started from, and what it did on the way.
+type Result struct {
+	Outcome Outcome
+	Before  Screen
+	// Typed: keys went in (Sent, Stuck, a Failed after the first key). Own: the box held this message's pictures or
+	// text from an earlier try, and only the rest was typed. ChatAbout: the question dialog was closed first.
+	Typed, ChatAbout, HandedOver bool
+	Own                          bool
+	// AsPath: Claude did not show a picture as a reference, and the message went with its path as text.
+	AsPath bool
+	Err    error
+}
+
+const (
+	pasteSettle      = 250 * time.Millisecond // Claude reads a paste as one block; an Enter on its heels lands too early
+	confirmPoll      = 150 * time.Millisecond
+	confirmRetry     = 700 * time.Millisecond
+	confirmMaxEnters = 3
+	confirmLimit     = 4000 * time.Millisecond
+	// confirmUnseen: a box that never showed the message is not yet proof that it left. Under load Claude draws a long
+	// typed line late, its Enter taken into it as a newline: the box reads empty for the first looks, then holds the
+	// text. Only a box free of it this long after the Enter counts as sent.
+	confirmUnseen  = 600 * time.Millisecond
+	chatAboutMoves = 8
+	chatAboutStep  = 120 * time.Millisecond
+)
+
+// errPicture: the agent did not show a reference for every picture pasted.
+var errPicture = errors.New("typist: a picture did not show up")
+
+// Plan is what one look at the screen lets a message do: the decision, and what of the message the box holds
+// already from an earlier try — Landed of its pictures, or its text (OwnText).
+type Plan struct {
+	Decision Decision
+	Landed   int
+	OwnText  bool
+	// Nothing: an Enter-only try finds the box without its text — there is nothing left to type.
+	Nothing bool
+	// ChatAbout: the question dialog is to be closed by «Chat about this» before the text goes in as the answer.
+	ChatAbout bool
+	// Clear: the box holds a setting command of the harness that did not go through, or picture paths the harness
+	// pasted that never became pictures; it is cleared first.
+	Clear string
+}
+
+// Own: the box holds some of the message already.
+func (p Plan) Own() bool { return p.Landed > 0 || p.OwnText }
+
+// Decide reads a look for a message, as Type does before any key: the outbox asks it first so a try the screen would
+// refuse is not started at all.
+func Decide(m Message, s Screen, provider wire.Provider) Plan {
+	// Claude still reads a paste of pictures: the box is not final, its references land later — nothing goes in now.
+	if provider != wire.ProviderCodex && s.Readable && Pasting(s.Plain) {
+		return Plan{Decision: DecideWait}
+	}
+	// The agent asks a question and the person wrote instead of picking: «Chat about this» closes the dialog and the
+	// message goes in as the reply.
+	if s.Menu == MenuQuestion && !blank(m.Text) && provider != wire.ProviderCodex && !m.EnterOnly {
+		return Plan{Decision: DecideSend, ChatAbout: true}
+	}
+	// An earlier try may have left this message's pictures in the box ([Image #1]) before the agent confirmed them,
+	// all or the first of them: they are ours, so the box counts as empty and only the missing ones are pasted. More
+	// pictures than the message has, or other text after them, are someone else's.
+	ownPictures := s.Readable && len(m.Images) > 0 && s.OnlyPictures && s.Pictures <= len(m.Images)
+	// A message an earlier try typed whose Enter was lost sits in the box (behind its pictures when it has them): it
+	// is ours too, and only its Enter is pressed again — it is never typed twice.
+	ownText := s.Readable && s.Input != "" && StillInBox(s, provider, m.Text)
+	leftover := !ownPictures && !ownText && !m.EnterOnly &&
+		(HarnessLeftover(s, provider) || PathLeftover(s, provider, m.Leftovers))
+	view := s
+	if ownPictures || ownText || leftover {
+		view.Input = ""
+	}
+	if m.Steer {
+		view.Busy = false
+	}
+	p := Plan{Decision: Deliverable(view), OwnText: ownText}
+	if leftover {
+		p.Clear = s.Box
+	}
+	if ownPictures && !ownText {
+		p.Landed = s.Pictures
+	}
+	if m.EnterOnly && !ownText && p.Decision == DecideSend {
+		p.Nothing = true
+	}
+	return p
+}
+
+// Type tries one message once: it reads the screen, closes a question dialog by «Chat about this» when the text is
+// the person's answer in words, decides whether it may type now, and types what the box does not hold yet. The caller
+// holds the pane's lock.
+func Type(m Message, provider wire.Provider, p Pane, c Clock) Result {
+	view := Look(p, provider)
+	res := Result{Before: view}
+	plan := Decide(m, view, provider)
+	if plan.ChatAbout {
+		if chatAbout(p, c) {
+			res.ChatAbout = true
+			view = Look(p, provider)
+		}
+		plan = Decide(Message{Text: m.Text, Images: m.Images, Steer: m.Steer}, view, provider)
+		if plan.ChatAbout {
+			res.Outcome = BlockedMenu
+			return res
+		}
+	}
+	if plan.Clear != "" && plan.Decision == DecideSend {
+		// A command of ours that did not go through sits in the box: it goes, then the box is looked at again.
+		if !ClearOwn(p, c, provider, plan.Clear, CountImageRefs(plan.Clear) > 0) {
+			res.Outcome = BlockedText
+			return res
+		}
+		plan = Decide(m, Look(p, provider), provider)
+	}
+	res.Own = plan.Own()
+	switch plan.Decision {
+	case DecideWait:
+		res.Outcome = Wait
+		return res
+	case DecideBlockedMenu:
+		res.Outcome = BlockedMenu
+		return res
+	case DecideBlockedText:
+		res.Outcome = BlockedText
+		return res
+	}
+	if plan.Nothing {
+		res.Outcome = Sent
+		return res
+	}
+	res.Outcome, res.Err = typeRest(m, provider, p, c, plan.Landed, plan.OwnText, &res.Typed, &res.AsPath)
+	if res.Outcome == Sent && m.Steer && m.HandOver && provider != wire.ProviderCodex && (m.HandOverOK == nil || m.HandOverOK()) {
+		res.HandedOver = handOver(p, c)
+	}
+	return res
+}
+
+// typeRest types what the box does not have yet: landed pictures of the message are there already, and ownText says
+// the text is too.
+func typeRest(m Message, provider wire.Provider, p Pane, c Clock, landed int, ownText bool, typed, asPath *bool) (Outcome, error) {
+	if len(m.Images) > landed && !ownText {
+		*typed = true
+		if err := pasteImages(m.Images[landed:], provider != wire.ProviderCodex, landed, p, c, provider); err != nil {
+			if errors.Is(err, errPicture) && provider != wire.ProviderCodex {
+				*asPath = true
+				return sendAsPath(m, landed, p, c)
+			}
+			if errors.Is(err, errPicture) && provider == wire.ProviderCodex {
+				// The paths stay in the box as text otherwise, and the next message finds the box taken by someone
+				// else's text: the box held nothing of anyone's before (else it was blocked), so it is wiped whole.
+				_ = p.Keys("C-u")
+			}
+			return Failed, err
+		}
+	}
+	text := m.Text
+	switch {
+	case ownText:
+	case provider == wire.ProviderCodex:
+		*typed = true
+		if err := p.Paste(text); err != nil {
+			return Failed, err
+		}
+		c.Sleep(pasteSettle)
+	case len(m.Images) == 0 && SubmitsAsTypedLine(text):
+		*typed = true
+		if err := p.TypeLine(text); err != nil {
+			return Failed, err
+		}
+		return confirmLeftBox(text, false, provider, p, c, true)
+	case !blank(text):
+		if len(m.Images) > 0 {
+			text = " " + text
+		}
+		*typed = true
+		if err := p.Paste(text); err != nil {
+			return Failed, err
+		}
+		c.Sleep(pasteSettle)
+	}
+	*typed = true
+	if err := p.Keys("Enter"); err != nil {
+		return Failed, err
+	}
+	return confirmLeftBox(m.Text, len(m.Images) > 0, provider, p, c, true)
+}
+
+// sendAsPath sends a Claude message whose pictures did not show as references with their paths as text: Claude reads
+// a file by its path all the same, and a reference it makes of one late is as good. Paths the box lost (no path text,
+// no late reference) are pasted again, then the text, one Enter, and the whole line is what must leave the box.
+func sendAsPath(m Message, landed int, p Pane, c Clock) (Outcome, error) {
+	escaped := make([]string, 0, len(m.Images)-landed)
+	for _, path := range m.Images[landed:] {
+		escaped = append(escaped, EscapePathForPrompt(path))
+	}
+	paths := strings.Join(escaped, " ")
+	view := Look(p, wire.ProviderClaude)
+	if !strings.Contains(noSpace(view.Box), noSpace(paths)) && CountImageRefs(view.Box) <= landed {
+		if err := p.Paste(paths); err != nil {
+			return Failed, err
+		}
+		c.Sleep(pasteSettle)
+	}
+	full := paths
+	if !blank(m.Text) {
+		full = paths + " " + m.Text
+		if err := p.Paste(" " + m.Text); err != nil {
+			return Failed, err
+		}
+		c.Sleep(pasteSettle)
+	}
+	if err := p.Keys("Enter"); err != nil {
+		return Failed, err
+	}
+	return confirmLeftBox(full, true, wire.ProviderClaude, p, c, true)
+}
+
+// confirmLeftBox: a message counts as sent only once it has left the input box. The box is read every 150 ms for up
+// to 4 s; while the message is still there, Enter is pressed again 700 ms after the last one, three Enters in all. A
+// message the box never showed is sent only once the box stayed free of it for confirmUnseen.
+// Still there after that: stuck — the next try finds the text as its own and presses only its Enter. A screen that
+// cannot be read is not held against the send: whether the agent took it is for the hook and the transcript to say.
+// A stuck text is cleared out of the box, row by row (ClearOwn), and the retry types it whole.
+func confirmLeftBox(text string, pictures bool, provider wire.Provider, p Pane, c Clock, entered bool) (Outcome, error) {
+	if blank(text) {
+		return Sent, nil
+	}
+	enters, sinceEnter, read, seen := 0, time.Duration(0), false, false
+	if entered {
+		enters = 1
+	}
+	for waited := time.Duration(0); waited < confirmLimit; waited += confirmPoll {
+		c.Sleep(confirmPoll)
+		sinceEnter += confirmPoll
+		view := Look(p, provider)
+		if !view.Readable {
+			continue
+		}
+		read = true
+		if !StillInBox(view, provider, text) {
+			if seen || waited+confirmPoll >= confirmUnseen {
+				return Sent, nil
+			}
+			continue
+		}
+		seen = true
+		if sinceEnter >= confirmRetry && enters < confirmMaxEnters {
+			if err := p.Keys("Enter"); err != nil {
+				return Failed, err
+			}
+			enters++
+			sinceEnter = 0
+		}
+	}
+	if !read {
+		return Sent, nil
+	}
+	// Three Enters and still there: the message fails (the person retries it), and the box is not left dirty — a text
+	// left behind would go with the next message, or reach the agent late, on someone else's Enter, as a copy.
+	ClearOwn(p, c, provider, text, pictures)
+	return Stuck, nil
+}
+
+// chatAbout moves the question dialog's cursor to «Chat about this», presses Enter and waits for the dialog to go.
+func chatAbout(p Pane, c Clock) bool {
+	for moves := 0; ; moves++ {
+		plain, ok := p.Capture()
+		if !ok {
+			return false
+		}
+		present, selected := screen.ChatAboutRow(plain)
+		if !present {
+			return false
+		}
+		if selected {
+			if p.Keys("Enter") != nil {
+				return false
+			}
+			break
+		}
+		if moves >= chatAboutMoves || p.Keys("Down") != nil {
+			return false
+		}
+		c.Sleep(chatAboutStep)
+	}
+	return screen.WaitForQuestionGone(p.Capture, c.Sleep)
+}
+
+// handOver presses Claude's chord ctrl+x ctrl+s once while its queue shows: a running Bash or MCP call goes to the
+// background and the queued message reaches the turn now. It is pressed only for such a tool; while the model writes
+// the chord would cut the answer short.
+func handOver(p Pane, c Clock) bool {
+	c.Sleep(confirmPoll)
+	styled, ok := p.CaptureStyled()
+	if !ok || !Read(styled, wire.ProviderClaude).Queued {
+		return false
+	}
+	return p.Keys("C-x", "C-s") == nil
+}
+
+// LongPromptText is the longest text Claude Code takes as typed; a longer typed burst reads as a paste too.
+const LongPromptText = 800
+
+var (
+	modeOpener     = regexp.MustCompile(`^[!#/&]`)
+	completionTail = regexp.MustCompile(`(?:^|` + sp + `)[@/]` + nsp + `*$`)
+)
+
+// SubmitsAsTypedLine: a line Claude Code takes as typed and submits on an Enter right behind it — short and single,
+// not opening a mode with its first character (! shell, # memory, / command, & background) and not ending in an @ or
+// / word, where Claude's completion list is open and would take the Enter.
+func SubmitsAsTypedLine(text string) bool {
+	line := jscompat.Trim(text)
+	return line != "" && !strings.Contains(text, "\n") && jscompat.Len(text) <= LongPromptText &&
+		!modeOpener.MatchString(line) && !completionTail.MatchString(line)
+}

@@ -1,0 +1,12 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 539,
+  "e": {
+    "type": "shots_set",
+    "shots": [
+      {"id": "5d41402abc4b", "name": "checkout-mobile.png", "at": 1792656100000, "agent": "Проверить оплату на телефоне"},
+      {"id": "7d793037a076", "name": "home.png", "at": 1792656000000}
+    ]
+  }
+}

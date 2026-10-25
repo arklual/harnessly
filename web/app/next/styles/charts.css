@@ -1,0 +1,769 @@
+/* The Machine tool's charts (design lib/hx/charts.css): same shapes and behaviour, tokens --hx-*. Only what the tool uses. */
+
+/* The series palette: roles of the active theme, so the charts follow the theme. */
+:root,
+[data-hx-theme] {
+  --hx-ch-s1: var(--hx-accent);
+  --hx-ch-s2: var(--hx-info);
+  --hx-ch-s3: var(--hx-success);
+  --hx-ch-s4: var(--hx-warning);
+  --hx-ch-s5: var(--hx-danger);
+  --hx-ch-s6: var(--hx-fg-3);
+  --hx-ch-grid: var(--hx-border); /* the grid: barely there */
+  --hx-ch-axis: var(--hx-border-strong); /* the axis, the cursor, dashes */
+  --hx-ch-track: var(--hx-bg-active); /* the track under a fill */
+  --hx-ch-label: var(--hx-fg-3); /* axis labels */
+  --hx-ch-ease: var(--hx-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+/* Entrances. */
+@keyframes hx-ch-reveal {
+  from {
+    clip-path: inset(-6px 100% -6px -6px);
+  }
+  to {
+    clip-path: inset(-6px -6px -6px -6px);
+  }
+}
+@keyframes hx-ch-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes hx-ch-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* One tooltip for all the charts; the parent shows it on :hover. */
+.hx-ch-tip {
+  position: absolute;
+  z-index: 6;
+  min-width: max-content;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  box-shadow: var(--hx-shadow-overlay);
+  font-size: var(--hx-text-xs);
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  transform-origin: 50% 100%;
+  transition:
+    opacity 140ms var(--hx-ch-ease),
+    transform 200ms var(--hx-ch-ease);
+}
+.hx-ch-tip__t {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-ch-tip__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+.hx-ch-tip__row i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c, var(--hx-ch-s1));
+}
+.hx-ch-tip__row > span {
+  color: color-mix(in srgb, var(--hx-primary-fg) 62%, transparent);
+}
+.hx-ch-tip__row b {
+  margin-left: 16px;
+  font-weight: var(--hx-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.hx-ch-tip__sum {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--hx-primary-fg) 16%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.hx-ch-tip__sum > span {
+  color: color-mix(in srgb, var(--hx-primary-fg) 62%, transparent);
+}
+.hx-ch-tip__sum b {
+  font-weight: var(--hx-weight-semibold);
+}
+
+/* The axes frame: Y labels on the left, the plot body, X labels below (--rows: grid intervals). */
+.hx-ch-frame {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: var(--hx-ch-h, 140px) auto;
+  column-gap: 8px;
+  row-gap: 8px;
+  font-size: 11px;
+  line-height: 12px;
+  color: var(--hx-ch-label);
+  font-variant-numeric: tabular-nums;
+}
+.hx-ch-frame__y {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-block: -6px;
+  text-align: right;
+  white-space: nowrap;
+}
+.hx-ch-frame__y > span {
+  display: block;
+  height: 12px;
+}
+.hx-ch-frame__body {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  min-width: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--hx-ch-grid) 0 1px,
+    transparent 1px calc(100% / var(--rows, 4))
+  );
+  box-shadow: 0 1px 0 var(--hx-ch-grid);
+}
+.hx-ch-frame__x {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+  white-space: nowrap;
+}
+.hx-ch-frame__x[data-cols='true'] {
+  justify-content: stretch;
+  gap: var(--hx-ch-gap, 3px);
+}
+.hx-ch-frame__x[data-cols='true'] > span {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+.hx-ch-frame[data-size='sm'] {
+  --hx-ch-h: 84px;
+}
+.hx-ch-frame[data-size='lg'] {
+  --hx-ch-h: 200px;
+}
+.hx-ch-frame[data-noy='true'] {
+  grid-template-columns: 0 minmax(0, 1fr);
+  column-gap: 0;
+}
+.hx-ch-frame[data-noy='true'] .hx-ch-frame__y {
+  display: none;
+}
+.hx-ch-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+
+/* Lines over soft areas (.hx-ch-plot); the hit columns carry the cursor, the dots and the tooltip. */
+.hx-ch-plot {
+  position: absolute;
+  inset: 0;
+}
+.hx-ch-plot__fill,
+.hx-ch-plot__line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  animation: hx-ch-reveal 900ms var(--hx-ch-ease) both;
+}
+.hx-ch-plot__fill {
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 94%);
+  mask-image: linear-gradient(to bottom, #000, transparent 94%);
+}
+.hx-ch-plot__fill path {
+  fill: var(--c, var(--hx-ch-s1));
+  fill-opacity: 0.2;
+}
+.hx-ch-plot[data-stack='true'] .hx-ch-plot__fill path {
+  fill-opacity: 0.3;
+}
+.hx-ch-plot__line path {
+  fill: none;
+  stroke: var(--c, var(--hx-ch-s1));
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.hx-ch-plot__ref {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--y);
+  border-top: 1px dashed var(--hx-ch-axis);
+  pointer-events: none;
+}
+.hx-ch-plot__ref > span {
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 12px;
+  color: var(--hx-ch-label);
+}
+
+.hx-ch-hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--x);
+  width: var(--w);
+  transform: translateX(-50%);
+}
+.hx-ch-hit::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  margin-left: -0.5px;
+  background: var(--hx-ch-axis);
+  opacity: 0;
+  transition: opacity 140ms var(--hx-ch-ease);
+}
+.hx-ch-hit__dot {
+  position: absolute;
+  left: 50%;
+  top: var(--y);
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: var(--hx-bg-raised);
+  border: 2px solid var(--c, var(--hx-ch-s1));
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 140ms var(--hx-ch-ease),
+    transform 220ms var(--hx-ch-ease);
+}
+.hx-ch-hit .hx-ch-tip {
+  top: 4px;
+  left: calc(50% + 12px);
+  transform-origin: 0 0;
+  transform: translateX(-4px) scale(0.98);
+}
+.hx-ch-hit[data-side='l'] .hx-ch-tip {
+  left: auto;
+  right: calc(50% + 12px);
+  transform-origin: 100% 0;
+  transform: translateX(4px) scale(0.98);
+}
+.hx-ch-hit:hover::before {
+  opacity: 1;
+}
+.hx-ch-hit:hover .hx-ch-hit__dot {
+  opacity: 1;
+  transform: none;
+}
+.hx-ch-hit:hover .hx-ch-tip {
+  opacity: 1;
+  transform: none;
+}
+
+/* The mini line of a tile (.hx-ch-sline); the one-line tooltip from data-tip is shared with the heat cells. */
+.hx-ch-sline {
+  position: relative;
+  height: var(--hx-ch-spark-h, 32px);
+}
+.hx-ch-sline svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: hx-ch-reveal 800ms var(--hx-ch-ease) both;
+}
+.hx-ch-sline__area {
+  fill: color-mix(in srgb, var(--c, var(--hx-ch-s1)) 13%, transparent);
+}
+.hx-ch-sline__line {
+  fill: none;
+  stroke: var(--c, var(--hx-ch-s1));
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.hx-ch-sline__end {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--c, var(--hx-ch-s1));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c, var(--hx-ch-s1)) 20%, transparent);
+  animation: hx-ch-in 400ms var(--hx-ch-ease) 700ms backwards;
+}
+
+/* The light tooltip from data-tip: the heat cells */
+.hx-ch-heat i[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 6;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+  box-shadow: var(--hx-shadow-overlay);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-regular);
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 140ms var(--hx-ch-ease),
+    transform 200ms var(--hx-ch-ease);
+}
+.hx-ch-heat i[data-tip]:first-child::after {
+  left: 0;
+  transform: translate(0, 4px);
+}
+.hx-ch-heat i[data-tip]:last-child::after {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px);
+}
+.hx-ch-heat i[data-tip]:hover::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.hx-ch-heat i[data-tip]:first-child:hover::after,
+.hx-ch-heat i[data-tip]:last-child:hover::after {
+  transform: none;
+}
+
+/* Tiles: the figure, its change, a few words and a mini line. */
+.hx-ch-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--hx-ch-kpi-min, 120px), 1fr));
+  gap: var(--hx-space-4) var(--hx-space-5);
+}
+.hx-ch-kpis[data-box='true'] {
+  gap: var(--hx-space-2);
+}
+.hx-ch-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  animation: hx-ch-in 520ms var(--hx-ch-ease) backwards;
+  animation-delay: calc(min(var(--i, 0), 24) * 60ms);
+}
+.hx-ch-kpis[data-box='true'] .hx-ch-kpi {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--hx-bg-active);
+}
+.hx-ch-kpi__label {
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-ch-kpi__value {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hx-ch-kpi__value small {
+  margin-left: 3px;
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-regular);
+  letter-spacing: 0;
+  color: var(--hx-fg-3);
+}
+.hx-ch-kpi__foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-height: 18px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-ch-kpi .hx-ch-sline {
+  margin-top: var(--hx-space-2);
+}
+.hx-ch-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 6px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: var(--hx-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hx-ch-delta[data-dir='up']::before,
+.hx-ch-delta[data-dir='down']::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border: 3px solid transparent;
+}
+.hx-ch-delta[data-dir='up']::before {
+  border-width: 0 3px 5px;
+  border-bottom-color: currentColor;
+}
+.hx-ch-delta[data-dir='down']::before {
+  border-width: 5px 3px 0;
+  border-top-color: currentColor;
+}
+.hx-ch-delta[data-tone='good'] {
+  background: var(--hx-success-soft);
+  color: color-mix(in srgb, var(--hx-success) 72%, var(--hx-fg-1));
+}
+.hx-ch-delta[data-tone='bad'] {
+  background: color-mix(in srgb, var(--hx-danger) 12%, transparent);
+  color: var(--hx-danger);
+}
+
+/* Rows with a bar behind them (.hx-ch-list): --v is the bar, --c its colour. */
+.hx-ch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hx-ch-list__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  min-height: 36px;
+  padding: 4px var(--hx-space-3);
+  border-radius: var(--hx-radius-sm);
+  font-size: var(--hx-text-sm);
+}
+.hx-ch-list__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, calc(var(--v, 0) * 100%));
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--c, var(--hx-accent)) 13%, transparent);
+  transform-origin: left;
+  animation: hx-ch-grow 640ms var(--hx-ch-ease) backwards;
+  animation-delay: calc(min(var(--i, 0), 24) * 60ms);
+  transition:
+    width 500ms var(--hx-ch-ease),
+    background-color 160ms var(--hx-ch-ease);
+}
+.hx-ch-list__row:hover .hx-ch-list__fill {
+  background: color-mix(in srgb, var(--c, var(--hx-accent)) 22%, transparent);
+}
+.hx-ch-list__row[data-tone='bad'] .hx-ch-list__fill {
+  background: color-mix(in srgb, var(--hx-danger) 14%, transparent);
+}
+.hx-ch-list__row[data-tone='muted'] .hx-ch-list__fill {
+  background: var(--hx-bg-hover);
+}
+.hx-ch-list__main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-ch-list__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-ch-list__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+}
+.hx-ch-list__sub:is(:empty, :has(> .sc-interp:only-child:empty)) {
+  display: none;
+}
+.hx-ch-list__val {
+  position: relative;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-ch-list__row[data-tone='bad'] .hx-ch-list__val {
+  color: var(--hx-danger);
+}
+
+/* A segmented bar (.hx-ch-stack): --w is the weight of a part, --c its colour. */
+.hx-ch-stack {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+.hx-ch-stack__part {
+  position: relative;
+  flex: var(--w, 1) 1 0%;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--c, var(--hx-ch-s1));
+  transform-origin: left;
+  animation: hx-ch-grow 640ms var(--hx-ch-ease) backwards;
+  animation-delay: calc(min(var(--i, 0), 24) * 50ms);
+  transition:
+    flex-grow 500ms var(--hx-ch-ease),
+    opacity 160ms var(--hx-ch-ease);
+}
+.hx-ch-stack__part::before {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
+}
+.hx-ch-stack__part:first-child {
+  border-radius: 4px 2px 2px 4px;
+}
+.hx-ch-stack__part:last-child {
+  border-radius: 2px 4px 4px 2px;
+}
+.hx-ch-stack__part[data-free='true'] {
+  background: var(--hx-ch-track);
+}
+.hx-ch-stack:hover .hx-ch-stack__part {
+  opacity: 0.45;
+}
+.hx-ch-stack .hx-ch-stack__part:hover {
+  opacity: 1;
+}
+.hx-ch-stack__part .hx-ch-tip {
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translate(-50%, 4px) scale(0.98);
+}
+.hx-ch-stack__part:first-child .hx-ch-tip {
+  left: 0;
+  transform: translate(0, 4px) scale(0.98);
+  transform-origin: 0 100%;
+}
+.hx-ch-stack__part:last-child .hx-ch-tip {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px) scale(0.98);
+  transform-origin: 100% 100%;
+}
+.hx-ch-stack__part:hover .hx-ch-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.hx-ch-stack__part:first-child:hover .hx-ch-tip,
+.hx-ch-stack__part:last-child:hover .hx-ch-tip {
+  transform: none;
+}
+
+/* The legend. */
+.hx-ch-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-2);
+}
+.hx-ch-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.hx-ch-legend__item i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c, var(--hx-ch-s1));
+}
+.hx-ch-legend__item[data-free='true'] i {
+  background: var(--hx-ch-track);
+  box-shadow: inset 0 0 0 1px var(--hx-ch-axis);
+}
+.hx-ch-legend__l {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-ch-legend__item b,
+.hx-ch-legend__p {
+  font-weight: var(--hx-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+.hx-ch-legend__item b:is(:empty, :has(> .sc-interp:only-child:empty)),
+.hx-ch-legend__p:is(:empty, :has(> .sc-interp:only-child:empty)) {
+  display: none;
+}
+.hx-ch-legend__p {
+  color: var(--hx-fg-3);
+  font-weight: var(--hx-weight-regular);
+}
+.hx-ch-legend[data-rows='true'] {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 0;
+  font-size: var(--hx-text-sm);
+}
+.hx-ch-legend[data-rows='true'] .hx-ch-legend__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  transition: background-color 160ms var(--hx-ch-ease);
+}
+.hx-ch-legend[data-rows='true'] .hx-ch-legend__item:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-ch-legend[data-rows='true'] .hx-ch-legend__item b {
+  color: var(--hx-fg-1);
+}
+.hx-ch-legend[data-rows='true'] .hx-ch-legend__p {
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Cells whose saturation is the value (.hx-ch-heat), one per core. */
+.hx-ch-heat {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+}
+.hx-ch-heat[data-wrap='true'] {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fill, minmax(14px, 1fr));
+}
+.hx-ch-heat i {
+  position: relative;
+  height: 16px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c, var(--hx-accent)) calc(8% + var(--v, 0) * 92%), var(--hx-ch-track));
+  transition: background-color 400ms var(--hx-ch-ease);
+}
+
+/* Gaps between neighbours: a legend above a plot and below a bar. */
+.hx-ch-legend:has(+ .hx-ch-frame, + .hx-ch-stack) {
+  margin-bottom: var(--hx-space-3);
+}
+.hx-ch-stack + .hx-ch-legend {
+  margin-top: var(--hx-space-3);
+}
+
+/* Motion: prefers-reduced-motion is respected. */
+@media (prefers-reduced-motion: reduce) {
+  [class*='hx-ch-'],
+  [class*='hx-ch-']::before,
+  [class*='hx-ch-']::after {
+    animation: none !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+/* The tool's level dot and its column (design components.css .hx-lvl; pane.css has the rest of .hx-mach). */
+.hx-lvl {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hx-success);
+}
+.hx-lvl[data-tone='warn'] {
+  background: var(--hx-warning);
+}
+.hx-lvl[data-tone='bad'] {
+  background: var(--hx-danger);
+}
+.hx-mach__proc > .hx-ch-list__val {
+  min-width: 36px;
+  text-align: right;
+}
+.hx-mach {
+  --hx-ch-kpi-min: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+}
+@media (max-width: 900px) {
+  .hx-mach .hx-ch-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Not in the design: the loading bars, a process on its way out, a stop that waits for the machine. */
+.hx-mach__sk-line {
+  height: 18px;
+}
+.hx-mach__sk-tile {
+  height: 112px;
+  border-radius: 10px;
+}
+.hx-mach__sk-chart {
+  height: 160px;
+  border-radius: 10px;
+}
+.hx-mach__proc[data-leaving='true'] {
+  pointer-events: none;
+  animation: hx-mach-out 220ms var(--hx-ch-ease) forwards;
+}
+@keyframes hx-mach-out {
+  to {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+.hx-mach__proc .hx-tv__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-mach__proc[data-leaving='true'] {
+    animation: none;
+    opacity: 0;
+  }
+}

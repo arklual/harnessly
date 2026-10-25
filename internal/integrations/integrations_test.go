@@ -160,3 +160,27 @@ func TestDocuments(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestListBoards(t *testing.T) {
+	var auth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/b/api/boards" || r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		auth = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{"boards":[{"slug":"flow","title":"Путь покупателя","url":"https://a.example/b/flow?k=1","updatedAt":"2026-10-20T10:00:00Z","stats":{"elements":4}},{"slug":"bare"},{"title":"no slug"}]}`))
+	}))
+	defer srv.Close()
+	got, err := Config{BoardsURL: srv.URL, BoardsToken: "runtime-token"}.ListBoards(context.Background())
+	want := []Board{
+		{Slug: "flow", Title: "Путь покупателя", URL: "https://a.example/b/flow?k=1", UpdatedAt: "2026-10-20T10:00:00Z"},
+		{Slug: "bare", Title: "bare", URL: srv.URL + "/b/bare"},
+	}
+	if err != nil || !reflect.DeepEqual(got, want) || auth != "Bearer runtime-token" {
+		t.Fatalf("%+v %v %q", got, err, auth)
+	}
+	if _, err := (Config{}).ListBoards(context.Background()); !errors.Is(err, ErrNotConfigured) {
+		t.Fatal(err)
+	}
+}
