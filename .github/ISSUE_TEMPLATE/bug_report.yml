@@ -13,8 +13,11 @@ body:
       label: Component
       options:
         - runtime (cmd/runtime)
+        - web page (web/)
         - machine agent (cmd/agent)
+        - harnessly CLI (cmd/harnessly)
         - agentprobe (cmd/agentprobe)
+        - deploy (Docker, compose, Helm, Argo CD, systemd)
         - build, CI or docs
     validations:
       required: true
