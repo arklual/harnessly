@@ -1,0 +1,28 @@
+# Area labels for pull requests, by the paths they touch (actions/labeler v5+ format).
+"area: runtime":
+  - changed-files:
+      - any-glob-to-any-file: ["cmd/runtime/**", "internal/**"]
+"area: agent":
+  - changed-files:
+      - any-glob-to-any-file: ["cmd/agent/**", "internal/agent/**", "internal/machine/**", "internal/machines/**"]
+"area: cli":
+  - changed-files:
+      - any-glob-to-any-file: ["cmd/harnessly/**", "internal/hlcli/**"]
+"area: web":
+  - changed-files:
+      - any-glob-to-any-file: ["web/**"]
+"area: deploy":
+  - changed-files:
+      - any-glob-to-any-file: ["deploy/**", "Dockerfile", "compose.yaml", ".dockerignore"]
+"area: skills":
+  - changed-files:
+      - any-glob-to-any-file: ["skills/**", "internal/agentskills/**"]
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ["docs/**", "*.md", "deploy/helm/harnessly/README.md"]
+ci:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**", ".gitlab-ci.yml", ".goreleaser.yaml", ".golangci.yml", "Makefile"]
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ["go.mod", "go.sum", "web/package.json", "web/pnpm-lock.yaml"]

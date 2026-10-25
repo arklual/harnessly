@@ -136,7 +136,9 @@ func TestPreviewDevtoolsGolden(t *testing.T) {
 	oldRT := &gate.OldRuntime{DataDir: dir, TokenHeaders: []string{"x-acme-token"}}
 	sessionOK := func(r *http.Request) bool {
 		c, err := r.Cookie("session-token")
-		return err == nil && agent.VerifySession(secret, c.Value, time.Now()) == nil
+		// The page session in the goldens was signed when they were taken: it is checked at the goldens' clock, not
+		// today's, or the test fails once that session expires.
+		return err == nil && agent.VerifySession(secret, c.Value, time.UnixMilli(g.Start)) == nil
 	}
 	d := deps{Home: home, DataDir: dir, Old: oldRT, SessionOK: sessionOK, Tmux: tmux.New(tmux.Names{Socket: "hs-test-preview", Prefix: "hs-"}),
 		APIRefusal: func(r *http.Request) (int, any, http.Header, bool) {

@@ -107,14 +107,17 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.
 The release changelog is built from these subjects, so `feat` and `fix` subjects should read well on their own.
 
 One logical change per commit. Open the pull request against `main`, fill in the template, and keep it focused; CI
-(tests, lint, CodeQL, the cross build and gitleaks) must be green before it is merged.
+(tests, lint, CodeQL, the cross build and gitleaks) must be green and a maintainer must approve before it is merged.
+Pull requests are squash-merged and the title becomes the commit subject, so the title is checked as a Conventional
+Commit too. Write "Fixes #123" in the description to close the issue on merge. Labels for the areas a pull request
+touches are set automatically.
 
 ## Releases
 
 A maintainer tags `vX.Y.Z` on `main`. The [release workflow](.github/workflows/release.yml) runs
-[GoReleaser](.goreleaser.yaml): `agent` and `runtime` for linux and darwin, amd64 and arm64, with checksums and a
-changelog from the commit subjects. [CHANGELOG.md](CHANGELOG.md) is updated in the same pull request that prepares the
-release.
+[GoReleaser](.goreleaser.yaml): `agent`, `harnessly` and `runtime` for linux and darwin, amd64 and arm64, with
+checksums and a changelog from the commit subjects. [CHANGELOG.md](CHANGELOG.md) is updated in the same pull request
+that prepares the release.
 
 ## License
 
