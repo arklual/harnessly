@@ -435,7 +435,19 @@ func (a *api) sideChat(c *call) {
 func (c *call) launchShape() (*agents.Launch, bool) {
 	model, _ := c.field("model")
 	effort, _ := c.field("effort")
-	return agents.ReadLaunchShape(model, effort)
+	// The Codex launcher script tells a chat on a backend profile as «profile/model» (agents.LauncherModel).
+	var profile string
+	if s, ok := model.(string); ok {
+		profile, s = agents.SplitLauncherModel(s)
+		if profile != "" {
+			model = s
+		}
+	}
+	l, ok := agents.ReadLaunchShape(model, effort)
+	if ok && l != nil {
+		l.Profile = profile
+	}
+	return l, ok
 }
 
 func (c *call) trimmedField(k string) string {

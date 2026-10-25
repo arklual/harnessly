@@ -11,6 +11,7 @@ import {
 } from '@/next/stores/quotes';
 import { useContextWindow } from '@/next/bindings/use-context-window';
 import { useAgentLimits } from '@/next/bindings/use-limits';
+import { limitsProviderOf } from '@/next/features/limits/model';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   answerQuestion,
@@ -179,7 +180,11 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
 
   const voice = useVoice(machine, text, onChange, read);
   const window = useContextWindow(machine, conv, working);
-  const limits = useAgentLimits(machine, record?.provider ?? null);
+  // The usage meter is Anthropic's (or Codex's) own: a chat on a vendor's profile has none.
+  const limits = useAgentLimits(
+    machine,
+    limitsProviderOf(record ? { provider: record.provider, profile: record.model?.profile } : null),
+  );
   const compacting = record?.state.k === 'working' && record.state.compacting;
   const idle = record?.state.k === 'idle' || record?.state.k === 'ready';
   const compact = useMemo(
@@ -319,7 +324,9 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
 
   // The field is there from the first frame, so the page does not jump when the chat's record arrives; the pill that
   // needs the record comes later inside it.
-  const agent = record ? pickerAgentOf(machineView?.machine.agents ?? [], record.provider) : null;
+  const agent = record
+    ? pickerAgentOf(machineView?.machine.agents ?? [], record.provider, record.model?.profile ?? null)
+    : null;
   const status = useDockStatus(record, pending, agent);
   // The pill shows what the chat will run on: a change that waits is already the choice, the line over the field says
   // when it takes effect. Ultracode is the exception: the pill shows the mode the agent was last seen in, and an ask
@@ -375,6 +382,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
             ? {
                 value: {
                   provider: record.provider,
+                  ...(record.model?.profile ? { profile: record.model.profile } : {}),
                   model: wanted?.id ?? null,
                   effort: wanted?.effort ?? null,
                   ultracode: record.model?.ultracode === true,

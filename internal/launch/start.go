@@ -398,6 +398,10 @@ func launchJSON(l *agents.Launch) *jsvalue.Object {
 	if l.Effort != nil {
 		o.Set("effort", *l.Effort)
 	}
+	// Only a chat on a backend profile remembers one: the launch of every other is stored as it always was.
+	if l.Profile != "" {
+		o.Set("profile", l.Profile)
+	}
 	return o
 }
 

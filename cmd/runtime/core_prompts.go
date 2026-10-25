@@ -151,6 +151,10 @@ func (w *promptWiring) LaunchChosen(session string, applied prompts.Applied) {
 	launch := jsvalue.NewObject()
 	launch.Set("model", value(applied.Model, current.Model))
 	launch.Set("effort", value(applied.Effort, current.Effort))
+	// A chat on a backend profile stays on it whatever model is chosen in it.
+	if current.Profile != "" {
+		launch.Set("profile", current.Profile)
+	}
 	patch := jsvalue.NewObject()
 	patch.Set("launch", launch)
 	if _, err := w.c.store.UpdateTabMeta(session, patch); err != nil {
@@ -264,5 +268,9 @@ func (c *core) tabLaunch(session string) agents.Launch {
 		}
 		return nil
 	}
-	return agents.Launch{Model: str("model"), Effort: str("effort")}
+	launched := agents.Launch{Model: str("model"), Effort: str("effort")}
+	if p := str("profile"); p != nil {
+		launched.Profile = *p
+	}
+	return launched
 }

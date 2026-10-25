@@ -76,4 +76,33 @@ describe('useHScroll', () => {
     expect(el.scrollBy).toHaveBeenNthCalledWith(1, { left: 240, behavior: 'smooth' });
     expect(el.scrollBy).toHaveBeenNthCalledWith(2, { left: -240, behavior: 'smooth' });
   });
+
+  it('turns a wheel going down into a sideways move of a strip that has more behind it', () => {
+    const el = strip(0, 300, 900);
+    renderHook(() => useHScroll({ current: el }));
+    const wheel = new WheelEvent('wheel', { deltaY: 120, cancelable: true });
+    el.dispatchEvent(wheel);
+    expect(el.scrollLeft).toBe(120);
+    expect(wheel.defaultPrevented).toBe(true);
+    el.dispatchEvent(new WheelEvent('wheel', { deltaY: 1000, cancelable: true }));
+    expect(el.scrollLeft).toBe(600);
+  });
+
+  it('leaves a wheel alone where the strip fits, is at its end or already goes sideways', () => {
+    const fits = strip(0, 300, 300);
+    renderHook(() => useHScroll({ current: fits }));
+    const onFit = new WheelEvent('wheel', { deltaY: 100, cancelable: true });
+    fits.dispatchEvent(onFit);
+    expect(onFit.defaultPrevented).toBe(false);
+    const end = strip(600, 300, 900);
+    renderHook(() => useHScroll({ current: end }));
+    const atEnd = new WheelEvent('wheel', { deltaY: 100, cancelable: true });
+    end.dispatchEvent(atEnd);
+    expect(atEnd.defaultPrevented).toBe(false);
+    const wide = strip(0, 300, 900);
+    renderHook(() => useHScroll({ current: wide }));
+    const sideways = new WheelEvent('wheel', { deltaX: 100, deltaY: 10, cancelable: true });
+    wide.dispatchEvent(sideways);
+    expect(sideways.defaultPrevented).toBe(false);
+  });
 });

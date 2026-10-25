@@ -10,6 +10,7 @@ import {
   useAgentPages,
 } from '@/next/bindings/settings-agents';
 import { AppsPage, BetaPage, GeneralPage, MachinesPage } from '@/next/bindings/settings-general';
+import { ModelsPage } from '@/next/bindings/settings-providers';
 import { NoticesPage } from '@/next/bindings/settings-notices';
 import { PeersPage } from '@/next/bindings/settings-peers';
 import SettingsShell from '@/next/features/settings/settings-shell';
@@ -68,6 +69,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
   if (active === 'general') body = <GeneralPage machine={machine} name={name} pending={pending} />;
   else if (active === 'notifications') body = <NoticesPage />;
   else if (active === 'accounts') body = <AccountsPage pages={pages} pending={pending} />;
+  else if (active === 'models') body = <ModelsPage machine={machine} />;
   else if (active === 'claude' || active === 'codex')
     body = (
       <AgentPage

@@ -19,6 +19,7 @@ export const SETTINGS_SECTIONS = [
   'general',
   'notifications',
   'accounts',
+  'models',
   'claude',
   'codex',
   'skills',

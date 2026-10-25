@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -41,7 +42,7 @@ func LauncherFlags(l *agents.Launch) ([]string, error) {
 	}
 	var flags []string
 	if l.Model != nil && *l.Model != "" {
-		flags = append(flags, "--model", agents.ShellQuote(*l.Model))
+		flags = append(flags, "--model", agents.ShellQuote(agents.LauncherModel(l)))
 	}
 	if l.Effort != nil && *l.Effort != "" {
 		flags = append(flags, "--effort", agents.ShellQuote(*l.Effort))
@@ -88,6 +89,25 @@ type LaunchConfig struct {
 	// are variables that still stay out (the runtime's own CLI token).
 	PassServiceEnv  bool
 	ShellEnvExclude []string
+	// Profiles points a launch on a backend profile at the vendor; nil refuses such a launch.
+	Profiles agents.ProfileLauncher
+}
+
+// ErrNoProfiles: a launch names a backend profile and this deployment has none.
+var ErrNoProfiles = errors.New("Backend profiles are not available on this machine")
+
+// profile is what a launch on a backend profile adds; the zero value for a launch on the CLI's own account.
+func (c LaunchConfig) profile(l *agents.Launch) (agents.CodexProfile, error) {
+	if l == nil || l.Profile == "" {
+		return agents.CodexProfile{}, nil
+	}
+	if c.Profiles == nil {
+		return agents.CodexProfile{}, ErrNoProfiles
+	}
+	if err := agents.CheckLaunch(l); err != nil {
+		return agents.CodexProfile{}, err
+	}
+	return c.Profiles.Codex(l.Profile)
 }
 
 func invalidID(id string) error { return errors.New("Invalid codex session ID format: " + id) }
@@ -113,6 +133,10 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 	if session != "" && !agents.IsUUID(session) {
 		return nil, false, invalidID(session)
 	}
+	prof, err := c.profile(launch)
+	if err != nil {
+		return nil, false, err
+	}
 	var hookArgs []string
 	if c.Hooks != nil {
 		if hookArgs, configParseError, err = c.Hooks.Flags(); err != nil {
@@ -135,7 +159,7 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 	args = append(args, MCPArgs(c.MCP)...)
 	args = append(args, "--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false")
 	args = append(args, devArgs...)
-	args = append(args, c.shellEnvArgs()...)
+	args = append(args, c.shellEnvArgs(prof.KeyEnv)...)
 	if c.SkipPermissions != nil && c.SkipPermissions() {
 		args = append(args, "--yolo")
 	} else if c.ContainerSandbox {
@@ -145,16 +169,19 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 	if err != nil {
 		return nil, false, err
 	}
-	return append(args, launchArgs...), configParseError, nil
+	// The vendor's provider comes with the model: Codex starts on the profile and asks it for the model.
+	return append(append(args, prof.Args...), launchArgs...), configParseError, nil
 }
 
 // shellEnvArgs are the two flags that keep Codex from dropping the services' tokens from its commands' environment.
-func (c LaunchConfig) shellEnvArgs() []string {
+//
+// The variable that carries a profile's key stays out of the commands too (keyEnv), also when the services' tokens do not.
+func (c LaunchConfig) shellEnvArgs(keyEnv string) []string {
 	if !c.PassServiceEnv {
 		return nil
 	}
-	exclude := make([]string, 0, len(c.ShellEnvExclude))
-	for _, name := range c.ShellEnvExclude {
+	exclude := make([]string, 0, len(c.ShellEnvExclude)+1)
+	for _, name := range append(slices.Clone(c.ShellEnvExclude), keyEnv) {
 		if name != "" {
 			exclude = append(exclude, TOMLBasicString(name))
 		}
@@ -181,10 +208,19 @@ func (c LaunchConfig) launcherLine(workspaceID, flag, session string, launch *ag
 	if session != "" && !agents.IsUUID(session) {
 		return "", invalidID(session)
 	}
+	prof, err := c.profile(launch)
+	if err != nil {
+		return "", err
+	}
 	if err := EnsureLauncher(c.LauncherScript, c.LauncherContent); err != nil {
 		return "", err
 	}
 	parts := []string{"node", agents.ShellQuote(c.LauncherScript)}
+	if prof.KeyEnv != "" {
+		// The pane's shell reads the key from its file into the variable of this one command: the key is not in the
+		// line that is typed, and not in the shell's own environment.
+		parts = append([]string{prof.KeyEnv + `="$(cat ` + agents.ShellQuote(prof.KeyFile) + `)"`}, parts...)
+	}
 	if workspaceID != "" {
 		parts = append(parts, "--workspace-id", agents.ShellQuote(workspaceID))
 	}

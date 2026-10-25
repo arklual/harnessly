@@ -1,6 +1,7 @@
 package outbox
 
 import (
+	"maps"
 	"slices"
 	"time"
 
@@ -15,11 +16,13 @@ type State struct {
 	Paused  *wire.QueuePause `json:"paused"`
 	Rev     int64            `json:"rev"`
 	Flight  string           `json:"flight"`
+	// Gone are the ids of the messages let go and when they ended (GoneKept).
+	Gone map[string]wire.Ms `json:"gone,omitempty"`
 }
 
 // State is the box to write.
 func (b *Box) State() State {
-	st := State{Items: slices.Clone(b.items), Paused: b.paused, Rev: b.rev, Flight: b.flight}
+	st := State{Items: slices.Clone(b.items), Paused: b.paused, Rev: b.rev, Flight: b.flight, Gone: maps.Clone(b.gone)}
 	for _, r := range b.sorted() {
 		st.Records = append(st.Records, *r)
 	}
@@ -42,6 +45,8 @@ func (b *Box) Restore(st State) {
 		}
 	}
 	b.paused, b.rev, b.flight = st.Paused, max(st.Rev, 1), ""
+	b.gone = map[string]wire.Ms{}
+	maps.Copy(b.gone, st.Gone)
 }
 
 // LegacyItem is a message of Legacy's prompt-queue.json.

@@ -94,7 +94,7 @@ func roundTrip(b []byte) ([]byte, error) {
 }
 
 // httpKinds is the answers of the v2 HTTP pages a fixture can hold.
-var httpKinds = []string{"hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "context", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft"}
+var httpKinds = []string{"hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "messageStatus", "context", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest"}
 
 func decodePage(kind string, b []byte) (interface{ Validate() error }, error) {
 	var v interface{ Validate() error }
@@ -152,6 +152,8 @@ func decodePage(kind string, b []byte) (interface{ Validate() error }, error) {
 		v = &LegacyTab{}
 	case "context":
 		v = &ConvContext{}
+	case "messageStatus":
+		v = &MessageStatuses{}
 	case "machineStats":
 		v = &MachineStats{}
 	case "machineStop":
@@ -164,6 +166,12 @@ func decodePage(kind string, b []byte) (interface{ Validate() error }, error) {
 		v = &OpenedRefs{}
 	case "agentSettings":
 		v = &AgentSettings{}
+	case "profiles":
+		v = &ProfileList{}
+	case "profileKey":
+		v = &ProfileKey{}
+	case "profileTest":
+		v = &ProfileTest{}
 	case "runtimeSettings":
 		v = &RuntimeSettings{}
 	case "rewindPlan":
@@ -315,7 +323,7 @@ func TestClosedListsMatchTheSchema(t *testing.T) {
 		"ServerFrameKind": strs(ServerFrameKinds), "MachineEventType": strs(MachineEventTypes),
 		"ConvsEventType": strs(ConvsEventTypes), "ConvEventType": strs(ConvEventTypes),
 		"CompactionPhase": strs(CompactionPhases), "Op": strs(Ops), "PromoteTo": strs(PromoteTos),
-		"DesignKind": strs(DesignKinds), "DesignRole": strs(DesignRoles), "FileKind": strs(FileKinds), "AppID": strs(AppIDs), "OpenTab": strs(OpenTabs), "AppState": strs(AppStates), "AppReason": strs(AppReasons), "AppSectionID": strs(AppSectionIDs), "AppFlag": strs(AppFlags), "AppTone": strs(AppTones), "AppRole": strs(AppRoles), "AppPipeline": strs(AppPipelines), "AgentOptionKey": strs(AgentOptionKeys), "AgentMcpKind": strs(AgentMcpKinds), "AgentAccountMethod": strs(AgentAccountMethods), "DiskPartID": strs(DiskPartIDs), "MachineProcKind": strs(MachineProcKinds), "MachineStopReason": strs(MachineStopReasons), "TaskStatus": strs(TaskStatuses), "ResultKind": strs(ResultKinds), "RefuseCode": strs(RefuseCodes), "RetryableRefuseCode": strs(RetryableRefuseCodes), "HttpKind": httpKinds, "TerminalStopBy": strs(TerminalStopBys), "IdleStop": strs(IdleStops), "FileChange": strs(FileChanges), "OriginKind": strs(OriginKinds), "OriginVia": strs(OriginVias), "HandoffMode": strs(HandoffModes), "DraftMode": strs(DraftModes), "OnOff": strs(OnOffs), "LimitWindow": strs(LimitWindows), "LimitAction": strs(LimitActions), "AutoContinueWhy": strs(AutoContinueWhys),
+		"DesignKind": strs(DesignKinds), "DesignRole": strs(DesignRoles), "FileKind": strs(FileKinds), "AppID": strs(AppIDs), "OpenTab": strs(OpenTabs), "AppState": strs(AppStates), "AppReason": strs(AppReasons), "AppSectionID": strs(AppSectionIDs), "AppFlag": strs(AppFlags), "AppTone": strs(AppTones), "AppRole": strs(AppRoles), "AppPipeline": strs(AppPipelines), "AgentOptionKey": strs(AgentOptionKeys), "AgentMcpKind": strs(AgentMcpKinds), "AgentAccountMethod": strs(AgentAccountMethods), "DiskPartID": strs(DiskPartIDs), "MachineProcKind": strs(MachineProcKinds), "MachineStopReason": strs(MachineStopReasons), "TaskStatus": strs(TaskStatuses), "ResultKind": strs(ResultKinds), "RefuseCode": strs(RefuseCodes), "RetryableRefuseCode": strs(RetryableRefuseCodes), "HttpKind": httpKinds, "TerminalStopBy": strs(TerminalStopBys), "IdleStop": strs(IdleStops), "FileChange": strs(FileChanges), "OriginKind": strs(OriginKinds), "OriginVia": strs(OriginVias), "HandoffMode": strs(HandoffModes), "DraftMode": strs(DraftModes), "OnOff": strs(OnOffs), "LimitWindow": strs(LimitWindows), "LimitAction": strs(LimitActions), "AutoContinueWhy": strs(AutoContinueWhys), "ProfileVendor": strs(ProfileVendors), "ProfileTestReason": strs(ProfileTestReasons), "MessageStatusKind": strs(MessageStatusKinds), "HandedWhere": strs(HandedWheres),
 	}
 	for name, def := range sc.defs {
 		if _, isEnum := def.(map[string]any)["enum"]; isEnum {

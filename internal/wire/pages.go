@@ -85,6 +85,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.runtimeSettings(w, r)
 	case strings.HasPrefix(p, "agent-settings/"):
 		s.agentSettings(w, r, strings.TrimPrefix(p, "agent-settings/"))
+	case p == "providers":
+		s.profiles(w, r, "")
+	case strings.HasPrefix(p, "providers/"):
+		s.profiles(w, r, strings.TrimPrefix(p, "providers/"))
 	case strings.HasPrefix(p, "machine/"):
 		s.machineTool(w, r, strings.TrimPrefix(p, "machine/"))
 	case strings.HasPrefix(p, "conversations/"):
@@ -109,7 +113,7 @@ func (s *Server) machines(w http.ResponseWriter, r *http.Request) {
 		refuse(w, RefuseInternal)
 		return
 	}
-	writeJSON(w, http.StatusOK, []Machine{snap.Machine})
+	writeJSON(w, http.StatusOK, []Machine{MachineFor(snap.Machine, CapsOf(r))})
 }
 
 // dirs serves GET /api/v2/dirs: the folders the machine offers for a new project.
@@ -233,6 +237,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 		return
 	case len(parts) == 2 && parts[1] == "legacy":
 		s.legacy(ctx, w, r, id)
+		return
+	case len(parts) == 2 && parts[1] == "messages":
+		s.messageStatus(ctx, w, r, id)
 		return
 	case len(parts) == 2 && parts[1] == "open":
 		s.open(ctx, w, r, id)

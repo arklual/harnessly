@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createWave, FLOOR, idleLevel, SAMPLE_MS, shape, WAVE_MODE } from '@/next/features/composer/wave';
+import { createWave, FLOOR, SAMPLE_MS, SHOWN, shape, WAVE_MODE } from '@/next/features/composer/wave';
 
 const run = (wave: ReturnType<typeof createWave>, levels: number[], frameMs = 16, from = 0) => {
   let now = from;
@@ -73,14 +73,20 @@ describe('the wave', () => {
     expect(reduced.bars(3, 0, WAVE_MODE.live).map((b) => b.at)).toEqual([0, 1, 2]);
   });
 
-  it('sweeps softly while the recording is turned into text', () => {
+  it('fades out and draws nothing while the recording is turned into text', () => {
     const wave = createWave();
     wave.step(0, 1, WAVE_MODE.live);
     wave.step(50, 1, WAVE_MODE.live);
-    for (let t = 100; t < 2000; t += 50) wave.step(t, 1, WAVE_MODE.busy);
-    expect(wave.envelope).toBeLessThan(0.1);
-    const bars = wave.bars(30, 2000, WAVE_MODE.busy).map((b) => b.h);
-    expect(Math.max(...bars) - Math.min(...bars)).toBeGreaterThan(0.1);
+    for (let t = 100; t < 3000; t += 50) wave.step(t, 1, WAVE_MODE.busy);
+    expect(wave.envelope).toBeLessThan(SHOWN);
+    for (let t = 3000; t < 12000; t += 55) wave.step(t, 1, WAVE_MODE.busy);
+    expect(wave.bars(40, 12000, WAVE_MODE.busy).every((b) => b.h === 0)).toBe(true);
+  });
+
+  it('draws nothing when there is no loudness to show', () => {
+    const wave = createWave();
+    for (let t = 0; t < 2000; t += 50) wave.step(t, 0.5, WAVE_MODE.idle);
+    expect(wave.bars(40, 2000, WAVE_MODE.idle).every((b) => b.h === 0)).toBe(true);
   });
 
   it('does not jump when a hidden tab comes back', () => {
@@ -90,12 +96,5 @@ describe('the wave', () => {
     // a minute of silence did not fill the history: only the bars of one frame stand, the rest are at rest
     const bars = wave.bars(12, 60_000, WAVE_MODE.live);
     expect(bars[8].h).toBeLessThan(FLOOR + 0.07);
-  });
-
-  it('has a calm loudness of its own for a browser without a meter', () => {
-    for (let t = 0; t < 5000; t += 100) {
-      expect(idleLevel(t)).toBeGreaterThan(0.1);
-      expect(idleLevel(t)).toBeLessThan(0.26);
-    }
   });
 });

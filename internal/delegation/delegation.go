@@ -52,6 +52,9 @@ type Service struct {
 	Settings func() wire.DelegationSettings
 	// Models are the models an agent CLI takes here; nil trusts any id.
 	Models func(p wire.Provider) []wire.AgentModel
+	// ProfileModels are the ids of the models of a backend profile (Kimi, GLM, Grok); nil, or none for an unknown profile,
+	// leaves a delegated chat on the CLI's own account.
+	ProfileModels func(profile string) []string
 	// Self is this machine and its owner, as the envelopes of the messages between the agents name them.
 	Self peers.Sender
 	Book *Book
@@ -195,12 +198,12 @@ func (s *Service) Delegate(ctx context.Context, callerID string, t Task) (wire.C
 	if limit := s.settings().MaxChildren; len(kids) >= limit {
 		return wire.Conversation{}, refuse("too-many", "this chat already has %d delegated chats (the person's limit is %d); finish with one and delete it, or ask the person", len(kids), limit)
 	}
-	model, err := s.model(t)
+	model, profile, err := s.model(t, caller)
 	if err != nil {
 		return wire.Conversation{}, err
 	}
 	key := peers.NewID()
-	cmd := wire.ConversationCreateCmd{OpID: "delegate-" + key, Provider: t.Provider, Model: model, ParentID: caller.ID,
+	cmd := wire.ConversationCreateCmd{OpID: "delegate-" + key, Provider: t.Provider, Model: model, Profile: profile, ParentID: caller.ID,
 		Title: strings.TrimSpace(t.Title), First: &wire.FirstMessage{ClientID: "delegate-" + key, Text: prompt, AttachmentIDs: []string{}}}
 	if title := []rune(cmd.Title); len(title) > wire.RefTitleMax {
 		cmd.Title = string(title[:wire.RefTitleMax])
@@ -275,11 +278,31 @@ func inside(root, path string) bool {
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")
 }
 
-// model is the task's model as the wire has it: nil for the default with the default effort.
-func (s *Service) model(t Task) (*wire.Model, error) {
+// model is the task's model as the wire has it: nil for the default with the default effort. A chat that runs on a
+// backend profile delegates to the same profile when the task is for the same CLI and names no model, or one of the
+// profile's: the profile is the second result. A task that names a model of the CLI's own account gets a chat on it.
+func (s *Service) model(t Task, caller wire.Conversation) (*wire.Model, string, error) {
 	if t.Effort != "" && !slices.Contains(wire.Efforts, t.Effort) {
-		return nil, refuse("bad-request", "effort is one of %s", joinEfforts(wire.Efforts))
+		return nil, "", refuse("bad-request", "effort is one of %s", joinEfforts(wire.Efforts))
 	}
+	if cur := caller.Model; cur != nil && cur.Profile != "" && caller.Provider == t.Provider && s.ProfileModels != nil {
+		id := t.Model
+		if id == "" {
+			id = cur.ID
+		}
+		if slices.Contains(s.ProfileModels(cur.Profile), id) {
+			if t.Effort != "" {
+				return nil, "", refuse("bad-request", "%s takes no effort", id)
+			}
+			return &wire.Model{ID: id}, cur.Profile, nil
+		}
+	}
+	m, err := s.plainModel(t)
+	return m, "", err
+}
+
+// plainModel is the task's model on the CLI's own account.
+func (s *Service) plainModel(t Task) (*wire.Model, error) {
 	if t.Model == "" && t.Effort == "" {
 		return nil, nil
 	}

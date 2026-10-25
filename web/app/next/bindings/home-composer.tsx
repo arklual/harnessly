@@ -11,6 +11,7 @@ import { choiceKey, launchPrompt, toggleChoice } from '@/next/features/composer/
 import { createConversation, type NewConversation } from '@/next/commands';
 import { failureText } from '@/next/bindings/outcome';
 import { useAgentLimits } from '@/next/bindings/use-limits';
+import { limitsProviderOf } from '@/next/features/limits/model';
 import { useUploads } from '@/next/bindings/use-uploads';
 import { rememberChoice } from '@/next/features/composer/start-choice';
 import { useStartChoice } from '@/next/bindings/use-start-choice';
@@ -95,7 +96,7 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
     if (!choice || choiceKey(next) !== choiceKey(choice)) setMore([]);
     onPick(next);
   };
-  const limits = useAgentLimits(machine, choice?.provider ?? null);
+  const limits = useAgentLimits(machine, limitsProviderOf(choice));
   // «/» on the start page: the commands that may start a chat, the model and depth of the pill, the earlier sessions.
   const slashActions = useMemo<ISlashActions>(() => ({ resume: () => requestUi(UI_REQUEST.resume) }), []);
   const slash = useSlashSource({
@@ -133,6 +134,7 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
         createConversation(machine, {
           where,
           provider: pick.provider,
+          ...(pick.profile ? { profile: pick.profile } : {}),
           model: pick.model ? { id: pick.model, effort: pick.effort, ultracode: pick.ultracode } : null,
           first,
           launch,
@@ -164,6 +166,7 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
     const created = createConversation(machine, {
       where,
       provider: choice?.provider ?? 'claude',
+      ...(choice?.profile ? { profile: choice.profile } : {}),
       model: choice?.model ? { id: choice.model, effort: choice.effort, ultracode: choice.ultracode } : null,
       first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready },
     });

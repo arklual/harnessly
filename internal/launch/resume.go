@@ -126,6 +126,9 @@ func tabLaunch(o *jsvalue.Object) *agents.Launch {
 			l.Effort = &s
 		}
 	}
+	if p, ok := o.Get("profile"); ok {
+		l.Profile, _ = p.(string)
+	}
 	return l
 }
 

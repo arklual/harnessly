@@ -5,8 +5,9 @@ import type { IModelChoice } from '@/next/features/composer/agents';
 /** At most this many chats start from one prompt: each is an agent process and a git worktree. */
 export const MULTI_MAX = 4;
 
-export const choiceKey = (c: Pick<IModelChoice, 'provider' | 'model'>): string =>
-  `${c.provider}:${c.model ?? ''}`;
+export const choiceKey = (
+  c: Pick<IModelChoice, 'provider' | 'model'> & { profile?: string | null },
+): string => `${c.profile ?? c.provider}:${c.model ?? ''}`;
 
 /** The set with the choice in it, or without when it was: the last one cannot be taken out, and the set is capped. */
 export function toggleChoice(set: readonly IModelChoice[], choice: IModelChoice): IModelChoice[] {

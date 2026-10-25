@@ -258,7 +258,7 @@ const Card = ({
 };
 
 const AccountsSection = ({ cards, open, busy, onToggle, onBaseUrl, onRetry }: IAccountsSectionProps) => (
-  <Group foot={t('next.settings.accounts.foot')}>
+  <Group foot={`${t('next.settings.accounts.foot')} ${t('next.providers.accountsHint')}`}>
     {cards.map((card) => (
       <Card
         key={card.provider}

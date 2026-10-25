@@ -21,6 +21,30 @@ type Launch struct {
 	Effort *string `json:"effort"`
 	// Ultracode starts Claude Code in its ultracode mode, beside the effort (the `ultracode` settings key).
 	Ultracode bool `json:"ultracode,omitempty"`
+	// Profile starts the agent on a backend profile (another vendor's models behind the CLI, see ProfileLauncher). It
+	// is set when the conversation starts and stays on the tab, so every later launch of it (resume, fork, rewind)
+	// goes to the same vendor. Empty: the CLI's own account.
+	Profile string `json:"profile,omitempty"`
+}
+
+// ProfileLauncher gives a launch on a backend profile what it needs of the profile: the Claude Code settings file that
+// points the CLI at the vendor, or the arguments that point Codex at it. It never gives a key: the CLI reads it from a
+// file the profile names.
+type ProfileLauncher interface {
+	// ClaudeSettings is the `--settings` file of a Claude Code chat on a profile and a model; hooksPath is the settings
+	// file of harnessly's hooks, which the file extends.
+	ClaudeSettings(profile, model, hooksPath string) (string, error)
+	// Codex is what a Codex chat on a profile adds to the launch.
+	Codex(profile string) (CodexProfile, error)
+}
+
+// CodexProfile is what a Codex chat on a profile adds to the launch.
+type CodexProfile struct {
+	// Args are the `-c` flags that make the profile Codex's model provider.
+	Args []string
+	// KeyEnv is the variable Codex reads the key from, KeyFile the file the key is in. The pane's shell fills the variable
+	// from the file (`VAR="$(cat file)"`), so the key is not in the line that is typed.
+	KeyEnv, KeyFile string
 }
 
 // Efforts are every reasoning level the CLIs know, weakest first.
@@ -33,9 +57,13 @@ var ModelIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}(\[1m\])?$`)
 func IsKnownEffort(e string) bool { return slices.Contains(Efforts, e) }
 
 var (
-	ErrLaunchModel  = errors.New("Invalid launch model")
-	ErrLaunchEffort = errors.New("Invalid launch effort")
+	ErrLaunchModel   = errors.New("Invalid launch model")
+	ErrLaunchEffort  = errors.New("Invalid launch effort")
+	ErrLaunchProfile = errors.New("Invalid launch profile")
 )
+
+// ProfileIDRe: a profile id is typed into a shell too.
+var ProfileIDRe = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 // CheckLaunch re-checks a stored choice right before it becomes shell text: a bad value stops the launch.
 func CheckLaunch(l *Launch) error {
@@ -47,6 +75,12 @@ func CheckLaunch(l *Launch) error {
 	}
 	if l.Effort != nil && !IsKnownEffort(*l.Effort) {
 		return ErrLaunchEffort
+	}
+	if l.Profile != "" {
+		// A profile's models take no effort and no ultracode, and the profile needs a model to name.
+		if !ProfileIDRe.MatchString(l.Profile) || l.Model == nil || *l.Model == "" || l.Effort != nil || l.Ultracode {
+			return ErrLaunchProfile
+		}
 	}
 	return nil
 }
@@ -73,6 +107,25 @@ func ReadLaunchShape(model, effort any) (*Launch, bool) {
 		l.Effort = &s
 	}
 	return l, true
+}
+
+// LauncherModel is the model of a launch as the Codex launcher script is told it. The script forwards `--model` to the
+// runtime whatever it is, and the one a platform ships does not know of profiles, so a chat on a backend profile names
+// the profile in front of the model («xai/grok-build-0.1»); SplitLauncherModel reads it back where the runtime builds
+// Codex's arguments. A model on the CLI's own account is told as it is.
+func LauncherModel(l *Launch) string {
+	if l.Profile == "" {
+		return *l.Model
+	}
+	return l.Profile + "/" + *l.Model
+}
+
+// SplitLauncherModel is the profile and the model of a model as the launcher script sent it; a plain model has no profile.
+func SplitLauncherModel(s string) (profile, model string) {
+	if i := strings.IndexByte(s, '/'); i > 0 && ProfileIDRe.MatchString(s[:i]) {
+		return s[:i], s[i+1:]
+	}
+	return "", s
 }
 
 // ShellQuote single-quotes s for sh.

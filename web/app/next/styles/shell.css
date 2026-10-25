@@ -28,7 +28,9 @@ html:has(.hx-app) body {
   background-image: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%234C8DF6%22/%3E%3Cstop offset=%22.55%22 stop-color=%22%239B72F2%22/%3E%3Cstop offset=%221%22 stop-color=%22%23D96570%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill=%22url%28%23g%29%22 d=%22M12 1.5C12.6 7.2 16.8 11.4 22.5 12C16.8 12.6 12.6 16.8 12 22.5C11.4 16.8 7.2 12.6 1.5 12C7.2 11.4 11.4 7.2 12 1.5Z%22/%3E%3C/svg%3E');
 }
 .hx-agent[data-agent='codex'],
-.hx-agent[data-agent='grok'] {
+.hx-agent[data-agent='grok'],
+.hx-agent[data-agent='kimi'],
+.hx-agent[data-agent='glm'] {
   background-color: currentColor;
   -webkit-mask: var(--hx-a) center / contain no-repeat;
   mask: var(--hx-a) center / contain no-repeat;
@@ -38,6 +40,13 @@ html:has(.hx-app) body {
 }
 .hx-agent[data-agent='grok'] {
   --hx-a: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222%22 stroke-linecap=%22round%22%3E%3Cpath d=%22M18.4 8.2A8 8 0 1 1 15.8 5%22/%3E%3Cpath d=%22M5 20 20 4%22/%3E%3C/svg%3E');
+}
+/* The vendors of the extra models: a K and a Z of the same stroke as the others. */
+.hx-agent[data-agent='kimi'] {
+  --hx-a: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M7 4v16M17 4l-9 8 9 8%22/%3E%3C/svg%3E');
+}
+.hx-agent[data-agent='glm'] {
+  --hx-a: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22M5 5h14L5 19h14%22/%3E%3C/svg%3E');
 }
 .hx-spacer {
   flex: 1 1 auto;

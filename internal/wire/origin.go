@@ -17,7 +17,7 @@ func guarded(p string, r *http.Request) bool {
 		return true
 	case p == "machine/processes/stop":
 		return true
-	case p == "me/settings", p == "runtime-settings", strings.HasPrefix(p, "agent-settings/"):
+	case p == "me/settings", p == "runtime-settings", strings.HasPrefix(p, "agent-settings/"), p == "providers", strings.HasPrefix(p, "providers/"):
 		return r.Method != http.MethodGet && r.Method != http.MethodHead
 	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/side-chat"):
 		return true

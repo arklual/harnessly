@@ -56,6 +56,17 @@ export const useHScroll = (ref: RefObject<HTMLElement | null>) => {
     const soon = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
+    // A wheel turned the usual way (down) moves a strip that only scrolls sideways, as a mouse has no other way to.
+    const wheel = (event: WheelEvent) => {
+      if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      if (el.scrollWidth <= el.clientWidth) return;
+      const max = el.scrollWidth - el.clientWidth;
+      const next = Math.min(max, Math.max(0, el.scrollLeft + event.deltaY));
+      if (next === el.scrollLeft) return;
+      event.preventDefault();
+      el.scrollLeft = next;
+    };
+    el.addEventListener('wheel', wheel, { passive: false });
     el.addEventListener('scroll', soon, { passive: true });
     const resize = new ResizeObserver(soon);
     resize.observe(el);
@@ -68,6 +79,7 @@ export const useHScroll = (ref: RefObject<HTMLElement | null>) => {
     });
     soon();
     return () => {
+      el.removeEventListener('wheel', wheel);
       el.removeEventListener('scroll', soon);
       resize.disconnect();
       mutate.disconnect();

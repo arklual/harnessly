@@ -126,6 +126,7 @@ export const startDesignConv = ({
   const created = createConversation(machine, {
     where: { cwd: dir },
     provider: choice?.provider ?? 'claude',
+    ...(choice?.profile ? { profile: choice.profile } : {}),
     model: choice?.model ? { id: choice.model, effort: choice.effort } : null,
     first: { text, attachments },
   });

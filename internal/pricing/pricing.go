@@ -78,11 +78,29 @@ func ClaudeCost(model string, input, output, cacheWrite5m, cacheWrite1h, cacheRe
 	return claudeCost(p, input, output, cacheWrite5m, cacheWrite1h, cacheRead), true
 }
 
+// Anthropic says whether a model id is one of Anthropic's: Claude Code's own ids and aliases, and the synthetic model
+// of its notices. Another vendor's model (Kimi, GLM, Grok) that runs through Claude Code is not, and has no price here.
+func Anthropic(model string) bool {
+	lower := strings.ToLower(model)
+	if lower == "" || strings.HasPrefix(lower, "<") {
+		return true
+	}
+	for _, f := range []string{"claude", "opus", "sonnet", "haiku", "fable"} {
+		if strings.Contains(lower, f) {
+			return true
+		}
+	}
+	return false
+}
+
 // ClaudeCostByFullID is ClaudeCost, with a model the table does not know priced by the family its id mentions (Sonnet
-// when none).
+// when none). A model that is not Anthropic's has no price: 0, never a Claude family's price.
 func ClaudeCostByFullID(model string, input, output, cacheWrite5m, cacheWrite1h, cacheRead float64) float64 {
 	if c, ok := ClaudeCost(model, input, output, cacheWrite5m, cacheWrite1h, cacheRead); ok {
 		return c
+	}
+	if !Anthropic(model) {
+		return 0
 	}
 	lower := strings.ToLower(model)
 	p := claudePrices["sonnet-4-6"]

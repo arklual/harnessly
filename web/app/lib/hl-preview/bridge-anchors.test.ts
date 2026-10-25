@@ -204,6 +204,38 @@ describe('uncover', () => {
   });
 });
 
+describe('hitAt', () => {
+  it('goes down through the open shadow roots to what answers', () => {
+    const { body, doc } = pageOf();
+    const inner = node(body, { left: 0, top: 0, width: 400, height: 60 });
+    const host = node(body, { left: 0, top: 0, width: 400, height: 800 });
+    Object.assign(host, { shadowRoot: { elementFromPoint: () => inner } });
+    doc.elementFromPoint = () => host;
+    expect(core.hitAt(doc, 10, 10)).toBe(inner);
+    // A host that answers itself, or has no open root, stays the answer.
+    Object.assign(host, { shadowRoot: { elementFromPoint: () => host } });
+    expect(core.hitAt(doc, 10, 10)).toBe(host);
+    Object.assign(host, { shadowRoot: null });
+    expect(core.hitAt(doc, 10, 10)).toBe(host);
+  });
+
+  it('lets a bar inside a component cut a block of the same component', () => {
+    const { body, win, doc } = pageOf();
+    const host = node(body, { left: 0, top: 0, width: 400, height: 800 });
+    const bar = node(host, { left: 0, top: 0, width: 400, height: 60 }, { position: 'sticky' });
+    const card = node(host, { left: 0, top: -40, width: 300, height: 200 });
+    Object.assign(host, {
+      shadowRoot: { elementFromPoint: (_x: number, y: number) => (y < 60 ? bar : card) },
+    });
+    doc.elementFromPoint = () => host;
+    const shown = { x: 0, y: 0, w: 300, h: 160 };
+    expect(core.uncover(card, shown, win, doc, core)).toEqual({
+      shown: { x: 0, y: 60, w: 300, h: 100 },
+      covered: false,
+    });
+  });
+});
+
 describe('anchorGeometry', () => {
   it('gives the box, and what of it the scrollers, the viewport and the page leave', () => {
     const { body, win, doc } = pageOf(400, 300);

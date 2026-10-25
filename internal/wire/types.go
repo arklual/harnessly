@@ -50,6 +50,9 @@ type MachineAgent struct {
 	Models []AgentModel `json:"models"`
 	// CanSwitchModel: a running conversation of this CLI takes the model command.
 	CanSwitchModel bool `json:"canSwitchModel"`
+	// Profiles are the vendor setups (Kimi, GLM, Grok) a conversation can start on through this CLI, each with its own
+	// models. Only a page that names the `profiles` cap gets them; absent where there are none.
+	Profiles []ProfileOffer `json:"profiles,omitempty"`
 }
 
 // AgentModel is one model of an agent CLI. Efforts are the reasoning efforts it takes, empty when it has no choice;
@@ -150,6 +153,10 @@ type Model struct {
 	ID        string  `json:"id"`
 	Effort    *Effort `json:"effort"`
 	Ultracode bool    `json:"ultracode,omitempty"`
+	// Profile is the backend profile the conversation runs on (ProfileOffer.ID); absent for the CLI's own account. It
+	// is set when the conversation starts and does not change. Only a page that names the `profiles` cap gets it. A
+	// command never carries it here: it names the profile beside the model (ConversationCreateCmd.Profile).
+	Profile string `json:"profile,omitempty"`
 }
 
 // Conversation is one agent tab: its id is the runtime's tabId ("tab-…").
@@ -886,6 +893,9 @@ type Queue struct {
 	Items          []string    `json:"items"`
 	Paused         *QueuePause `json:"paused"`
 	Rev            int64       `json:"rev"`
+	// Stalled are the items that wait stalled, for the older form of the queue (a page without CapMsgStatus does not
+	// list them: it holds them as failed). Server only.
+	Stalled []string `json:"-"`
 }
 
 // QueuePause is why and since when a queue is paused.
@@ -1105,9 +1115,11 @@ type Wait struct {
 
 // The terms of the waits of the runtime: §12 of the spec asks for "дольше обычного" at 3 s and an error by 10–15 s.
 const (
-	WaitSlowMs      = 3000
-	TypingDeadline  = 12_000 // typing → in-input, else queued again or failed{type-failed}
-	ConfirmDeadline = 15_000 // in-input → accepted, else failed{unconfirmed}
+	WaitSlowMs     = 3000
+	TypingDeadline = 12_000 // typing → in-input, else queued again or failed{type-failed}
+	// ConfirmDeadline: in-input → accepted, else the message goes back to the head of the queue, stalled (a steered
+	// one, which may sit in Claude's own queue, fails unconfirmed instead).
+	ConfirmDeadline = 30_000
 	AnswerDeadline  = 10_000 // answering → answered or back to open
 	LaunchSlowMs    = 15_000
 	LaunchDeadline  = 150_000 // starting → idle, else launch-failed (prompts/rules.go: 150 s without a prompt box)
@@ -1624,12 +1636,15 @@ const SeenAll = "all"
 // accepted result's ID is the new conversation's id: the page subscribes to its conv channel with afterSeq 0,
 // and the ring holds that channel from its first event, so the first message's states are not lost.
 type ConversationCreateCmd struct {
-	OpID      string        `json:"opId"`
-	ProjectID string        `json:"projectId,omitempty"`
-	Cwd       string        `json:"cwd,omitempty"`
-	Provider  Provider      `json:"provider"`
-	Model     *Model        `json:"model"` // nil: the agent's default
-	First     *FirstMessage `json:"first,omitempty"`
+	OpID      string   `json:"opId"`
+	ProjectID string   `json:"projectId,omitempty"`
+	Cwd       string   `json:"cwd,omitempty"`
+	Provider  Provider `json:"provider"`
+	Model     *Model   `json:"model"` // nil: the agent's default
+	// Profile starts the conversation on a backend profile (ProfileOffer.ID) of the Provider's CLI, with one of its
+	// models; empty: the CLI's own account. The profile needs a saved key and cannot be changed later.
+	Profile string        `json:"profile,omitempty"`
+	First   *FirstMessage `json:"first,omitempty"`
 	// Worktree starts the conversation in a git worktree of its own, on a new branch off the folder's HEAD; a folder
 	// that is no git repository is used as it is.
 	Worktree bool `json:"worktree,omitempty"`
@@ -1706,12 +1721,16 @@ type ConversationForkCmd struct {
 // which the runtime wraps into the new conversation's first message. The conversation it came from stays as it is.
 // The accepted result's ID is the new conversation's id, on convs.
 type ConversationHandoffCmd struct {
-	OpID     string      `json:"opId"`
-	ID       string      `json:"id"`
-	Provider Provider    `json:"provider"`
-	Model    *Model      `json:"model"`
-	Mode     HandoffMode `json:"mode"`
-	Text     string      `json:"text"`
+	OpID     string   `json:"opId"`
+	ID       string   `json:"id"`
+	Provider Provider `json:"provider"`
+	Model    *Model   `json:"model"`
+	// Profile starts the new conversation on a backend profile (see ConversationCreateCmd.Profile); empty: the CLI's
+	// own account. A handoff never inherits the profile of the conversation it comes from: it is how a chat moves to
+	// another one.
+	Profile string      `json:"profile,omitempty"`
+	Mode    HandoffMode `json:"mode"`
+	Text    string      `json:"text"`
 }
 
 // ConversationMergeCmd sends a fork's result back into the conversation it came from: Text (the note the fork's agent
@@ -2334,10 +2353,15 @@ const (
 	QueuedPaused      QueueReason = "paused"
 	QueuedBlockedMenu QueueReason = "blocked-menu"
 	QueuedBlockedText QueueReason = "blocked-text"
+	// QueuedStalled: typed, and the agent did not take it within ConfirmDeadline — something is wrong beyond this
+	// message. It is back at the head of the line, its text out of the agent's input box, and waits for the person
+	// (retry or promote) instead of being typed again by itself: it is never typed twice. Only for a page with
+	// CapMsgStatus; any other page gets it as failed{unconfirmed}.
+	QueuedStalled QueueReason = "stalled"
 )
 
 // QueueReasons is every QueueReason, in the schema's order.
-var QueueReasons = []QueueReason{QueuedBehind, QueuedAgentBusy, QueuedLaunching, QueuedResuming, QueuedPaused, QueuedBlockedMenu, QueuedBlockedText}
+var QueueReasons = []QueueReason{QueuedBehind, QueuedAgentBusy, QueuedLaunching, QueuedResuming, QueuedPaused, QueuedBlockedMenu, QueuedBlockedText, QueuedStalled}
 
 // MessageFailure is why a message failed.
 type MessageFailure string

@@ -185,6 +185,8 @@ export const QUEUE_REASONS = [
   'paused',
   'blocked-menu',
   'blocked-text',
+  // Typed, and the agent did not take it in 30 s: back at the head of the queue, waiting for the person (caps=msgstatus).
+  'stalled',
 ] as const;
 export type QueueReason = (typeof QUEUE_REASONS)[number];
 export const MESSAGE_FAILURES = [
@@ -232,7 +234,7 @@ export const CLIENT_FRAME_KINDS = ['hello', 'sub', 'unsub', 'ping'] as const;
 /** The optional parts of the frames this page reads, named in its socket's address (?caps=…) and in the HTTP calls
  *  that carry them: the runtime sends them only to a page that names them, so a tab left on an older build never meets
  *  a field it refuses. Not in hello: a runtime older than the page refuses a field of hello it does not know. */
-export const CLIENT_CAPS = ['delegation', 'workflows'] as const;
+export const CLIENT_CAPS = ['delegation', 'workflows', 'profiles'] as const;
 /** CLIENT_CAPS as a query: `caps=…`. */
 export const CAPS_QUERY = `caps=${CLIENT_CAPS.join(',')}`;
 export type ClientFrameKind = (typeof CLIENT_FRAME_KINDS)[number];
@@ -397,6 +399,66 @@ export interface MachineAgent {
   models: AgentModel[];
   /** A running conversation of this CLI takes the `model` command. */
   canSwitchModel: boolean;
+  /** The vendor setups (Kimi, GLM, Grok) a conversation can start on through this CLI; absent where there are none,
+   *  and for a page that does not name the `profiles` cap. Draw only the `configured` ones. */
+  profiles?: ProfileOffer[];
+}
+/** A profile id: lower case, `^[a-z][a-z0-9-]{0,31}$`. The runtime owns the list (`kimi`, `glm`, `xai`…). */
+export type ProfileId = string;
+export const PROFILE_VENDORS = ['kimi', 'glm', 'grok'] as const;
+export type ProfileVendor = (typeof PROFILE_VENDORS)[number];
+/** A backend profile a machine can start a conversation on: another vendor's models behind this CLI. */
+export interface ProfileOffer {
+  id: ProfileId;
+  label: string;
+  vendor: ProfileVendor;
+  /** A key is saved; a profile without one is not offered. */
+  configured: boolean;
+  /** The profile's own models (the vendor's ids); a conversation of the profile takes only these. */
+  models: AgentModel[];
+}
+/** Whether a key is saved: `tail` is «…» and its last four characters, null while none is saved. The key never comes back. */
+export interface ProfileKey {
+  configured: boolean;
+  tail: string | null;
+}
+/** One profile on the Settings screen (GET /api/v2/providers lists every preset of the runtime, a key saved or not).
+ *  `via` is the CLI it runs through, `host` the vendor's host the requests go to (shown, never typed). */
+export interface ProfileInfo {
+  id: ProfileId;
+  label: string;
+  vendor: ProfileVendor;
+  via: Provider;
+  host: string;
+  /** One line on the plan; empty when there is none. */
+  hint: string;
+  key: ProfileKey;
+  models: AgentModel[];
+}
+export interface ProfileList {
+  profiles: ProfileInfo[];
+}
+/** The body of PUT /api/v2/providers/{id}/key: 8–512 printable characters without a space. */
+export interface ProfileKeyEdit {
+  key: string;
+}
+export const PROFILE_TEST_REASONS = [
+  'no-key',
+  'unauthorized',
+  'forbidden',
+  'rate-limited',
+  'unreachable',
+  'timeout',
+  'rejected',
+] as const;
+export type ProfileTestReason = (typeof PROFILE_TEST_REASONS)[number];
+/** POST /api/v2/providers/{id}/test: one minimal request to the vendor with the saved key. A pass has no reason, a
+ *  failure has one; `status` is the vendor's HTTP code, null where it did not answer. */
+export interface ProfileTest {
+  ok: boolean;
+  reason: ProfileTestReason | null;
+  status: number | null;
+  ms: number;
 }
 export interface AgentModel {
   id: string;
@@ -560,6 +622,24 @@ export interface Task {
 export interface ConvContext {
   usedTokens: number;
   limitTokens: number;
+}
+/** What the runtime knows of a message by its clientId (GET /api/v2/conversations/{id}/messages?ids=a,b). */
+export const MESSAGE_STATUS_KINDS = ['known', 'unknown', 'expired'] as const;
+export type MessageStatusKind = (typeof MESSAGE_STATUS_KINDS)[number];
+/** Where a message typed into the agent is: its input box, its own queue (a steer), with the agent, in the transcript. */
+export const HANDED_WHERES = ['input-box', 'agent-queue', 'agent', 'transcript'] as const;
+export type HandedWhere = (typeof HANDED_WHERES)[number];
+export interface MessageHanded {
+  at: Ms;
+  where: HandedWhere;
+  entryId: EntryId | null;
+}
+export type MessageStatus =
+  | { clientId: ClientId; k: 'known'; message: Message; handed?: MessageHanded }
+  | { clientId: ClientId; k: 'unknown' }
+  | { clientId: ClientId; k: 'expired'; at: Ms };
+export interface MessageStatuses {
+  messages: MessageStatus[];
 }
 /** The parts of the disk layout, in the order they are drawn; `other` is the used part none of the named folders
  *  accounts for. */
@@ -917,6 +997,9 @@ export interface Model {
   id: string;
   effort: Effort | null;
   ultracode?: boolean;
+  /** The backend profile the chat runs on (ProfileOffer.id); absent for the CLI's own account. Set when the chat
+   *  starts and never changed. A command names it beside the model (`profile`), not here. */
+  profile?: ProfileId;
 }
 /** What the chats started by one prompt on several models share: the launch's id and the prompt (at most 200 characters). */
 export interface Launch {
@@ -1534,6 +1617,8 @@ export interface CommandBodies {
     /** A git worktree of its own, on a new branch off the folder's HEAD (a folder that is no repository is used as it is). */
     worktree?: boolean;
     launch?: Launch;
+    /** Starts the chat on a backend profile of the provider's CLI, with one of its models; needs a saved key. */
+    profile?: ProfileId;
   } & ({ projectId: string } | { cwd: string });
   'conversation.rename': OpBody & { id: ConvId; title: string };
   'conversation.retitle': OpBody & { id: ConvId };
@@ -1577,6 +1662,8 @@ export interface CommandBodies {
     id: ConvId;
     provider: Provider;
     model: Model | null;
+    /** Starts the new chat on a backend profile; a handoff never inherits the profile it comes from. */
+    profile?: ProfileId;
     mode: HandoffMode;
     text: string;
   };
@@ -1800,12 +1887,51 @@ const agentModel: Decoder<AgentModel> = object(
   },
   { ultracode: bool },
 );
-const machineAgent: Decoder<MachineAgent> = object({
-  provider,
-  version: nullable(str),
-  status: oneOf(AGENT_INSTALL_STATUSES),
+const PROFILE_ID = /^[a-z][a-z0-9-]{0,31}$/;
+const profileId: Decoder<ProfileId> = (v, p) =>
+  PROFILE_ID.test(str(v, p)) ? (v as string) : fail(p, 'not a profile id');
+const profileVendor = oneOf(PROFILE_VENDORS);
+const profileOffer: Decoder<ProfileOffer> = object({
+  id: profileId,
+  label: id,
+  vendor: profileVendor,
+  configured: bool,
   models: array(agentModel),
-  canSwitchModel: bool,
+});
+const machineAgent: Decoder<MachineAgent> = object(
+  {
+    provider,
+    version: nullable(str),
+    status: oneOf(AGENT_INSTALL_STATUSES),
+    models: array(agentModel),
+    canSwitchModel: bool,
+  },
+  { profiles: array(profileOffer) },
+);
+const PROFILE_TAIL = /^….{4}$/u;
+const profileKey: Decoder<ProfileKey> = object({
+  configured: bool,
+  tail: nullable((v, p) => (PROFILE_TAIL.test(str(v, p)) ? (v as string) : fail(p, 'not a key tail'))),
+});
+const profileList: Decoder<ProfileList> = object({
+  profiles: array(
+    object({
+      id: profileId,
+      label: id,
+      vendor: profileVendor,
+      via: provider,
+      host: id,
+      hint: str,
+      key: profileKey,
+      models: array(agentModel),
+    }),
+  ),
+});
+const profileTest: Decoder<ProfileTest> = object({
+  ok: bool,
+  reason: nullable(oneOf(PROFILE_TEST_REASONS)),
+  status: nullable(int),
+  ms: int,
 });
 const machineLoad: Decoder<MachineLoad> = object({
   at: ms,
@@ -1841,7 +1967,9 @@ function legacyUltracode<T>(d: Decoder<T>): Decoder<T> {
     return o.effort === LEGACY_ULTRACODE ? d({ ...o, effort: 'xhigh', ultracode: true }, p) : d(v, p);
   };
 }
-const model: Decoder<Model> = legacyUltracode(object({ id, effort: nullable(effort) }, { ultracode: bool }));
+const model: Decoder<Model> = legacyUltracode(
+  object({ id, effort: nullable(effort) }, { ultracode: bool, profile: profileId }),
+);
 
 const agentStateKinds = {
   starting: { since: ms, step: oneOf(LAUNCH_STEPS), wait: waitD },
@@ -2364,6 +2492,22 @@ const message: Decoder<Message> = object(
   },
   { refs: messageRefs, auto: oneOf(AUTO_CONTINUE_WHYS) },
 );
+const messageHanded: Decoder<MessageHanded> = object({
+  at: ms,
+  where: oneOf(HANDED_WHERES),
+  entryId: nullable(entryId),
+});
+const messageStatusKinds = {
+  known: { message },
+  unknown: {},
+  expired: { at: ms },
+} satisfies Record<MessageStatusKind, Shape>;
+const messageStatus: Decoder<MessageStatus> = variants(
+  'k',
+  messageStatusKinds,
+  { clientId: id },
+  { known: { handed: messageHanded } },
+);
 const queue: Decoder<Queue> = object({
   conversationId: convId,
   items: array(id),
@@ -2655,8 +2799,11 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   }),
   'conversation.create': byKey(
     'cwd',
-    object({ ...createBase, cwd: id }, { first: firstMessage, worktree: bool, launch }),
-    object({ ...createBase, projectId: id }, { first: firstMessage, worktree: bool, launch }),
+    object({ ...createBase, cwd: id }, { first: firstMessage, worktree: bool, launch, profile: profileId }),
+    object(
+      { ...createBase, projectId: id },
+      { first: firstMessage, worktree: bool, launch, profile: profileId },
+    ),
   ),
   'conversation.rename': object({ opId: id, id: convId, title: str }),
   'conversation.retitle': object({ opId: id, id: convId }),
@@ -2694,14 +2841,17 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   rewind: object({ opId: id, id: convId, entryId: turnId, text: id, files: bool }),
   'rewind.undo': object({ opId: id, id: convId }),
   'conversation.fork': object({ opId: id, id: convId }, { atTurn: turnId }),
-  'conversation.handoff': object({
-    opId: id,
-    id: convId,
-    provider,
-    model: nullable(model),
-    mode: oneOf(HANDOFF_MODES),
-    text: handoffText,
-  }),
+  'conversation.handoff': object(
+    {
+      opId: id,
+      id: convId,
+      provider,
+      model: nullable(model),
+      mode: oneOf(HANDOFF_MODES),
+      text: handoffText,
+    },
+    { profile: profileId },
+  ),
   'conversation.merge': object({ opId: id, id: convId, text: handoffText }),
   limit: object({ opId: id, id: convId, action: oneOf(LIMIT_ACTIONS) }),
 };
@@ -2787,6 +2937,7 @@ export const parsePage = {
   legacy: (v: unknown): LegacyTab => legacyTab(v, '$'),
   open: (v: unknown): OpenTarget => openTarget(v, '$'),
   openRefs: (v: unknown): OpenedRefs => openedRefs(v, '$'),
+  messageStatus: (v: unknown): MessageStatuses => object({ messages: array(messageStatus) })(v, '$'),
   context: (v: unknown): ConvContext => convContext(v, '$'),
   machineStats: (v: unknown): MachineStats => machineStats(v, '$'),
   machineStop: (v: unknown): MachineStopped => machineStopped(v, '$'),
@@ -2795,4 +2946,7 @@ export const parsePage = {
   runtimeSettings: (v: unknown): RuntimeSettings => runtimeSettings(v, '$'),
   rewindPlan: (v: unknown): RewindPlan => rewindPlan(v, '$'),
   handoffDraft: (v: unknown): HandoffDraft => handoffDraft(v, '$'),
+  profiles: (v: unknown): ProfileList => profileList(v, '$'),
+  profileKey: (v: unknown): ProfileKey => profileKey(v, '$'),
+  profileTest: (v: unknown): ProfileTest => profileTest(v, '$'),
 };

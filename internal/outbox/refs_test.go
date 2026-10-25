@@ -25,7 +25,9 @@ func TestTheQueueCarriesTheReferences(t *testing.T) {
 	}
 	again, code := r.box.Send(Draft{ClientID: "m1", Text: text, Refs: refs, Mode: wire.ModeQueue, Kind: wire.KindPrompt},
 		r.agent.State, r.clock.Now())
-	if code != "" || len(again.Events) != 0 || len(r.box.Queue().Items) != 1 {
+	// The same id again is the same message: its record goes out again, nothing new is queued.
+	if code != "" || len(again.Events) != 1 || again.Events[0].(wire.MessageUpsertEv).Message.Rev != up.Message.Rev ||
+		len(r.box.Queue().Items) != 1 {
 		t.Fatalf("repeat: %+v %q", again, code)
 	}
 	raw, err := json.Marshal(r.box.State())

@@ -146,6 +146,10 @@ describe('v2 closed lists', () => {
     LimitWindow: v2.LIMIT_WINDOWS,
     AutoContinueWhy: v2.AUTO_CONTINUE_WHYS,
     LimitAction: v2.LIMIT_ACTIONS,
+    ProfileVendor: v2.PROFILE_VENDORS,
+    ProfileTestReason: v2.PROFILE_TEST_REASONS,
+    MessageStatusKind: v2.MESSAGE_STATUS_KINDS,
+    HandedWhere: v2.HANDED_WHERES,
     HttpKind: Object.keys(parsePage),
   };
 
@@ -461,4 +465,43 @@ describe('v2 runtime settings', () => {
     expect(() => parsePage.runtimeSettings({ idleStop: '1h', limitContinue: 'auto' })).toThrow(
       ProtocolError,
     ));
+});
+
+describe('backend profiles', () => {
+  const fixture = (n: string) => Object.entries(fixtures).find(([p]) => name(p) === n)![1];
+  afterEach(() => setLenientDecoding(false));
+
+  it('reads the profiles a machine offers and the profile of a chat', () => {
+    const status = parseServerFrame(fixture('ev.machine_status-profiles')) as unknown as {
+      e: { agents: v2.MachineAgent[] };
+    };
+    expect(status.e.agents[0]!.profiles?.map((p) => [p.id, p.configured])).toEqual([
+      ['kimi', true],
+      ['glm', false],
+    ]);
+    const upsert = parseServerFrame(fixture('ev.conversation_upsert-profile')) as unknown as {
+      e: { conv: { model: v2.Model } };
+    };
+    expect(upsert.e.conv.model.profile).toBe('kimi');
+  });
+  it('names the profile beside the model in a command', () => {
+    const create = fixture('cmd.conversation.create-profile') as { body: unknown };
+    expect(parseCommand('conversation.create', create.body).body).toMatchObject({ profile: 'kimi' });
+    const handoff = fixture('cmd.conversation.handoff-profile') as { body: unknown };
+    expect(parseCommand('conversation.handoff', handoff.body).body).toMatchObject({ profile: 'xai' });
+  });
+  it('refuses a profile id and a key tail out of shape', () => {
+    const create = structuredClone(fixture('cmd.conversation.create-profile') as { body: object });
+    expect(() => parseCommand('conversation.create', { ...create.body, profile: 'Kimi' })).toThrow(
+      ProtocolError,
+    );
+    expect(() => parsePage.profileKey({ configured: true, tail: '…34' })).toThrow(ProtocolError);
+    expect(parsePage.profileKey({ configured: false, tail: null })).toEqual({
+      configured: false,
+      tail: null,
+    });
+  });
+  it('asks for the cap', () => {
+    expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles');
+  });
 });

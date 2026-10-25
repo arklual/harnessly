@@ -318,8 +318,8 @@ func (p Provider) WriteSessionID(tab *jsvalue.Object, sessionID any) {
 	p.write(tab, "sessionId", sessionID)
 }
 
-// TabLaunch is the launch choice a tab's metadata remembers: an object of a nullable-string model and effort, nil
-// for none (or a malformed one).
+// TabLaunch is the launch choice a tab's metadata remembers: an object of a nullable-string model and effort (and the
+// backend profile's id, when the chat runs on one), nil for none (or a malformed one).
 func (s *Store) TabLaunch(tab *jsvalue.Object) *jsvalue.Object {
 	l := tab.Object(s.cfg.MetaKey).Object("launch")
 	if l == nil {
@@ -332,5 +332,11 @@ func (s *Store) TabLaunch(tab *jsvalue.Object) *jsvalue.Object {
 	if !l.Has("model") || !l.Has("effort") || (m != nil && !ms) || (e != nil && !es) {
 		return nil
 	}
-	return jsvalue.NewObject("model", m, "effort", e)
+	out := jsvalue.NewObject("model", m, "effort", e)
+	if p, ok := l.Get("profile"); ok {
+		if name, isStr := p.(string); isStr && name != "" {
+			out.Set("profile", name)
+		}
+	}
+	return out
 }

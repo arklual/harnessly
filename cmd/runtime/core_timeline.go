@@ -148,6 +148,9 @@ func launchOfTab(o *jsvalue.Object) *agents.Launch {
 			l.Effort = &s
 		}
 	}
+	if v, _ := o.Get("profile"); v != nil {
+		l.Profile, _ = v.(string)
+	}
 	return l
 }
 

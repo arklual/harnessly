@@ -1047,6 +1047,7 @@ func TestCrossSiteRequestsAreRefused(t *testing.T) {
 		{"POST", "/api/v2/designly/create"}, {"POST", "/api/v2/designly/pin"}, {"POST", "/api/v2/conversations/" + conv + "/side-chat"},
 		{"POST", "/api/v2/conversations/" + conv + "/terminals"}, {"DELETE", "/api/v2/conversations/" + conv + "/terminals/abcdef"},
 		{"POST", "/api/v2/machine/processes/stop"}, {"PATCH", "/api/v2/agent-settings/claude"}, {"PATCH", "/api/v2/me/settings"},
+		{"PUT", "/api/v2/providers/kimi/key"}, {"DELETE", "/api/v2/providers/kimi/key"}, {"POST", "/api/v2/providers/kimi/test"},
 	}
 	foreign := []map[string]string{
 		{"Origin": "https://evil.example"},
@@ -1316,6 +1317,47 @@ func TestTasksPage(t *testing.T) {
 		t.Fatalf("a conversation with no tasks: %d %q", res.StatusCode, body)
 	}
 	if code := g.do("GET", "/api/v2/conversations/tab-nothere/tasks", nil, nil); code != http.StatusNotFound {
+		t.Fatalf("unknown conversation: %d", code)
+	}
+}
+
+// The status of messages by client id: the answer in contract, one per id; a stalled message reaches a page without the
+// msgstatus cap as failed{unconfirmed}; ids that are missing, too many or twice are a bad request; no source is a 404.
+func TestMessageStatusPage(t *testing.T) {
+	g := newRig(t, time.Hour)
+	path := "/api/v2/conversations/tab-k3Jx9QmZ/messages?ids=m1,m2"
+	if code := g.do("GET", path, nil, nil); code != http.StatusNotFound {
+		t.Fatalf("no source: %d", code)
+	}
+	g.srv.MessageStatus = func(_ context.Context, conv string, ids []string) (wire.MessageStatuses, error) {
+		if conv != "tab-k3Jx9QmZ" {
+			return wire.MessageStatuses{}, convo.ErrNotFound
+		}
+		m := wire.Message{ClientID: ids[0], ConversationID: conv, Attachments: []wire.AttachmentRef{}, Mode: wire.ModeQueue,
+			Kind: wire.KindPrompt, CreatedAt: 1, Rev: 3, State: wire.MessageState{K: wire.MsgQueued, Position: 1, Reason: wire.QueuedStalled, At: 1700}}
+		return wire.MessageStatuses{Messages: []wire.MessageStatus{{ClientID: ids[0], K: wire.StatusKnown, Message: &m},
+			{ClientID: ids[1], K: wire.StatusUnknown}}}, nil
+	}
+	var got wire.MessageStatuses
+	if code := g.do("GET", path+"&caps=msgstatus", nil, &got); code != 200 || got.Validate() != nil ||
+		got.Messages[0].Message.State.Reason != wire.QueuedStalled || got.Messages[1].K != wire.StatusUnknown {
+		t.Fatalf("with the cap: %d %+v", code, got)
+	}
+	got = wire.MessageStatuses{}
+	if code := g.do("GET", path, nil, &got); code != 200 || got.Messages[0].Message.State.K != wire.MsgFailed ||
+		got.Messages[0].Message.State.Code != wire.MsgFailedUnconfirmed || got.Messages[0].Message.State.At != 1700 {
+		t.Fatalf("without the cap: %d %+v", code, got)
+	}
+	many := make([]string, wire.MessageStatusMax+1)
+	for i := range many {
+		many[i] = fmt.Sprintf("m%d", i)
+	}
+	for _, bad := range []string{"", "?ids=", "?ids=a,,b", "?ids=a,a", "?ids=" + strings.Join(many, ",")} {
+		if code := g.do("GET", "/api/v2/conversations/tab-k3Jx9QmZ/messages"+bad, nil, nil); code != http.StatusBadRequest {
+			t.Fatalf("%q: %d", bad, code)
+		}
+	}
+	if code := g.do("GET", "/api/v2/conversations/tab-nothere/messages?ids=m1", nil, nil); code != http.StatusNotFound {
 		t.Fatalf("unknown conversation: %d", code)
 	}
 }

@@ -353,6 +353,18 @@
 .hx-carousel__track[data-n='4'] {
   --n: 4;
 }
+.hx-seg[data-n='5'],
+.hx-carousel__track[data-n='5'] {
+  --n: 5;
+}
+.hx-seg[data-n='6'],
+.hx-carousel__track[data-n='6'] {
+  --n: 6;
+}
+.hx-seg[data-n='7'],
+.hx-carousel__track[data-n='7'] {
+  --n: 7;
+}
 .hx-seg[data-a='0'],
 .hx-carousel__track[data-a='0'] {
   --a: 0;
@@ -368,6 +380,26 @@
 .hx-seg[data-a='3'],
 .hx-carousel__track[data-a='3'] {
   --a: 3;
+}
+.hx-seg[data-a='4'],
+.hx-carousel__track[data-a='4'] {
+  --a: 4;
+}
+.hx-seg[data-a='5'],
+.hx-carousel__track[data-a='5'] {
+  --a: 5;
+}
+.hx-seg[data-a='6'],
+.hx-carousel__track[data-a='6'] {
+  --a: 6;
+}
+
+/* With vendors' groups beside Claude and Codex the segments are many: the marks give way to the names. */
+.hx-seg:is([data-n='5'], [data-n='6'], [data-n='7']) .hx-seg__item {
+  font-size: 10.5px;
+}
+.hx-seg:is([data-n='5'], [data-n='6'], [data-n='7']) .hx-seg__item .hx-agent {
+  display: none;
 }
 
 /* Rows of the choice */

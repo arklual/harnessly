@@ -468,7 +468,8 @@ func TestStuckInInputThenRetry(t *testing.T) {
 	}
 }
 
-// in-input without a sign from the agent in 15 s fails unconfirmed; a retry that finds the entry accepts it.
+// in-input without a sign from the agent in 30 s goes back to the head of the queue, stalled; a retry that finds the
+// entry accepts it.
 func TestUnconfirmedThenFoundByRetry(t *testing.T) {
 	r := newRig(t, tui(t, "claude-idle-placeholder.ansi.txt"), wire.StateIdle)
 	r.leaves()
@@ -480,7 +481,7 @@ func TestUnconfirmedThenFoundByRetry(t *testing.T) {
 		t.Fatal("failed early")
 	}
 	r.advance(time.Millisecond)
-	if st := r.state("m1"); st.Code != wire.MsgFailedUnconfirmed || !st.Retryable {
+	if st := r.state("m1"); st.K != wire.MsgQueued || st.Reason != wire.QueuedStalled || st.Position != 1 {
 		t.Fatalf("%+v", st)
 	}
 	ch, code := r.box.Retry("m1", func(off int64, _ wire.Ms) (string, bool) { return "c:dd#0", off == 900 }, r.clock.Now())

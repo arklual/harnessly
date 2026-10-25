@@ -31,10 +31,12 @@ const LimitScreenFresh = 5 * time.Minute
 const RestartResumeAfter = 45 * time.Second
 
 func (c *conv) autoOn() (limit, restart bool) {
-	if c.d.AutoContinue == nil {
-		return true, true
+	limit, restart = true, true
+	if c.d.AutoContinue != nil {
+		limit, restart = c.d.AutoContinue()
 	}
-	return c.d.AutoContinue()
+	// A vendor's limit has no reset the runtime can trust to go on by itself at: the person goes on.
+	return limit && !c.onProfile(), restart
 }
 
 // limitEnd turns the end of a turn into a failure on the usage limit when its last line is the agent's notice of it.
@@ -62,7 +64,7 @@ func (c *conv) limitEnd(id string, st wire.TurnStatus, failure *wire.TurnFailure
 func (c *conv) hold(l feed.Limit, now time.Time) {
 	h := &wire.LimitHold{Provider: c.rec.Provider, Window: l.Window, At: ms(now)}
 	reset := l.ResetsAt
-	if reset <= ms(now) && c.d.LimitReset != nil {
+	if reset <= ms(now) && c.d.LimitReset != nil && !c.onProfile() {
 		if r := c.d.LimitReset(c.rec.Provider, now); r > reset {
 			reset = r
 		}
@@ -202,7 +204,7 @@ func (c *conv) limitCmd(m wire.LimitCmd, now time.Time) wire.CmdResult {
 // limitOnScreen holds a Codex chat whose turn just ended on the usage limit by its screen: Codex may keep its notice
 // off the transcript.
 func (c *conv) limitOnScreen(plain string, now time.Time) {
-	if c.rec.Provider != wire.ProviderCodex || c.rec.Limited != nil {
+	if c.rec.Provider != wire.ProviderCodex || c.rec.Limited != nil || c.onProfile() {
 		return
 	}
 	k := c.rec.State.K

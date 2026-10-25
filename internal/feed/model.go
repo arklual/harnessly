@@ -54,6 +54,7 @@ type turn struct {
 type builder struct {
 	conv     string
 	provider wire.Provider
+	vendor   bool
 	// model is the model the agent last answered with, as its transcript names it ("" not said).
 	model string
 	// context is the tokens its last answer was asked with (the input, cached or not): how full the window is.
@@ -215,7 +216,7 @@ func (b *builder) add(o *jsvalue.Object, offset int64) step {
 		}
 		b.push(&s, wire.Entry{ID: id, At: at, Rev: 1, T: wire.EntryNotice, Level: level, Code: "agent-notice",
 			Detail: sptr(str(o, "message"))}, offset)
-		if l, ok := limitOf(o, b.provider, at); ok {
+		if l, ok := limitOf(o, b.provider, b.vendor, at); ok {
 			b.limits[id] = l
 		}
 	case "session-exit":

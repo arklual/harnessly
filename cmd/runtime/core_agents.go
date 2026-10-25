@@ -18,6 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/launch"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/providers"
 )
 
 // coreAgents is what the core's routes need of the agent CLIs: whether they can run, the lines that start and resume
@@ -31,6 +32,8 @@ type coreAgents struct {
 	// launcherScript writes the launcher when it is missing; nil leaves it to the old runtime.
 	launcherScript *codex.LauncherScriptConfig
 	codexArgs      codex.LaunchConfig
+	// profiles keeps the keys of the backend profiles and gives a launch on one what it needs (providers).
+	profiles *providers.Store
 	// launchOn: the launch slice is on, so conversations start and resume here (set by main); starter and resume are
 	// the core's, set once it exists.
 	launchOn func() bool
@@ -84,6 +87,8 @@ func skipPermissions(configFile string) func() bool {
 }
 
 func newCoreAgents(c coreAgentsConfig) *coreAgents {
+	profiles := &providers.Store{Dir: filepath.Join(c.DataDir, "providers")}
+	launcher := providers.Launcher{Store: profiles}
 	editor := func() (string, error) {
 		script := c.EditorScript
 		if script == "" {
@@ -95,8 +100,9 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 		return script, nil
 	}
 	return &coreAgents{
-		checker: preflight.New(c.Home),
-		options: catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey},
+		profiles: profiles,
+		checker:  preflight.New(c.Home),
+		options:  catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey},
 		claude: claude.LaunchConfig{
 			HooksPath:       filepath.Join(c.DataDir, "hooks.json"),
 			MCPConfigPath:   filepath.Join(c.DataDir, "preview-mcp.json"),
@@ -107,6 +113,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			SkipPermissions: skipPermissions(c.ConfigFile),
 			EditorScript:    editor,
 			HumanEditorVar:  c.HumanEditorVar,
+			Profiles:        launcher,
 		},
 		codexLauncher:  filepath.Join(c.DataDir, "codex-launcher.js"),
 		launcherScript: launcherScriptConfig(c),
@@ -118,6 +125,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			PassServiceEnv:   c.PassServiceEnv,
 			ContainerSandbox: c.CodexContainerSandbox,
 			ShellEnvExclude:  []string{c.MCP.TokenEnv},
+			Profiles:         launcher,
 		},
 	}
 }
@@ -296,11 +304,21 @@ func (a *coreAgents) ValidateLaunch(provider string, model, effort any) (*agents
 }
 
 func (a *coreAgents) codexLine(workspaceID, resumeID string, launch *agents.Launch) (string, error) {
-	content, err := a.codexLauncherContent()
+	cfg, err := a.codexLauncherConfig(launch)
 	if err != nil {
 		return "", err
 	}
-	return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content}.LauncherLine(workspaceID, resumeID, launch)
+	return cfg.LauncherLine(workspaceID, resumeID, launch)
+}
+
+// codexLauncherConfig is what a Codex launch line is built from: the launcher script as the pane runs it, and the
+// profiles a launch may name.
+func (a *coreAgents) codexLauncherConfig(launch *agents.Launch) (codex.LaunchConfig, error) {
+	content, err := a.codexLauncherContent()
+	if err != nil {
+		return codex.LaunchConfig{}, err
+	}
+	return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content, Profiles: a.codexArgs.Profiles}, nil
 }
 
 // codexLauncherContent is the Codex launcher script as the pane runs it.
@@ -335,11 +353,11 @@ func (a *coreAgents) ResumeLine(provider, sessionID, workspaceID string, launch 
 // ForkLine is the line that starts the agent on a fork of a session: Codex's `fork`, Claude's `--fork-session`.
 func (a *coreAgents) ForkLine(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
 	if provider == agents.Codex {
-		content, err := a.codexLauncherContent()
+		cfg, err := a.codexLauncherConfig(launch)
 		if err != nil {
 			return "", err
 		}
-		return codex.LaunchConfig{LauncherScript: a.codexLauncher, LauncherContent: content}.ForkLauncherLine(workspaceID, sessionID, launch)
+		return cfg.ForkLauncherLine(workspaceID, sessionID, launch)
 	}
 	line, err := a.claude.ResumeCommand(sessionID, workspaceID, launch)
 	if err != nil {

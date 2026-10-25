@@ -26,6 +26,9 @@ type Message struct {
 	HandOverOK func() bool
 	// EnterOnly: a restart found the text in the box; only its Enter is pressed, and a box without it types nothing.
 	EnterOnly bool
+	// ClearOnly: the message is not to be sent but taken out of the box, where an earlier try left it (it stalled):
+	// Sent when the box no longer holds it, BlockedText when it could not be cleared, Wait when it was not there.
+	ClearOnly bool
 	// Leftovers are the picture paths the harness pasted for its messages (this one's and earlier ones'). Claude reads
 	// a big picture late: a paste the typist gave up on lands after it, as path text, and is ours to clear.
 	Leftovers []string
@@ -144,6 +147,17 @@ func Decide(m Message, s Screen, provider wire.Provider) Plan {
 func Type(m Message, provider wire.Provider, p Pane, c Clock) Result {
 	view := Look(p, provider)
 	res := Result{Before: view}
+	if m.ClearOnly {
+		switch {
+		case !view.Readable || view.Input == "" || !StillInBox(view, provider, m.Text):
+			res.Outcome = Wait
+		case ClearOwn(p, c, provider, m.Text, len(m.Images) > 0):
+			res.Outcome = Sent
+		default:
+			res.Outcome = BlockedText
+		}
+		return res
+	}
 	plan := Decide(m, view, provider)
 	if plan.ChatAbout {
 		if chatAbout(p, c) {

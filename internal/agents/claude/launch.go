@@ -37,7 +37,12 @@ type LaunchConfig struct {
 	EditorScript func() (string, error)
 	// HumanEditorVar is the variable the editor script finds the person's own editor in.
 	HumanEditorVar string
+	// Profiles gives a launch on a backend profile its settings file; nil refuses such a launch.
+	Profiles agents.ProfileLauncher
 }
+
+// ErrNoProfiles: a launch names a backend profile and this deployment has none.
+var ErrNoProfiles = errors.New("Backend profiles are not available on this machine")
 
 // LaunchEnv keeps a Claude the runtime starts from updating itself mid-session: the machine installs new versions
 // ahead of time, and the next session starts on them.
@@ -166,7 +171,22 @@ func (c LaunchConfig) promptFileFlags(workspaceID string, extra []string) ([]str
 // effort.
 func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFiles []string) (string, error) {
 	settings := c.HooksPath
-	if launch != nil && launch.Ultracode {
+	if launch != nil && launch.Profile != "" {
+		// The profile's settings file is the hooks file plus the vendor's address, models and key helper. Claude Code
+		// reads one --settings (the last one given), so it replaces the hooks file here, and the model goes in the file's
+		// environment as well as in --model.
+		if c.Profiles == nil {
+			return "", ErrNoProfiles
+		}
+		if err := agents.CheckLaunch(launch); err != nil {
+			return "", err
+		}
+		path, err := c.Profiles.ClaudeSettings(launch.Profile, *launch.Model, c.HooksPath)
+		if err != nil {
+			return "", err
+		}
+		settings = agents.ShellQuote(path)
+	} else if launch != nil && launch.Ultracode {
 		// Claude Code reads one --settings (the last one given): the mode goes into a copy of the hooks settings.
 		path, err := UltracodeSettings(c.HooksPath)
 		if err != nil {

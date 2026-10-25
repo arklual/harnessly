@@ -178,6 +178,9 @@ func (c *conv) refusedPending(p wire.PendingModel, err error, now time.Time) {
 	c.dropPending()
 	code := modelRefusal(err)
 	to := wire.Model{ID: p.ID, Effort: p.Effort, Ultracode: p.Ultracode}
+	if c.rec.Model != nil {
+		to.Profile = c.rec.Model.Profile
+	}
 	c.logSwitch(wire.ModelSwitch{At: ms(now), From: c.rec.Model, To: to, Refused: &code})
 }
 
@@ -288,6 +291,19 @@ func (t modelTook) on(from *wire.Model, m wire.ModelCmd, diff modelDiff) *wire.M
 
 // modelFits checks the ask against the models the machine lists for the provider.
 func (c *conv) modelFits(m wire.ModelCmd) wire.RefuseCode {
+	if cur := c.rec.Model; cur != nil && cur.Profile != "" {
+		// A conversation on a backend profile changes models only among the profile's own, and its models take no effort.
+		if c.d.Profiles == nil {
+			return wire.RefuseUnsupported
+		}
+		if _, _, models, ok := c.d.Profiles.Lookup(cur.Profile); !ok || !slices.Contains(models, m.Model) || m.Effort != nil || m.UltracodeAfter(cur) {
+			return wire.RefuseOptionUnknown
+		}
+		return ""
+	}
+	if c.d.Profiles != nil && c.d.Profiles.OwnsModel(m.Model) {
+		return wire.RefuseOptionUnknown
+	}
 	if c.d.Models == nil {
 		return ""
 	}

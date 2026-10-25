@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -730,10 +731,31 @@ func (r *Runtime) Context(ctx context.Context, id string) (wire.ConvContext, err
 	return live(r, ctx, id, func(c *conv, now time.Time) (wire.ConvContext, error) {
 		used := c.fd.Context()
 		limit := int64(wire.ContextWindow)
-		if m := c.rec.Model; m != nil && strings.HasSuffix(m.ID, "[1m]") || used > limit {
+		if m := c.rec.Model; m != nil && strings.HasSuffix(m.ID, "[1m]") {
 			limit = wire.ContextWindowLong
 		}
+		if r.d.Window != nil {
+			// What the agent reports is its real window (a model may run with the long one without the suffix).
+			reportedUsed, reported := r.d.Window(c.rec.Provider, c.rec.AgentSessionID, c.rec.TranscriptPath)
+			if reported > 0 {
+				limit = reported
+			}
+			if used == 0 {
+				used = reportedUsed
+			}
+		}
+		if used > limit {
+			limit = max(wire.ContextWindowLong, used)
+		}
 		return wire.ConvContext{UsedTokens: used, LimitTokens: limit}, nil
+	})
+}
+
+// MessageStatus is the conversation's word on its messages by their client ids, one per id in order: known (the record
+// and where a typed message went), unknown, or expired (its record let go long ago).
+func (r *Runtime) MessageStatus(ctx context.Context, id string, ids []string) (wire.MessageStatuses, error) {
+	return live(r, ctx, id, func(c *conv, now time.Time) (wire.MessageStatuses, error) {
+		return wire.MessageStatuses{Messages: c.box.Status(ids)}, nil
 	})
 }
 
@@ -1150,6 +1172,11 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 	if r.d.Launcher == nil {
 		return wire.Refused(wire.RefuseUnsupported)
 	}
+	model, code := r.onProfile(m.Provider, m.Model, m.Profile)
+	if code != "" {
+		return wire.Refused(code)
+	}
+	m.Model = model
 	id := "tab-" + newID()
 	if m.Worktree {
 		// One of several chats started by a prompt works in a tree of its own, so they do not step on each other.
@@ -1179,6 +1206,38 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 		rec.Title, rec.TitleSource = t, wire.TitleFromUser
 	}
 	return r.openConv(rec, LaunchRequest{Cwd: cwd, Provider: m.Provider, Model: m.Model}, m.First)
+}
+
+// onProfile is the model a conversation starts with: model, with the profile on it when one is named. The profile has to
+// be one the machine knows, run through the CLI of the provider and have a key saved; the model has to be one of its own
+// (and takes no effort and no ultracode). Without a profile the model must not be one a profile owns: a conversation on
+// the CLI's own account asking for a vendor's model would run on the wrong account.
+func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) (*wire.Model, wire.RefuseCode) {
+	if profile == "" {
+		if model != nil && r.d.Profiles != nil && r.d.Profiles.OwnsModel(model.ID) {
+			return nil, wire.RefuseOptionUnknown
+		}
+		return model, ""
+	}
+	if r.d.Profiles == nil {
+		return nil, wire.RefuseUnsupported
+	}
+	via, configured, models, ok := r.d.Profiles.Lookup(profile)
+	switch {
+	case !ok:
+		return nil, wire.RefuseNotFound
+	case via != p || !configured || len(models) == 0:
+		return nil, wire.RefuseUnsupported
+	}
+	if model == nil {
+		model = &wire.Model{ID: models[0]}
+	}
+	if !slices.Contains(models, model.ID) || model.Effort != nil || model.Ultracode {
+		return nil, wire.RefuseOptionUnknown
+	}
+	on := *model
+	on.Profile = profile
+	return &on, ""
 }
 
 // openConv adds a conversation and asks the launcher for its agent: a fresh one whose first message (first, when

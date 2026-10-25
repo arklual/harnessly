@@ -8,10 +8,15 @@ import {
   type MachineAgent,
   type Provider,
 } from '@/next/protocol/v2';
+import type { Vendor } from '@/next/features/providers/model';
 import { t } from '@/next/i18n';
 
 export interface IPickerAgent {
   provider: Provider;
+  /** The profile this group runs: null for Claude and Codex themselves. */
+  profile?: string | null;
+  /** The vendor of a profile group, for its mark; absent for Claude and Codex. */
+  vendor?: Vendor | null;
   name: string;
   short: string;
   models: readonly AgentModel[];
@@ -24,6 +29,8 @@ export interface IPickerAgent {
 
 export interface IModelChoice {
   provider: Provider;
+  /** The profile of the group the model is from; null or absent on Claude and Codex themselves. */
+  profile?: string | null;
   model: string | null;
   /** Null: the model's own default depth, or one the agent has not said. */
   effort: Effort | null;
@@ -39,6 +46,15 @@ const NAMES: Record<Provider, { name: string; short: string }> = {
   codex: { name: 'Codex', short: 'Codex' },
 };
 
+/** The profile a choice carries: nothing at all on Claude and Codex themselves. */
+const profileOf = (agent: IPickerAgent): { profile?: string } =>
+  agent.profile ? { profile: agent.profile } : {};
+
+/** The key of a group in the picker: its profile, else the agent. */
+export const agentKey = (a: { provider: Provider; profile?: string | null }): string =>
+  a.profile ?? a.provider;
+export const choiceAgentKey = (c: Pick<IModelChoice, 'provider' | 'profile'>): string => agentKey(c);
+
 const pickerAgent = (agent: MachineAgent): IPickerAgent => ({
   provider: agent.provider,
   ...NAMES[agent.provider],
@@ -49,8 +65,27 @@ const pickerAgent = (agent: MachineAgent): IPickerAgent => ({
 });
 
 /** Every agent the machine reports, in the protocol's order: the picker's segments; one not ready says why. */
-export const pickerAgents = (agents: readonly MachineAgent[]): IPickerAgent[] =>
-  PROVIDERS.flatMap((provider) => agents.filter((a) => a.provider === provider)).map(pickerAgent);
+export const pickerAgents = (agents: readonly MachineAgent[]): IPickerAgent[] => {
+  const own = PROVIDERS.flatMap((provider) => agents.filter((a) => a.provider === provider));
+  return [...own.map(pickerAgent), ...own.flatMap((a) => profileAgents(a))];
+};
+
+/** The groups of the agent's profiles that have a key and models, after Claude and Codex. */
+const profileAgents = (agent: MachineAgent): IPickerAgent[] =>
+  (agent.profiles ?? [])
+    .filter((p) => p.configured && p.models.length > 0)
+    .map((p) => ({
+      provider: agent.provider,
+      profile: p.id,
+      vendor: p.vendor,
+      name: p.label,
+      short: p.label,
+      models: p.models,
+      // A running chat takes a model of its own profile only; the runtime says so by the agent's flag.
+      canSwitch: agent.canSwitchModel,
+      available: agent.status === 'ready',
+      status: agent.status,
+    }));
 
 /** What signs an agent in on the machine, typed in a terminal there. */
 export const LOGIN_COMMANDS = { claude: 'claude auth login', codex: 'codex login' } as const satisfies Record<
@@ -65,7 +100,12 @@ export const unavailableNote = (agent: IPickerAgent): string =>
     : t('next.picker.notInstalled', { agent: agent.name });
 
 /** One agent of the machine, for a chat that already runs it; null when the machine does not report it. */
-export const pickerAgentOf = (agents: readonly MachineAgent[], provider: Provider): IPickerAgent | null => {
+export const pickerAgentOf = (
+  agents: readonly MachineAgent[],
+  provider: Provider,
+  profile: string | null = null,
+): IPickerAgent | null => {
+  if (profile !== null) return pickerAgents(agents).find((a) => a.profile === profile) ?? null;
   const agent = agents.find((a) => a.provider === provider);
   return agent ? pickerAgent(agent) : null;
 };
@@ -104,6 +144,7 @@ export const modelName = (agent: IPickerAgent, model: string | null): string => 
 /** A new chat starts on the agent's first model at its default depth. */
 export const firstChoice = (agent: IPickerAgent): IModelChoice => ({
   provider: agent.provider,
+  ...profileOf(agent),
   model: agent.models[0].id,
   effort: agent.models[0].defaultEffort,
   ultracode: false,
@@ -113,6 +154,7 @@ export const firstChoice = (agent: IPickerAgent): IModelChoice => ({
  *  on only on a model that runs it. */
 export const withModel = (choice: IModelChoice, agent: IPickerAgent, model: AgentModel): IModelChoice => ({
   provider: agent.provider,
+  ...profileOf(agent),
   model: model.id,
   effort: choice.effort && model.efforts.includes(choice.effort) ? choice.effort : model.defaultEffort,
   ultracode: choice.ultracode && model.ultracode === true,

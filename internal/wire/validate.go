@@ -181,6 +181,9 @@ func (a MachineAgent) Validate() error {
 	for i, m := range a.Models {
 		errs = append(errs, under("models["+strconv.Itoa(i)+"]", m.Validate()))
 	}
+	for i, p := range a.Profiles {
+		errs = append(errs, under("profiles["+strconv.Itoa(i)+"]", p.Validate()))
+	}
 	return errors.Join(errs...)
 }
 
@@ -256,6 +259,9 @@ func (s AgentSessions) Validate() error {
 
 func (m Model) Validate() error {
 	errs := []error{need("id", m.ID)}
+	if m.Profile != "" {
+		errs = append(errs, profileIDErr(m.Profile))
+	}
 	if m.Effort != nil {
 		errs = append(errs, in("effort", *m.Effort, Efforts))
 	}
@@ -946,13 +952,26 @@ func (c SeenCmd) Validate() error {
 	return scoped(c.OpID, c.ConversationID)
 }
 
+// commandModel checks the model of a command that starts a conversation: the profile it runs on is named beside it.
+func commandModel(m *Model, profile string) []error {
+	var errs []error
+	if m != nil {
+		errs = append(errs, under("model", m.Validate()))
+		if m.Profile != "" {
+			errs = append(errs, errors.New("model.profile: name the profile in profile"))
+		}
+	}
+	if profile != "" {
+		errs = append(errs, under("profile", profileIDErr(profile)))
+	}
+	return errs
+}
+
 func (c ConversationCreateCmd) Validate() error {
 	errs := []error{need("opId", c.OpID), in("provider", c.Provider, Providers)}
+	errs = append(errs, commandModel(c.Model, c.Profile)...)
 	if (c.ProjectID == "") == (c.Cwd == "") {
 		errs = append(errs, errors.New("projectId: either projectId or cwd"))
-	}
-	if c.Model != nil {
-		errs = append(errs, under("model", c.Model.Validate()))
 	}
 	if c.First != nil {
 		errs = append(errs, need("first.clientId", c.First.ClientID))
@@ -1035,9 +1054,7 @@ func handoffText(text string) error {
 func (c ConversationHandoffCmd) Validate() error {
 	errs := []error{byID(c.OpID, c.ID), in("provider", c.Provider, Providers), in("mode", c.Mode, HandoffModes),
 		handoffText(c.Text)}
-	if c.Model != nil {
-		errs = append(errs, under("model", c.Model.Validate()))
-	}
+	errs = append(errs, commandModel(c.Model, c.Profile)...)
 	return errors.Join(errs...)
 }
 

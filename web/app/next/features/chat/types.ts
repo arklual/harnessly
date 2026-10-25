@@ -143,7 +143,7 @@ export interface Now {
 
 export type MessageMode = 'queue' | 'now' | 'steer';
 export type QueueReason =
-  'behind' | 'agent-busy' | 'launching' | 'resuming' | 'paused' | 'blocked-menu' | 'blocked-text';
+  'behind' | 'agent-busy' | 'launching' | 'resuming' | 'paused' | 'blocked-menu' | 'blocked-text' | 'stalled';
 export type MessageFailure =
   | 'upload-failed'
   | 'refused'

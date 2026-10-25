@@ -1,7 +1,8 @@
 // The recording's wave as numbers, apart from the canvas that draws it: the microphone's loudness is smoothed
 // like an envelope (it rises fast and falls slowly, so the bars breathe with the voice instead of jumping), a new bar
 // is taken at a steady pace and the older ones glide left between those moments, and a quiet room still breathes a
-// little. Nothing here reads the clock or the page: `step` is told the time, so the same input gives the same bars.
+// little. Without a loudness to show (the microphone is starting, or the recording is being turned into text) the
+// bars fade out to nothing and nothing is drawn. Nothing here reads the clock or the page: `step` is told the time, so the same input gives the same bars.
 
 /** One bar is taken this often; the older ones move a whole step left in that time. */
 export const SAMPLE_MS = 55;
@@ -23,9 +24,9 @@ const CALM_SAMPLE_MS = 140;
 export const WAVE_MODE = {
   /** The microphone's loudness. */
   live: 'live',
-  /** No meter in the browser: a calm motion of its own. */
+  /** No loudness yet (the microphone is starting): what was drawn fades out, nothing is added. */
   idle: 'idle',
-  /** The recording is over and being turned into text: a soft sweep. */
+  /** The recording is over and being turned into text: what was drawn fades out, nothing is added. */
   busy: 'busy',
 } as const;
 export type TWaveMode = (typeof WAVE_MODE)[keyof typeof WAVE_MODE];
@@ -49,9 +50,8 @@ export interface IWave {
 /** Quiet speech should still move the bars: the loudness is lifted before it is drawn. */
 export const shape = (level: number): number => Math.min(1, Math.max(0, level) ** 0.65);
 
-/** A calm loudness for a browser that has no meter. */
-export const idleLevel = (now: number): number =>
-  0.12 + 0.12 * (0.5 + 0.5 * Math.sin(now / 430)) * (0.5 + 0.5 * Math.sin(now / 1170 + 1));
+/** A bar lower than this is not drawn: a wave with nothing to show leaves no mark. */
+export const SHOWN = 0.02;
 
 export const createWave = (reduced = false): IWave => {
   const every = reduced ? CALM_SAMPLE_MS : SAMPLE_MS;
@@ -64,7 +64,7 @@ export const createWave = (reduced = false): IWave => {
     step(now, level, mode) {
       const dt = last === null ? 0 : Math.min(Math.max(now - last, 0), MAX_DT_MS);
       last = now;
-      const target = mode === WAVE_MODE.busy ? 0 : shape(level);
+      const target = mode === WAVE_MODE.live ? shape(level) : 0;
       const tau = target > env ? ATTACK_MS : RELEASE_MS;
       env += (target - env) * (1 - Math.exp(-dt / tau));
       acc += dt;
@@ -79,10 +79,9 @@ export const createWave = (reduced = false): IWave => {
       return Array.from({ length: count }, (_, k) => {
         const at = k + phase;
         const own = k === 0 ? env : (history[k - 1] ?? 0);
+        if (mode !== WAVE_MODE.live) return { at, h: own < SHOWN ? 0 : own };
         const breath = reduced ? 0 : BREATH * (0.5 + 0.5 * Math.sin(now / BREATH_MS + at * 0.5));
-        const sweep =
-          !reduced && mode === WAVE_MODE.busy ? 0.3 * (0.5 + 0.5 * Math.sin(at * 0.32 - now / 260)) : 0;
-        const rest = FLOOR + breath + sweep;
+        const rest = FLOOR + breath;
         return { at, h: Math.min(1, rest + own * (1 - rest)) };
       });
     },

@@ -1,0 +1,12 @@
+{
+  "op": "conversation.create",
+  "body": {
+    "opId": "op-n2",
+    "projectId": "p7k2m9x4q1aa",
+    "provider": "claude",
+    "model": {"id": "kimi-k3.1-pro", "effort": null},
+    "profile": "kimi",
+    "first": {"clientId": "0192b6f1-0000-7000-8000-000000000008", "text": "Проверь §9", "attachmentIds": []}
+  },
+  "result": {"r": "accepted", "ch": "convs", "seq": 1843, "id": "tab-K1mi0Conv"}
+}

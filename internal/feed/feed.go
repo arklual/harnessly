@@ -131,6 +131,9 @@ type Feed struct {
 	// clients and ends are what the runtime set on the feed beyond the transcript; a rebuild keeps them.
 	clients map[string]string
 	ends    map[string]end
+	// vendor: the chat runs on a backend profile (another vendor's API behind Claude Code), so the notices of its
+	// usage limit are the vendor's words, not Claude's.
+	vendor bool
 	// start is where the read entries start in the file; more: there are older ones.
 	start  int64
 	more   bool
@@ -153,6 +156,11 @@ type end struct {
 func New(conv string, provider wire.Provider, src Source) *Feed {
 	return &Feed{conv: conv, provider: provider, src: src, tail: TailEntries, window: TailBytes, b: newBuilder(conv, provider),
 		clients: map[string]string{}, ends: map[string]end{}}
+}
+
+// OnVendor says the chat runs on a backend profile: a usage limit is read off the vendor's words only.
+func (f *Feed) OnVendor() {
+	f.vendor, f.b.vendor = true, true
 }
 
 // Load reads the transcript's tail. Its signals are the state of the transcript as it is now (an open question, an
@@ -207,6 +215,7 @@ func (f *Feed) Poll() Update {
 // rebuild builds the feed over the raws read, with what the runtime set on it.
 func (f *Feed) rebuild() Update {
 	f.b = newBuilder(f.conv, f.provider)
+	f.b.vendor = f.vendor
 	var u Update
 	for _, r := range f.raws {
 		f.apply(&u, f.b.add(r.o, r.offset))

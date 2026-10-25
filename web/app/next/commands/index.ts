@@ -18,6 +18,7 @@ import type {
   LimitAction,
   MachineId,
   Model,
+  ProfileId,
   Ms,
   Provider,
   TurnId,
@@ -179,13 +180,20 @@ export const forkConversation = (m: MachineId, id: ConvId, atTurn?: TurnId) =>
 export const handoffConversation = (
   m: MachineId,
   id: ConvId,
-  to: { provider: Provider; model: Model | null },
+  to: { provider: Provider; profile?: ProfileId; model: Model | null },
   mode: HandoffMode,
   text: string,
 ) =>
   opening(
     m,
-    runCommand(m, 'conversation.handoff', { id, provider: to.provider, model: to.model, mode, text }),
+    runCommand(m, 'conversation.handoff', {
+      id,
+      provider: to.provider,
+      model: to.model,
+      ...(to.profile ? { profile: to.profile } : {}),
+      mode,
+      text,
+    }),
   );
 
 /** A fork's result into the queue of the conversation it came from; the result's id is that conversation. */
@@ -195,6 +203,8 @@ export const mergeConversation = (m: MachineId, id: ConvId, text: string) =>
 export interface NewConversation {
   where: { projectId: string } | { cwd: string };
   provider: Provider;
+  /** The backend profile (Kimi, GLM, Grok) the chat starts on; absent on the CLI's own account. */
+  profile?: ProfileId;
   model: Model | null;
   first?: { text: string; attachments?: AttachmentRef[] };
   /** Several chats of one prompt on different models: each works in a git worktree of its own and they are grouped. */
@@ -217,6 +227,7 @@ export function createConversation(
     ...req.where,
     provider: req.provider,
     model: req.model,
+    ...(req.profile ? { profile: req.profile } : {}),
     ...(req.launch ? { launch: req.launch } : {}),
     ...(req.worktree ? { worktree: true } : {}),
     ...(req.first && firstClientId

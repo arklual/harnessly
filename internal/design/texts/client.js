@@ -952,6 +952,16 @@
     }
     return left;
   }
+  // What answers at a point, down through the open shadow roots (the document names the host of a component only).
+  function anchorHit(x, y) {
+    var hit = document.elementFromPoint(x, y);
+    for (var depth = 0; hit && hit.shadowRoot && typeof hit.shadowRoot.elementFromPoint === 'function' && depth < 16; depth += 1) {
+      var inner = hit.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === hit) break;
+      hit = inner;
+    }
+    return hit;
+  }
   function anchorUncover(el, shown) {
     function own(hit) { return !hit || anchorHolds(el, hit) || anchorHolds(hit, el); }
     function layer(hit) {
@@ -969,7 +979,7 @@
       var xs = left.w < 3 ? [left.x + left.w / 2] : [left.x + 1, left.x + left.w / 2, left.x + left.w - 1];
       var ys = left.h < 3 ? [left.y + left.h / 2] : [left.y + 1, left.y + left.h / 2, left.y + left.h - 1];
       var hits = [];
-      ys.forEach(function (y) { xs.forEach(function (x) { hits.push(document.elementFromPoint(x, y)); }); });
+      ys.forEach(function (y) { xs.forEach(function (x) { hits.push(anchorHit(x, y)); }); });
       var others = hits.filter(function (hit, i) { return !own(hit) && hits.indexOf(hit) === i; });
       if (!others.length) return { shown: left, covered: false };
       var cut = false;

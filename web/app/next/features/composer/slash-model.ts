@@ -413,7 +413,7 @@ export const effortRows = (agent: IPickerAgent, value: IModelChoice, query: stri
       current: effort === value.effort,
       action: {
         k: 'choose',
-        choice: { provider: agent.provider, model: value.model, effort, ultracode: value.ultracode },
+        choice: { ...value, provider: agent.provider, effort },
       },
       score: match.score,
     });

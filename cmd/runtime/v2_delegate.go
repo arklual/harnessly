@@ -13,6 +13,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
 	"github.com/ly-solutions/harnessly/internal/proc"
+	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -35,8 +36,12 @@ func newDelegation(v *v2Live, settings wire.RuntimeSettingsStore) *delegation.Se
 			return settings.RuntimeSettings().DelegationOf()
 		},
 		Models: v.machine.modelsOf,
-		Self:   peerSelf(os.Getenv),
-		Book:   &delegation.Book{Path: filepath.Join(v.d.DataDir, "v2", "delegations.json")},
+		ProfileModels: func(profile string) []string {
+			_, _, models, _ := providers.Launcher{Store: v.profiles}.Lookup(profile)
+			return models
+		},
+		Self: peerSelf(os.Getenv),
+		Book: &delegation.Book{Path: filepath.Join(v.d.DataDir, "v2", "delegations.json")},
 		Log: func(msg string, kv ...any) {
 			fs := make([]agent.F, 0, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {

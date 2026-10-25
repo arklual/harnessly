@@ -218,7 +218,13 @@ func (c *conv) openFeed() {
 		src = &feed.ClaudeSource{Path: c.rec.TranscriptPath}
 	}
 	c.fd = feed.New(c.rec.ID, c.rec.Provider, src)
+	if c.onProfile() {
+		c.fd.OnVendor()
+	}
 }
+
+// onProfile: the conversation runs on a backend profile (a vendor's API behind the agent CLI), not on the CLI's own plan.
+func (c *conv) onProfile() bool { return c.rec.Model != nil && c.rec.Model.Profile != "" }
 
 // --- publishing ---
 

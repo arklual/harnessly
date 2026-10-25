@@ -3,6 +3,7 @@ package wire
 import (
 	"encoding/json"
 	"reflect"
+	"sync/atomic"
 )
 
 // Marshal is json.Marshal for everything that goes on the wire: a nil slice leaves as [], never as null. The page's
@@ -10,7 +11,30 @@ import (
 // a slice nil whenever nothing was appended to it, so the guarantee is made here, once, and not by every producer.
 //
 // The value is copied on the way (the producers' own slices are not touched) and the copy is what is encoded.
-func Marshal(v any) ([]byte, error) { return json.Marshal(emptySlices(v)) }
+//
+// What it encodes passes the redactor, if one is set (SetRedactor): a secret an agent printed does not leave the machine.
+func Marshal(v any) ([]byte, error) {
+	b, err := json.Marshal(emptySlices(v))
+	if err != nil {
+		return b, err
+	}
+	if r := redactor.Load(); r != nil {
+		b = (*r)(b)
+	}
+	return b, nil
+}
+
+var redactor atomic.Pointer[func([]byte) []byte]
+
+// SetRedactor sets what every frame and page passes on its way out; it must return its argument when there is nothing
+// to change. nil sets none. The runtime sets the mask of its profiles' keys.
+func SetRedactor(f func([]byte) []byte) {
+	if f == nil {
+		redactor.Store(nil)
+		return
+	}
+	redactor.Store(&f)
+}
 
 func emptySlices(v any) any {
 	if v == nil {

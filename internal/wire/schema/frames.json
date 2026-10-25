@@ -213,7 +213,7 @@
     "MessageMode": {"enum": ["queue", "now", "steer"]},
     "MessageKind": {"enum": ["prompt", "command"]},
     "MessageStateKind": {"enum": ["queued", "typing", "in-input", "accepted", "in-turn", "done", "failed", "cancelled"]},
-    "QueueReason": {"enum": ["behind", "agent-busy", "launching", "resuming", "paused", "blocked-menu", "blocked-text"]},
+    "QueueReason": {"enum": ["behind", "agent-busy", "launching", "resuming", "paused", "blocked-menu", "blocked-text", "stalled"]},
     "MessageFailure": {
       "enum": [
         "upload-failed", "refused", "launch-failed", "agent-gone", "type-failed", "stuck-in-input",
@@ -266,7 +266,7 @@
       ]
     },
     "RetryableRefuseCode": {"enum": ["machine-offline", "rate-limited", "internal", "timeout"]},
-    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "context", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft"]},
+    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "messageStatus", "context", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest"]},
     "Channel": {"type": "string", "pattern": "^(machine|convs|conv:tab-[A-Za-z0-9_-]+)$"},
     "EntryId": {"type": "string", "pattern": "^((c:[0-9a-f-]+|x:[0-9]+)#[0-9]+|live:(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$"},
     "TurnId": {"type": "string", "pattern": "^(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+$"},
@@ -342,7 +342,70 @@
         "version": {"oneOf": [{"type": "string"}, {"type": "null"}]},
         "status": {"$ref": "#/$defs/AgentInstallStatus"},
         "models": {"type": "array", "items": {"$ref": "#/$defs/AgentModel"}},
-        "canSwitchModel": {"type": "boolean"}
+        "canSwitchModel": {"type": "boolean"},
+        "profiles": {"type": "array", "items": {"$ref": "#/$defs/ProfileOffer"}}
+      }
+    },
+    "ProfileId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$"},
+    "ProfileVendor": {"enum": ["kimi", "glm", "grok"]},
+    "ProfileTestReason": {"enum": ["no-key", "unauthorized", "forbidden", "rate-limited", "unreachable", "timeout", "rejected"]},
+    "ProfileOffer": {
+      "type": "object",
+      "required": ["id", "label", "vendor", "configured", "models"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/ProfileId"},
+        "label": {"type": "string", "minLength": 1},
+        "vendor": {"$ref": "#/$defs/ProfileVendor"},
+        "configured": {"type": "boolean"},
+        "models": {"type": "array", "items": {"$ref": "#/$defs/AgentModel"}}
+      }
+    },
+    "ProfileKey": {
+      "type": "object",
+      "required": ["configured", "tail"],
+      "additionalProperties": false,
+      "properties": {
+        "configured": {"type": "boolean"},
+        "tail": {"oneOf": [{"type": "string", "pattern": "^….{4}$"}, {"type": "null"}]}
+      }
+    },
+    "ProfileInfo": {
+      "type": "object",
+      "required": ["id", "label", "vendor", "via", "host", "hint", "key", "models"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/ProfileId"},
+        "label": {"type": "string", "minLength": 1},
+        "vendor": {"$ref": "#/$defs/ProfileVendor"},
+        "via": {"$ref": "#/$defs/Provider"},
+        "host": {"type": "string", "minLength": 1},
+        "hint": {"type": "string"},
+        "key": {"$ref": "#/$defs/ProfileKey"},
+        "models": {"type": "array", "items": {"$ref": "#/$defs/AgentModel"}}
+      }
+    },
+    "ProfileList": {
+      "type": "object",
+      "required": ["profiles"],
+      "additionalProperties": false,
+      "properties": {"profiles": {"type": "array", "items": {"$ref": "#/$defs/ProfileInfo"}}}
+    },
+    "ProfileKeyEdit": {
+      "type": "object",
+      "required": ["key"],
+      "additionalProperties": false,
+      "properties": {"key": {"type": "string", "pattern": "^[!-~]{8,512}$"}}
+    },
+    "ProfileTest": {
+      "type": "object",
+      "required": ["ok", "reason", "status", "ms"],
+      "additionalProperties": false,
+      "properties": {
+        "ok": {"type": "boolean"},
+        "reason": {"oneOf": [{"$ref": "#/$defs/ProfileTestReason"}, {"type": "null"}]},
+        "status": {"oneOf": [{"type": "integer", "minimum": 100, "maximum": 599}, {"type": "null"}]},
+        "ms": {"type": "integer", "minimum": 0}
       }
     },
     "Machine": {
@@ -500,6 +563,55 @@
         "usedTokens": {"type": "integer", "minimum": 0},
         "limitTokens": {"type": "integer", "minimum": 1}
       }
+    },
+    "MessageStatusKind": {"enum": ["known", "unknown", "expired"]},
+    "HandedWhere": {"enum": ["input-box", "agent-queue", "agent", "transcript"]},
+    "MessageHanded": {
+      "type": "object",
+      "required": ["at", "where", "entryId"],
+      "additionalProperties": false,
+      "properties": {
+        "at": {"type": "integer", "minimum": 1},
+        "where": {"$ref": "#/$defs/HandedWhere"},
+        "entryId": {"oneOf": [{"$ref": "#/$defs/EntryId"}, {"type": "null"}]}
+      }
+    },
+    "MessageStatus": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["clientId", "k", "message"],
+          "additionalProperties": false,
+          "properties": {
+            "clientId": {"type": "string", "minLength": 1},
+            "k": {"const": "known"},
+            "message": {"$ref": "#/$defs/Message"},
+            "handed": {"$ref": "#/$defs/MessageHanded"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["clientId", "k"],
+          "additionalProperties": false,
+          "properties": {"clientId": {"type": "string", "minLength": 1}, "k": {"const": "unknown"}}
+        },
+        {
+          "type": "object",
+          "required": ["clientId", "k", "at"],
+          "additionalProperties": false,
+          "properties": {
+            "clientId": {"type": "string", "minLength": 1},
+            "k": {"const": "expired"},
+            "at": {"type": "integer", "minimum": 1}
+          }
+        }
+      ]
+    },
+    "MessageStatuses": {
+      "type": "object",
+      "required": ["messages"],
+      "additionalProperties": false,
+      "properties": {"messages": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/MessageStatus"}}}
     },
     "DiskPartID": {"enum": ["workspace", "caches", "agents", "other", "free"]},
     "MachineDiskPart": {
@@ -955,7 +1067,8 @@
       "properties": {
         "id": {"type": "string", "minLength": 1},
         "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
-        "ultracode": {"type": "boolean"}
+        "ultracode": {"type": "boolean"},
+        "profile": {"$ref": "#/$defs/ProfileId"}
       }
     },
     "PendingModel": {
@@ -2371,6 +2484,7 @@
             "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
             "worktree": {"type": "boolean"},
             "launch": {"$ref": "#/$defs/Launch"},
+            "profile": {"$ref": "#/$defs/ProfileId"},
             "parentId": {"$ref": "#/$defs/ConvId"},
             "title": {"type": "string", "minLength": 1, "maxLength": 200},
             "first": {
@@ -2396,6 +2510,7 @@
             "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
             "worktree": {"type": "boolean"},
             "launch": {"$ref": "#/$defs/Launch"},
+            "profile": {"$ref": "#/$defs/ProfileId"},
             "parentId": {"$ref": "#/$defs/ConvId"},
             "title": {"type": "string", "minLength": 1, "maxLength": 200},
             "first": {
@@ -2511,6 +2626,7 @@
         "id": {"$ref": "#/$defs/ConvId"},
         "provider": {"$ref": "#/$defs/Provider"},
         "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+        "profile": {"$ref": "#/$defs/ProfileId"},
         "mode": {"$ref": "#/$defs/HandoffMode"},
         "text": {"type": "string", "minLength": 1, "maxLength": 90000}
       }
@@ -3493,6 +3609,15 @@
           "required": ["http", "response"],
           "additionalProperties": false,
           "properties": {
+            "http": {"const": "messageStatus"},
+            "response": {"oneOf": [{"$ref": "#/$defs/MessageStatuses"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
             "http": {"const": "context"},
             "response": {"oneOf": [{"$ref": "#/$defs/ConvContext"}, {"$ref": "#/$defs/Refusal"}]}
           }
@@ -3558,6 +3683,33 @@
           "properties": {
             "http": {"const": "handoffDraft"},
             "response": {"oneOf": [{"$ref": "#/$defs/HandoffDraft"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "profiles"},
+            "response": {"oneOf": [{"$ref": "#/$defs/ProfileList"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "profileKey"},
+            "response": {"oneOf": [{"$ref": "#/$defs/ProfileKey"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "profileTest"},
+            "response": {"oneOf": [{"$ref": "#/$defs/ProfileTest"}, {"$ref": "#/$defs/Refusal"}]}
           }
         }
       ]

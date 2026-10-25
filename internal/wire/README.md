@@ -672,3 +672,39 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     a page that names the cap (`/api/v2/socket?caps=delegation`, and `?caps=delegation` on `/api/v2/runtime-settings`):
     any other page gets the record without `parentId` (an event's older form is encoded with the same seq) and the
     settings without `delegation`.
+64. **Backend profiles (Kimi, GLM, Grok).** A profile is another vendor's models behind one of the agent CLIs, not a new
+    `Provider`: a Kimi or GLM chat is `provider: claude`, a Grok chat `provider: codex`. A profile id is
+    `^[a-z][a-z0-9-]{0,31}$` and the runtime owns the list. `conversation.create` and `conversation.handoff` may carry
+    `profile` beside `model` (a model of the profile; `model.profile` in a command is refused), and the record carries
+    `model.profile` for as long as it lives; it cannot be changed in a chat (a handoff starts another one).
+    `MachineAgent.profiles` lists `{id, label, vendor, configured, models}` under the CLI the profile runs through;
+    a page draws only the `configured` ones. All of it goes only to a page that names the cap
+    (`/api/v2/socket?caps=profiles`, and `?caps=profiles` on `/api/v2/machines`): any other page gets the agents
+    without `profiles` and the models without `profile` (an event's older form is encoded with the same seq, a
+    snapshot is cut the same way).
+    The Settings screen reads and writes the keys over HTTP, same origin only for a write: `GET /api/v2/providers` →
+    `{profiles: [{id, label, vendor, via, host, hint, key: {configured, tail}, models}]}` (every preset of the
+    runtime); `PUT /api/v2/providers/<id>/key` `{key}` → `{configured, tail}` (the key is 8–512 printable characters
+    without a space); `DELETE /api/v2/providers/<id>/key` → `{configured: false, tail: null}`;
+    `POST /api/v2/providers/<id>/test` → `{ok, reason, status, ms}`, one minimal request to the vendor with the saved
+    key. An unknown id is `not-found`, a bad key `bad-request`. The key never comes back: `tail` is «…» and its last
+    four characters. The key is not logged, not on the wire and not in a tab's metadata.
+65. **A message does not hang.** A typed message (not steered, not carried by a launch) that the agent has not taken
+    within `ConfirmDeadline` (30 s) — no prompt-submit, no transcript entry — is not failed: the transcript is asked
+    once more, and without its entry the message goes back to the head of the queue as `queued{position: 1, reason:
+    "stalled", wait: null}`. Its text is taken out of the agent's input box at the next look (a late Enter must not
+    send it behind the person's back), it is never typed again by itself, and the messages behind it wait: something
+    beyond this message is wrong. `retry` types it again (attempts+1, the transcript asked first), `promote` does the
+    same at its new place, `cancel` drops it; an entry with its text read later accepts it. A steered message is
+    Claude's to read at its next step and keeps its 30 min. A message left `typing` 30 s with no try on its way stalls
+    the same way. The stall goes only to a page that names the cap (`/api/v2/socket?caps=msgstatus`, and
+    `?caps=msgstatus` on the status page): any other page gets the same rev as `failed{unconfirmed, retryable: true,
+    at}` and a queue without its id.
+    `GET /api/v2/conversations/{id}/messages?ids=a,b` (1–20 client ids, none twice) answers `{messages: [...]}`, one per
+    id in order: `{clientId, k: "known", message, handed?: {at, where, entryId}}` — `where` is `input-box` (typed, not
+    taken), `agent-queue` (a steer in the agent's own queue), `agent` (its hook took it), `transcript` (`entryId`), and
+    `handed` is absent for a message not typed (queued, failed, cancelled); `{clientId, k: "unknown"}` for an id the
+    runtime never had; `{clientId, k: "expired", at}` for one whose record it let go (after a day; the ids are kept 7
+    days, at most 500 a conversation). A `send` with an id the runtime still has is accepted with its whole record
+    again (`message_upsert`), so a page that lost the events takes the true state; one of an expired id is
+    `refused{too-late}` — it was delivered, and is never typed twice.

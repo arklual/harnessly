@@ -20,6 +20,10 @@ type headPlan struct {
 
 // plan is §4.3's table: what the agent's state makes of the head of the queue.
 func (b *Box) plan(a Agent, head *Record) headPlan {
+	if head.Stalled {
+		// The agent did not take it once: the person says when to try again.
+		return headPlan{reason: wire.QueuedStalled}
+	}
 	if b.paused != nil {
 		return headPlan{reason: wire.QueuedPaused}
 	}
@@ -58,6 +62,9 @@ func (b *Box) plan(a Agent, head *Record) headPlan {
 // takes, is written after it. One message is on its way at a time.
 func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 	ch := b.Tick(now)
+	if job := b.clearJob(a, now); job != nil {
+		return job, ch
+	}
 	if r := b.recs[b.flight]; r != nil && r.EnterOnly && !b.typing && b.paused == nil {
 		b.typing = true
 		return &Job{ClientID: r.Message.ClientID, Attempt: r.Message.Attempts,
@@ -198,7 +205,15 @@ func (r *Record) recheckPace() time.Duration {
 
 // NeedsLook says the box wants a look at the pane even with nothing queued: a message in-input is due its recheck.
 func (b *Box) NeedsLook(now time.Time) bool {
-	return b.rechecked(now) != nil
+	if b.rechecked(now) != nil {
+		return true
+	}
+	for _, r := range b.recs {
+		if r.ClearBox {
+			return true
+		}
+	}
+	return false
 }
 
 // blocked: a menu or someone's text stops the head; it is looked at again 1.5 → 3 → 6 → 10 s later.
@@ -213,7 +228,13 @@ func (b *Box) positions(ch *Change, reason wire.QueueReason, now time.Time) {
 	for i, id := range b.items {
 		r := b.recs[id]
 		why := wire.QueuedBehind
-		if i == 0 {
+		if r.Stalled {
+			// Wherever a message that jumped ahead put it, a stalled message waits for the person.
+			why = wire.QueuedStalled
+		} else if i == 0 && reason == wire.QueuedStalled {
+			// The head was stalled and is gone: the one now first waits on the agent until the next look says more.
+			why = wire.QueuedAgentBusy
+		} else if i == 0 {
 			why = reason
 		} else if r.Reason == wire.QueuedAgentBusy {
 			// Pushed down the line by a message that jumped ahead («now»): it still waits on the agent, it does not go
@@ -229,6 +250,12 @@ func (b *Box) positions(ch *Change, reason wire.QueueReason, now time.Time) {
 			term = nil
 		}
 		st := wire.MessageState{K: wire.MsgQueued, Position: i + 1, Reason: why, Wait: term}
+		if why == wire.QueuedStalled {
+			st.At = r.Message.State.At // the moment of the stall, for the older form (failed{unconfirmed, at})
+			if r.Message.State.Reason != wire.QueuedStalled {
+				st.At = ms(now)
+			}
+		}
 		b.set(ch, r, st, now)
 		b.waiting(id, string(why))
 	}
@@ -237,7 +264,7 @@ func (b *Box) positions(ch *Change, reason wire.QueueReason, now time.Time) {
 // termOf is the term of a queued reason: the agent's own work and the place behind another have none.
 func termOf(why wire.QueueReason, since wire.Ms) *wire.Wait {
 	switch why {
-	case wire.QueuedAgentBusy, wire.QueuedBehind:
+	case wire.QueuedAgentBusy, wire.QueuedBehind, wire.QueuedStalled:
 		return nil
 	case wire.QueuedBlockedText:
 		return wait(since, OccupiedTTL)
@@ -251,6 +278,14 @@ func termOf(why wire.QueueReason, since wire.Ms) *wire.Wait {
 func (b *Box) Typed(clientID string, res typist.Result, now time.Time) Change {
 	var ch Change
 	r := b.recs[clientID]
+	if r != nil && clientID == b.clearing {
+		b.clearing, b.typing, r.ClearBox = "", false, false
+		if b.log != nil {
+			b.log.Info("stalled message taken out of the input box", "conversationId", b.conv, "clientId", clientID,
+				"cleared", res.Outcome == typist.Sent)
+		}
+		return ch
+	}
 	if r == nil || clientID != b.flight {
 		return ch
 	}
@@ -267,13 +302,13 @@ func (b *Box) Typed(clientID string, res typist.Result, now time.Time) Change {
 		switch {
 		case res.Outcome == typist.Stuck:
 			b.stuck(&ch, r, now)
-		case res.Outcome == typist.Sent && res.Typed:
+		case res.Outcome == typist.Sent && res.Typed && r.Steered:
 			r.TypedAt = ms(now)
-			term := wire.ConfirmDeadline * time.Millisecond
-			if r.Steered {
-				term = SteerDeadline
-			}
-			b.set(&ch, r, wire.MessageState{K: wire.MsgInInput, Wait: wait(r.TypedAt, term)}, now)
+			b.set(&ch, r, wire.MessageState{K: wire.MsgInInput, Wait: wait(r.TypedAt, SteerDeadline)}, now)
+		case res.Outcome == typist.Sent && res.Typed:
+			// An Enter pressed again does not move the term: a message the agent does not take in ConfirmDeadline from
+			// its typing stalls, however many Enters it got.
+			r.TypedAt = ms(now)
 		}
 		return ch
 	}
@@ -481,6 +516,10 @@ func (b *Box) accept(ch *Change, r *Record, entryID *string, now time.Time) {
 	if b.flight == r.Message.ClientID {
 		b.flight, b.typing = "", false
 	}
+	if entryID != nil {
+		r.EntryID = *entryID
+	}
+	r.Stalled, r.ClearBox = false, false
 	b.set(ch, r, wire.MessageState{K: wire.MsgAccepted, EntryID: entryID}, now)
 	delete(b.waits, r.Message.ClientID)
 }
@@ -533,28 +572,190 @@ func (b *Box) TurnEnded(turnID string, now time.Time) Change {
 	return ch
 }
 
-// Tick ends the waits past their terms: in-input past ConfirmDeadline is failed{unconfirmed}, a queued message past
-// the TTL of its reason failed{expired}; final messages older than FinalStored are forgotten.
+// Tick ends the waits past their terms: in-input past its term goes back to the line stalled (a steered or carried
+// message, which may still be in Claude's queue or its launch, fails unconfirmed), a message left typing that long with
+// no try on its way too; a queued message past the TTL of its reason is failed{expired}; final messages older than
+// FinalStored are forgotten, their ids kept GoneKept.
 func (b *Box) Tick(now time.Time) Change {
 	var ch Change
 	t := ms(now)
 	for _, r := range b.sorted() {
 		st := r.Message.State
+		mine := b.typing && b.flight == r.Message.ClientID
 		switch {
-		case st.K == wire.MsgInInput && st.Wait != nil && t >= st.Wait.DeadlineAt && !(b.typing && b.flight == r.Message.ClientID):
+		case st.K == wire.MsgInInput && st.Wait != nil && t >= st.Wait.DeadlineAt && !mine && (r.Steered || r.Carried):
 			if b.flight == r.Message.ClientID {
 				b.flight = ""
 			}
 			b.fail(&ch, r, wire.MsgFailedUnconfirmed, true, now)
+		case st.K == wire.MsgInInput && st.Wait != nil && t >= st.Wait.DeadlineAt && !mine,
+			st.K == wire.MsgTyping && !mine && t-r.TypedAt >= wire.ConfirmDeadline:
+			b.stall(&ch, r, now)
 		case st.K == wire.MsgQueued && st.Wait != nil && t >= st.Wait.DeadlineAt:
 			b.fail(&ch, r, wire.MsgFailedExpired, true, now)
 			ch.add(wire.QueueChangedEv{Queue: b.Queue()})
 		case final(st.K) && t-r.EndedAt > FinalStored.Milliseconds():
 			delete(b.recs, r.Message.ClientID)
 			delete(b.waits, r.Message.ClientID)
+			b.forget(r.Message.ClientID, r.EndedAt)
+		}
+	}
+	for id, at := range b.gone {
+		if t-at > GoneKept.Milliseconds() {
+			delete(b.gone, id)
 		}
 	}
 	return ch
+}
+
+// forget keeps the id of a message let go, at most GoneMax of them (the oldest go first).
+func (b *Box) forget(id string, endedAt wire.Ms) {
+	b.gone[id] = endedAt
+	for len(b.gone) > GoneMax {
+		oldest, at := "", wire.Ms(0)
+		for k, v := range b.gone {
+			if oldest == "" || v < at || v == at && k < oldest {
+				oldest, at = k, v
+			}
+		}
+		delete(b.gone, oldest)
+	}
+}
+
+// A stalled message's box is looked at for its text every clearAgain, clearLooks times at most, when no look came.
+const (
+	clearAgain = 1500 * time.Millisecond
+	clearLooks = 5
+)
+
+// stall: a typed message the agent did not take within its term. The transcript is asked first (an Enter that came
+// late is an answer); without its entry the message goes back to the head of the line, stalled — the pages show it in
+// the queue to retry, never as a bubble that waits for ever — and its text is taken out of the agent's input box at
+// the next look. It is not typed again by itself: something beyond this message is wrong, and the person decides.
+func (b *Box) stall(ch *Change, r *Record, now time.Time) {
+	if b.flight == r.Message.ClientID {
+		b.flight, b.typing = "", false
+	}
+	if id, ok := b.found(r, nil); ok {
+		b.accept(ch, r, &id, now)
+		return
+	}
+	r.Stalled, r.ClearBox, r.ClearAt, r.ClearLooks = true, true, ms(now), 0
+	r.EnterOnly, r.Rechecks, r.RecheckAt = false, 0, 0
+	r.WaitSince = ms(now)
+	if !slices.Contains(b.items, r.Message.ClientID) {
+		b.items = append([]string{r.Message.ClientID}, b.items...)
+		b.rev++
+	}
+	b.set(ch, r, wire.MessageState{K: wire.MsgQueued, Position: 1, Reason: wire.QueuedStalled, At: ms(now)}, now)
+	ch.add(wire.QueueChangedEv{Queue: b.Queue()})
+	b.positions(ch, wire.QueuedStalled, now)
+	if b.log != nil {
+		b.log.Warn("message not taken by the agent; back in the queue, stalled", "conversationId", b.conv,
+			"clientId", r.Message.ClientID, "attempts", r.Message.Attempts)
+	}
+}
+
+// unstall is the person's word on a stalled message: one the agent took after all (its entry is in the transcript) is
+// accepted, any other is typed again from the head of the line, attempts+1.
+func (b *Box) unstall(r *Record, find Find, now time.Time) Change {
+	var ch Change
+	if r.TypedOffset > 0 || r.TypedAt > 0 {
+		if id, ok := b.found(r, find); ok {
+			b.dropItem(r.Message.ClientID)
+			b.accept(&ch, r, &id, now)
+			ch.add(wire.QueueChangedEv{Queue: b.Queue()})
+			return ch
+		}
+	}
+	r.Stalled, r.ClearBox = false, false
+	r.Message.Attempts++
+	r.Tries, r.NextTry, r.Blocked, r.Waits, r.WaitSince = 0, 0, 0, 0, ms(now)
+	b.rev++
+	b.set(&ch, r, wire.MessageState{K: wire.MsgQueued, Position: 1, Reason: wire.QueuedBehind}, now)
+	ch.add(wire.QueueChangedEv{Queue: b.Queue()})
+	return ch
+}
+
+// clearJob is the try that takes a stalled message's text out of the agent's input box, when the look shows it there;
+// a look that does not ends the clearing (nothing of it is in the box). Without a look it is asked again a few times,
+// then let be: the box is the person's to see in the terminal.
+func (b *Box) clearJob(a Agent, now time.Time) *Job {
+	if b.typing {
+		return nil
+	}
+	for _, r := range b.sorted() {
+		if !r.ClearBox || ms(now) < r.ClearAt {
+			continue
+		}
+		if a.Screen == nil {
+			r.ClearLooks++
+			r.ClearAt = ms(now) + clearAgain.Milliseconds()
+			if r.ClearLooks >= clearLooks {
+				r.ClearBox = false
+			}
+			continue
+		}
+		msg := typist.Message{Text: r.Message.Text, Images: r.Images, ClearOnly: true}
+		if !typist.Decide(typist.Message{Text: r.Message.Text, Images: r.Images, EnterOnly: true}, *a.Screen, a.Provider).OwnText {
+			r.ClearBox = false
+			continue
+		}
+		b.clearing, b.typing = r.Message.ClientID, true
+		return &Job{ClientID: r.Message.ClientID, Attempt: r.Message.Attempts, Message: msg}
+	}
+	return nil
+}
+
+// Status is the box's word on each client id, in order: the record, and where a typed message went; a forgotten
+// id is expired; any other unknown.
+func (b *Box) Status(ids []string) []wire.MessageStatus {
+	out := make([]wire.MessageStatus, 0, len(ids))
+	for _, id := range ids {
+		r, ok := b.recs[id]
+		if !ok {
+			if at, gone := b.gone[id]; gone {
+				out = append(out, wire.MessageStatus{ClientID: id, K: wire.StatusExpired, At: max(at, 1)})
+				continue
+			}
+			out = append(out, wire.MessageStatus{ClientID: id, K: wire.StatusUnknown})
+			continue
+		}
+		m := r.Message
+		out = append(out, wire.MessageStatus{ClientID: id, K: wire.StatusKnown, Message: &m, Handed: r.handed()})
+	}
+	return out
+}
+
+// handed is when and where a typed message went: in the agent's input box, in its own queue (steered), with the agent
+// (its hook said so), or in the transcript (its entry); nil for a message not handed (queued, failed, cancelled).
+func (r *Record) handed() *wire.MessageHanded {
+	if r.TypedAt <= 0 {
+		return nil
+	}
+	h := &wire.MessageHanded{At: r.TypedAt}
+	switch r.Message.State.K {
+	case wire.MsgTyping:
+		h.Where = wire.HandedInputBox
+	case wire.MsgInInput:
+		h.Where = wire.HandedInputBox
+		if r.Steered {
+			h.Where = wire.HandedAgentQueue
+		}
+	case wire.MsgAccepted, wire.MsgInTurn, wire.MsgDone:
+		switch {
+		case r.EntryID != "":
+			id := r.EntryID
+			h.Where, h.EntryID = wire.HandedTranscript, &id
+		case r.Steered && r.Message.State.K == wire.MsgAccepted:
+			h.Where = wire.HandedAgentQueue
+		default:
+			h.Where = wire.HandedAgent
+		}
+	default:
+		return nil
+	}
+	return h
 }
 
 // Wake is when the box next needs a look of its own: a retry's time or the end of a wait; zero when nothing waits on
@@ -570,6 +771,12 @@ func (b *Box) Wake() time.Time {
 		st := r.Message.State
 		if pending(st.K) && st.Wait != nil && st.K != wire.MsgTyping {
 			soon(st.Wait.DeadlineAt)
+		}
+		if st.K == wire.MsgTyping && r.TypedAt > 0 && !(b.typing && b.flight == r.Message.ClientID) {
+			soon(r.TypedAt + wire.ConfirmDeadline)
+		}
+		if r.ClearBox && b.clearing == "" {
+			soon(r.ClearAt)
 		}
 	}
 	if len(b.items) > 0 {

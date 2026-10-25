@@ -1,0 +1,42 @@
+{
+  "http": "messageStatus",
+  "response": {
+    "messages": [
+      {
+        "clientId": "01a1747c-d1d1-76f3-ad33-edcdd1c219c8",
+        "k": "known",
+        "message": {
+          "clientId": "01a1747c-d1d1-76f3-ad33-edcdd1c219c8",
+          "conversationId": "tab-quryy2x5j",
+          "text": "как дела",
+          "attachments": [],
+          "mode": "queue",
+          "kind": "prompt",
+          "createdAt": 1792955699796,
+          "attempts": 0,
+          "state": {"k": "done", "turnId": "c:549b2661-65c4-45d1-bad1-230df4c4f06b#0"},
+          "rev": 7
+        },
+        "handed": {"at": 1792955701978, "where": "transcript", "entryId": "c:549b2661-65c4-45d1-bad1-230df4c4f06b#0"}
+      },
+      {
+        "clientId": "01a1754f-f17b-7c5b-9dc0-de4711c75492",
+        "k": "known",
+        "message": {
+          "clientId": "01a1754f-f17b-7c5b-9dc0-de4711c75492",
+          "conversationId": "tab-quryy2x5j",
+          "text": "и ещё одно",
+          "attachments": [],
+          "mode": "queue",
+          "kind": "prompt",
+          "createdAt": 1792969535946,
+          "attempts": 0,
+          "state": {"k": "queued", "position": 1, "reason": "stalled", "wait": null},
+          "rev": 5
+        }
+      },
+      {"clientId": "01a17550-1120-7afa-a3cf-c50f58188421", "k": "unknown"},
+      {"clientId": "01a17000-0000-7000-8000-000000000001", "k": "expired", "at": 1792800000000}
+    ]
+  }
+}

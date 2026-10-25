@@ -93,3 +93,86 @@ func TestTheWorkflowsCapIsReadFromTheAddress(t *testing.T) {
 		}
 	}
 }
+
+func TestTheProfilesCapIsReadFromTheAddress(t *testing.T) {
+	for addr, want := range map[string]bool{
+		"/api/v2/socket?machine=local&caps=delegation,workflows,profiles": true,
+		"/api/v2/machines?caps=profiles":                                  true,
+		"/api/v2/socket?caps=delegation,workflows":                        false,
+		"/api/v2/socket?caps=profilesx":                                   false,
+	} {
+		if got := CapsOf(httptest.NewRequest("GET", addr, nil)).Profiles; got != want {
+			t.Errorf("%s: %v", addr, got)
+		}
+	}
+}
+
+func TestASnapshotKeepsProfilesFromAPageThatDoesNotReadThem(t *testing.T) {
+	prof := &Model{ID: "kimi-k3.1-pro", Profile: "kimi"}
+	from := &Origin{K: OriginHandoff, FromModel: &Model{ID: "grok-build-0.1", Profile: "xai"}}
+	log := []ModelSwitch{{From: &Model{ID: "a", Profile: "kimi"}, To: Model{ID: "b", Profile: "kimi"}}}
+	convs := &ConvsSnapshot{Conversations: []Conversation{{ID: "tab-a", Model: prof, Origin: from, ModelLog: log}, {ID: "tab-b", Model: &Model{ID: "opus"}}}}
+	machine := &MachineSnapshot{Machine: Machine{Agents: []MachineAgent{{Provider: ProviderClaude, Profiles: []ProfileOffer{{ID: "kimi"}}}}}}
+	snap := SnapshotFrame{Ch: ChannelConvs, Convs: convs, Machine: machine}
+
+	old := snapshotFor(snap, Caps{Delegation: true, Workflows: true})
+	a := old.Convs.Conversations[0]
+	if a.Model.Profile != "" || a.Origin.FromModel.Profile != "" || a.ModelLog[0].To.Profile != "" || a.ModelLog[0].From.Profile != "" ||
+		a.Model.ID != prof.ID || old.Machine.Machine.Agents[0].Profiles != nil {
+		t.Fatalf("snapshot for an older page: %+v %+v", a, old.Machine.Machine.Agents)
+	}
+	if prof.Profile != "kimi" || from.FromModel.Profile != "xai" || log[0].To.Profile != "kimi" || machine.Machine.Agents[0].Profiles == nil {
+		t.Fatal("the snapshot itself changed")
+	}
+	if got := snapshotFor(snap, AllCaps); got.Convs != convs || got.Machine != machine {
+		t.Fatal("a page that reads profiles gets the snapshot as it is")
+	}
+	if _, changed := eventFor(ConversationUpsertEv{Conv: Conversation{ID: "tab-b", Model: &Model{ID: "opus"}}}, Caps{Delegation: true, Workflows: true}); changed {
+		t.Fatal("a chat without a profile is the same for every page")
+	}
+	if got := MachineFor(machine.Machine, Caps{}); got.Agents[0].Profiles != nil || machine.Machine.Agents[0].Profiles == nil {
+		t.Fatal("MachineFor")
+	}
+}
+
+// A stalled message is failed{unconfirmed} for a page that does not read a stall, with the same rev, and its queue does
+// not list it; a page with the cap gets it as it is. The status answer is cut the same way.
+func TestAnOlderPageGetsAStallAsAnUnconfirmedFailure(t *testing.T) {
+	stalled := MessageState{K: MsgQueued, Position: 1, Reason: QueuedStalled, At: 1700}
+	older := Caps{Delegation: true, Workflows: true, Profiles: true}
+	e, changed := eventFor(PromptStateEv{ClientID: "m1", State: stalled, Rev: 4}, older)
+	ps, _ := e.(PromptStateEv)
+	if !changed || ps.Rev != 4 || ps.State.K != MsgFailed || ps.State.Code != MsgFailedUnconfirmed || !ps.State.Retryable || ps.State.At != 1700 {
+		t.Fatalf("prompt_state: %v %#v", changed, e)
+	}
+	if _, changed := eventFor(PromptStateEv{ClientID: "m1", State: stalled, Rev: 4}, AllCaps); changed {
+		t.Fatal("a page with the cap gets the stall")
+	}
+	msg := Message{ClientID: "m1", ConversationID: "tab-a0000001", State: stalled, Rev: 4}
+	if e, changed := eventFor(MessageUpsertEv{Message: msg}, older); !changed || e.(MessageUpsertEv).Message.State.K != MsgFailed {
+		t.Fatalf("message_upsert: %#v", e)
+	}
+	q := Queue{ConversationID: "tab-a0000001", Items: []string{"m1", "m2"}, Rev: 3, Stalled: []string{"m1"}}
+	e, changed = eventFor(QueueChangedEv{Queue: q}, older)
+	if items := e.(QueueChangedEv).Queue.Items; !changed || len(items) != 1 || items[0] != "m2" || len(q.Items) != 2 {
+		t.Fatalf("queue: %v %v", changed, items)
+	}
+	if _, changed := eventFor(MessageUpsertEv{Message: Message{State: MessageState{K: MsgQueued, Reason: QueuedBehind}}}, Caps{}); changed {
+		t.Fatal("a message that is not stalled is the same for every page")
+	}
+
+	snap := SnapshotFrame{Ch: "conv:tab-a0000001", Conv: &ConvSnapshot{Queue: q, Messages: []Message{msg}}}
+	got := snapshotFor(snap, older)
+	if got.Conv.Messages[0].State.K != MsgFailed || len(got.Conv.Queue.Items) != 1 {
+		t.Fatalf("snapshot: %#v", got.Conv)
+	}
+	if snap.Conv.Messages[0].State.K != MsgQueued || len(snap.Conv.Queue.Items) != 2 {
+		t.Fatal("the snapshot itself is never changed")
+	}
+	if got := snapshotFor(snap, AllCaps); got.Conv != snap.Conv {
+		t.Fatal("a page with the cap gets the snapshot as it is")
+	}
+	if !CapsOf(httptest.NewRequest("GET", "/api/v2/socket?caps=delegation,workflows,profiles,msgstatus", nil)).MsgStatus {
+		t.Fatal("the cap is read")
+	}
+}

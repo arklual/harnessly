@@ -1326,6 +1326,24 @@ func TestContextIsTheLastAnswersInput(t *testing.T) {
 	}
 }
 
+// The window is the one the agent reports, not a guess from the model id: a model without the [1m] suffix may run with
+// the long window, and a Codex chat has its own.
+func TestContextLimitIsTheWindowTheAgentReports(t *testing.T) {
+	r := newRig(t)
+	r.deps = func(d *Deps) {
+		d.Window = func(p wire.Provider, sid, path string) (int64, int64) { return 0, 1_000_000 }
+	}
+	r.rt = r.runtime()
+	r.user("hi")
+	r.line(`"type":"assistant","message":{"role":"assistant","model":"claude-opus-5-5","content":[{"type":"text","text":"Hello"}],"usage":{"input_tokens":12,"cache_creation_input_tokens":1000,"cache_read_input_tokens":40000,"output_tokens":5}}`)
+	r.open()
+	r.settle(wire.StateWorking)
+	got, err := r.rt.Context(context.Background(), r.id)
+	if err != nil || got.UsedTokens != 41012 || got.LimitTokens != 1_000_000 {
+		t.Fatalf("context: %+v %v", got, err)
+	}
+}
+
 // A send the page repeats — its answer was lost, a gateway answered 502 in front of the runtime, the runtime restarted
 // in a rollout — is the same message: the same answer, no second copy in the queue, no second event. A refusal that is
 // only «no time» or «not now» (timeout, internal) is not kept as the answer, so the repeat is tried again.

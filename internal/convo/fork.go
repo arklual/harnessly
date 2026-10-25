@@ -172,6 +172,12 @@ func (r *Runtime) handoff(m wire.ConversationHandoffCmd) wire.CmdResult {
 	if !ok {
 		return wire.Refused(wire.RefuseNotFound)
 	}
+	// A handoff does not inherit the profile of the conversation it comes from: it names its own, or none.
+	model, code := r.onProfile(m.Provider, m.Model, m.Profile)
+	if code != "" {
+		return wire.Refused(code)
+	}
+	m.Model = model
 	now := r.d.Clock.Now()
 	via := wire.ViaExcerpt
 	if m.Mode == wire.HandoffNote {

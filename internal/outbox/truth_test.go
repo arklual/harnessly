@@ -84,7 +84,7 @@ func TestAMessageTheAgentTookAfterAllIsNeverTypedTwice(t *testing.T) {
 	r.pump()
 	r.clock.Sleep(time.Duration(wire.ConfirmDeadline+1) * time.Millisecond)
 	r.record(r.box.Tick(r.clock.Now()))
-	if st := r.state("m1"); st.K != wire.MsgFailed || st.Code != wire.MsgFailedUnconfirmed {
+	if st := r.state("m1"); st.K != wire.MsgQueued || st.Reason != wire.QueuedStalled {
 		t.Fatalf("%+v", st)
 	}
 	// The retry finds no entry yet: back to the head of the line; the agent is busy meanwhile.
@@ -139,7 +139,7 @@ func TestATypedMessageIsLookedForBeforeItIsTypedAgain(t *testing.T) {
 	if r.jobs != jobs || r.state("m1").K != wire.MsgAccepted || *r.state("m1").EntryID != "c:cc#0" {
 		t.Fatalf("jobs %d→%d %+v", jobs, r.jobs, r.state("m1"))
 	}
-	if got := r.trail("m1"); got != "typing → in-input → failed{unconfirmed} → queued{behind} → accepted" {
+	if got := r.trail("m1"); got != "typing → in-input → queued{stalled} → queued{behind} → accepted" {
 		t.Fatal(got)
 	}
 }

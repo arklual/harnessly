@@ -1,0 +1,38 @@
+{
+  "f": "ev",
+  "ch": "convs",
+  "seq": 612,
+  "e": {
+    "type": "conversation_upsert",
+    "conv": {
+      "id": "tab-K1mi0Conv",
+      "machineId": "runner-2",
+      "projectId": null,
+      "cwd": "/home/coder/workspace/harnessly",
+      "provider": "claude",
+      "model": {
+        "id": "kimi-k3.1-pro",
+        "effort": null,
+        "profile": "kimi"
+      },
+      "title": "Контракт v2",
+      "titleSource": "agent",
+      "pinned": false,
+      "createdAt": 1792652400000,
+      "lastActivityAt": 1792655999000,
+      "lastPromptAt": 1792655999000,
+      "state": {
+        "k": "idle",
+        "since": 1792663200000
+      },
+      "seenAt": 1792655999000,
+      "lastTurn": null,
+      "queue": {
+        "count": 0,
+        "paused": null
+      },
+      "gate": null,
+      "rev": 2
+    }
+  }
+}

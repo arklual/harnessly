@@ -8,6 +8,8 @@
 // design's mobile.css keeps it one), its rows a finger tall.
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
+  agentKey,
+  choiceAgentKey,
   effortHint,
   effortLabel,
   unavailableNote,
@@ -85,16 +87,16 @@ const ModelPicker = ({
 }: IModelPickerProps) => {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<TView>(VIEW.effort);
-  const [browse, setBrowse] = useState(value.provider);
+  const [browse, setBrowse] = useState(choiceAgentKey(value));
   const { mounted, state } = usePresentFlag(open, EXIT_MS);
   const anchorRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
 
-  const agent = agents.find((a) => a.provider === value.provider) ?? agents[0];
+  const agent = agents.find((a) => agentKey(a) === choiceAgentKey(value)) ?? agents[0];
   // The agents of the second screen: the chat's own, then those a handoff goes to.
   const listed = handoff
-    ? [...agents, ...handoff.agents.filter((a) => !agents.some((own) => own.provider === a.provider))]
+    ? [...agents, ...handoff.agents.filter((a) => !agents.some((own) => agentKey(own) === agentKey(a)))]
     : agents;
   const segmented = !locked || listed.length > 1;
   const model = modelOf(agent, value.model);
@@ -104,7 +106,7 @@ const ModelPicker = ({
   const step = effort ? stops.indexOf(effort) : -1;
   const browseIndex = Math.max(
     0,
-    listed.findIndex((a) => a.provider === browse),
+    listed.findIndex((a) => agentKey(a) === browse),
   );
   const frozen = !!blocked || !!busy;
   const ultracodeOffered = offersUltracode && model?.ultracode === true;
@@ -133,7 +135,7 @@ const ModelPicker = ({
       return;
     }
     setView(VIEW.effort);
-    setBrowse(value.provider);
+    setBrowse(choiceAgentKey(value));
     setOpen(true);
   };
   const setStep = (i: number) => {
@@ -192,7 +194,7 @@ const ModelPicker = ({
   };
 
   // Another agent of a created chat is a handoff: the preview opens, the chat stays as it is.
-  const crosses = (target: IPickerAgent) => locked && target.provider !== value.provider;
+  const crosses = (target: IPickerAgent) => locked && agentKey(target) !== choiceAgentKey(value);
   const pick = (target: IPickerAgent, next: AgentModel, add = false) => {
     if (handoff && crosses(target)) {
       close();
@@ -210,8 +212,8 @@ const ModelPicker = ({
   const chosenKeys = new Set((multi?.chosen ?? []).map(choiceKey));
   const isChosen = (target: IPickerAgent, m: AgentModel) =>
     multi
-      ? chosenKeys.has(choiceKey({ provider: target.provider, model: m.id }))
-      : target.provider === value.provider && m.id === value.model;
+      ? chosenKeys.has(choiceKey({ provider: target.provider, profile: target.profile, model: m.id }))
+      : agentKey(target) === choiceAgentKey(value) && m.id === value.model;
   const more = multi ? multi.chosen.length - 1 : 0;
 
   const hint = (): string => {
@@ -232,7 +234,7 @@ const ModelPicker = ({
         onClick={toggle}
       >
         {!open && <span className="hx-tip">{t('next.composer.modelTip')}</span>}
-        <i className="hx-agent" data-agent={value.provider} aria-hidden="true" />
+        <i className="hx-agent" data-agent={agent.vendor ?? value.provider} aria-hidden="true" />
         {ultracode && (
           <i
             className="hx-icon hx-model__ultra"
@@ -262,7 +264,7 @@ const ModelPicker = ({
                   type="button"
                   className="hx-picker__center"
                   onClick={() => {
-                    setBrowse(value.provider);
+                    setBrowse(choiceAgentKey(value));
                     setView(VIEW.models);
                   }}
                 >
@@ -270,7 +272,7 @@ const ModelPicker = ({
                     {effort ? effortLabel(effort) : t('next.picker.effortUnknown')}
                   </span>
                   <span className="hx-picker__model">
-                    <i className="hx-agent" data-agent={value.provider} aria-hidden="true" />
+                    <i className="hx-agent" data-agent={agent.vendor ?? value.provider} aria-hidden="true" />
                     {agent.name} · {modelName(agent, value.model)}
                     <Icon name="chevron-right" size="sm" />
                   </span>
@@ -349,13 +351,13 @@ const ModelPicker = ({
                   <span className="hx-seg__glider" />
                   {listed.map((a) => (
                     <button
-                      key={a.provider}
+                      key={agentKey(a)}
                       type="button"
                       className="hx-seg__item"
-                      aria-pressed={a.provider === browse}
-                      onClick={() => setBrowse(a.provider)}
+                      aria-pressed={agentKey(a) === browse}
+                      onClick={() => setBrowse(agentKey(a))}
                     >
-                      <i className="hx-agent" data-agent={a.provider} aria-hidden="true" />
+                      <i className="hx-agent" data-agent={a.vendor ?? a.provider} aria-hidden="true" />
                       {a.short}
                     </button>
                   ))}
@@ -367,7 +369,7 @@ const ModelPicker = ({
                     const active = index === browseIndex;
                     const across = crosses(a);
                     return (
-                      <div key={a.provider} className="hx-options" data-active={active} role="listbox">
+                      <div key={agentKey(a)} className="hx-options" data-active={active} role="listbox">
                         {!a.available && <div className="hx-options__note">{unavailableNote(a)}</div>}
                         {a.available && across && (
                           <div className="hx-options__note">

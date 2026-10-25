@@ -5,6 +5,14 @@
 import { locale, t } from '@/next/i18n';
 import type { Provider } from '@/next/protocol/v2';
 
+/**
+ * The agent whose quota a chat's chip shows: none for a chat on a vendor's profile (Kimi, GLM, Grok), whose limits are
+ * not Anthropic's or Codex's and are not read here.
+ */
+export const limitsProviderOf = (
+  chat: { provider: Provider; profile?: string | null } | null | undefined,
+): Provider | null => (!chat || chat.profile ? null : chat.provider);
+
 export const WINDOW = { fiveHour: 'five_hour', sevenDay: 'seven_day' } as const;
 export type WindowKind = (typeof WINDOW)[keyof typeof WINDOW];
 

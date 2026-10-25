@@ -25,6 +25,10 @@ const (
 	// FinalKept: a finished message stays in snapshots this long; on disk it stays FinalStored.
 	FinalKept   = 10 * time.Minute
 	FinalStored = 24 * time.Hour
+	// GoneKept: a forgotten message's id is remembered this long (at most GoneMax of them), so the status of a message
+	// sent long ago is «expired», not «unknown», and a page that sends it again does not have it typed a second time.
+	GoneKept = 7 * 24 * time.Hour
+	GoneMax  = 500
 	// MaxTries: a message whose typing failed this many times in a row has failed{type-failed}; the tries back off
 	// from retryBase, doubling up to retryMax (1.5 → 3 → 6 → 12 → 24 s).
 	MaxTries  = 10
@@ -108,6 +112,16 @@ type Record struct {
 	recheck   bool
 	// Carried: the message goes with the launch of the agent as its first prompt, never typed.
 	Carried bool `json:"carried"`
+	// Stalled: typed, and the agent did not take it within wire.ConfirmDeadline. It waits at the head of the line for
+	// the person (retry, promote, cancel) and is not typed again by itself. ClearBox: its text may still be in the
+	// agent's input box and is to be taken out of it at the next look, so no late Enter sends it behind our back.
+	Stalled  bool `json:"stalled,omitempty"`
+	ClearBox bool `json:"clearBox,omitempty"`
+	// ClearAt is when the box is looked at for it next; ClearLooks counts the times no look came.
+	ClearAt    wire.Ms `json:"clearAt,omitempty"`
+	ClearLooks int     `json:"clearLooks,omitempty"`
+	// EntryID is the transcript entry the message was accepted as, "" while none is known.
+	EntryID string `json:"entryId,omitempty"`
 }
 
 // Job is one try to type a message, for the actor to run under the pane lock.
@@ -141,6 +155,10 @@ type Box struct {
 	typing  bool
 	resumed bool
 	waits   map[string]string
+	// clearing is the stalled message whose text a job is taking out of the box now, "" none.
+	clearing string
+	// gone are the forgotten messages' ids and when they ended.
+	gone map[string]wire.Ms
 
 	// Transcript looks for a message's own entry (its text) in the transcript; nil: none to look in. A message that was
 	// typed once is looked for there before it is typed again, and a retry or a restart asks it rather than taking the
@@ -166,13 +184,20 @@ func (b *Box) found(r *Record, find Find) (string, bool) {
 
 // New is an empty box of conversation conv.
 func New(conv string, limits wire.Limits, log Logger) *Box {
-	return &Box{conv: conv, limits: limits, log: log, recs: map[string]*Record{}, rev: 1, waits: map[string]string{}}
+	return &Box{conv: conv, limits: limits, log: log, recs: map[string]*Record{}, rev: 1, waits: map[string]string{},
+		gone: map[string]wire.Ms{}}
 }
 
 // Queue is the conversation's queue as the wire carries it. An empty queue goes out as [], never null: the page
 // takes null for a frame outside the protocol.
 func (b *Box) Queue() wire.Queue {
-	return wire.Queue{ConversationID: b.conv, Items: append([]string{}, b.items...), Paused: b.paused, Rev: b.rev}
+	q := wire.Queue{ConversationID: b.conv, Items: append([]string{}, b.items...), Paused: b.paused, Rev: b.rev}
+	for _, id := range b.items {
+		if b.recs[id].Stalled {
+			q.Stalled = append(q.Stalled, id)
+		}
+	}
+	return q
 }
 
 // Summary is the queue as the sidebar row needs it.
@@ -244,12 +269,17 @@ type Draft struct {
 	Auto wire.AutoContinueWhy
 }
 
-// Send queues a message. The same client id again gives back the message it queued (its answer was lost on the
-// way): ok true, nothing new. A refusal names its code.
+// Send queues a message. The same client id again gives back the message it queued (its answer, or its events, were
+// lost on the way): accepted, nothing new, and its whole record goes out again so the page that sent it takes its true
+// state. The id of a message forgotten long ago is too-late: it was delivered, and is never typed a second time. A
+// refusal names its code.
 func (b *Box) Send(d Draft, agent wire.AgentState, now time.Time) (Change, wire.RefuseCode) {
 	var ch Change
-	if _, ok := b.recs[d.ClientID]; ok {
-		return ch, ""
+	if r, ok := b.recs[d.ClientID]; ok {
+		return resync(r), ""
+	}
+	if _, ok := b.gone[d.ClientID]; ok {
+		return ch, wire.RefuseTooLate
 	}
 	switch {
 	case blankText(d.Text) && len(d.Attachments) == 0:
@@ -355,12 +385,14 @@ func (b *Box) Retry(clientID string, find Find, now time.Time) (Change, wire.Ref
 	switch {
 	case !ok:
 		return ch, wire.RefuseNotFound
+	case r.Stalled && r.Message.State.K == wire.MsgQueued:
+		return b.unstall(r, find, now), ""
 	case r.Message.State.K != wire.MsgFailed:
 		return ch, wire.RefuseNotFailed
 	}
 	if r.TypedOffset > 0 {
 		if id, ok := b.found(r, find); ok {
-			b.set(&ch, r, wire.MessageState{K: wire.MsgAccepted, EntryID: &id}, now)
+			b.accept(&ch, r, &id, now)
 			return ch, ""
 		}
 	}
@@ -387,6 +419,13 @@ func (b *Box) Promote(clientID string, to wire.PromoteTo, agent wire.AgentState,
 		return ch, wire.RefuseTooLate
 	case to == wire.PromoteToSteer && agent.K != wire.StateWorking:
 		return ch, wire.RefuseNotWorking
+	}
+	if r.Stalled {
+		// «Сразу» on a stalled message is the person's word to send it: it goes like a retry, at its new place.
+		ch = b.unstall(r, nil, now)
+		if r.Message.State.K != wire.MsgQueued {
+			return ch, ""
+		}
 	}
 	r.Message.Mode = wire.MessageMode(to)
 	b.dropItem(clientID)

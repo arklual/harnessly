@@ -1,6 +1,7 @@
 package convo
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -348,5 +349,46 @@ func TestRestartSettingOff(t *testing.T) {
 	}
 	if rec := r.record(); len(rec.AutoContinues) != 0 {
 		t.Fatalf("autoContinues: %+v", rec.AutoContinues)
+	}
+}
+
+// A chat on a backend profile reads its usage limit off the vendor's words; the hold waits for the person, since the
+// runtime never goes on by itself on a vendor's limit.
+func TestProfileChatLimitIsHeldWithoutAutoContinue(t *testing.T) {
+	r := newRig(t)
+	r.open()
+	r.settle(wire.StateReady)
+	if err := r.rt.call(context.Background(), r.id, func(c *conv, _ time.Time) {
+		c.rec.Model = &wire.Model{ID: "glm-5.3", Profile: "glm"}
+		c.openFeed()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	r.agentTakes()
+	r.send("m1", "big job", wire.ModeQueue)
+	r.tick(time.Second)
+	reset := r.clock.Now().Add(time.Hour).UTC().Truncate(time.Second)
+	// Z.ai tells the reset in Beijing time.
+	text := `API Error: 429 {"error":{"code":"1308","message":"Usage limit reached for 5 hour. Your limit will reset at ` +
+		reset.In(time.FixedZone("", 8*3600)).Format("2006-01-02 15:04:05") + `"}}`
+	r.line(`"type":"assistant","message":{"model":"<synthetic>","role":"assistant","stop_reason":"stop_sequence","type":"message","content":[{"type":"text","text":%q}]},"error":"rate_limit","isApiErrorMessage":true,"apiErrorStatus":429`, text)
+	r.idle()
+	r.hook("stop")
+	h := r.record().Limited
+	if h == nil || h.Window != wire.LimitSession || h.ResetsAt == nil || *h.ResetsAt != reset.UnixMilli() {
+		t.Fatalf("the hold: %+v", h)
+	}
+	if h.ContinueAt != nil {
+		t.Fatalf("a vendor's limit goes on by itself: %+v", h)
+	}
+	typed := len(r.pane.calls)
+	r.tickTo(reset.Add(wire.LimitJitterMax + time.Minute))
+	for _, l := range r.typedLines(typed) {
+		if l == LimitContinueText {
+			t.Fatalf("typed %q", l)
+		}
+	}
+	if r.record().Limited != nil {
+		t.Fatalf("the hold ends quietly at the reset")
 	}
 }

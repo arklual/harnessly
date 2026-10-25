@@ -16,7 +16,7 @@ export const useStartChoice = (machine: MachineId | null) => {
   // only else the agent's first model; a pick of an agent the machine no longer runs gives way the same.
   const ready = agents.filter((a) => a.available);
   const readsSettings = (provider: IModelChoice['provider']) =>
-    machine !== null && ready.some((a) => a.provider === provider);
+    machine !== null && ready.some((a) => a.provider === provider && !a.profile);
   const claudeSettings = useAgentSettings(machine ?? '', 'claude', readsSettings('claude'));
   const codexSettings = useAgentSettings(machine ?? '', 'codex', readsSettings('codex'));
   const choice = startChoice({

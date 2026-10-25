@@ -43,15 +43,23 @@ func TestDelegationCallerIsFoundByTheConnection(t *testing.T) {
 		return ""
 	}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The server ends each connection, so the client's port is free again at once.
-		w.Header().Set("Connection", "close")
 		id, why := cache.of(r)
 		found <- [2]string{id, why}
+		// The server resets each connection before answering: neither end is left in TIME_WAIT, so the client's
+		// port can be bound again at once. curl binds its local port without SO_REUSEADDR, and a TIME_WAIT left
+		// by it would hold the port for a minute.
+		if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+			if tcp, ok := conn.(*net.TCPConn); ok {
+				_ = tcp.SetLinger(0)
+			}
+			_ = conn.Close()
+		}
 	}))
 	defer srv.Close()
 
 	// From inside the session's pane, two levels below its shell.
-	port := 20000 + rand.IntN(20000)
+	// Below the kernel's ephemeral range (32768 and up), so no outgoing connection of the machine takes it meanwhile.
+	port := 10000 + rand.IntN(22000)
 	cmd := fmt.Sprintf("sh -c 'curl -s -m 5 --local-port %d %s >/dev/null; sleep 30'", port, srv.URL)
 	if out, err := exec.Command("tmux", "-f", "/dev/null", "-L", socket, "new-session", "-d", "-s", "hs-deleg-a", "-x", "80", "-y", "24", cmd).CombinedOutput(); err != nil {
 		t.Fatalf("new-session: %v %s", err, out)
@@ -66,16 +74,16 @@ func TestDelegationCallerIsFoundByTheConnection(t *testing.T) {
 	}
 
 	// From this test process, over the very addresses the pane's connection had: a socket of its own, no chat's.
-	client := &http.Client{Transport: &http.Transport{DialContext: (&net.Dialer{
+	dialer := &net.Dialer{
 		LocalAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: port},
 		Control: func(_, _ string, raw syscall.RawConn) error {
 			return raw.Control(func(fd uintptr) { _ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1) })
 		},
-	}).DialContext}}
-	var res *http.Response
+	}
+	var conn net.Conn
 	var err error
 	for try := 0; try < 50; try++ {
-		if res, err = client.Get(srv.URL); err == nil {
+		if conn, err = dialer.Dial("tcp", srv.Listener.Addr().String()); err == nil {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -83,9 +91,17 @@ func TestDelegationCallerIsFoundByTheConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res.Body.Close()
-	if got := <-found; got[0] != "" || got[1] == "" {
-		t.Fatalf("from outside on the pane's port: %q (%s)", got[0], got[1])
+	defer conn.Close()
+	if _, err := conn.Write([]byte("GET / HTTP/1.1\r\nHost: x\r\n\r\n")); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-found:
+		if got[0] != "" || got[1] == "" {
+			t.Fatalf("from outside on the pane's port: %q (%s)", got[0], got[1])
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the outside request never came")
 	}
 }
 

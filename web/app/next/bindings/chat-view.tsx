@@ -242,12 +242,13 @@ const ChatView = ({
   // A model as the machine's agent names it («Sonnet 5.5»), for the lines of changed models in the feed.
   const agents = machineView?.machine.agents;
   const provider = record?.provider;
+  const profile = record?.model?.profile;
   const modelLabel = useCallback(
     (id: string) => {
-      const agent = provider ? pickerAgentOf(agents ?? [], provider) : null;
+      const agent = provider ? pickerAgentOf(agents ?? [], provider, profile ?? null) : null;
       return agent ? modelName(agent, id) : id;
     },
-    [agents, provider],
+    [agents, provider, profile],
   );
 
   // Going on from an earlier message: any of the person's messages but the first of the transcript (nothing before it

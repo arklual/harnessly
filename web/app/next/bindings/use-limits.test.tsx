@@ -2,6 +2,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAgentLimits } from '@/next/bindings/use-limits';
+import { limitsProviderOf } from '@/next/features/limits/model';
 
 const answer = (usedPct: number) => ({
   machines: [
@@ -55,5 +56,15 @@ describe('useAgentLimits', () => {
     });
     expect(good.result.current?.state).toBe('ready');
     vi.useRealTimers();
+  });
+});
+
+describe('limitsProviderOf', () => {
+  it("names the agent of a chat on the CLI's own account, and nothing for a chat on a vendor's profile", () => {
+    expect(limitsProviderOf({ provider: 'claude' })).toBe('claude');
+    expect(limitsProviderOf({ provider: 'codex', profile: null })).toBe('codex');
+    expect(limitsProviderOf({ provider: 'claude', profile: 'kimi' })).toBeNull();
+    expect(limitsProviderOf({ provider: 'codex', profile: 'xai' })).toBeNull();
+    expect(limitsProviderOf(null)).toBeNull();
   });
 });

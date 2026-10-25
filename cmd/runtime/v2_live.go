@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/history"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/prompts"
+	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/sessionmeta"
 	"github.com/ly-solutions/harnessly/internal/shots"
 	"github.com/ly-solutions/harnessly/internal/state"
@@ -55,6 +57,8 @@ type v2Live struct {
 	designly *v2Designly  // nil when the core cannot start agents
 	// delegation is the agents' delegation of chats to other agents (v2_delegate.go).
 	delegation *delegation.Service
+	// profiles keeps the keys of the backend profiles (Kimi, GLM, Grok) in <DataDir>/providers.
+	profiles *providers.Store
 
 	ready    atomic.Bool
 	kick     chan struct{}
@@ -104,7 +108,13 @@ func newV2Live(d deps, c *core) *v2Live {
 		dictation = dv
 		features = append(features, wire.FeatureVoice)
 	}
+	v.profiles = &providers.Store{Dir: filepath.Join(d.DataDir, "providers")}
+	if c.agents != nil && c.agents.profiles != nil {
+		// One store for the launch lines and the pages: a key saved on a page is the one the next launch reads.
+		v.profiles = c.agents.profiles
+	}
 	v.machine = newLiveMachine(v2Machine, version, features, d.DataDir, func() int { return v.rt.Busy() }, c.preflight, c.v2Models)
+	v.machine.offers = profileOffers(v.profiles)
 	v.hub = wire.NewHub(v.machine)
 	v.tm = &v2Tmux{tm: c.cfg.Tmux}
 	v.starter = &v2Launcher{v: v}
@@ -121,10 +131,12 @@ func newV2Live(d deps, c *core) *v2Live {
 		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir}, Titler: newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")).Title, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		Rewinder: v2Rewinder{c},
+		Window:   v2Window(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),
 		AutoContinue: func() (bool, bool) {
 			s := runtimeSettings.RuntimeSettings()
 			return s.LimitContinue != wire.Off, s.RestartContinue != wire.Off
 		},
+		Profiles: providers.Launcher{Store: v.profiles},
 		LimitReset: func(p wire.Provider, now time.Time) wire.Ms {
 			return wire.Ms(limits.ExhaustedReset(c.limits.Read()[string(p)], float64(now.Unix())) * 1000)
 		}})
@@ -157,7 +169,11 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.Open = open.Open
 	v.srv.OpenAll = open.OpenAll
 	v.srv.AgentSettings = newV2AgentSettings(d)
+	v.srv.Profiles = &providers.Source{Store: v.profiles, OnChange: v.machine.republishProfiles}
+	// A key an agent printed (a `cat` of its file, an environment dump) leaves the machine masked.
+	wire.SetRedactor(v.profiles.Redact)
 	v.srv.Context = v.rt.Context
+	v.srv.MessageStatus = v.rt.MessageStatus
 	v.srv.Shot = func(ctx context.Context, conv, id string) (wire.ShotFile, error) {
 		var f shots.File
 		path, err := v.rt.ShotPath(ctx, conv, id)
@@ -522,7 +538,16 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 		return errors.New("the core cannot start agents")
 	}
 	var chosen *agents.Launch
-	if req.Model != nil {
+	switch {
+	case req.Model != nil && req.Model.Profile != "":
+		// A vendor's model is no model of this machine's catalog, so the catalog does not check it: the conversation
+		// checked it against the profile when it was asked for. It runs with the vendor's own model and no effort.
+		model := req.Model.ID
+		chosen = &agents.Launch{Model: &model, Profile: req.Model.Profile}
+		if err := agents.CheckLaunch(chosen); err != nil {
+			return err
+		}
+	case req.Model != nil:
 		var effort any
 		if req.Model.Effort != nil {
 			effort = string(*req.Model.Effort)
@@ -588,6 +613,11 @@ func (l *v2Launcher) Resume(conv wire.Conversation) error {
 	if !ok {
 		return errors.New("the conversation has no tab to resume")
 	}
+	// A conversation on a backend profile resumes on it or not at all: started on Anthropic's account, an agent would
+	// get the vendor's history with signatures that are not Anthropic's.
+	if conv.Model != nil && conv.Model.Profile != "" && c.tabLaunch(conv.Session).Profile != conv.Model.Profile {
+		return errors.New("the tab does not remember the conversation's profile " + conv.Model.Profile)
+	}
 	switch got := c.resumeForQueue(tab); got {
 	case prompts.ResumeResumed, prompts.ResumeRunning:
 		return nil
@@ -620,4 +650,18 @@ func (cl v2Closer) Close(conv wire.Conversation) error {
 		m.RemoveTab(tab)
 	}
 	return nil
+}
+
+// profileOffers lists, per agent CLI, the vendor presets that run through it, each with whether its key is saved.
+func profileOffers(store *providers.Store) func(wire.Provider) []wire.ProfileOffer {
+	return func(p wire.Provider) []wire.ProfileOffer {
+		var out []wire.ProfileOffer
+		for _, pr := range providers.Presets() {
+			if pr.Via == p {
+				out = append(out, wire.ProfileOffer{ID: pr.ID, Label: pr.Label, Vendor: pr.Vendor,
+					Configured: store.Configured(pr.ID), Models: pr.AgentModels()})
+			}
+		}
+		return out
+	}
 }

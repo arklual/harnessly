@@ -67,6 +67,9 @@ type Server struct {
 	Tasks func(ctx context.Context, conv string) ([]Task, error)
 	// Context is how full a conversation's agent window is; nil: .../context is a 404.
 	Context func(ctx context.Context, conv string) (ConvContext, error)
+	// MessageStatus is the runtime's word on a conversation's messages by their client ids, one per id in order; nil:
+	// .../messages is a 404.
+	MessageStatus func(ctx context.Context, conv string, ids []string) (MessageStatuses, error)
 	// Legacy is the Legacy tab a conversation runs in; nil: .../legacy is a 404.
 	Legacy func(ctx context.Context, conv string) (LegacyTab, error)
 	// Files reads the folders of the conversations: .../files lists a folder, .../file reads a text file. nil: both are
@@ -90,6 +93,9 @@ type Server struct {
 	Apps AppsSource
 	// AgentSettings serves the Settings screen: GET and PATCH /api/v2/agent-settings/<provider>; nil: both are 404s.
 	AgentSettings AgentSettingsSource
+	// Profiles serves the backend profiles: GET /api/v2/providers, PUT and DELETE .../<id>/key, POST .../<id>/test; nil:
+	// all are 404s.
+	Profiles ProfilesSource
 	// RuntimeSettings are the runtime's own settings: GET and PUT /api/v2/runtime-settings; nil: both are 404s.
 	RuntimeSettings RuntimeSettingsStore
 	// Me is the person of a runtime on its own; nil: /api/v2/me is a 404 (the cluster's gateway answers it itself).

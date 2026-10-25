@@ -43,9 +43,12 @@ var (
 )
 
 // limitOf reads a usage limit off an error-notice of the transcript, written at at; false when it is no such notice.
-func limitOf(o *jsvalue.Object, provider wire.Provider, at wire.Ms) (Limit, bool) {
+func limitOf(o *jsvalue.Object, provider wire.Provider, vendor bool, at wire.Ms) (Limit, bool) {
 	message := strings.TrimSpace(str(o, "message"))
 	when := time.UnixMilli(at)
+	if vendor {
+		return VendorLimitText(message, when)
+	}
 	if provider == wire.ProviderCodex {
 		if str(o, "errorCode") != codexLimitCode && !codexLimitRE.MatchString(message) {
 			return Limit{}, false
@@ -85,6 +88,47 @@ func ClaudeLimitText(message string, when time.Time) (Limit, bool) {
 		}
 	}
 	return l, true
+}
+
+// The vendors' own words, as their APIs answer a request over the quota of the plan (Claude Code prints the body):
+//
+//	GLM   {"error":{"code":"1308","message":"Usage limit reached for 5 hour. Your limit will reset at 2026-10-25 18:23:45"}}
+//	Kimi  {"error":{"type":"exceeded_current_quota_error","message":"You've reached your usage limit for this billing cycle…"}}
+//
+// Z.ai prints the reset in Beijing time (UTC+8). A plain 429 of a vendor (GLM 1302 «Rate limit reached for requests»,
+// Kimi's rate_limit_reached_error, an overloaded service) is no usage limit: the agent retries it by itself, and
+// neither is a balance (1113): the chat is not held for what a reset does not bring back.
+var (
+	glmUsageRE     = regexp.MustCompile(`(?i)usage limit reached for\s+(\d+)?\s*(hour|day|week|month)`)
+	glmResetRE     = regexp.MustCompile(`(?i)(?:will\s+)?reset(?:s)?\s+at\s+(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})`)
+	kimiQuotaRE    = regexp.MustCompile(`(?i)exceeded_current_quota_error|reached your usage limit|quota will be refreshed`)
+	vendorZoneUTC8 = time.FixedZone("UTC+8", 8*3600)
+)
+
+// VendorLimitText reads the usage limit a backend profile's vendor names (GLM, Kimi): which window and the reset, when
+// it names one. Claude's words are not read here: a vendor's text never counts as a limit of the Anthropic plan.
+func VendorLimitText(message string, _ time.Time) (Limit, bool) {
+	if m := glmUsageRE.FindStringSubmatch(message); m != nil {
+		l := Limit{Window: wire.LimitOther}
+		switch strings.ToLower(m[2]) {
+		case "hour":
+			if m[1] == "5" {
+				l.Window = wire.LimitSession
+			}
+		case "week":
+			l.Window = wire.LimitWeekly
+		}
+		if r := glmResetRE.FindStringSubmatch(message); r != nil {
+			if t, err := time.ParseInLocation("2006-01-02 15:04:05", strings.Replace(r[1], "T", " ", 1), vendorZoneUTC8); err == nil {
+				l.ResetsAt = t.UnixMilli()
+			}
+		}
+		return l, true
+	}
+	if kimiQuotaRE.MatchString(message) {
+		return Limit{Window: wire.LimitOther}, true
+	}
+	return Limit{}, false
 }
 
 // CodexLimitText is the limit Codex's words of it name, seen at when (Codex prints the machine's time).

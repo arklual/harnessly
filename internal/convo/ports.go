@@ -35,6 +35,17 @@ type Probe struct {
 	HandOver bool
 }
 
+// Profiles knows the backend profiles: another vendor's models behind an agent CLI. A conversation runs on one from its
+// start to its end; the profile is on its record as Model.Profile.
+type Profiles interface {
+	// Lookup says which CLI a profile runs through, whether a key is saved for it and which models it has; ok is false
+	// for a profile the machine does not know.
+	Lookup(id string) (via wire.Provider, configured bool, models []string, ok bool)
+	// OwnsModel says whether the id is a model of some profile: a conversation on the CLI's own account is not started on
+	// it or switched to it.
+	OwnsModel(model string) bool
+}
+
 // Launcher starts agents. Its calls return at once; the steps, the ready and the failure come back through
 // Runtime.Launch*.
 type Launcher interface {
@@ -192,6 +203,9 @@ type Deps struct {
 	PictureRoots []string
 	// Models are the models an agent CLI takes; nil knows none, and the model command then trusts the id's shape.
 	Models func(p wire.Provider) []wire.AgentModel
+	// Profiles are the backend profiles (Kimi, GLM, Grok) a conversation may run on; nil knows none, and a conversation
+	// asked to start on one is refused.
+	Profiles Profiles
 	// AgentSession finds a session the agent CLI kept; nil knows none, and a conversation cannot then be opened on one.
 	AgentSession func(p wire.Provider, sessionID string) (AgentSession, bool)
 	// DefaultCwd is the folder a new conversation starts in when the person names none: it goes to the page with the
@@ -210,6 +224,10 @@ type Deps struct {
 	// AutoContinue says which of the runtime's own continuations are on, read each time one is due: after a usage
 	// limit resets, after a restart cut a turn short. nil: both on.
 	AutoContinue func() (limit, restart bool)
+	// Window is the window the agent itself reports for a session — its statusline for Claude, the transcript's
+	// model_context_window for Codex — and the tokens its last answer was asked with (0 where it says nothing). nil: the
+	// window is guessed from the model id.
+	Window func(p wire.Provider, sessionID, transcriptPath string) (used, limit int64)
 	// LimitReset is when the provider's usage limit resets by the limits it last reported — the window it ran out of —
 	// for a notice that names no time; 0 when they say nothing. nil: never known.
 	LimitReset func(p wire.Provider, now time.Time) wire.Ms

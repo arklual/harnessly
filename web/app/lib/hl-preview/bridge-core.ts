@@ -280,6 +280,21 @@ export const clipByAncestors = (
   return left;
 };
 
+/** What answers at a point, down through the open shadow roots (the document names the host of a component only). */
+export const hitAt = (doc: any, x: number, y: number): any => {
+  let hit = doc.elementFromPoint(x, y);
+  for (
+    let depth = 0;
+    hit && hit.shadowRoot && typeof hit.shadowRoot.elementFromPoint === 'function' && depth < 16;
+    depth += 1
+  ) {
+    const inner = hit.shadowRoot.elementFromPoint(x, y);
+    if (!inner || inner === hit) break;
+    hit = inner;
+  }
+  return hit;
+};
+
 /**
  * What the page lays over a block: the points of a grid on its visible part are hit-tested. What answers there and is
  * neither the block, inside it nor under it (an ancestor) lies over it; taken up to the widest of its ancestors that is
@@ -308,7 +323,7 @@ export const uncover = (el: any, shown: IAnchorBox, win: any, doc: any, core: an
     const xs = left.w < 3 ? [left.x + left.w / 2] : [left.x + 1, left.x + left.w / 2, left.x + left.w - 1];
     const ys = left.h < 3 ? [left.y + left.h / 2] : [left.y + 1, left.y + left.h / 2, left.y + left.h - 1];
     const hits: any[] = [];
-    for (const y of ys) for (const x of xs) hits.push(doc.elementFromPoint(x, y));
+    for (const y of ys) for (const x of xs) hits.push(core.hitAt(doc, x, y));
     const others = [...new Set(hits.filter((hit) => !own(hit)))];
     if (others.length === 0) return { shown: left, covered: false };
     let cut = false;

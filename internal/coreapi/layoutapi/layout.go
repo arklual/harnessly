@@ -70,6 +70,9 @@ func launchOf(o *jsvalue.Object) *agents.Launch {
 	if e, ok := func() (string, bool) { v, _ := o.Get("effort"); s, ok := v.(string); return s, ok }(); ok {
 		l.Effort = &e
 	}
+	if v, _ := o.Get("profile"); v != nil {
+		l.Profile, _ = v.(string)
+	}
 	return l
 }
 
@@ -83,6 +86,10 @@ func launchJSON(l *agents.Launch) *jsvalue.Object {
 	}
 	if l.Effort != nil {
 		o.Set("effort", *l.Effort)
+	}
+	// Only a chat on a backend profile remembers one: the launch of every other is stored as it always was.
+	if l.Profile != "" {
+		o.Set("profile", l.Profile)
 	}
 	return o
 }

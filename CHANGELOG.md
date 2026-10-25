@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Runtime: a message is never left waiting for ever. A typed message the agent does not take within 30 s goes back to
+  the head of the queue as `queued{stalled}` (its text taken out of the agent's input box) and waits for the person's
+  retry instead of a red failure or a bubble that spins; a steered message, held in Claude's own queue, is not touched.
+  `GET /api/v2/conversations/{id}/messages?ids=…` says what the runtime knows of each client id (known with when and
+  where it was handed, unknown, expired); a `send` of an id it already has gives its record back. A page reads the
+  stall with `caps=msgstatus`; any other page gets it as `failed{unconfirmed}`.
+
 - Designly: «Ссылки» is one screen with one form. «Кто откроет» chooses between a link for anyone without sign-in and an
   invite for the signed-in; one list shows both kinds, each marked, and a made link is copied at once. A link without
   sign-in carries the look the owner gave the design (device, browser bars, fit, lock, page) so a guest opens it the

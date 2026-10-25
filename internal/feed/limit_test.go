@@ -83,3 +83,52 @@ func TestLimitEndOfAClaudeTurn(t *testing.T) {
 		t.Fatal("a usage limit taken for an error end")
 	}
 }
+
+// The vendors' words of a usage limit, and the 429s that are not one. Claude's words must not catch any of them.
+func TestVendorLimitText(t *testing.T) {
+	at := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	limits := []struct {
+		text   string
+		window wire.LimitWindow
+		reset  time.Time
+	}{
+		{`API Error: 429 {"error":{"code":"1308","message":"Usage limit reached for 5 hour. Your limit will reset at 2026-10-25 18:23:45"}}`,
+			wire.LimitSession, time.Date(2026, 10, 25, 10, 23, 45, 0, time.UTC)},
+		{`{"error":{"code":"1310","message":"Weekly usage limit reached for 1 week. Your limit will reset at 2026-10-30 00:00:00"}}`,
+			wire.LimitWeekly, time.Date(2026, 10, 29, 16, 0, 0, 0, time.UTC)},
+		{`API Error: 429 {"error":{"message":"You've reached your usage limit for this billing cycle. Your quota will be refreshed in the next cycle.","type":"exceeded_current_quota_error"}}`,
+			wire.LimitOther, time.Time{}},
+	}
+	for _, c := range limits {
+		l, ok := VendorLimitText(c.text, at)
+		if !ok || l.Window != c.window || l.ResetsAt != wire.Ms(zeroOr(c.reset)) {
+			t.Errorf("%q: %+v %v", c.text, l, ok)
+		}
+		if _, ok := ClaudeLimitText(c.text, at); ok {
+			t.Errorf("Claude's words catch %q", c.text)
+		}
+	}
+	plain := []string{
+		`API Error: 429 {"error":{"code":"1302","message":"Rate limit reached for requests"}}`,
+		`Rate limit reached for requests`,
+		`API Error: 429 {"error":{"code":"1305","message":"The service may be temporarily overloaded, please try again later"}}`,
+		`API Error: 429 {"error":{"message":"Your account reached max concurrency","type":"rate_limit_reached_error"}}`,
+		`API Error: 429 {"error":{"code":"1113","message":"Insufficient balance or no resource package. Please recharge."}}`,
+		`API Error: 429 {"error":{"message":"The engine is currently overloaded, please try again later","type":"engine_overloaded_error"}}`,
+	}
+	for _, text := range plain {
+		if _, ok := VendorLimitText(text, at); ok {
+			t.Errorf("vendor: %q is no usage limit", text)
+		}
+		if _, ok := ClaudeLimitText(text, at); ok {
+			t.Errorf("claude: %q is no usage limit", text)
+		}
+	}
+}
+
+func zeroOr(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.UnixMilli()
+}

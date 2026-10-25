@@ -1,0 +1,131 @@
+{
+  "f": "ev",
+  "ch": "machine",
+  "seq": 502,
+  "e": {
+    "type": "machine_status",
+    "reach": "unreachable",
+    "runtime": null,
+    "agents": [
+      {
+        "provider": "claude",
+        "version": "2.3.1",
+        "status": "ready",
+        "canSwitchModel": true,
+        "models": [
+          {
+            "id": "sonnet",
+            "label": "Sonnet",
+            "hint": "Everyday work",
+            "efforts": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultEffort": "medium"
+          },
+          {
+            "id": "opus",
+            "label": "Opus",
+            "hint": "The strongest",
+            "efforts": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultEffort": null
+          }
+        ],
+        "profiles": [
+          {
+            "id": "kimi",
+            "label": "Kimi · платформа",
+            "vendor": "kimi",
+            "configured": true,
+            "models": [
+              {
+                "id": "kimi-k3.1-pro",
+                "label": "K3.1 Pro",
+                "hint": "",
+                "efforts": [],
+                "defaultEffort": null
+              }
+            ]
+          },
+          {
+            "id": "glm",
+            "label": "GLM · Z.ai",
+            "vendor": "glm",
+            "configured": false,
+            "models": [
+              {
+                "id": "glm-5.3",
+                "label": "GLM 5.3",
+                "hint": "",
+                "efforts": [],
+                "defaultEffort": null
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "provider": "codex",
+        "version": "0.152.0",
+        "status": "login-required",
+        "canSwitchModel": false,
+        "models": [
+          {
+            "id": "gpt-5.6-sol",
+            "label": "GPT-5.6-Sol",
+            "hint": "",
+            "efforts": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max",
+              "ultra"
+            ],
+            "defaultEffort": "low"
+          }
+        ],
+        "profiles": [
+          {
+            "id": "xai",
+            "label": "Grok",
+            "vendor": "grok",
+            "configured": true,
+            "models": [
+              {
+                "id": "grok-build-0.1",
+                "label": "Grok Build 0.1",
+                "hint": "",
+                "efforts": [],
+                "defaultEffort": null
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "health": {
+      "level": "critical",
+      "since": 1792655990000,
+      "issues": [
+        {
+          "metric": "disk",
+          "level": "critical"
+        },
+        {
+          "metric": "cpu",
+          "level": "warn"
+        }
+      ]
+    }
+  }
+}

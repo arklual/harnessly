@@ -171,7 +171,8 @@ const DesignlyView = ({ machine }: IDesignlyViewProps) => {
 
   // The agent that draws: the person's pick, else the first ready agent's first model, as a new chat does.
   const machineView = useMachine(machine);
-  const agents = pickerAgents(machineView?.machine.agents ?? []);
+  // A design starts through its own request, which has no backend profile: only the CLIs' own groups are offered.
+  const agents = pickerAgents(machineView?.machine.agents ?? []).filter((a) => !a.profile);
   const [picked, setPicked] = useState<IModelChoice | null>(null);
   const ready = agents.filter((a) => a.available);
   let choice: IModelChoice | null = null;

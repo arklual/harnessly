@@ -126,6 +126,8 @@ type liveMachine struct {
 	check   func() preflight.Result
 	models  func(wire.Provider) []wire.AgentModel
 	health  *machines.HealthMonitor
+	// offers are the profiles a provider's CLI can start a chat on; nil is a machine without profiles.
+	offers func(wire.Provider) []wire.ProfileOffer
 
 	mu      sync.Mutex
 	machine wire.Machine
@@ -240,8 +242,34 @@ func (m *liveMachine) refresh() {
 	if m.check == nil {
 		return
 	}
-	agents := agentsNow(m.check(), m.models)
+	agents := m.withOffers(agentsNow(m.check(), m.models))
 	m.mu.Lock()
+	changed := !reflect.DeepEqual(agents, m.machine.Agents)
+	m.machine.Agents = agents
+	ev, subs := m.statusLocked()
+	m.mu.Unlock()
+	if changed {
+		for _, fn := range subs {
+			fn(ev)
+		}
+	}
+}
+
+// withOffers adds the profiles each agent CLI offers.
+func (m *liveMachine) withOffers(agents []wire.MachineAgent) []wire.MachineAgent {
+	if m.offers == nil {
+		return agents
+	}
+	for i := range agents {
+		agents[i].Profiles = m.offers(agents[i].Provider)
+	}
+	return agents
+}
+
+// republishProfiles tells the sockets that a key was saved or removed: the agents as held, with the profiles anew.
+func (m *liveMachine) republishProfiles() {
+	m.mu.Lock()
+	agents := m.withOffers(append([]wire.MachineAgent{}, m.machine.Agents...))
 	changed := !reflect.DeepEqual(agents, m.machine.Agents)
 	m.machine.Agents = agents
 	ev, subs := m.statusLocked()

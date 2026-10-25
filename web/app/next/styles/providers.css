@@ -1,0 +1,126 @@
+/* Модели: Kimi, GLM, Grok. Карточки — из «Моделей и ключей» (.hx-acct), здесь только то, чего там нет. */
+
+/* Закрывающийся и открывающийся ряд: высота плавно уходит в ноль, а не пропадает. */
+.hx-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 280ms var(--hx-ease-out),
+    opacity 180ms ease;
+}
+.hx-reveal[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.hx-reveal__in {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Поле секрета */
+.hx-secret {
+  position: relative;
+}
+.hx-secret__input {
+  padding-right: 42px;
+}
+.hx-secret[data-invalid] .hx-secret__input {
+  border-color: var(--hx-danger);
+}
+.hx-secret__eye {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+}
+.hx-secret__eye:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+
+/* Карточка вендора: имя крупнее всего остального */
+.hx-prov__name {
+  font-size: var(--hx-text-lg);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-prov__body {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px 64px;
+}
+.hx-prov__body .hx-segmented {
+  justify-self: start;
+}
+.hx-preset {
+  display: flex;
+  flex-direction: column;
+}
+.hx-preset__hint {
+  margin: 0 0 10px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.5;
+}
+.hx-preset__form {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 2px;
+}
+.hx-preset__form[data-state='busy'] .hx-secret {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.hx-preset__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hx-preset__saved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: var(--hx-text-sm);
+}
+.hx-preset__test,
+.hx-preset .hx-key-form__err {
+  margin-top: 10px;
+}
+.hx-preset__saved .hx-icon {
+  color: var(--hx-success);
+}
+.hx-preset__test {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 2px;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-sm);
+  line-height: 1.45;
+}
+.hx-preset__test .hx-icon {
+  margin-top: 2px;
+}
+.hx-preset__test[data-ok] {
+  color: var(--hx-success);
+}
+@media (max-width: 600px) {
+  .hx-prov__body {
+    padding-left: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-reveal {
+    transition: none;
+  }
+}

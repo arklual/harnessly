@@ -4,7 +4,13 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { forkConversation, handoffConversation, loadHandoffDraft, mergeConversation } from '@/next/commands';
 import { pageText, settled } from '@/next/bindings/outcome';
-import { modelName, pickerAgentOf, pickerAgents, type IPickerAgent } from '@/next/features/composer/agents';
+import {
+  agentKey,
+  modelName,
+  pickerAgentOf,
+  pickerAgents,
+  type IPickerAgent,
+} from '@/next/features/composer/agents';
 import type { IChatLinks } from '@/next/features/chat/handoff';
 import HandoffSheet, {
   SHEET_MODE,
@@ -78,7 +84,7 @@ export function useChatHandoff(
   const label = useCallback(
     (provider: Provider, model: Model | null): string | null => {
       if (!model) return null;
-      const agent = pickerAgentOf(agents ?? [], provider);
+      const agent = pickerAgentOf(agents ?? [], provider, model.profile ?? null);
       return agent ? modelName(agent, model.id) : model.id;
     },
     [agents],
@@ -123,10 +129,11 @@ export function useChatHandoff(
   );
 
   const canHandoff = hasFeature(machine, 'handoff') && record !== undefined;
-  const provider = record?.provider;
+  // A chat's profile never changes: another group of the picker is a handoff, even on the same CLI.
+  const own = record ? agentKey({ provider: record.provider, profile: record.model?.profile }) : null;
   const others = useMemo(
-    () => pickerAgents(agents ?? []).filter((a) => a.available && a.provider !== provider),
-    [agents, provider],
+    () => pickerAgents(agents ?? []).filter((a) => a.available && agentKey(a) !== own),
+    [agents, own],
   );
   const handoff = useMemo(
     () =>
@@ -167,7 +174,13 @@ export function useChatHandoff(
             if (!target || mode === SHEET_MODE.result) return;
             const model = { id: target.model.id, effort: target.model.defaultEffort };
             await opened(
-              handoffConversation(machine, conv, { provider: target.agent.provider, model }, mode, text),
+              handoffConversation(
+                machine,
+                conv,
+                { provider: target.agent.provider, profile: target.agent.profile ?? undefined, model },
+                mode,
+                text,
+              ),
             );
           }}
         />

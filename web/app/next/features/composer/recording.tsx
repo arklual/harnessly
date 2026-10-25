@@ -2,7 +2,7 @@
 // the field's text with the words just recognized fading in. The numbers of the wave are in wave.ts; here are the canvas
 // that draws them and the layer over the field that shows what was said.
 import { useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react';
-import { createWave, idleLevel, WAVE_MODE, type IWave, type TWaveMode } from '@/next/features/composer/wave';
+import { createWave, SHOWN, WAVE_MODE, type IWave, type TWaveMode } from '@/next/features/composer/wave';
 import { elapsed } from '@/next/i18n/format';
 
 export const RecordingTime = ({ startedAt }: { startedAt: number }) => {
@@ -89,12 +89,13 @@ export const RecordingWave = ({ level, listening }: { level: (() => number) | nu
     let glow = -1;
     let frame = requestAnimationFrame(function tick(now) {
       const { level: read, mode } = feed.current;
-      wave.step(now, mode === WAVE_MODE.live && read ? read() : idleLevel(now), mode);
+      wave.step(now, mode === WAVE_MODE.live && read ? read() : 0, mode);
       colors(now);
       paint.clearRect(0, 0, width, height);
       paint.fillStyle = fill;
       const count = Math.ceil(width / STEP) + 2;
       for (const bar of wave.bars(count, now, mode)) {
+        if (bar.h < SHOWN) continue;
         const x = width - bar.at * STEP - BAR_W;
         if (x < -BAR_W) continue;
         const tall = Math.max(BAR_W, bar.h * (height - 2));
