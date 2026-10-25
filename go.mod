@@ -18,4 +18,4 @@ require (
 
 require golang.org/x/sys v0.49.0
 
-require github.com/andybalholm/brotli v1.2.0
+require github.com/andybalholm/brotli v1.2.6
