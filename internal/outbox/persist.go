@@ -30,7 +30,6 @@ func (b *Box) State() State {
 func (b *Box) Restore(st State) {
 	b.recs = map[string]*Record{}
 	for _, r := range st.Records {
-		r := r
 		if r.Message.ClientID == "" {
 			continue
 		}

@@ -188,7 +188,8 @@ func (r *Runtime) Import(tabs []ImportTab, queues map[string][]outbox.LegacyItem
 		c.launchUltracode = t.LaunchUltracode
 		r.add(c)
 		items := queues[t.ID]
-		r.call(context.Background(), t.ID, func(c *conv, now time.Time) {
+		// The conversation was added a line above, so only a stop of its actor fails this call; it is then gone.
+		_ = r.call(context.Background(), t.ID, func(c *conv, now time.Time) {
 			c.feedUpdate(c.fd.Load(), false, now)
 			if t := c.fd.LastTurn(); t != nil && t.StartedAt > c.rec.LastActivityAt {
 				c.rec.LastActivityAt = t.StartedAt

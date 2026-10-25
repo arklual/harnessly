@@ -51,7 +51,6 @@ func (s Shot) Name() string { return filepath.Base(s.Path) }
 var (
 	extRE   = regexp.MustCompile(`(?i)\.(?:png|jpe?g|gif|webp)$`)
 	linkRE  = regexp.MustCompile(`\]\(([^)\s]+?\.(?i:png|jpe?g|gif|webp))\)`)
-	absRE   = regexp.MustCompile(`(?i)(/[^\s"'<>()\[\]\\]+?\.(?:png|jpe?g|gif|webp))`)
 	idMark  = []byte(`"tool_use_id":"`)
 	hasUse  = []byte(`"tool_use"`)
 	hasRes  = []byte(`"tool_result"`)

@@ -56,7 +56,9 @@ func TestActorsOnTheirGoroutines(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "t.jsonl")
-	writeFile(path, "")
+	if err := writeFile(path, ""); err != nil {
+		t.Fatal(err)
+	}
 	rt.Import([]ImportTab{{ID: "tab-a", Session: "s", Provider: wire.ProviderClaude, TranscriptPath: path},
 		{ID: "tab-b", Session: "s2", Provider: wire.ProviderClaude, TranscriptPath: path}}, nil)
 
@@ -186,7 +188,9 @@ func TestAFullMailboxRefusesWhatItDoesNotTake(t *testing.T) {
 	}
 	t.Cleanup(rt.Stop)
 	path := filepath.Join(dir, "t.jsonl")
-	writeFile(path, "")
+	if err := writeFile(path, ""); err != nil {
+		t.Fatal(err)
+	}
 	rt.Import([]ImportTab{{ID: "tab-a", Session: "s", Provider: wire.ProviderClaude, TranscriptPath: path}}, nil)
 	release := make(chan struct{})
 	var once sync.Once

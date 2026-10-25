@@ -106,7 +106,9 @@ func TestIncrementalReadMatchesWhole(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					fh.Write(piece)
+					if _, err := fh.Write(piece); err != nil {
+						t.Fatal(err)
+					}
 					fh.Close()
 					f.Poll()
 				}
@@ -287,7 +289,9 @@ func TestPollReportsWhatChanged(t *testing.T) {
 	f.Load()
 
 	fh, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
-	fh.WriteString(lines[4] + lines[5])
+	if _, err := fh.WriteString(lines[4] + lines[5]); err != nil {
+		t.Fatal(err)
+	}
 	fh.Close()
 	u := f.Poll()
 	if len(u.Steps) != 2 || len(u.Started) != 1 || len(u.Ended) != 1 {
@@ -307,7 +311,9 @@ func TestPollReportsWhatChanged(t *testing.T) {
 	}
 
 	fh, _ = os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
-	fh.WriteString(lines[6])
+	if _, err := fh.WriteString(lines[6]); err != nil {
+		t.Fatal(err)
+	}
 	fh.Close()
 	u = f.Poll()
 	if len(u.Steps) != 0 || len(u.Updated) != 1 || u.Updated[0].Rev != 2 || u.Updated[0].OK == nil {
@@ -373,7 +379,9 @@ func TestLinesAfterARuntimeEndStayInTheTurn(t *testing.T) {
 	}
 	append := func(text string) Update {
 		fh, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
-		fh.WriteString(text)
+		if _, err := fh.WriteString(text); err != nil {
+			t.Fatal(err)
+		}
 		fh.Close()
 		return f.Poll()
 	}

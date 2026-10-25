@@ -143,18 +143,6 @@ func (s *Store) saveConv(f convFile) error {
 	return writeRaw(path, raw)
 }
 
-func (s *Store) removeConv(id string) error {
-	s.mu.Lock()
-	delete(s.queued, s.convPath(id))
-	s.mu.Unlock()
-	s.Flush()
-	err := os.Remove(s.convPath(id))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	return err
-}
-
 // loadConvs reads every conversation written; a file that does not parse is skipped and named in the error.
 func (s *Store) loadConvs() ([]convFile, error) {
 	dir := filepath.Join(s.dir, "convs")
@@ -305,7 +293,7 @@ func writeRaw(path string, raw []byte) error {
 		return err
 	}
 	if d, err := os.Open(dir); err == nil {
-		d.Sync()
+		_ = d.Sync() // the file is already renamed; syncing the directory only makes it durable sooner
 		d.Close()
 	}
 	return nil

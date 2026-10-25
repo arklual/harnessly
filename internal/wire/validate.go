@@ -870,7 +870,7 @@ func (e BackgroundRemovedEv) Validate() error { return need("id", e.ID) }
 func (e ShotsSetEv) Validate() error          { return shotsValid(e.Shots) }
 func (e PicturesSetEv) Validate() error       { return picturesValid(e.Pictures) }
 func (e FeedResetEv) Validate() error {
-	return TurnsPage{Turns: e.Turns, Entries: e.Entries, BeforeTurnID: e.BeforeTurnID}.Validate()
+	return TurnsPage(e).Validate()
 }
 
 func (c SendCmd) Validate() error {

@@ -325,16 +325,16 @@ func ghLabels(v any) []any {
 
 // viewParts are the fields of the one shape both services answer.
 type viewParts struct {
-	kind, url, project, ref, title, description string
-	author, at, state                           any
-	draft                                       bool
-	source, target                              any
-	pipeline                                    any
-	diff                                        string
-	truncated                                   bool
-	labels                                      []any
-	stages, comments                            any
-	limited                                     any
+	kind, url, ref, title, description string
+	author, at, state                  any
+	draft                              bool
+	source, target                     any
+	pipeline                           any
+	diff                               string
+	truncated                          bool
+	labels                             []any
+	stages, comments                   any
+	limited                            any
 }
 
 func (s *Service) githubViewOf(r *ghRef, p viewParts) *jsvalue.Object {

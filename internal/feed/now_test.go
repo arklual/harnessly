@@ -22,7 +22,9 @@ func TestNowIsWhatTheOpenTurnDoes(t *testing.T) {
 		t.Fatal(err)
 	}
 	fh, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
-	fh.WriteString(lines[2])
+	if _, err := fh.WriteString(lines[2]); err != nil {
+		t.Fatal(err)
+	}
 	fh.Close()
 	f.Poll()
 	if n := f.Now("", 6); n == nil || n.Action != nil {

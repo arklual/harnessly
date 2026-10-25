@@ -80,7 +80,9 @@ func TestATitleTheUserTypedWinsOverTheAgents(t *testing.T) {
 	r.rt.Stop()
 	r.rt = r.runtime()
 	r.rt.d.Meta = &sessionmeta.Reader{}
-	r.rt.Start(context.Background())
+	if err := r.rt.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	r.tick(metaEvery)
 	if rec := r.record(); rec.Title != "Моё имя" || rec.TitleSource != wire.TitleFromUser {
 		t.Fatalf("after a restart: %q %q", rec.Title, rec.TitleSource)

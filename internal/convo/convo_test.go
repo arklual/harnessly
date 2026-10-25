@@ -192,7 +192,9 @@ func TestPermissionMenu(t *testing.T) {
 	r.settle(wire.StateWorking)
 	r.tool("toolu_rm", "rm -rf build")
 	r.pane.screen = permissionScreen
-	r.rt.Hook(r.id, Hook{Kind: "notification", Notification: "permission_prompt"})
+	if err := r.rt.Hook(r.id, Hook{Kind: "notification", Notification: "permission_prompt"}); err != nil {
+		t.Fatal(err)
+	}
 	st := r.state()
 	if st.K != wire.StateWaitingPermission || st.PermissionID != "p:toolu_rm" {
 		t.Fatalf("state: %+v", st)
@@ -281,7 +283,9 @@ func TestWrappedPicturesAreOwn(t *testing.T) {
 			r.pane.screen = busy
 		}
 	}
-	r.rt.on(r.rt.actor(r.id), func(c *conv, now time.Time) { c.change(ch, now); c.pump(now) })
+	if err := r.rt.on(r.rt.actor(r.id), func(c *conv, now time.Time) { c.change(ch, now); c.pump(now) }); err != nil {
+		t.Fatal(err)
+	}
 	for _, call := range r.pane.calls {
 		if strings.HasPrefix(call, "paste:/u/") {
 			t.Fatalf("pasted a picture the box holds: %v", r.pane.calls)
@@ -526,7 +530,9 @@ func TestOpIdempotency(t *testing.T) {
 	}
 	r.rt.Stop()
 	r.rt = r.runtime()
-	r.rt.Start(context.Background())
+	if err := r.rt.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	if again := r.do(wire.ConversationRenameCmd{OpID: "o1", ID: r.id, Title: "new name"}); again.Seq != first.Seq {
 		t.Fatalf("after a restart: %+v", again)
 	}
@@ -584,7 +590,9 @@ func TestCreateLaunchesWithTheFirstMessage(t *testing.T) {
 		t.Fatalf("launched %+v", r.launcher.launched)
 	}
 	r.agentTakes()
-	r.rt.Attach(r.id, "s1", r.path, "sess")
+	if err := r.rt.Attach(r.id, "s1", r.path, "sess"); err != nil {
+		t.Fatal(err)
+	}
 	r.tick(5 * time.Second)
 	r.hook("session-start")
 	r.tick(time.Second)
@@ -609,7 +617,9 @@ func TestMessageToAStartingAgentIsTypedWhenItIsReady(t *testing.T) {
 		t.Fatalf("first: %+v", m.State)
 	}
 	r.agentTakes()
-	r.rt.Attach(r.id, "s1", r.path, "sess")
+	if err := r.rt.Attach(r.id, "s1", r.path, "sess"); err != nil {
+		t.Fatal(err)
+	}
 	r.tick(time.Second)
 	// The prompt box just drawn is not ready yet: the agent counts once the screen has stood still.
 	if st := r.state(); st.K != wire.StateStarting {
@@ -786,7 +796,9 @@ func TestDecideOnAMenuThatChangedPressesNothing(t *testing.T) {
 	r.settle(wire.StateWorking)
 	r.tool("toolu_rm", "rm -rf build")
 	r.pane.screen = permissionScreen
-	r.rt.Hook(r.id, Hook{Kind: "notification", Notification: "permission_prompt"})
+	if err := r.rt.Hook(r.id, Hook{Kind: "notification", Notification: "permission_prompt"}); err != nil {
+		t.Fatal(err)
+	}
 	if k := r.state().K; k != wire.StateWaitingPermission {
 		t.Fatalf("state %s", k)
 	}
@@ -803,7 +815,6 @@ func TestDecideOnAMenuThatChangedPressesNothing(t *testing.T) {
 	}
 	var stale, fresh *wire.Permission
 	for _, p := range r.snap().Permissions {
-		p := p
 		if p.ID == "p:toolu_rm" {
 			stale = &p
 		} else {
@@ -828,7 +839,9 @@ func TestDecideOnTheSameCallWithOtherOptionsOpensTheGateAgain(t *testing.T) {
 	r.settle(wire.StateWorking)
 	r.tool("toolu_rm", "rm -rf build")
 	r.pane.screen = permissionScreen
-	r.rt.Hook(r.id, Hook{Kind: "notification", Notification: "permission_prompt"})
+	if err := r.rt.Hook(r.id, Hook{Kind: "notification", Notification: "permission_prompt"}); err != nil {
+		t.Fatal(err)
+	}
 	r.pane.screen = strings.Replace(permissionScreen, "Yes, and don't ask again", "Yes, and allow all", 1)
 	r.do(wire.DecideCmd{OpID: "d1", ConversationID: r.id, PermissionID: "p:toolu_rm", OptionID: "2"})
 	for _, c := range r.pane.calls {
@@ -860,7 +873,9 @@ func TestATranscriptFoundAfterTheTurnEnded(t *testing.T) {
 		t.Fatalf("after stop: %s", k)
 	}
 
-	r.rt.Attach(r.id, "s1", r.path, "")
+	if err := r.rt.Attach(r.id, "s1", r.path, ""); err != nil {
+		t.Fatal(err)
+	}
 	r.tick(time.Second)
 	if k := r.state().K; k != wire.StateReady {
 		t.Fatalf("the late transcript moved the conversation to %s", k)
@@ -926,7 +941,9 @@ func TestImportedTitlesAreLegacys(t *testing.T) {
 
 	r := newRig(t)
 	r.rt.Import([]ImportTab{{ID: r.id, Session: "s1", Title: "Claude Code", Name: "Claude Code", Provider: wire.ProviderClaude, Cwd: "/w"}}, nil)
-	r.rt.call(context.Background(), r.id, func(c *conv, now time.Time) { c.rec.TitleSource = wire.TitleFromUser })
+	if err := r.rt.call(context.Background(), r.id, func(c *conv, now time.Time) { c.rec.TitleSource = wire.TitleFromUser }); err != nil {
+		t.Fatal(err)
+	}
 	r.rt.RetitleImported(ImportTab{ID: r.id, Title: "Почини сборку", Name: "Claude Code"})
 	if c := r.rec(); c.Title != "Почини сборку" || c.TitleSource != wire.TitleFromAgent {
 		t.Fatalf("named after the tab: %q %s", c.Title, c.TitleSource)
@@ -1324,7 +1341,9 @@ func TestASendRepeatedByThePageIsTheSameMessage(t *testing.T) {
 		if step == "after a restart" {
 			r.rt.Stop()
 			r.rt = r.runtime()
-			r.rt.Start(context.Background())
+			if err := r.rt.Start(context.Background()); err != nil {
+				t.Fatal(err)
+			}
 		}
 		again := r.send("m1", "once", wire.ModeQueue)
 		if again.R != first.R || again.Seq != first.Seq || again.Ch != first.Ch {

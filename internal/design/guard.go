@@ -231,10 +231,6 @@ func (g *guardCtx) addRoot(root string) {
 	}
 }
 
-func under(p, dir string) bool {
-	return p == dir || strings.HasPrefix(p, dir+string(filepath.Separator))
-}
-
 // refuseBelow: some project of the library holds less than min for the person; the words for that project.
 func (g *guardCtx) refuseBelow(root string, min Role) string {
 	entries, err := os.ReadDir(root)

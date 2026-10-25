@@ -553,13 +553,6 @@ func closeClient(t *testing.T, s *Server, c *websocket.Conn, l *socketLog) {
 	}
 }
 
-func leftPad(s string, n int) string {
-	for len(s) < n {
-		s = "0" + s
-	}
-	return s
-}
-
 func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {

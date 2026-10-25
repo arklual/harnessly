@@ -403,7 +403,8 @@ func (r *Runtime) all() []*actor {
 // Advance runs every actor's clock turn and look: what the runner does every LookEvery (tests drive it).
 func (r *Runtime) Advance() {
 	for _, a := range r.all() {
-		r.on(a, func(c *conv, now time.Time) {
+		// A full mailbox is logged by on, and a gone actor needs no turn; either way the rest still advance.
+		_ = r.on(a, func(c *conv, now time.Time) {
 			c.read(now)
 			c.observe(now)
 			c.tick(now)
@@ -1016,7 +1017,8 @@ func convOf(cmd wire.Command) string {
 func (r *Runtime) seenAll(m wire.SeenCmd) wire.CmdResult {
 	res := wire.Accepted(wire.ChannelConvs, 0)
 	for _, a := range r.all() {
-		r.call(context.Background(), a.c.rec.ID, func(c *conv, now time.Time) {
+		// A conversation removed since all() has nothing to mark seen.
+		_ = r.call(context.Background(), a.c.rec.ID, func(c *conv, now time.Time) {
 			if c.deletedAt != 0 {
 				return
 			}
@@ -1188,7 +1190,8 @@ func (r *Runtime) openConv(rec wire.Conversation, req LaunchRequest, first *wire
 	id := rec.ID
 	req.ID = id
 	var res wire.CmdResult
-	r.call(context.Background(), id, func(c *conv, now time.Time) {
+	// The conversation was added a line above, so only a stop of its actor fails this call; it is then gone.
+	_ = r.call(context.Background(), id, func(c *conv, now time.Time) {
 		c.mark, c.markConvs = 0, 0
 		c.input(agentstate.Input{K: agentstate.LaunchRequested}, now)
 		if rec.TranscriptPath != "" {

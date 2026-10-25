@@ -35,13 +35,11 @@ func pasteImages(paths []string, batch bool, landed int, p Pane, c Clock, provid
 	}
 	before, _ := p.Capture()
 	attached := 0
-	all := make([]string, 0, len(paths))
 	for _, g := range groups {
 		escaped := make([]string, len(g))
 		for i, path := range g {
 			escaped[i] = EscapePathForPrompt(path)
 		}
-		all = append(all, escaped...)
 		if err := p.Paste(strings.Join(escaped, " ")); err != nil {
 			return err
 		}

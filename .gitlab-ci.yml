@@ -36,6 +36,15 @@ verify:
     - GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/...
     - go test -race -count=1 ./...
 
+# The same linter and version as the public GitHub CI (.github/workflows/lint.yml), so its main stays green.
+golangci:
+  stage: verify
+  variables:
+    GOLANGCI_LINT_VERSION: "2.15.0"
+  script:
+    - curl -sSfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -xz -C /tmp
+    - /tmp/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint run ./...
+
 web:
   stage: verify
   image: docker.io/node:22-bookworm

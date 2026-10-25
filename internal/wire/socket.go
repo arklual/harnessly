@@ -374,7 +374,7 @@ func (s *Server) frame(ctx context.Context, c *client, b []byte) {
 	}
 	switch f := f.(type) {
 	case PingFrame:
-		c.send(PongFrame{T: f.T})
+		c.send(PongFrame(f))
 	case UnsubFrame:
 		c.later(func() { s.Hub.unsubscribe(c, f.Ch) })
 	case SubFrame:

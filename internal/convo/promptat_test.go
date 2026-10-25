@@ -85,7 +85,9 @@ func TestLastPromptAtSurvivesARestart(t *testing.T) {
 	want := r.rec().LastPromptAt
 	r.rt.Stop()
 	r.rt = r.runtime()
-	r.rt.Start(t.Context())
+	if err := r.rt.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	if got := r.rec().LastPromptAt; got != want {
 		t.Fatalf("after a restart: %d, want %d", got, want)
 	}

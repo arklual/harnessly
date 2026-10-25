@@ -92,7 +92,9 @@ func TestTasksFromTheTranscript(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			fh.Write(piece)
+			if _, err := fh.Write(piece); err != nil {
+				t.Fatal(err)
+			}
 			fh.Close()
 			f.Poll()
 		}
