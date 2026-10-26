@@ -759,6 +759,9 @@ type historyState struct {
 	lastLookup map[string]time.Time
 	failure    string
 	onFailure  func(string)
+	// work counts the snapshots and the poller in flight; stopHistory waits for them, so nothing writes the
+	// repository after the history is stopped.
+	work sync.WaitGroup
 }
 
 func (l *Library) noteEditors(rel string) {
@@ -820,6 +823,8 @@ func (l *Library) runSnapshot() {
 		return
 	}
 	h.running = true
+	h.work.Add(1)
+	defer h.work.Done()
 	editors := append([]string{}, h.editorList...)
 	runtime := h.runtime
 	h.mu.Unlock()
@@ -950,8 +955,10 @@ func (l *Library) startHistoryWith(runtime string, onFailure func(string), quiet
 	h.pollTicker = time.NewTicker(poll)
 	ticker := h.pollTicker
 	l.arm(0)
+	h.work.Add(1)
 	h.mu.Unlock()
 	go func() {
+		defer h.work.Done()
 		for {
 			select {
 			case <-stopCh:
@@ -965,8 +972,10 @@ func (l *Library) startHistoryWith(runtime string, onFailure func(string), quiet
 	}()
 }
 
+// stopHistory stops the history and returns once the snapshot or the look at the tree in flight has finished.
 func (l *Library) stopHistory() {
 	h := &l.hist
+	defer h.work.Wait()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if !h.started {

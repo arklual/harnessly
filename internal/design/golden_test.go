@@ -225,6 +225,7 @@ func newGoldenRig(t *testing.T) *goldenRig {
 	l.osUser = func() string { return "agent" }
 	t.Cleanup(l.StopServer)
 	t.Cleanup(l.StopWatching)
+	t.Cleanup(l.StopBackground)
 	sessions := map[string]string{}
 	transcripts := map[string]string{}
 	for _, s := range g.Sources {

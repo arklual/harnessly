@@ -11,6 +11,8 @@ func ownerLibrary(t *testing.T, root, user, email string) *Library {
 	l := New(Config{LibraryDir: root, DataDir: t.TempDir(), OwnerEmail: email,
 		Texts: Texts{People: map[string]string{"p.smirnov": "Пётр", "o.orlov": "Олег"}}})
 	l.osUser = func() string { return user }
+	// A route may start the history; it must stop before the temporary folders go.
+	t.Cleanup(l.StopBackground)
 	return l
 }
 
