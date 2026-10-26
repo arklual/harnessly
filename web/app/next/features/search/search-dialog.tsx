@@ -22,6 +22,8 @@ export interface ISearchRow {
   snippet?: string;
   /** Where it is: a chat's project, a file's chat, a date. */
   meta: string;
+  /** For a message: the chat it is in and the place in it that opens. */
+  target?: { chatId: string; entryId: string; turnId: string | null };
 }
 
 export interface ISearchGroup {
@@ -43,6 +45,8 @@ export interface ISearchDialogProps {
   /** What shows before anything is typed. */
   recent: readonly ISearchRow[];
   onPick: (row: ISearchRow) => void;
+  /** The machine is still reading its older chats, so the messages found may not be all there are. */
+  indexing?: boolean;
   /** The chat list did not come: why, and how to ask again. null while it is on its way or here. */
   failed?: { reason: string; onRetry: () => void | Promise<unknown> } | null;
 }
@@ -83,6 +87,7 @@ const SearchDialog = ({
   recent,
   onPick,
   failed = null,
+  indexing = false,
 }: ISearchDialogProps) => {
   const container = usePortalContainer();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -230,10 +235,14 @@ const SearchDialog = ({
                   })}
                 </div>
               ))}
+              {typed && indexing && rows.length > 0 && (
+                <div className="hx-srch__note">{t('next.search.indexing')}</div>
+              )}
               {nothing && (
                 <div className="hx-srch__none">
                   <b>{t('next.search.nothing')}</b>
                   <span>{t('next.search.nothingHint')}</span>
+                  {indexing && <span>{t('next.search.indexing')}</span>}
                 </div>
               )}
               {unavailable && (

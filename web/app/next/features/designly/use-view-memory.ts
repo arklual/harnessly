@@ -14,9 +14,13 @@ export interface IViewSaver {
   save: (change: Partial<IViewMemory>) => void;
 }
 
-/** The kept view of a design (none without a design) and the way to keep it; a pending write is made on leaving. */
-export const useViewMemory = (design: string | null): IViewSaver => {
-  const [initial] = useState(() => (design === null ? VIEW_DEFAULT : readView(design)));
+/** The kept view of a design (none without a design, the seed where nothing is kept) and the way to keep it; a pending write is made on leaving. */
+export const useViewMemory = (design: string | null, seed?: IViewMemory): IViewSaver => {
+  // What the browser kept wins; a design it has kept nothing for starts with the seed (a guest link's view of the owner).
+  const [initial] = useState(() => {
+    const kept = design === null ? VIEW_DEFAULT : readView(design);
+    return kept === VIEW_DEFAULT && seed ? seed : kept;
+  });
   const current = useRef<IViewMemory>(initial);
   const written = useRef(JSON.stringify(initial));
   const timer = useRef(0);

@@ -2,6 +2,8 @@
   'use strict';
   var script = document.currentScript;
   var id = script && script.getAttribute('data-artifact');
+  // A guest link's board (data-guest): the owner's tools — the live log, the live reload, the board bar, the state the agent reads — stay off; the bridge to the framing page stays.
+  var guest = !!script && script.getAttribute('data-guest') === '1';
   if (!id || (window.parent !== window.top && window.parent !== window)) return;
 
   var errors = [];
@@ -10,7 +12,7 @@
   // The live log an agent reads with `{{cli}} design logs`: a few dozen entries a page at most.
   var reported = 0;
   function report(kind, message) {
-    if (reported >= 40) return;
+    if (guest || reported >= 40) return;
     reported += 1;
     var page = location.pathname.replace(/^\/a\/[^/]+\/p\//, '') + location.search;
     try { fetch('/__lib/log?a=' + encodeURIComponent(id) + '&k=' + kind + '&p=' + encodeURIComponent(page) + '&m=' + encodeURIComponent(String(message).slice(0, 600)), { cache: 'no-store', keepalive: true }).catch(function () {}); } catch (e) {}
@@ -216,8 +218,10 @@
       if (failures >= 3) source.close();
     };
   }
-  catchUp().then(poll, poll);
-  listen();
+  if (!guest) {
+    catchUp().then(poll, poll);
+    listen();
+  }
 
   var LABELS = {
     Desktop: 'Screen', Mobile: 'Screen', Empty: 'Empty', Loading: 'Loading', ErrorState: 'Error', History: 'History', Blank: 'Blank',
@@ -373,7 +377,7 @@
     setTimeout(showError, 0);
   });
 
-  fetch('/__lib/boards?a=' + encodeURIComponent(id), { cache: 'no-store' })
+  if (!guest) fetch('/__lib/boards?a=' + encodeURIComponent(id), { cache: 'no-store' })
     .then(function (response) { return response.ok ? response.json() : null; })
     .then(function (data) { if (data && data.boards && data.boards.length) mount(data.boards); }, function () {});
 
@@ -1296,6 +1300,7 @@
   }
   var stateTimer = 0;
   function reportState() {
+    if (guest) return;
     clearTimeout(stateTimer);
     stateTimer = setTimeout(function () {
       var board = currentBoard();

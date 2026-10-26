@@ -1,6 +1,7 @@
 package convo
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agentstate"
 	"github.com/ly-solutions/harnessly/internal/attach"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/screen"
 	"github.com/ly-solutions/harnessly/internal/typist"
@@ -218,7 +220,13 @@ func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
 func (c *conv) refsBlock(refs []wire.MessageRef) (string, wire.RefuseCode) {
 	items := make([]attach.Item, 0, len(refs))
 	for _, r := range refs {
-		line := attach.LineOf(r)
+		line, body := attach.LineOf(r), ""
+		if r.Kind == wire.RefChat {
+			var code wire.RefuseCode
+			if line, body, code = c.chatRef(r); code != "" {
+				return "", code
+			}
+		}
 		if r.Kind == wire.RefDesign {
 			if c.d.Refs == nil {
 				return "", wire.RefuseUnsupported
@@ -228,9 +236,36 @@ func (c *conv) refsBlock(refs []wire.MessageRef) (string, wire.RefuseCode) {
 				return "", code
 			}
 		}
-		items = append(items, attach.Item{Ref: r, Line: line})
+		items = append(items, attach.Item{Ref: r, Line: line, Body: body})
 	}
 	return attach.Block(items), ""
+}
+
+// ChatRefBudget is how many characters of another chat a message carries under its words (about 6 000 tokens).
+const ChatRefBudget = 18000
+
+// chatRef is the line and the excerpt of another chat the message points at: its title, the first request, the latest
+// messages, and the path of the whole conversation as Markdown.
+func (c *conv) chatRef(r wire.MessageRef) (line, body string, code wire.RefuseCode) {
+	if c.d.Digest == nil {
+		return "", "", wire.RefuseUnsupported
+	}
+	if r.ID == c.rec.ID {
+		return "", "", wire.RefuseBadRequest
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	d, err := c.d.Digest(ctx, r.ID, ChatRefBudget)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return "", "", wire.RefuseNotFound
+		}
+		c.d.Log.Warn("chat reference not read", "conv", c.rec.ID, "ref", r.ID, "err", err)
+		return "", "", wire.RefuseInternal
+	}
+	line = attach.LineOf(wire.MessageRef{Kind: wire.RefChat, Title: d.Title}) + locale.Pick(
+		". An excerpt follows; the whole conversation is the Markdown file ", ". Ниже выдержка; весь разговор — Markdown-файл ") + attach.OneLine(d.Path)
+	return line, d.Text, ""
 }
 
 // --- gates ---

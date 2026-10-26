@@ -4,6 +4,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnnotateQuote } from '@/next/ui/annotate/parts';
 import Icon from '@/next/ui/icon';
+import Sheet from '@/next/ui/sheet';
+import { usePhone } from '@/next/ui/use-media';
 import {
   changedKeys,
   hasEdit,
@@ -75,6 +77,15 @@ export interface INoteMic {
   onToggle: () => void;
 }
 
+/**
+ * The card of a guest of a link: it has only the words (the name was asked when commenting began), no block settings and no trash, and sends the comment to the
+ * link's gateway: the card waits for the answer and stays, with its words, where it was refused.
+ */
+export interface INoteGuest {
+  /** True when the comment was taken. */
+  submit: (text: string) => Promise<boolean>;
+}
+
 export interface INotePopoverProps {
   n: number;
   draft: INoteDraft;
@@ -92,6 +103,7 @@ export interface INotePopoverProps {
   gone: boolean;
   /** Another page is on screen: the card steps away (it comes back with its page). */
   hidden?: boolean;
+  guest?: INoteGuest;
 }
 
 /** The colour of a swatch reaches the CSS through a custom property of its own, not through a style attribute. */
@@ -277,14 +289,17 @@ export const NotePopover = ({
   onStyle,
   gone,
   hidden = false,
+  guest,
 }: INotePopoverProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
+  const [sending, setSending] = useState(false);
   // The block's settings are folded until asked for: the card opens small, over less of the page.
   const [tune, setTune] = useState(false);
   // Where the person moved the card (this session's); null while it stands at its block.
   const [moved, setMoved] = useState<IPoint | null>(readNotePos);
-  const { look } = draft.picked;
+  // A guest only writes: the look of the block (its settings) is the owner's to try.
+  const look = guest ? null : draft.picked.look;
   const wants = needsText && !text.trim() && !hasEdit(draft.style);
 
   useLayoutEffect(() => {
@@ -316,8 +331,16 @@ export const NotePopover = ({
     window.setTimeout(then, NOTE_OUT_MS);
   };
   const ok = () => {
-    if (wants) return;
-    leave(() => onOk(text.trim()));
+    if (wants || sending) return;
+    if (!guest) {
+      leave(() => onOk(text.trim()));
+      return;
+    }
+    setSending(true);
+    void guest.submit(text.trim()).then((taken) => {
+      setSending(false);
+      if (taken) leave(onCancel);
+    });
   };
 
   return (
@@ -373,7 +396,8 @@ export const NotePopover = ({
           className="hx-ann__input"
           autoFocus
           rows={1}
-          placeholder={t('next.notes.placeholder')}
+          disabled={sending}
+          placeholder={guest ? t('next.guest.placeholder') : t('next.notes.placeholder')}
           value={text}
           onChange={(event) => onText(event.target.value)}
           onKeyDown={(event) => {
@@ -394,17 +418,19 @@ export const NotePopover = ({
         <button type="button" className="hx-ann__cancel" onClick={() => leave(onCancel)}>
           {t('next.notes.revert')}
         </button>
-        <button
-          type="button"
-          className="hx-ann__icon hx-tipped"
-          aria-label={t('next.notes.delete')}
-          onClick={() => leave(onDelete)}
-        >
-          <Icon name="trash-2" size="sm" />
-          <span className="hx-tip" data-pos="below">
-            {t('next.notes.deleteTip')}
-          </span>
-        </button>
+        {!guest && (
+          <button
+            type="button"
+            className="hx-ann__icon hx-tipped"
+            aria-label={t('next.notes.delete')}
+            onClick={() => leave(onDelete)}
+          >
+            <Icon name="trash-2" size="sm" />
+            <span className="hx-tip" data-pos="below">
+              {t('next.notes.deleteTip')}
+            </span>
+          </button>
+        )}
         <span className="hx-spacer" />
         {mic && (
           <button
@@ -423,13 +449,14 @@ export const NotePopover = ({
         <button
           type="button"
           className="hx-ann__ok hx-tipped"
-          aria-label={t('next.notes.toMessage')}
+          aria-label={guest ? t('next.guest.send') : t('next.notes.toMessage')}
           disabled={wants}
+          data-busy={sending || undefined}
           onClick={ok}
         >
           <Icon name="arrow-up" />
           <span className="hx-tip" data-pos="below" data-align="end">
-            {t('next.notes.toMessage')}
+            {guest ? t('next.guest.send') : t('next.notes.toMessage')}
             <kbd>↵</kbd>
           </span>
         </button>
@@ -564,6 +591,7 @@ const AnnRow = ({
   leaving,
   onEdit,
   onRemove,
+  readOnly,
 }: {
   note: INote;
   n: number;
@@ -571,6 +599,7 @@ const AnnRow = ({
   leaving: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  readOnly: boolean;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -590,31 +619,33 @@ const AnnRow = ({
         {note.text && <div className="hx-anns__text">{note.text}</div>}
         <StyleChips edit={note.style} />
       </div>
-      <div className="hx-anns__acts">
-        <button
-          type="button"
-          className="hx-anns__act hx-tipped"
-          aria-label={t('next.notes.edit')}
-          onClick={onEdit}
-        >
-          <Icon name="pencil" size="sm" />
-          <span className="hx-tip" data-align="end">
-            {t('next.notes.edit')}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="hx-anns__act hx-tipped"
-          data-danger="true"
-          aria-label={t('next.notes.remove')}
-          onClick={onRemove}
-        >
-          <Icon name="trash-2" size="sm" />
-          <span className="hx-tip" data-align="end">
-            {t('next.notes.remove')}
-          </span>
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="hx-anns__acts">
+          <button
+            type="button"
+            className="hx-anns__act hx-tipped"
+            aria-label={t('next.notes.edit')}
+            onClick={onEdit}
+          >
+            <Icon name="pencil" size="sm" />
+            <span className="hx-tip" data-align="end">
+              {t('next.notes.edit')}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="hx-anns__act hx-tipped"
+            data-danger="true"
+            aria-label={t('next.notes.remove')}
+            onClick={onRemove}
+          >
+            <Icon name="trash-2" size="sm" />
+            <span className="hx-tip" data-align="end">
+              {t('next.notes.remove')}
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -626,20 +657,25 @@ export const NoteStrip = ({
   onEdit,
   onRemove,
   onClear,
+  readOnly = false,
 }: {
   notes: readonly INote[];
   onEdit: (id: string) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
+  /** A guest's list of the comments: only read; on the phone it is a bottom sheet. */
+  readOnly?: boolean;
 }) => {
+  const phone = usePhone();
+  const sheeted = readOnly && phone;
   const [open, setOpen] = useState(false);
   const kept = usePresence(notes.length > 0 ? notes : null, LIST_OUT_MS);
   const list = usePresentFlag(open && notes.length > 0, LIST_OUT_MS);
   const rows = useLeavingList(kept.value ?? EMPTY_NOTES, (note) => note.id, LIST_OUT_MS);
 
-  // A press outside the strip and Esc close the list.
+  // A press outside the strip and Esc close the list (a sheet closes itself).
   useEffect(() => {
-    if (!open) return;
+    if (!open || sheeted) return;
     const onDown = (event: PointerEvent) => {
       if (!(event.target as Element).closest('.hx-anns')) setOpen(false);
     };
@@ -652,37 +688,44 @@ export const NoteStrip = ({
       window.removeEventListener('pointerdown', onDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, sheeted]);
 
   if (kept.value === null) return null;
+  const listBox = (
+    <div
+      className="hx-anns__list"
+      data-state={sheeted ? PRESENCE.open : list.state}
+      role="dialog"
+      aria-label={t('next.notes.annotations')}
+    >
+      {rows.map(({ item, leaving }, index) => (
+        <AnnRow
+          key={item.id}
+          note={item}
+          n={numberAt(rows, index)}
+          index={index}
+          leaving={leaving}
+          readOnly={readOnly}
+          onEdit={() => {
+            setOpen(false);
+            onEdit(item.id);
+          }}
+          onRemove={() => {
+            if (notes.length <= 1) setOpen(false);
+            onRemove(item.id);
+          }}
+        />
+      ))}
+    </div>
+  );
   return (
     <div className="hx-island__chips">
       <div className="hx-anns" data-gone={kept.state === PRESENCE.closing}>
-        {list.mounted && (
-          <div
-            className="hx-anns__list"
-            data-state={list.state}
-            role="dialog"
-            aria-label={t('next.notes.annotations')}
-          >
-            {rows.map(({ item, leaving }, index) => (
-              <AnnRow
-                key={item.id}
-                note={item}
-                n={numberAt(rows, index)}
-                index={index}
-                leaving={leaving}
-                onEdit={() => {
-                  setOpen(false);
-                  onEdit(item.id);
-                }}
-                onRemove={() => {
-                  if (notes.length <= 1) setOpen(false);
-                  onRemove(item.id);
-                }}
-              />
-            ))}
-          </div>
+        {list.mounted && !sheeted && listBox}
+        {sheeted && (
+          <Sheet open={open} onClose={() => setOpen(false)} label={t('next.notes.annotations')}>
+            {listBox}
+          </Sheet>
         )}
         <span className="hx-anns__chip" data-open={open}>
           <button
@@ -695,17 +738,19 @@ export const NoteStrip = ({
             <span>{plural(kept.value.length, 'next.notes.annotationsCount')}</span>
             <Icon name="chevron-up" size="sm" className="hx-anns__chev" />
           </button>
-          <button
-            type="button"
-            className="hx-anns__x"
-            aria-label={t('next.notes.clear')}
-            onClick={() => {
-              setOpen(false);
-              onClear();
-            }}
-          >
-            <Icon name="x" size="sm" />
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              className="hx-anns__x"
+              aria-label={t('next.notes.clear')}
+              onClick={() => {
+                setOpen(false);
+                onClear();
+              }}
+            >
+              <Icon name="x" size="sm" />
+            </button>
+          )}
         </span>
       </div>
     </div>

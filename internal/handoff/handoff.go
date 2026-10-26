@@ -29,7 +29,12 @@ func Window(provider wire.Provider, model string) int {
 
 // Budget is the tokens an excerpt for the model may take: DefaultBudget, and never more than a quarter of its window.
 func Budget(provider wire.Provider, model string) int {
-	return min(DefaultBudget, Window(provider, model)/4)
+	return BudgetIn(Window(provider, model))
+}
+
+// BudgetIn is Budget for a model whose window is known: the vendors' models on a backend profile have their own.
+func BudgetIn(window int) int {
+	return min(DefaultBudget, window/4)
 }
 
 // Agent is how the blocks name an agent.

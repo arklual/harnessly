@@ -88,6 +88,11 @@ interface IOptions<TDrag extends string, TDrop extends string, TPlan> {
   resolve: (source: IDragSource<TDrag>, target: IDropTarget<TDrop>) => TPlan | null;
   /** The drop; a promise is waited for before the element, if the order has not changed, goes back to its place. */
   onDrop: (plan: TPlan) => unknown;
+  /**
+   * A place outside the list that takes what is carried (`selector` finds it under the pointer): it lights up like a
+   * place of the list, and a drop on it hands the plan to the owner while the row eases back to where it stood.
+   */
+  external?: { selector: string; resolve: (source: IDragSource<TDrag>) => TPlan | null };
   /** A finger that held a row and let go where it was, without carrying it: the place of the release. */
   onHoldRelease?: (source: IDragSource<TDrag>, point: { x: number; y: number }) => void;
 }
@@ -116,6 +121,8 @@ interface ITracking<TDrag extends string, TDrop extends string, TPlan> {
   moved: boolean;
   hold: number | undefined;
   plan: TPlan | null;
+  /** The plan is for the place outside the list. */
+  outside: boolean;
   box: HTMLElement | null;
   scroll: number;
   frame: number | undefined;
@@ -174,12 +181,13 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
   resolve,
   onDrop,
   onHoldRelease,
+  external,
 }: IOptions<TDrag, TDrop, TPlan>): IUseDrag => {
   const [dragging, setDragging] = useState(false);
   const held = useRef<IHeld | null>(null);
-  const latest = useRef({ resolve, onDrop, onHoldRelease, lined, dragKinds, dropKinds });
+  const latest = useRef({ resolve, onDrop, onHoldRelease, lined, dragKinds, dropKinds, external });
   useEffect(() => {
-    latest.current = { resolve, onDrop, onHoldRelease, lined, dragKinds, dropKinds };
+    latest.current = { resolve, onDrop, onHoldRelease, lined, dragKinds, dropKinds, external };
   });
 
   // The render that brings the new order lets the dropped row go, before it is painted: it is in that place already.
@@ -285,8 +293,26 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
       return found;
     };
 
+    // The outside place under the pointer, if the owner has one for what is carried.
+    const outside = (t: ITracking<TDrag, TDrop, TPlan>) => {
+      const spec = latest.current.external;
+      if (!spec) return null;
+      const box = document.elementFromPoint(t.x, t.y)?.closest<HTMLElement>(spec.selector);
+      if (!box || list.contains(box)) return null;
+      const plan = spec.resolve(t.source);
+      return plan ? { box, plan } : null;
+    };
+
     const hit = (t: ITracking<TDrag, TDrop, TPlan>, pointer: number, center: number) => {
       const s = t.slots;
+      const far = outside(t);
+      t.outside = far !== null;
+      if (far) {
+        if (s) moveSlots(t, s.from);
+        light(t, far.box, null);
+        t.plan = far.plan;
+        return;
+      }
       const first = s?.spans[0];
       const last = s?.spans[s.spans.length - 1];
       const among =
@@ -459,7 +485,11 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
         latest.current.onHoldRelease(t.source, { x: t.x, y: t.y });
         return;
       }
-      if (drop && t.plan) commit(t, t.plan);
+      if (drop && t.plan && t.outside) {
+        // Carried out of the list: the row is where it was, the owner has what it stood for.
+        latest.current.onDrop(t.plan);
+        back(t);
+      } else if (drop && t.plan) commit(t, t.plan);
       else back(t);
     };
 
@@ -559,6 +589,7 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
         moved: false,
         hold: undefined,
         plan: null,
+        outside: false,
         box: null,
         scroll: 0,
         frame: undefined,

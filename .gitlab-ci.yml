@@ -45,6 +45,20 @@ golangci:
     - curl -sSfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -xz -C /tmp
     - /tmp/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint run ./...
 
+# The same secret scan as the public GitHub CI: a key-shaped literal (even a test fixture) is caught here, before the
+# open-source export refuses the tree.
+gitleaks:
+  stage: verify
+  # Only the files of the commit: the shared cache restores the Go module cache into the checkout, and its
+  # third-party test fixtures are not ours to scan.
+  cache: []
+  variables:
+    GITLEAKS_VERSION: "8.30.1"
+  script:
+    - curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C /tmp gitleaks
+    - mkdir /tmp/tree && git archive HEAD | tar -x -C /tmp/tree
+    - cd /tmp/tree && /tmp/gitleaks dir . --no-banner --redact --verbose
+
 web:
   stage: verify
   image: docker.io/node:22-bookworm

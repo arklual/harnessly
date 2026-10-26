@@ -1075,6 +1075,9 @@ func (r HandoffDraftRequest) Validate() error {
 	if r.Provider != "" {
 		errs = append(errs, in("provider", r.Provider, Providers))
 	}
+	if r.Profile != "" && !ValidProfileID(r.Profile) {
+		errs = append(errs, errors.New("profile: not a profile id"))
+	}
 	return errors.Join(errs...)
 }
 

@@ -25,7 +25,7 @@ type v2Handoff struct {
 
 func (h *v2Handoff) Draft(ctx context.Context, conv string, req wire.HandoffDraftRequest) (wire.HandoffDraft, error) {
 	if req.Mode == wire.DraftExcerpt {
-		d, err := h.rt.Excerpt(conv, req.Provider, req.Model)
+		d, err := h.rt.Excerpt(conv, req.Provider, req.Model, req.Profile)
 		if errors.Is(err, convo.ErrNoTranscript) {
 			return d, wire.ErrDraftUnsupported
 		}

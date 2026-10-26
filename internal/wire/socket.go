@@ -75,6 +75,11 @@ type Server struct {
 	// Files reads the folders of the conversations: .../files lists a folder, .../file reads a text file. nil: both are
 	// 404s.
 	Files FilesSource
+	// Search finds the messages of the conversations that hold the words of a query; nil: GET /api/v2/search is a 404.
+	Search func(ctx context.Context, query string, limit int) (MessageSearch, error)
+	// Digest cuts a conversation to a block of about budget characters for another agent's context and writes the whole
+	// of it to a file; nil: .../digest is a 404.
+	Digest func(ctx context.Context, conv string, budget int) (ChatDigest, error)
 	// Shot opens a picture the conversation lists in its snapshot's shots; ErrNoShot for any other id. nil: .../shot is
 	// a 404.
 	Shot func(ctx context.Context, conv, id string) (ShotFile, error)
@@ -96,6 +101,9 @@ type Server struct {
 	// Profiles serves the backend profiles: GET /api/v2/providers, PUT and DELETE .../<id>/key, POST .../<id>/test; nil:
 	// all are 404s.
 	Profiles ProfilesSource
+	// Logins signs the agents in and out: GET/POST/DELETE /api/v2/agents/<provider>/login, POST .../login/code, PUT
+	// .../key, POST .../logout; nil: no such routes.
+	Logins LoginSource
 	// RuntimeSettings are the runtime's own settings: GET and PUT /api/v2/runtime-settings; nil: both are 404s.
 	RuntimeSettings RuntimeSettingsStore
 	// Me is the person of a runtime on its own; nil: /api/v2/me is a 404 (the cluster's gateway answers it itself).

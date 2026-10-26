@@ -12,7 +12,6 @@ const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent:
   general: { icon: 'sliders-horizontal' },
   notifications: { icon: 'bell' },
   accounts: { icon: 'key-round' },
-  models: { icon: 'plug' },
   claude: { agent: 'claude' },
   codex: { agent: 'codex' },
   skills: { icon: 'blocks' },

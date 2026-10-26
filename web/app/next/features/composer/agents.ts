@@ -87,6 +87,17 @@ const profileAgents = (agent: MachineAgent): IPickerAgent[] =>
       status: agent.status,
     }));
 
+/** The label of the profile a chat runs on when its key was removed (the profile is listed, but without a key); else null. */
+export const removedKeyOf = (
+  agents: readonly MachineAgent[],
+  provider: Provider,
+  profile: string | null | undefined,
+): string | null => {
+  if (!profile) return null;
+  const found = agents.find((a) => a.provider === provider)?.profiles?.find((p) => p.id === profile);
+  return found && !found.configured ? found.label : null;
+};
+
 /** What signs an agent in on the machine, typed in a terminal there. */
 export const LOGIN_COMMANDS = { claude: 'claude auth login', codex: 'codex login' } as const satisfies Record<
   Provider,

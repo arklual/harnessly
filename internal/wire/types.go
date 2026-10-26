@@ -384,6 +384,8 @@ type HandoffDraftRequest struct {
 	Mode     DraftMode `json:"mode"`
 	Provider Provider  `json:"provider,omitempty"`
 	Model    string    `json:"model,omitempty"`
+	// Profile is the backend profile the context goes to (its models have windows of their own).
+	Profile string `json:"profile,omitempty"`
 }
 
 // LimitHold is a conversation held on its agent's usage limit. At is when the turn ended on it; ResetsAt is when the
@@ -2297,10 +2299,12 @@ const (
 	RefFile   RefKind = "file"
 	RefMR     RefKind = "mr"
 	RefTask   RefKind = "task"
+	// RefChat is another conversation: ID is its id; the runtime hands the agent an excerpt and the path of the whole.
+	RefChat RefKind = "chat"
 )
 
 // RefKinds is every RefKind, in the schema's order.
-var RefKinds = []RefKind{RefDesign, RefDoc, RefBoard, RefFile, RefMR, RefTask}
+var RefKinds = []RefKind{RefDesign, RefDoc, RefBoard, RefFile, RefMR, RefTask, RefChat}
 
 // MessageMode is when a message should reach the agent.
 type MessageMode string

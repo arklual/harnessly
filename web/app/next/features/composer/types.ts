@@ -48,6 +48,8 @@ export interface QueueRow {
 /** A one-line notice over the field: the machine stopped answering, or the subscription's limit ran out. */
 export type DockNotice =
   | { kind: 'machine'; machine: string; onStop: () => Promise<unknown> }
+  /** The key of the chat's vendor was removed: it can be added again or the chat continued in another model. */
+  | { kind: 'key'; vendor: string; onOpen: () => void; onContinue: (() => void) | null }
   | {
       kind: 'limit';
       provider: Provider;

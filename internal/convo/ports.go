@@ -1,9 +1,11 @@
 package convo
 
 import (
+	"context"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/feed"
+	"github.com/ly-solutions/harnessly/internal/msgindex"
 	"github.com/ly-solutions/harnessly/internal/sessionmeta"
 	"github.com/ly-solutions/harnessly/internal/shots"
 	"github.com/ly-solutions/harnessly/internal/typist"
@@ -44,6 +46,8 @@ type Profiles interface {
 	// OwnsModel says whether the id is a model of some profile: a conversation on the CLI's own account is not started on
 	// it or switched to it.
 	OwnsModel(model string) bool
+	// Window is the context window of a model of the profile, in tokens; 0 when the profile or the model is not known.
+	Window(profile, model string) int
 }
 
 // Launcher starts agents. Its calls return at once; the steps, the ready and the failure come back through
@@ -215,6 +219,13 @@ type Deps struct {
 	// Terminals end the conversations' terminals; nil: terminal.stop is refused{unsupported} and nothing is stopped
 	// for standing idle.
 	Terminals Terminals
+	// Index keeps the messages of the conversations for search; nil: nothing is searched.
+	Index *msgindex.Index
+	// Digest cuts another conversation to about budget characters for a message that points at it (wire.RefChat); nil:
+	// such a reference is refused (unsupported).
+	Digest func(ctx context.Context, conv string, budget int) (wire.ChatDigest, error)
+	// ExportDir is where a conversation is written whole as Markdown for another agent to read; empty: no digest.
+	ExportDir string
 	// IdleStop is after how long without work a chat's terminal is stopped by itself, read at every sweep; nil or 0
 	// never.
 	IdleStop func() time.Duration

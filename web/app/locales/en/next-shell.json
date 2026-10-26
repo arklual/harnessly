@@ -183,7 +183,7 @@
   "next.pending.retry": "Retry",
   "next.pending.noAnswer": "The server did not answer in time",
   "next.search.title": "Search",
-  "next.search.placeholder": "Find a chat by its title",
+  "next.search.placeholder": "Find a chat or a message",
   "next.search.clear": "Clear",
   "next.search.cancel": "Cancel",
   "next.search.where": "where to look",
@@ -192,10 +192,13 @@
   "next.search.searching": "Searching…",
   "next.search.nothing": "Nothing found",
   "next.search.nothingHint": "Try other words",
-  "next.search.start": "Type to search chats",
+  "next.search.start": "Type to find a chat or a message",
   "next.search.keySelect": "select",
   "next.search.keyOpen": "open",
   "next.search.groupChats": "Chats",
+  "next.search.you": "You",
+  "next.search.agent": "Agent",
+  "next.search.indexing": "Older chats are still being read — more may turn up",
   "next.greeting.title": "What shall we work on, {name}?",
   "next.greeting.titleNoName": "What shall we work on?",
   "next.greeting.sub": "The agent starts on your machine and shows every step.",
@@ -838,5 +841,6 @@
   "next.rowMenu.retitle": "Update title",
   "next.sidebar.retitleFailed": "Could not update the title",
   "next.chatStatus.limited": "Waiting for the limit to reset",
-  "next.chatStatus.limitedUntil": "Waiting for the limit to reset until {when}"
+  "next.chatStatus.limitedUntil": "Waiting for the limit to reset until {when}",
+  "next.rowMenu.continue": "Continue in another model"
 }

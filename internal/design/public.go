@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
 
 // The public read of a design for a guest link: the platform's gateway signs a 60-second token for the link's project
@@ -29,6 +30,10 @@ const (
 	publicSkew = 30
 	// PublicFileLimit is the largest file the public route sends.
 	PublicFileLimit = 32 << 20
+	// PublicAppDir and PublicGuestDir are first segments of a public path that are not project files: the guest page's
+	// bundle, and the script the boards load.
+	PublicAppDir   = "_app"
+	PublicGuestDir = "__guest"
 )
 
 // PublicConfig names how the public token is checked: the pair's secret, the HKDF salt (the share salt), the audience
@@ -212,6 +217,27 @@ func (a *API) Public(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	switch segments[0] {
+	case PublicAppDir:
+		a.publicApp(w, r, segments[1:], head)
+		return
+	case PublicGuestDir:
+		if len(segments) == 2 && segments[1] == "client.js" {
+			body := []byte(a.L.clientScript())
+			h := w.Header()
+			h.Set("Content-Type", "text/javascript; charset=utf-8")
+			h.Set("Content-Length", strconv.Itoa(len(body)))
+			h.Set("Cache-Control", "private, max-age=300")
+			h.Set("X-Content-Type-Options", "nosniff")
+			w.WriteHeader(200)
+			if !head {
+				_, _ = w.Write(body)
+			}
+			return
+		}
+		publicText(w, 404, "Not found")
+		return
+	}
 	typ := ContentType(extname(segments[len(segments)-1]))
 	if typ == "" {
 		publicText(w, 404, "Not found")
@@ -229,13 +255,39 @@ func (a *API) Public(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", typ)
-	h.Set("Content-Length", strconv.FormatInt(st.Size(), 10))
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
+	if strings.HasPrefix(typ, "text/html") {
+		// A board gets the library's board script in guest mode: the bridge to the framing page (picking a block, the
+		// board's settings, the canvas keys) without the owner's tools.
+		src, err := io.ReadAll(io.LimitReader(f, PublicFileLimit))
+		if err != nil {
+			publicText(w, 404, "Not found")
+			return
+		}
+		body := []byte(withGuestClient(jscompat.DecodeUTF8(src), project, strings.Repeat("../", len(segments)-1)+PublicGuestDir+"/client.js"))
+		h.Set("Content-Length", strconv.Itoa(len(body)))
+		w.WriteHeader(200)
+		if !head {
+			_, _ = w.Write(body)
+		}
+		return
+	}
+	h.Set("Content-Length", strconv.FormatInt(st.Size(), 10))
 	w.WriteHeader(200)
 	if !head {
 		_, _ = io.Copy(w, io.LimitReader(f, PublicFileLimit))
 	}
+}
+
+// withGuestClient puts the board script in guest mode at the head of a board; src is relative to the board, so it
+// resolves under whatever address the board is served at.
+func withGuestClient(source, project, src string) string {
+	tag := `<script data-artifact="` + project + `" data-guest="1" src="` + src + `"></script>`
+	if m := headTag.FindString(source); m != "" {
+		return strings.Replace(source, m, m+tag, 1)
+	}
+	return tag + source
 }
 
 // openPublic opens a file of the project folder without leaving it, symlinks included; the project's own support.js

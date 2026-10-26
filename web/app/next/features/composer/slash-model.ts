@@ -13,7 +13,8 @@ import {
 import type { IQuickPrompt } from '@/next/features/composer/prompts';
 import type { ICatalogItem } from '@/next/features/settings/api';
 import { t } from '@/next/i18n';
-import { EFFORTS, type FileEntry, type Provider } from '@/next/protocol/v2';
+import type { IChatPick } from '@/next/features/composer/chat-sources';
+import { EFFORTS, type FileEntry, type MessageRef, type Provider } from '@/next/protocol/v2';
 
 export const GROUP = {
   setting: 'setting',
@@ -22,6 +23,7 @@ export const GROUP = {
   mcp: 'mcp',
   quick: 'quick',
   file: 'file',
+  chat: 'chat',
 } as const;
 export type TGroup = (typeof GROUP)[keyof typeof GROUP];
 
@@ -33,6 +35,7 @@ export const GROUP_ORDER: readonly TGroup[] = [
   GROUP.mcp,
   GROUP.quick,
   GROUP.file,
+  GROUP.chat,
 ];
 
 /** What starts a word of the palette: a command, a skill of Codex, a file. */
@@ -114,7 +117,9 @@ export type TAction =
   /** The word becomes «@folder/» and goes on to the folder's entries. */
   | { k: 'dir'; text: string }
   /** The model (or the depth) is chosen: the existing switch, as the pill does it. */
-  | { k: 'choose'; choice: IModelChoice };
+  | { k: 'choose'; choice: IModelChoice }
+  /** The word goes out of the field and the chat becomes a chip: the message points at it. */
+  | { k: 'chat'; ref: MessageRef };
 
 export interface ISlashRow {
   id: string;
@@ -144,6 +149,7 @@ const ICON: Record<TGroup, string> = {
   mcp: 'plug',
   quick: 'zap',
   file: 'file-text',
+  chat: 'message-square',
 };
 
 const SOURCE_KEY: Record<string, string> = {
@@ -455,6 +461,26 @@ export const fileRows = (entries: readonly FileEntry[], name: string): IRowList 
   const ordered = name ? [...rows].sort((a, b) => b.score - a.score) : rows;
   return { rows: ordered.slice(0, FILES_SHOWN), more: Math.max(0, ordered.length - FILES_SHOWN) };
 };
+
+/** The chats «@» offers beside the files, in the order they were found. */
+export const chatRows = (picks: readonly IChatPick[], name: string): ISlashRow[] =>
+  picks.map((pick, index) => {
+    const match = fuzzyMatch(name, pick.ref.title);
+    return {
+      id: `chat:${pick.ref.id}`,
+      group: GROUP.chat,
+      name: pick.ref.title,
+      prefix: '',
+      ranges: match?.ranges ?? [],
+      description: pick.snippet ?? '',
+      hint: null,
+      source: t('next.slash.src.chat'),
+      icon: ICON.chat,
+      current: false,
+      action: { k: 'chat', ref: pick.ref },
+      score: -index,
+    };
+  });
 
 /** The text with the word `[start, end)` replaced; the caret goes after the replacement. A space the replacement ends with
  *  takes the one that already follows the word. */

@@ -25,7 +25,7 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
   const action = usePending<string>();
   if (!value) return null;
   const busy = isBusy(action.phase);
-  let icon: 'server' | 'gauge' = 'server';
+  let icon: 'server' | 'gauge' | 'key-round' = 'server';
   let title = '';
   let sub: string | null = null;
   let quiet = false;
@@ -34,6 +34,18 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
     title = t('next.dockBar.machine', { machine: value.machine });
     sub = t('next.dockBar.machineSub');
     actions = [{ key: 'stop', label: t('next.dockBar.stop'), variant: 'ghost', run: value.onStop }];
+  } else if (value.kind === 'key') {
+    icon = 'key-round';
+    title = t('next.dockBar.keyGone', { vendor: value.vendor });
+    const { onOpen, onContinue } = value;
+    actions = [{ key: 'open', label: t('next.dockBar.keyOpen'), run: async () => onOpen() }];
+    if (onContinue)
+      actions.push({
+        key: 'continue',
+        label: t('next.rowMenu.continue'),
+        variant: 'ghost',
+        run: async () => onContinue(),
+      });
   } else {
     icon = 'gauge';
     title = t('next.dockBar.limit', {

@@ -73,6 +73,8 @@ type conv struct {
 	rec         wire.Conversation
 	box         *outbox.Box
 	fd          *feed.Feed
+	// indexSeen is the size of the transcript the search index followed the feed to (see indexUpdate).
+	indexSeen int64
 
 	gates map[string]*gate
 	order []string
@@ -553,6 +555,7 @@ func (c *conv) feedUpdate(u feed.Update, live bool, now time.Time) {
 // past, that the update is a transcript read as a whole, whose turns that are over open nothing and end nothing now.
 func (c *conv) feedUpdateOf(u feed.Update, live, past bool, now time.Time) {
 	c.promptsOf(u)
+	c.indexUpdate(u)
 	// The user entries first: an entry that is our message goes out carrying its client id.
 	var signals []feed.Signal
 	var changes []outbox.Change

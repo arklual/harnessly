@@ -3,6 +3,7 @@
 // result goes back as a <fork-result> block. Neither is the person's words: the feed draws them as a card that says
 // where they come from, and the instructions to the agent are not shown.
 import { createContext } from 'react';
+import type { HandoffDraftRequest, Provider } from '@/next/protocol/v2';
 
 export const BLOCK_KIND = { handoff: 'handoff', fork: 'fork', result: 'result' } as const;
 export type TBlockKind = (typeof BLOCK_KIND)[keyof typeof BLOCK_KIND];
@@ -72,3 +73,15 @@ export interface IChatLinks {
 }
 
 export const ChatLinks = createContext<IChatLinks | null>(null);
+
+/** The draft's request for a target: the profile goes along, so the excerpt is cut to that model's own window. */
+export const draftRequestOf = (
+  mode: HandoffDraftRequest['mode'],
+  agent: { provider: Provider; profile?: string | null },
+  model: string,
+): HandoffDraftRequest => ({
+  mode,
+  provider: agent.provider,
+  model,
+  ...(agent.profile ? { profile: agent.profile } : {}),
+});

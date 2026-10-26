@@ -11,7 +11,7 @@
   "next.settings.section.machines": "Машины",
   "next.settings.section.apps": "Приложения",
   "next.settings.lead.general": "Вид приложения и аккаунт",
-  "next.settings.lead.accounts": "Как агенты входят и куда идут их запросы",
+  "next.settings.lead.accounts": "Как агенты и модели входят и куда идут их запросы",
   "next.settings.lead.claude": "Как Claude Code работает на машине «{machine}». Пишется в {path}",
   "next.settings.lead.codex": "Как Codex работает на машине «{machine}». Пишется в {path}",
   "next.settings.lead.skills": "Что агент находит на машине и может использовать",
@@ -209,7 +209,7 @@
   "next.settings.accounts.signIn": "Подписка",
   "next.settings.accounts.signIn.claude": "Войдите в терминале машины: claude auth login",
   "next.settings.accounts.signIn.codex": "Войдите в терминале машины: codex login",
-  "next.settings.accounts.terminal": "Вход и ключи — дело самого агента: он хранит их у себя на машине. Здесь они не вводятся и не показываются.",
+  "next.settings.accounts.terminal": "Подписка входит через страницу вендора, ключ вводится здесь и после сохранения не показывается. И то и другое хранится на этой машине.",
   "next.settings.accounts.where": "Куда идут запросы",
   "next.settings.accounts.direct": "Напрямую",
   "next.settings.accounts.viaProxy": "Через прокси",
@@ -217,7 +217,7 @@
   "next.settings.accounts.proxyAria": "Адрес прокси",
   "next.settings.accounts.proxyBad": "Нужен адрес вида https://llm.example.ru",
   "next.settings.accounts.gets": "Агент получит",
-  "next.settings.accounts.foot": "Подписка тратит свои лимиты, ключ — деньги с баланса. Через прокси запросы считаются и ограничиваются на его стороне.",
+  "next.settings.accounts.foot": "Подписка тратит свои лимиты, ключ — деньги с баланса. Через прокси запросы считаются и ограничиваются на его стороне. Модели Kimi, GLM и Grok работают в отдельных чатах: остальные чаты не меняются.",
   "next.settings.skills.agent": "Агент",
   "next.settings.skills.show": "Показать",
   "next.settings.skills.tab.skills": "Скиллы",
@@ -279,5 +279,10 @@
   "next.settings.general.limitContinue": "Продолжать после сброса лимита",
   "next.settings.general.limitContinue.hint": "Когда лимит подписки кончается посреди работы, чат сам продолжит, как только лимит сбросится",
   "next.settings.general.restartContinue": "Продолжать после перезапуска",
-  "next.settings.general.restartContinue.hint": "Работа, которую оборвал перезапуск, продолжится сама"
+  "next.settings.general.restartContinue.hint": "Работа, которую оборвал перезапуск, продолжится сама",
+  "next.settings.accounts.method.subscription": "Подписка",
+  "next.settings.accounts.method.key": "Ключ API",
+  "next.settings.accounts.keyHint.claude": "Ключ с console.anthropic.com, оплата с баланса",
+  "next.settings.accounts.keyHint.codex": "Ключ API OpenAI, оплата с баланса",
+  "next.settings.accounts.method.console": "API-оплата"
 }

@@ -152,7 +152,7 @@ func TestMergeQueuesTheResultInTheParent(t *testing.T) {
 func TestExcerptDraftHoldsTheTurns(t *testing.T) {
 	r := newRig(t)
 	r.twoTurns()
-	d, err := r.rt.Excerpt(r.id, wire.ProviderCodex, "")
+	d, err := r.rt.Excerpt(r.id, wire.ProviderCodex, "", "")
 	if err != nil || d.Mode != wire.DraftExcerpt || d.Turns != 2 || d.Tokens == 0 || d.Validate() != nil {
 		t.Fatalf("draft: %+v %v", d, err)
 	}

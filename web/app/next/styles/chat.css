@@ -131,6 +131,27 @@
   gap: var(--hx-space-5);
   padding-bottom: var(--hx-space-6);
 }
+/* The turn a search result pointed at: a soft wash of the accent that settles back (ease-out). */
+.hx-turnwrap[data-reveal='true'] {
+  animation: hx-reveal 1800ms var(--hx-ease-out);
+}
+@keyframes hx-reveal {
+  0%,
+  35% {
+    background: color-mix(in srgb, var(--hx-accent) 14%, transparent);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--hx-accent) 14%, transparent);
+    border-radius: var(--hx-radius-md, 12px);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-turnwrap[data-reveal='true'] {
+    animation-duration: 1ms;
+  }
+}
 .hx-turnwrap[data-enter='true'] {
   animation: hx-msg-in 520ms var(--hx-ease-out) backwards;
 }

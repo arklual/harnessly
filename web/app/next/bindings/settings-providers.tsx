@@ -8,13 +8,9 @@ import {
   putProviderKey,
   testProvider,
 } from '@/next/features/providers/api';
-import ModelsSection from '@/next/features/providers/models-section';
 import type { IPresetState, PresetId, TestState } from '@/next/features/providers/model';
-import { Note } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
 import type { MachineId, ProfileKey } from '@/next/protocol/v2';
-import { Button } from '@/next/ui/button';
-import { Skeleton } from '@/next/ui/skeleton';
 
 type TState = { k: 'loading' } | { k: 'failed'; text: string } | { k: 'ready'; presets: IPresetState[] };
 
@@ -85,19 +81,4 @@ export const useProviders = (machine: MachineId, enabled = true) => {
   }, []);
 
   return { state, onSave, onRemove, onTest, retry };
-};
-
-export const ModelsPage = ({ machine }: { machine: MachineId }) => {
-  const { state, onSave, onRemove, onTest, retry } = useProviders(machine);
-  if (state.k === 'failed')
-    return (
-      <Note>
-        <p>{state.text}</p>
-        <Button size="sm" icon="rotate-ccw" onClick={retry}>
-          {t('next.settings.retry')}
-        </Button>
-      </Note>
-    );
-  if (state.k === 'loading') return <Skeleton className="hx-set__sk" />;
-  return <ModelsSection states={state.presets} onSave={onSave} onRemove={onRemove} onTest={onTest} />;
 };

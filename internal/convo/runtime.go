@@ -61,6 +61,9 @@ type Runtime struct {
 	inline  bool
 	pending []job
 
+	// indexed: the scan read every conversation into the search index (search.go).
+	indexed atomic.Bool
+
 	stop chan struct{}
 	wg   sync.WaitGroup
 }
@@ -172,6 +175,10 @@ func (r *Runtime) Start(ctx context.Context) error {
 		r.wg.Add(2)
 		go r.opsSaver()
 		go r.reaper()
+		if r.d.Index != nil {
+			r.wg.Add(1)
+			go r.indexer()
+		}
 	}
 	return errors.Join(errs...)
 }

@@ -35,6 +35,7 @@ describe('routes', () => {
     expect(parseRoute('/settings/')).toEqual({ kind: ROUTE.settings, section: null });
     expect(parseRoute('/settings/machines')).toEqual({ kind: ROUTE.settings, section: 'machines' });
     expect(parseRoute('/settings/claude/?x=1')).toEqual({ kind: ROUTE.settings, section: 'claude' });
+    expect(parseRoute('/settings/models')).toEqual({ kind: ROUTE.settings, section: 'accounts' });
     expect(routePath({ kind: ROUTE.settings, section: null })).toBe('/settings');
     expect(routePath({ kind: ROUTE.settings, section: 'skills' })).toBe('/settings/skills');
     for (const section of SETTINGS_SECTIONS) {

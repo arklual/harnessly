@@ -61,6 +61,10 @@ const OLDER_AHEAD_PX = 800;
 const SLIDE_MIN_PX = 6;
 /** How many of the last items may be new at once (a message, its turn, the live line). */
 const NEW_TAIL = 4;
+/** The turn a search result pointed at shows itself this long (hx-reveal in chat.css). */
+const REVEAL_MS = 1800;
+/** Turns drawn around the one revealed, when a long feed draws only a window. */
+const REVEAL_AROUND = 3;
 
 /** Measured heights of drawn turns, by key: what the spacers of a windowed feed are made of. */
 class HeightCache {
@@ -98,6 +102,12 @@ export interface IFeedProps extends THandlers {
   /** The last page of older turns did not come: the top says why and offers to try again, nothing asks it by scroll. */
   olderFailed?: string | null;
   onLoadOlder: () => void;
+  /**
+   * A message a search result points at: the feed brings its turn into view (loading older turns until it is there)
+   * and shows it for a moment, then says it is served. A turn that is not in the chat any more is given up on.
+   */
+  reveal?: { turnId: string | null; entryId: string; nonce: number } | null;
+  onRevealed?: (nonce: number) => void;
   density: FeedDensity;
   offline: boolean;
   /** Turns and messages newer than this come in with an animation; history that loads does not. */
@@ -320,6 +330,40 @@ const Feed = (props: IFeedProps) => {
   }
 
   const noteAnchor = useFeedAnchor(scrollerRef, atBottom);
+
+  // A message a search result pointed at: the turn it is in is drawn (the window moves to it) and brought into view;
+  // the older turns are loaded until it is there.
+  const { reveal = null, onRevealed, hasOlder: moreOlder, onLoadOlder: loadOlder } = props;
+  const olderError = props.olderFailed ?? null;
+  const [served, setServed] = useState<number | null>(null);
+  const revealAt = reveal ? keys.indexOf(reveal.turnId ?? reveal.entryId) : -1;
+  if (reveal && revealAt >= 0 && served !== reveal.nonce) {
+    setServed(reveal.nonce);
+    if (virtual)
+      setRange({
+        startKey: keys[Math.max(0, revealAt - REVEAL_AROUND)],
+        endKey: keys[Math.min(keys.length - 1, revealAt + REVEAL_AROUND)],
+      });
+  }
+  const revealTimer = useRef(0);
+  useEffect(() => {
+    if (!reveal || items === null || revealAt >= 0 || loadingOlder) return;
+    if (moreOlder && olderError === null) loadOlder();
+    else onRevealed?.(reveal.nonce);
+  }, [reveal, items, revealAt, loadingOlder, moreOlder, olderError, loadOlder, onRevealed]);
+  useLayoutEffect(() => {
+    if (!reveal || served !== reveal.nonce || revealAt < 0) return;
+    const scroller = scrollerRef.current;
+    const row = scroller?.querySelector<HTMLElement>(`[data-key="${CSS.escape(keys[revealAt])}"]`);
+    if (!scroller || !row) return;
+    atBottom.current = false;
+    row.scrollIntoView?.({ block: 'center' });
+    row.setAttribute('data-reveal', 'true');
+    window.clearTimeout(revealTimer.current);
+    revealTimer.current = window.setTimeout(() => row.removeAttribute('data-reveal'), REVEAL_MS);
+    onRevealed?.(reveal.nonce);
+  }, [reveal, served, revealAt, keys, range, onRevealed]);
+  useEffect(() => () => window.clearTimeout(revealTimer.current), []);
 
   const stick = useCallback(() => {
     const scroller = scrollerRef.current;

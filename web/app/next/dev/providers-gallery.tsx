@@ -15,9 +15,11 @@ import { useEffect, useRef, useState } from 'react';
 import Composer from '@/next/features/composer/composer';
 import { pickerAgents, type IModelChoice } from '@/next/features/composer/agents';
 import type { IPresetState, PresetId, TestState } from '@/next/features/providers/model';
-import ModelsSection from '@/next/features/providers/models-section';
+import ContinueSheet from '@/next/features/chat/continue-sheet';
+import AccountsSection, { type IAgentCredentials } from '@/next/features/settings/accounts-section';
+import type { LoginState } from '@/next/features/accounts/model';
 import { pinLocale } from '@/next/i18n';
-import type { MachineAgent } from '@/next/protocol/v2';
+import type { AgentSettings, MachineAgent, Provider } from '@/next/protocol/v2';
 import { PortalContext } from '@/next/ui/portal';
 import { useRouter } from '@/platform/router';
 
@@ -153,8 +155,37 @@ const startStates = (state: string | undefined): IPresetState[] =>
 
 const tailOf = (key: string) => `…${key.slice(-4)}`;
 
-const SettingsScene = ({ state, check }: { state?: string; check?: string }) => {
+const LOGINS: Record<string, LoginState> = {
+  idle: { k: 'idle' },
+  starting: { k: 'starting' },
+  device: { k: 'waiting', url: 'https://example.test/device', userCode: 'WDJB-MJHT', asksCode: false },
+  code: { k: 'waiting', url: 'https://example.test/oauth', userCode: null, asksCode: true },
+  failed: { k: 'failed', reason: 'Вход не завершился за пять минут. Попробуйте ещё раз' },
+};
+
+const settingsOf = (provider: Provider, signedIn: boolean): AgentSettings => ({
+  provider,
+  path: provider === 'claude' ? '~/.claude/settings.json' : '~/.codex/config.toml',
+  rev: 'r1',
+  account: {
+    signedIn,
+    method: signedIn ? 'subscription' : null,
+    plan: signedIn ? 'Max' : null,
+    who: signedIn ? 'sergey@example.test' : null,
+  },
+  options: [],
+  rules: null,
+  env: [],
+  mcp: [],
+});
+
+const later = <T,>(value: T, ms = 600) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms));
+
+const SettingsScene = ({ state, check, login }: { state?: string; check?: string; login?: string }) => {
   const [states, setStates] = useState(() => startStates(state));
+  const [open, setOpen] = useState<string | null>(state === 'empty' ? 'claude' : 'kimi');
+  const [loginState, setLoginState] = useState<LoginState>(LOGINS[login ?? 'idle'] ?? LOGINS.idle);
+  const [codexKey, setCodexKey] = useState({ configured: login === 'key', tail: null });
   const change = (id: PresetId, patch: Partial<IPresetState>) =>
     setStates((have) => have.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const result = (): TestState => {
@@ -163,25 +194,60 @@ const SettingsScene = ({ state, check }: { state?: string; check?: string }) => 
     if (check === 'limit') return { k: 'failed', reason: 'rate-limited' };
     return { k: 'ok' };
   };
+  const credentials = (key: { configured: boolean; tail: null }): IAgentCredentials => ({
+    login: loginState,
+    key,
+    onLogin: async () => {
+      setLoginState({ k: 'starting' });
+      await later(null, 900);
+      setLoginState(LOGINS.code);
+      return null;
+    },
+    onSubmitCode: async () => later(null, 700),
+    onCancelLogin: async () => setLoginState(LOGINS.idle),
+    onLogout: async () => {
+      await later(null, 400);
+      setCodexKey({ configured: false, tail: null });
+      return null;
+    },
+    onSaveKey: async () => {
+      await later(null, 500);
+      setCodexKey({ configured: true, tail: null });
+      return null;
+    },
+  });
   return (
     <div className="hx-root hx-providers-set">
       <div className="hx-set__page-in">
-        <ModelsSection
-          states={states}
-          onSave={async (id, key) => {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            change(id, { key: { configured: true, tail: tailOf(key) } });
-            return null;
+        <AccountsSection
+          cards={[
+            { provider: 'claude', k: 'ready', settings: settingsOf('claude', login === 'connected') },
+            { provider: 'codex', k: 'ready', settings: settingsOf('codex', false) },
+          ]}
+          credentials={{
+            claude: credentials({ configured: false, tail: null }),
+            codex: credentials(codexKey),
           }}
-          onRemove={async (id) => {
-            await new Promise((resolve) => setTimeout(resolve, 400));
-            change(id, { key: { configured: false, tail: null } });
-            return null;
+          vendors={{
+            k: 'ready',
+            presets: states,
+            onSave: async (id, key) => {
+              await later(null, 500);
+              change(id, { key: { configured: true, tail: tailOf(key) } });
+              return null;
+            },
+            onRemove: async (id) => {
+              await later(null, 400);
+              change(id, { key: { configured: false, tail: null } });
+              return null;
+            },
+            onTest: async () => later(result(), 900),
           }}
-          onTest={async () => {
-            await new Promise((resolve) => setTimeout(resolve, 900));
-            return result();
-          }}
+          open={open}
+          busy={new Set()}
+          onToggle={(card) => setOpen((now) => (now === card ? null : card))}
+          onBaseUrl={async () => true}
+          onRetry={() => undefined}
         />
       </div>
     </div>
@@ -226,6 +292,26 @@ const PickerScene = ({ locked = false }: { locked?: boolean }) => {
   );
 };
 
+const ContinueScene = () => {
+  const portalRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(true);
+  const others = pickerAgents(MACHINE_AGENTS).filter((a) => a.available && a.profile !== 'kimi');
+  return (
+    <PortalContext value={portalRef}>
+      <div className="hx-root hx-providers-dock">
+        <ContinueSheet
+          open={open}
+          onClose={() => setOpen(false)}
+          agents={others}
+          onPick={() => setOpen(false)}
+          onConnect={() => setOpen(false)}
+        />
+        <div ref={portalRef} className="hx-portal" />
+      </div>
+    </PortalContext>
+  );
+};
+
 const ProvidersGallery = () => {
   const { query } = useRouter();
   const theme = query.theme === 'dark' ? 'dark' : 'light';
@@ -236,9 +322,16 @@ const ProvidersGallery = () => {
     root.classList.toggle('dark', theme === 'dark');
     root.style.colorScheme = theme;
   }, [theme]);
+  if (query.scene === 'continue') return <ContinueScene />;
   if (query.scene === 'picker') return <PickerScene />;
   if (query.scene === 'chat') return <PickerScene locked />;
-  return <SettingsScene state={String(query.state ?? '')} check={String(query.check ?? '')} />;
+  return (
+    <SettingsScene
+      state={String(query.state ?? '')}
+      check={String(query.check ?? '')}
+      login={String(query.login ?? '')}
+    />
+  );
 };
 
 export default ProvidersGallery;

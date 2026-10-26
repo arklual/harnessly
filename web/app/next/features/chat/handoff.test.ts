@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseContextBlock } from '@/next/features/chat/handoff';
+import { draftRequestOf, parseContextBlock } from '@/next/features/chat/handoff';
 
 // The blocks as internal/handoff writes them (handoff_test.go has the same shapes).
 const handoff =
@@ -41,5 +41,24 @@ describe('context blocks', () => {
     expect(
       parseContextBlock('<handoff mode="note">\n<instructions>x</instructions>\n\nno source\n</handoff>'),
     ).toBeNull();
+  });
+});
+
+describe('the request of a handoff draft', () => {
+  it('carries the target profile, so the excerpt is cut to that model’s window', () => {
+    expect(draftRequestOf('excerpt', { provider: 'claude', profile: 'kimi' }, 'kimi-k3')).toEqual({
+      mode: 'excerpt',
+      provider: 'claude',
+      model: 'kimi-k3',
+      profile: 'kimi',
+    });
+  });
+
+  it('has no profile for Claude and Codex themselves', () => {
+    expect(draftRequestOf('note', { provider: 'codex', profile: null }, 'gpt')).toEqual({
+      mode: 'note',
+      provider: 'codex',
+      model: 'gpt',
+    });
   });
 });

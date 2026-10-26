@@ -7,6 +7,7 @@
 package feed
 
 import (
+	"math"
 	"slices"
 
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
@@ -161,6 +162,14 @@ func New(conv string, provider wire.Provider, src Source) *Feed {
 // OnVendor says the chat runs on a backend profile: a usage limit is read off the vendor's words only.
 func (f *Feed) OnVendor() {
 	f.vendor, f.b.vendor = true, true
+}
+
+// Everything is a feed that reads a transcript of size bytes whole, in one read: for what wants all the messages of a
+// conversation (the search index), not for a page of turns.
+func Everything(conv string, provider wire.Provider, src Source, size int64) *Feed {
+	f := New(conv, provider, src)
+	f.tail, f.window = math.MaxInt32, max(size, TailBytes)+1
+	return f
 }
 
 // Load reads the transcript's tail. Its signals are the state of the transcript as it is now (an open question, an

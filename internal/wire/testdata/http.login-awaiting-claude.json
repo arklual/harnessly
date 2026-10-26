@@ -1,0 +1,4 @@
+{
+  "http": "login",
+  "response": {"flow": {"id": "0123456789abcdef0123456789abcdef", "provider": "claude", "mode": "subscription", "state": "awaiting", "input": "code", "url": "https://claude.com/cai/oauth/authorize?code=true&client_id=00000000-0000-0000-0000-000000000000", "userCode": null, "startedAt": 1800000000000, "expiresAt": 1800000600000, "reason": null}}
+}

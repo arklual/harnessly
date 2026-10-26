@@ -1,3 +1,6 @@
+/** The text as the search reads it: lower case, «ё» as «е». */
+export const foldText = (text: string): string => text.toLowerCase().replace(/ё/g, 'е');
+
 export interface ITextPart {
   text: string;
   hit: boolean;

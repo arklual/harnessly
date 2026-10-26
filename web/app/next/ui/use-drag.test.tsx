@@ -61,6 +61,34 @@ const Rows = ({ onDrop }: { onDrop?: (plan: IPlan) => void }) => {
   );
 };
 
+/** A list whose rows can also be carried out of it onto a place of the page that takes them. */
+const Carry = ({ onDrop, takes = true }: { onDrop: (plan: IPlan) => void; takes?: boolean }) => {
+  const listRef = useRef<HTMLDivElement>(null);
+  useDrag({
+    listRef,
+    dragKinds: KINDS,
+    dropKinds: KINDS,
+    resolve: () => null,
+    onDrop,
+    external: {
+      selector: '[data-chat-drop]',
+      resolve: (source) => (takes ? { id: source.id, to: -1 } : null),
+    },
+  });
+  return (
+    <>
+      <div ref={listRef} data-testid="list">
+        {['a', 'b'].map((id) => (
+          <div key={id} data-row={id} data-drag={ROW} data-drag-id={id} data-drop={ROW} data-drop-id={id}>
+            {id}
+          </div>
+        ))}
+      </div>
+      <div data-testid="field" data-chat-drop="true" />
+    </>
+  );
+};
+
 const List = ({ onDrop }: { onDrop?: (plan: IPlan) => void }) => (
   <Profiler id="list" onRender={counted}>
     <Rows onDrop={onDrop} />
@@ -219,5 +247,70 @@ describe('useDrag: the row itself is carried', () => {
     expect(onDrop).toHaveBeenCalledExactlyOnceWith({ id: 'c', to: 0 });
     expect(order()).toEqual(['c', 'a', 'b', 'd']);
     expect(row('c').style.transform).toBe('');
+  });
+});
+
+describe('useDrag: carried out of the list', () => {
+  const field = () => document.querySelector<HTMLElement>('[data-testid="field"]') as HTMLElement;
+  /** The pointer is over the field, which stands outside the list. */
+  const point = vi.fn<(x: number, y: number) => Element | null>();
+  beforeEach(() => {
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, writable: true, value: point });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'elementFromPoint');
+  });
+  const over = (inField: boolean) =>
+    point.mockImplementation((_x, y) => (inField && y > 300 ? field() : row('a')));
+
+  it('lights the place that takes the row, and hands it the drop while the row eases back', () => {
+    const onDrop = vi.fn();
+    render(<Carry onDrop={onDrop} />);
+    layOut();
+    over(true);
+    press('a', 20);
+    moveTo(30);
+    expect(field().hasAttribute('data-drop-over')).toBe(false);
+    moveTo(400);
+    expect(field().getAttribute('data-drop-over')).toBe('true');
+    release(400);
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith({ id: 'a', to: -1 });
+    expect(field().hasAttribute('data-drop-over')).toBe(false);
+    // The row is not left where the pointer took it: it eases back to its place.
+    expect(row('a').style.transform).toBe('');
+    expect(row('a').hasAttribute('data-drag-settle')).toBe(true);
+    wait(SETTLE_MS);
+    expect(row('a').hasAttribute('data-dragging')).toBe(false);
+  });
+
+  it('puts the light out when the pointer leaves the place, and a drop elsewhere drops nothing', () => {
+    const onDrop = vi.fn();
+    render(<Carry onDrop={onDrop} />);
+    layOut();
+    over(true);
+    press('a', 20);
+    moveTo(30);
+    moveTo(400);
+    expect(field().getAttribute('data-drop-over')).toBe('true');
+    point.mockImplementation(() => row('a'));
+    moveTo(60);
+    expect(field().hasAttribute('data-drop-over')).toBe(false);
+    release(60);
+    wait(SETTLE_MS);
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it('leaves a place alone that the owner has no plan for', () => {
+    const onDrop = vi.fn();
+    render(<Carry onDrop={onDrop} takes={false} />);
+    layOut();
+    over(true);
+    press('a', 20);
+    moveTo(30);
+    moveTo(400);
+    expect(field().hasAttribute('data-drop-over')).toBe(false);
+    release(400);
+    wait(SETTLE_MS);
+    expect(onDrop).not.toHaveBeenCalled();
   });
 });

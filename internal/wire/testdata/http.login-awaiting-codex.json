@@ -1,0 +1,4 @@
+{
+  "http": "login",
+  "response": {"flow": {"id": "fedcba9876543210fedcba9876543210", "provider": "codex", "mode": "device", "state": "awaiting", "input": "none", "url": "https://auth.openai.com/codex/device", "userCode": "ABCD-EFGH1", "startedAt": 1800000000000, "expiresAt": 1800000900000, "reason": null}}
+}

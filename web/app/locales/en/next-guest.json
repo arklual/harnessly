@@ -1,0 +1,15 @@
+{
+  "next.guest.name": "Your name",
+  "next.guest.placeholder": "Your comment",
+  "next.guest.send": "Send comment",
+  "next.guest.pick": "Comment",
+  "next.guest.pickTip": "Pick a block and leave a comment",
+  "next.guest.sent": "Comment sent",
+  "next.guest.failed": "The comment was not sent",
+  "next.guest.empty": "Nothing to show here yet",
+  "next.guest.noLink": "This page opens from a link",
+  "next.guest.nameTitle": "What is your name?",
+  "next.guest.nameLead": "Your comments are signed with it. It is asked once.",
+  "next.guest.nameGo": "Continue",
+  "next.guest.account": "Your name: {name}"
+}

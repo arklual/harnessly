@@ -65,7 +65,7 @@ describe('the key form', () => {
     expect(screen.getByRole('alert').textContent).toContain('too short');
   });
 
-  it('keeps the typed key and says why when the machine refuses it', async () => {
+  it('clears the typed key at once and says why when the machine refuses it', async () => {
     const { onSave } = setup(OFF);
     onSave.mockResolvedValueOnce('Could not save the key');
     fireEvent.change(field(), { target: { value: 'sk-test-1234567890' } });
@@ -73,7 +73,7 @@ describe('the key form', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
     });
     expect(screen.getByRole('alert').textContent).toContain('Could not save the key');
-    expect(field().value).toBe('sk-test-1234567890');
+    expect(field().value).toBe('');
   });
 });
 
@@ -122,6 +122,19 @@ describe('a saved key', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Replace key' }));
     fireEvent.change(field(), { target: { value: 'sk-test-abcdefgh' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(field().value).toBe('');
+  });
+
+  it('replaces a saved key only on the second press', async () => {
+    const { onSave } = setup(ON);
+    fireEvent.click(screen.getByRole('button', { name: 'Replace key' }));
+    fireEvent.change(field(), { target: { value: 'sk-test-abcdefgh' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Replace' }));
+    expect(onSave).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Replace for sure?' }));
+    });
+    expect(onSave).toHaveBeenCalledWith('kimi', 'sk-test-abcdefgh');
     expect(field().value).toBe('');
   });
 });

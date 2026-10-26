@@ -88,6 +88,7 @@ describe('v2 closed lists', () => {
     PeerNoteKind: v2.PEER_NOTE_KINDS,
     AttachmentKind: v2.ATTACHMENT_KINDS,
     RefKind: v2.REF_KINDS,
+    MessageRole: v2.MESSAGE_ROLES,
     MessageMode: v2.MESSAGE_MODES,
     MessageKind: v2.MESSAGE_KINDS,
     MessageStateKind: v2.MESSAGE_STATE_KINDS,
@@ -148,6 +149,10 @@ describe('v2 closed lists', () => {
     LimitAction: v2.LIMIT_ACTIONS,
     ProfileVendor: v2.PROFILE_VENDORS,
     ProfileTestReason: v2.PROFILE_TEST_REASONS,
+    LoginMode: v2.LOGIN_MODES,
+    LoginState: v2.LOGIN_STATES,
+    LoginInput: v2.LOGIN_INPUTS,
+    LoginReason: v2.LOGIN_REASONS,
     MessageStatusKind: v2.MESSAGE_STATUS_KINDS,
     HandedWhere: v2.HANDED_WHERES,
     HttpKind: Object.keys(parsePage),
@@ -501,7 +506,16 @@ describe('backend profiles', () => {
       tail: null,
     });
   });
+  it('reads a sign-in flow', () => {
+    const flow = (fixture('http.login-awaiting-codex') as { response: unknown }).response;
+    expect(parsePage.login(flow)).toMatchObject({ flow: { state: 'awaiting', userCode: 'ABCD-EFGH1' } });
+    expect(parsePage.login({ flow: null })).toEqual({ flow: null });
+    expect(parsePage.loginOK({ ok: true })).toEqual({ ok: true });
+    const bad = structuredClone(flow) as { flow: { state: string } };
+    bad.flow.state = 'open';
+    expect(() => parsePage.login(bad)).toThrow(ProtocolError);
+  });
   it('asks for the cap', () => {
-    expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles');
+    expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles,msgstatus');
   });
 });

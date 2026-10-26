@@ -1144,12 +1144,34 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
         ...history(now),
         outgoing('Отправляется только что', { k: 'submitting' }, now),
         outgoing('Отправляется дольше обычного', { k: 'typing' }, now - 5000),
-        outgoing('Не подтвердилось за 15 секунд', { k: 'in-input' }, now - 20_000),
+        outgoing('Агент ещё не принял', { k: 'in-input' }, now - 20_000),
         outgoing(
           'Не отправилось: машина отказала',
           { k: 'failed', code: 'refused', retryable: true, at: now },
           now - MIN,
         ),
+      ],
+    }),
+  },
+  delivery: {
+    title: 'Доставка: не дошло, отправлено',
+    build: (now) => ({
+      items: [
+        ...history(now),
+        // Sent, and its turn does not show it: it fades away a moment after the scene opens.
+        outgoing(
+          'Отправлено и гаснет',
+          { k: 'accepted', entryId: 'c:0f0e0d0c-0000-4000-8000-00000000aa01#0' },
+          now - 8000,
+        ),
+        outgoing('Отправляется дольше обычного', { k: 'typing' }, now - 5000),
+      ],
+      // Typed, and the agent did not take it in 30 s: back in the queue for Повторить; the runtime did not know the
+      // second one at all; the third waits behind them.
+      queue: [
+        queued('как дела', { k: 'queued', position: 1, reason: 'stalled' }),
+        queued('И глянь логи оплаты', { k: 'failed', code: 'unconfirmed', retryable: true, at: now }),
+        queued('Потом обнови README', { k: 'queued', position: 2, reason: 'behind' }),
       ],
     }),
   },

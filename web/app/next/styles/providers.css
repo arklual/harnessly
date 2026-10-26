@@ -124,3 +124,46 @@
     transition: none;
   }
 }
+
+.hx-preset__where {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.5;
+}
+.hx-preset__link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  color: var(--hx-accent);
+  font-size: var(--hx-text-sm);
+  text-decoration: none;
+}
+.hx-preset__link:hover {
+  text-decoration: underline;
+}
+.hx-preset__code {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--hx-bg-hover);
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-lg);
+  letter-spacing: 0.12em;
+  user-select: all;
+}
+.hx-spin-ic {
+  animation: hx-spin 800ms linear infinite;
+}
+
+/* The card that only says why the vendors are not listed. */
+.hx-acct--solo {
+  padding: 14px 16px;
+}
+.hx-acct__how {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}

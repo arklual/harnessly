@@ -53,6 +53,7 @@ import { useMachine } from '@/next/stores/machines';
 import { useWaitingAgents } from '@/next/bindings/waiting';
 import { useMe } from '@/next/stores/me';
 import { messagesStore } from '@/next/stores/messages';
+import { doneReveal, useReveal } from '@/next/stores/reveal';
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
@@ -141,6 +142,7 @@ const ChatView = ({
   const limited = record?.limited ?? null;
   const machineClock = useCallback(() => machineNow(machine), [machine]);
   const me = useMe();
+  const reveal = useReveal(conv);
   const shown = useFeedKinds();
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderFailed, setOlderFailed] = useState<string | null>(null);
@@ -324,6 +326,8 @@ const ChatView = ({
                     loadingOlder={loadingOlder}
                     catchingUp={catchingUp}
                     onLoadOlder={onLoadOlder}
+                    reveal={reveal}
+                    onRevealed={doneReveal}
                     density={density}
                     offline={connection !== undefined && connection.k !== 'live'}
                     enterAfter={feed?.subscribedAt ?? openedAt}

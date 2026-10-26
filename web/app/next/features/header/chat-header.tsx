@@ -226,6 +226,9 @@ const ChatHeader = ({
                 : undefined
             }
             onMerge={actions.onMerge && chat.canMerge ? () => actions.onMerge?.(chat.id) : undefined}
+            onContinue={
+              actions.onContinue && chat.canContinue ? () => actions.onContinue?.(chat.id) : undefined
+            }
             onGoal={goal ? () => setGoalOpen(true) : undefined}
             trigger={
               <button

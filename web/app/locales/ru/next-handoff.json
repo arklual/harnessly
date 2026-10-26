@@ -28,14 +28,17 @@
     "other": "{n} хода"
   },
   "next.handoff.failed": "Не удалось передать",
-  "next.handoff.title": "Передать в {agent} · {model}",
+  "next.handoff.title": "Продолжить в {model}",
   "next.handoff.lead": "Новый чат в той же папке начнёт с этого текста. Чат на {from} останется как есть.",
   "next.handoff.thisChat": "этой модели",
-  "next.handoff.send": "Передать",
+  "next.handoff.send": "Продолжить",
   "next.handoff.mergeTitle": "Влить обратно в «{title}»",
   "next.handoff.mergeLead": "Итог этого ответвления уйдёт сообщением в исходный чат — в его очередь.",
   "next.handoff.mergeSend": "Влить",
   "next.handoff.merged": "Итог отправлен в «{title}»",
   "next.handoff.openParent": "Открыть",
-  "next.handoff.pickOption": "Передать в {agent}"
+  "next.handoff.pickOption": "Продолжить в {agent}",
+  "next.handoff.continue.title": "Продолжить в другой модели",
+  "next.handoff.continue.lead": "Новый чат начнётся с контекстом этого. Этот чат останется как есть.",
+  "next.handoff.continue.connect": "Подключить модели"
 }

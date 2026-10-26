@@ -23,6 +23,8 @@ const (
 type Item struct {
 	Ref  wire.MessageRef
 	Line string
+	// Body is what the agent reads under the line, on lines of its own (another chat's excerpt); "" for none.
+	Body string
 }
 
 var (
@@ -47,6 +49,21 @@ func Tag(r wire.MessageRef) string {
 	return `<ref kind="` + string(r.Kind) + `" id="` + attr(r.ID) + `" title="` + attr(r.Title) + `"/>`
 }
 
+// bodyLines are the lines of a body with no control characters but the line breaks and without the block's own tags,
+// so a body cannot close the block or open a place of it.
+func bodyLines(body string) []string {
+	body = strings.TrimSpace(strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(body))
+	if body == "" {
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimRight(tags.ReplaceAllString(controls.ReplaceAllString(line, " "), `<\$1$2`), " \t")
+		out = append(out, line)
+	}
+	return out
+}
+
 // Block is the places as the agent reads them; "" for none.
 func Block(items []Item) string {
 	if len(items) == 0 {
@@ -55,6 +72,7 @@ func Block(items []Item) string {
 	lines := []string{Open, locale.Pick("Attached to the message:", "Прикреплено к сообщению:")}
 	for _, it := range items {
 		lines = append(lines, Tag(it.Ref)+" "+OneLine(it.Line))
+		lines = append(lines, bodyLines(it.Body)...)
 	}
 	return strings.Join(append(lines, Close), "\n")
 }
@@ -99,6 +117,8 @@ func LineOf(r wire.MessageRef) string {
 		return locale.Pick("Project file — ", "Файл проекта — ") + target
 	case wire.RefMR:
 		return locale.Pick("Merge request ", "Merge request ") + quoted(r.Title) + " — " + target
+	case wire.RefChat:
+		return locale.Pick("Another chat ", "Другой чат ") + quoted(r.Title)
 	case wire.RefTask:
 		return locale.Pick("Task ", "Задача ") + quoted(r.Title) + " — " + target
 	}

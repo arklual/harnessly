@@ -708,3 +708,18 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     days, at most 500 a conversation). A `send` with an id the runtime still has is accepted with its whole record
     again (`message_upsert`), so a page that lost the events takes the true state; one of an expired id is
     `refused{too-late}` — it was delivered, and is never typed twice.
+
+66. **Signing an agent in from the page.** The CLI does the signing in; the runtime drives it through a terminal of its
+    own, and the page sees the vendor's link, the one-time code of a device flow and a state, nothing else the CLI
+    prints. `POST /api/v2/agents/{claude|codex}/login` `{mode}` (`subscription` or `console` for Claude, `device` for
+    Codex) starts a flow and answers `{flow}`: `{id, provider, mode, state, input, url, userCode, startedAt, expiresAt,
+    reason}`. States: `starting` (no link yet), `awaiting` (`url` is out; `input: "code"` means paste the code the
+    vendor's site showed, `"none"` that the person finishes there), `checking` (the code went to the CLI), then the end:
+    `done`, `failed` (with a `reason`: `not-installed`, `start-failed`, `code-rejected`, `refused`, `timeout`),
+    `cancelled`, `expired`. `GET .../login` answers the last flow (`{flow: null}` if none), `POST .../login/code`
+    `{id, code}` hands the code to that flow (a stale `id` is `conflict`), `DELETE .../login` cancels. One flow a CLI at
+    a time (`conflict` for a second start); starts are limited (`rate-limited`). `PUT /api/v2/agents/codex/key` `{key}`
+    gives the CLI an API key on its standard input, `POST .../logout` signs it out; both answer `{ok: true}`. A page
+    reads who is signed in from `GET /api/v2/agent-settings/{provider}` (`account`), as before. Writes are same-origin
+    only; no answer carries a code or a key, and the code and the key are not logged. Claude takes no API key this way:
+    `console` is its sign-in for API billing.

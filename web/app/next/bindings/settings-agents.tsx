@@ -8,7 +8,12 @@ import {
   type IAgentSettingsHandle,
   type Loaded,
 } from '@/next/bindings/settings-data';
-import AccountsSection, { type AccountCard } from '@/next/features/settings/accounts-section';
+import { useAgentCredentials } from '@/next/bindings/settings-credentials';
+import { useProviders } from '@/next/bindings/settings-providers';
+import AccountsSection, {
+  type AccountCard,
+  type VendorCards,
+} from '@/next/features/settings/accounts-section';
 import AgentSection from '@/next/features/settings/agent-section';
 import { EnvGroup, RulesGroup } from '@/next/features/settings/rules-groups';
 import {
@@ -32,6 +37,7 @@ import type {
   AgentOptionKey,
   AgentOptionValue,
   AgentSettings,
+  MachineId,
   Provider,
 } from '@/next/protocol/v2';
 import { Button } from '@/next/ui/button';
@@ -145,6 +151,7 @@ const AgentLoaded = ({
 };
 
 interface IAccountsPageProps {
+  machine: MachineId;
   pages: AgentPages;
   pending: Pending;
 }
@@ -155,14 +162,37 @@ const cardOf = (provider: Provider, state: Loaded<AgentSettings>): AccountCard =
   return { provider, k: 'loading' };
 };
 
-export const AccountsPage = ({ pages, pending }: IAccountsPageProps) => {
-  const [open, setOpen] = useState<Provider | null>('claude');
+const readyOf = (state: Loaded<AgentSettings>): AgentSettings | null =>
+  state.k === 'ready' ? state.value : null;
+
+const vendorsOf = ({
+  state,
+  onSave,
+  onRemove,
+  onTest,
+  retry,
+}: ReturnType<typeof useProviders>): VendorCards => {
+  if (state.k === 'ready') return { k: 'ready', presets: state.presets, onSave, onRemove, onTest };
+  if (state.k === 'failed') return { k: 'failed', text: state.text, onRetry: retry };
+  return { k: 'loading' };
+};
+
+export const AccountsPage = ({ machine, pages, pending }: IAccountsPageProps) => {
+  const [open, setOpen] = useState<string | null>('claude');
+  const providers = useProviders(machine);
+  const credentials = {
+    claude: useAgentCredentials(machine, 'claude', readyOf(pages.claude.state), pages.claude.retry),
+    codex: useAgentCredentials(machine, 'codex', readyOf(pages.codex.state), pages.codex.retry),
+  };
+  const vendors = vendorsOf(providers);
   const { run, pending: waiting } = pending;
   const cards = PROVIDER_LIST.map((provider) => cardOf(provider, pages[provider].state));
   const busy = new Set(PROVIDER_LIST.filter((provider) => waiting.has(`${provider}/baseUrl`)));
   return (
     <AccountsSection
       cards={cards}
+      credentials={credentials}
+      vendors={vendors}
       open={open}
       busy={busy}
       onToggle={(provider) => setOpen((now) => (now === provider ? null : provider))}

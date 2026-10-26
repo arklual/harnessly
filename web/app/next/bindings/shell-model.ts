@@ -38,7 +38,7 @@ import {
 } from '@/next/features/sidebar/types';
 import { locale, plural, t } from '@/next/i18n';
 import { goTo, routePath, ROUTE } from '@/next/routes/routes';
-import { requestUi, UI_REQUEST } from '@/next/stores/ui-requests';
+import { requestContinue, requestUi, UI_REQUEST } from '@/next/stores/ui-requests';
 import type {
   Conversation,
   HealthIssue,
@@ -278,6 +278,7 @@ export function useShellModel(): IShellModel {
   const features = machines?.find((v) => v.machine.id === active)?.features;
   const canStop = features?.includes('terminal-stop') ?? false;
   const canFork = features?.includes('fork') ?? false;
+  const canHandoff = features?.includes('handoff') ?? false;
   const chats = useMemo<readonly ISidebarChat[] | null>(
     () =>
       convs &&
@@ -309,9 +310,10 @@ export function useShellModel(): IShellModel {
             : {}),
           canFork: canFork && c.lastTurn !== null,
           canMerge: canFork && c.origin?.k === 'fork',
+          canContinue: canHandoff && c.lastTurn !== null,
         };
       }),
-    [convs, linkDown, canStop, canFork],
+    [convs, linkDown, canStop, canFork, canHandoff],
   );
   const favorites = useFavorites(active);
   const listedProjects = useProjects(active);
@@ -374,6 +376,10 @@ export function useShellModel(): IShellModel {
         if (conv) goTo({ kind: ROUTE.chat, id: conv });
       },
       onMerge: () => requestUi(UI_REQUEST.merge),
+      onContinue: (id) => {
+        goTo({ kind: ROUTE.chat, id });
+        requestContinue(id);
+      },
     };
   }, [active, retitle]);
 

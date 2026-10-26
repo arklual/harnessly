@@ -11,7 +11,8 @@ import {
   pickerAgents,
   type IPickerAgent,
 } from '@/next/features/composer/agents';
-import type { IChatLinks } from '@/next/features/chat/handoff';
+import { draftRequestOf, type IChatLinks } from '@/next/features/chat/handoff';
+import ContinueSheet from '@/next/features/chat/continue-sheet';
 import HandoffSheet, {
   SHEET_MODE,
   type TDraftOutcome,
@@ -30,7 +31,7 @@ import type {
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { conversationsStore } from '@/next/stores/conversations';
 import { hasFeature, useMachine } from '@/next/stores/machines';
-import { UI_REQUEST, useUiRequest } from '@/next/stores/ui-requests';
+import { UI_REQUEST, useContinueRequest, useUiRequest } from '@/next/stores/ui-requests';
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 
@@ -80,12 +81,15 @@ export function useChatHandoff(
   const agents = view?.machine.agents;
   const [target, setTarget] = useState<ITarget | null>(null);
   const [merging, setMerging] = useState(false);
+  const [choosing, setChoosing] = useState(false);
 
   const label = useCallback(
     (provider: Provider, model: Model | null): string | null => {
       if (!model) return null;
       const agent = pickerAgentOf(agents ?? [], provider, model.profile ?? null);
-      return agent ? modelName(agent, model.id) : model.id;
+      if (!agent) return model.id;
+      // A vendor's model is named with its vendor: «Kimi · K2», the labels of Claude and Codex say whose they are.
+      return agent.profile ? `${agent.short} · ${modelName(agent, model.id)}` : modelName(agent, model.id);
     },
     [agents],
   );
@@ -143,6 +147,11 @@ export function useChatHandoff(
     [canHandoff, others],
   );
 
+  // «Продолжить в другой модели» of the menus: the list of models first, then the sheet of the handoff.
+  useContinueRequest(conv, () => {
+    if (handoff) setChoosing(true);
+  });
+
   // «Влить обратно» of the header's menu: only a fork has a chat to merge into.
   const parent = source?.k === 'fork' ? source : null;
   useUiRequest(UI_REQUEST.merge, () => {
@@ -152,23 +161,33 @@ export function useChatHandoff(
   const from = record ? label(record.provider, record.model) : null;
   const sheets = (
     <>
+      {canHandoff && handoff && (
+        <ContinueSheet
+          open={choosing}
+          onClose={() => setChoosing(false)}
+          agents={handoff.agents}
+          onPick={(agent, model) => {
+            setChoosing(false);
+            setTarget({ agent, model });
+          }}
+          onConnect={() => {
+            setChoosing(false);
+            goTo({ kind: ROUTE.settings, section: 'accounts' });
+          }}
+        />
+      )}
       {canHandoff && (
         <HandoffSheet
           open={target !== null}
           onClose={() => setTarget(null)}
           title={t('next.handoff.title', {
-            agent: target?.agent.short ?? '',
-            model: target?.model.label ?? '',
+            model: target ? `${target.agent.short} · ${target.model.label}` : '',
           })}
           lead={t('next.handoff.lead', { from: from ?? t('next.handoff.thisChat') })}
           modes={HANDOFF_MODES}
           sendLabel={t('next.handoff.send')}
           onDraft={(mode: TSheetMode) =>
-            draftOf(
-              machine,
-              conv,
-              target ? { mode, provider: target.agent.provider, model: target.model.id } : { mode },
-            )
+            draftOf(machine, conv, target ? draftRequestOf(mode, target.agent, target.model.id) : { mode })
           }
           onSend={async (mode, text) => {
             if (!target || mode === SHEET_MODE.result) return;

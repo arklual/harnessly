@@ -229,7 +229,7 @@ describe('a handoff from the picker', () => {
     const segments = [...view.container.querySelectorAll<HTMLButtonElement>('.hx-seg__item')];
     expect(segments.map((s) => s.textContent)).toEqual(['Claude', 'Codex']);
     const handoff = view.container.querySelector<HTMLButtonElement>('.hx-option[data-handoff]');
-    expect(handoff?.textContent).toContain('Hand over to Codex');
+    expect(handoff?.textContent).toContain('Continue in Codex');
     act(() => handoff?.click());
     expect(onPick).toHaveBeenCalledWith(codex, gpt);
     expect(onChange).not.toHaveBeenCalled();

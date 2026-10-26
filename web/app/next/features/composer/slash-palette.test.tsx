@@ -356,3 +356,56 @@ describe('files in the palette', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 });
+
+describe('chats in the palette', () => {
+  const picks = [
+    {
+      ref: { kind: 'chat' as const, id: 'tab-old', title: 'Old release work', target: '' },
+      snippet: null,
+      at: 1,
+    },
+    {
+      ref: { kind: 'chat' as const, id: 'tab-db', title: 'Database moves', target: '' },
+      snippet: '…the migration failed on a duplicate index…',
+      at: 2,
+    },
+  ];
+
+  it('«@» lists the chats found beside the files; one picked leaves the field and points the message at it', async () => {
+    const findChats = vi.fn(() => Promise.resolve(picks));
+    const onChat = vi.fn();
+    const listFolder = vi.fn(() =>
+      Promise.resolve([{ name: 'src', path: 'src', kind: 'directory' as const }]),
+    );
+    render(<Harness slash={source({ listFolder, findChats, onChat })} initial="see " />);
+    await act(async () => type('see @mig'));
+    await waitFor(() => expect(rows().join('|')).toContain('Database moves'));
+    expect(findChats).toHaveBeenCalledWith('mig', expect.anything());
+    const text = rows().join('|');
+    expect(text).toContain('the migration failed on a duplicate index');
+    expect(text).toContain('chat');
+    fireEvent.click(
+      screen.getAllByRole('option').find((row) => row.textContent?.includes('Database moves'))!,
+    );
+    expect(onChat).toHaveBeenCalledExactlyOnceWith(picks[1].ref);
+    expect(field().value).toBe('see ');
+  });
+
+  it('asks for no chats once the word is a path', async () => {
+    const findChats = vi.fn(() => Promise.resolve(picks));
+    const listFolder = vi.fn(() =>
+      Promise.resolve([{ name: 'app.ts', path: 'src/app.ts', kind: 'file' as const }]),
+    );
+    render(<Harness slash={source({ listFolder, findChats })} />);
+    await act(async () => type('@src/a'));
+    await waitFor(() => expect(rows().join('|')).toContain('app.ts'));
+    expect(findChats).not.toHaveBeenCalled();
+  });
+
+  it('opens «@» where only chats can be named (the chat has no folder to list)', async () => {
+    const findChats = vi.fn(() => Promise.resolve(picks));
+    render(<Harness slash={source({ listFolder: null, findChats })} />);
+    await act(async () => type('@'));
+    await waitFor(() => expect(rows().join('|')).toContain('Old release work'));
+  });
+});

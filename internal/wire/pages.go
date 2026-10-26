@@ -73,6 +73,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.dirs(w, r)
 	case p == "sessions":
 		s.sessions(w, r)
+	case p == "search":
+		s.search(w, r)
 	case p == "voice":
 		s.voice(w, r)
 	case strings.HasPrefix(p, "designly/"):
@@ -89,6 +91,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.profiles(w, r, "")
 	case strings.HasPrefix(p, "providers/"):
 		s.profiles(w, r, strings.TrimPrefix(p, "providers/"))
+	case strings.HasPrefix(p, "agents/"):
+		s.logins(w, r, strings.TrimPrefix(p, "agents/"))
 	case strings.HasPrefix(p, "machine/"):
 		s.machineTool(w, r, strings.TrimPrefix(p, "machine/"))
 	case strings.HasPrefix(p, "conversations/"):
@@ -228,6 +232,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 		return
 	case len(parts) == 2 && parts[1] == "shot":
 		s.shot(ctx, w, r, id)
+		return
+	case len(parts) == 2 && parts[1] == "digest":
+		s.digest(ctx, w, r, id)
 		return
 	case len(parts) == 2 && parts[1] == "tasks":
 		s.tasks(ctx, w, r, id)

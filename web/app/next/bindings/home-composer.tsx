@@ -57,6 +57,8 @@ interface IHomeComposerProps {
   onCreated: (id: ConvId) => void;
 }
 
+const noChat = () => undefined;
+
 const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: IHomeComposerProps) => {
   const enterSends = useEnterSends();
   // Arriving with something taken from the Apps screen, the person goes on in the field.
@@ -105,6 +107,7 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
     provider: choice?.provider ?? null,
     cwd,
     actions: slashActions,
+    onChat: noChat,
   });
 
   const onSubmit = useCallback(() => {

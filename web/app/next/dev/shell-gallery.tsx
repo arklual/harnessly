@@ -22,11 +22,12 @@ import { notificationsFromChats } from '@/next/features/notifications/from-chats
 import { notificationsFromMachines } from '@/next/features/notifications/from-machines';
 import { alertOf, cardOf, choiceOf } from '@/next/bindings/shell-model';
 import { pinLocale } from '@/next/i18n';
-import type { HealthIssue, HealthLevel, MachineLoad } from '@/next/protocol/v2';
+import type { HealthIssue, HealthLevel, MachineLoad, MessageHit } from '@/next/protocol/v2';
 import type { MachineView } from '@/next/stores/machines';
 import { toast, ToastHost } from '@/next/ui/toast';
 import SearchDialog from '@/next/features/search/search-dialog';
-import { CHAT_SCOPES, recentChats, searchChats } from '@/next/features/search/search-chats';
+import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
+import { foldText } from '@/next/features/search/highlight';
 import AppFrame from '@/next/features/shell/app-frame';
 import ChatStage from '@/next/features/shell/chat-stage';
 import TabStrip, { PACE, type IStripTab } from '@/next/features/shell/tab-strip';
@@ -326,6 +327,54 @@ const FEED_TEXT = Array.from(
   (_, i) =>
     `Абзац ${i + 1}. Агент разобрал задачу, прошёл по файлам панели, поправил анимацию и проверил, что лента остаётся на месте, пока колонка чата меняет ширину вместе с правой панелью.`,
 );
+
+/** What the runtime's message search would find in the made-up chats: the words are matched here, the way it does. */
+const seedMessages = (now: number): readonly MessageHit[] => {
+  const hit = (
+    chat: string,
+    n: number,
+    ago: number,
+    role: MessageHit['role'],
+    snippet: string,
+  ): MessageHit => ({
+    convId: chat as MessageHit['convId'],
+    entryId: `c:00000000-0000-4000-8000-00000000000${n}#0`,
+    turnId: `c:00000000-0000-4000-8000-00000000000${n}#0`,
+    at: now - ago,
+    role,
+    snippet,
+  });
+  return [
+    hit(
+      'c-deploy',
+      1,
+      70 * MIN,
+      'user',
+      '…выкат на прод упал на миграции, посмотри логи джобы и скажи, что делать…',
+    ),
+    hit(
+      'c-deploy',
+      2,
+      66 * MIN,
+      'agent',
+      'Миграция упала на дубле индекса: откатил её и выкатил заново, прод жив.',
+    ),
+    hit(
+      'c-onboarding',
+      3,
+      5 * DAY,
+      'agent',
+      'Для платежей нужна миграция схемы: добавим таблицу выплат и индекс по организатору.',
+    ),
+    hit(
+      'c-refunds',
+      4,
+      2 * HOUR,
+      'user',
+      'Сверь акт по возвратам за октябрь и найди расхождения по миграции платежей',
+    ),
+  ];
+};
 
 const seedChats = (now: number): ISidebarChat[] => {
   const chat = (id: string, title: string, ago: number, extra: Partial<ISidebarChat> = {}): ISidebarChat => ({
@@ -813,7 +862,21 @@ const Gallery = () => {
             scopes={CHAT_SCOPES}
             scope={scope}
             onScope={setScope}
-            results={searchChats(chats, projects, query)}
+            results={[
+              ...searchChats(chats, projects, query),
+              ...messageGroups(
+                query.trim().length < 2
+                  ? []
+                  : seedMessages(now).filter((hit) =>
+                      foldText(query)
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .every((word) => foldText(hit.snippet).includes(word)),
+                    ),
+                chats,
+                now,
+              ),
+            ]}
             recent={recentChats(chats, projects)}
             onPick={(row) => {
               setSearchOpen(false);

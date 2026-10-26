@@ -209,3 +209,38 @@ describe('UserMessage with attached places', () => {
     expect(screen.getByRole('button', { name: 'Open design “Checkout”' })).toBeTruthy();
   });
 });
+
+describe('UserMessage that was sent long ago', () => {
+  const show = (outgoing: Message | null) =>
+    render(
+      <UserMessage
+        text="Hello"
+        attachments={[]}
+        outgoing={outgoing}
+        offline={false}
+        onRetry={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+  it('fades away with its closing animation when no turn shows it, ten seconds after it went', () => {
+    show(message({ k: 'accepted', entryId: 'c:1#0' }));
+    expect(look()).toBe('sent');
+    act(() => void vi.advanceTimersByTime(9_900));
+    expect(look()).toBe('sent');
+    act(() => void vi.advanceTimersByTime(200));
+    expect(look()).toBe('leaving');
+    act(() => void vi.advanceTimersByTime(300));
+    expect(document.querySelector('.hx-msg-user')).toBeNull();
+  });
+
+  it('a message on its way and a turn’s prompt stay', () => {
+    show(message({ k: 'in-input' }));
+    act(() => void vi.advanceTimersByTime(60_000));
+    expect(look()).toBe('sending');
+    cleanup();
+    show(null);
+    act(() => void vi.advanceTimersByTime(60_000));
+    expect(look()).toBe('sent');
+  });
+});

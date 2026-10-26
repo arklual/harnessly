@@ -748,6 +748,11 @@ html:has(.hx-app) body {
   text-align: center;
   animation: hx-srch-fade 200ms ease backwards;
 }
+.hx-srch__note {
+  padding: 8px 10px 4px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
 .hx-srch__none b {
   color: var(--hx-fg-1);
   font-weight: var(--hx-weight-medium);

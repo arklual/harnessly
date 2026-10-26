@@ -174,6 +174,7 @@
   "next.queue.retry": "Повторить",
   "next.queue.sending": "отправляется",
   "next.queue.slow": "дольше обычного…",
+  "next.queue.stalled": "не дошло",
   "next.ref.file": "Файл",
   "next.ref.link": "Ссылка",
   "next.ref.mr": "Merge request",
@@ -384,6 +385,10 @@
   "next.attach.kindDoc": "документ",
   "next.attach.kindBoard": "доска",
   "next.attach.kindFile": "файл проекта",
+  "next.slash.group.chat": "Чаты",
+  "next.slash.src.chat": "чат",
+  "next.attach.kindChat": "чат",
+  "next.composer.dropChat": "Отпустите, чтобы приложить чат",
   "next.attach.kindMr": "merge request",
   "next.attach.kindTask": "задача",
   "next.rich.diagram": "Диаграмма",
@@ -463,5 +468,7 @@
   "next.auto.limit.pending": "Лимит сброшен · продолжаю…",
   "next.auto.restart.pending": "Прервано перезапуском · продолжаю…",
   "next.composer.placeholderLimited": "Отправится после сброса лимита {at}",
-  "next.composer.placeholderLimitedUnknown": "Отправится после сброса лимита"
+  "next.composer.placeholderLimitedUnknown": "Отправится после сброса лимита",
+  "next.dockBar.keyGone": "Ключ {vendor} удалён — добавьте его в «Модели и ключи» или продолжите в другой модели",
+  "next.dockBar.keyOpen": "Модели и ключи"
 }

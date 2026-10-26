@@ -1,0 +1,15 @@
+{
+  "next.guest.name": "Ваше имя",
+  "next.guest.placeholder": "Ваш комментарий",
+  "next.guest.send": "Отправить комментарий",
+  "next.guest.pick": "Комментировать",
+  "next.guest.pickTip": "Выберите блок и оставьте комментарий",
+  "next.guest.sent": "Комментарий отправлен",
+  "next.guest.failed": "Комментарий не отправился",
+  "next.guest.empty": "Здесь пока нечего показать",
+  "next.guest.noLink": "Эта страница открывается по ссылке",
+  "next.guest.nameTitle": "Как вас зовут?",
+  "next.guest.nameLead": "Под этим именем будут ваши комментарии. Спрашиваем один раз.",
+  "next.guest.nameGo": "Продолжить",
+  "next.guest.account": "Ваше имя: {name}"
+}

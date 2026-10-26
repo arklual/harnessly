@@ -3,7 +3,7 @@
 // with nobody listening is lost, which is right: there is nothing to open.
 import { useEffect, useRef } from 'react';
 
-export const UI_REQUEST = { goal: 'goal', resume: 'resume', merge: 'merge' } as const;
+export const UI_REQUEST = { goal: 'goal', resume: 'resume', merge: 'merge', continue: 'continue' } as const;
 export type TUiRequest = (typeof UI_REQUEST)[keyof typeof UI_REQUEST];
 
 const listeners = new Map<TUiRequest, Set<() => void>>();
@@ -27,4 +27,28 @@ export const useUiRequest = (kind: TUiRequest, handler: () => void): void => {
       set.delete(run);
     };
   }, [kind]);
+};
+
+/** The chat whose «Продолжить в другой модели» was asked for from a menu: it may not be on the screen yet. */
+let continueFor: string | null = null;
+
+/** Asks the chat `id` to open its «Продолжить в другой модели» sheet, now or as soon as it is on the page. */
+export const requestContinue = (id: string): void => {
+  continueFor = id;
+  requestUi(UI_REQUEST.continue);
+};
+
+/** Runs `handler` when the chat `id` is asked to continue in another model, also when it was asked before it mounted. */
+export const useContinueRequest = (id: string, handler: () => void): void => {
+  const latest = useRef(handler);
+  useEffect(() => {
+    latest.current = handler;
+  });
+  const take = () => {
+    if (continueFor !== id) return;
+    continueFor = null;
+    latest.current();
+  };
+  useUiRequest(UI_REQUEST.continue, take);
+  useEffect(take, [id]);
 };

@@ -254,6 +254,7 @@
       .hx-set__spin i,
       .hx-set__btn-spin,
       .hx-gate__spin,
+      .hx-spin-ic,
       .hx-chat-status[data-status='thinking'],
       .hx-chat-status[data-status='background'],
       .hx-chat-status[data-status='busy'],

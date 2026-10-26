@@ -244,3 +244,53 @@
     min-height: 200px;
   }
 }
+
+/* ── «Продолжить в другой модели»: the models to choose from ── */
+.hx-continue__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0 8px;
+  overflow-y: auto;
+}
+.hx-continue__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-continue__name {
+  margin: 0 0 2px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--hx-fg-3);
+}
+.hx-continue__model {
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-continue__model:hover,
+.hx-continue__model:focus-visible {
+  background: var(--hx-bg-hover);
+}
+.hx-continue__connect {
+  align-self: flex-start;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.hx-continue__connect:hover {
+  color: var(--hx-fg-1);
+}

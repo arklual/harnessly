@@ -1,0 +1,47 @@
+/* The page of a guest link: the design's viewer alone, in the window the owner has it in, over the whole page. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.hx-guest {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  background: var(--hx-shell);
+  color: var(--hx-fg-1);
+}
+
+.hx-guest .hx-main {
+  flex: 1;
+  margin: 10px;
+}
+
+@media (max-width: 720px) {
+  .hx-guest .hx-main {
+    margin: 0;
+    border-radius: 0;
+  }
+}
+
+.hx-guest__empty {
+  margin: auto;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-md);
+}
+
+/* The list of the comments sits over the page, at the bottom, where the owner's island is. */
+.hx-guest__strip {
+  position: absolute;
+  inset: auto 0 12px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.hx-guest__strip > * {
+  pointer-events: auto;
+}

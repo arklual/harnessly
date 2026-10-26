@@ -20,6 +20,7 @@ const KIND_KEYS: Record<MessageRef['kind'], string> = {
   file: 'next.attach.kindFile',
   mr: 'next.attach.kindMr',
   task: 'next.attach.kindTask',
+  chat: 'next.attach.kindChat',
 } as const;
 
 export interface IRefChip extends Pick<MessageRef, 'kind' | 'id' | 'title'> {

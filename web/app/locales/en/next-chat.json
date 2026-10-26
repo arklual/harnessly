@@ -172,6 +172,7 @@
   "next.queue.retry": "Retry",
   "next.queue.sending": "sending",
   "next.queue.slow": "takes longer than usual…",
+  "next.queue.stalled": "didn't go through",
   "next.ref.file": "File",
   "next.ref.link": "Link",
   "next.ref.mr": "Merge request",
@@ -378,6 +379,10 @@
   "next.attach.kindDoc": "document",
   "next.attach.kindBoard": "board",
   "next.attach.kindFile": "project file",
+  "next.slash.group.chat": "Chats",
+  "next.slash.src.chat": "chat",
+  "next.attach.kindChat": "chat",
+  "next.composer.dropChat": "Drop to attach the chat",
   "next.attach.kindMr": "merge request",
   "next.attach.kindTask": "task",
   "next.rich.diagram": "Diagram",
@@ -449,5 +454,7 @@
   "next.auto.limit.pending": "Limit reset · continuing…",
   "next.auto.restart.pending": "Interrupted by a restart · continuing…",
   "next.composer.placeholderLimited": "Will send when the limit resets {at}",
-  "next.composer.placeholderLimitedUnknown": "Will send when the limit resets"
+  "next.composer.placeholderLimitedUnknown": "Will send when the limit resets",
+  "next.dockBar.keyGone": "The {vendor} key was removed — add it in Models and keys or continue in another model",
+  "next.dockBar.keyOpen": "Models and keys"
 }

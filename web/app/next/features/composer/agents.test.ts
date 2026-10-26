@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { pinLocale } from '@/next/i18n';
-import { effortLabel, modelName, modelOf, unavailableNote, type IPickerAgent } from './agents';
+import { effortLabel, modelName, modelOf, removedKeyOf, unavailableNote, type IPickerAgent } from './agents';
 
 beforeAll(() => pinLocale('en'));
 
@@ -38,5 +38,22 @@ describe('an agent that cannot start a chat', () => {
   });
   it('names the ultra depth', () => {
     expect(effortLabel('ultra')).toBe('Ultra');
+  });
+});
+
+describe('a chat of a vendor whose key was removed', () => {
+  const machine = (configured: boolean) =>
+    [{ provider: 'claude', profiles: [{ id: 'kimi', label: 'Kimi', configured }] }] as unknown as Parameters<
+      typeof removedKeyOf
+    >[0];
+
+  it('names the vendor while its profile is listed without a key', () => {
+    expect(removedKeyOf(machine(false), 'claude', 'kimi')).toBe('Kimi');
+  });
+
+  it('says nothing while the key is there, for Claude itself or for an unknown profile', () => {
+    expect(removedKeyOf(machine(true), 'claude', 'kimi')).toBeNull();
+    expect(removedKeyOf(machine(false), 'claude', null)).toBeNull();
+    expect(removedKeyOf(machine(false), 'claude', 'glm')).toBeNull();
   });
 });

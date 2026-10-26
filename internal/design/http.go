@@ -2,10 +2,12 @@ package design
 
 import (
 	"io"
+	"io/fs"
 	"mime"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
@@ -35,7 +37,12 @@ type API struct {
 	AppBase string
 	// PublicToken checks the tokens of the public read (design-public).
 	PublicToken PublicConfig
-	Log         func(level, msg string, err error)
+	// GuestApp is the built web page (web/dist): the guest page of a link without sign-in is served from it.
+	GuestApp  fs.FS
+	guestOnce sync.Once
+	// guestFiles are the files of GuestApp the guest page needs, read from its manifest on first use.
+	guestFiles map[string]bool
+	Log        func(level, msg string, err error)
 }
 
 // Answer is a route's answer: status, value (JSON, gate.Raw, or nil for no body) and headers.

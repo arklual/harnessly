@@ -158,7 +158,7 @@ export type PeerNoteKind = (typeof PEER_NOTE_KINDS)[number];
 export const ATTACHMENT_KINDS = ['image', 'file'] as const;
 export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
 /** What a message's reference points at (MessageRef): nothing is uploaded, the runtime writes a line for it. */
-export const REF_KINDS = ['design', 'doc', 'board', 'file', 'mr', 'task'] as const;
+export const REF_KINDS = ['design', 'doc', 'board', 'file', 'mr', 'task', 'chat'] as const;
 export type RefKind = (typeof REF_KINDS)[number];
 /** How many references one message or draft carries. */
 export const REFS_MAX = 10;
@@ -234,7 +234,7 @@ export const CLIENT_FRAME_KINDS = ['hello', 'sub', 'unsub', 'ping'] as const;
 /** The optional parts of the frames this page reads, named in its socket's address (?caps=…) and in the HTTP calls
  *  that carry them: the runtime sends them only to a page that names them, so a tab left on an older build never meets
  *  a field it refuses. Not in hello: a runtime older than the page refuses a field of hello it does not know. */
-export const CLIENT_CAPS = ['delegation', 'workflows', 'profiles'] as const;
+export const CLIENT_CAPS = ['delegation', 'workflows', 'profiles', 'msgstatus'] as const;
 /** CLIENT_CAPS as a query: `caps=…`. */
 export const CAPS_QUERY = `caps=${CLIENT_CAPS.join(',')}`;
 export type ClientFrameKind = (typeof CLIENT_FRAME_KINDS)[number];
@@ -460,6 +460,59 @@ export interface ProfileTest {
   status: number | null;
   ms: number;
 }
+export const LOGIN_MODES = ['subscription', 'console', 'device'] as const;
+export type LoginMode = (typeof LOGIN_MODES)[number];
+export const LOGIN_STATES = [
+  'starting',
+  'awaiting',
+  'checking',
+  'done',
+  'failed',
+  'cancelled',
+  'expired',
+] as const;
+export type LoginState = (typeof LOGIN_STATES)[number];
+export const LOGIN_INPUTS = ['code', 'none'] as const;
+export type LoginInput = (typeof LOGIN_INPUTS)[number];
+export const LOGIN_REASONS = [
+  'not-installed',
+  'start-failed',
+  'code-rejected',
+  'refused',
+  'timeout',
+] as const;
+export type LoginReason = (typeof LOGIN_REASONS)[number];
+/** One sign-in of an agent CLI, driven by the runtime. `url` is the vendor's link; `userCode` the one-time code to type
+ *  there (device mode); `input: 'code'` asks the page to paste back the code the vendor's site showed. */
+export interface LoginFlow {
+  id: string;
+  provider: Provider;
+  mode: LoginMode;
+  state: LoginState;
+  input: LoginInput;
+  url: string | null;
+  userCode: string | null;
+  startedAt: number;
+  expiresAt: number;
+  reason: LoginReason | null;
+}
+/** Answer of the sign-in routes under /api/v2/agents/{provider}/login: null when none was started. */
+export interface LoginStatus {
+  flow: LoginFlow | null;
+}
+/** The body of POST /api/v2/agents/{provider}/login. */
+export interface LoginStart {
+  mode: LoginMode;
+}
+/** The body of POST /api/v2/agents/{provider}/login/code. */
+export interface LoginCode {
+  id: string;
+  code: string;
+}
+/** PUT .../key (an API key to the CLI's stdin; the body is {@link ProfileKeyEdit}) and POST .../logout. */
+export interface LoginOK {
+  ok: boolean;
+}
 export interface AgentModel {
   id: string;
   label: string;
@@ -640,6 +693,35 @@ export type MessageStatus =
   | { clientId: ClientId; k: 'expired'; at: Ms };
 export interface MessageStatuses {
   messages: MessageStatus[];
+}
+/** Who wrote a message the search found. */
+export const MESSAGE_ROLES = ['user', 'agent'] as const;
+export type MessageRole = (typeof MESSAGE_ROLES)[number];
+/** One message found (GET /api/v2/search): its conversation, its entry, the turn the entry is in (null for one outside
+ *  any), and the words around the match. */
+export interface MessageHit {
+  convId: ConvId;
+  entryId: EntryId;
+  turnId: TurnId | null;
+  at: Ms;
+  role: MessageRole;
+  snippet: string;
+}
+/** The messages that hold every word of the query, the newest first. `indexing`: the runtime is still reading the
+ *  older conversations, so the answer may lack some. */
+export interface MessageSearch {
+  query: string;
+  hits: MessageHit[];
+  indexing: boolean;
+}
+/** What a chat said, cut to the size of a context block (GET /api/v2/conversations/{id}/digest); `path` is the whole
+ *  conversation as Markdown on the machine. */
+export interface ChatDigest {
+  convId: ConvId;
+  title: string;
+  text: string;
+  path: string;
+  truncated: boolean;
 }
 /** The parts of the disk layout, in the order they are drawn; `other` is the used part none of the named folders
  *  accounts for. */
@@ -1137,6 +1219,8 @@ export interface HandoffDraftRequest {
   mode: DraftMode;
   provider?: Provider;
   model?: string;
+  /** The backend profile the context goes to: an excerpt is cut to that model's own window. */
+  profile?: ProfileId;
 }
 /** When and why a chat's terminal was stopped; `idleMs` is how long it had stood idle (`by: idle` only). */
 export interface TerminalStop {
@@ -1933,6 +2017,20 @@ const profileTest: Decoder<ProfileTest> = object({
   status: nullable(int),
   ms: int,
 });
+const loginFlow: Decoder<LoginFlow> = object({
+  id: str,
+  provider,
+  mode: oneOf(LOGIN_MODES),
+  state: oneOf(LOGIN_STATES),
+  input: oneOf(LOGIN_INPUTS),
+  url: nullable(str),
+  userCode: nullable(str),
+  startedAt: ms,
+  expiresAt: ms,
+  reason: nullable(oneOf(LOGIN_REASONS)),
+});
+const loginStatus: Decoder<LoginStatus> = object({ flow: nullable(loginFlow) });
+const loginOK: Decoder<LoginOK> = object({ ok: bool });
 const machineLoad: Decoder<MachineLoad> = object({
   at: ms,
   cpu: num,
@@ -2098,6 +2196,16 @@ const designlyPin: Decoder<DesignlyPin> = object({ id, pinned: bool });
 const taskStatus = oneOf(TASK_STATUSES);
 const task: Decoder<Task> = object({ id, subject: str, status: taskStatus });
 const convContext: Decoder<ConvContext> = object({ usedTokens: int, limitTokens: int });
+const messageHit: Decoder<MessageHit> = object({
+  convId,
+  entryId,
+  turnId: nullable(turnId),
+  at: ms,
+  role: oneOf(MESSAGE_ROLES),
+  snippet: str,
+});
+const messageSearch: Decoder<MessageSearch> = object({ query: str, hits: array(messageHit), indexing: bool });
+const chatDigest: Decoder<ChatDigest> = object({ convId, title: str, text: str, path: id, truncated: bool });
 const share: Decoder<number> = (v, p) => (num(v, p) <= 1 ? (v as number) : fail(p, 'above 1'));
 const diskPartId = oneOf(DISK_PART_IDS);
 const machineDiskPart: Decoder<MachineDiskPart> = object({ id: diskPartId, bytes: int });
@@ -2939,6 +3047,8 @@ export const parsePage = {
   openRefs: (v: unknown): OpenedRefs => openedRefs(v, '$'),
   messageStatus: (v: unknown): MessageStatuses => object({ messages: array(messageStatus) })(v, '$'),
   context: (v: unknown): ConvContext => convContext(v, '$'),
+  search: (v: unknown): MessageSearch => messageSearch(v, '$'),
+  digest: (v: unknown): ChatDigest => chatDigest(v, '$'),
   machineStats: (v: unknown): MachineStats => machineStats(v, '$'),
   machineStop: (v: unknown): MachineStopped => machineStopped(v, '$'),
   apps: (v: unknown): AppsFeed => appsFeed(v, '$'),
@@ -2949,4 +3059,6 @@ export const parsePage = {
   profiles: (v: unknown): ProfileList => profileList(v, '$'),
   profileKey: (v: unknown): ProfileKey => profileKey(v, '$'),
   profileTest: (v: unknown): ProfileTest => profileTest(v, '$'),
+  login: (v: unknown): LoginStatus => loginStatus(v, '$'),
+  loginOK: (v: unknown): LoginOK => loginOK(v, '$'),
 };

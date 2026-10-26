@@ -32,7 +32,9 @@ import { notificationsFromMachines } from '@/next/features/notifications/from-ma
 import NotificationCenter from '@/next/features/notifications/notification-center';
 import NoticeStack from '@/next/features/notifications/notice-stack';
 import { useNotices } from '@/next/bindings/notices';
-import { CHAT_SCOPES, recentChats, searchChats } from '@/next/features/search/search-chats';
+import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
+import { useMessageSearch } from '@/next/bindings/use-message-search';
+import { revealMessage } from '@/next/stores/reveal';
 import type { ISearchRow } from '@/next/features/search/search-dialog';
 import AppFrame, { type IAppFrameProps } from '@/next/features/shell/app-frame';
 import { toggleRail, useRail } from '@/next/bindings/rail';
@@ -66,7 +68,9 @@ import InviteAccept from '@/next/features/designly/access/invite-accept';
 import { useProjectDialog, useResumeDialog } from '@/next/bindings/shell-dialogs';
 import { useAppUpdate } from '@/next/bindings/use-app-update';
 import UpdateBanner from '@/next/features/update/update-banner';
-import type { ConvId } from '@/next/protocol/v2';
+import { REFS_MAX, type ConvId } from '@/next/protocol/v2';
+import { chatRef } from '@/next/features/composer/chat-sources';
+import { addDraftRef } from '@/next/stores/drafts';
 import { isUnread, useConversation, useConvsAnswered } from '@/next/stores/conversations';
 import { linkReason, useConnection } from '@/next/stores/connection';
 import { useMe } from '@/next/stores/me';
@@ -297,10 +301,14 @@ const Shell = ({ owner }: IShellProps) => {
   }, [model.chats, model.machineNotices]);
   const [machineReveal, setMachineReveal] = useState(0);
   const unread = notificationItems?.some((item) => item.unread) ?? false;
-  const searchResults = useMemo(
-    () => (model.chats === null ? null : searchChats(model.chats, model.projects ?? [], query)),
-    [model.chats, model.projects, query],
-  );
+  const messages = useMessageSearch(model.active, query, searchOpen);
+  const searchResults = useMemo(() => {
+    if (model.chats === null) return null;
+    const titles = searchChats(model.chats, model.projects ?? [], query);
+    // The messages are still being asked and no title answers yet: the dialog keeps its «searching» rather than «nothing».
+    if (messages.asked && messages.hits === null && titles.length === 0) return null;
+    return messages.hits ? [...titles, ...messageGroups(messages.hits, model.chats, now)] : titles;
+  }, [model.chats, model.projects, query, messages.asked, messages.hits, now]);
   const recent = useMemo(
     () => (model.chats === null ? [] : recentChats(model.chats, model.projects ?? [])),
     [model.chats, model.projects],
@@ -400,6 +408,14 @@ const Shell = ({ owner }: IShellProps) => {
     ...model.actions,
     onOpenInNewTab: tabs.enabled ? (id: string) => openInNewTab({ kind: ROUTE.chat, id }, true) : undefined,
     onNewProject: projectDialog.show,
+    onAttachChat:
+      currentId !== null && isConvId(currentId)
+        ? (id: string) => {
+            const chat = model.chats?.find((item) => item.id === id);
+            if (chat && id !== currentId)
+              addDraftRef(currentId, chatRef(chat.id as ConvId, chat.title), REFS_MAX);
+          }
+        : undefined,
     onNewChatIn: (projectId: string) => {
       newChatProjectStore.set(projectId);
       navigate(HOME);
@@ -540,11 +556,20 @@ const Shell = ({ owner }: IShellProps) => {
             onScope: setScope,
             results: searchResults,
             failed: listFailed,
+            indexing: messages.indexing,
             recent,
             onPick: (row: ISearchRow) => {
               setSearchOpen(false);
               setQuery('');
-              openChat(row.id);
+              if (row.target && isConvId(row.target.chatId)) {
+                // The chat opens at the message: the feed of that chat takes the ask when it is on screen.
+                revealMessage({
+                  conv: row.target.chatId,
+                  entryId: row.target.entryId,
+                  turnId: row.target.turnId,
+                });
+                openChat(row.target.chatId);
+              } else openChat(row.id);
             },
           }}
         />

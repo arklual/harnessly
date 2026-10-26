@@ -44,13 +44,20 @@ func modelID(m *wire.Model) string {
 	return m.ID
 }
 
+func profileOf(m *wire.Model) string {
+	if m == nil {
+		return ""
+	}
+	return m.Profile
+}
+
 func fromOf(rec wire.Conversation) handoff.From {
 	return handoff.From{ID: rec.ID, Title: rec.Title, Provider: rec.Provider, Model: modelID(rec.Model)}
 }
 
 // Excerpt is the draft of a handoff by excerpt: the conversation's context within the budget of the model it goes to
 // (provider "" is the conversation's own agent).
-func (r *Runtime) Excerpt(id string, provider wire.Provider, model string) (wire.HandoffDraft, error) {
+func (r *Runtime) Excerpt(id string, provider wire.Provider, model, profile string) (wire.HandoffDraft, error) {
 	rec, ok := r.Record(id)
 	if !ok {
 		return wire.HandoffDraft{}, ErrNotFound
@@ -60,12 +67,26 @@ func (r *Runtime) Excerpt(id string, provider wire.Provider, model string) (wire
 	}
 	if provider == "" {
 		provider, model = rec.Provider, modelID(rec.Model)
+		if rec.Model != nil {
+			profile = rec.Model.Profile
+		}
 	}
-	text, kept := handoff.Excerpt(r.whole(rec), rec.Provider, handoff.Budget(provider, model))
+	text, kept := handoff.Excerpt(r.whole(rec), rec.Provider, r.budgetFor(provider, model, profile))
 	if strings.TrimSpace(text) == "" {
 		return wire.HandoffDraft{}, ErrNoTranscript
 	}
 	return wire.HandoffDraft{Mode: wire.DraftExcerpt, Text: text, Tokens: handoff.Tokens(text), Turns: kept}, nil
+}
+
+// budgetFor is the tokens an excerpt for a model may take: by the window of the model, the vendor's own where the model
+// runs on a backend profile.
+func (r *Runtime) budgetFor(provider wire.Provider, model, profile string) int {
+	if profile != "" && r.d.Profiles != nil {
+		if w := r.d.Profiles.Window(profile, model); w > 0 {
+			return handoff.BudgetIn(w)
+		}
+	}
+	return handoff.Budget(provider, model)
 }
 
 // forkPoint is what a fork reads of the conversation it branches off, on its actor.
@@ -150,7 +171,7 @@ func (r *Runtime) fork(m wire.ConversationForkCmd) wire.CmdResult {
 				break
 			}
 		}
-		text, _ := handoff.Excerpt(turns, src.Provider, handoff.Budget(src.Provider, modelID(src.Model)))
+		text, _ := handoff.Excerpt(turns, src.Provider, r.budgetFor(src.Provider, modelID(src.Model), profileOf(src.Model)))
 		if strings.TrimSpace(text) == "" {
 			return wire.Refused(wire.RefuseUnsupported)
 		}

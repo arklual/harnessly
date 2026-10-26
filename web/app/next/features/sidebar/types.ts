@@ -46,6 +46,8 @@ export interface ISidebarChat {
   canFork?: boolean;
   /** «Влить обратно»: the chat is a fork of another one, which its result can go back to. */
   canMerge?: boolean;
+  /** «Продолжить в другой модели»: the chat has a turn to carry over and the machine can hand off. */
+  canContinue?: boolean;
   /** Set on a chat started with others by one prompt on several models: they stand together under the prompt. */
   launch?: ISidebarLaunch;
 }
@@ -175,6 +177,8 @@ export interface IChatActions {
   onDelete?: (id: string) => Promise<void>;
   /** A chat into the favorites (pinned when it is not): in a group or, with null, ungrouped; before a chat or last. */
   onPlaceFavorite?: (id: string, groupId: string | null, beforeId: string | null) => Promise<void>;
+  /** A chat dropped on the composer of the open chat: its next message points at it; absent where no chat is open. */
+  onAttachChat?: (id: string) => void;
   /** A new group; resolves with its id. */
   onCreateGroup?: (name: string) => Promise<string | null>;
   onRenameGroup?: (id: string, name: string) => Promise<void>;
@@ -195,5 +199,7 @@ export interface IChatActions {
   onFork?: (id: string) => Promise<void>;
   /** Opens the open chat's «Влить обратно» sheet (a fork's result back into the chat it came from). */
   onMerge?: (id: string) => void;
+  /** Opens the chat (if it is not open) and its sheet to continue it in another model. */
+  onContinue?: (id: string) => void;
   onNewProject?: () => void;
 }

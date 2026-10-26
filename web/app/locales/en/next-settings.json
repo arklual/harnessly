@@ -11,7 +11,7 @@
   "next.settings.section.machines": "Machines",
   "next.settings.section.apps": "Apps",
   "next.settings.lead.general": "How the app looks, and your account",
-  "next.settings.lead.accounts": "How the agents sign in and where their requests go",
+  "next.settings.lead.accounts": "How agents and models sign in and where their requests go",
   "next.settings.lead.claude": "How Claude Code works on “{machine}”. Written to {path}",
   "next.settings.lead.codex": "How Codex works on “{machine}”. Written to {path}",
   "next.settings.lead.skills": "What the agent finds on the machine and can use",
@@ -207,7 +207,7 @@
   "next.settings.accounts.signIn": "Subscription",
   "next.settings.accounts.signIn.claude": "Sign in in the machine’s terminal: claude auth login",
   "next.settings.accounts.signIn.codex": "Sign in in the machine’s terminal: codex login",
-  "next.settings.accounts.terminal": "Signing in and keys are the agent’s own business: it keeps them on the machine. They are not typed or shown here.",
+  "next.settings.accounts.terminal": "A subscription signs in through the vendor's page, a key is typed here and is not shown after saving. Both are kept on this machine.",
   "next.settings.accounts.where": "Where requests go",
   "next.settings.accounts.direct": "Direct",
   "next.settings.accounts.viaProxy": "Through a proxy",
@@ -215,7 +215,7 @@
   "next.settings.accounts.proxyAria": "Proxy address",
   "next.settings.accounts.proxyBad": "An address like https://llm.example.com is needed",
   "next.settings.accounts.gets": "The agent gets",
-  "next.settings.accounts.foot": "A subscription spends its limits, a key spends money from a balance. Through a proxy the requests are counted and limited on its side.",
+  "next.settings.accounts.foot": "A subscription spends its limits, a key spends money from the balance. Through a proxy the requests are counted and limited on its side. Kimi, GLM and Grok models run in chats of their own: your other chats do not change.",
   "next.settings.skills.agent": "Agent",
   "next.settings.skills.show": "Show",
   "next.settings.skills.tab.skills": "Skills",
@@ -277,5 +277,10 @@
   "next.settings.general.limitContinue": "Continue after the limit resets",
   "next.settings.general.limitContinue.hint": "When the subscription's limit runs out in the middle of work, the chat goes on by itself once the limit resets",
   "next.settings.general.restartContinue": "Continue after a restart",
-  "next.settings.general.restartContinue.hint": "Work that a restart cut short goes on by itself"
+  "next.settings.general.restartContinue.hint": "Work that a restart cut short goes on by itself",
+  "next.settings.accounts.method.subscription": "Subscription",
+  "next.settings.accounts.method.key": "API key",
+  "next.settings.accounts.keyHint.claude": "A key from console.anthropic.com, paid from the balance",
+  "next.settings.accounts.keyHint.codex": "An OpenAI API key, paid from the balance",
+  "next.settings.accounts.method.console": "API billing"
 }

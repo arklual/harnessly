@@ -60,6 +60,7 @@ export const REF_ICON: Record<RefKind, string> = {
   file: 'file-code',
   mr: 'git-pull-request',
   task: 'list-checks',
+  chat: 'message-square',
 } as const;
 
 /** The key that tells one place from another in a field. */

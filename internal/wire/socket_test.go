@@ -1048,6 +1048,7 @@ func TestCrossSiteRequestsAreRefused(t *testing.T) {
 		{"POST", "/api/v2/conversations/" + conv + "/terminals"}, {"DELETE", "/api/v2/conversations/" + conv + "/terminals/abcdef"},
 		{"POST", "/api/v2/machine/processes/stop"}, {"PATCH", "/api/v2/agent-settings/claude"}, {"PATCH", "/api/v2/me/settings"},
 		{"PUT", "/api/v2/providers/kimi/key"}, {"DELETE", "/api/v2/providers/kimi/key"}, {"POST", "/api/v2/providers/kimi/test"},
+		{"POST", "/api/v2/agents/claude/login"}, {"POST", "/api/v2/agents/claude/login/code"}, {"DELETE", "/api/v2/agents/claude/login"}, {"PUT", "/api/v2/agents/codex/key"}, {"POST", "/api/v2/agents/codex/logout"},
 	}
 	foreign := []map[string]string{
 		{"Origin": "https://evil.example"},

@@ -135,6 +135,12 @@ export class FakeRuntime {
   ringSize = 2000;
   /** The drafts the convs snapshot carries (a runtime with `drafts`). */
   drafts: Draft[] = [];
+  /** Client ids whose records the runtime let go, and when they ended: their status is expired. */
+  forgotten = new Map<string, number>();
+  /** The client ids each status question asked about; null in place of the list: the status page answers 404 (an
+   *  older runtime). */
+  statusAsks: string[][] = [];
+  statusPage = true;
   private nextConv = 1;
 
   constructor(o: FakeRuntimeOptions = {}) {
@@ -381,6 +387,21 @@ export class FakeRuntime {
         throw new TypeError('Failed to fetch');
       }
       return json(result);
+    }
+    const status = /^\/conversations\/([^/]+)\/messages$/.exec(path);
+    if (status && this.statusPage) {
+      const ids = (u.searchParams.get('ids') ?? '').split(',');
+      this.statusAsks.push(ids);
+      const data = this.convs.get(decodeURIComponent(status[1]));
+      if (!data) return json({ r: 'refused', code: 'not-found' }, 404);
+      return json({
+        messages: ids.map((clientId) => {
+          const message = data.messages.find((m) => m.clientId === clientId);
+          if (message) return { clientId, k: 'known', message };
+          const at = this.forgotten.get(clientId);
+          return at === undefined ? { clientId, k: 'unknown' } : { clientId, k: 'expired', at };
+        }),
+      });
     }
     return json({ r: 'refused', code: 'not-found' }, 404);
   };

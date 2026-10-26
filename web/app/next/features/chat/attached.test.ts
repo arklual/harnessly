@@ -62,3 +62,24 @@ describe('attachedOf', () => {
     expect(attachedOf(block, own).refs).toHaveLength(3);
   });
 });
+
+describe('readAttached: another chat', () => {
+  it('reads its chip and leaves the excerpt lines under it to the agent', () => {
+    const read = readAttached(
+      [
+        'continue that',
+        '',
+        '<attached>',
+        'Attached to the message:',
+        '<ref kind="chat" id="tab-old" title="Old work"/> Another chat «Old work». An excerpt follows.',
+        'Chat «Old work»',
+        '',
+        'Original request:',
+        'fix the deploy',
+        '</attached>',
+      ].join('\n'),
+    );
+    expect(read.text).toBe('continue that');
+    expect(read.refs).toEqual([{ kind: 'chat', id: 'tab-old', title: 'Old work', target: 'tab-old' }]);
+  });
+});

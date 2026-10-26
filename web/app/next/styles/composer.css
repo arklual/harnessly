@@ -64,6 +64,20 @@
   pointer-events: none;
   animation: hx-drop-in 180ms var(--hx-ease-out) backwards;
 }
+/* A chat carried from the sidebar: the same hint, shown while the sidebar's drag lights the field (data-drop-over). */
+.hx-drop--chat {
+  opacity: 0;
+  visibility: hidden;
+  animation: none;
+  transition:
+    opacity var(--hx-dur-sm) var(--hx-ease-out),
+    visibility 0s linear var(--hx-dur-sm);
+}
+.hx-composer[data-drop-over='true'] .hx-drop--chat {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
 .hx-drop .hx-icon {
   animation: hx-drop-nudge 1.4s var(--hx-ease-in-out) infinite;
 }
@@ -1081,7 +1095,8 @@
     gap: 0;
   }
   .hx-queue__note {
-    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
     line-height: 16px;
   }
 }

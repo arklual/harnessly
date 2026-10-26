@@ -1,12 +1,26 @@
-// «Models and keys»: per agent, how it is signed in on the machine and where its requests go. The sign-in is the CLI's
-// own (a subscription or an API key it keeps itself): the page shows it and never holds a key; the address of the
-// requests is a setting of the CLI's file and is changed here.
+// «Models and keys»: per agent and per vendor, how it is signed in on the machine and where its requests go. Everything
+// is entered here: a subscription is signed in through a login the machine runs (its link and code are on the card), a
+// key goes into a write-only field. The page never holds a saved key, only its last digits; the address of the requests
+// is a setting of the CLI's file and is changed here.
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import LoginPanel from '@/next/features/accounts/login-panel';
+import {
+  METHODS_OF,
+  type ICredentialActions,
+  type ISavedKey,
+  type LoginMethod,
+  type LoginVia,
+  type LoginState,
+} from '@/next/features/accounts/model';
+import KeyPanel from '@/next/features/providers/key-panel';
+import { vendorsOf, type IPresetActions, type IPresetState } from '@/next/features/providers/model';
+import VendorCard from '@/next/features/providers/vendor-card';
 import { optionValue } from '@/next/features/settings/options';
 import { FormError, Group, SetButton } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
 import type { AgentSettings, Provider } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
+import Segmented from '@/next/ui/segmented';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import { Skeleton } from '@/next/ui/skeleton';
 
@@ -31,12 +45,27 @@ export type AccountCard =
   | { provider: Provider; k: 'failed'; text: string }
   | { provider: Provider; k: 'ready'; settings: AgentSettings };
 
+/** What the card of an agent takes and does with its credentials. */
+export interface IAgentCredentials extends ICredentialActions {
+  login: LoginState;
+  key: ISavedKey;
+}
+
+/** The vendors' cards (Kimi, GLM, Grok): the presets as the runtime lists them, or why it has none to show. */
+export type VendorCards =
+  | { k: 'loading' }
+  | { k: 'failed'; text: string; onRetry: () => void }
+  | ({ k: 'ready'; presets: readonly IPresetState[] } & IPresetActions);
+
 export interface IAccountsSectionProps {
   cards: readonly AccountCard[];
-  open: Provider | null;
+  credentials: Readonly<Record<Provider, IAgentCredentials>>;
+  vendors: VendorCards;
+  /** The open card: an agent or a vendor. */
+  open: string | null;
   /** The providers whose address is being written. */
   busy: ReadonlySet<Provider>;
-  onToggle: (provider: Provider) => void;
+  onToggle: (card: string) => void;
   /** Resolves true when the machine took the new address (null: the requests go direct). */
   onBaseUrl: (provider: Provider, url: string | null) => Promise<boolean>;
   onRetry: (provider: Provider) => void;
@@ -50,41 +79,62 @@ const statusText = (settings: AgentSettings): string => {
     : t('next.settings.accounts.onKey');
 };
 
-const SignIn = ({ settings }: { settings: AgentSettings }) => {
+const SignIn = ({ settings, credentials }: { settings: AgentSettings; credentials: IAgentCredentials }) => {
   const { account, provider } = settings;
+  const methods = METHODS_OF[provider];
+  const [method, setMethod] = useState<LoginMethod>(
+    account.method === 'key' && methods.some((m) => m === 'key') ? 'key' : 'subscription',
+  );
+  const name = t(`next.settings.accounts.name.${provider}`);
+  const open = (value: LoginMethod) => ({ 'data-open': method === value }) as const;
+  const inert = (value: LoginMethod) => (method !== value ? true : undefined);
+  const panel = (via: LoginVia) => (
+    <LoginPanel
+      via={via}
+      account={account}
+      login={credentials.login}
+      onLogin={credentials.onLogin}
+      onSubmitCode={credentials.onSubmitCode}
+      onCancel={credentials.onCancelLogin}
+      onLogout={credentials.onLogout}
+    />
+  );
   return (
     <>
       <div className="hx-acct__label">{t('next.settings.accounts.how')}</div>
-      <div className="hx-src" role="radiogroup" aria-label={t('next.settings.accounts.how')}>
-        {account.signedIn && account.method === 'subscription' && (
-          <div className="hx-src__row" role="radio" aria-checked="true" data-readonly="true">
-            <span className="hx-src__radio" aria-hidden="true" />
-            <span className="hx-src__txt">
-              <span className="hx-src__title hx-trunc">
-                {t('next.settings.accounts.subscription', { plan: account.plan ?? '' }).trim()}
-              </span>
-              {account.who && <span className="hx-src__sub hx-trunc">{account.who}</span>}
-            </span>
+      <div className="hx-acct__how">
+        <Segmented
+          label={t('next.settings.accounts.how')}
+          value={method}
+          options={methods.map((value) => ({
+            value,
+            label: t(`next.settings.accounts.method.${value}`),
+          }))}
+          onChange={setMethod}
+        />
+        <div className="hx-reveal" {...open('subscription')}>
+          <div className="hx-reveal__in" inert={inert('subscription')}>
+            {panel('subscription')}
+          </div>
+        </div>
+        {provider === 'claude' && (
+          <div className="hx-reveal" {...open('console')}>
+            <div className="hx-reveal__in" inert={inert('console')}>
+              {panel('console')}
+            </div>
           </div>
         )}
-        {account.signedIn && account.method === 'key' && (
-          <div className="hx-src__row" role="radio" aria-checked="true" data-readonly="true">
-            <span className="hx-src__radio" aria-hidden="true" />
-            <span className="hx-src__txt">
-              <span className="hx-src__title hx-trunc">{t('next.settings.accounts.key')}</span>
-              <span className="hx-src__sub hx-trunc">{t('next.settings.accounts.keyNote')}</span>
-            </span>
-          </div>
-        )}
-        {!account.signedIn && (
-          <div className="hx-src__row" data-static="true">
-            <span className="hx-src__ic">
-              <Icon name="log-in" size="sm" />
-            </span>
-            <span className="hx-src__txt">
-              <span className="hx-src__title">{t('next.settings.accounts.signIn')}</span>
-              <span className="hx-src__sub hx-trunc">{t(`next.settings.accounts.signIn.${provider}`)}</span>
-            </span>
+        {provider === 'codex' && (
+          <div className="hx-reveal" {...open('key')}>
+            <div className="hx-reveal__in" inert={inert('key')}>
+              <KeyPanel
+                hint={t('next.settings.accounts.keyHint.codex')}
+                label={t('next.providers.keyAria', { vendor: name })}
+                saved={credentials.key}
+                onSave={credentials.onSaveKey}
+                onRemove={credentials.onLogout}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -204,10 +254,11 @@ const Card = ({
   card,
   open,
   busy,
+  credentials,
   onToggle,
   onBaseUrl,
   onRetry,
-}: { card: AccountCard; open: boolean; busy: boolean } & Pick<
+}: { card: AccountCard; open: boolean; busy: boolean; credentials: IAgentCredentials } & Pick<
   IAccountsSectionProps,
   'onToggle' | 'onBaseUrl' | 'onRetry'
 >) => {
@@ -247,7 +298,7 @@ const Card = ({
           )}
           {settings && (
             <>
-              <SignIn settings={settings} />
+              <SignIn settings={settings} credentials={credentials} />
               <Proxy key={settings.provider} settings={settings} busy={busy} onBaseUrl={onBaseUrl} />
             </>
           )}
@@ -257,19 +308,53 @@ const Card = ({
   );
 };
 
-const AccountsSection = ({ cards, open, busy, onToggle, onBaseUrl, onRetry }: IAccountsSectionProps) => (
-  <Group foot={`${t('next.settings.accounts.foot')} ${t('next.providers.accountsHint')}`}>
+const AccountsSection = ({
+  cards,
+  credentials,
+  vendors,
+  open,
+  busy,
+  onToggle,
+  onBaseUrl,
+  onRetry,
+}: IAccountsSectionProps) => (
+  <Group foot={t('next.settings.accounts.foot')}>
     {cards.map((card) => (
       <Card
         key={card.provider}
         card={card}
         open={open === card.provider}
         busy={busy.has(card.provider)}
+        credentials={credentials[card.provider]}
         onToggle={onToggle}
         onBaseUrl={onBaseUrl}
         onRetry={onRetry}
       />
     ))}
+    {vendors.k === 'ready' &&
+      vendorsOf(vendors.presets).map((vendor) => (
+        <VendorCard
+          key={vendor}
+          vendor={vendor}
+          states={vendors.presets}
+          open={open === vendor}
+          onToggle={onToggle}
+          onSave={vendors.onSave}
+          onRemove={vendors.onRemove}
+          onTest={vendors.onTest}
+        />
+      ))}
+    {vendors.k === 'loading' && <Skeleton className="hx-set__sk" />}
+    {vendors.k === 'failed' && (
+      <div className="hx-acct hx-acct--solo">
+        <LoadFailed
+          size={LOAD_FAILED_SIZE.inline}
+          title={t('next.providers.loadFailed')}
+          reason={vendors.text}
+          onRetry={vendors.onRetry}
+        />
+      </div>
+    )}
   </Group>
 );
 

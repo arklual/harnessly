@@ -1,0 +1,10 @@
+{
+  "http": "digest",
+  "response": {
+    "convId": "tab-a1b2c3",
+    "title": "Починить деплой",
+    "text": "Чат «Починить деплой»\n\nПервый запрос:\nпочему деплой падает\n",
+    "path": "/home/me/.harnessly/chat-exports/tab-a1b2c3.md",
+    "truncated": false
+  }
+}

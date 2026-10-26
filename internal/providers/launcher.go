@@ -54,6 +54,16 @@ func (l Launcher) Lookup(id string) (via wire.Provider, configured bool, models 
 	return p.Via, l.Store.Configured(id), models, true
 }
 
+// Window is the context window of a model of the profile; 0 for one it does not know.
+func (Launcher) Window(profile, model string) int {
+	if p, ok := Find(profile); ok {
+		if m, ok := p.ModelOf(model); ok {
+			return m.Window
+		}
+	}
+	return 0
+}
+
 // OwnsModel says whether the model id is one of some profile's: a conversation on the CLI's own account is not to be
 // started on it or switched to it.
 func (Launcher) OwnsModel(model string) bool {

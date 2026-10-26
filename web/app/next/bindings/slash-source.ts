@@ -5,9 +5,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { useAgentSettings, useCatalog, type SkillCatalog } from '@/next/bindings/settings-data';
 import type { ICatalogItem } from '@/next/features/settings/api';
 import { listFolder } from '@/next/features/pane/chat-files-api';
+import { findChats } from '@/next/features/composer/chat-sources';
 import type { ISlashSource } from '@/next/features/composer/slash-palette';
 import type { IMcpRef, ISlashActions } from '@/next/features/composer/slash-model';
-import type { ConvId, MachineId, Provider } from '@/next/protocol/v2';
+import type { ConvId, MachineId, MessageRef, Provider } from '@/next/protocol/v2';
 
 interface IOptions {
   machine: MachineId | null;
@@ -17,6 +18,8 @@ interface IOptions {
   /** Where the agent works, so a project's own commands are found. */
   cwd: string | null;
   actions: ISlashActions;
+  /** A chat picked after «@»: the message points at it. */
+  onChat: (ref: MessageRef) => void;
 }
 
 /** The folders that are not the person's files to point at. */
@@ -28,7 +31,14 @@ const listOf = (state: SkillCatalog): readonly ICatalogItem[] | null => {
   return state.k === 'failed' ? [] : null;
 };
 
-export const useSlashSource = ({ machine, conv, provider, cwd, actions }: IOptions): ISlashSource | null => {
+export const useSlashSource = ({
+  machine,
+  conv,
+  provider,
+  cwd,
+  actions,
+  onChat,
+}: IOptions): ISlashSource | null => {
   const [woken, setWoken] = useState(false);
   const wake = useCallback(() => setWoken(true), []);
   const on = woken && machine !== null && provider !== null;
@@ -53,6 +63,15 @@ export const useSlashSource = ({ machine, conv, provider, cwd, actions }: IOptio
     [machine, conv],
   );
 
+  // Another chat is a place a message points at; the start page's first message has no such places.
+  const chats = useMemo(
+    () =>
+      machine !== null && conv !== null
+        ? (query: string, signal: AbortSignal) => findChats(machine, conv, query, signal)
+        : null,
+    [machine, conv],
+  );
+
   return useMemo(
     () =>
       machine !== null && provider !== null
@@ -65,8 +84,10 @@ export const useSlashSource = ({ machine, conv, provider, cwd, actions }: IOptio
             starting: conv === null,
             filesScope: conv ?? '',
             listFolder: lister,
+            findChats: chats,
+            onChat,
           }
         : null,
-    [machine, provider, wake, list, mcp, actions, conv, lister],
+    [machine, provider, wake, list, mcp, actions, conv, lister, chats, onChat],
   );
 };

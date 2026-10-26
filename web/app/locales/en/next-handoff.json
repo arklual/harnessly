@@ -26,14 +26,17 @@
     "other": "{n} turns"
   },
   "next.handoff.failed": "Could not hand over",
-  "next.handoff.title": "Hand over to {agent} · {model}",
+  "next.handoff.title": "Continue in {model}",
   "next.handoff.lead": "A new chat in the same folder starts with this text. The chat on {from} stays as it is.",
   "next.handoff.thisChat": "this model",
-  "next.handoff.send": "Hand over",
+  "next.handoff.send": "Continue",
   "next.handoff.mergeTitle": "Merge back into “{title}”",
   "next.handoff.mergeLead": "This branch's result goes to the original chat as a message, into its queue.",
   "next.handoff.mergeSend": "Merge",
   "next.handoff.merged": "Result sent to “{title}”",
   "next.handoff.openParent": "Open",
-  "next.handoff.pickOption": "Hand over to {agent}"
+  "next.handoff.pickOption": "Continue in {agent}",
+  "next.handoff.continue.title": "Continue in another model",
+  "next.handoff.continue.lead": "A new chat starts with this one's context. This chat stays as it is.",
+  "next.handoff.continue.connect": "Connect models"
 }

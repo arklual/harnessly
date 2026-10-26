@@ -5,8 +5,13 @@
 // against the clock.
 import { useEffect, useState } from 'react';
 import type { LocalMessageState, Ms } from '@/next/features/chat/types';
+import { usePresentFlag, type TPresenceState } from '@/next/ui/presence';
 
 export const SEND_SLOW_MS = 3000;
+/** A sent message that still stands in the feed on its own (its turn does not show it) goes this long after it was sent. */
+export const SENT_FADE_MS = 10_000;
+/** How long it takes to leave (hx-msg-out in chat.css). */
+export const SENT_EXIT_MS = 240;
 
 export const MESSAGE_PHASE = {
   draft: 'draft',
@@ -87,4 +92,19 @@ export const useMessagePhase = (
     return () => clearTimeout(timer);
   }, [wait]);
   return messagePhase(state, since, now, offline, handed, waitsMachine);
+};
+
+/**
+ * A sent message is the feed's once its turn shows it; one that still stands on its own long after it went is no longer
+ * news, and leaves with its closing animation like a toast that was read: `closing` while it fades, unmounted after.
+ */
+export const useSentFade = (sent: boolean, since: Ms): { mounted: boolean; state: TPresenceState } => {
+  const [now, setNow] = useState(() => Date.now());
+  const left = sent ? since + SENT_FADE_MS - now : null;
+  useEffect(() => {
+    if (left === null || left <= 0) return;
+    const timer = setTimeout(() => setNow(Date.now()), left);
+    return () => clearTimeout(timer);
+  }, [left]);
+  return usePresentFlag(left === null || left > 0, SENT_EXIT_MS);
 };

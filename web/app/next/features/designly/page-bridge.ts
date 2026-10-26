@@ -239,6 +239,8 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
   if (m.type !== 'tk:picked' || typeof m.selector !== 'string' || typeof m.tag !== 'string') return null;
   const r = (m.rect ?? {}) as Record<string, unknown>;
   if (!isNum(r.x) || !isNum(r.y) || !isNum(r.width) || !isNum(r.height)) return null;
+  if (m.selector === '' || r.width < 0 || r.height < 0) return null;
+  const coord = (v: number) => Math.max(-MAX_COORD, Math.min(MAX_COORD, v));
   const component = (m.component ?? null) as Record<string, unknown> | null;
   return {
     k: 'picked',
@@ -251,7 +253,7 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
       selector: clip(m.selector, 512),
       tag: clip(m.tag, 32),
       text: clip(m.text, 120),
-      rect: { x: r.x, y: r.y, width: r.width, height: r.height },
+      rect: { x: coord(r.x), y: coord(r.y), width: coord(r.width), height: coord(r.height) },
       component: component && typeof component.name === 'string' ? clip(component.name, 80) : null,
       html: clip(m.outerHTML, 2048),
     },

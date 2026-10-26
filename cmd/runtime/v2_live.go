@@ -22,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/limits"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/machine"
+	"github.com/ly-solutions/harnessly/internal/msgindex"
 	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/prompts"
@@ -127,7 +128,19 @@ func newV2Live(d deps, c *core) *v2Live {
 	if c.cfg.Tmux != nil {
 		terminals = newV2Stopper(v, c.cfg.Tmux)
 	}
-	v.rt = convo.New(convo.Deps{AgentSession: ses.Find, MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter,
+	// The search index is a cache of the transcripts: one that cannot be opened leaves the runtime without message search.
+	index, err := msgindex.Open(filepath.Join(d.DataDir, "v2", "search"))
+	if err != nil {
+		agent.Log("warn", "v2: message search is off", agent.F{K: "error", V: err.Error()})
+		index = nil
+	}
+	var digest func(ctx context.Context, conv string, budget int) (wire.ChatDigest, error)
+	if index != nil {
+		digest = func(ctx context.Context, conv string, budget int) (wire.ChatDigest, error) {
+			return v.rt.ChatDigest(ctx, conv, budget)
+		}
+	}
+	v.rt = convo.New(convo.Deps{Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter,
 		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir}, Titler: newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")).Title, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		Rewinder: v2Rewinder{c},
@@ -161,6 +174,10 @@ func newV2Live(d deps, c *core) *v2Live {
 	if terminals != nil {
 		v.srv.Rewind = v.rt
 	}
+	if index != nil {
+		v.srv.Search = v.rt.SearchMessages
+		v.srv.Digest = v.rt.ChatDigest
+	}
 	v.srv.MachineTool = v2MachineTool{ref: d.MachineKit}
 	v.srv.Apps = v2Apps{d: d}
 	handlers, _ := handlersFor(d)
@@ -172,6 +189,13 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.Profiles = &providers.Source{Store: v.profiles, OnChange: v.machine.republishProfiles}
 	// A key an agent printed (a `cat` of its file, an environment dump) leaves the machine masked.
 	wire.SetRedactor(v.profiles.Redact)
+	if c.agents != nil && c.agents.checker != nil {
+		v.srv.Logins = v2Logins(d.Home, cachedPath(c.agents.checker.ShellPath), func(wire.Provider) {
+			// The account changed: the next look at the CLIs is a fresh one, and the page hears it.
+			c.agents.checker.Invalidate()
+			go v.machine.refresh()
+		})
+	}
 	v.srv.Context = v.rt.Context
 	v.srv.MessageStatus = v.rt.MessageStatus
 	v.srv.Shot = func(ctx context.Context, conv, id string) (wire.ShotFile, error) {
@@ -618,6 +642,9 @@ func (l *v2Launcher) Resume(conv wire.Conversation) error {
 	if conv.Model != nil && conv.Model.Profile != "" && c.tabLaunch(conv.Session).Profile != conv.Model.Profile {
 		return errors.New("the tab does not remember the conversation's profile " + conv.Model.Profile)
 	}
+	if err := profileKeyGone(l.v.profiles, conv); err != nil {
+		return err
+	}
 	switch got := c.resumeForQueue(tab); got {
 	case prompts.ResumeResumed, prompts.ResumeRunning:
 		return nil
@@ -664,4 +691,17 @@ func profileOffers(store *providers.Store) func(wire.Provider) []wire.ProfileOff
 		}
 		return out
 	}
+}
+
+// errProfileKeyGone: the key of the conversation's profile was removed; the page shows it from the profile's offer
+// (configured: false) beside the conversation's model.profile.
+var errProfileKeyGone = errors.New("the key of the conversation's profile was removed: save it again to go on")
+
+// profileKeyGone is the reason a conversation on a backend profile can not be resumed: its key is not there. Resumed,
+// the agent would start and fail on every request.
+func profileKeyGone(store *providers.Store, conv wire.Conversation) error {
+	if conv.Model == nil || conv.Model.Profile == "" || store == nil || store.Configured(conv.Model.Profile) {
+		return nil
+	}
+	return errProfileKeyGone
 }

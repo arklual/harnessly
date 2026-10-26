@@ -93,7 +93,13 @@ export const waitsInQueue = (m: MessageView, agent: AgentStateKind | undefined):
   if (m.held) return true;
   if (state.k === 'queued') {
     const { position, reason } = state;
-    if (position > 1 || reason === 'paused' || reason === 'blocked-menu' || reason === 'blocked-text')
+    if (
+      position > 1 ||
+      reason === 'paused' ||
+      reason === 'blocked-menu' ||
+      reason === 'blocked-text' ||
+      reason === 'stalled'
+    )
       return true;
     return reason !== 'launching' && reason !== 'resuming' && agent !== undefined && HOLDS.has(agent);
   }
@@ -277,6 +283,32 @@ export function forgetEndedElsewhere(conv: ConvId, machine: MachineId, listed: R
     return !ended;
   });
   if (keep.length !== ids.length) convMessagesStore.set(conv, keep);
+}
+
+/** The agent did not take it in time: back at the head of the queue, waiting for the person's Повторить. */
+export const isStalled = (m: MessageView): boolean => m.state.k === 'queued' && m.state.reason === 'stalled';
+
+/**
+ * A message the runtime says it does not know (the status of its clientId is unknown): nothing of it is on the
+ * runtime, so the page's copy is all there is. It goes back to the queue over the field as the page's own, not sent,
+ * with Повторить — it is never lost, and never sent again by itself (the runtime is there and did not get it, so
+ * something is wrong beyond the road).
+ */
+export function returnToQueue(id: ClientId, at: Ms): void {
+  messagesStore.patch(id, (m) =>
+    m
+      ? {
+          ...m,
+          held: true,
+          rev: 0,
+          state: { k: 'failed', code: 'unconfirmed', retryable: true, at },
+          stateAt: at,
+          wait: null,
+          issue: null,
+          refused: null,
+        }
+      : m,
+  );
 }
 
 /**

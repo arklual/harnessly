@@ -81,6 +81,7 @@ export interface IRowHandlers {
   terminal: ((id: string) => void) | undefined;
   stopTerminal: ((id: string) => void) | undefined;
   fork: ((id: string) => void) | undefined;
+  continueIn?: ((id: string) => void) | undefined;
   /** Shows or hides the chats a chat delegated. */
   toggleKids?: (id: string) => void;
 }
@@ -153,7 +154,7 @@ const ChatRow = ({
   const look = chat.status === CHAT_STATUS.none ? null : STATUS_LOOK[chat.status];
   const busy = pending !== undefined;
   const label = pending === PENDING.slow ? t('next.chatRow.slow') : (chat.waitsFor ?? look?.label);
-  const { copyLink, openInNewTab, terminal, stopTerminal, fork } = handlers;
+  const { copyLink, openInNewTab, terminal, stopTerminal, fork, continueIn } = handlers;
   const showMenu = !busy && rename === RENAME.off;
   const rowClass = enter ? `${ROW_CLASS[variant]} hx-enter` : ROW_CLASS[variant];
 
@@ -273,6 +274,7 @@ const ChatRow = ({
             onTerminal={terminal ? () => terminal(chat.id) : undefined}
             onStopTerminal={stopTerminal && chat.canStopTerminal ? () => stopTerminal(chat.id) : undefined}
             onFork={fork && chat.canFork ? () => fork(chat.id) : undefined}
+            onContinue={continueIn && chat.canContinue ? () => continueIn(chat.id) : undefined}
             onOpenChange={(open) => {
               setMenuOpen(open);
               // Opened by a tap, it opened once: coming back after a rename or an action it stays shut.

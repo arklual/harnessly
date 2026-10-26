@@ -209,7 +209,7 @@
     "SubagentStatus": {"enum": ["running", "done", "failed"]},
     "NoticeLevel": {"enum": ["info", "warn", "error"]},
     "AttachmentKind": {"enum": ["image", "file"]},
-    "RefKind": {"enum": ["design", "doc", "board", "file", "mr", "task"]},
+    "RefKind": {"enum": ["design", "doc", "board", "file", "mr", "task", "chat"]},
     "MessageMode": {"enum": ["queue", "now", "steer"]},
     "MessageKind": {"enum": ["prompt", "command"]},
     "MessageStateKind": {"enum": ["queued", "typing", "in-input", "accepted", "in-turn", "done", "failed", "cancelled"]},
@@ -266,7 +266,7 @@
       ]
     },
     "RetryableRefuseCode": {"enum": ["machine-offline", "rate-limited", "internal", "timeout"]},
-    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "messageStatus", "context", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest"]},
+    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "login", "loginOK"]},
     "Channel": {"type": "string", "pattern": "^(machine|convs|conv:tab-[A-Za-z0-9_-]+)$"},
     "EntryId": {"type": "string", "pattern": "^((c:[0-9a-f-]+|x:[0-9]+)#[0-9]+|live:(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$"},
     "TurnId": {"type": "string", "pattern": "^(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+$"},
@@ -396,6 +396,39 @@
       "required": ["key"],
       "additionalProperties": false,
       "properties": {"key": {"type": "string", "pattern": "^[!-~]{8,512}$"}}
+    },
+    "LoginMode": {"enum": ["subscription", "console", "device"]},
+    "LoginState": {"enum": ["starting", "awaiting", "checking", "done", "failed", "cancelled", "expired"]},
+    "LoginInput": {"enum": ["code", "none"]},
+    "LoginReason": {"enum": ["not-installed", "start-failed", "code-rejected", "refused", "timeout"]},
+    "LoginFlow": {
+      "type": "object",
+      "required": ["id", "provider", "mode", "state", "input", "url", "userCode", "startedAt", "expiresAt", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "provider": {"$ref": "#/$defs/Provider"},
+        "mode": {"$ref": "#/$defs/LoginMode"},
+        "state": {"$ref": "#/$defs/LoginState"},
+        "input": {"$ref": "#/$defs/LoginInput"},
+        "url": {"oneOf": [{"type": "string", "pattern": "^https://"}, {"type": "null"}]},
+        "userCode": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "startedAt": {"type": "integer", "minimum": 0},
+        "expiresAt": {"type": "integer", "minimum": 0},
+        "reason": {"oneOf": [{"$ref": "#/$defs/LoginReason"}, {"type": "null"}]}
+      }
+    },
+    "LoginStatus": {
+      "type": "object",
+      "required": ["flow"],
+      "additionalProperties": false,
+      "properties": {"flow": {"oneOf": [{"$ref": "#/$defs/LoginFlow"}, {"type": "null"}]}}
+    },
+    "LoginOK": {
+      "type": "object",
+      "required": ["ok"],
+      "additionalProperties": false,
+      "properties": {"ok": {"type": "boolean"}}
     },
     "ProfileTest": {
       "type": "object",
@@ -612,6 +645,42 @@
       "required": ["messages"],
       "additionalProperties": false,
       "properties": {"messages": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/MessageStatus"}}}
+    },
+    "MessageRole": {"enum": ["user", "agent"]},
+    "MessageHit": {
+      "type": "object",
+      "required": ["convId", "entryId", "turnId", "at", "role", "snippet"],
+      "additionalProperties": false,
+      "properties": {
+        "convId": {"type": "string", "minLength": 1},
+        "entryId": {"type": "string", "minLength": 1},
+        "turnId": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
+        "at": {"type": "integer", "minimum": 0},
+        "role": {"$ref": "#/$defs/MessageRole"},
+        "snippet": {"type": "string"}
+      }
+    },
+    "MessageSearch": {
+      "type": "object",
+      "required": ["query", "hits", "indexing"],
+      "additionalProperties": false,
+      "properties": {
+        "query": {"type": "string"},
+        "hits": {"type": "array", "items": {"$ref": "#/$defs/MessageHit"}},
+        "indexing": {"type": "boolean"}
+      }
+    },
+    "ChatDigest": {
+      "type": "object",
+      "required": ["convId", "title", "text", "path", "truncated"],
+      "additionalProperties": false,
+      "properties": {
+        "convId": {"type": "string", "minLength": 1},
+        "title": {"type": "string"},
+        "text": {"type": "string"},
+        "path": {"type": "string", "minLength": 1},
+        "truncated": {"type": "boolean"}
+      }
     },
     "DiskPartID": {"enum": ["workspace", "caches", "agents", "other", "free"]},
     "MachineDiskPart": {
@@ -3627,6 +3696,24 @@
           "required": ["http", "response"],
           "additionalProperties": false,
           "properties": {
+            "http": {"const": "search"},
+            "response": {"oneOf": [{"$ref": "#/$defs/MessageSearch"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "digest"},
+            "response": {"oneOf": [{"$ref": "#/$defs/ChatDigest"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
             "http": {"const": "machineStats"},
             "response": {"oneOf": [{"$ref": "#/$defs/MachineStats"}, {"$ref": "#/$defs/Refusal"}]}
           }
@@ -3710,6 +3797,24 @@
           "properties": {
             "http": {"const": "profileTest"},
             "response": {"oneOf": [{"$ref": "#/$defs/ProfileTest"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "login"},
+            "response": {"oneOf": [{"$ref": "#/$defs/LoginStatus"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "loginOK"},
+            "response": {"oneOf": [{"$ref": "#/$defs/LoginOK"}, {"$ref": "#/$defs/Refusal"}]}
           }
         }
       ]

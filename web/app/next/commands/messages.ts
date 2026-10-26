@@ -12,6 +12,7 @@
 import { machineNow, pageClock } from '@/next/core/clock';
 import { uuidv7 } from '@/next/core/ids';
 import { batch } from '@/next/core/store';
+import { startMessageStatus } from '@/next/commands/message-status';
 import { runCommand, type OpHandle } from '@/next/commands/run';
 import { connectionStore } from '@/next/stores/connection';
 import { limitsOf } from '@/next/stores/machines';
@@ -20,6 +21,7 @@ import {
   HOLDS,
   isPassingRefusal,
   isRetryableRefusal,
+  isStalled,
   messagesStore,
   forgetMessage,
   moveLocally,
@@ -168,6 +170,11 @@ export function settleSubmit(clientId: ClientId, st: Awaited<OpHandle['done']>):
   }
   // f.r === 'refused' here: the runtime said no on the merits, and the same clientId would get the same no.
   forgetResend(clientId);
+  if (f.code === 'too-late') {
+    // The runtime delivered this clientId long ago and let its record go: the page's copy is all that was left of it.
+    forgetMessage(clientId);
+    return;
+  }
   moveLocally(clientId, () => ({
     state: { k: 'failed', code: 'refused', retryable: false, at: st.at },
     refused: f.code,
@@ -182,6 +189,22 @@ export function retryMessage(clientId: ClientId): OpHandle | null {
   if (!m) return null;
   if (m.rev === 0) {
     if (m.state.k === 'failed' && !m.state.retryable) return null;
+    if (m.state.k === 'failed' && m.state.code === 'unconfirmed' && m.conversationId) {
+      // The runtime said it does not know this clientId, yet its memory of the opId answers it: the words go again as
+      // a new message (nothing of the old one is on the runtime, so it can never be typed twice), in the same place.
+      const next = sendMessage(m.machineId, {
+        conversationId: m.conversationId,
+        text: m.text,
+        attachments: m.attachments,
+        refs: m.refs,
+        mode: m.mode,
+        kind: m.kind,
+      });
+      messagesStore.patch(next, (v) => v && { ...v, held: true });
+      forgetResend(clientId);
+      moveLocally(clientId, () => ({ state: { k: 'cancelled', by: 'user' }, wait: null, issue: null }));
+      return null;
+    }
     forgetResend(clientId);
     moveLocally(clientId, (v) => ({
       state: { k: 'submitting' },
@@ -193,7 +216,8 @@ export function retryMessage(clientId: ClientId): OpHandle | null {
     void submit(clientId);
     return null;
   }
-  if (m.state.k !== 'failed' || !m.conversationId) return null;
+  // A stalled message (the agent did not take it in time) waits at the head of the queue for this word, like a failed one.
+  if ((m.state.k !== 'failed' && !isStalled(m)) || !m.conversationId) return null;
   return runCommand(m.machineId, 'retry', { conversationId: m.conversationId, clientId });
 }
 
@@ -290,8 +314,12 @@ export function flushOutbox(machine: MachineId): void {
   }
 }
 
-/** Resends a machine's unanswered messages each time its socket becomes live; stopping it stops their timers too. */
+/**
+ * Resends a machine's unanswered messages each time its socket becomes live, and asks the runtime where the late ones
+ * are (commands/message-status); stopping it stops their timers too.
+ */
 export function startOutbox(): () => void {
+  const stopStatus = startMessageStatus();
   const wasLive = new Map<MachineId, boolean>();
   const unsubscribe = connectionStore.subscribeAll((changed) => {
     for (const m of changed) {
@@ -302,6 +330,7 @@ export function startOutbox(): () => void {
   });
   return () => {
     unsubscribe();
+    stopStatus();
     for (const id of [...resendTimers.keys()]) forgetResend(id);
   };
 }

@@ -93,13 +93,21 @@ export interface IDropTarget {
   edge?: TEdge;
 }
 
-export const PLAN = { place: 'place', moveGroup: 'move-group', move: 'move', unpin: 'unpin' } as const;
+export const PLAN = {
+  place: 'place',
+  moveGroup: 'move-group',
+  move: 'move',
+  unpin: 'unpin',
+  attach: 'attach',
+} as const;
 export type TDropPlan =
   | { op: typeof PLAN.place; id: string; groupId: string | null; beforeId: string | null }
   | { op: typeof PLAN.moveGroup; id: string; beforeId: string | null }
   /** A chat into a project (null: out of any); a pinned one leaves the favorites with it, for it would show there. */
   | { op: typeof PLAN.move; id: string; projectId: string | null; unpin: boolean }
-  | { op: typeof PLAN.unpin; id: string };
+  | { op: typeof PLAN.unpin; id: string }
+  /** A chat carried out of the list onto the composer: the open chat's next message points at it. */
+  | { op: typeof PLAN.attach; id: string };
 
 interface ILayoutIds {
   groups: { id: string; chats: string[] }[];

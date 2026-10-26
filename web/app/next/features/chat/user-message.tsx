@@ -3,7 +3,13 @@
 // quietly and goes by itself (Delete only); a red edge, the reason and Delete are for a message the runtime refused.
 import AttachmentThumb, { ThumbSet } from '@/next/ui/attachment-thumb';
 import { memo } from 'react';
-import { MESSAGE_PHASE, useMessagePhase, type TMessagePhase } from '@/next/features/chat/message-phase';
+import {
+  MESSAGE_PHASE,
+  useMessagePhase,
+  useSentFade,
+  type TMessagePhase,
+} from '@/next/features/chat/message-phase';
+import { PRESENCE } from '@/next/ui/presence';
 import type { AttachmentRef, Message, MessageFailure } from '@/next/features/chat/types';
 import Icon from '@/next/ui/icon';
 import usePending, { isBusy, PENDING } from '@/next/ui/use-pending';
@@ -229,10 +235,13 @@ const UserMessage = ({
     outgoing?.handed ?? false,
     outgoing?.waitsMachine ?? false,
   );
+  // A sent message the feed still draws on its own (no turn shows it) fades away after a while; a turn's prompt stays.
+  const fade = useSentFade(outgoing !== null && phase === MESSAGE_PHASE.sent, outgoing?.stateSince ?? 0);
   // The places the runtime wrote under the words (`<attached>`) are chips, never the block itself.
   const placed = attachedOf(text, outgoing?.refs);
   // A picture's path in the words (a paste of the old view) is the picture itself, without the path.
   const pictures = useNamedPictures(placed.text);
+  if (!fade.mounted) return null;
   // Another agent's words are never the person's bubble (internal/peers delivers them as an envelope).
   const peer = parsePeer(text);
   if (peer) return <PeerCard peer={peer} delivery={peerDelivery(phase, outgoing, steered)} />;
@@ -262,7 +271,7 @@ const UserMessage = ({
   const { text: shown, notes } = readAnnotated(words.replace(IMAGE_TOKEN, '').trim());
   return (
     <div className="hx-msg" data-kind="user">
-      <div className="hx-msg-user" data-send={SEND_LOOK[phase]}>
+      <div className="hx-msg-user" data-send={fade.state === PRESENCE.closing ? 'leaving' : SEND_LOOK[phase]}>
         {tag && (
           <div className="hx-msg-user__tag">
             <Icon name="corner-down-right" size="sm" />

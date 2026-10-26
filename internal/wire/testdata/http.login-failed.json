@@ -1,0 +1,4 @@
+{
+  "http": "login",
+  "response": {"flow": {"id": "0123456789abcdef0123456789abcdef", "provider": "claude", "mode": "console", "state": "failed", "input": "code", "url": null, "userCode": null, "startedAt": 1800000000000, "expiresAt": 1800000600000, "reason": "code-rejected"}}
+}

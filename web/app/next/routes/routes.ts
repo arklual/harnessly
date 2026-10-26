@@ -19,7 +19,6 @@ export const SETTINGS_SECTIONS = [
   'general',
   'notifications',
   'accounts',
-  'models',
   'claude',
   'codex',
   'skills',
@@ -79,7 +78,10 @@ export const parseRoute = (path: string): TRoute => {
   if (APPS_RE.test(pathname)) return { kind: ROUTE.apps };
   const settings = SETTINGS_RE.exec(pathname);
   if (settings) {
-    const section = SETTINGS_SECTIONS.find((id) => id === settings[1]);
+    // «Models» was a section of its own: its address leads to the page it moved to.
+    const section = SETTINGS_SECTIONS.find(
+      (id) => id === (settings[1] === 'models' ? 'accounts' : settings[1]),
+    );
     if (!settings[1]) return { kind: ROUTE.settings, section: null };
     return section ? { kind: ROUTE.settings, section } : HOME;
   }

@@ -97,6 +97,8 @@ export interface IComposerProps {
   onRemoveQuote?: (id: string) => void;
   contexts?: ComposerContext[];
   onContext?: (id: string) => void;
+  /** A chat carried from the sidebar can be dropped on the field: its next message points at it. */
+  acceptsChats?: boolean;
   /** The places attached to the message (a design, a document, a board, a file, an MR, a task): chips before the files. */
   refs?: readonly IRefChip[];
   onRemoveRef?: (ref: IRefChip) => void;
@@ -437,7 +439,14 @@ const Composer = (props: IComposerProps) => {
       data-rec={bar ? 'true' : undefined}
       data-mode={dropping ? 'drop' : undefined}
       data-quiet={props.quiet || undefined}
+      data-chat-drop={props.acceptsChats || undefined}
     >
+      {props.acceptsChats && (
+        <div className="hx-drop hx-drop--chat" aria-hidden="true">
+          <Icon name="message-square" />
+          <span>{t('next.composer.dropChat')}</span>
+        </div>
+      )}
       {dropping && (
         <div className="hx-drop" aria-hidden="true">
           <Icon name="upload" />

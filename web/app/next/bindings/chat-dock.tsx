@@ -26,15 +26,20 @@ import {
   setModel,
 } from '@/next/commands';
 import { deviceId } from '@/next/core/device';
-import { HOME, goTo } from '@/next/routes/routes';
-import { UI_REQUEST, requestUi } from '@/next/stores/ui-requests';
+import { HOME, ROUTE, goTo } from '@/next/routes/routes';
+import { UI_REQUEST, requestContinue, requestUi } from '@/next/stores/ui-requests';
 import { useSlashSource } from '@/next/bindings/slash-source';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
 import { failureText, settled } from '@/next/bindings/outcome';
 import { isHanded } from '@/next/bindings/feed-items';
 import { useUploads } from '@/next/bindings/use-uploads';
 import ConnectionBanner from '@/next/features/connection/banner';
-import { pickerAgentOf, type IModelChoice, type IPickerAgent } from '@/next/features/composer/agents';
+import {
+  pickerAgentOf,
+  removedKeyOf,
+  type IModelChoice,
+  type IPickerAgent,
+} from '@/next/features/composer/agents';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import Composer, { type IComposerQuote, type TSendMode } from '@/next/features/composer/composer';
 import {
@@ -59,7 +64,7 @@ import DockStatus from '@/next/features/composer/dock-status';
 import { useDockStatus } from '@/next/bindings/use-dock-status';
 import Queue from '@/next/features/composer/queue';
 import { inQueueOrder } from '@/next/features/composer/queue-order';
-import type { ComposerMode, QueueRow } from '@/next/features/composer/types';
+import type { ComposerMode, DockNotice, QueueRow } from '@/next/features/composer/types';
 import QuestionCard from '@/next/features/questions/question-card';
 import type { ConvId, MachineId, PromoteTo } from '@/next/protocol/v2';
 import { reconnectNow, useConnection } from '@/next/stores/connection';
@@ -70,7 +75,7 @@ import { attachedOf, refKey } from '@/next/features/chat/attached';
 import { designThumb } from '@/next/features/composer/attach-sources';
 import type { IPlusAttach } from '@/next/features/composer/plus-menu';
 import { openAttached } from '@/next/features/pane/open-attached';
-import { REFS_MAX } from '@/next/protocol/v2';
+import { REFS_MAX, type MessageRef } from '@/next/protocol/v2';
 import { limitPlaceholder } from '@/next/features/chat/limit';
 import { machineNow } from '@/next/core/clock';
 import { useDraftField } from '@/next/bindings/use-draft';
@@ -157,13 +162,32 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   else if (working) mode = 'working';
   else if (stopped) mode = 'stopped';
   const maxText = limitsOf(machine).maxText;
+  // A chat of a vendor whose key was removed cannot run: the bar says so and the field waits.
+  const goneVendor = record
+    ? removedKeyOf(machineView?.machine.agents ?? [], record.provider, record.model?.profile)
+    : null;
+  const keyNotice = useMemo<DockNotice | null>(
+    () =>
+      goneVendor === null
+        ? null
+        : {
+            kind: 'key',
+            vendor: goneVendor,
+            onOpen: () => goTo({ kind: ROUTE.settings, section: 'accounts' }),
+            onContinue: handoff ? () => requestContinue(conv) : null,
+          },
+    [goneVendor, handoff, conv],
+  );
+
   // Held on the usage limit: the queue waits for the reset by itself, so it is not a pause to resume. The card in the
   // feed is the control; here the field and the rows only say what a message written now waits for.
   const limitHold = record?.limited ?? null;
   const heldOnLimit = limitHold !== null || queue?.paused?.reason === 'limited';
-  const hint = heldOnLimit
-    ? limitPlaceholder(limitHold ?? { resetsAt: null }, machineNow(machine))
-    : undefined;
+  const hint = goneVendor
+    ? t('next.dockBar.keyGone', { vendor: goneVendor })
+    : heldOnLimit
+      ? limitPlaceholder(limitHold ?? { resetsAt: null }, machineNow(machine))
+      : undefined;
 
   const agentState = record?.state.k;
   // The rows stand in the order of the machine's line; a runtime that cannot put them in another order has no grips.
@@ -207,7 +231,15 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     }),
     [provider, compact],
   );
-  const slash = useSlashSource({ machine, conv, provider, cwd: record?.cwd ?? null, actions: slashActions });
+  const onChat = useCallback((ref: MessageRef) => addDraftRef(conv, ref, REFS_MAX), [conv]);
+  const slash = useSlashSource({
+    machine,
+    conv,
+    provider,
+    cwd: record?.cwd ?? null,
+    actions: slashActions,
+    onChat,
+  });
 
   const onSubmit = useCallback(
     (sendMode: TSendMode) => {
@@ -350,7 +382,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
           clearDraft(conv);
         }}
       />
-      <DockBar notice={null} />
+      <DockBar notice={keyNotice} />
       <DockStatus pending={status.pending} steps={status.steps} />
       <GoalBar
         goal={provider === 'claude' ? (record?.goal ?? null) : null}
@@ -375,6 +407,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onSubmit={onSubmit}
         mode={mode}
         placeholder={hint}
+        quiet={goneVendor !== null}
         onStop={() => settled(interrupt(machine, conv))}
         waiting={waitingAgents.length > 0}
         picker={
@@ -406,6 +439,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onRemoveRef={(ref) => removeDraftRef(conv, ref)}
         attach={attach}
         stash={stash}
+        acceptsChats
         quotes={[
           ...quotes.map((q) => ({
             id: q.id,

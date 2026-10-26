@@ -18,6 +18,8 @@ import {
   type ConvContext,
   type HandoffDraft,
   type HandoffDraftRequest,
+  type ChatDigest,
+  type MessageSearch,
   type OutputPage,
   type RewindPlan,
   type Task,
@@ -128,6 +130,26 @@ export const loadContext = (m: MachineId, conv: ConvId): Promise<PageOutcome<Con
     machineApi(m).http(`/conversations/${enc(conv)}/context`),
     parsePage.context,
     limitsOf(m).cmdTimeoutMs,
+  );
+
+/** The messages of the machine's conversations that hold the words of the query. */
+export const searchMessages = (
+  m: MachineId,
+  query: string,
+  limit = 40,
+): Promise<PageOutcome<MessageSearch>> =>
+  getPage(
+    machineApi(m).http(`/search?q=${enc(query)}&limit=${limit}`),
+    parsePage.search,
+    limitsOf(m).cmdTimeoutMs,
+  );
+
+/** A chat cut to the size of a context block for another agent, and the whole of it written to a file on the machine. */
+export const loadChatDigest = (m: MachineId, conv: ConvId): Promise<PageOutcome<ChatDigest>> =>
+  getPage(
+    machineApi(m).http(`/conversations/${enc(conv)}/digest`),
+    parsePage.digest,
+    limitsOf(m).cmdTimeoutMs * 3,
   );
 
 /** Where a chip or a link of the conversation opens in the right pane: the runtime's rules, the agent's open command's. */

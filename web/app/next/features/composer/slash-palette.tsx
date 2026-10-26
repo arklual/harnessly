@@ -16,9 +16,11 @@ import {
 import { modelOf, type IPickerAgent } from '@/next/features/composer/agents';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import type { IQuickPrompt } from '@/next/features/composer/prompts';
+import type { IChatPick } from '@/next/features/composer/chat-sources';
 import { highlighted } from '@/next/features/composer/slash-match';
 import {
   buildRows,
+  chatRows,
   clampSelection,
   detectSub,
   detectTrigger,
@@ -42,7 +44,7 @@ import {
   type TSub,
 } from '@/next/features/composer/slash-model';
 import type { ICatalogItem } from '@/next/features/settings/api';
-import type { FileEntry, Provider } from '@/next/protocol/v2';
+import type { FileEntry, MessageRef, Provider } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePresentFlag, type TPresenceState } from '@/next/ui/presence';
@@ -66,6 +68,10 @@ export interface ISlashSource {
   filesScope: string;
   /** The entries of a folder of the chat's (relative to it); null where the chat has none to list (the start page). */
   listFolder: ((dir: string, signal: AbortSignal) => Promise<readonly FileEntry[]>) | null;
+  /** The chats «@» offers beside the files, for the words typed; null where a message cannot point at a chat. */
+  findChats?: ((query: string, signal: AbortSignal) => Promise<readonly IChatPick[]>) | null;
+  /** A chat is picked: the message points at it from now on. */
+  onChat?: (ref: MessageRef) => void;
 }
 
 interface ISlashOptions {
@@ -127,6 +133,16 @@ interface IFolders {
 
 const NO_FOLDERS: IFolders = { scope: '', dirs: {} };
 
+/** The chats found for a word, kept with the word: a list for another word is not the answer. */
+interface IChatsFound {
+  scope: string;
+  query: string;
+  picks: readonly IChatPick[];
+}
+
+/** The chats are asked of the machine this long after the last key. */
+const CHATS_DEBOUNCE_MS = 160;
+
 export const useSlashPalette = ({
   value,
   onChange,
@@ -141,6 +157,7 @@ export const useSlashPalette = ({
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [picked, setPicked] = useState({ key: '', index: 0 });
   const [folders, setFolders] = useState<IFolders>(NO_FOLDERS);
+  const [chats, setChats] = useState<IChatsFound | null>(null);
   const [kept, setKept] = useState<{ sig: string; view: IView } | null>(null);
   const pendingCaret = useRef<{ text: string; caret: number } | null>(null);
 
@@ -155,7 +172,7 @@ export const useSlashPalette = ({
     live && slash && !sub
       ? detectTrigger(value, Math.min(caret, value.length), {
           skills: slash.provider === 'codex',
-          files: slash.listFolder !== null,
+          files: slash.listFolder !== null || !!slash.findChats,
         })
       : null;
 
@@ -180,6 +197,29 @@ export const useSlashPalette = ({
   // A folder is read again when the word is typed again: the chat's files change while it works.
   const mentioning = trigger?.char === TRIGGER_CHAR.file;
   if (!mentioning && folders !== NO_FOLDERS) setFolders(NO_FOLDERS);
+
+  // The chats «@» offers: asked for the word's name part when it is not a path; the answer is kept for that word.
+  const chatQuery =
+    trigger?.char === TRIGGER_CHAR.file && !trigger.query.includes('/') ? trigger.query : null;
+  const findChats = slash?.findChats ?? null;
+  useEffect(() => {
+    if (chatQuery === null || !findChats) return;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => {
+      findChats(chatQuery, ctl.signal).then(
+        (picks) => setChats({ scope, query: chatQuery, picks }),
+        () => {
+          if (!ctl.signal.aborted) setChats({ scope, query: chatQuery, picks: [] });
+        },
+      );
+    }, CHATS_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      ctl.abort();
+    };
+  }, [chatQuery, findChats, scope]);
+  const chatPicks =
+    chatQuery !== null && chats?.scope === scope && chats.query === chatQuery ? chats.picks : null;
 
   const wanted = sub !== null || trigger !== null;
   const wake = slash?.wake;
@@ -211,6 +251,7 @@ export const useSlashPalette = ({
       const entries = dir !== null ? known[dir] : undefined;
       failed = entries === null;
       list = entries ? fileRows(entries, splitMention(trigger.query).name) : { rows: [], more: 0 };
+      if (chatPicks) list = { ...list, rows: [...list.rows, ...chatRows(chatPicks, trigger.query)] };
     } else {
       list = buildRows({
         trigger,
@@ -270,7 +311,10 @@ export const useSlashPalette = ({
       return;
     }
     if (!trigger) return;
-    if (action.k === 'sub') put(replaceWord(value, trigger.start, trigger.end, `/${action.sub} `));
+    if (action.k === 'chat') {
+      put(removeWord(value, trigger.start, trigger.end));
+      slash?.onChat?.(action.ref);
+    } else if (action.k === 'sub') put(replaceWord(value, trigger.start, trigger.end, `/${action.sub} `));
     else if (action.k === 'insert' || action.k === 'dir')
       put(replaceWord(value, trigger.start, trigger.end, action.text));
     else {
@@ -338,6 +382,7 @@ const GROUP_KEY: Record<TGroup, string> = {
   [GROUP.mcp]: 'next.slash.group.mcp',
   [GROUP.quick]: 'next.slash.group.quick',
   [GROUP.file]: 'next.slash.group.file',
+  [GROUP.chat]: 'next.slash.group.chat',
 };
 
 interface ISlashPanelProps {

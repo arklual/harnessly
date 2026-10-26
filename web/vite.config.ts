@@ -24,6 +24,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // The guest page is a second entry of the same build; the runtime serves its files without a session by the manifest.
+    manifest: true,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        guest: fileURLToPath(new URL('./guest.html', import.meta.url)),
+      },
+    },
     chunkSizeWarningLimit: 900,
   },
   server: {

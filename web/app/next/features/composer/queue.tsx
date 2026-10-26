@@ -64,6 +64,7 @@ const FAILURE_KEYS: Partial<Record<MessageFailure, string>> = {
   'agent-gone': 'next.queue.failGone',
   'stuck-in-input': 'next.queue.failStuck',
   'returned-to-input': 'next.queue.failReturned',
+  unconfirmed: 'next.queue.stalled',
 };
 
 /** A queue held by a launch that failed or an agent that left says so; a pause of the person's is only a pause. */
@@ -79,7 +80,8 @@ const pauseNote = (pause: QueuePause | null): string => {
 
 const rowState = (row: QueueRow, paused: boolean, limit: boolean): TRowState => {
   const k = row.state.k;
-  if (k === 'failed') return 'failed';
+  // Typed, and the agent did not take it: it waits for Повторить like a message that could not go.
+  if (k === 'failed' || (k === 'queued' && row.state.reason === 'stalled')) return 'failed';
   if (k === 'submitting' || k === 'typing' || k === 'in-input' || k === 'uploading') return 'sending';
   // A message typed into the turn does not wait for its end: it is on its way to the agent, whoever holds it.
   if (row.steer) return 'sending';
@@ -152,6 +154,7 @@ const Row = ({
   if (row.state.k === 'queued' && row.state.reason === 'blocked-text') note = t('next.queue.blockedText');
   if (state === 'failed' && row.state.k === 'failed')
     note = t(FAILURE_KEYS[row.state.code] ?? 'next.queue.failed');
+  if (state === 'failed' && row.state.k === 'queued') note = t('next.queue.stalled');
   if (action.phase === PENDING.failed) note = t('next.queue.actionFailed');
   if (action.phase === PENDING.slow) note = t('next.queue.slow');
   const carried = grip !== null && isMovable(row);

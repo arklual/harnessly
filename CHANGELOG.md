@@ -15,6 +15,10 @@ All notable changes to this project are documented here. The format follows
   where it was handed, unknown, expired); a `send` of an id it already has gives its record back. A page reads the
   stall with `caps=msgstatus`; any other page gets it as `failed{unconfirmed}`.
 
+- Designly: a guest link opens the same viewer the owner has (bar, devices, sizes, zoom, browser and status bars, board
+  settings) read-only, in the view the owner shared. A guest with the right to comment picks a block and comments on it.
+  The page is a second entry of the web build (`guest.html`); the runtime serves its files and the boards under
+  `design-public/<project>/` without a session, with the board bridge for picking and live settings.
 - Designly: «Ссылки» is one screen with one form. «Кто откроет» chooses between a link for anyone without sign-in and an
   invite for the signed-in; one list shows both kinds, each marked, and a made link is copied at once. A link without
   sign-in carries the look the owner gave the design (device, browser bars, fit, lock, page) so a guest opens it the

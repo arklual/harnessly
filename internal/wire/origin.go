@@ -15,13 +15,15 @@ func guarded(p string, r *http.Request) bool {
 	switch {
 	case p == "socket", p == "terminal", p == "voice", p == "designly/create", p == "designly/pin":
 		return true
-	case p == "machine/processes/stop":
+	case p == "machine/processes/stop", p == "search":
 		return true
-	case p == "me/settings", p == "runtime-settings", strings.HasPrefix(p, "agent-settings/"), p == "providers", strings.HasPrefix(p, "providers/"):
+	case p == "me/settings", p == "runtime-settings", strings.HasPrefix(p, "agent-settings/"), p == "providers", strings.HasPrefix(p, "providers/"), strings.HasPrefix(p, "agents/"):
 		return r.Method != http.MethodGet && r.Method != http.MethodHead
 	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/side-chat"):
 		return true
 	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/handoff-draft"):
+		return true
+	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/digest"):
 		return true
 	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/shot"):
 		return true

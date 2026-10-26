@@ -51,6 +51,7 @@ import {
 import { DEV_TAB, type TDevTab } from '@/next/features/designly/devtools-data';
 import SiteDevtools from '@/next/features/designly/site-devtools';
 import type { IStyleItem } from '@/next/features/designly/element-style';
+import { fromFrame } from '@/next/features/designly/bridge-origin';
 import { AnchorContext, createAnchorStore, type IAnchorItem } from '@/next/features/designly/note-anchor';
 import { useDomBridge } from '@/next/features/designly/use-dom-bridge';
 import SiteLoader from '@/next/features/designly/site-loader';
@@ -59,6 +60,7 @@ import { useSiteLoad } from '@/next/features/designly/use-site-load';
 import SiteTweaks from '@/next/features/designly/site-tweaks';
 import { PaneDock, ZoomControls } from '@/next/features/designly/site-dock';
 import { useViewMemory } from '@/next/features/designly/use-view-memory';
+import type { IViewMemory } from '@/next/features/designly/view-memory';
 import { useCanvasZoom } from '@/next/features/designly/use-canvas-zoom';
 import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
@@ -121,6 +123,19 @@ export interface ISiteAccess {
   onOpen: () => void;
 }
 
+/**
+ * A visitor of a guest link: the design is looked at the way its owner looks at it (the same bar, devices, sizes, zoom
+ * and board settings), without editing, chats, sharing or tools. The board is served with a sandbox, so its window has
+ * no origin of its own to speak to: it is addressed as `*` and trusted for being the frame's window.
+ */
+export interface ISiteGuest {
+  /** What the bar's pick button is called and its tip («Комментировать»): the block picked becomes a comment. */
+  pickLabel: string;
+  pickTip: string;
+  /** «Your name: Ann» in «Ещё»: the guest changes the name they comment under; null until there is one. */
+  account?: { label: string; onOpen: () => void } | null;
+}
+
 export interface ISiteViewProps {
   title: string;
   pages: readonly ISitePage[];
@@ -154,6 +169,10 @@ export interface ISiteViewProps {
   pane?: ISitePane;
   /** The design whose view (device, canvas, page) is kept in the browser; without it nothing is. */
   memoryKey?: string;
+  /** The view a design starts with where the browser has kept none (a guest link carries the owner's). */
+  viewSeed?: IViewMemory;
+  /** Set for a visitor of a guest link. */
+  guest?: ISiteGuest;
   /** Set where the gateway keeps the project's access and the person has something to do there. */
   access?: ISiteAccess;
   /** The page's preview slot, whose record DevTools read; without it the panel is not offered. */
@@ -185,6 +204,8 @@ export interface ISiteStage {
   pick: boolean;
   /** `at` is the block's bottom-left corner in the section's pixels, where its note opens. */
   onPicked: (picked: IPicked, at: { x: number; y: number; right: boolean }) => void;
+  /** The settings the board offers now (its `tk:tweaks`), as the page said them. */
+  onControls?: (controls: ITweak[]) => void;
   /** The page ended the pick itself: Esc in it, or it went to another address. */
   onPickEnd: () => void;
   /** The page on screen has the slot's bridge (it said hello), or a new page has not yet. */
@@ -284,11 +305,13 @@ const SiteView = ({
   access,
   devtools,
   memoryKey,
+  viewSeed,
+  guest,
 }: ISiteViewProps) => {
   const pop = usePop();
   // A phone has one column: the chat docked to the right is stacked like the left one there.
   const phone = usePhone();
-  const memory = useViewMemory(memoryKey ?? null);
+  const memory = useViewMemory(memoryKey ?? null, viewSeed);
   const [deviceId, setDeviceId] = useState(memory.initial.device);
   const [size, setSize] = useState<ISize | null>(memory.initial.size);
   const [rot, setRot] = useState(memory.initial.rot);
@@ -338,7 +361,9 @@ const SiteView = ({
   // The pane's pill stands under the page like the field over the site's: a device keeps room for it (and for the
   // field over the pill when the pane's chat is «Снизу»).
   const paneBottomChat = pane?.chat?.mode === PANE_CHAT.bottom;
-  const underField = (keys && (stage?.mode === 'island' || stage?.mode === 'notes')) || pane !== undefined;
+  const underField =
+    guest === undefined &&
+    ((keys && (stage?.mode === 'island' || stage?.mode === 'notes')) || pane !== undefined);
   const paneRoom = paneBottomChat ? 2 * DOCK_ROOM : DOCK_ROOM;
   // A phone has no floating pill and no zoom over the page (the design's mobile.css): the address switches the pages,
   // the device's menu holds the zoom, «…» the settings, so the page's own header and tab bar stay free.
@@ -479,7 +504,9 @@ const SiteView = ({
   /** The slot's frame and origin, or null while there is no page. */
   const frameOf = () => {
     const frame = frameRef.current;
-    return frame && src !== null ? { frame, origin: new URL(src, window.location.href).origin } : null;
+    if (!frame || src === null) return null;
+    // A guest's board has an opaque origin (its sandbox): nothing to name, the window itself is what is trusted.
+    return { frame, origin: guest ? '*' : new URL(src, window.location.href).origin };
   };
   /** The slot's window and origin once its page has loaded, or null before. */
   const slotOf = () => (loadedKey.current === `${src}#${reloadKey}` ? frameOf() : null);
@@ -537,7 +564,7 @@ const SiteView = ({
     // on its way says «hello» itself, and onLoad asks.
     ping();
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== frame.contentWindow || event.origin !== origin) return;
+      if (!fromFrame(event, frame.contentWindow, origin)) return;
       const message = readBridgeMessage(event.data);
       const now = latestStage.current;
       if (message?.k === 'anchored') {
@@ -578,6 +605,7 @@ const SiteView = ({
       }
       if (message?.k === 'tweaks') {
         setOffer({ key: `${src}#${reloadKey}`, controls: message.controls });
+        latestStage.current?.onControls?.(message.controls);
         return;
       }
       if (message?.k === 'tweaks-panel') {
@@ -833,15 +861,28 @@ const SiteView = ({
 
   /** What «Ещё» offers: only what works here. */
   const offered: (IMoreItem | null | undefined)[] = [
-    {
-      id: 'outside',
-      icon: 'external-link',
-      label: t('next.site.openOutside'),
-      pick: () => {
-        pop.close();
-        onOpenOutside();
-      },
-    },
+    guest
+      ? null
+      : {
+          id: 'outside',
+          icon: 'external-link',
+          label: t('next.site.openOutside'),
+          pick: () => {
+            pop.close();
+            onOpenOutside();
+          },
+        },
+    guest?.account
+      ? {
+          id: 'guest-name',
+          icon: 'user',
+          label: guest.account.label,
+          pick: () => {
+            pop.close();
+            guest.account?.onOpen();
+          },
+        }
+      : null,
     devtools && {
       id: 'devtools',
       sep: true,
@@ -938,7 +979,7 @@ const SiteView = ({
   );
   useSheetDrag(barMenuOf, pop.close, phone && barMenu);
   // In the pane the section is the pane's own unless its chat is over the design or at its foot.
-  const ownMode = stage?.mode ?? 'island';
+  const ownMode = guest ? 'view' : (stage?.mode ?? 'island');
   const paneMode = pane && !paneOwnChat ? 'pane' : ownMode;
 
   return (
@@ -959,15 +1000,17 @@ const SiteView = ({
         <div className="hx-browser">
           {!pane && (
             <div className="hx-strip">
-              <button
-                type="button"
-                className="hx-head-btn hx-site__menu"
-                aria-label={t('next.header.openMenu')}
-                onClick={onOpenDrawer}
-              >
-                <Icon name="menu" />
-              </button>
-              {stage && (
+              {!guest && (
+                <button
+                  type="button"
+                  className="hx-head-btn hx-site__menu"
+                  aria-label={t('next.header.openMenu')}
+                  onClick={onOpenDrawer}
+                >
+                  <Icon name="menu" />
+                </button>
+              )}
+              {stage && !guest && (
                 <button
                   type="button"
                   className="hx-tochat hx-site__back"
@@ -1056,7 +1099,7 @@ const SiteView = ({
                   )}
                 </div>
               </div>
-              {stage && (
+              {stage && !guest && (
                 <SiteModes
                   mode={stage.mode}
                   onMode={(mode) => {
@@ -1065,7 +1108,7 @@ const SiteView = ({
                   }}
                 />
               )}
-              {stage && (
+              {stage && !guest && (
                 <button
                   type="button"
                   className="hx-head-btn hx-site__swap"
@@ -1079,17 +1122,19 @@ const SiteView = ({
                   <Icon name={stage.mode === 'chat' ? 'maximize-2' : 'message-square'} />
                 </button>
               )}
-              <button
-                type="button"
-                className="hx-head-btn hx-tipped hx-strip__max"
-                aria-label={maxed ? t('next.site.showSide') : t('next.site.fullWidth')}
-                onClick={onToggleMax}
-              >
-                <Icon name={maxed ? 'minimize-2' : 'maximize-2'} />
-                <span className="hx-tip" data-pos="below" data-align="end">
-                  {maxed ? t('next.site.showSide') : t('next.site.fullWidth')}
-                </span>
-              </button>
+              {!guest && (
+                <button
+                  type="button"
+                  className="hx-head-btn hx-tipped hx-strip__max"
+                  aria-label={maxed ? t('next.site.showSide') : t('next.site.fullWidth')}
+                  onClick={onToggleMax}
+                >
+                  <Icon name={maxed ? 'minimize-2' : 'maximize-2'} />
+                  <span className="hx-tip" data-pos="below" data-align="end">
+                    {maxed ? t('next.site.showSide') : t('next.site.fullWidth')}
+                  </span>
+                </button>
+              )}
             </div>
           )}
 
@@ -1180,13 +1225,13 @@ const SiteView = ({
                 className="hx-browser__tool hx-tipped"
                 aria-pressed={stage.picking ?? false}
                 aria-disabled={stage.picking === null}
-                aria-label={t('next.site.pick')}
+                aria-label={guest?.pickLabel ?? t('next.site.pick')}
                 onClick={() => stage.picking !== null && togglePick()}
               >
                 <Icon name="square-dashed-mouse-pointer" size="sm" />
-                <span className="hx-browser__tool-label">{t('next.site.pick')}</span>
+                <span className="hx-browser__tool-label">{guest?.pickLabel ?? t('next.site.pick')}</span>
                 <span className="hx-tip" data-pos="below">
-                  {t('next.site.pickTip')}
+                  {guest?.pickTip ?? t('next.site.pickTip')}
                   {keys && <kbd>V</kbd>}
                 </span>
               </button>

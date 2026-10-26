@@ -387,12 +387,13 @@ const Sidebar = ({
   useLayoutEffect(() => {
     latest.current = { actions, run, onOpen, renameEnd, favView, toggleKids };
   });
-  const { onCopyLink, onOpenInNewTab, onTerminal, onStopTerminal, onFork } = actions;
+  const { onCopyLink, onOpenInNewTab, onTerminal, onStopTerminal, onFork, onContinue } = actions;
   const hasCopyLink = onCopyLink !== undefined;
   const hasNewTab = onOpenInNewTab !== undefined;
   const hasTerminal = onTerminal !== undefined;
   const hasStopTerminal = onStopTerminal !== undefined;
   const hasFork = onFork !== undefined;
+  const hasContinue = onContinue !== undefined;
   const handlers = useMemo<IRowHandlers>(() => {
     const act = (id: string, failure: string, action: (now: IChatActions) => Promise<unknown> | undefined) =>
       void latest.current.run(id, failure, () => action(latest.current.actions) ?? Promise.resolve());
@@ -424,9 +425,10 @@ const Sidebar = ({
         ? (id) => act(id, t('next.sidebar.stopTerminalFailed'), (now) => now.onStopTerminal?.(id))
         : undefined,
       fork: hasFork ? (id) => act(id, t('next.handoff.forkFailed'), (now) => now.onFork?.(id)) : undefined,
+      continueIn: hasContinue ? (id) => latest.current.actions.onContinue?.(id) : undefined,
       toggleKids: (id) => latest.current.toggleKids(id),
     };
-  }, [hasCopyLink, hasNewTab, hasTerminal, hasStopTerminal, hasFork]);
+  }, [hasCopyLink, hasNewTab, hasTerminal, hasStopTerminal, hasFork, hasContinue]);
 
   const renderRow = (chat: ISidebarChat, variant: TRowVariant, enter?: IRowEnter, open?: boolean) => (
     <ChatRow
@@ -549,6 +551,9 @@ const Sidebar = ({
         return;
       case PLAN.unpin:
         go(plan.id, t('next.sidebar.unpinFailed'), () => now.onPin?.(plan.id, false));
+        return;
+      case PLAN.attach:
+        now.onAttachChat?.(plan.id);
     }
   };
 
@@ -566,10 +571,17 @@ const Sidebar = ({
         [PLAN.moveGroup]: actions.onMoveGroup !== undefined,
         [PLAN.move]: actions.onMove !== undefined,
         [PLAN.unpin]: actions.onPin !== undefined,
+        [PLAN.attach]: actions.onAttachChat !== undefined,
       };
       return can[plan.op] ? plan : null;
     },
     onDrop: runPlan,
+    // A chat carried onto the composer of the open chat is attached to its next message.
+    external: {
+      selector: '[data-chat-drop]',
+      resolve: (source) =>
+        source.kind === DRAG.chat && actions.onAttachChat ? { op: PLAN.attach, id: source.id } : null,
+    },
     // A finger held on a chat and let go where it was: its «…» menu, as a long press opens one elsewhere.
     onHoldRelease: (source) => {
       if (source.kind !== DRAG.chat) return;

@@ -44,6 +44,7 @@ export interface IChatMenuProps {
   onFork?: () => void;
   /** «Влить обратно»: a fork's result into the chat it came from (the open chat's sheet). */
   onMerge?: () => void;
+  onContinue?: () => void;
   /** «Цель…»: the header's menu of a Claude chat opens the goal's dialog. */
   onGoal?: () => void;
   onOpenChange?: (open: boolean) => void;
@@ -78,6 +79,7 @@ const ChatMenu = ({
   onStopTerminal,
   onFork,
   onMerge,
+  onContinue,
   onGoal,
   onRetitle,
   onOpenChange,
@@ -148,6 +150,12 @@ const ChatMenu = ({
               <Menu.Item className="hx-cmenu__item" onClick={onMerge}>
                 <Icon name="git-merge" size="sm" />
                 <span className="hx-cmenu__txt">{t('next.rowMenu.merge')}</span>
+              </Menu.Item>
+            )}
+            {onContinue && (
+              <Menu.Item className="hx-cmenu__item" onClick={onContinue}>
+                <Icon name="arrow-left-right" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.continue')}</span>
               </Menu.Item>
             )}
             {onGoal && (

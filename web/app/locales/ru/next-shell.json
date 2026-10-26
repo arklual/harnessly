@@ -195,7 +195,7 @@
   "next.pending.retry": "Повторить",
   "next.pending.noAnswer": "Сервер не ответил вовремя",
   "next.search.title": "Поиск",
-  "next.search.placeholder": "Найти чат по названию",
+  "next.search.placeholder": "Найти чат или сообщение",
   "next.search.clear": "Очистить",
   "next.search.cancel": "Отмена",
   "next.search.where": "где искать",
@@ -204,10 +204,13 @@
   "next.search.searching": "Ищем…",
   "next.search.nothing": "Ничего не нашли",
   "next.search.nothingHint": "Попробуйте другие слова",
-  "next.search.start": "Начните вводить, чтобы найти чат",
+  "next.search.start": "Начните вводить, чтобы найти чат или сообщение",
   "next.search.keySelect": "выбрать",
   "next.search.keyOpen": "открыть",
   "next.search.groupChats": "Чаты",
+  "next.search.you": "Вы",
+  "next.search.agent": "Агент",
+  "next.search.indexing": "Старые чаты ещё читаются — найдётся больше",
   "next.greeting.title": "Чем займёмся, {name}?",
   "next.greeting.titleNoName": "Чем займёмся?",
   "next.greeting.sub": "Агент запустится на вашей машине и покажет каждый шаг.",
@@ -888,5 +891,6 @@
   "next.rowMenu.retitle": "Обновить название",
   "next.sidebar.retitleFailed": "Не удалось обновить название",
   "next.chatStatus.limited": "Ждёт сброса лимита",
-  "next.chatStatus.limitedUntil": "Ждёт сброса лимита до {when}"
+  "next.chatStatus.limitedUntil": "Ждёт сброса лимита до {when}",
+  "next.rowMenu.continue": "Продолжить в другой модели"
 }
