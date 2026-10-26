@@ -35,8 +35,12 @@ var _ wire.ProfilesSource = (*Source)(nil)
 func (s *Source) Profiles(context.Context) (wire.ProfileList, error) {
 	out := make([]wire.ProfileInfo, 0, len(presets))
 	for _, p := range presets {
-		out = append(out, wire.ProfileInfo{ID: p.ID, Label: p.Label, Vendor: p.Vendor, Via: p.Via, Host: p.Host, Hint: p.Hint,
-			Key: s.Store.State(p.ID), Models: p.AgentModels()})
+		info := wire.ProfileInfo{ID: p.ID, Label: p.Label, Vendor: p.Vendor, Via: p.Via, Host: p.Host, Hint: p.Hint,
+			Key: s.Store.State(p.ID), Models: p.AgentModels()}
+		if account, ok := s.Store.LoginOf(p.ID); ok {
+			info.Login = &wire.ProfileLogin{Account: account}
+		}
+		out = append(out, info)
 	}
 	return wire.ProfileList{Profiles: out}, nil
 }
@@ -66,7 +70,7 @@ func (s *Source) client() *http.Client {
 	return &http.Client{Timeout: TestTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 }
 
-// TestProfile makes one minimal request to the vendor with the saved key: a message of a token for the Anthropic-
+// TestProfile makes one minimal request to the vendor with the saved key (else the vendor CLI's sign-in): a message of a token for the Anthropic-
 // compatible vendors, a response of a few tokens for xAI. The answer says how it went and holds neither the key nor
 // the vendor's body.
 func (s *Source) TestProfile(ctx context.Context, id string) (wire.ProfileTest, error) {
@@ -74,8 +78,8 @@ func (s *Source) TestProfile(ctx context.Context, id string) (wire.ProfileTest, 
 	if !ok {
 		return wire.ProfileTest{}, wire.ErrProfileUnknown
 	}
-	key, err := s.Store.Key(id)
-	if errors.Is(err, ErrNoKey) {
+	key, err := s.Store.Credential(ctx, id)
+	if errors.Is(err, ErrNoKey) || errors.Is(err, ErrNoLogin) {
 		r := wire.TestNoKey
 		return wire.ProfileTest{Reason: &r}, nil
 	}

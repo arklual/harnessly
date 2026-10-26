@@ -7,10 +7,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // ErrLauncher: the managed launcher must be an absolute path without control characters.
@@ -180,6 +182,12 @@ func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFil
 		}
 		if err := agents.CheckLaunch(launch); err != nil {
 			return "", err
+		}
+		if launch.Effort != nil {
+			m, ok := c.Profiles.Model(launch.Profile, *launch.Model)
+			if !ok || !slices.Contains(m.Efforts, wire.Effort(*launch.Effort)) {
+				return "", agents.ErrLaunchEffort
+			}
 		}
 		path, err := c.Profiles.ClaudeSettings(launch.Profile, *launch.Model, c.HooksPath)
 		if err != nil {

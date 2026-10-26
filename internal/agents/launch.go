@@ -12,6 +12,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // Launch is the model and reasoning effort a conversation starts with; nil means the CLI's own default ("Auto"). Same
@@ -36,6 +37,8 @@ type ProfileLauncher interface {
 	ClaudeSettings(profile, model, hooksPath string) (string, error)
 	// Codex is what a Codex chat on a profile adds to the launch.
 	Codex(profile string) (CodexProfile, error)
+	// Model is the capability record the launch checks its effort against.
+	Model(profile, model string) (wire.AgentModel, bool)
 }
 
 // CodexProfile is what a Codex chat on a profile adds to the launch.
@@ -77,8 +80,8 @@ func CheckLaunch(l *Launch) error {
 		return ErrLaunchEffort
 	}
 	if l.Profile != "" {
-		// A profile's models take no effort and no ultracode, and the profile needs a model to name.
-		if !ProfileIDRe.MatchString(l.Profile) || l.Model == nil || *l.Model == "" || l.Effort != nil || l.Ultracode {
+		// A profile needs a model and takes no ultracode. Its launcher checks the effort against this model's own list.
+		if !ProfileIDRe.MatchString(l.Profile) || l.Model == nil || *l.Model == "" || l.Ultracode {
 			return ErrLaunchProfile
 		}
 	}

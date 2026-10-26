@@ -242,6 +242,13 @@ func TestLaunchShape(t *testing.T) {
 	if err := agents.CheckLaunch(&agents.Launch{Effort: &id}); err != agents.ErrLaunchEffort {
 		t.Fatal(err)
 	}
+	model, effort := "k3.1-pro", "high"
+	if err := agents.CheckLaunch(&agents.Launch{Model: &model, Effort: &effort, Profile: "kimi-code"}); err != nil {
+		t.Fatalf("a profile effort has a valid launch shape: %v", err)
+	}
+	if err := agents.CheckLaunch(&agents.Launch{Model: &model, Effort: &effort, Profile: "kimi-code", Ultracode: true}); err != agents.ErrLaunchProfile {
+		t.Fatalf("a profile still takes no ultracode: %v", err)
+	}
 }
 
 // claude-platform-hooks: recognises a bare agent command only for the tab's own agent.

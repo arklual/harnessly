@@ -70,12 +70,15 @@ export const settingsChoice = (agent: IPickerAgent, options: readonly AgentOptio
   };
 };
 
-/** The last pick, if its agent and model are still offered. */
-const lastFor = (agent: IPickerAgent, last: IModelChoice | null): IModelChoice | null => {
+/** A pick made on the page or restored from storage, if its agent and model are still offered. */
+const choiceFor = (agent: IPickerAgent, last: IModelChoice | null): IModelChoice | null => {
   if (!last || choiceAgentKey(last) !== agentKey(agent)) return null;
   const model = agent.models.find((m) => m.id === last.model);
   if (!model) return null;
-  const effort = last.effort && model.efforts.includes(last.effort) ? last.effort : model.defaultEffort;
+  const effort =
+    last.effort === null || (last.effort && model.efforts.includes(last.effort))
+      ? last.effort
+      : model.defaultEffort;
   return {
     provider: agent.provider,
     ...(agent.profile ? { profile: agent.profile } : {}),
@@ -94,10 +97,11 @@ interface IStartInput {
 }
 
 export const startChoice = ({ ready, picked, settings, last }: IStartInput): IModelChoice | null => {
-  if (picked && ready.some((a) => agentKey(a) === choiceAgentKey(picked))) return picked;
+  const pickedAgent = picked && ready.find((a) => agentKey(a) === choiceAgentKey(picked));
+  if (pickedAgent) return choiceFor(pickedAgent, picked);
   const agent = (last && ready.find((a) => agentKey(a) === choiceAgentKey(last))) || ready[0];
   if (!agent) return null;
   // The settings file is the CLI's own: a profile group runs on the vendor's models, not on what it names.
   const options = agent.profile ? null : settings[agent.provider];
-  return (options && settingsChoice(agent, options)) ?? lastFor(agent, last) ?? firstChoice(agent);
+  return (options && settingsChoice(agent, options)) ?? choiceFor(agent, last) ?? firstChoice(agent);
 };

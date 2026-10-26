@@ -36,6 +36,8 @@ interface IKeyPanelProps {
   label: string;
   /** What the machine has: whether a key is saved and its last digits. */
   saved: { configured: boolean; tail: string | null };
+  /** The vendor CLI's sign-in the profile runs on while no key is saved: a subscription, checked like a key. */
+  login?: { account: string };
   /** Saves the key; resolves null when taken, else the reason. */
   onSave: (key: string) => Promise<string | null>;
   onRemove: () => Promise<string | null>;
@@ -45,7 +47,7 @@ interface IKeyPanelProps {
   onSaved?: () => void;
 }
 
-const KeyPanel = ({ hint, label, saved, onSave, onRemove, onTest, onSaved }: IKeyPanelProps) => {
+const KeyPanel = ({ hint, label, saved, login, onSave, onRemove, onTest, onSaved }: IKeyPanelProps) => {
   const [replacing, setReplacing] = useState(false);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,8 @@ const KeyPanel = ({ hint, label, saved, onSave, onRemove, onTest, onSaved }: IKe
   const alive = useRef(true);
   const configured = saved.configured;
   const form = !configured || replacing;
+  // Without a key the CLI's sign-in does the work; the form stays to put a key in its place.
+  const signed = !configured && login !== undefined;
 
   useEffect(() => {
     alive.current = true;
@@ -142,6 +146,24 @@ const KeyPanel = ({ hint, label, saved, onSave, onRemove, onTest, onSaved }: IKe
   return (
     <div className="hx-preset">
       {hint !== '' && <p className="hx-preset__hint">{hint}</p>}
+      {login !== undefined && (
+        <div className="hx-reveal" data-open={signed}>
+          <div className="hx-reveal__in" inert={!signed || undefined}>
+            <div className="hx-preset__saved">
+              <Icon name="circle-check" size="sm" />
+              <span>{t('next.providers.loginSaved', { account: login?.account ?? '' })}</span>
+            </div>
+            <p className="hx-preset__where">{t('next.providers.loginNote')}</p>
+            {onTest && (
+              <div className="hx-preset__row">
+                <SetButton tone="primary" busy={test.k === 'testing'} onClick={() => void check()}>
+                  {test.k === 'testing' ? t('next.providers.testing') : t('next.providers.test')}
+                </SetButton>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div className="hx-reveal" data-open={form}>
         <div className="hx-reveal__in" inert={!form || undefined}>
           <div className="hx-preset__form" data-state={saving ? 'busy' : undefined}>
@@ -204,7 +226,7 @@ const KeyPanel = ({ hint, label, saved, onSave, onRemove, onTest, onSaved }: IKe
           </div>
         </div>
       </div>
-      <div className="hx-reveal" data-open={line !== null && !form}>
+      <div className="hx-reveal" data-open={line !== null && (!form || signed)}>
         <div className="hx-reveal__in">
           <div className="hx-preset__test" data-ok={kept.ok || undefined} role="status">
             <Icon name={kept.ok ? 'circle-check' : 'triangle-alert'} size="sm" />

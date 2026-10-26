@@ -87,8 +87,8 @@ func skipPermissions(configFile string) func() bool {
 }
 
 func newCoreAgents(c coreAgentsConfig) *coreAgents {
-	profiles := &providers.Store{Dir: filepath.Join(c.DataDir, "providers")}
-	launcher := providers.Launcher{Store: profiles}
+	profiles := &providers.Store{Dir: filepath.Join(c.DataDir, "providers"), Logins: profileLogins(c.Home)}
+	launcher := providers.Launcher{Store: profiles, Relay: codexRelay(c)}
 	editor := func() (string, error) {
 		script := c.EditorScript
 		if script == "" {
@@ -151,6 +151,24 @@ func codexMCP(c coreAgentsConfig) codex.MCP {
 		m.TokenHeader = c.TokenHeaders[0]
 	}
 	return m
+}
+
+// profileLogins are the vendor CLIs' sign-ins of the person a profile can run on: the Grok CLI's for xai.
+func profileLogins(home string) map[string]providers.Login {
+	if home == "" {
+		return nil
+	}
+	return map[string]providers.Login{"xai": &providers.GrokLogin{Path: filepath.Join(providers.GrokHome(home), "auth.json")}}
+}
+
+// codexRelay is the runtime's relay as Codex is told about it: on the runtime's port, behind the CLI token Codex
+// already has for the MCP server. nil (straight to the vendor with the key) while the port or the token is unknown.
+func codexRelay(c coreAgentsConfig) *providers.RelayEndpoint {
+	base := codex.MCPURL(c.Port, providers.RelayPrefix)
+	if base == "" || c.MCP.TokenEnv == "" || len(c.TokenHeaders) == 0 {
+		return nil
+	}
+	return &providers.RelayEndpoint{Base: base, Header: c.TokenHeaders[0], TokenEnv: c.MCP.TokenEnv}
 }
 
 func launcherScriptConfig(c coreAgentsConfig) *codex.LauncherScriptConfig {

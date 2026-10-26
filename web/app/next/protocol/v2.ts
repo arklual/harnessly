@@ -434,6 +434,13 @@ export interface ProfileInfo {
   hint: string;
   key: ProfileKey;
   models: AgentModel[];
+  /** The vendor CLI's own sign-in on the machine (a subscription) the profile runs on when no key is saved; absent
+   *  when there is none. */
+  login?: ProfileLogin;
+}
+/** A sign-in of the vendor's CLI: whom it is of (an email). */
+export interface ProfileLogin {
+  account: string;
 }
 export interface ProfileList {
   profiles: ProfileInfo[];
@@ -1999,16 +2006,19 @@ const profileKey: Decoder<ProfileKey> = object({
 });
 const profileList: Decoder<ProfileList> = object({
   profiles: array(
-    object({
-      id: profileId,
-      label: id,
-      vendor: profileVendor,
-      via: provider,
-      host: id,
-      hint: str,
-      key: profileKey,
-      models: array(agentModel),
-    }),
+    object(
+      {
+        id: profileId,
+        label: id,
+        vendor: profileVendor,
+        via: provider,
+        host: id,
+        hint: str,
+        key: profileKey,
+        models: array(agentModel),
+      },
+      { login: object({ account: str }) },
+    ),
   ),
 });
 const profileTest: Decoder<ProfileTest> = object({

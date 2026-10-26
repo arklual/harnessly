@@ -28,6 +28,21 @@ func (f fakeProfiles) Lookup(id string) (wire.Provider, bool, []string, bool) {
 	return "", false, nil, false
 }
 
+func (f fakeProfiles) Model(profile, model string) (wire.AgentModel, bool) {
+	_, _, models, ok := f.Lookup(profile)
+	if !ok || !slices.Contains(models, model) {
+		return wire.AgentModel{}, false
+	}
+	m := wire.AgentModel{ID: model, Efforts: []wire.Effort{}}
+	switch profile {
+	case "glm", "kimi":
+		m.Efforts = []wire.Effort{wire.EffortLow, wire.EffortHigh, wire.EffortMax}
+	case "xai":
+		m.Efforts = []wire.Effort{wire.EffortLow, wire.EffortMedium, wire.EffortHigh, wire.EffortXHigh}
+	}
+	return m, true
+}
+
 func (fakeProfiles) Window(profile, model string) int {
 	if profile == "glm" && model == "glm-5" {
 		return 32_000
@@ -47,11 +62,14 @@ func profileRig(t *testing.T, f fakeProfiles) *rig {
 
 func TestCreateOnAProfile(t *testing.T) {
 	r := profileRig(t, fakeProfiles{via: wire.ProviderClaude, configured: true})
-	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude, Profile: "glm"})
+	high := wire.EffortHigh
+	res := r.do(wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude, Profile: "glm",
+		Model: &wire.Model{ID: "glm-5", Effort: &high}})
 	if res.R != wire.ResultAccepted || res.ID == nil {
 		t.Fatalf("%+v", res)
 	}
-	if got := r.launcher.launched; len(got) != 1 || got[0].Model == nil || got[0].Model.ID != "glm-5" || got[0].Model.Profile != "glm" {
+	if got := r.launcher.launched; len(got) != 1 || got[0].Model == nil || got[0].Model.ID != "glm-5" ||
+		got[0].Model.Profile != "glm" || got[0].Model.Effort == nil || *got[0].Model.Effort != high {
 		t.Fatalf("%+v", got)
 	}
 	r.id = *res.ID
@@ -61,7 +79,7 @@ func TestCreateOnAProfile(t *testing.T) {
 }
 
 func TestCreateOnAProfileRefusals(t *testing.T) {
-	high := wire.EffortHigh
+	medium := wire.EffortMedium
 	for name, c := range map[string]struct {
 		f    fakeProfiles
 		cmd  wire.ConversationCreateCmd
@@ -71,7 +89,7 @@ func TestCreateOnAProfileRefusals(t *testing.T) {
 		"no key":                            {fakeProfiles{wire.ProviderClaude, false}, wire.ConversationCreateCmd{Profile: "glm"}, wire.RefuseUnsupported},
 		"other cli":                         {fakeProfiles{wire.ProviderCodex, true}, wire.ConversationCreateCmd{Profile: "glm"}, wire.RefuseUnsupported},
 		"foreign model":                     {fakeProfiles{wire.ProviderClaude, true}, wire.ConversationCreateCmd{Profile: "glm", Model: &wire.Model{ID: "opus"}}, wire.RefuseOptionUnknown},
-		"effort":                            {fakeProfiles{wire.ProviderClaude, true}, wire.ConversationCreateCmd{Profile: "glm", Model: &wire.Model{ID: "glm-5", Effort: &high}}, wire.RefuseOptionUnknown},
+		"unsupported effort":                {fakeProfiles{wire.ProviderClaude, true}, wire.ConversationCreateCmd{Profile: "glm", Model: &wire.Model{ID: "glm-5", Effort: &medium}}, wire.RefuseOptionUnknown},
 		"vendor model on the cli's account": {fakeProfiles{wire.ProviderClaude, true}, wire.ConversationCreateCmd{Model: &wire.Model{ID: "glm-5"}}, wire.RefuseOptionUnknown},
 	} {
 		r := profileRig(t, c.f)
@@ -100,8 +118,12 @@ func TestAProfileChatSwitchesOnlyAmongItsModels(t *testing.T) {
 		t.Errorf("a profile chat to Claude's own model: %+v", got)
 	}
 	high := wire.EffortHigh
-	if got := r.do(wire.ModelCmd{OpID: "m2", ID: r.id, Model: "glm-4.5-air", Effort: &high}); got.R != wire.ResultRefused || got.Code != wire.RefuseOptionUnknown {
-		t.Errorf("an effort on a profile chat: %+v", got)
+	if got := r.do(wire.ModelCmd{OpID: "m2", ID: r.id, Model: "glm-4.5-air", Effort: &high}); got.R != wire.ResultAccepted {
+		t.Errorf("a supported effort on a profile chat: %+v", got)
+	}
+	medium := wire.EffortMedium
+	if got := r.do(wire.ModelCmd{OpID: "m3", ID: r.id, Model: "glm-4.5-air", Effort: &medium}); got.R != wire.ResultRefused || got.Code != wire.RefuseOptionUnknown {
+		t.Errorf("an unsupported effort on a profile chat: %+v", got)
 	}
 }
 

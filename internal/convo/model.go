@@ -292,11 +292,14 @@ func (t modelTook) on(from *wire.Model, m wire.ModelCmd, diff modelDiff) *wire.M
 // modelFits checks the ask against the models the machine lists for the provider.
 func (c *conv) modelFits(m wire.ModelCmd) wire.RefuseCode {
 	if cur := c.rec.Model; cur != nil && cur.Profile != "" {
-		// A conversation on a backend profile changes models only among the profile's own, and its models take no effort.
+		// A conversation on a backend profile changes models only among the profile's own; each model names its efforts.
 		if c.d.Profiles == nil {
 			return wire.RefuseUnsupported
 		}
-		if _, _, models, ok := c.d.Profiles.Lookup(cur.Profile); !ok || !slices.Contains(models, m.Model) || m.Effort != nil || m.UltracodeAfter(cur) {
+		_, _, models, ok := c.d.Profiles.Lookup(cur.Profile)
+		capabilities, known := c.d.Profiles.Model(cur.Profile, m.Model)
+		if !ok || !known || !slices.Contains(models, m.Model) || m.UltracodeAfter(cur) ||
+			(m.Effort != nil && !slices.Contains(capabilities.Efforts, *m.Effort)) {
 			return wire.RefuseOptionUnknown
 		}
 		return ""

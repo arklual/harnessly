@@ -56,6 +56,26 @@ describe('startChoice', () => {
     expect(startChoice({ ready: [claude, codex], picked, last: null, settings })).toEqual(picked);
   });
 
+  it('gives a profile model its own depth when the previous model’s depth does not fit', () => {
+    const kimi: IPickerAgent = {
+      ...claude,
+      profile: 'kimi-code',
+      name: 'Kimi Code',
+      models: [{ ...model('k3.1-pro'), efforts: ['low', 'high', 'max'], defaultEffort: 'high' }],
+    };
+    const picked = {
+      provider: 'claude',
+      profile: 'kimi-code',
+      model: 'k3.1-pro',
+      effort: 'medium',
+      ultracode: false,
+    } as const;
+    expect(startChoice({ ready: [kimi], picked, last: null, settings: NONE })).toEqual({
+      ...picked,
+      effort: 'high',
+    });
+  });
+
   it('starts on the agent of the last pick', () => {
     const last = { provider: 'codex', model: 'gpt-6', effort: null, ultracode: false } as const;
     expect(startChoice({ ready: [claude, codex], picked: null, last, settings: NONE })?.provider).toBe(

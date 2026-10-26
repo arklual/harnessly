@@ -109,7 +109,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		dictation = dv
 		features = append(features, wire.FeatureVoice)
 	}
-	v.profiles = &providers.Store{Dir: filepath.Join(d.DataDir, "providers")}
+	v.profiles = &providers.Store{Dir: filepath.Join(d.DataDir, "providers"), Logins: profileLogins(d.Home)}
 	if c.agents != nil && c.agents.profiles != nil {
 		// One store for the launch lines and the pages: a key saved on a page is the one the next launch reads.
 		v.profiles = c.agents.profiles
@@ -564,10 +564,14 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 	var chosen *agents.Launch
 	switch {
 	case req.Model != nil && req.Model.Profile != "":
-		// A vendor's model is no model of this machine's catalog, so the catalog does not check it: the conversation
-		// checked it against the profile when it was asked for. It runs with the vendor's own model and no effort.
+		// A vendor's model is no model of this machine's catalog, so the conversation checked the choice against the
+		// profile when it was asked for. The launch keeps the model and the effort the vendor accepts.
 		model := req.Model.ID
 		chosen = &agents.Launch{Model: &model, Profile: req.Model.Profile}
+		if req.Model.Effort != nil {
+			effort := string(*req.Model.Effort)
+			chosen.Effort = &effort
+		}
 		if err := agents.CheckLaunch(chosen); err != nil {
 			return err
 		}
@@ -679,14 +683,15 @@ func (cl v2Closer) Close(conv wire.Conversation) error {
 	return nil
 }
 
-// profileOffers lists, per agent CLI, the vendor presets that run through it, each with whether its key is saved.
+// profileOffers lists, per agent CLI, the vendor presets that run through it, each with whether it is ready: a key is
+// saved, or the vendor CLI is signed in.
 func profileOffers(store *providers.Store) func(wire.Provider) []wire.ProfileOffer {
 	return func(p wire.Provider) []wire.ProfileOffer {
 		var out []wire.ProfileOffer
 		for _, pr := range providers.Presets() {
 			if pr.Via == p {
 				out = append(out, wire.ProfileOffer{ID: pr.ID, Label: pr.Label, Vendor: pr.Vendor,
-					Configured: store.Configured(pr.ID), Models: pr.AgentModels()})
+					Configured: store.Ready(pr.ID), Models: pr.AgentModels()})
 			}
 		}
 		return out
@@ -700,7 +705,7 @@ var errProfileKeyGone = errors.New("the key of the conversation's profile was re
 // profileKeyGone is the reason a conversation on a backend profile can not be resumed: its key is not there. Resumed,
 // the agent would start and fail on every request.
 func profileKeyGone(store *providers.Store, conv wire.Conversation) error {
-	if conv.Model == nil || conv.Model.Profile == "" || store == nil || store.Configured(conv.Model.Profile) {
+	if conv.Model == nil || conv.Model.Profile == "" || store == nil || store.Ready(conv.Model.Profile) {
 		return nil
 	}
 	return errProfileKeyGone

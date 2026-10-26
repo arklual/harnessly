@@ -101,6 +101,15 @@ type ProfileInfo struct {
 	Hint   string        `json:"hint"`
 	Key    ProfileKey    `json:"key"`
 	Models []AgentModel  `json:"models"`
+	// Login is the vendor CLI's own sign-in the profile runs on while no key is saved (the Grok CLI's for xai); absent
+	// while the CLI is not signed in, and from a runtime that does not read it.
+	Login *ProfileLogin `json:"login,omitempty"`
+}
+
+// ProfileLogin is a sign-in of the vendor's CLI on the machine: whom it is of (an email; "" when the CLI does not say).
+// The credential stays with the CLI.
+type ProfileLogin struct {
+	Account string `json:"account"`
 }
 
 func (p ProfileInfo) Validate() error {

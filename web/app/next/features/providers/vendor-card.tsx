@@ -20,7 +20,14 @@ import Segmented from '@/next/ui/segmented';
 export const vendorStatus = (vendor: Vendor, states: readonly IPresetState[]): string => {
   const own = presetsOfVendor(vendor, states);
   const first = own.find((s) => s.key.configured);
-  if (!first) return t('next.providers.off');
+  if (!first) {
+    // No key, but the vendor's CLI is signed in: the profile runs on that subscription.
+    const signed = own.find((s) => s.login !== undefined);
+    if (!signed?.login) return t('next.providers.off');
+    const account = signed.login.account;
+    if (own.length === 1) return t('next.providers.onLogin', { account });
+    return t('next.providers.onLoginPreset', { preset: presetName(signed), account });
+  }
   const tail = first.key.tail ?? '';
   if (own.length === 1) return t('next.providers.on', { tail });
   return t('next.providers.onPreset', { preset: presetName(first), tail });

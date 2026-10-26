@@ -1220,9 +1220,9 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 }
 
 // onProfile is the model a conversation starts with: model, with the profile on it when one is named. The profile has to
-// be one the machine knows, run through the CLI of the provider and have a key saved; the model has to be one of its own
-// (and takes no effort and no ultracode). Without a profile the model must not be one a profile owns: a conversation on
-// the CLI's own account asking for a vendor's model would run on the wrong account.
+// be one the machine knows, run through the CLI of the provider and have a key saved; the model and its effort have to
+// be ones the profile lists (ultracode stays Claude's own). Without a profile the model must not be one a profile owns:
+// a conversation on the CLI's own account asking for a vendor's model would run on the wrong account.
 func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) (*wire.Model, wire.RefuseCode) {
 	if profile == "" {
 		if model != nil && r.d.Profiles != nil && r.d.Profiles.OwnsModel(model.ID) {
@@ -1243,7 +1243,9 @@ func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) 
 	if model == nil {
 		model = &wire.Model{ID: models[0]}
 	}
-	if !slices.Contains(models, model.ID) || model.Effort != nil || model.Ultracode {
+	capabilities, known := r.d.Profiles.Model(profile, model.ID)
+	if !slices.Contains(models, model.ID) || !known || model.Ultracode ||
+		(model.Effort != nil && !slices.Contains(capabilities.Efforts, *model.Effort)) {
 		return nil, wire.RefuseOptionUnknown
 	}
 	on := *model

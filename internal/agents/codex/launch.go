@@ -11,6 +11,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/nodejson"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // MCP is the runtime's own MCP server as Codex is told about it. The token travels in an environment variable the
@@ -106,6 +107,12 @@ func (c LaunchConfig) profile(l *agents.Launch) (agents.CodexProfile, error) {
 	}
 	if err := agents.CheckLaunch(l); err != nil {
 		return agents.CodexProfile{}, err
+	}
+	if l.Effort != nil {
+		m, ok := c.Profiles.Model(l.Profile, *l.Model)
+		if !ok || !slices.Contains(m.Efforts, wire.Effort(*l.Effort)) {
+			return agents.CodexProfile{}, agents.ErrLaunchEffort
+		}
 	}
 	return c.Profiles.Codex(l.Profile)
 }

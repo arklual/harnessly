@@ -382,8 +382,15 @@
         "host": {"type": "string", "minLength": 1},
         "hint": {"type": "string"},
         "key": {"$ref": "#/$defs/ProfileKey"},
-        "models": {"type": "array", "items": {"$ref": "#/$defs/AgentModel"}}
+        "models": {"type": "array", "items": {"$ref": "#/$defs/AgentModel"}},
+        "login": {"$ref": "#/$defs/ProfileLogin"}
       }
+    },
+    "ProfileLogin": {
+      "type": "object",
+      "required": ["account"],
+      "additionalProperties": false,
+      "properties": {"account": {"type": "string"}}
     },
     "ProfileList": {
       "type": "object",

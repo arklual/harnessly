@@ -42,6 +42,14 @@ describe('presets', () => {
     expect(defaultPreset('glm', LIST)).toBeNull();
   });
 
+  it('opens a card on the preset signed in through its CLI when none has a key', () => {
+    const list = [
+      preset('kimi', 'kimi', 'Kimi · платформа'),
+      { ...preset('kimi-code', 'kimi', 'Kimi · Kimi Code'), login: { account: 'me@example.com' } },
+    ];
+    expect(defaultPreset('kimi', list)).toBe('kimi-code');
+  });
+
   it('names a preset by what tells it from its vendor’s others', () => {
     expect(presetName(LIST[0])).toBe('Платформа');
     expect(presetName(LIST[2])).toBe('Grok');

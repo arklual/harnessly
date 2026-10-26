@@ -15,6 +15,7 @@ const PresetPanel = ({ state, vendor, onSave, onRemove, onTest, onSaved }: IPres
     hint={state.hint}
     label={t('next.providers.keyAria', { vendor })}
     saved={state.key}
+    login={state.login}
     onSave={(key) => onSave(state.id, key)}
     onRemove={() => onRemove(state.id)}
     onTest={() => onTest(state.id)}

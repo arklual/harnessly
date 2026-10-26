@@ -22,6 +22,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/limits"
 	"github.com/ly-solutions/harnessly/internal/preflight"
+	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -254,6 +255,14 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 				}
 			}),
 		},
+	}
+	if ref.c.agents != nil && ref.c.agents.profiles != nil {
+		// The relay a Codex chat on a vendor profile talks to (xAI): only the runtime's own CLIs, which hold its token.
+		relays := providers.Relays(ref.c.agents.profiles, providers.RelayPrefix)
+		routes = append(routes, gate.Route{
+			Match:   func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, providers.RelayPrefix+"/") },
+			Handler: internal(relays.ServeHTTP),
+		})
 	}
 
 	f, err := gate.New(cfg, routes...)

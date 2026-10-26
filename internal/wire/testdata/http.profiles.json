@@ -18,7 +18,8 @@
       {
         "id": "xai", "label": "Grok", "vendor": "grok", "via": "codex", "host": "api.x.ai",
         "hint": "", "key": {"configured": false, "tail": null},
-        "models": [{"id": "grok-build-0.1", "label": "Grok Build 0.1", "hint": "", "efforts": [], "defaultEffort": null}]
+        "models": [{"id": "grok-build-0.1", "label": "Grok Build 0.1", "hint": "", "efforts": [], "defaultEffort": null}],
+        "login": {"account": "me@example.com"}
       }
     ]
   }

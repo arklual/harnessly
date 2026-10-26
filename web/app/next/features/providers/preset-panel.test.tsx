@@ -19,6 +19,7 @@ const OFF: IPresetState = {
   models: [],
 };
 const ON: IPresetState = { ...OFF, key: { configured: true, tail: '…3456' } };
+const SIGNED: IPresetState = { ...OFF, login: { account: 'me@example.com' } };
 
 const setup = (state: IPresetState, over: Partial<Parameters<typeof PresetPanel>[0]> = {}) => {
   const onSave = vi.fn(() => Promise.resolve(null as string | null));
@@ -136,5 +137,24 @@ describe('a saved key', () => {
     });
     expect(onSave).toHaveBeenCalledWith('kimi', 'sk-test-abcdefgh');
     expect(field().value).toBe('');
+  });
+});
+
+describe('a CLI sign-in', () => {
+  it('says the profile runs on the subscription, checks it and still takes a key', async () => {
+    const { onTest } = setup(SIGNED);
+    expect(screen.getByText('Runs on the subscription: CLI sign-in · me@example.com')).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Check connection' })[0]);
+    });
+    expect(onTest).toHaveBeenCalledWith('kimi');
+    expect(screen.getByRole('status').textContent).toBe('The connection works');
+    expect(field()).toBeTruthy();
+  });
+
+  it('is not shown over a saved key', () => {
+    setup({ ...ON, login: { account: 'me@example.com' } });
+    const line = screen.getByText(/Runs on the subscription/);
+    expect(line.closest('.hx-reveal')?.getAttribute('data-open')).toBe('false');
   });
 });

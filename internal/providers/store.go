@@ -2,6 +2,7 @@ package providers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -19,6 +20,9 @@ import (
 // feed. It is never logged and never put in a launch line.
 type Store struct {
 	Dir string
+	// Logins are the vendor CLIs' own sign-ins a profile runs on when no key is saved for it, by profile id (the Grok
+	// CLI's for xai); nil for none.
+	Logins map[string]Login
 
 	mu sync.Mutex
 	// masks are the keys the feed hides, each with the form it has in a JSON string; read on every frame, so kept here
@@ -120,6 +124,39 @@ func (s *Store) State(id string) wire.ProfileKey {
 
 // Configured says whether a key is saved for the profile.
 func (s *Store) Configured(id string) bool { return s.State(id).Configured }
+
+// LoginOf is the account of the vendor CLI's sign-in the profile can run on; ok is false while there is none.
+func (s *Store) LoginOf(id string) (account string, ok bool) {
+	l := s.Logins[id]
+	if l == nil {
+		return "", false
+	}
+	return l.Account()
+}
+
+// Ready says whether a conversation can run on the profile: a key is saved, or the vendor CLI is signed in.
+func (s *Store) Ready(id string) bool {
+	if s.Configured(id) {
+		return true
+	}
+	_, ok := s.LoginOf(id)
+	return ok
+}
+
+// Credential is what a request of the profile is authorised with: the saved key, else the token of the vendor CLI's
+// sign-in. A saved key is the person's choice on the Settings screen and goes first.
+func (s *Store) Credential(ctx context.Context, id string) (string, error) {
+	key, err := s.Key(id)
+	if err == nil || !errors.Is(err, ErrNoKey) {
+		return key, err
+	}
+	if l := s.Logins[id]; l != nil {
+		if _, ok := l.Account(); ok {
+			return l.Token(ctx)
+		}
+	}
+	return "", ErrNoKey
+}
 
 // tailOf is «…» and the last four characters of key.
 func tailOf(key string) wire.ProfileKey {

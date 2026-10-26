@@ -108,8 +108,14 @@ func TestClaudeProfileLaunchUsesProfileSettings(t *testing.T) {
 	eff := "high"
 	l := choose(p.Models[0].ID, "glm")
 	l.Effort = &eff
+	line, err = c.LaunchCommand("ws", l, nil)
+	if err != nil || !strings.Contains(line, "--effort high") {
+		t.Fatalf("a supported profile effort: %q %v", line, err)
+	}
+	unsupported := "medium"
+	l.Effort = &unsupported
 	if _, err := c.LaunchCommand("ws", l, nil); err == nil {
-		t.Fatal("a profile takes no effort")
+		t.Fatal("an effort the profile model does not support")
 	}
 }
 
@@ -147,6 +153,35 @@ func TestCodexProfileLaunchLine(t *testing.T) {
 	}
 	if _, err := c.LauncherLine("ws", "", choose(p.Models[0].ID, "kimi")); err == nil {
 		t.Fatal("kimi does not run through Codex")
+	}
+}
+
+func TestCodexProfileEffortReachesTheResponsesAPI(t *testing.T) {
+	st := newStore(t)
+	if _, err := st.Set("xai", fakeKey); err != nil {
+		t.Fatal(err)
+	}
+	c := codexCfg(t, st, true)
+	effort := "xhigh"
+	l := choose("grok-4.7", "xai")
+	l.Effort = &effort
+	line, err := c.LauncherLine("ws", "", l)
+	if err != nil || !strings.Contains(line, "--effort 'xhigh'") {
+		t.Fatalf("launcher line: %q %v", line, err)
+	}
+	args, _, err := c.RuntimeArgs("ws", "", l)
+	if err != nil || !strings.Contains(strings.Join(args, " "), `model_reasoning_effort="xhigh"`) {
+		t.Fatalf("runtime args: %q %v", args, err)
+	}
+	unsupported := "max"
+	l.Effort = &unsupported
+	if _, err := c.LauncherLine("ws", "", l); err == nil {
+		t.Fatal("Grok 4.7 took max")
+	}
+	l = choose("grok-build-0.1", "xai")
+	l.Effort = &effort
+	if _, err := c.LauncherLine("ws", "", l); err == nil {
+		t.Fatal("Grok Build took an adjustable effort")
 	}
 }
 

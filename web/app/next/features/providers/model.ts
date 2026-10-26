@@ -32,7 +32,7 @@ export const vendorsOf = (presets: readonly IPresetState[]): Vendor[] =>
 /** The preset a card opens on: the one that has a key, else the vendor's first. */
 export const defaultPreset = (vendor: Vendor, presets: readonly IPresetState[]): PresetId | null => {
   const own = presetsOfVendor(vendor, presets);
-  return (own.find((p) => p.key.configured) ?? own[0])?.id ?? null;
+  return (own.find((p) => p.key.configured) ?? own.find((p) => p.login !== undefined) ?? own[0])?.id ?? null;
 };
 
 /** What tells a preset from its vendor's others in a segment: «Kimi · платформа» is «Платформа», «Grok» stays. */

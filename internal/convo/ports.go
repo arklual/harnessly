@@ -43,6 +43,8 @@ type Profiles interface {
 	// Lookup says which CLI a profile runs through, whether a key is saved for it and which models it has; ok is false
 	// for a profile the machine does not know.
 	Lookup(id string) (via wire.Provider, configured bool, models []string, ok bool)
+	// Model is the capability record a choice's effort is checked against.
+	Model(profile, model string) (wire.AgentModel, bool)
 	// OwnsModel says whether the id is a model of some profile: a conversation on the CLI's own account is not started on
 	// it or switched to it.
 	OwnsModel(model string) bool

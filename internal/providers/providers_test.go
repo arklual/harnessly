@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -55,14 +56,66 @@ func TestPresetsAreWithinTheContract(t *testing.T) {
 			t.Errorf("%s: %v", p.ID, err)
 		}
 		for _, m := range p.AgentModels() {
-			if m.Efforts == nil || len(m.Efforts) != 0 || m.Ultracode {
-				t.Errorf("%s: %s takes no effort and no ultracode", p.ID, m.ID)
+			if m.Efforts == nil || m.Ultracode {
+				t.Errorf("%s: %s has invalid capabilities", p.ID, m.ID)
+			}
+			if m.DefaultEffort != nil && !slices.Contains(m.Efforts, *m.DefaultEffort) {
+				t.Errorf("%s: %s has default effort %s outside %v", p.ID, m.ID, *m.DefaultEffort, m.Efforts)
 			}
 		}
 	}
 	for _, id := range []string{"kimi", "kimi-code", "glm", "glm-cn", "xai"} {
 		if !seen[id] {
 			t.Errorf("no preset %s", id)
+		}
+	}
+}
+
+func TestPresetModelEfforts(t *testing.T) {
+	lowHighMax := []wire.Effort{wire.EffortLow, wire.EffortHigh, wire.EffortMax}
+	for _, tc := range []struct {
+		profile, model string
+		efforts        []wire.Effort
+		defaultEffort  wire.Effort
+	}{
+		{"kimi", "kimi-k3.1-pro", lowHighMax, wire.EffortMax},
+		{"kimi", "kimi-k3.1-pro-highspeed", lowHighMax, wire.EffortMax},
+		{"kimi", "kimi-k2.7-code", []wire.Effort{}, ""},
+		{"kimi-code", "k3.1-pro", lowHighMax, wire.EffortHigh},
+		{"kimi-code", "k3.1-pro-highspeed", lowHighMax, wire.EffortHigh},
+		{"kimi-code", "k3", lowHighMax, wire.EffortHigh},
+		{"kimi-code", "k3-256k", lowHighMax, wire.EffortHigh},
+		{"kimi-code", "kimi-for-coding", lowHighMax, wire.EffortMax},
+		{"kimi-code", "kimi-for-coding-highspeed", []wire.Effort{}, ""},
+		{"glm", "glm-5.3", lowHighMax, wire.EffortMax},
+		{"glm", "glm-5.3-flash", lowHighMax, wire.EffortMax},
+		{"glm-cn", "glm-5.3", lowHighMax, wire.EffortMax},
+		{"xai", "grok-4.7", []wire.Effort{wire.EffortLow, wire.EffortMedium, wire.EffortHigh, wire.EffortXHigh}, wire.EffortHigh},
+		{"xai", "grok-build-0.1", []wire.Effort{}, ""},
+	} {
+		p, ok := Find(tc.profile)
+		if !ok {
+			t.Fatalf("no preset %s", tc.profile)
+		}
+		if _, ok := p.ModelOf(tc.model); !ok {
+			t.Errorf("%s: no model %s", tc.profile, tc.model)
+			continue
+		}
+		var got wire.AgentModel
+		for _, candidate := range p.AgentModels() {
+			if candidate.ID == tc.model {
+				got = candidate
+			}
+		}
+		if !slices.Equal(got.Efforts, tc.efforts) {
+			t.Errorf("%s/%s efforts: got %v, want %v", tc.profile, tc.model, got.Efforts, tc.efforts)
+		}
+		if tc.defaultEffort == "" {
+			if got.DefaultEffort != nil {
+				t.Errorf("%s/%s default: got %s, want none", tc.profile, tc.model, *got.DefaultEffort)
+			}
+		} else if got.DefaultEffort == nil || *got.DefaultEffort != tc.defaultEffort {
+			t.Errorf("%s/%s default: got %v, want %s", tc.profile, tc.model, got.DefaultEffort, tc.defaultEffort)
 		}
 	}
 }
