@@ -29,6 +29,16 @@ All notable changes to this project are documented here. The format follows
   at `design-public/<project>` (the board list, the project files, `support.js` of the project's release) for a
   60-second token only; hidden files, paths out of the project and symlinks out of it are not served.
 
+### Changed
+
+- The interface opens faster on a phone and typing in it no longer stutters. It comes as one file instead of about 80
+  (124 requests at start become 42, which counts on HTTP/1.1), loads a single language, and the terminal, the right
+  pane's tabs, sign-in and docs load when first opened. On an emulated iPhone 14 the home screen is ready in about 4 s
+  instead of 5.9 s and a chat in 6.6 s instead of 8.4 s; the main-thread work while typing is halved.
+  The guest page of a design loads 10 files instead of 36 and none of the interface's, and its buttons get the styles
+  they were missing.
+- Enter pressed on the start page before the list of machines arrives waits and sends instead of being dropped.
+
 ### Fixed
 
 - A message with a picture Claude does not show as «[Image #1]» in 8 s (5 s before) no longer fails try after try: it goes

@@ -37,6 +37,12 @@ type Pane interface {
 	Keys(keys ...string) error
 }
 
+// LineTyper is a pane that can type a line's keys without its Enter: the typist then presses the Enter once the box has
+// read the line to its end (a loaded Claude reads a burst of keys as a paste, slowly).
+type LineTyper interface {
+	TypeOnly(text string) error
+}
+
 var (
 	locksMu sync.Mutex
 	locks   = map[string]*sync.Mutex{}

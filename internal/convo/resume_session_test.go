@@ -1,9 +1,12 @@
 package convo
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -110,4 +113,73 @@ func TestResumeASessionRefusals(t *testing.T) {
 	if bad := r.do(wire.ConversationResumeCmd{OpID: "x", ID: r.id, SessionID: sessKnown}); bad.Code != wire.RefuseBadRequest {
 		t.Fatalf("both forms: %+v", bad)
 	}
+}
+
+// A session whose last run stopped mid-turn comes back idle, with the actors on their goroutines: the agent started on
+// it again waits for a prompt, so the turn the transcript leaves open is not running, however the actor's first look
+// falls against the history the resume shows.
+func TestResumeASessionLeftMidTurnIsNotWorking(t *testing.T) {
+	dir := t.TempDir()
+	folder := filepath.Join(dir, "app")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	history := `{"type":"user","timestamp":"2026-10-20T10:00:00.000Z","uuid":"u-1","message":{"role":"user","content":"old question"}}` + "\n" +
+		`{"type":"assistant","timestamp":"2026-10-20T10:00:05.000Z","uuid":"a-1","message":{"role":"assistant","content":[{"type":"text","text":"half an answer"}]}}` + "\n"
+	const n = 20
+	sessions := map[string]string{}
+	for i := range n {
+		id := fmt.Sprintf("00000009-0000-4000-8000-%012d", i)
+		sessions[id] = filepath.Join(dir, id+".jsonl")
+		if err := os.WriteFile(sessions[id], []byte(history), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rt := New(Deps{MachineID: "m1", Publisher: &fakePub{t: t, seqs: map[wire.Channel]int64{}}, Launcher: &lockedLauncher{},
+		Store: NewStore(filepath.Join(dir, "v2")), Limits: wire.DefaultLimits,
+		AgentSession: func(_ wire.Provider, id string) (AgentSession, bool) {
+			p, ok := sessions[id]
+			return AgentSession{Title: "Cut short", Cwd: folder, TranscriptPath: p}, ok
+		}})
+	if err := rt.Start(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Stop()
+	for id := range sessions {
+		res := rt.Do(t.Context(), "d", wire.ConversationResumeCmd{OpID: "r-" + id, Provider: wire.ProviderClaude, SessionID: id, Cwd: folder})
+		if res.R != wire.ResultAccepted || res.ID == nil {
+			t.Fatalf("resume: %+v", res)
+		}
+	}
+	time.Sleep(3 * LookEvery / 2)
+	cs, err := rt.Conversations(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cs.Conversations) != n {
+		t.Fatalf("%d conversations", len(cs.Conversations))
+	}
+	for _, c := range cs.Conversations {
+		if c.State.K == wire.StateWorking {
+			t.Fatalf("%s came back working on the turn its history left open: %+v", c.ID, c.State)
+		}
+	}
+}
+
+// lockedLauncher takes launches from many actors at once.
+type lockedLauncher struct {
+	mu sync.Mutex
+	l  fakeLauncher
+}
+
+func (l *lockedLauncher) Launch(req LaunchRequest) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.l.Launch(req)
+}
+
+func (l *lockedLauncher) Resume(c wire.Conversation) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.l.Resume(c)
 }

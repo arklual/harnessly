@@ -442,10 +442,10 @@ func (f *Feed) FindUser(offset int64, at wire.Ms) (string, bool) {
 }
 
 // FindUserText is FindUser for one message: the first user entry at or after offset (or written at or after at) that
-// carries its text. An entry of someone else — the person typing into the terminal, another tool — is never taken for it.
+// carries its text, or its start when Claude cut the paste short. An entry of someone else — the person typing into the terminal, another tool — is never taken for it.
 func (f *Feed) FindUserText(offset int64, at wire.Ms, text string) (string, bool) {
 	for i, e := range f.b.entries {
-		if e.T != wire.EntryUser || e.ClientID != nil || !screen.SameMessage(e.Text, text) {
+		if e.T != wire.EntryUser || e.ClientID != nil || !screen.SameMessage(e.Text, text) && !screen.CutShort(e.Text, text) {
 			continue
 		}
 		if off := f.b.offsets[i]; off >= 0 && off >= offset || off < 0 && e.At >= at-clockSkew {

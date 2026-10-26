@@ -1,30 +1,16 @@
 import useBoardFrame from '@/hooks/use-board-frame';
 import { gitlabHosts } from '@/lib/site';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ExternalLink, Shapes } from 'lucide-react';
 
-import DocViewer from '@/components/agents/docs/doc-viewer';
-import SubagentsTab from '@/components/agents/inspector/subagents-tab';
-import ArtifactsTab from '@/components/agents/inspector/artifacts-tab';
-import PeersTab from '@/components/agents/inspector/peers-tab';
-import GitLabTab from '@/components/agents/inspector/gitlab-tab';
 import ChangesTab, { CommitView, isCommitTarget } from '@/components/agents/inspector/changes-tab';
-import GitLabView from '@/components/agents/inspector/gitlab-view';
-import FilesTab from '@/components/agents/inspector/files-tab';
-import DiskTab from '@/components/agents/inspector/disk-tab';
-import PlanTab from '@/components/agents/inspector/plan-tab';
 import { FileViewerContent } from '@/components/agents/inspector/file-viewer';
 import * as EconomicsIsland from '@/components/agents/inspector/economics-island';
-import BrowserTab, { shownAddress } from '@/components/agents/pane/browser-tab';
-import ShellTab, { closePaneShell } from '@/components/agents/pane/shell-tab';
-import ToolsPage, { type IToolCount } from '@/components/agents/pane/tools-page';
-import OverviewTab, { type IOverviewIsland } from '@/components/agents/pane/overview-tab';
-import TaskTab from '@/components/agents/pane/task-tab';
-import DesignLibraryTab, { DesignIsland } from '@/components/agents/pane/design-library-tab';
+import { shownAddress } from '@/components/agents/pane/shown-address';
+import { closePaneShell } from '@/components/agents/pane/pane-shell';
+import type { IToolCount } from '@/components/agents/pane/tools-page';
+import type { IOverviewIsland } from '@/components/agents/pane/overview-tab';
 import SiteIcon from '@/components/agents/site-icon';
-import SideChatView from '@/components/agents/side-chat/side-chat-view';
-import GalleryView from '@/components/agents/gallery/gallery-view';
-import VaultTab from '@/components/agents/vault/vault-tab';
 import { PANE_KINDS, TOOL_ORDER } from '@/components/agents/pane/pane-registry';
 import useLinkMeta from '@/hooks/use-link-meta';
 import usePaneData from '@/hooks/use-pane-data';
@@ -42,6 +28,30 @@ import { closeTab, openTab, retitleTab, type IPaneTab, type TPaneTabKind } from 
 import { usePreviewState } from '@/lib/hl-preview-store';
 import type { ITab } from '@/types/terminal';
 import { t } from '@/lib/i18n';
+
+// Each tab's view comes in its own chunk the first time it shows, not with the page: the pane draws them under a
+// Suspense (next/legacy/pane.tsx). What the hook itself calls (a tab's title, closing a shell) stays imported here.
+const DocViewer = lazy(() => import('@/components/agents/docs/doc-viewer'));
+const SubagentsTab = lazy(() => import('@/components/agents/inspector/subagents-tab'));
+const ArtifactsTab = lazy(() => import('@/components/agents/inspector/artifacts-tab'));
+const PeersTab = lazy(() => import('@/components/agents/inspector/peers-tab'));
+const GitLabTab = lazy(() => import('@/components/agents/inspector/gitlab-tab'));
+const GitLabView = lazy(() => import('@/components/agents/inspector/gitlab-view'));
+const FilesTab = lazy(() => import('@/components/agents/inspector/files-tab'));
+const DiskTab = lazy(() => import('@/components/agents/inspector/disk-tab'));
+const PlanTab = lazy(() => import('@/components/agents/inspector/plan-tab'));
+const ToolsPage = lazy(() => import('@/components/agents/pane/tools-page'));
+const OverviewTab = lazy(() => import('@/components/agents/pane/overview-tab'));
+const TaskTab = lazy(() => import('@/components/agents/pane/task-tab'));
+const DesignLibraryTab = lazy(() => import('@/components/agents/pane/design-library-tab'));
+const DesignIsland = lazy(() =>
+  import('@/components/agents/pane/design-library-tab').then((m) => ({ default: m.DesignIsland })),
+);
+const SideChatView = lazy(() => import('@/components/agents/side-chat/side-chat-view'));
+const GalleryView = lazy(() => import('@/components/agents/gallery/gallery-view'));
+const BrowserTab = lazy(() => import('@/components/agents/pane/browser-tab'));
+const ShellTab = lazy(() => import('@/components/agents/pane/shell-tab'));
+const VaultTab = lazy(() => import('@/components/agents/vault/vault-tab'));
 
 // What the right pane of a conversation shows in each of its tabs, and the state behind them (`hl-pane-store`): one
 // place for both interfaces. The current one draws these tabs in its own strip; the Legacy one in `ConversationPane`.

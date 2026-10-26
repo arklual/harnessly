@@ -304,19 +304,23 @@ func (r *Runtime) loop(a *actor) {
 	defer r.wg.Done()
 	c := a.c
 	next := r.d.Clock.Now()
+	// The actor looks only after its first message, the one its maker sends: that one reads the transcript as history,
+	// and a look before it would take the history for news (a turn a resumed session left open would be running).
+	told := false
 	for {
 		now := r.d.Clock.Now()
 		wake := c.wake(now)
-		if next.Before(wake) {
+		if told && next.Before(wake) {
 			wake = next
 		}
 		select {
 		case f := <-a.mail:
 			f()
+			told = true
 			a.publish()
 		case <-r.d.Clock.After(wake.Sub(now)):
 			now = r.d.Clock.Now()
-			if !now.Before(next) {
+			if told && !now.Before(next) {
 				c.read(now)
 				c.observe(now)
 				next = now.Add(c.lookEvery())

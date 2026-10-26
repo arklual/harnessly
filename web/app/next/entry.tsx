@@ -2,6 +2,8 @@
 // its stores. main.tsx loads this chunk only for a person who chose the new interface; when the person goes (another
 // account, sign-out) the boot lets everything of theirs go.
 
+import '@/next/styles/order';
+
 import { useEffect } from 'react';
 import Shell, { type IShellProps } from '@/next/bindings/shell';
 import { bootNext, shutdownNext } from '@/next/boot';

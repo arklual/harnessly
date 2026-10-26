@@ -472,7 +472,7 @@ func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, no
 		st := r.Message.State
 		ours := r.Message.ClientID == b.flight && (st.K == wire.MsgInInput || st.K == wire.MsgTyping) ||
 			// Claude reads its queue in order: the oldest steered message first — the one with this text, when it is known.
-			st.K == wire.MsgInInput && r.Steered && (text == "" || screen.SameMessage(text, r.Message.Text)) ||
+			st.K == wire.MsgInInput && r.Steered && (text == "" || takes(text, r.Message.Text)) ||
 			st.K == wire.MsgAccepted && st.EntryID == nil
 		if !ours || offset < r.TypedOffset {
 			continue
@@ -481,6 +481,7 @@ func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, no
 			r.Submitted = true
 			b.typing = false
 		}
+		b.cut(r, text)
 		b.accept(&ch, r, &entryID, now)
 		b.join(&ch, r, turn, now)
 		return r.Message.ClientID, ch
@@ -491,13 +492,14 @@ func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, no
 	for _, r := range b.sorted() {
 		st := r.Message.State
 		if st.K != wire.MsgQueued && st.K != wire.MsgFailed || r.TypedAt == 0 || offset < r.TypedOffset ||
-			!screen.SameMessage(text, r.Message.Text) {
+			!takes(text, r.Message.Text) {
 			continue
 		}
 		if b.log != nil {
 			b.log.Info("message found in the transcript after all", "conversationId", b.conv, "clientId", r.Message.ClientID,
 				"state", string(st.K))
 		}
+		b.cut(r, text)
 		queued := slices.Contains(b.items, r.Message.ClientID)
 		reason := r.Reason
 		b.dropItem(r.Message.ClientID)
@@ -510,6 +512,19 @@ func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, no
 		return r.Message.ClientID, ch
 	}
 	return "", ch
+}
+
+// takes: a user entry with this text is this message's — all of it, or its start when Claude cut the paste short.
+func takes(entry, text string) bool {
+	return screen.SameMessage(entry, text) || screen.CutShort(entry, text)
+}
+
+// cut logs a message whose entry has only its start: the agent read part of it, the rest was lost in the paste.
+func (b *Box) cut(r *Record, text string) {
+	if b.log != nil && text != "" && screen.CutShort(text, r.Message.Text) {
+		b.log.Warn("the agent took the message cut short", "conversationId", b.conv, "clientId", r.Message.ClientID,
+			"took", len([]rune(text)), "of", len([]rune(r.Message.Text)))
+	}
 }
 
 func (b *Box) accept(ch *Change, r *Record, entryID *string, now time.Time) {

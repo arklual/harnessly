@@ -283,6 +283,9 @@ func (c *core) start() {
 	c.mu.Lock()
 	c.m, c.prompts, c.sleeper = m, svc, sleeper
 	c.mu.Unlock()
+	if c.resumeAtStart.Load() && c.launcher != nil {
+		c.launcher.RememberStartStates()
+	}
 	m.Start(ctx)
 	if c.v2d != nil && v2Enabled() {
 		v := newV2Live(*c.v2d, c)

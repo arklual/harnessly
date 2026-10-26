@@ -135,21 +135,27 @@ describe('the page asks the runtime where a late message is', () => {
     expect(messagesStore.has(id)).toBe(false);
   });
 
-  it('a message typed into the agent and never moved on is asked about past the runtime’s term; a steer is not', async () => {
+  it('a message typed into the agent and never moved on is asked about past the runtime’s term; a steer too', async () => {
     const { rt, m } = await openChat();
     const data = rt.convs.get(CONV)!;
     const wait = { slowAt: machineNow(m) + 3000, deadlineAt: machineNow(m) + 30_000 };
     applyMessage(m, record('m-typed', { k: 'in-input', wait }, 2));
     applyMessage(m, { ...record('m-steer', { k: 'in-input', wait }, 2), mode: 'steer' });
-    // The runtime moved it on; this page missed the frame.
-    data.messages = [record('m-typed', { k: 'queued', position: 1, reason: 'stalled', wait: null }, 3)];
+    // The runtime moved the first on; the steer still waits in the agent's queue. This page missed the frame.
+    data.messages = [
+      record('m-typed', { k: 'queued', position: 1, reason: 'stalled', wait: null }, 3),
+      { ...record('m-steer', { k: 'in-input', wait }, 2), mode: 'steer' },
+    ];
     await vi.advanceTimersByTimeAsync(30_000);
     expect(rt.statusAsks).toEqual([]);
     await vi.advanceTimersByTimeAsync(5_100);
-    expect(rt.statusAsks).toEqual([['m-typed']]);
+    expect(rt.statusAsks).toEqual([['m-typed', 'm-steer']]);
     expect(msg('m-typed').state).toMatchObject({ k: 'queued', reason: 'stalled' });
     expect(waitsInQueue(msg('m-typed'), 'idle')).toBe(true);
     expect(msg('m-steer').state.k).toBe('in-input');
+    // Still waiting: asked again, no oftener than every 30 s.
+    await vi.advanceTimersByTimeAsync(STATUS_EVERY_MS);
+    expect(rt.statusAsks).toEqual([['m-typed', 'm-steer'], ['m-steer']]);
   });
 
   it('an older runtime without the status page decides nothing: the message waits and is asked about again later', async () => {

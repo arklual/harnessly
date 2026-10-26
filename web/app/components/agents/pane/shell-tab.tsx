@@ -5,12 +5,6 @@ import { TerminalView } from '@/terminal/terminal-view';
 import { appFetch } from '@/lib/app-path';
 import { t } from '@/lib/i18n';
 
-export const closePaneShell = (tabId: string): void => {
-  void appFetch(`/api/platform/pane-shell?tabId=${encodeURIComponent(tabId)}`, { method: 'DELETE' }).catch(
-    () => {},
-  );
-};
-
 const startShell = async (tabId: string): Promise<string> => {
   const response = await appFetch('/api/platform/pane-shell', {
     method: 'POST',

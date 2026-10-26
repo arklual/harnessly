@@ -1,5 +1,6 @@
 // The tab of a change (merge request, pull request, commit, issue) as Legacy draws it, for the gallery that shows it on
 // its own (next/dev/change-gallery.tsx). The pane itself gets it through `usePaneContents`.
+import '@/styles/legacy';
 import GitLabView from '@/components/agents/inspector/gitlab-view';
 import { changeTitleOf, gitlabRefOf } from '@/lib/hl-gitlab-ref';
 

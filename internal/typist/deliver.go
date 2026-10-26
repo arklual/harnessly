@@ -67,6 +67,9 @@ type Result struct {
 
 const (
 	pasteSettle      = 250 * time.Millisecond // Claude reads a paste as one block; an Enter on its heels lands too early
+	enterAfterText   = 50 * time.Millisecond  // a typed line's Enter as its own key, not part of the burst
+	pasteReadPoll    = 100 * time.Millisecond // how often the box is looked at for the end of a paste
+	pasteReadLimit   = 3 * time.Second        // the longest an Enter waits for the box to read a paste to its end
 	confirmPoll      = 150 * time.Millisecond
 	confirmRetry     = 700 * time.Millisecond
 	confirmMaxEnters = 3
@@ -230,7 +233,7 @@ func typeRest(m Message, provider wire.Provider, p Pane, c Clock, landed int, ow
 		c.Sleep(pasteSettle)
 	case len(m.Images) == 0 && SubmitsAsTypedLine(text):
 		*typed = true
-		if err := p.TypeLine(text); err != nil {
+		if err := typeLine(text, p, c); err != nil {
 			return Failed, err
 		}
 		return confirmLeftBox(text, false, provider, p, c, true)
@@ -243,12 +246,42 @@ func typeRest(m Message, provider wire.Provider, p Pane, c Clock, landed int, ow
 			return Failed, err
 		}
 		c.Sleep(pasteSettle)
+		waitPasteRead(text, p, c)
 	}
 	*typed = true
 	if err := p.Keys("Enter"); err != nil {
 		return Failed, err
 	}
 	return confirmLeftBox(m.Text, len(m.Images) > 0, provider, p, c, true)
+}
+
+// typeLine types a line and its Enter. A pane that types the keys alone gets its Enter once the box has read the line
+// to its end: a working Claude on a loaded machine takes a burst of keys as a paste, and an Enter 50 ms behind it
+// queued a message of 26.10 cut short at its 102nd character.
+func typeLine(text string, p Pane, c Clock) error {
+	lt, ok := p.(LineTyper)
+	if !ok {
+		return p.TypeLine(text)
+	}
+	if err := lt.TypeOnly(text); err != nil {
+		return err
+	}
+	c.Sleep(enterAfterText)
+	waitPasteRead(text, p, c)
+	return p.Keys("Enter")
+}
+
+// waitPasteRead holds the Enter until Claude's box has read the paste to its end: a working Claude on a loaded machine
+// reads a paste slowly, and an Enter before its end queues the message cut short (the rest is lost). A screen that
+// cannot be read, or a box still short of the end past pasteReadLimit, holds it no longer.
+func waitPasteRead(text string, p Pane, c Clock) {
+	for waited := time.Duration(0); waited < pasteReadLimit; waited += pasteReadPoll {
+		view := Look(p, wire.ProviderClaude)
+		if !view.Readable || !view.InputLine || screen.ClaudeBoxHoldsEnd(view.Box, text) {
+			return
+		}
+		c.Sleep(pasteReadPoll)
+	}
 }
 
 // sendAsPath sends a Claude message whose pictures did not show as references with their paths as text: Claude reads

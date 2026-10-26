@@ -252,6 +252,26 @@ func (c *conv) emitConvs(e wire.Event) int64 {
 // change publishes what the box did and keeps the record's queue summary.
 func (c *conv) change(ch outbox.Change, now time.Time) {
 	c.emit(ch.Events...)
+	// A message the outbox found in the transcript by itself (a stall that looked first, a retry) marks its entry too:
+	// the feed draws the message once, and the stack over the field lets it go by the entry as well.
+	for _, e := range ch.Events {
+		var st wire.MessageState
+		var client string
+		switch ev := e.(type) {
+		case wire.MessageUpsertEv:
+			st, client = ev.Message.State, ev.Message.ClientID
+		case wire.PromptStateEv:
+			st, client = ev.State, ev.ClientID
+		default:
+			continue
+		}
+		if st.EntryID == nil {
+			continue
+		}
+		if entry, changed := c.fd.SetClientID(*st.EntryID, client); changed {
+			c.emit(wire.EntryUpdateEv{Entry: entry})
+		}
+	}
 	if len(ch.Events) > 0 {
 		c.dirty = true
 	}

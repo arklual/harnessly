@@ -32,6 +32,7 @@ func (p v2Pane) CaptureStyled() (string, bool) { return p.tm.CaptureStyled(p.ses
 func (p v2Pane) Capture() (string, bool)       { return p.tm.Capture(p.session) }
 func (p v2Pane) Paste(text string) error       { return p.tm.SendBracketedPasteOnly(p.session, text) }
 func (p v2Pane) TypeLine(text string) error    { return p.tm.SendLiteralThenEnter(p.session, text) }
+func (p v2Pane) TypeOnly(text string) error    { return p.tm.SendLiteral(p.session, text) }
 func (p v2Pane) Keys(keys ...string) error     { return p.tm.SendKeySequence(p.session, keys...) }
 
 // v2Tmux is convo.Machine over tmux. A pane that looks gone, or an agent that looks exited, is believed only when

@@ -145,21 +145,42 @@ const GROW_MS = 180;
  * measured: while it runs it holds the field at its in-between height, scrollHeight reads that height and an emptied
  * field would keep it. Returns the new animation, or null where the field jumps (no change, no motion, `animate` off).
  */
-const fitHeight = (
-  field: HTMLTextAreaElement,
-  running: Animation | null,
-  animate: boolean,
-): Animation | null => {
+/** Whether `next` is `prev` with text put in at one place and nothing taken out: typing, a paste without a selection. */
+const onlyAdded = (prev: string, next: string) => {
+  if (next.length <= prev.length) return false;
+  let head = 0;
+  while (head < prev.length && prev.charCodeAt(head) === next.charCodeAt(head)) head++;
+  let tail = 0;
+  while (
+    tail < prev.length - head &&
+    prev.charCodeAt(prev.length - 1 - tail) === next.charCodeAt(next.length - 1 - tail)
+  )
+    tail++;
+  return head + tail === prev.length;
+};
+
+/** The field's height after a fit, and whether CSS capped it below its text (it then scrolls). */
+interface IFit {
+  grow: Animation | null;
+  capped: boolean;
+}
+
+const fitHeight = (field: HTMLTextAreaElement, running: Animation | null, animate: boolean): IFit => {
   const was = field.offsetHeight;
   running?.cancel();
   field.style.height = 'auto';
-  field.style.height = `${field.scrollHeight}px`;
+  const content = field.scrollHeight;
+  field.style.height = `${content}px`;
   const target = field.offsetHeight;
-  if (!animate || was <= 0 || Math.abs(target - was) <= 1 || !canAnimate(field)) return null;
-  return field.animate([{ height: `${was}px` }, { height: `${target}px` }], {
+  // Held lower than its text (the max height): more text scrolls inside and the height stays.
+  const capped = target + 1 < content;
+  if (!animate || was <= 0 || Math.abs(target - was) <= 1 || !canAnimate(field))
+    return { grow: null, capped };
+  const grow = field.animate([{ height: `${was}px` }, { height: `${target}px` }], {
     duration: GROW_MS,
     easing: FLIGHT_EASE,
   });
+  return { grow, capped };
 };
 
 const Composer = (props: IComposerProps) => {
@@ -188,11 +209,21 @@ const Composer = (props: IComposerProps) => {
   // back from the queue) shows its end: the caret stays in sight.
   // It shrinks the same way when the text leaves (into the queue, into the agent's turn, deleted): the measure never
   // reads a height an earlier animation still holds (fitHeight).
+  // Measuring the height lays the page out three times, so a keystroke that only adds text measures once: the field
+  // needs a new height only when the text no longer fits it, and never once it has reached its cap.
   const growRef = useRef<Animation | null>(null);
+  const shownRef = useRef({ value, capped: false });
   useLayoutEffect(() => {
     const field = fieldRef.current;
     if (!field) return;
-    growRef.current = fitHeight(field, growRef.current, true);
+    const shown = shownRef.current;
+    const added = onlyAdded(shown.value, value) && growRef.current?.playState !== 'running';
+    shown.value = value;
+    if (!added || (!shown.capped && field.scrollHeight > field.clientHeight)) {
+      const fit = fitHeight(field, growRef.current, true);
+      growRef.current = fit.grow;
+      shown.capped = fit.capped;
+    }
     if (field.selectionStart === field.value.length) field.scrollTop = field.scrollHeight;
   }, [value]);
 
@@ -207,7 +238,9 @@ const Composer = (props: IComposerProps) => {
     const fit = () => {
       frame = 0;
       const easing = growRef.current?.playState === 'running';
-      growRef.current = fitHeight(field, growRef.current, easing);
+      const fit = fitHeight(field, growRef.current, easing);
+      growRef.current = fit.grow;
+      shownRef.current.capped = fit.capped;
     };
     const watcher = new ResizeObserver(() => {
       if (field.clientWidth === width) return;

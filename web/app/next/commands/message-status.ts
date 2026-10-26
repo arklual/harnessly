@@ -3,10 +3,11 @@
 // memory of its opId after an F5 while the message's frames went out long before, a socket missed them — the page
 // would say «дольше обычного» for ever. So it asks, by clientId, about the messages that should have moved and did not:
 // a send answered without its message's event, a send without an answer for 30 s, a message typed into the agent and
-// still not taken past the runtime's own 30 s term. The answer is taken as it is: known — its record, by rev; expired —
-// delivered long ago, the copy goes; unknown — the runtime does not have it, and it goes back to the queue over the
-// field with Повторить, never lost. An answer that does not come (an older runtime, the road) decides nothing: the
-// message is asked about again later. The runtime keeps the terms; the page only asks.
+// still not taken past the runtime's own 30 s term — a steer too, every 30 s while it waits in the agent's queue. The
+// answer is taken as it is: known — its record, by rev; expired — delivered long ago, the copy goes; unknown — the
+// runtime does not have it, and it goes back to the queue over the field with Повторить, never lost. An answer that
+// does not come (an older runtime, the road) decides nothing: the message is asked about again later. The runtime
+// keeps the terms; the page only asks.
 
 import { machineNow, pageClock, toPageTime } from '@/next/core/clock';
 import { getPage } from '@/next/core/net/http';
@@ -54,8 +55,9 @@ function dueAt(m: MessageView): number | null {
     // A send on its way is the outbox's; one the runtime answered is asked about soon, one unanswered after 30 s.
     if (op?.k === 'pending') return null;
     at = op?.k === 'done' ? op.at + STATUS_SOON_MS : toPageTime(m.machineId, m.stateAt) + STATUS_AFTER_MS;
-  } else if (m.rev > 0 && (m.state.k === 'typing' || m.state.k === 'in-input') && m.mode !== 'steer') {
-    // A steer waits in the agent's own queue for minutes: that is not late.
+  } else if (m.rev > 0 && (m.state.k === 'typing' || m.state.k === 'in-input')) {
+    // A steer waits in the agent's own queue for minutes, and is asked about all that while: the frame that took it
+    // into the turn may be the one the page missed, and the strip over the field must not hold it on a guess.
     at = toPageTime(m.machineId, m.stateAt) + STATUS_AFTER_MS + STATUS_GRACE_MS;
   }
   if (at === null) return null;

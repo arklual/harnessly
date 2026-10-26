@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
@@ -63,7 +64,13 @@ type Config struct {
 }
 
 // Starter starts conversations.
-type Starter struct{ cfg Config }
+type Starter struct {
+	cfg Config
+	// startStates are the agent tabs' states as the last run left them (RememberStartStates), read by the next
+	// ResumeTargets once.
+	mu          sync.Mutex
+	startStates map[string]string
+}
 
 // New is a starter over cfg.
 func New(cfg Config) *Starter {

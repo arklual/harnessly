@@ -1,0 +1,101 @@
+/* The rules of the old stylesheets that act on the whole document: the generic colour variables, selection, the
+   paused animations of a hidden frame and the phone's document scrolling. The page loads these at once; the rest of
+   the hl-*.css comes with the parts that draw the old classes (styles/legacy.ts). */
+:root,
+.dark {
+  --content-max-width: 50rem;
+  --radius: 0.625rem;
+  --background: var(--t-bg);
+  --foreground: var(--t-text);
+  --card: var(--t-surface);
+  --card-foreground: var(--t-text);
+  --popover: var(--t-surface);
+  --popover-foreground: var(--t-text);
+  --primary: var(--t-accent-purple);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--t-surface-raised);
+  --secondary-foreground: var(--t-text);
+  --muted: var(--t-surface-raised);
+  --muted-foreground: var(--t-text-secondary);
+  --accent: var(--t-surface-hover);
+  --accent-foreground: var(--t-text);
+  --destructive: var(--t-danger);
+  --border: var(--t-border);
+  --input: var(--t-border-input);
+  --ring: var(--t-focus-ring);
+  --sidebar: var(--t-bg);
+  --sidebar-foreground: var(--t-text);
+  --sidebar-primary: var(--t-accent-purple);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: var(--t-surface-hover);
+  --sidebar-accent-foreground: var(--t-text);
+  --sidebar-border: var(--t-border);
+  --sidebar-ring: var(--t-focus-ring);
+  --brand: var(--t-accent-purple);
+  --focus-indicator: var(--t-accent-purple);
+  --claude-active: var(--t-accent-purple-soft);
+  --tw-glass: color-mix(in oklab, var(--t-surface) 74%, transparent);
+  --tw-glass-strong: color-mix(in oklab, var(--t-surface) 88%, transparent);
+  /* Anything that floats over the conversation is frosted glass, not a flat slab or a see-through tint. */
+  --tw-glass-blur: blur(20px) saturate(1.4);
+  --tw-hairline: var(--t-border-subtle);
+  --tw-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --tw-claude: oklch(0.7 0.13 45);
+  --tw-claude-bg: oklch(0.7 0.13 45 / 14%);
+  --tw-codex: oklch(0.78 0.02 250);
+  --tw-codex-bg: oklch(0.78 0.02 250 / 12%);
+  --tw-chat: var(--t-accent-purple-soft);
+  --tw-chat-bg: var(--t-accent-purple-bg);
+  --tw-terminal: var(--t-accent-teal-soft);
+  --tw-terminal-bg: var(--t-accent-teal-bg);
+}
+
+.dark {
+  --tw-claude: oklch(0.76 0.12 48);
+  --tw-codex: oklch(0.86 0.01 250);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--t-accent-purple) 38%, transparent);
+}
+
+html[data-frame-hidden] *,
+html[data-frame-hidden] *::before,
+html[data-frame-hidden] *::after {
+  animation-play-state: paused !important;
+}
+
+/* ─── Claude web motion (iteration 2) ───────────────────────────────── */
+:root,
+.dark {
+  --tw-clay: #d97757;
+  --tw-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --tw-out: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+html[data-runtime-split],
+html[data-runtime-split] body {
+  background: transparent;
+}
+
+/* ─── Phone ──────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Sideways swipes open the drawers; the browser must not turn them into history navigation. */
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+}
+/* The owner's iPhone (iOS 26+, Home Screen app, translucent status bar) gives the page a web view of 812
+   on an 874 screen and draws nothing of ours under it (phone reports and screenshots). A layout
+   taller than the view is cut, so it follows the dynamic viewport. The document keeps its rubber band:
+   dragging it is what makes iOS hand the app the whole screen. */
+@media (max-width: 767px) and (display-mode: standalone) {
+  html,
+  body {
+    overflow: visible;
+    overscroll-behavior-y: auto;
+  }
+}

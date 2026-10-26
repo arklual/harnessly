@@ -4,7 +4,7 @@
 // runs in. What the agent asks its pane to show (`harnessly open`, the runtime's own auto-open) is the new pane's
 // (bindings/pane-intents.ts): it opens these tools through `show`. When Legacy goes, these tools are written for the new
 // interface and this folder goes with it.
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, use, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
 import useTimeline from '@/hooks/use-timeline';
 import useTimelineSnapshotStore from '@/hooks/use-timeline-snapshot-store';
 import { PaneSurfaceShownContext } from '@/hooks/use-pane-surface-shown';
@@ -165,6 +165,14 @@ const useLegacyTab = (conv: Conversation | null): ITab | null => {
   return conv && have ? asTab(conv, have) : null;
 };
 
+// The old stylesheets (styles/legacy.ts) come the first time a Legacy content shows, not with the page; what draws
+// with them waits for them, so it never shows unstyled.
+let legacyStyles: Promise<unknown> | null = null;
+const LegacyStyles = ({ need, children }: { need: boolean; children: ReactNode }) => {
+  if (need) use((legacyStyles ??= import('@/styles/legacy')));
+  return children;
+};
+
 /** Keeps the Legacy timeline of the conversation in the snapshot store while mounted: the contents read it there. */
 const Timeline = ({ tab, provider }: { tab: ITab; provider: string }) => {
   const timeline = useTimeline({
@@ -304,26 +312,32 @@ export const useLegacyPane = (conv: Conversation | null, options: ILegacyPaneOpt
         );
       return (
         x && (
-          <div
-            key={`${x.id}#${reloads[x.id] ?? 0}`}
-            className={`hx-legacy tw-rpane-panel tw-rpane-panel-${x.kind}`}
-            data-kind={x.kind}
-          >
-            <PaneSurfaceShownContext.Provider value>{contents.content(x)}</PaneSurfaceShownContext.Provider>
-          </div>
+          <Suspense key={`${x.id}#${reloads[x.id] ?? 0}`} fallback={null}>
+            <LegacyStyles need>
+              <div className={`hx-legacy tw-rpane-panel tw-rpane-panel-${x.kind}`} data-kind={x.kind}>
+                <PaneSurfaceShownContext.Provider value>
+                  {contents.content(x)}
+                </PaneSurfaceShownContext.Provider>
+              </div>
+            </LegacyStyles>
+          </Suspense>
         )
       );
     },
     extras: (
       <>
         {options.open && tab && conv && <Timeline tab={tab} provider={conv.provider} />}
-        <FileViewer
-          file={contents.viewing}
-          files={contents.data.files}
-          onNavigate={contents.setViewing}
-          onClose={() => contents.setViewing(null)}
-          onOpenInPane={contents.openFileTab}
-        />
+        <Suspense fallback={null}>
+          <LegacyStyles need={contents.viewing !== null}>
+            <FileViewer
+              file={contents.viewing}
+              files={contents.data.files}
+              onNavigate={contents.setViewing}
+              onClose={() => contents.setViewing(null)}
+              onOpenInPane={contents.openFileTab}
+            />
+          </LegacyStyles>
+        </Suspense>
       </>
     ),
   };

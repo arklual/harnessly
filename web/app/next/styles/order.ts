@@ -1,0 +1,49 @@
+// The interface's stylesheets in one fixed order. They are packed into one file with the interface (vite.config.ts,
+// the «shell» group), and inside one file the later rule wins between equal selectors; the bundler alone would order
+// them by when a module first asks for them, which differs from the order they had as separate files. This module is
+// the first thing the interface imports, so this list is the cascade: the base first, the features after it.
+import '@/next/styles/tokens.css';
+import '@/next/styles/base.css';
+import '@/next/styles/icons.css';
+import '@/next/styles/ui.css';
+import '@/next/styles/shell.css';
+import '@/next/styles/pane.css';
+import '@/next/styles/picker.css';
+import '@/next/styles/composer.css';
+import '@/next/styles/goal.css';
+import '@/next/styles/limits.css';
+import '@/next/styles/background.css';
+import '@/next/styles/pictures.css';
+import '@/next/styles/subagents.css';
+import '@/next/styles/workflows.css';
+import '@/next/styles/peer-note.css';
+import '@/next/styles/peers.css';
+import '@/next/styles/note-chip.css';
+import '@/next/styles/handoff.css';
+import '@/next/styles/limit.css';
+import '@/next/styles/chat.css';
+import '@/next/styles/delegation.css';
+import '@/next/styles/artifacts.css';
+import '@/next/styles/designly.css';
+import '@/next/styles/annotate.css';
+import '@/next/styles/questions.css';
+import '@/next/styles/site.css';
+import '@/next/styles/notes.css';
+import '@/next/styles/island.css';
+import '@/next/styles/vendor-devices.css';
+import '@/next/styles/site-tools.css';
+import '@/next/styles/site-pane.css';
+import '@/next/styles/connection.css';
+import '@/next/styles/design-access.css';
+import '@/next/styles/side-chat.css';
+import '@/next/styles/editor.css';
+import '@/next/styles/apps.css';
+import '@/next/styles/sidebar.css';
+import '@/next/styles/tabs.css';
+import '@/next/styles/health.css';
+import '@/next/styles/row-card.css';
+import '@/next/styles/settings.css';
+import '@/next/styles/providers.css';
+import '@/next/styles/notices.css';
+import '@/next/styles/motion.css';
+import '@/next/styles/header.css';

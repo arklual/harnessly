@@ -8,9 +8,11 @@ import { Delayed, Skeleton } from '@/next/ui/skeleton';
 export const LEGACY_SCREEN = { stats: 'stats', efficiency: 'efficiency' } as const;
 export type TLegacyScreen = (typeof LEGACY_SCREEN)[keyof typeof LEGACY_SCREEN];
 
+// Each screen brings the old stylesheets along (styles/legacy.ts), the page does not load them.
 const LOADERS = {
-  stats: () => import('@/components/agents/stats/stats-view'),
-  efficiency: () => import('@/components/agents/efficiency/efficiency-view'),
+  stats: () => import('@/styles/legacy').then(() => import('@/components/agents/stats/stats-view')),
+  efficiency: () =>
+    import('@/styles/legacy').then(() => import('@/components/agents/efficiency/efficiency-view')),
 } as const;
 
 const NO_PROPS = {};

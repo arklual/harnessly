@@ -194,6 +194,26 @@ func SameMessage(entry, text string) bool {
 	return e == m || utf8.RuneCountInString(m) >= codexProbeChars && strings.Contains(e, m)
 }
 
+// CutShort: a user entry of the transcript is the start of this message and not all of it — Claude took the box while
+// the paste was still coming in (a loaded machine) and read the rest as gone. Long enough not to be a coincidence.
+func CutShort(entry, text string) bool {
+	e := noSpace(claudeImageRE.ReplaceAllString(entry, " "))
+	m := noSpace(claudeImageRE.ReplaceAllString(text, " "))
+	return len(e) < len(m) && utf8.RuneCountInString(e) >= codexProbeChars && strings.HasPrefix(m, e)
+}
+
+// ClaudeBoxHoldsEnd: Claude's box has read a paste of this message to its end — the box ends with the message's last
+// 24 characters (white space and picture references aside), or Claude folded the paste into a "[Pasted text #n …]".
+func ClaudeBoxHoldsEnd(box, text string) bool {
+	if claudePastedRE.MatchString(collapse(box)) {
+		return true
+	}
+	b := noSpace(claudeImageRE.ReplaceAllString(box, " "))
+	m := []rune(noSpace(claudeImageRE.ReplaceAllString(text, " ")))
+	tail := string(m[max(0, len(m)-codexProbeChars):])
+	return tail != "" && strings.HasSuffix(b, tail)
+}
+
 // ClaudeBoxPieceOf: what is left in Claude's box (picture references aside) is a piece of text, however short — the box
 // being cleared of a message of ours row by row.
 func ClaudeBoxPieceOf(input, text string) bool {

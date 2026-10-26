@@ -223,7 +223,7 @@ test('3b. a file goes to the chat from «+», pasted into the field or dropped o
   const composer = page.locator('.hx-stage .hx-composer');
   await composer.locator('.hx-plus-btn').click();
   const chooser = page.waitForEvent('filechooser');
-  await page.locator('.hx-plus__item').filter({ hasText: 'File' }).click();
+  await page.locator('.hx-plus__item').filter({ hasText: 'File from this computer' }).click();
   await (
     await chooser
   ).setFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('picked') });

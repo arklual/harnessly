@@ -47,20 +47,14 @@ import { parsePreviewTarget, targetAddress, targetLabel, type TPreviewTarget } f
 import { extractLocalUrls, mergePortRows } from '@/lib/hl-preview-chat-urls';
 import { readUrlHistory, writeUrlHistory } from '@/lib/hl-preview-history';
 import { relatedPorts } from '@/lib/hl-preview/ports-shared';
-import { readPreview, usePreviewState, type TPreviewState } from '@/lib/hl-preview-store';
+import { readPreview, usePreviewState } from '@/lib/hl-preview-store';
 import type { ITab } from '@/types/terminal';
 import type { ITimelineEntry } from '@/types/timeline';
 import { t } from '@/lib/i18n';
+import { shownAddress } from '@/components/agents/pane/shown-address';
 
 const failureMessage = (error: unknown): string =>
   error instanceof Error ? error.message : t('pane.browserTab.openFailed');
-
-/** The address the field shows: host (or port) and the page path. */
-export const shownAddress = (state: TPreviewState): string => {
-  if (state.kind !== 'open' && state.kind !== 'opening' && state.kind !== 'taken') return '';
-  const path = state.kind === 'opening' ? '/' : state.path;
-  return `${targetLabel(state.target)}${path === '/' ? '' : path}`;
-};
 
 interface IBrowserTabProps {
   tab: ITab;

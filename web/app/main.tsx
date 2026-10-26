@@ -3,31 +3,8 @@ import '@fontsource-variable/jetbrains-mono';
 import '@/styles/base.css';
 import '@/components/ui/ui.css';
 import '@/styles/hl-tokens.css';
-import '@/styles/hl.css';
-import '@/styles/hl-links.css';
-import '@/styles/hl-stats.css';
-import '@/styles/hl-ui.css';
-import '@/styles/hl-launch.css';
-import '@/styles/hl-commands.css';
-import '@/styles/hl-command-output.css';
-import '@/styles/hl-economics.css';
-import '@/styles/hl-preview.css';
-import '@/styles/hl-preview-device.css';
-import '@/styles/hl-pane.css';
-import '@/styles/hl-devtools.css';
-import '@/styles/hl-share.css';
-import '@/styles/hl-sidebar.css';
-import '@/styles/hl-design-library.css';
-import '@/styles/hl-design-home.css';
+import '@/styles/hl-global.css';
 import '@/styles/hl-notifications.css';
-import '@/styles/hl-composer.css';
-import '@/styles/hl-text-annotation.css';
-import '@/styles/hl-side-chat.css';
-import '@/styles/hl-docs.css';
-import '@/styles/hl-checkpoints.css';
-import '@/styles/hl-gallery.css';
-import '@/styles/hl-timeline-items.css';
-import '@xterm/xterm/css/xterm.css';
 
 import { createElement, lazy, StrictMode, Suspense, useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -41,16 +18,20 @@ import { locale } from '@/lib/i18n';
 import { useRouter } from '@/platform/router';
 import { appFetch } from '@/lib/app-path';
 import { auth } from '@/runtime/endpoints';
-import SignIn from '@/components/auth/sign-in';
 import useWorkspaceStore, { type IWorkspaceInitialData } from '@/hooks/use-workspace-store';
 import useConfigStore, { type IConfigInitialData } from '@/hooks/use-config-store';
 import PushBridge from '@/components/agents/push-bridge';
 import { captureInstallPrompt } from '@/hooks/use-install-prompt';
-import DocViewerPage from '@/pages/docs/[slug]';
 
-const Docs = DocViewerPage as unknown as ComponentType<Record<string, unknown>>;
-// The interface is its own chunk, loaded once the person is signed in.
-const NextShell = lazy(() => import('@/next/entry'));
+// The sign-in and the docs page are drawn with the old stylesheets, which come with them (styles/legacy.ts).
+const SignIn = lazy(() => import('@/styles/legacy').then(() => import('@/components/auth/sign-in')));
+const Docs = lazy(() =>
+  import('@/styles/legacy').then(() => import('@/pages/docs/[slug]')),
+) as unknown as ComponentType<Record<string, unknown>>;
+// The interface is its own chunk. It is fetched together with the start data rather than after it, which on a phone
+// saves the round trips of a whole batch of files; a person who turns out to be signed out has it in the cache.
+const loadShell = () => import('@/next/entry');
+const NextShell = lazy(loadShell);
 // The interface's states on mock data (?dev=<name> opens next/dev/<name>-gallery.tsx).
 const GALLERIES: Record<string, ComponentType> = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: ComponentType }>('./next/dev/*-gallery.tsx')).map(
@@ -129,16 +110,25 @@ const Entry = () => {
 const App = () => {
   const { pathname } = useRouter();
   const [phase, reload] = useBootstrap();
+  useEffect(() => {
+    if (pathname !== '/docs/[slug]') void loadShell();
+  }, [pathname]);
   if (phase.kind === 'checking') return null;
   if (phase.kind === 'signed-out') {
-    return <SignIn needsSetup={phase.needsSetup} requiresAuth={phase.requiresAuth} onSignedIn={reload} />;
+    return (
+      <Suspense fallback={null}>
+        <SignIn needsSetup={phase.needsSetup} requiresAuth={phase.requiresAuth} onSignedIn={reload} />
+      </Suspense>
+    );
   }
   const boot = phase.boot;
   const props = ((boot.props as Record<string, unknown> | undefined) ?? boot) as Record<string, unknown>;
   return (
     <>
       {pathname === '/docs/[slug]' ? (
-        <Docs {...props} />
+        <Suspense fallback={null}>
+          <Docs {...props} />
+        </Suspense>
       ) : (
         <Suspense fallback={null}>
           <NextShell owner={typeof props.owner === 'string' ? props.owner : ''} />

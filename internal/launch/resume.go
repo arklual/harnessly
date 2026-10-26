@@ -50,12 +50,39 @@ func (s *Starter) log(rc ResumeConfig, level, msg string, kv ...any) {
 	}
 }
 
+// RememberStartStates keeps each agent tab's state as the last run left it, for the next ResumeTargets. Call it before
+// the status keeper starts: a turn that was running is settled to idle as soon as the keeper sees no agent in its pane,
+// which after a restart it never does, and the resume would then take the working agent for a quiet one.
+func (s *Starter) RememberStartStates() {
+	states := map[string]string{}
+	for _, v := range s.cfg.Store.Workspaces().Array("workspaces") {
+		ws, ok := v.(*jsvalue.Object)
+		if !ok {
+			continue
+		}
+		layout := s.cfg.Store.Layout(ws.String("id"))
+		if layout == nil {
+			continue
+		}
+		for _, tab := range state.AllTabs(layout) {
+			states[tab.String("id")] = tab.String("cliState")
+		}
+	}
+	s.mu.Lock()
+	s.startStates = states
+	s.mu.Unlock()
+}
+
 // ResumeTargets are the agent tabs to resume at startup: only conversations that were working or were touched
 // recently. A machine that resumed forty tabs at boot ran out of memory; the others stay chats, resumed by their next
 // prompt.
 func (s *Starter) ResumeTargets(rc ResumeConfig) []Target {
 	var targets []Target
 	now := s.cfg.Now()
+	s.mu.Lock()
+	remembered := s.startStates
+	s.startStates = nil
+	s.mu.Unlock()
 	skipped := 0
 	type pre struct{ installed, found bool }
 	preflights := map[string]pre{}
@@ -97,7 +124,11 @@ func (s *Starter) ResumeTargets(rc ResumeConfig) []Target {
 			if rc.LastActivity != nil {
 				last = rc.LastActivity(provider, sid)
 			}
-			if !sleep.ShouldResumeAtStartup(tab.String("cliState"), last, now, rc.Sleep) {
+			cliState := tab.String("cliState")
+			if st, ok := remembered[tab.String("id")]; ok {
+				cliState = st
+			}
+			if !sleep.ShouldResumeAtStartup(cliState, last, now, rc.Sleep) {
 				skipped++
 				continue
 			}

@@ -8,20 +8,10 @@
 //   plural(3, 'timeline.toolGroup.actions')                 → picks one/few/many/other by the language's plural rules
 import { appConfig } from '@/platform/config';
 
-type TEntry = string | Partial<Record<Intl.LDMLPluralRule, string>>;
-type TDictionary = Record<string, TEntry>;
+import { dictionary } from '@/next/i18n/dictionary';
 
-const load = (lang: 'en' | 'ru'): TDictionary => {
-  const files =
-    lang === 'en'
-      ? import.meta.glob('../locales/en/*.json', { eager: true, import: 'default' })
-      : import.meta.glob('../locales/ru/*.json', { eager: true, import: 'default' });
-  return Object.assign({}, ...Object.values(files)) as TDictionary;
-};
-
-const english = load('en');
 export const locale = (): 'en' | 'ru' => appConfig().locale;
-const current: TDictionary = locale() === 'ru' ? { ...english, ...load('ru') } : english;
+const current = dictionary(locale());
 
 const fill = (text: string, params?: Record<string, string | number>): string =>
   params

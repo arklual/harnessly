@@ -376,7 +376,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       <QuestionCard
         question={question}
         device={deviceId()}
-        ownAnswer={text}
+        ownAnswer={question ? text : ''}
         onAnswer={async (id, answers) => {
           await settled(answerQuestion(machine, conv, id, answers));
           clearDraft(conv);

@@ -584,3 +584,47 @@ func TestPickFindsTheCallInItsDrawnForm(t *testing.T) {
 		}
 	}
 }
+
+// typingPane types a line's keys alone, the way tmux does: its Enter is the typist's to press.
+type typingPane struct{ *fakePane }
+
+func (p typingPane) TypeOnly(text string) error { return p.send("keys-only:" + text) }
+
+// A loaded machine: Claude's box reads a burst of keys or a paste slowly. The Enter waits for the box to hold the
+// message's end — an Enter 50 ms behind the keys queued a message of 26.10 cut short at its 102nd character, the rest
+// lost. A pane that cannot type without the Enter types as before.
+func TestTheEnterWaitsForTheBoxToReadTheTextToItsEnd(t *testing.T) {
+	line := "Да, и ещё важно интеграцию КиМИ, ГЛМ и так далее. Ну, вот КиМИ— это самое важное. А и кодексы катить надо осаб прям."
+	for name, text := range map[string]string{"typed line": line, "paste": strings.Replace(line, " Ну,", "\nНу,", 1)} {
+		t.Run(name, func(t *testing.T) {
+			half := withInput(t, "Да, и ещё важно интеграцию КиМИ, ГЛМ и так далее. Ну, вот КиМИ— это самое важное. А и кодексы катить н")
+			whole := withInput(t, line)
+			fake := newPane(tui(t, "claude-idle-placeholder.ansi.txt"))
+			c := newClock()
+			read, held := false, false
+			fake.onSend = func(call string) {
+				switch {
+				case strings.HasPrefix(call, "paste:") || strings.HasPrefix(call, "keys-only:"):
+					fake.set(half)
+				case call == "keys:Enter":
+					held = read
+					fake.set(tui(t, "claude-idle-placeholder.ansi.txt"))
+				}
+			}
+			c.onSleep = func(total time.Duration) {
+				if total >= time.Second && !read {
+					read = true
+					fake.set(whole)
+				}
+			}
+			res := Type(Message{Text: text}, claude, typingPane{fake}, c)
+			if res.Outcome != Sent || !held {
+				t.Fatalf("Enter before the box read the text: %+v %v", res, fake.sent())
+			}
+		})
+	}
+	p := newPane(tui(t, "claude-idle-placeholder.ansi.txt"))
+	if res := Type(Message{Text: line}, claude, p, newClock()); res.Outcome != Sent || p.sent()[0] != "line:"+line {
+		t.Fatalf("a pane without TypeOnly: %+v %v", res, p.sent())
+	}
+}

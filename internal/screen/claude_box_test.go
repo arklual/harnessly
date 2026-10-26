@@ -53,3 +53,46 @@ func TestClaudeStillInBoxClippedToItsTail(t *testing.T) {
 		}
 	}
 }
+
+// Claude queued a message of 26.10 cut short: its first 102 characters. The entry is the message's, cut.
+func TestCutShort(t *testing.T) {
+	whole := "Да, и ещё важно интеграцию КиМИ, ГЛМ и так далее. Ну, вот КиМИ— это самое важное. А и кодексы катить надо осаб прям Вот, как только будет доступно."
+	took := "Да, и ещё важно интеграцию КиМИ, ГЛМ и так далее. Ну, вот КиМИ— это самое важное. А и кодексы катить н"
+	cases := []struct {
+		entry, text string
+		want        bool
+	}{
+		{took, whole, true},
+		{"[Image #1] " + took, "[Image #1]" + whole, true},
+		{"Да, и ещё важно\nинтеграцию КиМИ, ГЛМ", whole, true},
+		{whole, whole, false},
+		{"Да, и ещё важно", whole, false},
+		{"Да, и ещё важно интеграцию Codex", whole, false},
+		{"", whole, false},
+	}
+	for _, c := range cases {
+		if got := CutShort(c.entry, c.text); got != c.want {
+			t.Errorf("CutShort(%q) = %v, want %v", c.entry, got, c.want)
+		}
+	}
+}
+
+// The box has read a paste to its end: its last characters are the message's, or Claude folded it.
+func TestClaudeBoxHoldsEnd(t *testing.T) {
+	whole := "Да, и ещё важно интеграцию КиМИ, ГЛМ и так далее. Ну, вот КиМИ— это самое важное."
+	cases := []struct {
+		box  string
+		want bool
+	}{
+		{whole, true},
+		{"ГЛМ и так далее. Ну, вот КиМИ—\n это самое важное.", true},
+		{"[Pasted text #1 +3 lines]", true},
+		{"Да, и ещё важно интеграцию КиМИ, ГЛМ и так далее. Ну, в", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := ClaudeBoxHoldsEnd(c.box, whole); got != c.want {
+			t.Errorf("ClaudeBoxHoldsEnd(%q) = %v, want %v", c.box, got, c.want)
+		}
+	}
+}

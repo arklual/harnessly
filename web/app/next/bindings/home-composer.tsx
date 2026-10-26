@@ -3,7 +3,7 @@
 // the chat; if it refuses, they are still there and the reason is on screen.
 import { uploadSrc } from '@/next/commands/uploads';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { uuidv7 } from '@/next/core/ids';
 import { useBeta } from '@/next/stores/beta';
 import type { IModelChoice } from '@/next/features/composer/agents';
@@ -69,6 +69,9 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
   const uploads = useUploads(machine, NEW_CHAT, files);
   const voice = useVoice(machine, text, setText, read);
   const [creating, setCreating] = useState(false);
+  // Enter pressed before the machine's list arrives waits for it and then sends, instead of being lost.
+  const waiting = useRef<(() => void) | null>(null);
+  const submitRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     if (mentions.length > 0) field.current?.focus();
     // Only on arrival: a chip added or removed later leaves the focus where the person put it.
@@ -113,7 +116,12 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
   const onSubmit = useCallback(() => {
     if (creating) return;
     if (!machine || conversations === null) {
-      toast(t('next.newChat.connecting'), { tone: 'info' });
+      if (!waiting.current) toast(t('next.newChat.connecting'), { tone: 'info' });
+      const asked = read();
+      // Typing on after the early Enter means the person is still writing: nothing goes out behind their back.
+      waiting.current = () => {
+        if (read() === asked) submitRef.current();
+      };
       return;
     }
     let where: NewConversation['where'] | null = null;
@@ -202,7 +210,17 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
     choice,
     companions,
     conversations,
+    read,
   ]);
+  useLayoutEffect(() => {
+    submitRef.current = onSubmit;
+  });
+  const ready = machine !== null && conversations !== null;
+  useEffect(() => {
+    const send = waiting.current;
+    waiting.current = null;
+    if (ready) send?.();
+  }, [ready]);
 
   const srcOf = useCallback((item: { id: string }) => (machine ? uploadSrc(machine, item) : null), [machine]);
 

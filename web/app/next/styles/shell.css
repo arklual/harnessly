@@ -2,6 +2,26 @@
    dialogs and toasts. Rules come from the design (harnessly/project/lib/hx); the parts its prototype script draws are
    at the end. */
 
+/* Values the code writes while a finger moves (the dock's height, the keyboard, a pane being swiped) are read only by
+   the element they are written on. Not inheriting them keeps each write from restyling everything inside: the feed,
+   the pane's contents. With syntax '*' there is no initial value, so var() fallbacks still apply. */
+@property --dock-pad {
+  syntax: '*';
+  inherits: false;
+}
+@property --hx-kb {
+  syntax: '*';
+  inherits: false;
+}
+@property --px {
+  syntax: '*';
+  inherits: false;
+}
+@property --sp {
+  syntax: '*';
+  inherits: false;
+}
+
 /* The design's spring curve; tokens.css has only the calm ones. */
 .hx-root {
   --hx-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);

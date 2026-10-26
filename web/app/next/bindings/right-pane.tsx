@@ -1,26 +1,28 @@
 // The open chat's right pane over the machine: the header's button, the tabs and what each shows. A tab is the
 // launcher, the side chat (questions about this chat, the agent is not disturbed), an own terminal of the chat (a shell
 // the machine keeps until the tab closes it) or a browser tab with its own history. Only tools the machine really has are offered; the rest of the design's list waits for its API.
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
 import PaneDrawer from '@/next/features/shell/pane-drawer';
 import ToolPane, { TOOLS_TAB, type IPaneTab } from '@/next/features/pane/tool-pane';
 import ToolsLauncher, { type ITool, type IToolGroup } from '@/next/features/pane/tools-launcher';
-import ShellView from '@/next/features/pane/shell-view';
 import BrowserView from '@/next/features/pane/browser-view';
 import SideChat from '@/next/features/pane/side-chat';
 import { SideFloat } from '@/next/features/pane/side-float';
-import PlanView from '@/next/features/pane/plan-view';
-import SubagentView from '@/next/features/pane/subagent-view';
 import { onOpenSubagent, openSubagent } from '@/next/features/subagents/open';
 import { workflowsOf } from '@/next/features/workflows/run';
 import { onOpenNotePage } from '@/next/features/designly/open-note';
 import { onOpenAttached } from '@/next/features/pane/open-attached';
 import type { MessageRef } from '@/next/protocol/v2';
 import { useSubagents } from '@/next/bindings/subagents';
-import MachineTab from '@/next/bindings/machine-tab';
-import DesignlyPane from '@/next/bindings/designly-pane';
 import { setPaneOpen } from '@/next/bindings/pane-open';
-import FilesView from '@/next/features/pane/files-view';
 import LazyFileEditor from '@/next/features/pane/editor/lazy';
 import { listFolder, readFile, saveFile } from '@/next/features/pane/chat-files-api';
 import { useFileEdits, type IFileEdits } from '@/next/bindings/file-edits';
@@ -29,6 +31,7 @@ import { Button } from '@/next/ui/button';
 import type { IDraft } from '@/next/features/pane/editor/file-editor';
 import { useSideChat } from '@/next/bindings/side-chat';
 import Icon from '@/next/ui/icon';
+import LazyView from '@/next/ui/lazy-view';
 import { CLIENT_ID } from '@/next/bindings/agent-terminal';
 import { pageText } from '@/next/bindings/outcome';
 import { closeTerminal, loadOpenTarget, loadTasks, loadTerminals, openTerminal } from '@/next/commands/pages';
@@ -56,6 +59,17 @@ import { usePaneIntents } from '@/next/bindings/pane-intents';
 import { usePhone } from '@/next/ui/use-media';
 import { chatPaneOf, chatPanes, useChatPane, type IChatPane } from '@/next/stores/pane-state';
 import { conversationsStore, convsLoadedStore } from '@/next/stores/conversations';
+
+// The views a tab shows come in their own chunk the first time that tab opens, not with the page (a shell is xterm).
+const later =
+  <P extends object>(load: () => Promise<{ default: ComponentType<P> }>) =>
+  (props: P) => <LazyView load={load} props={props} fallback={null} title={t('next.load.screen')} />;
+const ShellView = later(() => import('@/next/features/pane/shell-view'));
+const PlanView = later(() => import('@/next/features/pane/plan-view'));
+const SubagentView = later(() => import('@/next/features/pane/subagent-view'));
+const MachineTab = later(() => import('@/next/bindings/machine-tab'));
+const DesignlyPane = later(() => import('@/next/bindings/designly-pane'));
+const FilesView = later(() => import('@/next/features/pane/files-view'));
 
 /** The launcher's tools in the design's order; one not named keeps its place after them. */
 const TOOL_ORDER = [
