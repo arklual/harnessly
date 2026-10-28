@@ -381,6 +381,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	checker, checkOn := newUpdateChecker(cfg.Standalone())
 	self := newSelfUpdater()
 	f.Add(updateRoutes(d, checker, checkOn, self)...)
+	f.Add(machineCheckRoutes(d, self)...)
 	f.Add(notifyBotRoutes(d)...)
 	f.Add(askRoutes(d, ref.c)...)
 	f.Add(secretRoutes(d, ref.c)...)

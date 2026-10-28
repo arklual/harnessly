@@ -20,18 +20,37 @@ The first press of the microphone on a machine that has not got the model yet sa
 The download happens once. If it fails (no network), the microphone says why and tries again at the next press; the
 button stays where it is.
 
+## Your own recognition server
+
+Settings → Voice input → _Recognize with_ → _Your server_ sends the recordings to any server that speaks OpenAI's
+speech-to-text API (`POST <address>/audio/transcriptions`): OpenAI itself (`https://api.openai.com/v1`, model
+`whisper-1` or `gpt-4o-transcribe`), a self-hosted [faster-whisper-server](https://github.com/fedirz/faster-whisper-server)
+or speaches (`http://127.0.0.1:8000/v1`, model `Systran/faster-whisper-large-v3`), Groq, LocalAI. The runtime then
+downloads and runs nothing, so this also works on a machine the built-in engine cannot run on (no AVX2, macOS without
+Homebrew's whisper-cpp).
+
+- A recording is sent whole once you stop speaking; no words appear while you speak, so a paid service is asked once
+  per recording.
+- The address, model and key are kept on the machine in `<data folder>/voice/server.json` (mode 0600). The key goes
+  only into the requests' `Authorization` header: the page never gets it back, it shows the last four characters.
+  An empty key field keeps the saved key.
+- Switching back to the built-in model keeps the server's settings for the next time.
+- With `RUNTIME_VOICE_SOCKET` set (a service of the operator's) the choice is not offered.
+
 ## Speed
 
 A 30-second recording takes a few seconds on two processors with `base` and about three times as long with `small`.
 Words appear in the field about every two seconds while you speak, and the whole text is made exact when you stop.
-Set `RUNTIME_VOICE_MODEL=tiny` for a very slow machine or `small` for better Russian on a fast one.
+Set `RUNTIME_VOICE_MODEL=tiny` for a very slow machine or `small` for better Russian on a fast one. Settings → Voice input
+also offers `medium` (540 MB) and `large-v3-turbo` (575 MB) for a machine with many processors and memory to spare;
+the turbo is the more exact of the two at about the same speed.
 
 ## Settings
 
 | Variable | |
 | --- | --- |
 | `RUNTIME_VOICE_ENGINE=off` | do not start the built-in engine |
-| `RUNTIME_VOICE_MODEL=tiny\|base\|small` | the model size |
+| `RUNTIME_VOICE_MODEL=tiny\|base\|small\|medium\|large-v3-turbo` | the model size (a choice in Settings wins) |
 | `RUNTIME_VOICE_MODEL_FILE`, `RUNTIME_VOICE_WHISPER_BIN` | your own model file or server (no download, no checksum) |
 | `RUNTIME_VOICE_DOWNLOAD=off` | air-gapped: use only the files that are already there |
 | `RUNTIME_VOICE_PREFETCH=1` | download at start instead of at the first dictation |

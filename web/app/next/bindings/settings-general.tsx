@@ -5,6 +5,13 @@ import AppsSection from '@/next/features/settings/apps-section';
 import BetaSection from '@/next/features/settings/beta-section';
 import GeneralSection from '@/next/features/settings/general-section';
 import UpdateGroup from '@/next/features/settings/update-group';
+import ChecksGroup from '@/next/features/settings/checks-group';
+import {
+  browserChecks,
+  fixMachineCheck,
+  loadMachineChecks,
+  type IMachineCheck,
+} from '@/next/features/settings/machine-checks';
 import { applyMachineUpdate, loadUpdateInfo, type TUpdateInfo } from '@/next/features/update/machine-update';
 import { machineRows } from '@/next/features/settings/machines';
 import MachinesSection from '@/next/features/settings/machines-section';
@@ -112,6 +119,45 @@ const useUpdateInfo = (machine: MachineId) => {
   return { value, busy, apply, copy };
 };
 
+/** «Проверка машины»: the machine's checks and this browser's, read when the page opens; empty until they come. */
+const useMachineChecks = (machine: MachineId) => {
+  const [read, setRead] = useState<{ machine: MachineId; value: IMachineCheck[] } | null>(null);
+  const [browser, setBrowser] = useState<IMachineCheck[]>([]);
+  const [fixing, setFixing] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadMachineChecks(machine).then((value) => {
+      if (live && value) setRead({ machine, value });
+    });
+    void browserChecks().then((value) => {
+      if (live) setBrowser(value);
+    });
+    return () => {
+      live = false;
+    };
+  }, [machine]);
+  const checks = [...(read?.machine === machine ? read.value : []), ...browser];
+  // Pessimistic: the row goes when the machine says the check passes now.
+  const fix = async (id: string) => {
+    setFixing(id);
+    const next = await fixMachineCheck(machine, id);
+    setFixing(null);
+    if (!next) {
+      toast(t('next.settings.checks.fixFailed'), { tone: 'error' });
+      return;
+    }
+    setRead({ machine, value: next });
+    if (next.find((c) => c.id === id)?.ok) toast(t('next.settings.checks.fixed'));
+  };
+  const copy = (command: string) => {
+    void navigator.clipboard.writeText(command).then(
+      () => toast(t('next.settings.checks.copied')),
+      () => toast(t('next.shellData.noClipboard'), { tone: 'error' }),
+    );
+  };
+  return { checks, fixing, fix, copy };
+};
+
 interface IGeneralPageProps {
   machine: MachineId;
   /** The name the sidebar shows for the person. */
@@ -128,6 +174,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
   const feedKinds = useFeedKinds();
   const runtime = useRuntimeSettings(machine);
   const update = useUpdateInfo(machine);
+  const machineChecks = useMachineChecks(machine);
   const settings = me.k === 'ready' ? me.me.settings : DEFAULT_SETTINGS;
   const email = me.k === 'ready' ? me.me.email : null;
   const { run, pending: waiting } = pending;
@@ -175,6 +222,14 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
             onCopy={update.copy}
           />
         ) : null
+      }
+      checks={
+        <ChecksGroup
+          checks={machineChecks.checks}
+          fixing={machineChecks.fixing}
+          onCopy={machineChecks.copy}
+          onFix={(id) => void machineChecks.fix(id)}
+        />
       }
       onSignOut={() => {
         void signOut(machine).then((res) => {

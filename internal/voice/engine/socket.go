@@ -195,8 +195,12 @@ func (s *session) begin() {
 	s.partials()
 }
 
-// partials recognizes the recording so far every few seconds while it is being made.
+// partials recognizes the recording so far every few seconds while it is being made. A server of the person's own is
+// asked once per recording, at its end: a paid one would bill every partial.
 func (s *session) partials() {
+	if s.e.UsesRemote() {
+		return
+	}
 	var lastLen int
 	var lastText string
 	var spent time.Duration

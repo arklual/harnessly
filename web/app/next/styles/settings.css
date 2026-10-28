@@ -1763,3 +1763,54 @@
 .hx-set__tools > :last-child:not(:first-child) {
   margin-left: auto;
 }
+
+/* Проверка машины: строка того, что не в порядке — что видно, команда, кнопки */
+.hx-check {
+  align-items: flex-start;
+}
+.hx-check > .hx-set__spin {
+  align-self: center;
+}
+.hx-check__seen {
+  overflow-wrap: anywhere;
+}
+.hx-check__cmd {
+  display: block;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.hx-check__acts {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-self: center;
+}
+@media (max-width: 600px) {
+  .hx-check {
+    flex-wrap: wrap;
+  }
+  .hx-check__acts {
+    width: 100%;
+  }
+}
+
+/* Голосовой ввод: свой сервер распознавания */
+.hx-key-form.hx-voice-server {
+  margin-top: 0;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--hx-border);
+  border-radius: 0;
+  background: transparent;
+}
+.hx-voice-server__field {
+  display: grid;
+  gap: 4px;
+}

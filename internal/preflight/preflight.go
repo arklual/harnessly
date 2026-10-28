@@ -195,6 +195,9 @@ func accountShell(uid int) string {
 	return ""
 }
 
+// LoginShell is the account's shell from the password file, else $SHELL, else /bin/bash.
+func (c *Checker) LoginShell() string { return c.loginShell() }
+
 // ShellPath is the PATH the person's interactive login shell builds, else the runtime's own (getShellPath).
 func (c *Checker) ShellPath() string { return c.shellPath() }
 

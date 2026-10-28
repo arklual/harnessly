@@ -1,8 +1,9 @@
 // Settings → «Голосовой ввод»: the machine's dictation (state, model) and this browser's microphone and language.
 import { useEffect, useState } from 'react';
-import VoiceSection, { type IMicrophone } from '@/next/features/settings/voice-section';
+import VoiceSection, { type IMicrophone, type IRemoteForm } from '@/next/features/settings/voice-section';
 import {
   loadVoiceEngine,
+  saveVoiceEngine,
   saveVoiceModel,
   type IVoiceEngine,
   type TVoiceModel,
@@ -46,6 +47,7 @@ export const VoicePage = ({ machine }: { machine: MachineId }) => {
   const microphones = useMicrophones();
   const [read, setRead] = useState<{ machine: MachineId; value: IVoiceEngine } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [engineBusy, setEngineBusy] = useState(false);
   const engine = read?.machine === machine ? read.value : null;
   const preparing = engine?.state === 'preparing';
 
@@ -73,6 +75,26 @@ export const VoicePage = ({ machine }: { machine: MachineId }) => {
     });
   };
 
+  // Pessimistic as well: the engine is the machine's once it has kept it. A refusal comes back in the machine's words.
+  const onRemote = async (form: IRemoteForm): Promise<string | null> => {
+    setEngineBusy(true);
+    const res = await saveVoiceEngine(machine, { engine: 'remote', ...form });
+    setEngineBusy(false);
+    if (res === null) return t('next.settings.failed');
+    if ('error' in res) return res.error;
+    setRead({ machine, value: res });
+    return null;
+  };
+
+  const onBuiltin = () => {
+    setEngineBusy(true);
+    void saveVoiceEngine(machine, { engine: 'builtin' }).then((res) => {
+      setEngineBusy(false);
+      if (res && 'decoder' in res) setRead({ machine, value: res });
+      else toast(res?.error ?? t('next.settings.failed'), { tone: 'error' });
+    });
+  };
+
   const onCopyInstall = () => {
     if (!engine) return;
     void navigator.clipboard?.writeText(engine.install).then(
@@ -87,9 +109,12 @@ export const VoicePage = ({ machine }: { machine: MachineId }) => {
       prefs={prefs}
       microphones={microphones}
       modelBusy={busy}
+      engineBusy={engineBusy}
       onDevice={(deviceId) => setVoicePrefs({ deviceId })}
       onLang={(lang) => setVoicePrefs({ lang })}
       onModel={onModel}
+      onBuiltin={onBuiltin}
+      onRemote={onRemote}
       onCopyInstall={onCopyInstall}
     />
   );

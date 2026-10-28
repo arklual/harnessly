@@ -77,6 +77,8 @@ export interface IGeneralSectionProps {
   onSignOut: () => void;
   /** «Обновления» of a machine a hub carries (update-group.tsx); null on any other machine. */
   updates?: ReactNode;
+  /** «Проверка машины» (checks-group.tsx): what is not in order on the machine; null when all is. */
+  checks?: ReactNode;
 }
 
 const SignOutRow = ({ account, onSignOut }: Pick<IGeneralSectionProps, 'account' | 'onSignOut'>) => {
@@ -131,8 +133,10 @@ const GeneralSection = ({
   onDelegation,
   onSignOut,
   updates = null,
+  checks = null,
 }: IGeneralSectionProps) => (
   <>
+    {checks}
     <Group title={t('next.settings.general.look')}>
       <SegRow
         label={t('next.settings.general.theme')}

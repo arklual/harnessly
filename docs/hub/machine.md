@@ -328,3 +328,29 @@ Run `harnessly-agent status` on the machine (`sudo harnessly-agent status` for `
 
 Logs: `journalctl -u harnessly-agent -u harnessly-runtime -n 100` (`--user` for `full` on Linux),
 `~/Library/Logs/harnessly/*.log` on macOS, `docker logs harnessly-machine` for the container.
+
+## When something on the machine quietly does not work
+
+Settings → General → _Machine check_ lists only what is not in order on the machine, each with the command that puts
+it right (and a _Copy_ button). The runtime runs a fixed list of checks; the page names a check by its id and can make
+the runtime run nothing else. Two fixes the runtime makes itself, without root, by the _Fix_ button: the `PATH` line
+for `~/.local/bin` in the shell's start file, and the hub's update of the machine's programs.
+
+| Check | Seen as | Fix |
+| --- | --- | --- |
+| tmux 2.9+ | chats do not start | `sudo apt-get install -y tmux` (`brew install tmux`) |
+| git | no changes shown, no commits | `sudo apt-get install -y git` |
+| Claude Code or Codex | no agent to start | `curl -fsSL https://claude.ai/install.sh \| bash`, `npm install -g @openai/codex` |
+| git `user.email` | the agent cannot commit | `git config --global user.name "…" && git config --global user.email …` |
+| `~/.local/bin` in the login shell's `PATH` | `harnessly: command not found`, `claude: command not found` in a new terminal | `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc` (button) |
+| the `harnessly` command beside the runtime | agents cannot open tabs or show files (a machine an older hub installed) | `curl -fsSL <hub>/install \| sh -s -- --update` (button, where the machine updates itself) |
+| lingering (`full` on Linux) | the machine goes offline when you log out | `sudo loginctl enable-linger $USER` |
+| ffmpeg | no microphone | `sudo apt-get install -y ffmpeg` (`brew install ffmpeg`) |
+| the built-in recognition can run | the microphone answers with an error | macOS: `brew install whisper-cpp`; a processor without AVX2: your own server (docs/voice.md) |
+| the voice model can be downloaded | the first dictation fails | download the model by hand (the command is shown), or your own server |
+| room on the data folder's disk (1 GB and the model still to come) | downloads and updates fail | free the disk; the command shows what takes the room |
+| https (in the browser) | no microphone button | open the machine through the hub, or put TLS in front |
+| the microphone allowed (in the browser) | dictation does not start | allow it in the site settings and reload |
+
+Only the voice checks reach the network, and only when the model or the server binary is still to be downloaded: a
+`HEAD` request to `huggingface.co` and `github.com`, kept for ten minutes.

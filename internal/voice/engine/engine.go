@@ -79,6 +79,7 @@ type Engine struct {
 	failedAt time.Time
 	bin      string
 	model    string
+	remote   *Remote // a server of the person's own recognizes instead (remote.go)
 
 	srvMu sync.Mutex // the server process and what is asked of it, one at a time
 	proc  *server
@@ -159,6 +160,9 @@ func (e *Engine) SetModel(name string) bool {
 
 // Eligible is nil when this machine can recognize with the engine (maybe after a download), else why not.
 func (e *Engine) Eligible() error {
+	if e.UsesRemote() {
+		return nil
+	}
 	if e.cfg.Bin != "" || e.localBinary() != "" {
 		return nil
 	}
@@ -198,10 +202,13 @@ func (e *Engine) localBinary() string {
 	return ""
 }
 
-// Status is the preparation's state now.
+// Status is the preparation's state now; an engine that sends to a server of the person's own is always ready.
 func (e *Engine) Status() Status {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.remote != nil {
+		return Status{State: "ready"}
+	}
 	return e.st
 }
 
@@ -216,7 +223,7 @@ const retryAfter = 20 * time.Second
 func (e *Engine) Prepare() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.st.State == "ready" || e.st.State == "preparing" {
+	if e.remote != nil || e.st.State == "ready" || e.st.State == "preparing" {
 		return
 	}
 	if e.st.State == "failed" && time.Since(e.failedAt) < retryAfter {
@@ -458,6 +465,9 @@ func (e *Engine) Close() {
 // Infer recognizes PCM16 mono 16 kHz audio; lang is "ru", "en" or "auto". The server is started when it is not
 // running and stopped after Idle without a request. Cancelling ctx stops the pass.
 func (e *Engine) Infer(ctx context.Context, pcm []byte, lang string) (string, error) {
+	if r := e.remoteServer(); r != nil {
+		return e.inferRemote(ctx, r, pcm, lang)
+	}
 	if !e.Ready() {
 		return "", errors.New("speech engine is not ready")
 	}
