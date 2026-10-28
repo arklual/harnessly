@@ -53,7 +53,10 @@ FROM debian:bullseye-slim AS whisper
 ARG TARGETARCH
 ARG WHISPER_VERSION=v1.9.5
 ARG WHISPER_COMMIT=d1be6fde11ac6e0407606b4e42fe72d34add8037
-RUN apt-get update \
+# Debian 11 is out of support: its packages are on archive.debian.org now.
+RUN printf 'deb http://archive.debian.org/debian bullseye main\n' > /etc/apt/sources.list \
+ && rm -f /etc/apt/sources.list.d/* \
+ && apt-get -o Acquire::Check-Valid-Until=false update \
  && apt-get install -y --no-install-recommends build-essential cmake git ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 RUN git clone --depth 1 --branch "${WHISPER_VERSION}" https://github.com/ggml-org/whisper.cpp /whisper \
