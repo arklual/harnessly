@@ -354,6 +354,10 @@
   "next.designly.empty": "Your mockups will show up here",
   "next.designly.emptyMine": "The mockups you start will show up here",
   "next.designly.emptyShared": "No mockups from teammates yet",
+  "next.designly.engine.missing": "{design} needs its board engine on this machine",
+  "next.designly.engine.missingText": "The engine is not shipped with harnessly: fetch it once with your own Claude account — run this in a terminal of the machine, then reload the page.",
+  "next.designly.engine.tools": "Not installed on this machine: {tools}",
+  "next.designly.engine.toolsText": "Designs work without them; checks, pictures and PDF exports need Chromium, video exports need ffmpeg.",
   "next.designly.createFailed": "Could not start the mockup",
   "next.designly.started": "Drawing “{title}”…",
   "next.sidebar.designly": "{design}",
@@ -648,6 +652,10 @@
   "next.editor.saved": "Saved",
   "next.editor.saving": "Saving…",
   "next.editor.save": "Save",
+  "next.share.button": "Share",
+  "next.share.unlink": "Unlink from the file",
+  "next.share.unlinked": "The document is unlinked: edits to the file no longer reach it",
+  "next.share.failed": "Could not share",
   "next.editor.mode": "Mode",
   "next.editor.edit": "Edit",
   "next.editor.preview": "Preview",
@@ -842,5 +850,10 @@
   "next.sidebar.retitleFailed": "Could not update the title",
   "next.chatStatus.limited": "Waiting for the limit to reset",
   "next.chatStatus.limitedUntil": "Waiting for the limit to reset until {when}",
-  "next.rowMenu.continue": "Continue in another model"
+  "next.rowMenu.continue": "Continue in another model",
+  "next.delivered.loading": "Reading the archive",
+  "next.delivered.zipFailed": "The archive did not open",
+  "next.delivered.zipEmpty": "The archive is empty",
+  "next.delivered.saveOnly": "This file opens in its own program: download it.",
+  "next.rowMenu.moveVm": "Continue on another machine"
 }

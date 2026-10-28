@@ -32,6 +32,7 @@ const ICON: Record<TBlockKind, string> = {
 const MODE_LABEL = {
   [BLOCK_MODE.excerpt]: 'next.handoff.mode.excerpt',
   [BLOCK_MODE.note]: 'next.handoff.mode.note',
+  [BLOCK_MODE.history]: 'next.handoff.mode.history',
 } as const;
 
 /** «Выдержка · Claude · claude-opus-5-5» without the parts the block does not say. */
@@ -59,26 +60,26 @@ export const ContextCard = memo(({ block, state }: IContextCardProps) => {
   const canOpen = links?.has(block.fromId) ?? false;
   return (
     <div className="hx-msg" data-kind="context">
-      <div className="hx-ctx" data-kind={block.kind}>
-        <div className="hx-ctx__head">
-          <Icon name={ICON[block.kind]} size="sm" className="hx-ctx__ic" />
-          <span className="hx-ctx__title">{t(TITLE[block.kind], { title })}</span>
-          {line && <span className="hx-ctx__line">{line}</span>}
+      <div className="hx-hcard" data-kind={block.kind}>
+        <div className="hx-hcard__head">
+          <Icon name={ICON[block.kind]} size="sm" className="hx-hcard__ic" />
+          <span className="hx-hcard__title">{t(TITLE[block.kind], { title })}</span>
+          {line && <span className="hx-hcard__line">{line}</span>}
         </div>
-        <div className="hx-ctx__body" data-open={open || !long || undefined}>
-          <div className="hx-ctx__text">
+        <div className="hx-hcard__body" data-open={open || !long || undefined}>
+          <div className="hx-hcard__text">
             <Md md={block.text} paths />
           </div>
         </div>
-        <div className="hx-ctx__foot">
+        <div className="hx-hcard__foot">
           {long && (
-            <button type="button" className="hx-ctx__act" onClick={() => setOpen((value) => !value)}>
+            <button type="button" className="hx-hcard__act" onClick={() => setOpen((value) => !value)}>
               {open ? t('next.message.pastedLess') : t('next.message.pastedMore')}
             </button>
           )}
           <span className="hx-spacer" />
           {canOpen && links && (
-            <button type="button" className="hx-ctx__act" onClick={() => links.open(block.fromId)}>
+            <button type="button" className="hx-hcard__act" onClick={() => links.open(block.fromId)}>
               <Icon name="external-link" size="sm" />
               {t('next.handoff.openSource')}
             </button>

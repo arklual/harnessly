@@ -30,7 +30,10 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
   let sub: string | null = null;
   let quiet = false;
   let actions: IAction[] = [];
-  if (value.kind === 'machine') {
+  if (value.kind === 'off') {
+    title = t('next.dockBar.off');
+    quiet = true;
+  } else if (value.kind === 'machine') {
     title = t('next.dockBar.machine', { machine: value.machine });
     sub = t('next.dockBar.machineSub');
     actions = [{ key: 'stop', label: t('next.dockBar.stop'), variant: 'ghost', run: value.onStop }];

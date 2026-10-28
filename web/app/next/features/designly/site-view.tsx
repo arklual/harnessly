@@ -20,6 +20,7 @@ import {
   browserOf,
   DEVICES,
   deviceOf,
+  overviewBox,
   overviewOf,
   SCROLL_START,
   trackScroll,
@@ -43,6 +44,8 @@ import {
   type TDock,
 } from '@/next/features/designly/site-drag';
 import {
+  GUEST_KEY_CODE,
+  guestKeyValue,
   readBridgeMessage,
   type IPicked,
   type ITweak,
@@ -121,6 +124,8 @@ export interface ISiteAccess {
   /** «Поделиться» for a person who manages, «Запросить правку» for one who may only look. */
   label: string;
   onOpen: () => void;
+  /** The person manages the project: a deck opens its own share popover instead of the dialog. */
+  manage?: boolean;
 }
 
 /**
@@ -134,6 +139,8 @@ export interface ISiteGuest {
   pickTip: string;
   /** «Your name: Ann» in «Ещё»: the guest changes the name they comment under; null until there is one. */
   account?: { label: string; onOpen: () => void } | null;
+  /** «Во весь экран» on the bar: the page alone over the whole window, without the bar and the device. */
+  full?: { label: string; tip: string; onOpen: () => void };
 }
 
 export interface ISiteViewProps {
@@ -157,7 +164,8 @@ export interface ISiteViewProps {
   onNavigate: (path: string) => void;
   onHistory: (step: -1 | 1) => void;
   onReload: (hard: boolean) => void;
-  onOpenOutside: () => void;
+  /** Opens the current board in its own browser tab; absent while there is no board URL to open. */
+  onOpenOutside?: () => void;
   onCopyLink: () => void;
   onRetry: () => void;
   onOpenDrawer: () => void;
@@ -173,6 +181,8 @@ export interface ISiteViewProps {
   viewSeed?: IViewMemory;
   /** Set for a visitor of a guest link. */
   guest?: ISiteGuest;
+  /** The page alone over the view's whole box: no bar, no device, no zoom (a guest's full screen). */
+  full?: boolean;
   /** Set where the gateway keeps the project's access and the person has something to do there. */
   access?: ISiteAccess;
   /** The page's preview slot, whose record DevTools read; without it the panel is not offered. */
@@ -190,6 +200,8 @@ export interface ISiteStage {
   /** The island is folded into its pill. */
   min: boolean;
   run: 'idle' | 'run' | 'done';
+  /** The agent of the design's chat is starting or working on a turn (the chat's own «Собираю контекст…»). */
+  busy?: boolean;
   float: IFloat | null;
   /** The side of the docked chat, and its width. */
   dock: TDock;
@@ -202,6 +214,8 @@ export interface ISiteStage {
   pins: ReactNode;
   /** A click on the page picks a block (through the slot's bridge) instead of acting on it. */
   pick: boolean;
+  /** A finger held on a block picks it too (a guest on a phone), without turning picking on. */
+  hold?: boolean;
   /** `at` is the block's bottom-left corner in the section's pixels, where its note opens. */
   onPicked: (picked: IPicked, at: { x: number; y: number; right: boolean }) => void;
   /** The settings the board offers now (its `tk:tweaks`), as the page said them. */
@@ -225,6 +239,15 @@ export interface ISiteStage {
   onSview: (open: boolean) => void;
   /** Words from the page's tools (a console line, a request) go into the field. */
   onAttach: (words: string) => void;
+  /**
+   * A deck's context for the chat: one transient chip («Слайд 3 · Заголовок») sent with the next message as an
+   * `<annotation>`; null takes it away. Absent from a stage that has no chat field.
+   */
+  context?: (ctx: { label: string; text: string; selected?: boolean } | null) => void;
+  /** The chat alone, without the window it stands in (a deck's panel hosts it); absent where the stage has no chat. */
+  deckChat?: ReactNode;
+  /** Sends a message on the person's behalf (a deck's «Короче», a layout change, «＋ слайд»). */
+  ask?: (text: string) => void;
 }
 
 interface IMoreItem {
@@ -307,6 +330,7 @@ const SiteView = ({
   memoryKey,
   viewSeed,
   guest,
+  full = false,
 }: ISiteViewProps) => {
   const pop = usePop();
   // A phone has one column: the chat docked to the right is stacked like the left one there.
@@ -348,7 +372,8 @@ const SiteView = ({
   // The address reads the page and where it is; a site named by its own address shows it once.
   const addrName = page?.name ?? title;
   const addrPath = pagePath ? `${title}/${pagePath}` : title;
-  const device = deviceOf(deviceId);
+  // The full screen shows the page as «Адаптивно» does, over the whole box; the device chosen comes back after it.
+  const device = deviceOf(full ? 'fill' : deviceId);
   // The page's tree for DevTools' «Elements», read through the board's own script while that tab is in view.
   const dom = useDomBridge(
     frameRef,
@@ -368,21 +393,25 @@ const SiteView = ({
   // A phone has no floating pill and no zoom over the page (the design's mobile.css): the address switches the pages,
   // the device's menu holds the zoom, «…» the settings, so the page's own header and tab bar stay free.
   const dockShown = pane !== undefined && !phone;
-  const vp = area ? viewportOf(device, area, size, rot, dockShown ? VP_PAD + paneRoom : VP_PAD) : null;
+  const vp = area
+    ? viewportOf(device, area, full ? null : size, full ? false : rot, dockShown ? VP_PAD + paneRoom : VP_PAD)
+    : null;
   const framed = vp?.kind === VP_KIND.frame;
   const overview = vp?.kind === VP_KIND.overview;
   const phoneBrowser = framed && !vp.rot && chrome ? browserOf(device, browserId) : null;
   const browsers = phoneBrowser && device.os ? BROWSERS[device.os] : [];
-  const cards = vp && overview ? overviewOf({ w: vp.vw, h: vp.vh }, underField) : [];
+  // «Обзор» keeps room at the bottom for the field, or for a guest's list of comments.
+  const ovwRoom = underField || guest !== undefined;
+  const cards = vp && overview ? overviewOf({ w: vp.vw, h: vp.vh }, ovwRoom) : [];
   const qr = useMemo(() => (phoneUrl ? qrModules(phoneUrl) : null), [phoneUrl]);
   // The canvas: the page's box zooms and pans over its area; another device or size starts at the fit again.
   const canvas = useCanvasZoom(
     areaRef,
     sectionRef,
     vp?.fit ?? 1,
-    vp !== null && !overview && error === null,
-    `${deviceId}|${size?.w ?? 0}x${size?.h ?? 0}|${rot}`,
-    { w: vp ? vp.bw * vp.fit : 0, h: vp ? vp.bh * vp.fit : 0 },
+    vp !== null && error === null && !full,
+    `${device.id}|${size?.w ?? 0}x${size?.h ?? 0}|${rot}|${full}`,
+    overview ? overviewBox(cards, ovwRoom) : { w: vp ? vp.bw * vp.fit : 0, h: vp ? vp.bh * vp.fit : 0 },
     { start: memory.initial, onChange: memory.save },
   );
   // What the device says is kept with the canvas's view; the page is restored once, then followed.
@@ -536,6 +565,10 @@ const SiteView = ({
   const arm = (on: boolean) => {
     const slot = slotOf();
     slot?.frame.contentWindow?.postMessage({ type: 'tk:pick', on }, slot.origin);
+    slot?.frame.contentWindow?.postMessage(
+      { type: 'tk:hold', on: latestStage.current?.hold === true },
+      slot.origin,
+    );
   };
   // The board's own script offers its settings: the site says it draws them (and whether the panel is open), takes the
   // list and sends the changes back.
@@ -622,9 +655,21 @@ const SiteView = ({
         // And it picks blocks and wears the notes' looks, as the slot's bridge does.
         if (now) {
           frame.contentWindow?.postMessage({ type: 'tk:pick', on: now.pick }, origin);
+          frame.contentWindow?.postMessage({ type: 'tk:hold', on: now.hold === true }, origin);
           frame.contentWindow?.postMessage({ type: 'tk:styles', items: now.styles }, origin);
           now.onBridge(true);
         }
+        return;
+      }
+      if (message?.k === 'key') {
+        // The guest page listens for its keys on its window: one pressed over the board comes there the same.
+        if (guest)
+          window.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              key: guestKeyValue(message.key),
+              code: GUEST_KEY_CODE[message.key],
+            }),
+          );
         return;
       }
       if (message?.k === 'hello') {
@@ -861,9 +906,8 @@ const SiteView = ({
 
   /** What «Ещё» offers: only what works here. */
   const offered: (IMoreItem | null | undefined)[] = [
-    guest
-      ? null
-      : {
+    onOpenOutside
+      ? {
           id: 'outside',
           icon: 'external-link',
           label: t('next.site.openOutside'),
@@ -871,7 +915,8 @@ const SiteView = ({
             pop.close();
             onOpenOutside();
           },
-        },
+        }
+      : null,
     guest?.account
       ? {
           id: 'guest-name',
@@ -992,6 +1037,7 @@ const SiteView = ({
       data-min={stage?.min ?? false}
       data-run={stage?.run ?? 'idle'}
       data-pick={pick}
+      data-full={full}
       data-dev={dev}
       data-sview={stage ? stage.sview && stage.mode === 'chat' : false}
     >
@@ -1232,7 +1278,22 @@ const SiteView = ({
                 <span className="hx-browser__tool-label">{guest?.pickLabel ?? t('next.site.pick')}</span>
                 <span className="hx-tip" data-pos="below">
                   {guest?.pickTip ?? t('next.site.pickTip')}
-                  {keys && <kbd>V</kbd>}
+                  {keys && <kbd>{guest ? 'C' : 'V'}</kbd>}
+                </span>
+              </button>
+            )}
+            {guest?.full && (
+              <button
+                type="button"
+                className="hx-browser__tool hx-tipped"
+                aria-label={guest.full.label}
+                onClick={guest.full.onOpen}
+              >
+                <Icon name="maximize-2" size="sm" />
+                <span className="hx-browser__tool-label">{guest.full.label}</span>
+                <span className="hx-tip" data-pos="below">
+                  {guest.full.tip}
+                  <kbd>F</kbd>
                 </span>
               </button>
             )}
@@ -1315,12 +1376,10 @@ const SiteView = ({
                       </span>
                     </button>
                   </div>
-                  {!overview && (
-                    <div className="hx-devzoom">
-                      <span className="hx-devsize__label">{t('next.site.zoom')}</span>
-                      <ZoomControls zoom={canvas} />
-                    </div>
-                  )}
+                  <div className="hx-devzoom">
+                    <span className="hx-devsize__label">{t('next.site.zoom')}</span>
+                    <ZoomControls zoom={canvas} />
+                  </div>
                   {framed && !vp.rot && (
                     <button
                       type="button"
@@ -1492,6 +1551,7 @@ const SiteView = ({
               {overview && (
                 <Overview
                   cards={cards}
+                  room={ovwRoom}
                   src={loadedFor === frameKey ? plainSrc : null}
                   onPick={(id) => {
                     setDeviceId(id);
@@ -1589,7 +1649,7 @@ const SiteView = ({
                   ))}
                 </div>
               )}
-              {!failed && !overview && <div className="hx-vpshield" aria-hidden="true" />}
+              {!failed && <div className="hx-vpshield" aria-hidden="true" />}
             </div>
             {dockShown && !failed && (
               <PaneDock
@@ -1597,10 +1657,10 @@ const SiteView = ({
                 path={pagePath}
                 onGo={onNavigate}
                 tweaks={{ on: tweaksOpen, disabled: noTweaks && !tweaksOpen, onToggle: toggleTweaks }}
-                zoom={overview ? null : canvas}
+                zoom={canvas}
               />
             )}
-            {!pane && !phone && !failed && !overview && (
+            {!pane && !phone && !failed && (
               <div className="hx-vpzoom">
                 <ZoomControls zoom={canvas} />
               </div>

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -52,5 +52,21 @@ describe('the narrow field', () => {
         /\.hx-model\b|\.hx-composer__(layer|bar|field|input)\b|\.hx-lim\b|\.hx-ctx\b/,
       );
     }
+  });
+});
+
+// One sheet's class meant two things once: the handed-over context card took `.hx-ctx` (a left rule and padding) and drew
+// a purple bar at the left edge of the context ring. A name of the ring belongs to the ring's sheet alone.
+describe('the context ring', () => {
+  it('has its class names to itself: no other sheet styles .hx-ctx or its parts', () => {
+    const owners = readdirSync(__dirname)
+      .filter((name) => name.endsWith('.css') && name !== 'composer.css' && name !== 'motion.css')
+      .filter((name) => /\.hx-ctx(?![\w-])|\.hx-ctx__/.test(readFileSync(join(__dirname, name), 'utf8')));
+    expect(owners).toEqual([]);
+  });
+
+  it('is drawn by composer.css without a border or padding of its own', () => {
+    const rule = css.match(/\n\.hx-ctx\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(rule).not.toMatch(/border|padding/);
   });
 });

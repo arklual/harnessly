@@ -2,7 +2,94 @@
 
 harnessly is two static binaries: `runtime` (one per person: the web page, the API, tmux and the agents) and
 `agent` (one per Unix account, only for linking machines to a cluster). A single person on a single host needs
-only the runtime. Pick the way that fits:
+only the runtime.
+
+## Quick start
+
+Three ways, the shortest first. All of them end the same way: open the page, sign in once, choose your password.
+
+### Quick start with Docker
+
+```sh
+docker run -d --name harnessly -p 127.0.0.1:8022:8022 -v harnessly-home:/home/agent ghcr.io/ly-solutions/harnessly:latest
+docker logs harnessly | grep -i password
+```
+
+Open <http://127.0.0.1:8022>, enter the `Initial password` the second command printed, and choose your own password
+when the page asks. Workspaces, the runtime's data and the agents' logins live on the `harnessly-home` volume. The image
+has no agent CLIs: use `ghcr.io/ly-solutions/harnessly:with-agents` for Claude Code and Codex, or see
+[what the agents need](#what-the-agents-need). Tags: `X.Y.Z` (pin this in production), `X.Y`, `latest`, and the same
+with a `-with-agents` suffix (`with-agents` is the latest of those). The images are for linux/amd64 and linux/arm64.
+
+Verify the image (needs [cosign](https://docs.sigstore.dev/cosign/installation/) or the [GitHub CLI](https://cli.github.com/)):
+
+```sh
+cosign verify ghcr.io/ly-solutions/harnessly:latest \
+  --certificate-identity-regexp '^https://github.com/ly-solutions/harnessly/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/ly-solutions/harnessly:latest --repo ly-solutions/harnessly
+```
+
+### Quick start with a release binary
+
+Needs `tmux` and `git` on the machine. Every [release](https://github.com/ly-solutions/harnessly/releases) has an archive
+per system, `harnessly_<version>_<os>_<arch>.tar.gz` for `linux` and `darwin` on `amd64` and `arm64`, with the
+`runtime` (the page is compiled in), the `agent` and the `harnessly` command line tool, plus `checksums.txt` and its
+signature `checksums.txt.sigstore.json`.
+
+```sh
+VERSION=0.15.47 OS=linux ARCH=amd64     # the version of the latest release; OS: linux or darwin; ARCH: amd64 or arm64
+BASE=https://github.com/ly-solutions/harnessly/releases/download/v$VERSION
+ARCHIVE=harnessly_${VERSION}_${OS}_${ARCH}.tar.gz
+curl -fsSLO "$BASE/$ARCHIVE" -O "$BASE/checksums.txt" -O "$BASE/checksums.txt.sigstore.json"
+
+# 1. checksums.txt was signed by this repository's release workflow (cosign), keyless:
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
+  --certificate-identity "https://github.com/ly-solutions/harnessly/.github/workflows/release.yml@refs/tags/v$VERSION" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+# 2. the archive is the one in checksums.txt (on macOS: shasum -a 256 -c -):
+grep " $ARCHIVE\$" checksums.txt | sha256sum -c -
+# 3. optional, the build provenance GitHub recorded for the archive:
+gh attestation verify "$ARCHIVE" --repo ly-solutions/harnessly
+
+tar xzf "$ARCHIVE"
+RUNTIME_GATE_LISTEN=127.0.0.1:8022 RUNTIME_GATE_UPSTREAM= RUNTIME_APP_BASE_PATH=/ ./runtime
+```
+
+Open <http://127.0.0.1:8022> and choose your password. A runtime that listens on `127.0.0.1` leaves the setup open to
+whoever reaches the port first, which on your own machine is you; see [the first visit](#the-first-visit) before you
+listen on anything else. To keep it running, use [systemd](#systemd-one-host-one-account).
+
+### Quick start from source
+
+```sh
+git clone https://github.com/ly-solutions/harnessly.git && cd harnessly
+make run                        # builds web/ and the runtime with the page, serves http://127.0.0.1:8022
+```
+
+Needs Go (the version in [`go.mod`](../go.mod)), Node.js 22 with pnpm (corepack), tmux and git; more under
+[plain commands](#plain-commands).
+
+### Updating
+
+- **Docker**: pull the new image and recreate the container. The home volume stays, so the password, workspaces and
+  logins stay too:
+
+  ```sh
+  docker pull ghcr.io/ly-solutions/harnessly:latest
+  docker rm -f harnessly
+  docker run -d --name harnessly -p 127.0.0.1:8022:8022 -v harnessly-home:/home/agent ghcr.io/ly-solutions/harnessly:latest
+  ```
+
+  With a pinned tag, put the new version in both places. With compose: `docker compose pull && docker compose up -d`.
+- **Binary**: download and verify the new archive as above, replace `runtime` (and `agent`, `harnessly` if you use them)
+  and restart it. The data in `~/.harnessly` is kept. Under [systemd](#systemd-one-host-one-account) the restart keeps
+  tmux and the agents running.
+- **From source**: `git pull && make run` (or `make install` and restart the service).
+
+The runtime's `/api/health` answers with the version it runs, and the release notes list what changed.
+
+## All the ways to run
 
 | Way | For | What you get |
 | --- | --- | --- |
@@ -50,21 +137,27 @@ the variable that carries the token to Codex's MCP server on its own (`RUNTIME_S
 
 ## The first visit
 
-The page asks for a password the first time it is opened, and **whoever reaches it first chooses it**. On your own
-machine that is you. On a host others can reach, between the start and your first visit that is anyone, so set
-`INIT_PASSWORD` (at least 4 characters) in the runtime's environment before the first start:
+The page asks for a password the first time it is opened. Until one is chosen, anyone who reaches the page could choose
+it, so a runtime that listens beyond this machine locks the setup behind an **initial password**:
 
-```sh
-INIT_PASSWORD=$(openssl rand -hex 16)      # keep it: you type it once
-```
+- **Nothing set, listening on all interfaces** (a container, `RUNTIME_GATE_LISTEN=0.0.0.0:8022`, a server): the runtime
+  makes a one-time initial password at start and prints it once, in a block that contains the line
+  `Initial password: XXXX-XXXX-XXXX-XXXX-XXXX` (`docker logs harnessly | grep -i password`, `journalctl -u harnessly`).
+  The page asks for it before it shows the setup and refuses to set up for anyone who has not signed in with it. You
+  then choose your own password; that one is stored, and the initial one stops working. The initial password is kept
+  in memory only: if the runtime restarts before the setup is done, it prints a new one.
+- **`INIT_PASSWORD` set** (at least 4 characters): that is the initial password, in any listen mode, and nothing is
+  generated. Use it when you want to know the password beforehand (`INIT_PASSWORD=$(openssl rand -hex 16)`). It is in
+  `.env` for compose ([`.env.example`](../.env.example)), in `~/.config/harnessly/env` for systemd and under `extraEnv`
+  in the Helm chart. It is not read again once a password exists.
+- **Listening on loopback only** (`RUNTIME_GATE_LISTEN=127.0.0.1:…`, which is what `make run` does): nothing is
+  generated and the first visitor chooses the password, as before. On your own machine, or behind an SSH tunnel, that is
+  you. If a reverse proxy on the same host exposes that port to others, set `INIT_PASSWORD` or
+  `RUNTIME_GENERATE_INIT_PASSWORD=1` (the runtime cannot tell proxied clients from local ones).
 
-With it the page asks for that password before it shows the setup, and refuses to set up for anyone who has not
-signed in with it; you then choose the real password, and `INIT_PASSWORD` is not read again once a password exists
-(remove it afterwards). It is in `.env` for compose ([`.env.example`](../.env.example)), in
-`~/.config/harnessly/env` for systemd and under `extraEnv` in the Helm chart. Alternatively keep the first start on
-loopback or behind your VPN and finish the setup before opening the port. The runtime does not tell loopback clients
-from others on its own (behind a proxy or Docker's port mapping every client arrives from a local address), so it
-cannot enforce that for you.
+`RUNTIME_GENERATE_INIT_PASSWORD=0` turns the generation off (the first visitor chooses, as before). There is no
+password form in the page yet: to choose a new password later, stop the runtime, delete `authPassword` and `authSecret`
+from `config.json` in its data folder (`~/.harnessly`) and start it again; the setup then runs again.
 
 The setup stores `networkAccess` in the runtime's `config.json` (the page chooses `localhost`; `tailscale` and `all`
 exist). It is not a firewall and not the listen address (`RUNTIME_GATE_LISTEN` is): it decides which remote addresses
@@ -340,6 +433,29 @@ compose, keep the published slot ports on 127.0.0.1 and let only Caddy reach the
 
 The Helm chart does not route the slots yet: the pod listens on `8023`–`8030`, and a Service port and an Ingress host
 per slot, with `RUNTIME_PREVIEW_PUBLIC_ORIGINS` in `extraEnv`, are yours to add.
+
+## Updates
+
+A standalone runtime built from a release looks for a newer one: at start and then every 12 hours it makes one
+`GET https://api.github.com/repos/ly-solutions/harnessly/releases/latest` (unauthenticated, 10 seconds at most, with
+`If-None-Match`, through `HTTPS_PROXY` if you set it) and compares the tag with its own version. It sends nothing
+else: no identifier, no usage, no version of yours beyond the standard request headers. A failure is logged at debug
+level and changes nothing. When a newer release exists, the page shows a quiet "new version" notice with a link to
+its notes; closing it hides that version until the next one comes out.
+
+The check is skipped, and the notice never appears, for a `dev` build (`make run` from a clone), for a runtime a
+[hub](hub/machine.md) carries (the hub serves its machines' binaries), and when you set `RUNTIME_UPDATE_CHECK=0`.
+`RUNTIME_UPDATE_CHECK_URL` points the check at a mirror that answers like the GitHub API.
+
+Nothing updates itself: how you update is how you installed.
+
+| Installed with | Update |
+| --- | --- |
+| a release binary | download the new archive from the [releases page](https://github.com/ly-solutions/harnessly/releases), replace `runtime`, restart it |
+| `make install install-systemd` | `git pull`, `make install`, `systemctl --user restart harnessly` (the agents keep working through the restart) |
+| `docker compose` | `git pull`, `docker compose up -d --build` |
+| Docker | `git pull`, `docker build -t harnessly .`, then run the container again on the same volume |
+| Helm | set the new image tag in the chart's values and `helm upgrade` |
 
 ## Behind a proxy
 

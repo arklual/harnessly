@@ -8,6 +8,79 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Releases: a `vX.Y.Z` tag publishes archives for linux and macOS (amd64, arm64) with `checksums.txt` signed keyless with cosign
+  (`checksums.txt.sigstore.json`) and a build provenance attestation, and a multi-arch container image
+  `ghcr.io/ly-solutions/harnessly` (`X.Y.Z`, `X.Y`, `latest`, and `-with-agents`), signed and attested. `docs/deploy.md` starts
+  with a quick start (Docker, release binary, source), how to verify and how to update.
+- Presentations: sharing a deck never waits for its PDF. The link is made and can be copied at once; the runtime keeps
+  the guests' PDF (`POST /design/deck/pdf`, a marker in `.media/pdf-auto`), builds it in the background, again a few
+  seconds after the deck stops changing, and publishes each build the usual way. The share sheet says how the PDF is
+  doing in one quiet line, and an open guest page offers the PDF as soon as it is there.
+- Telegram notifications through one shared bot: Settings → Notifications → «Connect Telegram» opens the bot with a
+  one-time code, Start links the person's chat, and agents write there with `harnessly notify send "<text>"` (no
+  `--bot`). The person has one instruction of when agents write, the same on all their machines; /stop in the bot or
+  «Disconnect» unlinks. The cloud's bot is reached through the machine agent (`POST /notify/call`, event `notify.call`,
+  op `notify.result`) and its token never reaches the machine; a self-hosted runtime may have its own installation bot
+  (`RUNTIME_NOTIFY_BOT_TOKEN`). Bots of the person's own by token are offered only while there is no shared bot,
+  unless `RUNTIME_NOTIFY_OWN_BOTS` is `on` (or `off`).
+- Design: the model of a presentation: settings in `meta/deck.json` with `deck-theme.css` written from them, speaker notes and
+  team and guest comments one file each, the deck, settings, notes, dictation-tidy, comments and company-template
+  (`.pptx` colours, fonts, layouts) routes, the deck lines of the agent's create prompt and guide, and
+  `harnessly design notes get|set`.
+- Presentations: exports of a deck as PDF (a page per slide), PNG pictures, PowerPoint (editable text, speaker notes) and
+  one offline HTML file, built as jobs with progress, one at a time per machine
+- Design: the deck's left panel (chat, notes, comments; docked, floating or a phone sheet), notes by voice, comments with pins,
+  a picked place and a held finger, guest comments beside the team's, and the slide as context of the chat.
+- Design: the contracts of presentations (projects of the kind `slides`): the deck's JSON shapes and files
+  (`meta/deck.json`, `meta/notes`, `meta/comments`, `.media/`, which the history leaves out), the `/design/deck/*`
+  routes (answering 501 until their parts land), `deck` settings and `attachmentIds` in `POST /api/v2/designly/create`,
+  and the page's deck readers, calls, board messages, store and texts. A deck still opens in the site view.
+- Design: a deck's recordings (chunks appended by sequence, events, finish, the transcript with pauses and fillers,
+  the montage, retakes where the last take wins) and the MP4 render of a recording with the camera circle, subtitles
+  and chapters, published for guests.
+- Design: hand edits of a slide are written into its board: `POST /design/deck/patch` finds the element by the engine's
+  `data-dc-tpl` (the same HTML parse, held against Chrome by a parity test), checks the text the page saw (409 when the
+  board changed, 422 for text the code fills), replaces only that text or `style` (a move is `translate` in `cqw`,
+  "back in place" removes it) and saves a history version named "Manual edit" («Правка вручную»). The board script
+  gets the deck bridge: in-place editing of plain texts, block hover, dragging free blocks with snapping, hit tests,
+  steps, the pointer, a touch hold that picks a place, and the deck's keys.
+- Design: a hand edit of a block's style, place or reset carries the fingerprint the board gave for it (source tag,
+  `style` and words) and lands only on that element, else it is refused as changed; a block inside its own size
+  container moves in `px` (`unit`), the rest in `cqw`. The Chrome parity test checks the fingerprints too.
+- Design: the Presentation tile of Designly's start opens a create screen (`/designly/new/slides`): the brief, files that
+  come along, a company .pptx whose colours, fonts and layouts are read as the deck's style, and the settings (length
+  5–45 min, slides, tone, prompter text) as a popover, or a bottom sheet on a phone.
+- Design: a deck's share popover (who opens it, how a link opens, comments, PDF, views) and its guest page: slides, full
+  screen or the recording with chapters, comments at a place on a slide, views reported per slide; the public index
+  carries `kind` and `deck`, and `__media/<file>` serves the published video and PDF with Range.
+- Design: a presentation opens in its own editor: the bar, the slide strip, the slide fitted to the stage, a frame and
+  a grip to move a block (with guides and a way back), the text toolbar, the notes as subtitles, the style and «More»
+  menus with downloads, and on a phone a dock to ask the agent and a sheet to edit a text above the slide.
+- Design: the show, record, done and montage scenes of a presentation (page side): the presenter's panel with the clock
+  and the pace, the prompter that follows the voice, the recorder that uploads 5-second chunks and events, the finished
+  recording's dialog and the transcript montage.
+- «Что нового»: after a release the page shows a card at the top once — two or three points in the person's words,
+  each with an icon, «Понятно» or Esc puts it away for good (remembered in this browser). It waits while «Вышла новая
+  версия» is up. A release adds its entry to `web/app/next/features/whats-new/releases.ts` and its texts to
+  `app/locales/<lang>/next-whats-new.json`; `?dev=whatsnew` shows the card.
+- Telegram notifications: in Settings → Notifications the person links any number of Telegram bots, each by its
+  @BotFather token, with a name and an instruction of when an agent should use it. A chat (private, group or channel)
+  is bound by a one-time code the person sends the bot with Start; the runtime finds it in the bot's updates. Agents
+  see the bound bots and their instructions in the system prompt of every Claude Code and Codex launch, list them with
+  `harnessly notify` and send with `harnessly notify send --bot NAME TEXT` (markdown-ish text as Telegram HTML, long
+  text split, at most 20 messages a minute per bot). The runtime keeps the tokens (`v2/notify-bots.json`, 0600) and
+  makes every call to Telegram; no answer to the page or the agents carries a token.
+- Design: the preview of the owner's own design records a timeline in the background (pages, clicks, scrolling, viewport,
+  tweaks, console errors, failed or slow requests, long tasks, dropped frames, web vitals) and the runtime keeps the last
+  six hours per design (at most 20000 events or 4 MB). Agents read it on demand with `design timeline` and
+  `design moment`; nothing is put into their context, nothing a person types is recorded, and guests record nothing.
+- A handoff can send the complete conversation history without putting it in the browser or command line. The runtime
+  streams it into a private provider-neutral file, gives the new agent a short first prompt that points to it, and
+  keeps that handoff ahead of messages sent while the new agent starts. Source account, model, session and machine
+  metadata do not cross the handoff boundary; private artifacts are removed after use and expire after a crash.
+- A non-retryable provider quota response now ends the turn immediately instead of leaving the CLI in a retry loop.
+  The chat shows one durable notice and waits for the person to choose another available model or profile; it never
+  resends the prompt or switches an account by itself. Transient 429 responses remain retryable.
 - Runtime: a message is never left waiting for ever. A typed message the agent does not take within 30 s goes back to
   the head of the queue as `queued{stalled}` (its text taken out of the agent's input box) and waits for the person's
   retry instead of a red failure or a bubble that spins; a steered message, held in Claude's own queue, is not touched.
@@ -28,9 +101,26 @@ All notable changes to this project are documented here. The format follows
   it at once, and a menu extends it by 7 days, changes what it allows or revokes it. The runtime answers the gateway
   at `design-public/<project>` (the board list, the project files, `support.js` of the project's release) for a
   60-second token only; hidden files, paths out of the project and symlinks out of it are not served.
+- The hub (`cmd/hub`, `docs/hub/`): sign-in for a team by email code, passkeys, GitHub, Yandex ID or any OpenID Connect
+  provider, spaces with invitations, and machines that connect outbound with a one-time code and are known by their
+  Ed25519 key. It serves the onboarding UI, the machine installer and the machine binaries, and carries each machine's
+  page over the agent's tunnel. SQLite by default, Postgres by a DSN. Deploy with `compose.hub.yaml`, the Helm chart in
+  `deploy/helm/harnessly-hub` or the systemd unit; see `docs/hub/deploy.md`.
+- On the machine: `harnessly-agent register`, `status`, `off`, `on` and `policy`; a local `policy.toml` and a kill
+  switch the hub cannot change; installs of Claude Code and Codex, sign-in to them by link, in a console or with a key
+  sealed in the browser, a provider network check and an optional proxy for agent launches; `deploy/install/install.sh`
+  with the `dir`, `container` and `full` profiles (`docs/hub/machine.md`).
 
 ### Changed
 
+- A runtime that listens beyond loopback and has no password and no `INIT_PASSWORD` makes a one-time initial password at
+  start and prints it once (`Initial password: …`), so the first visitor of a public host can no longer choose the
+  password. `RUNTIME_GENERATE_INIT_PASSWORD=1|0` forces it on or off; a runtime on `127.0.0.1` behaves as before.
+- The Docker image builds the page and the Go binaries on the builder's platform and cross-compiles, so a multi-arch image
+  is not built under emulation.
+- A completed goal leaves the composer but remains in the conversation history, where it can be continued explicitly.
+- Public Designly boards open in a clean guest tab and load versioned local vendor assets with ETag, gzip and private
+  caching instead of repeatedly transferring the full vendor payload.
 - The interface opens faster on a phone and typing in it no longer stutters. It comes as one file instead of about 80
   (124 requests at start become 42, which counts on HTTP/1.1), loads a single language, and the terminal, the right
   pane's tabs, sign-in and docs load when first opened. On an emulated iPhone 14 the home screen is ready in about 4 s
@@ -40,6 +130,19 @@ All notable changes to this project are documented here. The format follows
 - Enter pressed on the start page before the list of machines arrives waits and sends instead of being dropped.
 
 ### Fixed
+
+- Telegram notifications: a chat's title (set by whoever made the chat) reaches the agent as one quoted line of at most
+  64 characters, so it cannot add lines of its own to the agent's instructions.
+- A long link in the agent's reply stays inside the chat column: its chip is never wider than the column and the address
+  ends with an ellipsis.
+- Designly: «Обзор» (all devices side by side) is on the canvas like a single device: a drag of the empty area, the
+  wheel, a trackpad, Space or the middle button pan it, ⌘/Ctrl + wheel, a pinch and the zoom controls zoom it. It keeps
+  room at the bottom for a guest's list of comments, and that list sits inside the page in the window's frame instead
+  of on its edge.
+- A conversation keeps loading its transcript and older pages from its origin machine when another machine is selected;
+  switching the execution view no longer replaces existing Codex history with a false “not on this machine” error.
+- A required first handoff prompt keeps its private priority without pretending to be a steered message, so it remains
+  first after a failed launch while the visible queue and timeline preserve their normal FIFO order.
 
 - A message with a picture Claude does not show as «[Image #1]» in 8 s (5 s before) no longer fails try after try: it goes
   with the picture's path as text, path and text under one Enter, and Claude reads the file by its path.

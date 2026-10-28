@@ -12,6 +12,7 @@ import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-ac
 import { atLeast, claimOwnership, fetchAccess, isUnowned } from '@/next/features/designly/access/api';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
 import NoAccess from '@/next/features/designly/access/no-access';
+import ProjectAway from '@/next/features/designly/access/project-away';
 import {
   boardHref,
   fetchLibrary,
@@ -31,6 +32,7 @@ import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { toast } from '@/next/ui/toast';
 import { t } from '@/next/i18n';
 import { onOpenNotePage, takeNoteBoard } from '@/next/features/designly/open-note';
+import DesignlyDeck from '@/next/bindings/designly-deck';
 
 /** The slot the open design's page lives in; «open outside» takes the next one so the two do not fight. */
 const PAGE_SLOT = 1;
@@ -216,11 +218,20 @@ const DesignlySiteBody = ({
     }, step);
     return () => clearTimeout(timer);
   }, [missing, granted, attempt]);
+  // A project the gateway gives the person no place in, and no gateway at all, lead back to the library. One they have a
+  // place in but their library does not have after the waits stays on its own card (ProjectAway): it is somewhere else.
   useEffect(() => {
-    if (missing && gate.state.k !== ACCESS.loading && !turnedAway && (!granted || exhausted)) onMissing();
+    if (missing && gate.state.k !== ACCESS.loading && !turnedAway && !granted) onMissing();
     // onMissing is the host's; a new one each render must not run it again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missing, gate.state.k, turnedAway, granted, exhausted]);
+  }, [missing, gate.state.k, turnedAway, granted]);
+  /** Looks for the project again from the start: the waits run anew. */
+  const lookAgain = () => {
+    retries.current = 0;
+    setExhausted(false);
+    setLoadError(null);
+    setAttempt((n) => n + 1);
+  };
   // Opening the dialog asks the gateway again, quietly: a request that came in meanwhile shows up.
   useEffect(() => {
     if (shareOpen) gate.reload();
@@ -272,6 +283,7 @@ const DesignlySiteBody = ({
 
   // The slot opens for the page on screen at the time; the pages after it reuse it (see the effect on the path).
   const pathRef = useRef(path);
+  const hasPath = path !== null;
   useEffect(() => {
     pathRef.current = path;
   }, [path]);
@@ -309,8 +321,9 @@ const DesignlySiteBody = ({
     return () => {
       live = false;
     };
-    // The path is read once through the ref: a page switch inside an open slot must not open another.
-  }, [machine, port, id, reloadKey, reopen, pageSlot]);
+    // The path is read once through the ref: a page switch inside an open slot must not open another. A project that
+    // had no page yet (a deck whose agent is still making it) opens the slot when its first page comes.
+  }, [machine, port, id, reloadKey, reopen, pageSlot, hasPath]);
 
   /**
    * Called where the page on screen may change, with the page it will be (nothing changes when it is the same one).
@@ -368,7 +381,8 @@ const DesignlySiteBody = ({
   const gated = gate.state.k === ACCESS.ready ? gate.state.access : null;
   const shareButton = ((): ISiteAccess | undefined => {
     if (gated === null) return undefined;
-    if (gated.canManage) return { label: t('next.pane.designShare'), onOpen: () => setShareOpen(true) };
+    if (gated.canManage)
+      return { label: t('next.pane.designShare'), onOpen: () => setShareOpen(true), manage: true };
     if (gated.role === 'view' || gated.role === 'comment')
       return { label: t('next.access.askEdit'), onOpen: () => setShareOpen(true) };
     if (isUnowned(gated) && atLeast(gated.role, 'edit'))
@@ -376,19 +390,17 @@ const DesignlySiteBody = ({
     return undefined;
   })();
 
+  const back = pane ? pane.onBack : () => goTo({ kind: ROUTE.designly });
   if (gated !== null && gated.role === null) {
-    return (
-      <NoAccess
-        project={id}
-        access={gated}
-        onAsked={gate.apply}
-        onBack={pane ? pane.onBack : () => goTo({ kind: ROUTE.designly })}
-      />
-    );
+    return <NoAccess project={id} access={gated} onAsked={gate.apply} onBack={back} />;
   }
-  if (missing && project === null) return null;
+  if (missing && project === null && granted && exhausted) {
+    return <ProjectAway ownerName={gated?.ownerName ?? ''} onRetry={lookAgain} onBack={back} />;
+  }
 
-  if (loadError !== null && project === null) {
+  // Before the project is known (the library, the gateway's answer, the waits for a role just given) the design's
+  // frame stands with its loader, and a failed read says why with a retry: the screen is never empty.
+  if (project === null && (missing || loadError !== null)) {
     return (
       <SiteView
         title=""
@@ -396,7 +408,7 @@ const DesignlySiteBody = ({
         tabs={[]}
         tab=""
         src={null}
-        error={loadError}
+        error={missing ? null : loadError}
         reloadKey={0}
         onPickTab={() => undefined}
         onCloseTab={() => undefined}
@@ -406,10 +418,7 @@ const DesignlySiteBody = ({
         onReload={() => undefined}
         onOpenOutside={() => undefined}
         onCopyLink={() => undefined}
-        onRetry={() => {
-          setLoadError(null);
-          setAttempt((n) => n + 1);
-        }}
+        onRetry={lookAgain}
         onOpenDrawer={onOpenDrawer}
         onToggleMax={onToggleMax}
         maxed={maxed}
@@ -417,68 +426,101 @@ const DesignlySiteBody = ({
     );
   }
 
+  const navigate = (page: string) => {
+    refreshSlot(page);
+    updateTab((x) =>
+      x.hist[x.hi] === page ? x : { ...x, hist: [...x.hist.slice(0, x.hi + 1), page], hi: x.hi + 1 },
+    );
+  };
+
+  const site = (
+    <SiteView
+      key={id}
+      title={project?.design.title ?? ''}
+      pages={project ? pagesOf(project.design) : []}
+      tabs={tabs}
+      tab={current?.id ?? ''}
+      src={src}
+      plainSrc={plainSrc}
+      phoneUrl={isPublicAddress(shareUrl) ? shareUrl : null}
+      error={slotError}
+      reloadKey={reloadKey}
+      onPickTab={(picked) => {
+        const target = tabs.find((x) => x.id === picked);
+        refreshSlot(target?.hist[target.hi]);
+        setTab(picked);
+      }}
+      onCloseTab={(closing) => {
+        const at = tabs.findIndex((x) => x.id === closing);
+        const next = tabs.filter((x) => x.id !== closing);
+        setTabs(next);
+        if (closing === current?.id && next.length > 0) setTab(next[Math.max(0, at - 1)].id);
+      }}
+      onNewTab={(page) => {
+        refreshSlot(page);
+        const added = newTab(page);
+        setTabs((list) => [...list, added]);
+        setTab(added.id);
+      }}
+      onNavigate={navigate}
+      onHistory={(step) => {
+        refreshSlot(
+          current && current.hist[Math.max(0, Math.min(current.hist.length - 1, current.hi + step))],
+        );
+        updateTab((x) => ({ ...x, hi: Math.max(0, Math.min(x.hist.length - 1, x.hi + step)) }));
+      }}
+      onReload={() => setReloadKey((n) => n + 1)}
+      onOpenOutside={() => {
+        if (port === null || path === null) return;
+        openPreview(machine, { kind: 'port', port }, outsideSlot, boardHref(id, path)).then(
+          (slot) => window.open(slot.enterUrl, '_blank', 'noopener'),
+          (failure: Error) =>
+            toast(t('next.site.openFailed'), { tone: 'error', description: failure.message }),
+        );
+      }}
+      onCopyLink={copyLink}
+      onRetry={() => setReloadKey((n) => n + 1)}
+      onOpenDrawer={onOpenDrawer}
+      onToggleMax={onToggleMax}
+      maxed={maxed}
+      stage={stage}
+      pane={pane && { onShare: copyLink, chat: paneChat }}
+      access={shareButton}
+      devtools={{ machine, slot: slotOrigin, artifact: id }}
+      memoryKey={id}
+    />
+  );
+
   return (
     <>
-      <SiteView
-        key={id}
-        title={project?.design.title ?? ''}
-        pages={project ? pagesOf(project.design) : []}
-        tabs={tabs}
-        tab={current?.id ?? ''}
-        src={src}
-        plainSrc={plainSrc}
-        phoneUrl={isPublicAddress(shareUrl) ? shareUrl : null}
-        error={slotError}
-        reloadKey={reloadKey}
-        onPickTab={(picked) => {
-          const target = tabs.find((x) => x.id === picked);
-          refreshSlot(target?.hist[target.hi]);
-          setTab(picked);
-        }}
-        onCloseTab={(closing) => {
-          const at = tabs.findIndex((x) => x.id === closing);
-          const next = tabs.filter((x) => x.id !== closing);
-          setTabs(next);
-          if (closing === current?.id && next.length > 0) setTab(next[Math.max(0, at - 1)].id);
-        }}
-        onNewTab={(page) => {
-          refreshSlot(page);
-          const added = newTab(page);
-          setTabs((list) => [...list, added]);
-          setTab(added.id);
-        }}
-        onNavigate={(page) => {
-          refreshSlot(page);
-          updateTab((x) =>
-            x.hist[x.hi] === page ? x : { ...x, hist: [...x.hist.slice(0, x.hi + 1), page], hi: x.hi + 1 },
-          );
-        }}
-        onHistory={(step) => {
-          refreshSlot(
-            current && current.hist[Math.max(0, Math.min(current.hist.length - 1, current.hi + step))],
-          );
-          updateTab((x) => ({ ...x, hi: Math.max(0, Math.min(x.hist.length - 1, x.hi + step)) }));
-        }}
-        onReload={() => setReloadKey((n) => n + 1)}
-        onOpenOutside={() => {
-          if (port === null || path === null) return;
-          openPreview(machine, { kind: 'port', port }, outsideSlot, boardHref(id, path)).then(
-            (slot) => window.open(slot.enterUrl, '_blank', 'noopener'),
-            (failure: Error) =>
-              toast(t('next.site.openFailed'), { tone: 'error', description: failure.message }),
-          );
-        }}
-        onCopyLink={copyLink}
-        onRetry={() => setReloadKey((n) => n + 1)}
-        onOpenDrawer={onOpenDrawer}
-        onToggleMax={onToggleMax}
-        maxed={maxed}
-        stage={stage}
-        pane={pane && { onShare: copyLink, chat: paneChat }}
-        access={shareButton}
-        devtools={{ machine, slot: slotOrigin, artifact: id }}
-        memoryKey={id}
-      />
+      {project?.design.kind === 'slides' ? (
+        <DesignlyDeck
+          machine={machine}
+          id={id}
+          title={project.design.title}
+          boards={project.design.boards.map((b) => ({ path: b.path, title: b.title || b.path }))}
+          path={path}
+          onGo={navigate}
+          src={src}
+          frameSrc={(page) =>
+            opened !== null && opened.origin !== null
+              ? new URL(boardHref(id, page), opened.origin).href
+              : null
+          }
+          slotError={slotError}
+          onReload={() => setReloadKey((n) => n + 1)}
+          stage={stage}
+          pane={pane && { onBack: pane.onBack }}
+          access={shareButton}
+          maxed={maxed}
+          onToggleMax={onToggleMax}
+          onOpenDrawer={onOpenDrawer}
+          fallback={site}
+          onStale={() => setAttempt((n) => n + 1)}
+        />
+      ) : (
+        site
+      )}
       {gated !== null && (
         <ShareDialog
           open={shareOpen}
@@ -488,6 +530,7 @@ const DesignlySiteBody = ({
           access={gated}
           focus={accessFocus}
           onNext={gate.apply}
+          pages={project?.design.boards.map((b) => ({ path: b.path, title: b.title || b.path }))}
           onCopyLink={copyLink}
           onClaim={async () => {
             await claimOwnership(machine, id);

@@ -1,0 +1,62 @@
+# The harnessly hub as a systemd system service, for a server: the hub runs as its own unprivileged account, keeps its
+# data (SQLite, the SSH key) in /var/lib/harnessly-hub, and listens on loopback for a reverse proxy to publish
+# (docs/hub/deploy.md, "A server with Caddy"). Install by hand:
+#   useradd --system --no-create-home --home-dir /var/lib/harnessly-hub --shell /usr/sbin/nologin harnessly-hub
+#   make hub hub-dist                                                         # bin/hub with the page, bin/hub-dist for machines
+#   install -Dm755 bin/hub /usr/local/bin/harnessly-hub
+#   install -d /opt/harnessly && cp -r bin/hub-dist /opt/harnessly/dist
+#   install -Dm644 deploy/systemd/harnessly-hub.service /etc/systemd/system/harnessly-hub.service
+#   install -Dm600 deploy/systemd/hub.env.example /etc/harnessly/hub.env      # then edit it: HUB_PUBLIC_URL at least
+#   systemctl daemon-reload && systemctl enable --now harnessly-hub
+# `harnessly-hub check-config` (as the same user, with the same environment) says what a start would read, secrets left out.
+[Unit]
+Description=harnessly hub: sign-in, spaces and the machines people connect
+Documentation=https://github.com/ly-solutions/harnessly/blob/main/docs/hub/deploy.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=harnessly-hub
+Group=harnessly-hub
+# /var/lib/harnessly-hub, created and owned by the account above.
+StateDirectory=harnessly-hub
+StateDirectoryMode=0700
+Environment=HUB_LISTEN=127.0.0.1:8040
+Environment=HUB_DATA_DIR=/var/lib/harnessly-hub
+Environment=HUB_DIST_DIR=/opt/harnessly/dist
+EnvironmentFile=/etc/harnessly/hub.env
+# A bad setting stops the start with the reason in the journal instead of a half-working hub.
+ExecStartPre=/usr/local/bin/harnessly-hub check-config
+ExecStart=/usr/local/bin/harnessly-hub serve
+Restart=on-failure
+RestartSec=3
+# The hub ends its streams and agent links and closes the database within 20 seconds.
+TimeoutStopSec=30
+
+# The hub needs the network and its own data folder, and nothing else.
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

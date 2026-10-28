@@ -97,7 +97,7 @@ const SmallfeatsGallery = () => {
   return (
     <PortalContext value={portalRef}>
       <div className="hx-root hx-smallfeats hx-dock">
-        {goalState === 'met' && <GoalNote text={GOAL} />}
+        {goalState === 'met' && <GoalNote text={GOAL} onContinue={() => Promise.resolve()} />}
         <GoalBar
           goal={goalState === 'none' ? null : { text: GOAL, status: goalState, since: 1 }}
           onStop={() => Promise.resolve()}

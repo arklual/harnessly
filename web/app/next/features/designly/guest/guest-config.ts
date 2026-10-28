@@ -11,6 +11,14 @@ export interface IGuestBoard {
   h: number | null;
 }
 
+/** What the owner published of a deck (the runtime's index, passed through by the gateway). */
+export interface IGuestDeck {
+  /** The recording with its chapters (`page` is a board's id, `t` ms); null where there is none. */
+  video: { chapters: { page: string; title: string; t: number }[] } | null;
+  /** A PDF is published. */
+  pdf: boolean;
+}
+
 export interface IGuestConfig {
   v: 1;
   token: string;
@@ -20,9 +28,17 @@ export interface IGuestConfig {
   /** The look the owner shared (access/guest-view.ts), or null. */
   view: Record<string, unknown> | null;
   boards: IGuestBoard[];
+  /** What the project is: a deck opens as slides. Null from a gateway or runtime that does not say. */
+  kind: 'site' | 'slides' | 'ds' | null;
+  /** The deck's published recording and PDF; null for anything but a deck, and for a link that shows a snapshot or some pages. */
+  deck: IGuestDeck | null;
   /** Where the project's files are, with the trailing slash. */
   filesBase: string;
   commentsUrl: string;
+  /** Where the published recording and PDF are, with the trailing slash (`video.mp4`, `deck.pdf`). */
+  mediaBase: string;
+  /** Where the views of a board are reported. */
+  seenUrl: string;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -30,6 +46,33 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback);
 const size = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+const KINDS: readonly string[] = ['site', 'slides', 'ds'];
+
+const readDeck = (v: unknown): IGuestDeck | null => {
+  if (!isRecord(v)) return null;
+  let video: IGuestDeck['video'] = null;
+  if (isRecord(v.video)) {
+    const list = Array.isArray(v.video.chapters) ? v.video.chapters : [];
+    video = {
+      chapters: list.filter(isRecord).flatMap((c) => {
+        const at = size(c.t);
+        return typeof c.page === 'string' && c.page !== '' && at !== null && at >= 0
+          ? [{ page: c.page, title: str(c.title), t: at }]
+          : [];
+      }),
+    };
+  }
+  return { video, pdf: v.pdf === true };
+};
+
+/** The sibling of the files' address that holds the published media (`/s/<token>/f/` → `/s/<token>/m/`). */
+export const mediaBaseOf = (filesBase: string): string =>
+  filesBase.endsWith('/f/') ? `${filesBase.slice(0, -2)}m/` : './m/';
+
+/** The address views are reported to, beside the comments' (`…/comments` → `…/seen`). */
+export const seenUrlOf = (commentsUrl: string): string =>
+  commentsUrl.endsWith('/comments') ? `${commentsUrl.slice(0, -'comments'.length)}seen` : './seen';
 
 /** The config of the page, or null where there is none (the page was opened on its own). */
 export const readGuestConfig = (doc: Document = document): IGuestConfig | null => {
@@ -47,6 +90,8 @@ export const readGuestConfig = (doc: Document = document): IGuestConfig | null =
           h: size(b.h),
         }))
       : [];
+    const filesBase = str(parsed.filesBase, './f/');
+    const commentsUrl = str(parsed.commentsUrl);
     return {
       v: 1,
       token: str(parsed.token),
@@ -55,8 +100,12 @@ export const readGuestConfig = (doc: Document = document): IGuestConfig | null =
       expiresAt: typeof parsed.expiresAt === 'string' ? parsed.expiresAt : null,
       view: isRecord(parsed.view) ? parsed.view : null,
       boards: boards.filter((b) => b.path !== ''),
-      filesBase: str(parsed.filesBase, './f/'),
+      kind: KINDS.includes(str(parsed.kind)) ? (parsed.kind as IGuestConfig['kind']) : null,
+      deck: readDeck(parsed.deck),
+      filesBase,
       commentsUrl: str(parsed.commentsUrl),
+      mediaBase: mediaBaseOf(filesBase),
+      seenUrl: seenUrlOf(commentsUrl),
     };
   } catch {
     return null;

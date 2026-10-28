@@ -13,8 +13,14 @@ import AccessLog from '@/next/features/designly/access/access-log';
 import AccessPeople from '@/next/features/designly/access/access-people';
 import AccessRequests from '@/next/features/designly/access/access-requests';
 import AccessTransfer from '@/next/features/designly/access/access-transfer';
-import { atLeast, isUnowned, type IProjectAccess } from '@/next/features/designly/access/api';
+import {
+  atLeast,
+  isUnowned,
+  type IProjectAccess,
+  type TGuestRights,
+} from '@/next/features/designly/access/api';
 import { roleLabel } from '@/next/features/designly/access/labels';
+import type { IScopePage } from '@/next/features/designly/access/link-scope';
 import RequestForm from '@/next/features/designly/access/request-form';
 import ShareMenu, { SUB_VIEW, type TSubView } from '@/next/features/designly/access/share-menu';
 import { useAction } from '@/next/features/designly/access/use-action';
@@ -45,7 +51,17 @@ export interface IShareDialogProps {
   onCopyLink: () => void;
   /** The runtime takes the project for the person; resolves when the gateway knows the owner. */
   onClaim: () => Promise<void>;
+  /** The design's pages, for limiting a link without sign-in to some of them. */
+  pages?: readonly IScopePage[];
+  /** What the foot carries after the link buttons: a document made of a file puts its «Отвязать» here. */
+  footExtra?: ReactNode;
+  /** What a link without sign-in may allow; empty where there are no such links. Both by default. */
+  guestRights?: readonly TGuestRights[];
+  /** A block after «Общий доступ» for whoever manages: a document's old public link, while it is open. */
+  extra?: ReactNode;
 }
+
+const ALL_RIGHTS: readonly TGuestRights[] = ['view', 'comment'];
 
 /** A view leaves in this long (styles/design-access.css, .hx-acc-view--sub[data-state='closing']). */
 const VIEW_OUT_MS = 220;
@@ -108,6 +124,10 @@ const ShareDialog = ({
   onNext,
   onCopyLink,
   onClaim,
+  pages,
+  footExtra,
+  guestRights = ALL_RIGHTS,
+  extra,
 }: IShareDialogProps) => {
   const action = useAction();
   const me = useMe();
@@ -118,6 +138,7 @@ const ShareDialog = ({
   const idle = action.busy === null;
   const section = { project, access, action, onNext };
   const manages = access.canManage;
+  const links = guestRights.length > 0;
 
   // The dialog opens again on its main view (adjusted while rendering; a closing dialog keeps its view as it leaves).
   const [wasOpen, setWasOpen] = useState(open);
@@ -148,7 +169,7 @@ const ShareDialog = ({
       onClose={onClose}
       initialFocus={manages ? field : undefined}
       title={shareTitle}
-      actions={manages && <ShareMenu {...section} onView={go} />}
+      actions={manages && <ShareMenu {...section} links={links} onView={go} />}
     >
       <div className="hx-modal__body hx-acc-body" ref={body}>
         {manages ? (
@@ -158,6 +179,7 @@ const ShareDialog = ({
               <AccessRequests {...section} />
               <AccessPeople {...section} me={me.k === 'ready' ? me.me.email : null} />
               <AccessGeneral {...section} />
+              {extra}
             </div>
             {sub.value && (
               <div className="hx-acc-view hx-acc-view--sub" data-state={sub.state} inert={view === null}>
@@ -173,7 +195,9 @@ const ShareDialog = ({
                   <h3 className="hx-acc-back__title">{t(VIEW_TITLE[sub.value])}</h3>
                 </div>
                 {sub.value === SUB_VIEW.log && <AccessLog project={project} />}
-                {sub.value === SUB_VIEW.links && <AccessLinks {...section} />}
+                {sub.value === SUB_VIEW.links && (
+                  <AccessLinks {...section} pages={pages} guestRights={guestRights} />
+                )}
                 {sub.value === SUB_VIEW.transfer && <AccessTransfer {...section} onDone={() => go(null)} />}
               </div>
             )}
@@ -214,7 +238,7 @@ const ShareDialog = ({
             <Icon name="link" size="sm" />
             <span>{t('next.access.copyLink')}</span>
           </button>
-          {manages && (
+          {manages && links && (
             <Tooltip label={t('next.access.linkSettings')}>
               <button
                 type="button"
@@ -227,6 +251,7 @@ const ShareDialog = ({
               </button>
             </Tooltip>
           )}
+          {footExtra}
         </div>
         <button type="button" className="hx-btn" data-variant="primary" data-size="sm" onClick={onClose}>
           {t('next.access.done')}

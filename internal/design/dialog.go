@@ -8,8 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/attach"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
 // Locating a picked element, the design dialog an agent is started into, and the messages typed into an agent's
@@ -158,6 +160,36 @@ func ContinuePrompt(a *Artifact, task string) string {
 	return head + " Загрузи правила, посмотри доски и коротко скажи, что на них и что умеешь менять. Потом жди моих комментариев из панели."
 }
 
+// WordsAbove stands for the person's words in a task the agent reads under them: DialogMessage keeps the words out of
+// the block, so they are said once and the chat shows them as typed.
+func WordsAbove() string {
+	return locale.Pick("(the person's message above this block)", "(сообщение человека над этим блоком)")
+}
+
+// DialogMessage is a design dialog's first message: the person's words as the chat shows them, and under them, in the
+// design's <attached> block (internal/attach) that the page folds into the design's chip, everything the agent is
+// told besides — the head of ContinuePrompt, the project's task, and rules for an agent that takes no instruction
+// files. The transcript keeps the whole text, so the chat shows only the words after a reload too.
+func DialogMessage(a *Artifact, words, task, rules string) string {
+	words = jscompat.Trim(StripControlChars(words))
+	if words != "" {
+		lead := locale.Pick("The person's request is their message above this block.", "Просьба человека — его сообщение над этим блоком.")
+		if jscompat.Trim(task) == "" {
+			task = lead
+		} else {
+			task = lead + "\n\n" + task
+		}
+	}
+	body := ContinuePrompt(a, task)
+	if rules = jscompat.Trim(rules); rules != "" {
+		body = rules + "\n\n" + body
+	}
+	line := locale.Pick("Design \""+plain(a.Title, 120)+"\" of the library (id "+a.ID+"): what the agent is told for this conversation follows.",
+		"Макет «"+plain(a.Title, 120)+"» из библиотеки (id "+a.ID+"): ниже — указания агенту к этому диалогу.")
+	ref := wire.MessageRef{Kind: wire.RefDesign, ID: a.ID, Title: a.Title}
+	return attach.With(words, attach.Block([]attach.Item{{Ref: ref, Line: line, Body: body}}))
+}
+
 // writeContinueInstructions puts the instructions under the data dir, the only place the launcher takes system-prompt
 // files from.
 func (l *Library) writeContinueInstructions(a *Artifact) (string, error) {
@@ -195,8 +227,9 @@ type DialogResult struct {
 }
 
 // StartProjectDialog starts a new agent conversation in a project's folder, working the way the design tool does: it
-// edits the design in place and publishes nothing. resolveCwd is the launcher's check of the folder.
-func (a *API) StartProjectDialog(id, task string, resolveCwd func(requested string, roots []string) (string, error)) DialogResult {
+// edits the design in place and publishes nothing. words are the person's (what the chat shows), task what the agent
+// is told besides (see DialogMessage). resolveCwd is the launcher's check of the folder.
+func (a *API) StartProjectDialog(id, words, task string, resolveCwd func(requested string, roots []string) (string, error)) DialogResult {
 	l := a.L
 	if !IsLibraryID(id) {
 		return DialogResult{Status: 400, Error: locale.Pick("Unknown design", "Неизвестный макет")}
@@ -217,7 +250,7 @@ func (a *API) StartProjectDialog(id, task string, resolveCwd func(requested stri
 	if a.Launch == nil {
 		return DialogResult{Status: 503, Error: "the tab keeper is not running"}
 	}
-	res := a.Launch(LaunchRequest{Cwd: cwd, CwdRoots: []string{l.Root()}, Prompt: ContinuePrompt(art, task), PromptFiles: []string{instructions}})
+	res := a.Launch(LaunchRequest{Cwd: cwd, CwdRoots: []string{l.Root()}, Prompt: DialogMessage(art, words, task, ""), PromptFiles: []string{instructions}})
 	if !res.OK {
 		msg := res.Error
 		if t, ok := availabilityText[msg]; ok {

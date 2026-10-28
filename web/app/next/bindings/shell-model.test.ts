@@ -1,10 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { alertOf, cardOf, choiceOf, terminalRuns, terminalStopText } from '@/next/bindings/shell-model';
+import {
+  alertOf,
+  cardOf,
+  choiceOf,
+  oneListOf,
+  terminalRuns,
+  terminalStopText,
+} from '@/next/bindings/shell-model';
+import { movedKey } from '@/next/stores/central';
 import { applyMachineEvent } from '@/next/core/realtime/apply';
 import { pinLocale } from '@/next/i18n';
 import { MACHINE_HEALTH, MACHINE_TONE } from '@/next/features/sidebar/types';
 import { machinesStore, putMachines, type MachineView } from '@/next/stores/machines';
-import type { HealthIssue, Machine, MachineHealth } from '@/next/protocol/v2';
+import type { Conversation, HealthIssue, Machine, MachineHealth } from '@/next/protocol/v2';
 
 const view = (reach: Machine['reach'], runtime: MachineView['runtime']): MachineView => ({
   machine: {
@@ -153,5 +161,34 @@ describe("a chat's terminal", () => {
       terminalStopText({ state: { k: 'idle', since: 1 }, terminalStop: { at: 1, by: 'idle', idleMs: 1 } }),
     ).toBe(null);
     expect(terminalStopText({ state: { k: 'stopped', since: 1, resumable: true } })).toBe(null);
+  });
+});
+
+describe('the one list of every machine', () => {
+  const conv = (id: string, machineId: string) => ({ id, machineId }) as unknown as Conversation;
+
+  const list = [
+    conv('tab-a', 'runner-2'),
+    conv('tab-b', 'dev'),
+    conv('tab-c', 'runner-2'),
+    conv('tab-d', 'off'),
+  ];
+  const on = new Set(['runner-2', 'dev']);
+
+  it('keeps the chats of the machines the copy is on for and drops the ones continued elsewhere', () => {
+    const moved = new Set([movedKey('dev', 'tab-b')]);
+    expect(oneListOf(list, 'runner-2', { on, moved }).map((c) => c.id)).toEqual(['tab-a', 'tab-c']);
+    expect(
+      oneListOf(list, 'runner-2', { on, moved: new Set([movedKey('runner-2', 'tab-b')]) }).map((c) => c.id),
+    ).toEqual(['tab-a', 'tab-b', 'tab-c']);
+  });
+
+  it('a machine the copy is off for shows only when it is the one the person works on', () => {
+    expect(oneListOf(list, 'off', { on, moved: new Set() }).map((c) => c.id)).toEqual([
+      'tab-a',
+      'tab-b',
+      'tab-c',
+      'tab-d',
+    ]);
   });
 });

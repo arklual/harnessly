@@ -37,6 +37,18 @@ it stays with the previous runtime.
 | `AGENT_EXTRA_STATE_FILES` | — | more root files of the data directory to keep in step, comma-separated |
 | `AGENT_SCAN_MS` | `30000` | full transcript scan, the safety net under the file watcher |
 | `AGENT_VERSION` | build version | version the agent reports |
+| `AGENT_AUTH` | `auto` | `auto` signs the dial to a hub with the Ed25519 key when `AGENT_MACHINE_FILE` exists, else with the pair's secret (the closed-cluster way); `ed25519` and `hs256` force one |
+| `AGENT_MACHINE_FILE` | `$AGENT_DATA_DIR/machine.json` | this machine's registration with a hub: its id, the hub's address and its two private keys (0600) |
+| `AGENT_POLICY_FILE` | `/etc/harnessly/policy.toml` if it exists, else `~/.config/harnessly/policy.toml` | the local policy the hub cannot change |
+| `AGENT_ENV_DIR` | `$AGENT_DATA_DIR/agent-env` | the env files agent launches source: keys, delivered secrets, the proxy (the runtime reads the same variable) |
+| `AGENT_WORK_DIR` | `$RUNTIME_WORKSPACE_DIR`, else the home | the folder the agent's sign-in and status commands run in |
+
+Registered with a hub (`harnessly-agent register`), the agent dials it instead of a cluster: `AGENT_CLUSTER_URL` and
+`AGENT_RUNTIME_ID` are ignored, and the four `AGENT_RUNTIME_*` paths above start with the machine's base path
+(`/m/<id>/api/agent`, …) because the runtime serves its API under it. The commands `register`, `status`, `off`, `on` and
+`policy` read `AGENT_DATA_DIR`, `AGENT_MACHINE_FILE` and `AGENT_POLICY_FILE` from the environment, or from
+`/etc/harnessly/agent.env` / `~/.config/harnessly/agent.env` when the environment has none. Profiles, files, the policy
+and the kill switch are in [hub/machine.md](hub/machine.md).
 
 ## Runtime
 
@@ -56,7 +68,8 @@ it stays with the previous runtime.
 | `RUNTIME_CLI_TOKEN_HEADERS` | headers carrying the runtime's `cli-token` between the gate and the previous runtime |
 | `RUNTIME_PLATFORM_API` | prefix of the routes the platform's own pages call (default `/api/platform`) |
 | `RUNTIME_ACCESS_HOST` | the previous runtime's `HOST`: who may call the hook and agent routes (unset: the config's `networkAccess`; `HOST` itself is still read) |
-| `INIT_PASSWORD` | an initial password (4 characters or more) that guards the first-run setup: while no password is set, the page asks for it before it lets anyone choose one, and sign-in with it works until the real one is chosen. Unset, whoever opens the page first chooses the password ([deploy](deploy.md#the-first-visit)) |
+| `INIT_PASSWORD` | an initial password (4 characters or more) that guards the first-run setup: while no password is set, the page asks for it before it lets anyone choose one, and sign-in with it works until the real one is chosen. Unset, a runtime that listens beyond loopback makes a one-time one at start and prints it once (`Initial password: …` in its log); one on `127.0.0.1` leaves the first visitor to choose ([deploy](deploy.md#the-first-visit)) |
+| `RUNTIME_GENERATE_INIT_PASSWORD` | `1` makes the initial password at start even on loopback (a runtime behind a reverse proxy), `0` never does; unset decides by the listen address ([deploy](deploy.md#the-first-visit)) |
 | `HOST` | the hook route's network access rule, as the previous runtime read it (`localhost`, `tailscale`, `lan`, `all` or CIDRs, comma-separated); unset takes `networkAccess` of the runtime config (`localhost`, `tailscale` or `all`, default `all`) |
 | `RUNTIME_AGENT_TOKEN_HEADER` | header of the machine agent's loopback routes, for committing state to the cluster |
 | `RUNTIME_RELEASE_FILE` | the release file (`{"version", "commit"}`) the snapshot and `/api/health` report (unset: none; health then says `0.0.0-development`) |
@@ -72,6 +85,7 @@ it stays with the previous runtime.
 
 | Variable | Meaning |
 | --- | --- |
+| `AGENT_ENV_DIR` | the machine agent's env files (default `$AGENT_DATA_DIR/agent-env`): every Claude and Codex launch line, resume and the runtime's own side-chat and title calls get the variables in `all.env` and the provider's file |
 | `RUNTIME_TMUX_SOCKET`, `RUNTIME_TMUX_LEGACY_SOCKET` | the runtime's tmux servers (`-L`; default `harnessly`, no legacy one) |
 | `RUNTIME_SESSION_PREFIX`, `RUNTIME_LEGACY_SESSION_PREFIX` | tab session name prefixes (default `hs-`); a legacy one may live on either server |
 | `RUNTIME_TMUX_CONF` | the tmux.conf a new tmux server reads and is re-read after each new session (set but empty: tmux defaults; unset: none in front of the previous runtime, and standalone `tmux.conf` in the data directory, written with the status bar off when missing) |
@@ -112,6 +126,8 @@ it stays with the previous runtime.
 | `RUNTIME_UPLOAD_HEADER_PREFIXES` | prefixes of an upload's headers (`<prefix>filename` and the like), the current one first, comma-separated (default `x-harnessly-`) |
 | `RUNTIME_SESSION_MEMORY_DIRS` | folders whose `<entry>/memory` hold synced copies of memory notes, comma-separated (Claude Code's `projects` is always read) |
 | `RUNTIME_SECRET_CONFIG_DIRS` | home-relative folders holding credentials (`.config/<app>`), refused by the viewer like `.ssh`, comma-separated |
+| `RUNTIME_SECRETS_KEY_FILE` | the safe's key (32 bytes, created on the first secret): default `$XDG_STATE_HOME/harnessly/safe.key`, else `~/.local/state/harnessly/safe.key`, outside the data folder ([the safe](safe.md)) |
+| `RUNTIME_SECRETS_FILES_DIR` | where `harnessly secret file` writes its short-lived files (default `/dev/shm`, else the system temp folder; a `harnessly-safe-<uid>` folder inside) |
 | `RUNTIME_DATA_DIR_LABEL` | how messages name the data folder (default `~/` and its path under the home) |
 | `RUNTIME_CHECKPOINT_NAMESPACE`, `RUNTIME_CHECKPOINT_TMP_TAG` | the turn checkpoints' git refs (`refs/<ns>/checkpoints/`, `refs/<ns>/saved/`) and author (`<ns>@localhost`), default `harnessly`; and the tag of the files a rewind stages (`<file>.<tag>-<hex>.tmp`, default `hs`) |
 
@@ -125,6 +141,9 @@ it stays with the previous runtime.
 | `RUNTIME_GITLAB_API_ORIGIN` | for tests: the origin the GitLab API is read from instead of `https://<host>` |
 | `RUNTIME_TRACKER_URL`, `RUNTIME_TRACKER_HOSTS`, `RUNTIME_TRACKER_KEYS` | the issue tracker's origin, the hosts its issue links use (comma-separated) and its project keys (comma-separated; unset: the alternatives of `RUNTIME_TASK_KEY_RE` when it is the plain `^(KEY\|KEY)-…` form), by which the conversation sources tell issues apart |
 | `RUNTIME_ICON_USER_AGENT` | the User-Agent of site icon requests |
+| `RUNTIME_NOTIFY_BOT_TOKEN` | a self-hosted installation's own shared Telegram bot: the runtime reads its messages (a /start with the one-time code links the person's chat, /stop forgets it) and sends through it. Unset: the cloud's shared bot through the machine agent, if the cloud has one |
+| `RUNTIME_NOTIFY_OWN_BOTS` | bots of the person's own by token in Settings → Notifications: `auto` (default) only while there is no shared bot, `on` always, `off` never |
+| `RUNTIME_TELEGRAM_API_URL` | Telegram's Bot API (default `https://api.telegram.org`), for a proxy or a test |
 | `RUNTIME_ORGANIZER_FILE` | the person's organizer (projects, which project a conversation belongs to, pins), a JSON file (unset: those routes stay with the previous runtime) |
 | `GITLAB_SELF_TOKEN`, `GITLAB_TOKEN`, `YOUTRACK_TOKEN` | the person's tokens the `services` slice calls with: the first of `RUNTIME_GITLAB_HOSTS`, any other GitLab, the tracker; when unset, read from a file (`gitlab-self-token`; `gitlab-token` or `glab-token`; `youtrack-token`) in one of the `RUNTIME_SECRET_CONFIG_DIRS` of the home |
 
@@ -163,15 +182,18 @@ it stays with the previous runtime.
 | `RUNTIME_DESIGN_HISTORY_DIR` | where the boards' private history repositories live (default the data directory) |
 | `RUNTIME_DESIGN_KITS_DIR` | where UI kits are installed by version (`<dir>/<id>/<version>/`), served by the library server at `/kit/<id>/<version>/<file>`; default `design-kits` in the data folder. Install with `harnessly design kit install` |
 | `RUNTIME_DESIGN_KIT_ORIGINS` | comma-separated origins (`https://host[:port]`) of pages that show boards: they may read kit files across origins, frame the library server's pages (its `frame-ancestors` names them besides itself and loopback) and talk to the board script; the library server's own loopback origins always may, any other origin gets no CORS header. Boards shown through a preview slot get the slot's own `frame-ancestors`. Default empty |
-| `RUNTIME_DESIGN_RELEASES_DIR` | a checkout of a design-upstream mirror: its `releases.json` lists the releases of the board format (Claude Design) with their engines and status; a project with `meta/` gets its release's engine (`"release"` in `meta/project.json`, default `legacy`) as `support.js`, new projects start on the newest stable one, and the panel offers newer stable releases. Unset: every project is served its own `support.js` as before |
+| `RUNTIME_DESIGN_RELEASES_DIR` | a checkout of a design-upstream mirror: its `releases.json` lists the releases of the board format (Claude Design) with their engines and status; a project with `meta/` gets its release's engine (`"release"` in `meta/project.json`, default `legacy`) as `support.js`, new projects start on the newest stable one, and the panel offers newer stable releases. Unset: the engine folder of this machine (`RUNTIME_DESIGN_ENGINE_DIR`), which `harnessly design engine fetch` keeps as such a mirror |
 | `RUNTIME_DESIGN_LIBRARY_PORT` | the library server's preferred loopback port |
-| `RUNTIME_DESIGN_CHROME` | the headless browser a check drives (unset: the usual places) |
+| `RUNTIME_DESIGN_ENGINE_DIR` | where the board engine fetched with the owner's own account is kept, laid out as a releases mirror (default `design-engine` in the data folder); see [the board engine](design-engine.md) |
+| `RUNTIME_DESIGN_CHROME` | the headless browser a check drives (unset: the usual places, then `chromium`, `google-chrome` and the like on `PATH`) |
+| `RUNTIME_DESIGN_CHROME_ARGS` | extra switches for that browser, space separated (the container image sets `--no-sandbox`) |
+| `RUNTIME_DESIGN_FFMPEG` | the ffmpeg of video exports and recordings (unset: `ffmpeg` on `PATH`) |
 | `RUNTIME_CLI_NAME` | the command agents are told to run (`<cli> design check …`, the DevTools hints; default `harnessly`) |
 | `RUNTIME_DESIGN_TAG`, `RUNTIME_DESIGN_HISTORY_EMAIL` | what this runtime writes into shared places (the history's author and markers, a check's temporary profile; default `harnessly-design`) and the history's author address (default `design@localhost`) |
 | `RUNTIME_DESIGN_SHARED_DIR` | the team's shared library on the machines, named in the library's rules file (default `/srv/design`) |
 | `RUNTIME_DESIGN_KIT_GLOBAL`, `RUNTIME_DESIGN_PAGES_GLOBAL`, `RUNTIME_DESIGN_ARGS_GLOBAL` | the window globals of a project's UI kit, its page renderer and the renderer's arguments (default `DesignKit`, `DesignPages`, `__DESIGN_ARGS`) |
 | `RUNTIME_DESIGN_CANVAS_KEY` | the key of a project's `project/canvas.json` under which the runtime keeps its page data (ids, routes); default `harnessly` (see [design pages](design-pages.md)) |
-| `RUNTIME_DESIGN_ENGINE_FILE` | the board engine (`support.js`) a new project gets when the library has no `.template/`; unset: the copy shipped with the runtime |
+| `RUNTIME_DESIGN_ENGINE_FILE` | the board engine (`support.js`) a new project gets when the library has no `.template/`; unset: the engine of the release new projects start on; none is shipped with the runtime (see [the board engine](design-engine.md)) |
 | `RUNTIME_PEOPLE` | names a claim shows, by the local part of the owner's address: `local=Name,local2=Name2` |
 
 ### Preview proxy
@@ -194,6 +216,13 @@ it stays with the previous runtime.
 | --- | --- |
 | `RUNTIME_VOICE_SOCKET` | the machine's speech recognition service, a Unix socket (default `/run/harnessly-voice/asr.sock`) |
 | `RUNTIME_VOICE_FFMPEG_BIN` | ffmpeg's absolute path (unset: the usual places) |
+| `RUNTIME_VOICE_ENGINE` | `off` keeps the built-in speech recognition from starting ([voice.md](voice.md)) |
+| `RUNTIME_VOICE_MODEL` | the built-in engine's model: `tiny`, `base` or `small` (unset: `small` from 4 processors up, `base` below) |
+| `RUNTIME_VOICE_MODEL_FILE` | a ggml model file of your own for the built-in engine (no download, no checksum) |
+| `RUNTIME_VOICE_WHISPER_BIN` | a `whisper-server` of your own for the built-in engine |
+| `RUNTIME_VOICE_THREADS` | processors the built-in engine may use (default: up to 4) |
+| `RUNTIME_VOICE_DOWNLOAD` | `off` never touches the network: only files that are already in place are used |
+| `RUNTIME_VOICE_PREFETCH` | `1` fetches the model when the runtime starts, not at the first dictation |
 
 ### Environment of the process
 
@@ -226,6 +255,8 @@ the previous runtime the pages are someone else's and the gate leaves those path
 
 | Variable | Meaning |
 | --- | --- |
+| `RUNTIME_UPDATE_CHECK` | `0` (or `off`, `false`) turns off the check for a new release; see [updates](deploy.md#updates). A runtime a hub carries and a `dev` build never check |
+| `RUNTIME_UPDATE_CHECK_URL` | the address of the latest-release check (default: the project's GitHub releases API); for a mirror or a test |
 | `RUNTIME_WEB` | `on` serves the page in front of the previous runtime too, `off` never; unset: standalone only |
 | `RUNTIME_WEB_DIR` | a built page (`web/dist`) to serve instead of the one compiled in (`-tags webui`); without either there is no page; its files go out gzipped to browsers that accept it |
 Every page variable below is read the same way by `runtime web export <dir>`: it writes the page this runtime would serve
@@ -238,10 +269,11 @@ can serve the same build while the machine behind it is down.
 | `RUNTIME_DESIGN_NAME` | the design tool's name in the page's texts: sidebar, pane, tab, hints (default `Designly`) |
 | `RUNTIME_APP_MARK_URL` | the URL of the product mark the page shows in place of the harnessly one and gives the browser as the tab icon (default: the harnessly mark) |
 | `RUNTIME_LOCALE` | the page's and the API's language: `en` (default) or `ru` |
-| `RUNTIME_WEB_FEATURES` | optional parts of the page, comma separated: `chats` (plain chats through an OpenWebUI next to the runtime), `efficiency` (the team report), `vault` (the password safe), `design` (Claude Design boards); none by default. Unknown names, including the retired `next-ui`, are ignored |
+| `RUNTIME_WEB_FEATURES` | optional parts of the page, comma separated: `chats` (plain chats through an OpenWebUI next to the runtime), `efficiency` (the team report), `vault` (the password safe), `design` (the design library tab of the old panel); none by default. Unknown names, including the retired `next-ui`, are ignored |
 | `RUNTIME_WEB_COPY_FILE` | a JSON file of product copy the page uses instead of its defaults (welcome line, suggested first prompts) |
 | `RUNTIME_PEOPLE` | `login=Name` pairs, comma separated: display names of the people of this installation (greeting, statistics, mentions) |
 | `RUNTIME_PANE_HOSTS` | extra hosts whose pages the side pane's browser tab may open |
+| `RUNTIME_HUB_URL` | the public address of the [hub](hub/machine.md) that carries this runtime (the installer sets it); the page gets it as `hubUrl`. It also closes the first-run password setup (the hub signs people in) and lets the machine agent open a login console at `<base>/console/<id>` |
 | `RUNTIME_SPEED_POSTHOG_HOST`, `RUNTIME_SPEED_POSTHOG_KEY` | a PostHog project the page reports its own speed to (load, long tasks); unset: nothing is sent |
 
 The runtime writes these into the page as `<meta name="hl-config">` when it serves `index.html`, together with the

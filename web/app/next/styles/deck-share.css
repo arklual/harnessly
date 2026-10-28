@@ -1,0 +1,29 @@
+/* The deck's «Поделиться» (deck/deck-share.tsx): the people block — the add field of the share dialog and who has a
+   role — sits in the popover's narrow column; the popover scrolls when the list is long. */
+.hx-deck-share {
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hx-deck-share__people {
+  display: grid;
+  gap: 10px;
+}
+.hx-deck-share__people .hx-acc-field {
+  height: 38px;
+  padding-left: 12px;
+  border-radius: 10px;
+}
+.hx-deck-share__people .hx-acc-sec {
+  margin-top: 2px;
+}
+.hx-deck-share__people .hx-acc-row {
+  padding-left: 0;
+  padding-right: 0;
+}
+/* Three long words share the popover's width on a phone: each takes its part and never pushes past the edge. */
+.hx-deck-share__seg button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

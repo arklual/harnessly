@@ -17,6 +17,8 @@ import PeerNotes from '@/next/features/chat/peer-note';
 import SystemNote, { SYSTEM_NOTE } from '@/next/features/chat/system-note';
 import { parsePeerOut } from '@/next/features/chat/peer';
 import { PeerOutStep } from '@/next/features/chat/peer-card';
+import { parseAskCall } from '@/next/features/asks/parse';
+import { AskStep } from '@/next/features/asks/ask-step';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { useSeen } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
@@ -248,7 +250,40 @@ export const isWorkflowCall = (entry: Entry): entry is ToolEntry & { tool: 'Work
 const peerOutOf = (entry: ToolEntry) =>
   parsePeerOut(entry.tool, entry.summary, entry.ok, entry.output?.text ?? null);
 
-export const groupSteps = (steps: Entry[], live: boolean): TStepNode[] => {
+/** A question of the agent to a person (`harnessly ask`): its card, not a line among the tools. */
+const askCallOf = (entry: ToolEntry) => parseAskCall(entry.tool, entry.summary, entry.output?.text ?? null);
+
+/**
+ * One tool call is one step, however many entries carry its id (a transcript that logs the call again): the step stays
+ * where the call first stood and takes what the later entry knows (the result), so no copy keeps spinning.
+ */
+export const dedupeTools = (steps: Entry[]): Entry[] => {
+  const first = new Map<string, number>();
+  const out: Entry[] = [];
+  for (const entry of steps) {
+    if (entry.t !== 'tool' || entry.toolUseId === '') {
+      out.push(entry);
+      continue;
+    }
+    const at = first.get(entry.toolUseId);
+    const kept = at === undefined ? undefined : out[at];
+    if (at === undefined || kept?.t !== 'tool') {
+      first.set(entry.toolUseId, out.length);
+      out.push(entry);
+      continue;
+    }
+    out[at] = {
+      ...kept,
+      ok: entry.ok ?? kept.ok,
+      output: entry.output ?? kept.output,
+      summary: kept.summary || entry.summary,
+    };
+  }
+  return out;
+};
+
+export const groupSteps = (rawSteps: Entry[], live: boolean): TStepNode[] => {
+  const steps = dedupeTools(rawSteps);
   const out: TStepNode[] = [];
   let run: ToolEntry[] = [];
   const flush = (last: boolean) => {
@@ -263,7 +298,7 @@ export const groupSteps = (steps: Entry[], live: boolean): TStepNode[] => {
       return;
     }
     // A message to another agent stays in view: it is not folded into «K actions».
-    if (entry.t === 'tool' && !peerOutOf(entry)) {
+    if (entry.t === 'tool' && !peerOutOf(entry) && !askCallOf(entry)) {
       run.push(entry);
       return;
     }
@@ -296,7 +331,9 @@ const Step = ({ entry, renderGate }: { entry: Entry; renderGate?: (permissionId:
       return <Think entry={entry} />;
     case 'tool': {
       const out = peerOutOf(entry);
-      return out ? <PeerOutStep out={out} /> : <ToolStep entry={entry} />;
+      if (out) return <PeerOutStep out={out} />;
+      const ask = askCallOf(entry);
+      return ask ? <AskStep call={ask} ran={entry.ok !== false} /> : <ToolStep entry={entry} />;
     }
     case 'compaction':
       return <Compaction entry={entry} />;

@@ -31,6 +31,13 @@ func (h *v2Handoff) Draft(ctx context.Context, conv string, req wire.HandoffDraf
 		}
 		return d, err
 	}
+	if req.Mode == wire.DraftHistory {
+		d, err := h.rt.History(conv)
+		if errors.Is(err, convo.ErrNoTranscript) || errors.Is(err, handoff.ErrNoCompleteHistory) {
+			return d, wire.ErrDraftUnsupported
+		}
+		return d, err
+	}
 	rec, ok := h.rt.Record(conv)
 	if !ok {
 		return wire.HandoffDraft{}, convo.ErrNotFound

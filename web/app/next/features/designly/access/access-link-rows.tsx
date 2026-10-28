@@ -1,7 +1,13 @@
 // The rows of «Ссылки»: a link without sign-in (copy again, a menu to extend, to change what it allows and to revoke) and
 // an invite link (revoke only: its address is given when it is made). Each says who it opens for.
 import { useState } from 'react';
-import type { IGuestLink, IInvite, TGuestRights, TTtlValue } from '@/next/features/designly/access/api';
+import {
+  GUEST_VERSION,
+  type IGuestLink,
+  type IGuestLinkChange,
+  type IInvite,
+  type TGuestRights,
+} from '@/next/features/designly/access/api';
 import { copyText } from '@/next/features/designly/access/copy-link';
 import { canLabel, untilLabel } from '@/next/features/designly/access/labels';
 import { dayLabel, ttlLabel } from '@/next/features/designly/access/ttl-picker';
@@ -38,12 +44,23 @@ interface IRowProps {
   leaving: boolean;
   idle: boolean;
   now: number;
-  onGuestChange: (link: IGuestLink, change: { ttl?: TTtlValue; rights?: TGuestRights }) => void;
+  onGuestChange: (link: IGuestLink, change: IGuestLinkChange) => void;
   onGuestRevoke: (link: IGuestLink) => void;
   onInviteRevoke: (invite: IInvite) => void;
+  /** False for a document's link: its term and rights are not changed in place, only revoked. */
+  editable?: boolean;
 }
 
-const LinkRow = ({ item, leaving, idle, now, onGuestChange, onGuestRevoke, onInviteRevoke }: IRowProps) => {
+const LinkRow = ({
+  item,
+  leaving,
+  idle,
+  now,
+  onGuestChange,
+  onGuestRevoke,
+  onInviteRevoke,
+  editable = true,
+}: IRowProps) => {
   const [open, setOpen] = useState(false);
   const label = t('next.access.guest.actions');
   const pick = (run: () => void) => {
@@ -78,16 +95,18 @@ const LinkRow = ({ item, leaving, idle, now, onGuestChange, onGuestRevoke, onInv
       </span>
       {guest && (
         <>
-          <button
-            type="button"
-            className="hx-btn"
-            data-variant="ghost"
-            data-size="sm"
-            disabled={leaving}
-            onClick={() => void copied(copyText(Promise.resolve(guest.url)))}
-          >
-            {t('next.access.copy')}
-          </button>
+          {guest.url !== '' && (
+            <button
+              type="button"
+              className="hx-btn"
+              data-variant="ghost"
+              data-size="sm"
+              disabled={leaving}
+              onClick={() => void copied(copyText(Promise.resolve(guest.url)))}
+            >
+              {t('next.access.copy')}
+            </button>
+          )}
           <Popover
             open={open}
             onOpenChange={setOpen}
@@ -102,26 +121,42 @@ const LinkRow = ({ item, leaving, idle, now, onGuestChange, onGuestRevoke, onInv
             }
           >
             <div role="menu" aria-label={label} className="hx-acc-menu">
-              <button
-                type="button"
-                role="menuitem"
-                className="hx-acc-mi"
-                disabled={!idle}
-                onClick={() => pick(() => onGuestChange(guest, { ttl: EXTEND }))}
-              >
-                <Icon name="clock" size="sm" className="hx-acc-mi__icon" />
-                <span className="hx-acc-mi__text">{t('next.access.guest.extend')}</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="hx-acc-mi"
-                disabled={!idle}
-                onClick={() => pick(() => onGuestChange(guest, { rights: other }))}
-              >
-                <span className="hx-acc-mi__text">{t(`next.access.guest.make.${other}`)}</span>
-              </button>
-              <span className="hx-acc-mi__sep" role="separator" />
+              {editable && (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="hx-acc-mi"
+                    disabled={!idle}
+                    onClick={() => pick(() => onGuestChange(guest, { ttl: EXTEND }))}
+                  >
+                    <Icon name="clock" size="sm" className="hx-acc-mi__icon" />
+                    <span className="hx-acc-mi__text">{t('next.access.guest.extend')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="hx-acc-mi"
+                    disabled={!idle}
+                    onClick={() => pick(() => onGuestChange(guest, { rights: other }))}
+                  >
+                    <span className="hx-acc-mi__text">{t(`next.access.guest.make.${other}`)}</span>
+                  </button>
+                  {guest.version === GUEST_VERSION.pinned && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="hx-acc-mi"
+                      disabled={!idle}
+                      onClick={() => pick(() => onGuestChange(guest, { refresh: true }))}
+                    >
+                      <Icon name="refresh-cw" size="sm" className="hx-acc-mi__icon" />
+                      <span className="hx-acc-mi__text">{t('next.access.guest.refresh')}</span>
+                    </button>
+                  )}
+                </>
+              )}
+              {editable && <span className="hx-acc-mi__sep" role="separator" />}
               <button
                 type="button"
                 role="menuitem"

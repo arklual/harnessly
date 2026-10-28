@@ -42,8 +42,8 @@ services:
       RUNTIME_PREVIEW_LISTEN: 0.0.0.0:${HARNESSLY_PREVIEW_PORT:-8023}
       RUNTIME_PREVIEW_PUBLIC_ORIGINS: ${HARNESSLY_PREVIEW_PUBLIC_ORIGINS:-}
       RUNTIME_OWNER_NAME: ${HARNESSLY_OWNER_NAME:-}
-      # Whoever opens the page first sets the password, unless INIT_PASSWORD is set: then that password signs in
-      # to the setup, and only after it can the real one be chosen.
+      # The initial password that signs in to the setup, after which the real one is chosen. Empty: the runtime makes one
+      # at start and prints it (docker compose logs harnessly | grep -i password).
       INIT_PASSWORD: ${INIT_PASSWORD:-}
       RUNTIME_BOARDS_URL: *boards-url
       RUNTIME_BOARDS_TOKEN: ${BOARDS_RUNTIME_TOKEN:-local-boards-runtime-token}

@@ -28,7 +28,8 @@ const (
 func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 	if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
 		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if r.URL.RequestURI() != ListenPath || !ok || token == "" || VerifyHS256(a.secret, token, a.cfg.ListenAudience, time.Now()) != nil {
+		secret := a.sessionSecret()
+		if r.URL.RequestURI() != ListenPath || !ok || token == "" || secret == nil || VerifyHS256(secret, token, a.cfg.ListenAudience, time.Now()) != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -41,6 +42,14 @@ func (a *Agent) handler(w http.ResponseWriter, r *http.Request) {
 	}
 	if a.localToken != "" && r.Method == http.MethodPost && (r.URL.RequestURI() == "/docs/bind" || r.URL.RequestURI() == "/docs/reply") {
 		a.docRoute(w, r)
+		return
+	}
+	if a.localToken != "" && r.Method == http.MethodPost && (r.URL.RequestURI() == "/docs/publish" || r.URL.RequestURI() == "/docs/acl") {
+		a.docRelayRoute(w, r)
+		return
+	}
+	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == "/notify/call" {
+		a.notifyRoute(w, r)
 		return
 	}
 	if a.localToken != "" && r.Method == http.MethodPost && r.URL.RequestURI() == "/design/event" {
@@ -121,7 +130,7 @@ func (a *Agent) dialOnce(ctx context.Context, pause *time.Duration) time.Duratio
 		u.Path = DialPath
 	}
 	header := http.Header{}
-	header.Set("Authorization", "Bearer "+SignHS256(a.secret, a.cfg.RuntimeID, a.cfg.DialAudience, 5*time.Minute))
+	header.Set("Authorization", "Bearer "+SignHS256(a.sessionSecret(), a.cfg.RuntimeID, a.cfg.DialAudience, 5*time.Minute))
 	dialCtx, cancel := context.WithTimeout(ctx, dialHandshake)
 	conn, res, err := websocket.Dial(dialCtx, u.String(), &websocket.DialOptions{HTTPHeader: header, CompressionMode: websocket.CompressionDisabled})
 	cancel()
@@ -147,38 +156,46 @@ func (a *Agent) dialOnce(ctx context.Context, pause *time.Duration) time.Duratio
 	// Liveness: a ping every 15 s; 45 s without a pong or a message and the link is dropped.
 	heard := make(chan struct{}, 1)
 	done := make(chan struct{})
-	go func() {
-		last := time.Now()
-		t := time.NewTicker(dialPing)
-		defer t.Stop()
-		for {
-			select {
-			case <-done:
-				return
-			case <-heard:
-				last = time.Now()
-			case <-t.C:
-				if time.Since(last) > dialSilent {
-					conn.CloseNow()
-					return
-				}
-				go func() {
-					pctx, cancel := context.WithTimeout(ctx, dialSilent)
-					defer cancel()
-					if conn.Ping(pctx) == nil {
-						select {
-						case heard <- struct{}{}:
-						default:
-						}
-					}
-				}()
-			}
-		}
-	}()
+	go keepAlive(ctx, conn, heard, done)
 	err = a.serve(conn, heard)
 	close(done)
 	if websocket.CloseStatus(err) == closeSwitchedOff {
 		return time.Minute
 	}
 	return 0
+}
+
+// keepAlive pings the link every dialPing and drops it after dialSilent without a word from the other end. It returns
+// when done closes.
+func keepAlive(ctx context.Context, conn *websocket.Conn, heard chan struct{}, done <-chan struct{}) {
+	last := time.Now()
+	t := time.NewTicker(dialPing)
+	defer t.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ctx.Done():
+			// The agent is stopping: let go of the hub now, not when it next fails to answer.
+			conn.CloseNow()
+			return
+		case <-heard:
+			last = time.Now()
+		case <-t.C:
+			if time.Since(last) > dialSilent {
+				conn.CloseNow()
+				return
+			}
+			go func() {
+				pctx, cancel := context.WithTimeout(ctx, dialSilent)
+				defer cancel()
+				if conn.Ping(pctx) == nil {
+					select {
+					case heard <- struct{}{}:
+					default:
+					}
+				}
+			}()
+		}
+	}
 }

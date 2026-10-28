@@ -35,6 +35,9 @@ type pageConfig struct {
 	UploadHeaderPrefix string            `json:"uploadHeaderPrefix"`
 	GithubHost         string            `json:"githubHost"`
 	Copy               map[string]any    `json:"copy,omitempty"`
+	// HubURL is the public address of the hub this machine is connected to (RUNTIME_HUB_URL), without a trailing slash;
+	// null for a runtime no hub carries. The page links back to the hub and signs out there.
+	HubURL *string `json:"hubUrl"`
 }
 
 // list is never null in the JSON: the page reads these as arrays.
@@ -54,8 +57,8 @@ func optional(v string) *string {
 }
 
 // pageFeatures are the optional parts of the page (RUNTIME_WEB_FEATURES, comma separated): chats (an OpenWebUI next to
-// the runtime), efficiency (the team report), vault (the password safe), design (Claude Design boards). Other names,
-// next-ui among them (the switch to the new interface, which is the only interface now), are ignored.
+// the runtime), efficiency (the team report), vault (the password safe), design (the design library tab of the old
+// panel). Other names, next-ui among them (the switch to the new interface, which is the only interface now), are ignored.
 func pageFeatures(list string) map[string]bool {
 	out := map[string]bool{"chats": false, "efficiency": false, "vault": false, "design": false}
 	for _, name := range splitList(list) {
@@ -73,7 +76,7 @@ func pageConfigFromEnv() pageConfig {
 	}
 	c := pageConfig{
 		ProductName:       env("RUNTIME_APP_NAME", "harnessly"),
-		DesignName:        env("RUNTIME_DESIGN_NAME", "Designly"),
+		DesignName:        env("RUNTIME_DESIGN_NAME", "Sinopia Design"),
 		MarkURL:           optional(os.Getenv("RUNTIME_APP_MARK_URL")),
 		Locale:            env("RUNTIME_LOCALE", "en"),
 		ArtifactsURL:      optional(env("RUNTIME_ARTIFACTS_URL", docsOrigin)),
@@ -91,6 +94,7 @@ func pageConfigFromEnv() pageConfig {
 		Features:          pageFeatures(os.Getenv("RUNTIME_WEB_FEATURES")),
 	}
 	c.GithubHost = githubFromEnv().Web
+	c.HubURL = optional(strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_HUB_URL")), "/"))
 	if prefixes := splitList(env("RUNTIME_UPLOAD_HEADER_PREFIXES", "x-harnessly-")); len(prefixes) > 0 {
 		c.UploadHeaderPrefix = prefixes[0]
 	}

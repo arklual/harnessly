@@ -245,6 +245,17 @@ export const overviewOf = (area: ISize, underField: boolean): IOverviewCard[] =>
   return devices.map((device) => ({ device, w: device.vw ?? 0, h: device.vh ?? 0, scale }));
 };
 
+/** The row of «Обзор» as drawn (site.css .hx-ovw: padding 20/24, a label of 24 and a gap of 8 over each screen). */
+export const overviewBox = (cards: readonly IOverviewCard[], underField: boolean): ISize => {
+  if (cards.length === 0) return { w: 0, h: 0 };
+  const across = cards.reduce((total, c) => total + c.w * c.scale, 0);
+  const tallest = Math.max(...cards.map((c) => c.h * c.scale));
+  return {
+    w: 48 + across + OVERVIEW_GAP * (cards.length - 1),
+    h: 20 + 32 + tallest + (underField ? 96 : 20),
+  };
+};
+
 /**
  * How a phone's browser spends the screen: heights in CSS pixels as [unfolded, folded]. `top` and `bot` bars push the
  * page (it grows when they fold), `over` hangs over the page under glass, `gest` is the gesture strip of Android.

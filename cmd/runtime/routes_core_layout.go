@@ -12,6 +12,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
+	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/integrations"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
@@ -157,6 +158,10 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 	}
 	if c.agents == nil {
 		deps.Agents = nil
+	}
+	access := workspaceAccess(d)
+	deps.Deliver = func(path, title string) (delivery.Info, *delivery.Refusal) {
+		return delivery.Describe(access, path, title)
 	}
 	// "open design <id|path|title>" names a design of this machine's library.
 	deps.Targets.DesignRef = designAPI(d).L.RefOf

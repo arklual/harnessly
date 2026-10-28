@@ -16,6 +16,28 @@ import { t } from '@/next/i18n';
 import '@/next/styles/ui.css';
 import '@/next/styles/questions.css';
 
+/** A shell summary starts with «$ »; the card draws its own prompt. */
+const shellLine = (command: string) => command.replace(/^\$\s+/, '');
+
+const clock = (secs: number) => `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+
+/** Claude's own countdown to denying the request on an unattended session, ticking down off the moment it said. */
+const AutoDeny = ({ at }: { at: number }) => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const left = Math.ceil((at - now) / 1000);
+  if (left <= 0) return null;
+  return (
+    <div className="hx-gate__autodeny" role="timer">
+      <Icon name="clock" size="sm" />
+      <span>{t('next.gate.autoDeny', { time: clock(left) })}</span>
+    </div>
+  );
+};
+
 const CLOSE_KEYS: Record<GateCloseReason, string> = {
   'agent-moved-on': 'next.gate.closedMovedOn',
   'chat-about': 'next.gate.closedChat',
@@ -84,6 +106,9 @@ const GateCard = ({ permission, device, decided, onDecide, onOpenTerminal = null
   const action = usePending<string>();
   const waiting = permission.state.k === 'open' || permission.state.k === 'answering';
   const refused = permission.state.k === 'open' && permission.state.refused === 'menu-unmatched';
+  const autoDenyAt = permission.state.k === 'open' ? (permission.state.autoDenyAt ?? null) : null;
+  // A menu the machine cannot match gets no key: the card does not offer buttons that would do nothing.
+  const live = waiting && !refused;
   const busy = isBusy(action.phase) || permission.state.k === 'answering';
   const plan = permission.kind === 'plan';
   const [mode, setMode] = useState<TPlanMode>('plan-ask');
@@ -100,7 +125,7 @@ const GateCard = ({ permission, device, decided, onDecide, onOpenTerminal = null
   const tools = permission.options.filter(
     (option) => option.scope === 'once' || option.scope === 'always' || option.scope === 'deny',
   );
-  useDigitKeys(waiting && !plan && !busy, tools.length, (n) => decide(tools[n - 1].id));
+  useDigitKeys(live && !plan && !busy, tools.length, (n) => decide(tools[n - 1].id));
 
   const optionBy = (scope: PermissionScope) =>
     permission.options.find((option) => option.scope === scope) ?? null;
@@ -123,7 +148,7 @@ const GateCard = ({ permission, device, decided, onDecide, onOpenTerminal = null
       {!plan && permission.command && (
         <div className="hx-gate__cmd">
           <span className="hx-gate__prompt">$</span>
-          <code>{permission.command}</code>
+          <code>{shellLine(permission.command)}</code>
         </div>
       )}
       {plan && permission.planMd && waiting && (
@@ -131,7 +156,7 @@ const GateCard = ({ permission, device, decided, onDecide, onOpenTerminal = null
           <Md md={permission.planMd} />
         </div>
       )}
-      {waiting && !plan && (
+      {live && !plan && (
         <div className="hx-gate__acts">
           {tools.map((option, index) => (
             <button
@@ -150,7 +175,7 @@ const GateCard = ({ permission, device, decided, onDecide, onOpenTerminal = null
           ))}
         </div>
       )}
-      {waiting && plan && (
+      {live && plan && (
         <div className="hx-gate__acts">
           <Segmented
             label={t('next.gate.planModeLabel')}
@@ -191,6 +216,7 @@ const GateCard = ({ permission, device, decided, onDecide, onOpenTerminal = null
           )}
         </div>
       )}
+      {live && autoDenyAt !== null && <AutoDeny at={autoDenyAt} />}
       {waiting && action.phase === PENDING.slow && <div className="hx-gate__slow">{t('next.gate.slow')}</div>}
       {refused && (
         <div className="hx-gate__refused" role="status">

@@ -1,5 +1,16 @@
-# A pushed version tag (v1.2.3) builds agent, harnessly and runtime (with the web page compiled in) for linux and darwin, amd64
-# and arm64, and publishes them with checksums and a changelog as a GitHub release.
+# A pushed version tag (vX.Y.Z) publishes a release:
+#
+#   binaries  GoReleaser builds agent, harnessly and runtime (with the web page compiled in) for linux and darwin on amd64
+#             and arm64, and makes a GitHub release from them: the archives, checksums.txt, its keyless cosign signature
+#             (checksums.txt.sigstore.json) and a changelog grouped by commit type. The archives get a build provenance
+#             attestation. A stable tag becomes the "latest" release, a tag with a pre-release part (v1.2.3-rc.1) a
+#             pre-release.
+#   image     The Dockerfile's runtime target (and with-agents) as a multi-arch image on ghcr.io/ly-solutions/harnessly,
+#             tagged X.Y.Z, X.Y and latest (X.Y.Z-with-agents, X.Y-with-agents and with-agents), signed keyless with cosign,
+#             with a provenance attestation.
+#
+# Nothing is signed with a key kept anywhere: both signatures and attestations use the run's GitHub OIDC identity.
+# Every action is pinned to a commit (the comment names the release); Dependabot bumps them.
 name: release
 
 on:
@@ -9,31 +20,115 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  goreleaser:
+  binaries:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
-      contents: write
+      contents: write # the release and its assets
+      id-token: write # keyless signing and the attestation
+      attestations: write # the build provenance
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v7
+          fetch-depth: 0 # the changelog reads the history
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       # GoReleaser's before hook builds web/ for the runtime's webui tag.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           package_json_file: web/package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-      - uses: goreleaser/goreleaser-action@v7
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           distribution: goreleaser
           version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The attestation names the archives by the digests in checksums.txt, so `gh attestation verify <archive>` finds it.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/checksums.txt
+
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write # push to ghcr.io
+      id-token: write # keyless signing and the attestation
+      attestations: write # the build provenance
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: runtime
+            suffix: ""
+            floating: latest
+          - target: with-agents
+            suffix: -with-agents
+            floating: with-agents
+    env:
+      IMAGE: ghcr.io/ly-solutions/harnessly
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # v1.2.3 -> 1.2.3 and 1.2; the floating tag (latest, with-agents) only for a stable version.
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}${{ matrix.suffix && format(',suffix={0}', matrix.suffix) || '' }}
+            type=semver,pattern={{major}}.{{minor}}${{ matrix.suffix && format(',suffix={0}', matrix.suffix) || '' }},enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=${{ matrix.floating }},enable=${{ !contains(github.ref_name, '-') }}
+          labels: |
+            org.opencontainers.image.title=harnessly
+            org.opencontainers.image.description=A workspace for people and coding agents: terminals, conversations, documents and boards in one place
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ steps.meta.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,scope=${{ matrix.target }},mode=max
+          provenance: false # the attestation below is the signed one
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      # Signs the digest, so every tag of the image is covered. The tags come from the metadata step, not from the user.
+      - name: Sign the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

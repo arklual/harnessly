@@ -74,7 +74,11 @@ const SMOOTH_MS = 320;
 const SETTLE_MS = 150;
 
 /** What a press on the canvas must leave alone: its controls, the handles of «Резина», the pins. */
-const CONTROLS = 'button, a, input, textarea, select, [role="button"], .hx-vpgrab, .hx-ovw';
+const CONTROLS = 'button, a, input, textarea, select, [role="button"], .hx-vpgrab';
+
+/** What the canvas moves: the page's case, or the row of cards of «Обзор». */
+const boxOf = (area: HTMLElement): HTMLElement | null =>
+  area.querySelector<HTMLElement>(area.dataset.dev === 'overview' ? '.hx-ovw' : '.hx-vpbox');
 
 const typing = (target: EventTarget | null) =>
   (target as Element | null)?.closest?.('input, textarea, select, [contenteditable]') != null;
@@ -148,7 +152,7 @@ export const useCanvasZoom = (
 
   /** The box's corner as the layout put it, in the client's pixels (a transform does not move offsets). */
   const originOf = (area: HTMLElement): IPoint | null => {
-    const el = area.querySelector<HTMLElement>('.hx-vpbox');
+    const el = boxOf(area);
     if (!el) return null;
     const r = area.getBoundingClientRect();
     return { x: r.left + el.offsetLeft, y: r.top + el.offsetTop };
@@ -157,7 +161,7 @@ export const useCanvasZoom = (
   /** The view as the canvas can take it: the box never leaves the area entirely. */
   const bound = (z: IZoom): IZoom => {
     const area = areaRef.current;
-    const el = area?.querySelector<HTMLElement>('.hx-vpbox');
+    const el = area ? boxOf(area) : null;
     if (!area || !el) return z;
     return keptInView(
       z,
@@ -385,8 +389,9 @@ export const useCanvasZoom = (
       const target = event.target as Element;
       const free = space || event.button === 1 || pointers.size > 0;
       if (!free && (event.button !== 0 || target.closest(CONTROLS))) return;
-      // A left press on the page's case (not on its empty area) is the page's: only Space or the middle button pan it.
-      if (!free && event.pointerType === 'mouse' && target.closest('.hx-vpbox')) return;
+      // A left press on the page's case or a card's screen (not on its empty area) is the page's: only Space or the
+      // middle button pan it.
+      if (!free && event.pointerType === 'mouse' && target.closest('.hx-vpbox, .hx-ovw__screen')) return;
       event.preventDefault();
       area.setPointerCapture(event.pointerId);
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });

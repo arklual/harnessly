@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // Files: the folder of a conversation as the person browses it beside the chat. Paths are relative to the conversation's
@@ -167,7 +167,7 @@ func (s *Server) files(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	case ctx.Err() != nil:
 		refuse(w, RefuseTimeout)
 	default:
-		agent.Log("warn", "v2: files failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: files failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	}
 }
@@ -211,7 +211,7 @@ func (s *Server) shot(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	case ctx.Err() != nil:
 		refuse(w, RefuseTimeout)
 	default:
-		agent.Log("warn", "v2: shot failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: shot failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	}
 }

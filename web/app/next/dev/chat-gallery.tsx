@@ -14,7 +14,7 @@ import '@/next/styles/questions.css';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from '@/platform/router';
-import type { LimitAction, LimitHold } from '@/next/protocol/v2';
+import type { HandoffDraft, LimitAction, LimitHold } from '@/next/protocol/v2';
 import { pinLocale, t } from '@/next/i18n';
 import { runsByCall, WorkflowRuns, type TWorkflowTask } from '@/next/features/workflows/run';
 import { sampleWorkflow } from '@/next/dev/workflow-sample';
@@ -545,8 +545,9 @@ const HANDOFF_NOTE =
   '## Files\n- `internal/pay/gateway.go`\n- `internal/pay/gateway_test.go`\n\n' +
   '## Verify\n`go test ./internal/pay/...`\n\n## Gotchas\nСтенд отвечает медленно по утрам: таймаут не трогать.';
 
-const SHEET_DRAFTS: Record<TSheetMode, { text: string; tokens: number; turns: number }> = {
+const SHEET_DRAFTS = {
   [SHEET_MODE.excerpt]: {
+    mode: 'excerpt',
     text:
       '### The person (first request)\nНайди, почему после вчерашнего выката падает оплата заказа\n\n' +
       '_… 4 turns in between are left out …_\n\n### The person\nА повтор запроса нужен?\n\n' +
@@ -554,13 +555,20 @@ const SHEET_DRAFTS: Record<TSheetMode, { text: string; tokens: number; turns: nu
     tokens: 2140,
     turns: 3,
   },
-  [SHEET_MODE.note]: { text: HANDOFF_NOTE, tokens: 160, turns: 0 },
+  [SHEET_MODE.note]: { mode: 'note', text: HANDOFF_NOTE, tokens: 160, turns: 0 },
   [SHEET_MODE.result]: {
+    mode: 'result',
     text: 'Сделано: повтор запроса к шлюзу только для сетевых ошибок.\nФайлы: `internal/pay/retry.go`.\nОсталось: e2e.',
     tokens: 40,
     turns: 0,
   },
-};
+  [SHEET_MODE.history]: {
+    mode: 'history',
+    tokens: 0,
+    turns: 0,
+    artifact: { id: '0123456789abcdef0123456789abcdef', bytes: 292_552_704 },
+  },
+} satisfies Record<TSheetMode, HandoffDraft>;
 
 const CODEX_AGENT: IPickerAgent = {
   provider: 'codex',
@@ -1874,6 +1882,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
         onCancelRecording={() => setScene((current) => ({ ...current, recording: null }))}
         onFinishRecording={() => setScene((current) => ({ ...current, recording: null }))}
         maxText={20_000}
+        contextRing={{ used: 52_000, limit: 200_000, compacting: false }}
       />
     </>
   );
@@ -1881,7 +1890,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
   const sheet = scene.sheet ?? null;
   const closeSheet = () => setScene((current) => ({ ...current, sheet: null }));
   const draftOf = (mode: TSheetMode) =>
-    later(true, mode === SHEET_MODE.excerpt ? ANSWER_MS : 1600).then(() => ({
+    later(true, mode === SHEET_MODE.note || mode === SHEET_MODE.result ? 1600 : ANSWER_MS).then(() => ({
       ok: true as const,
       draft: SHEET_DRAFTS[mode],
     }));
@@ -1988,7 +1997,7 @@ const SceneView = ({ build }: { build: (now: Ms) => IScene }) => {
             onClose={closeSheet}
             title="Передать в Codex · GPT-5.5"
             lead="Новый чат в той же папке начнёт с этого текста. Чат на Opus 5.5 останется как есть."
-            modes={[SHEET_MODE.excerpt, SHEET_MODE.note]}
+            modes={[SHEET_MODE.excerpt, SHEET_MODE.note, SHEET_MODE.history]}
             sendLabel="Передать"
             onDraft={draftOf}
             onSend={() => later()}

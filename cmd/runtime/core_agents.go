@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agentnet"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
@@ -17,6 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/launch"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/notifybots"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/providers"
 )
@@ -41,12 +43,17 @@ type coreAgents struct {
 	resume   func() int
 	// preflight answers which CLIs run; the checker's by default.
 	preflight func() preflight.Result
+	// envDir holds the env files a machine agent keeps (keys, secrets, proxy): the CLIs' launch lines source them first
+	// (agents.EnvSourcePrefix); "" or no files, nothing is added.
+	envDir string
 }
 
 type coreAgentsConfig struct {
 	DataDir, Home, ConfigFile string
 	ClaudeDir, CodexDir       string
 	DefaultsKey               string
+	// EnvDir is AGENT_ENV_DIR: the machine agent's env files for the CLIs.
+	EnvDir string
 	// Launcher is the managed Claude launcher ("" runs `claude`).
 	Launcher string
 	// EditorScript is the prompt editor script Claude gets as its editor (the prompt service's RUNTIME_PROMPT_EDITOR),
@@ -67,6 +74,9 @@ type coreAgentsConfig struct {
 	PassServiceEnv  bool
 	// CodexContainerSandbox: RUNTIME_CODEX_SANDBOX=container, Codex runs without its own sandbox (the container is one).
 	CodexContainerSandbox bool
+	// SafePrompt: every agent's prompt gets the safe's block (internal/secrets). The runtime turns it on; the launches
+	// the previous runtime's goldens recorded had no such block.
+	SafePrompt bool
 }
 
 // skipPermissions: the runtime config's dangerouslySkipPermissions, read at every launch as the old runtime did.
@@ -99,14 +109,19 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 		}
 		return script, nil
 	}
+	// The Telegram bots and the safe go into the prompt of every agent that starts (internal/notifybots, internal/secrets).
+	bots, promptDir := notifybots.Open(c.DataDir), filepath.Join(c.DataDir, "launch-prompts")
+	shared := notifySharedFor(c.DataDir)
 	return &coreAgents{
 		profiles: profiles,
 		checker:  preflight.New(c.Home),
+		envDir:   c.EnvDir,
 		options:  catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey},
 		claude: claude.LaunchConfig{
-			HooksPath:       filepath.Join(c.DataDir, "hooks.json"),
-			MCPConfigPath:   filepath.Join(c.DataDir, "preview-mcp.json"),
-			WorkspacePrompt: func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "claude-prompt.md") },
+			HooksPath:     filepath.Join(c.DataDir, "hooks.json"),
+			MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
+			WorkspacePrompt: withNotifyBots(bots, shared, promptDir,
+				withSafe(c.SafePrompt, promptDir, func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "claude-prompt.md") })),
 			PluginDir:       pluginDirOnce(c.SkillsPluginDir),
 			JoinDir:         filepath.Join(c.DataDir, "launch-prompts"),
 			Launcher:        c.Launcher,
@@ -118,9 +133,10 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 		codexLauncher:  filepath.Join(c.DataDir, "codex-launcher.js"),
 		launcherScript: launcherScriptConfig(c),
 		codexArgs: codex.LaunchConfig{
-			Hooks:            &codex.HookConfig{Script: filepath.Join(c.DataDir, "codex-hook.sh"), UserConfig: filepath.Join(c.Home, ".codex", "config.toml")},
-			MCP:              codexMCP(c),
-			WorkspacePrompt:  func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "codex-prompt.md") },
+			Hooks: &codex.HookConfig{Script: filepath.Join(c.DataDir, "codex-hook.sh"), UserConfig: filepath.Join(c.Home, ".codex", "config.toml")},
+			MCP:   codexMCP(c),
+			WorkspacePrompt: withNotifyBots(bots, shared, promptDir,
+				withSafe(c.SafePrompt, promptDir, func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "codex-prompt.md") })),
 			SkipPermissions:  skipPermissions(c.ConfigFile),
 			PassServiceEnv:   c.PassServiceEnv,
 			ContainerSandbox: c.CodexContainerSandbox,
@@ -352,16 +368,30 @@ func (a *coreAgents) codexLauncherContent() ([]byte, error) {
 	return content, nil
 }
 
-// LaunchLine is the line that starts a new conversation.
-func (a *coreAgents) LaunchLine(provider, workspaceID string, launch *agents.Launch) (string, error) {
-	if provider == agents.Codex {
-		return a.codexLine(workspaceID, "", launch)
-	}
-	return a.claude.LaunchCommand(workspaceID, launch, nil)
+// envSource is what goes before a whole command so the CLI starts with the keys, secrets and proxy a machine agent keeps
+// in its env files; read at each launch, since they change while the runtime runs.
+func (a *coreAgents) envSource(provider string) string {
+	return agents.EnvSourcePrefix(a.envDir, provider)
 }
 
-// ResumeLine is the line that resumes a conversation.
-func (a *coreAgents) ResumeLine(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
+// LaunchLine is the line that starts a new conversation, ready to be typed into a shell.
+func (a *coreAgents) LaunchLine(provider, workspaceID string, launch *agents.Launch) (string, error) {
+	var line string
+	var err error
+	if provider == agents.Codex {
+		line, err = a.codexLine(workspaceID, "", launch)
+	} else {
+		line, err = a.claude.LaunchCommand(workspaceID, launch, nil)
+	}
+	if err != nil {
+		return "", err
+	}
+	return a.envSource(provider) + line, nil
+}
+
+// resumeLine is the line that resumes a conversation, bare: the starter puts the variables of a start and the env files
+// in front of it itself.
+func (a *coreAgents) resumeLine(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
 	if provider == agents.Codex {
 		return a.codexLine(workspaceID, sessionID, launch)
 	}
@@ -384,6 +414,15 @@ func (a *coreAgents) ForkLine(provider, sessionID, workspaceID string, launch *a
 	return line + " --fork-session", nil
 }
 
+// ResumeLine is the line that resumes a conversation, ready to be typed into a shell.
+func (a *coreAgents) ResumeLine(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
+	line, err := a.resumeLine(provider, sessionID, workspaceID, launch)
+	if err != nil {
+		return "", err
+	}
+	return a.envSource(provider) + line, nil
+}
+
 func (a *coreAgents) launching() bool { return a.launchOn != nil && a.launchOn() && a.starter != nil }
 
 // lines are the launch lines as the starter asks for them.
@@ -397,7 +436,7 @@ func (l lines) Launch(provider, workspaceID string, launch *agents.Launch, promp
 }
 
 func (l lines) Resume(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
-	return l.a.ResumeLine(provider, sessionID, workspaceID, launch)
+	return l.a.resumeLine(provider, sessionID, workspaceID, launch)
 }
 
 func (l lines) Fork(provider, sessionID, workspaceID string, launch *agents.Launch) (string, error) {
@@ -441,4 +480,32 @@ func (a *coreAgents) AutoResume() {
 func errorJSON(text string) []byte {
 	raw, _ := json.Marshal(errorBody(text))
 	return raw
+}
+
+// agentEnvDir is where a machine agent keeps the env files its launches source (keys, secrets, the proxy).
+func agentEnvDir(dataDir string) string {
+	return env("AGENT_ENV_DIR", filepath.Join(dataDir, agents.EnvDirName))
+}
+
+// withAgentEnv is a process environment with the variables the machine agent's env files give a provider's CLI: the
+// shared file's, then the provider's. The CLIs the runtime starts itself (a side chat, a title) have no shell line to
+// source them in. Without env files it is the base as it was.
+func withAgentEnv(base []string, dir, provider string) []string {
+	if dir == "" {
+		return base
+	}
+	merged := agentnet.NewEnvDir(dir).Merged(provider)
+	if len(merged) == 0 {
+		return base
+	}
+	names := make([]string, 0, len(merged))
+	for name := range merged {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	out := slices.Clone(base)
+	for _, name := range names {
+		out = append(out, name+"="+merged[name])
+	}
+	return out
 }

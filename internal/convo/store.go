@@ -43,16 +43,18 @@ func (s *Store) Fresh() bool {
 
 // convFile is a conversation as it is written.
 type convFile struct {
-	Conv           wire.Conversation `json:"conv"`
-	Session        string            `json:"session"`
-	TranscriptPath string            `json:"transcriptPath"`
-	AgentSessionID string            `json:"agentSessionId"`
-	Outbox         outbox.State      `json:"outbox"`
-	Questions      []wire.Question   `json:"questions"`
-	Permissions    []wire.Permission `json:"permissions"`
-	DeletedAt      wire.Ms           `json:"deletedAt"`
-	Rewinds        []rewindRec       `json:"rewinds,omitempty"`
-	Left           []string          `json:"left,omitempty"`
+	Conv                    wire.Conversation `json:"conv"`
+	Session                 string            `json:"session"`
+	TranscriptPath          string            `json:"transcriptPath"`
+	AgentSessionID          string            `json:"agentSessionId"`
+	HandoffArtifact         string            `json:"handoffArtifact,omitempty"`
+	HandoffArtifactClientID string            `json:"handoffArtifactClientId,omitempty"`
+	Outbox                  outbox.State      `json:"outbox"`
+	Questions               []wire.Question   `json:"questions"`
+	Permissions             []wire.Permission `json:"permissions"`
+	DeletedAt               wire.Ms           `json:"deletedAt"`
+	Rewinds                 []rewindRec       `json:"rewinds,omitempty"`
+	Left                    []string          `json:"left,omitempty"`
 }
 
 func (s *Store) convPath(id string) string { return filepath.Join(s.dir, "convs", id+".json") }

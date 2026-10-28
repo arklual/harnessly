@@ -10,6 +10,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agentstate"
 	"github.com/ly-solutions/harnessly/internal/attach"
+	"github.com/ly-solutions/harnessly/internal/chatguard"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/screen"
@@ -31,6 +32,9 @@ func (c *conv) do(device string, cmd wire.Command, now time.Time) wire.CmdResult
 	}
 	switch m := cmd.(type) {
 	case wire.SendCmd:
+		if c.d.Moves != nil && c.d.Moves.Blocked(c.rec.ID) {
+			return wire.Refused(wire.RefuseConflict)
+		}
 		return c.send(m, now)
 	case wire.CancelCmd:
 		ch, code := c.box.Cancel(m.ClientID, now)
@@ -181,7 +185,14 @@ func (c *conv) seen(upTo wire.Ms, now time.Time) wire.CmdResult {
 	return wire.Accepted(wire.ChannelConvs, c.convsSeq())
 }
 
+// terminalOff: the machine's policy keeps the terminal off for the hub.
+func (c *conv) terminalOff() bool { return c.d.TerminalOff != nil && c.d.TerminalOff() }
+
 func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
+	if c.terminalOff() && chatguard.BashMode(m.Text) {
+		// A bash-mode line is a shell command to the agent, run without asking: the terminal's work, not the chat's.
+		return wire.Refused(wire.RefuseForbidden)
+	}
 	d := outbox.Draft{ClientID: m.ClientID, Text: m.Text, Mode: m.Mode, Kind: m.Kind, Attachments: []wire.AttachmentRef{}}
 	if len(m.AttachmentIDs) > 0 {
 		if c.d.Uploads == nil {
@@ -414,7 +425,7 @@ func (c *conv) decide(device string, m wire.DecideCmd, now time.Time) wire.CmdRe
 	if g.p == nil {
 		return wire.Refused(wire.RefuseGateClosed)
 	}
-	want := typist.PickWant{Plan: g.p.Kind == wire.PermPlan}
+	want := typist.PickWant{Plan: g.p.Kind == wire.PermPlan, Cwd: c.rec.Cwd}
 	if g.p.Command != nil {
 		want.Command = *g.p.Command
 	}

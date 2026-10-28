@@ -8,7 +8,7 @@ import type { HandoffDraftRequest, Provider } from '@/next/protocol/v2';
 export const BLOCK_KIND = { handoff: 'handoff', fork: 'fork', result: 'result' } as const;
 export type TBlockKind = (typeof BLOCK_KIND)[keyof typeof BLOCK_KIND];
 
-export const BLOCK_MODE = { excerpt: 'excerpt', note: 'note' } as const;
+export const BLOCK_MODE = { excerpt: 'excerpt', note: 'note', history: 'history' } as const;
 export type TBlockMode = (typeof BLOCK_MODE)[keyof typeof BLOCK_MODE];
 
 export interface IContextBlock {
@@ -40,7 +40,7 @@ const agentOf = (value: string | undefined): IContextBlock['agent'] =>
   value === 'claude' || value === 'codex' ? value : null;
 
 const modeOf = (value: string | undefined): TBlockMode | null =>
-  value === BLOCK_MODE.excerpt || value === BLOCK_MODE.note ? value : null;
+  value === BLOCK_MODE.excerpt || value === BLOCK_MODE.note || value === BLOCK_MODE.history ? value : null;
 
 const kindOf = (tag: string, a: Record<string, string>): TBlockKind => {
   if (tag === 'fork-result') return BLOCK_KIND.result;
@@ -52,17 +52,24 @@ export const parseContextBlock = (input: string): IContextBlock | null => {
   const m = BLOCK.exec(input);
   if (!m) return null;
   const a = attrs(m[2]);
-  if (!a.from) return null;
   const tag = m[1];
+  const mode = tag === 'fork-result' ? null : modeOf(a.mode);
+  const text = m[3].replaceAll(`<\\/${tag}`, `</${tag}`);
+  const privateArtifact = text.startsWith('Private context file: ');
+  if (
+    (tag === 'fork-result' && !a.from) ||
+    (tag === 'handoff' && (mode === null || (!a.from && !privateArtifact)))
+  )
+    return null;
   return {
     kind: kindOf(tag, a),
-    fromId: a.from,
+    fromId: a.from ?? '',
     title: a.title ?? '',
     agent: agentOf(a.agent),
     model: a.model ? a.model : null,
-    mode: tag === 'fork-result' ? null : modeOf(a.mode),
+    mode,
     // The runtime breaks a closing tag inside the text so it cannot end the block early; here it reads as written.
-    text: m[3].replaceAll(`<\\/${tag}`, `</${tag}`),
+    text,
   };
 };
 

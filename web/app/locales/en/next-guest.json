@@ -11,5 +11,12 @@
   "next.guest.nameTitle": "What is your name?",
   "next.guest.nameLead": "Your comments are signed with it. It is asked once.",
   "next.guest.nameGo": "Continue",
-  "next.guest.account": "Your name: {name}"
+  "next.guest.account": "Your name: {name}",
+  "next.guest.full": "Full screen",
+  "next.guest.fullTip": "The design alone, over the whole screen",
+  "next.guest.fullPhone": "Watch full screen",
+  "next.guest.exit": "Exit",
+  "next.guest.newTab": "New tab",
+  "next.guest.holdHint": "Hold a finger on a block to comment",
+  "next.guest.dragHint": "Pull the handle down to exit"
 }

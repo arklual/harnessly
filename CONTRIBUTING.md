@@ -39,6 +39,8 @@ make test
 | `make vet` | `go vet ./...` |
 | `make cover` | the tests with coverage into `coverage.out`, and the total |
 | `make cross` | compile every package for linux and darwin, amd64 and arm64 |
+| `make hub` / `make hub-dist` | `bin/hub` with its page, and what a hub serves to its machines (`HUB_TARGETS=linux/amd64` for one system); they build the page first |
+| `tools/hub-e2e.sh` | the hub, a machine agent and its runtime run against each other on this host, without Docker (see the header of the script) |
 | `make clean` | remove build outputs |
 
 Before you push, run what CI runs:

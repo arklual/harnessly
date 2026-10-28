@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/feed"
+	"github.com/ly-solutions/harnessly/internal/handoff"
 	"github.com/ly-solutions/harnessly/internal/msgindex"
 	"github.com/ly-solutions/harnessly/internal/sessionmeta"
 	"github.com/ly-solutions/harnessly/internal/shots"
@@ -188,6 +189,10 @@ type Deps struct {
 	Log   Logger
 	// Store keeps the conversations and the op answers; nil keeps nothing (tests).
 	Store *Store
+	// Handoffs keeps private full-history and oversized-text artifacts; nil does not support those handoffs.
+	Handoffs *handoff.ArtifactStore
+	// Moves names the conversations moved to another machine, which take no more messages; nil names none.
+	Moves Moves
 	// Source opens a conversation's transcript; nil reads the files of internal/transcript.
 	Source func(c wire.Conversation) feed.Source
 	// Closer closes the pane and tab of a deleted conversation; nil leaves them.
@@ -244,4 +249,9 @@ type Deps struct {
 	// LimitReset is when the provider's usage limit resets by the limits it last reported — the window it ran out of —
 	// for a notice that names no time; 0 when they say nothing. nil: never known.
 	LimitReset func(p wire.Provider, now time.Time) wire.Ms
+
+	// TerminalOff says that the machine's policy keeps the terminal off for the hub; nil: it is on. While it is, a
+	// message that would start Claude's bash mode ("!…") is refused{forbidden}, and one queued earlier is not typed
+	// (see internal/chatguard, which also guards the pane the typist writes to).
+	TerminalOff func() bool
 }

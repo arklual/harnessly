@@ -49,6 +49,17 @@ func (f *fakeRuntime) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case r.URL.Path == "/api/cli/notify/bots":
+		_, _ = w.Write([]byte(`{"bots":[{"id":"nb_1","name":"Алерты","username":"ping_bot","chat":"Анна","bound":true,` +
+			`"instruction":"когда закончил\nили нужен ответ"},{"id":"nb_2","name":"Free","username":"free_bot","chat":"","bound":false,"instruction":""}],` +
+			`"shared":{"enabled":true,"bot":"harnessly_bot","linked":true,"chat":"Anna","instruction":"когда нужен ответ"}}`))
+	case r.URL.Path == "/api/cli/notify/send" && body["bot"] == "":
+		_, _ = w.Write([]byte(`{"bot":"","chat":"Anna","messages":1}`))
+	case r.URL.Path == "/api/cli/notify/send" && body["bot"] == "nobody":
+		w.WriteHeader(404)
+		_, _ = w.Write([]byte(`{"error":"not-found"}`))
+	case r.URL.Path == "/api/cli/notify/send":
+		_, _ = w.Write([]byte(`{"bot":"Алерты","chat":"Анна","messages":2}`))
 	case r.URL.Path == "/api/cli/peers":
 		_, _ = w.Write([]byte(`{"chats":[{"ref":"dev-department/tab-rsk","title":"Модель по умолчанию","machine":"dev-department",` +
 			`"machineName":"dev-department","owner":"Иван","state":"busy"}],"errors":["no-relay"]}`))
@@ -81,6 +92,8 @@ func (f *fakeRuntime) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, _ = w.Write([]byte(`{"ok":true,"applied":true,"message":"opened for the person"}`))
+	case r.URL.Path == "/api/cli/deliver":
+		_, _ = w.Write([]byte(`{"ok":true,"message":"Delivered notes.md\nhttps://delivered.harnessly.invalid/file"}`))
 	case r.URL.Path == "/api/cli/api-guide":
 		w.Header().Set("Content-Type", "text/markdown")
 		_, _ = w.Write([]byte("# API\n"))
@@ -393,5 +406,57 @@ func TestPeersListAndSend(t *testing.T) {
 	}
 	if r := f.run(t, "hs-me", "peers", "send", "only-ref"); r.code != 2 {
 		t.Fatalf("usage: %+v", r)
+	}
+}
+
+func TestNotifyListAndSend(t *testing.T) {
+	f := newFake(t)
+	r := f.run(t, "hs-me", "notify")
+	if r.code != 0 || !strings.HasPrefix(r.out, "Telegram\t@harnessly_bot → Anna\t(send without --bot)\n\tкогда нужен ответ\n") ||
+		!strings.Contains(r.out, "nb_1\tАлерты\t@ping_bot → Анна\n\tкогда закончил\n\tили нужен ответ\n") ||
+		!strings.Contains(r.out, "nb_2\tFree\t@free_bot (no chat yet)\n\t(no instruction") {
+		t.Fatalf("list: %+v", r)
+	}
+	r = f.run(t, "hs-me", "notify", "send", "--bot", "алерты", "--silent", "готово,", "выкатил")
+	if r.code != 0 || r.out != "sent → Анна (Алерты), 2 messages\n" {
+		t.Fatalf("send: %+v", r)
+	}
+	if c := f.last(); c.Path != "/api/cli/notify/send" || c.Body["bot"] != "алерты" || c.Body["text"] != "готово, выкатил" ||
+		c.Body["silent"] != true || c.Body["session"] != "hs-me" {
+		t.Fatalf("body: %+v", c.Body)
+	}
+	if r := f.run(t, "hs-me", "notify", "send", "--bot=Алерты", "-"); r.code != 0 || f.last().Body["text"] != "piped text" || f.last().Body["silent"] != false {
+		t.Fatalf("stdin: %+v %+v", r, f.last().Body)
+	}
+	r = f.run(t, "hs-me", "notify", "send", "--bot", "nobody", "x")
+	if r.code != 1 || !strings.Contains(r.errs, "refused: not-found — there is no bot by that name") {
+		t.Fatalf("refusal: %+v", r)
+	}
+	if r := f.run(t, "hs-me", "notify", "send", "text only"); r.code != 0 || r.out != "sent → Anna\n" || f.last().Body["bot"] != "" {
+		t.Fatalf("no bot is the shared one: %+v %+v", r, f.last().Body)
+	}
+	if r := f.run(t, "hs-me", "notify", "send", "--bot", "x"); r.code != 2 {
+		t.Fatalf("no text is usage: %+v", r)
+	}
+}
+
+func TestDeliverSendsTheAbsolutePathAndTheTitle(t *testing.T) {
+	f := newFake(t)
+	r := f.run(t, "hs-me", "deliver", "notes/todo.md", "--title", "Plan")
+	if r.code != 0 {
+		t.Fatalf("exit %d: %s", r.code, r.errs)
+	}
+	got := f.last()
+	if got.Path != "/api/cli/deliver" || got.Method != "POST" || got.Body["session"] != "hs-me" || got.Body["path"] != "/home/a/work/notes/todo.md" || got.Body["title"] != "Plan" {
+		t.Fatalf("sent %+v", got)
+	}
+	if !strings.Contains(r.out, "Delivered notes.md") || !strings.Contains(r.out, "delivered.harnessly.invalid") {
+		t.Fatalf("output %q", r.out)
+	}
+	if r := f.run(t, "hs-me", "deliver"); r.code != 2 {
+		t.Fatalf("no path: exit %d", r.code)
+	}
+	if r := f.run(t, "", "deliver", "x.zip"); r.code == 0 {
+		t.Fatal("outside a pane there is nobody to hand a file to")
 	}
 }

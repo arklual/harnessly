@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -31,9 +32,12 @@ func TestV2SideChat(t *testing.T) {
 		"tab-ok":     {ID: "tab-ok", Provider: wire.ProviderClaude, Cwd: cwd, AgentSessionID: sideChatUUID},
 	}
 	var ran []sidechat.Run
+	envDir := filepath.Join(t.TempDir(), "agent-env")
+	writeEnvFiles(t, envDir, map[string]string{"claude": "ANTHROPIC_API_KEY='from-the-agent'\n"})
 	c := &v2SideChat{
 		record: func(id string) (wire.Conversation, bool) { r, ok := recs[id]; return r, ok },
 		home:   home,
+		envDir: envDir,
 		ask: func(ctx context.Context, run sidechat.Run, on func(sidechat.Event)) {
 			ran = append(ran, run)
 			on(sidechat.Event{Type: "delta", Text: "Hi"})
@@ -82,6 +86,10 @@ func TestV2SideChat(t *testing.T) {
 	if len(ran) != 1 || ran[0].SessionID != sideChatUUID || ran[0].Cwd != cwd || ran[0].Model != "sonnet" || ran[0].ProjectDir != proj ||
 		!strings.Contains(ran[0].Prompt, "What is this?") {
 		t.Fatalf("%+v", ran)
+	}
+	// The key the machine agent keeps for Claude reaches the question's process.
+	if !slices.Contains(ran[0].BaseEnv, "ANTHROPIC_API_KEY=from-the-agent") {
+		t.Errorf("the env files did not reach the side chat: %v", ran[0].BaseEnv)
 	}
 
 	// One question runs per conversation.

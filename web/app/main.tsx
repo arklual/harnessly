@@ -17,6 +17,7 @@ import { ThemeProvider, useTheme } from '@/platform/theme';
 import { locale } from '@/lib/i18n';
 import { useRouter } from '@/platform/router';
 import { appFetch } from '@/lib/app-path';
+import { appConfig } from '@/platform/config';
 import { auth } from '@/runtime/endpoints';
 import useWorkspaceStore, { type IWorkspaceInitialData } from '@/hooks/use-workspace-store';
 import useConfigStore, { type IConfigInitialData } from '@/hooks/use-config-store';
@@ -50,6 +51,22 @@ type TPhase =
   | { kind: 'signed-out'; needsSetup: boolean; requiresAuth: boolean }
   | { kind: 'ready'; boot: TBootstrap };
 
+/**
+ * A machine of a hub has no password to offer: the hub signs the person in and hands the machine's page a session. When
+ * that session is gone, the hub is where to go (and back here after). False when the hub was sent the person a moment
+ * ago and the page is back again, so the machine's own sign-in shows instead of a loop.
+ */
+const toHubSignIn = (hubUrl: string): boolean => {
+  try {
+    if (Date.now() - Number(sessionStorage.getItem('hl-hub-signin') ?? 0) < 15_000) return false;
+    sessionStorage.setItem('hl-hub-signin', String(Date.now()));
+  } catch {
+    // No storage: go anyway, once per page load.
+  }
+  window.location.assign(`${hubUrl}/signin?next=${encodeURIComponent(location.pathname + location.search)}`);
+  return true;
+};
+
 /** Signs in when the runtime asks for it, then loads the page's start data (it answers 503 while the core starts). */
 const useBootstrap = (): [TPhase, () => void] => {
   const [phase, setPhase] = useState<TPhase>({ kind: 'checking' });
@@ -60,6 +77,9 @@ const useBootstrap = (): [TPhase, () => void] => {
     const load = async () => {
       const res = await appFetch('/api/platform/bootstrap').catch(() => null);
       if (!alive) return;
+      // The hub answers a request without its session with a redirect to its sign-in page.
+      const hubUrl = appConfig().hubUrl;
+      if (hubUrl && (res?.redirected || res?.status === 401) && toHubSignIn(hubUrl)) return;
       if (res?.status === 401) {
         const state = await auth.state().catch(() => ({ needsSetup: false, requiresAuth: false }));
         if (alive)

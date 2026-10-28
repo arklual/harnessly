@@ -41,7 +41,7 @@ const (
 const historyRepoConfig = "[core]\n\trepositoryformatversion = 0\n\tfilemode = false\n\tbare = false\n\tlogallrefupdates = true\n[gc]\n\tautoDetach = false\n"
 
 var (
-	historyIgnoredDirs   = []string{".claims", ".check", ".thumbs", ".trash", ".claude", ".playwright-mcp", ".remember", "node_modules"}
+	historyIgnoredDirs   = []string{".claims", ".check", ".thumbs", ".trash", ".media", ".claude", ".playwright-mcp", ".remember", "node_modules"}
 	historyStagePrefixes = []string{".importing-", ".creating-"}
 	lockBusy             = regexp.MustCompile(`(?i)index\.lock|Unable to create .*\.lock|another git process`)
 	addSkippable         = regexp.MustCompile(`(?i)unable to (index|stat)|Permission denied|failed to insert`)

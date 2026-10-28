@@ -19,7 +19,7 @@ import { batch } from '@/next/core/store';
 import { holdConversation } from '@/next/stores/cache';
 import { onReconnectNow } from '@/next/stores/connection';
 import { ensureFeed, startEmptyFeed } from '@/next/stores/conversation';
-import { activeMachineStore } from '@/next/stores/machines';
+import { activeMachineStore, homeMachineStore } from '@/next/stores/machines';
 import { CAPS_QUERY, parsePage, type Channel, type ConvId, type MachineId } from '@/next/protocol/v2';
 
 export const APP = 'next/0.1.0';
@@ -59,6 +59,7 @@ class Hub {
   start(machines: MachineId[], active: MachineId | null): void {
     batch(() => {
       for (const m of machines) this.ensure(m);
+      homeMachineStore.set(active ?? machines[0] ?? null);
       this.setActive(active ?? machines[0] ?? null);
     });
     this.watchHidden();
@@ -143,6 +144,7 @@ class Hub {
     this.unVisible = null;
     pageClock().clearTimeout(this.hiddenTimer);
     activeMachineStore.set(null);
+    homeMachineStore.set(null);
   }
 
   /** A hidden tab lets the sockets of the inactive machines go after 10 minutes; visible brings them back. */

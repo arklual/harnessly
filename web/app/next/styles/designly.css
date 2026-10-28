@@ -1147,3 +1147,31 @@
   height: 160px;
   margin: var(--hx-space-10) var(--hx-space-8);
 }
+
+/* What the machine lacks for designs (the board engine, a browser, ffmpeg) and the command that fixes it. */
+.hx-dl__notice {
+  max-width: 1120px;
+  margin: var(--hx-space-4) auto 0;
+  padding: var(--hx-space-3) var(--hx-space-4);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+}
+.hx-dl__notice-title {
+  font-weight: var(--hx-weight-semibold);
+  color: var(--hx-fg-1);
+}
+.hx-dl__notice-text {
+  margin-top: var(--hx-space-1);
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+.hx-dl__notice-cmd {
+  display: inline-block;
+  margin-top: var(--hx-space-2);
+  padding: var(--hx-space-1) var(--hx-space-2);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-hover);
+  font-size: var(--hx-text-sm);
+  user-select: all;
+}

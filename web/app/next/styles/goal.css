@@ -88,7 +88,8 @@
   color: var(--hx-fg-1);
   font-weight: var(--hx-weight-medium);
 }
-.hx-goalbar__act {
+.hx-goalbar__act,
+.hx-goalline__act {
   flex: none;
   padding: 2px 8px;
   border: 0;
@@ -99,12 +100,15 @@
   cursor: pointer;
 }
 .hx-goalbar__act:hover:not(:disabled),
-.hx-goalbar__act:focus-visible {
+.hx-goalbar__act:focus-visible,
+.hx-goalline__act:hover:not(:disabled),
+.hx-goalline__act:focus-visible {
   background: var(--hx-bg-active);
   color: var(--hx-fg-1);
   outline: none;
 }
-.hx-goalbar__act:disabled {
+.hx-goalbar__act:disabled,
+.hx-goalline__act:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -136,6 +140,13 @@
 .hx-goalline__text {
   max-width: 70%;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-goalline__error {
+  max-width: 240px;
+  overflow: hidden;
+  color: var(--hx-danger);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

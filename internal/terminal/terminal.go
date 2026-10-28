@@ -63,6 +63,12 @@ type Bridge interface {
 	ReconcileCwd(session string)
 }
 
+// outputBridge is implemented by a runtime that classifies terminal failures. It is optional so terminal serving
+// remains usable on its own; the bytes are observation only and are still forwarded unchanged to the page.
+type outputBridge interface {
+	TerminalOutput(session string, data []byte)
+}
+
 type Config struct {
 	Tmux   *tmux.Tmux
 	Bridge Bridge
@@ -257,7 +263,11 @@ func (c *conn) readPty() {
 			cut := completeUTF8(data)
 			carry = append([]byte(nil), data[cut:]...)
 			if cut > 0 {
-				c.deliver(validUTF8(data[:cut]))
+				whole := validUTF8(data[:cut])
+				if observer, ok := c.s.cfg.Bridge.(outputBridge); ok {
+					observer.TerminalOutput(c.session, whole)
+				}
+				c.deliver(whole)
 			}
 		}
 		if err != nil {

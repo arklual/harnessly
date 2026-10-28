@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/sidechat"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -23,23 +24,38 @@ const (
 // own CLI (Claude on Haiku; Codex's default model). The calls take turns: the machine is small and a chat's title can wait.
 type v2Titler struct {
 	runtimeFile string
-	slot        chan struct{}
+	// envDir holds the machine agent's env files, whose variables the CLI gets ("" when there is none).
+	envDir string
+	slot   chan struct{}
 	// run is the CLI call; a test puts its own.
 	run func(ctx context.Context, p wire.Provider, prompt string) (string, error)
 }
 
-func newV2Titler(runtimeFile string) *v2Titler {
-	t := &v2Titler{runtimeFile: runtimeFile, slot: make(chan struct{}, 1)}
+// oneShotSlot is the machine's one turn for these calls, shared by every titler.
+var oneShotSlot = make(chan struct{}, 1)
+
+func newV2Titler(runtimeFile, envDir string) *v2Titler {
+	t := &v2Titler{runtimeFile: runtimeFile, envDir: envDir, slot: oneShotSlot}
 	t.run = t.runCLI
 	return t
 }
 
-func (t *v2Titler) Title(p wire.Provider, firstMessage, firstAnswer string) (string, error) {
-	t.slot <- struct{}{}
+// oneShot is one call of the agent's CLI with a prompt, in its turn: the titles of chats and a deck's notes made from a
+// dictation take the same slot, the machine is small.
+func (t *v2Titler) oneShot(ctx context.Context, p wire.Provider, prompt string) (string, error) {
+	select {
+	case t.slot <- struct{}{}:
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
 	defer func() { <-t.slot }()
+	return t.run(ctx, p, prompt)
+}
+
+func (t *v2Titler) Title(p wire.Provider, firstMessage, firstAnswer string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), titleCallTimeout)
 	defer cancel()
-	out, err := t.run(ctx, p, titlePrompt(firstMessage, firstAnswer))
+	out, err := t.oneShot(ctx, p, titlePrompt(firstMessage, firstAnswer))
 	if err != nil {
 		return "", err
 	}
@@ -87,12 +103,12 @@ func (t *v2Titler) runCLI(ctx context.Context, p wire.Provider, prompt string) (
 	if p == wire.ProviderCodex {
 		cmd = exec.CommandContext(ctx, "codex", "exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only", "-c",
 			`approval_policy="never"`, prompt)
-		cmd.Env = os.Environ()
+		cmd.Env = withAgentEnv(os.Environ(), t.envDir, agents.Codex)
 	} else {
 		rt := sidechat.ReadRuntime(t.runtimeFile)
 		cmd = exec.CommandContext(ctx, rt.Binary, "--print", "--model", "haiku", "--no-session-persistence", "--tools", "",
 			"--strict-mcp-config", "--disable-slash-commands", "--settings", `{"disableAllHooks":true}`)
-		cmd.Env = sidechat.Env(os.Environ(), rt)
+		cmd.Env = sidechat.Env(withAgentEnv(os.Environ(), t.envDir, agents.Claude), rt)
 		cmd.Stdin = strings.NewReader(prompt)
 	}
 	cmd.Dir = dir

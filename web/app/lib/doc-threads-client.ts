@@ -5,6 +5,7 @@ import type {
   IDocDiffResponse,
   IDocListResponse,
   IDocPeopleResponse,
+  IDocSource,
   IDocThread,
   IDocVersionsResponse,
   TDocThreadStatus,
@@ -12,16 +13,32 @@ import type {
 
 const BASE = '/api/platform/docs';
 
-class DocThreadsError extends Error {}
+/** A refusal of the gateway: its words, the HTTP status and its code (`version_conflict` for an edit made on an old version). */
+export class DocThreadsError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string | null,
+  ) {
+    super(message);
+  }
+}
 
 /** The gateway says what went wrong in `{error}`; that text is shown as it is, the status line only when there is none. */
 const asJson = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const said = await response
       .json()
-      .then((body: { error?: unknown }) => (typeof body?.error === 'string' ? body.error : ''))
-      .catch(() => '');
-    throw new DocThreadsError(said || `${response.status} ${response.statusText}`);
+      .then((body: { error?: unknown; code?: unknown }) => ({
+        error: typeof body?.error === 'string' ? body.error : '',
+        code: typeof body?.code === 'string' ? body.code : null,
+      }))
+      .catch(() => ({ error: '', code: null }));
+    throw new DocThreadsError(
+      said.error || `${response.status} ${response.statusText}`,
+      response.status,
+      said.code,
+    );
   }
   return response.json() as Promise<T>;
 };
@@ -104,5 +121,36 @@ export const setDocPublic = async (slug: string, open: boolean): Promise<IDocAcc
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ public: open }),
+    }),
+  );
+
+/** The Markdown of the current version and whether the person may edit it. */
+export const fetchDocSource = async (slug: string): Promise<IDocSource> =>
+  asJson(await appFetch(`${BASE}/${encodeURIComponent(slug)}/source`));
+
+/** Saves the edited Markdown as a new version; refused with `version_conflict` (409) when `baseVersion` is no longer current. */
+export const saveDocSource = async (
+  slug: string,
+  markdown: string,
+  baseVersion: number,
+): Promise<{ version: number }> =>
+  asJson(
+    await appFetch(`${BASE}/${encodeURIComponent(slug)}/source`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ markdown, baseVersion }),
+    }),
+  );
+
+/** Saves one block of a page edited in place as a new version; `before` is its text as the page showed it. */
+export const saveDocBlock = async (
+  slug: string,
+  edit: { index: number; before: string; html: string; baseVersion: number },
+): Promise<{ version: number }> =>
+  asJson(
+    await appFetch(`${BASE}/${encodeURIComponent(slug)}/source/block`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(edit),
     }),
   );

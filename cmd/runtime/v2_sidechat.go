@@ -28,8 +28,10 @@ type v2SideChat struct {
 	home  string
 	// runtimeFile is the machine's runtime config naming the Claude binary and login.
 	runtimeFile string
-	ask         func(ctx context.Context, run sidechat.Run, onEvent func(sidechat.Event))
-	heartbeat   time.Duration
+	// envDir holds the machine agent's env files, whose variables the CLI gets ("" when there is none).
+	envDir    string
+	ask       func(ctx context.Context, run sidechat.Run, onEvent func(sidechat.Event))
+	heartbeat time.Duration
 }
 
 const sideChatBodyMax = 1 << 20
@@ -145,7 +147,7 @@ func (c *v2SideChat) Serve(w http.ResponseWriter, r *http.Request, conv string) 
 	go func() {
 		defer close(events)
 		ask(ctx, sidechat.Run{SessionID: sessionID, Cwd: cwd, Prompt: sidechat.BuildPrompt(req), Model: req.Model,
-			Runtime: sidechat.ReadRuntime(c.runtimeFile), BaseEnv: os.Environ(), ProjectDir: c.projectDir(cwd), Log: coreLog},
+			Runtime: sidechat.ReadRuntime(c.runtimeFile), BaseEnv: withAgentEnv(os.Environ(), c.envDir, agents.Claude), ProjectDir: c.projectDir(cwd), Log: coreLog},
 			func(e sidechat.Event) { events <- sidechat.Format(e) })
 	}()
 	beat := c.heartbeat

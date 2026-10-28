@@ -98,14 +98,16 @@ export const PhoneBottom = ({ browser, host, onUnfold }: IBarsProps) => (
 
 interface IOverviewProps {
   cards: readonly IOverviewCard[];
+  /** Room at the bottom for the field or a guest's list of comments (devices.ts overviewBox counts it too). */
+  room: boolean;
   /** The page at an address the slot lets in without a ticket; null until the slot has let the first frame in. */
   src: string | null;
   onPick: (id: string) => void;
 }
 
 /** The devices side by side, each with the page in its own size, scaled by one factor. */
-export const Overview = ({ cards, src, onPick }: IOverviewProps) => (
-  <div className="hx-ovw">
+export const Overview = ({ cards, room, src, onPick }: IOverviewProps) => (
+  <div className="hx-ovw" data-room={room}>
     {cards.map(({ device, w, h, scale }) => {
       const name = t(`next.site.devices.${device.id}`);
       return (

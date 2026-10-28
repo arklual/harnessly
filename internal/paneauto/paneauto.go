@@ -197,3 +197,16 @@ func (w *Watcher) keep(tabID string, f Found, now time.Time) bool {
 	w.env.Intents.Add(tabID, panel.Command{Kind: "open", Tab: f.Tab, Target: f.Target, Auto: true, Reload: true}.JSON())
 	return true
 }
+
+// OpenOnce asks the conversation's pane to open a tab on a target, unless the conversation was asked for the very thing
+// already (within the intents' lifetime): the way a handed-over file opens, once, as `open` does. It returns whether it
+// kept an intent, which the caller tells the pages of.
+func OpenOnce(intents *paneintents.Store, tabID, tab, target string) bool {
+	for _, it := range intents.List(tabID) {
+		if cmd := it.Object("command"); sameThing(cmd, Found{Tab: tab, Target: target}) && !isReload(cmd) {
+			return false
+		}
+	}
+	intents.Add(tabID, panel.Command{Kind: "open", Tab: tab, Target: target, Auto: true}.JSON())
+	return true
+}

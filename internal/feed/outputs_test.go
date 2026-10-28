@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -117,5 +118,29 @@ func TestAnUpdatedPageIsChangedAndAFailedCallMadeNothing(t *testing.T) {
 	outs := f.b.turns[0].rec.Outputs
 	if len(outs) != 1 || outs[0].Op != wire.OutputChanged || outs[0].Ref != "https://claude.ai/artifact/old-1" || outs[0].Title != "board" {
 		t.Fatalf("outputs: %+v", outs)
+	}
+}
+
+// A file the agent hands over makes a card with its record, whichever way it did (the CLI or the MCP tool); a file it
+// only writes, or one it merely names in a command, makes none.
+func TestAHandedOverFileIsACard(t *testing.T) {
+	info := delivery.Info{Path: "/w/out/report.zip", Name: "report.zip", Title: "Отчёт", Mime: "application/zip", Size: 2048, SHA256: "ab12"}
+	record := delivery.Message(info)
+	text := `{"type":"user","timestamp":"2026-10-12T10:00:00.000Z","message":{"role":"user","content":"собери zip"}}` + "\n" +
+		toolPair(t, 1, "Write", map[string]any{"file_path": "/w/out/notes.txt", "content": "x"}, "ok") +
+		toolPair(t, 2, "Bash", map[string]any{"command": "harnessly deliver /w/out/report.zip --title Отчёт"}, record) +
+		toolPair(t, 3, "mcp__preview__deliver_file", map[string]any{"path": "/w/out/report.zip"}, record) +
+		toolPair(t, 4, "Bash", map[string]any{"command": "harnessly deliver /w/out/gone.zip"}, "refused") +
+		toolPair(t, 5, "Bash", map[string]any{"command": "harnessly deliver /w/out/fake.zip"}, "Delivered fake.zip https://example.com/fake")
+	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: write(t, text)})
+	f.Load()
+	validate(t, f)
+	outs := f.b.turns[0].rec.Outputs
+	if len(outs) != 1 {
+		t.Fatalf("outputs: %+v", outs)
+	}
+	o := outs[0]
+	if o.Kind != wire.OutputDelivery || o.Ref != info.Path || o.Title != "Отчёт" || o.Name != "report.zip" || o.Size != 2048 || o.Mime != "application/zip" || o.SHA256 != "ab12" {
+		t.Fatalf("%+v", o)
 	}
 }

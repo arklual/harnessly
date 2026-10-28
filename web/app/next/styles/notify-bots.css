@@ -1,0 +1,228 @@
+/* Settings → Notifications → Telegram: the linked bots as rows of one card (the name above everything else), an open
+   bot's form under its row, and «Добавить бота» at the bottom. Open, close and removal fold with .hx-reveal. */
+
+.hx-nb-wrap + .hx-nb-wrap .hx-nb,
+.hx-nb-wrap + .hx-nb-add,
+.hx-nb-empty + .hx-nb-add {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-nb-empty {
+  margin: 0;
+  padding: 16px 16px 14px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+
+.hx-nb__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--hx-dur-xs) ease;
+}
+.hx-nb__head:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-nb-wrap:first-child .hx-nb__head {
+  border-radius: 16px 16px 0 0;
+}
+.hx-nb__ic {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+.hx-nb__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-nb__name {
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-nb__sub,
+.hx-nb__instr {
+  overflow: hidden;
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-nb__sub {
+  color: var(--hx-fg-2);
+}
+.hx-nb__instr {
+  color: var(--hx-fg-3);
+}
+.hx-nb__chev {
+  flex: none;
+  color: var(--hx-fg-3);
+  transition: transform var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-nb[data-open='true'] .hx-nb__chev {
+  transform: rotate(180deg);
+}
+
+.hx-nb__body {
+  display: grid;
+  gap: 16px;
+  padding: 4px 16px 18px 60px;
+}
+.hx-nb__field {
+  display: grid;
+  gap: 6px;
+}
+.hx-nb__label {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-nb__bind > .hx-nb__label,
+.hx-nb__token > .hx-nb__label {
+  margin-bottom: 6px;
+}
+.hx-nb__textarea {
+  height: auto;
+  min-height: 76px;
+  padding: 9px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.hx-nb__hint {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.5;
+}
+.hx-nb__link {
+  color: var(--hx-accent);
+  text-decoration: none;
+}
+.hx-nb__link:hover {
+  text-decoration: underline;
+}
+.hx-nb__chat {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.hx-nb__chat-line {
+  flex: 1;
+  min-width: 0;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  overflow-wrap: anywhere;
+}
+.hx-nb__chat-line[data-none] {
+  color: var(--hx-fg-3);
+}
+.hx-nb__wait {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding-bottom: 2px;
+}
+.hx-nb__open {
+  text-decoration: none;
+}
+.hx-nb__code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+.hx-nb__waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-nb__waiting .hx-set__btn {
+  margin-left: 4px;
+}
+.hx-nb__form {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 2px;
+}
+.hx-nb__body .hx-key-form__err,
+.hx-nb__body .hx-preset__test {
+  margin-top: 10px;
+}
+.hx-nb__actions {
+  padding-top: 2px;
+}
+
+/* The shared bot: the connection and the one instruction in a single card. */
+.hx-nb-shared {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+.hx-nb-shared .hx-key-form__err,
+.hx-nb-shared .hx-preset__test {
+  margin-top: 10px;
+}
+
+.hx-nb-add__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 0 0 16px 16px;
+  background: none;
+  color: var(--hx-accent);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--hx-dur-xs) ease;
+}
+.hx-nb-add__btn:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-nb-add:only-child .hx-nb-add__btn {
+  border-radius: 16px;
+}
+.hx-nb-add__form {
+  padding: 14px 16px 16px;
+}
+
+@media (max-width: 600px) {
+  .hx-nb__body {
+    padding-left: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-nb__chev {
+    transition: none;
+  }
+}

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // MessageStatusMax is how many client ids one GET .../messages asks about.
@@ -150,7 +150,7 @@ func (s *Server) messageStatus(ctx context.Context, w http.ResponseWriter, r *ht
 	case err != nil && ctx.Err() != nil:
 		refuse(w, RefuseTimeout)
 	case err != nil:
-		agent.Log("warn", "v2: message status failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: message status failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		if !CapsOf(r).MsgStatus {

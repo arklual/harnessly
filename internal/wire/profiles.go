@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // Backend profiles: another vendor's models (Kimi, GLM, Grok) behind one of the agent CLIs the machine has. A profile is
@@ -299,7 +299,7 @@ func (s *Server) profilesFailed(w http.ResponseWriter, r *http.Request, err erro
 	case r.Context().Err() != nil || errors.Is(err, context.DeadlineExceeded):
 		refuse(w, RefuseTimeout)
 	default:
-		agent.Log("warn", "v2: the profiles failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: the profiles failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	}
 }

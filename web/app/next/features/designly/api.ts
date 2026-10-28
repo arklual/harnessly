@@ -57,14 +57,31 @@ export const createDesign = (m: MachineId, body: DesignlyCreate) =>
 export const fetchSystems = (m: MachineId, signal?: AbortSignal) =>
   page(m, '/designly/systems', parsePage.designlySystems, { signal });
 
+/** What the machine has for designs: the board engine (fetched with the owner's own account), a browser, ffmpeg. */
+export interface IDesignEngine {
+  ready: boolean;
+  release: string | null;
+  chrome: boolean;
+  ffmpeg: boolean;
+  /** The command that fetches the engine, to run in a terminal of the machine. */
+  fetch: string;
+}
+
+export const fetchEngine = (m: MachineId, signal?: AbortSignal) =>
+  runtimeJson<IDesignEngine>(m, platformPath('/design/engine'), { signal });
+
 export const pinDesign = (m: MachineId, id: string, pinned: boolean) =>
   page(m, '/designly/pin', parsePage.designlyPin, { method: 'POST', body: { id, pinned } });
 
 /** The picture of a board for a card; `version` is the cache key (the project's last change). */
-export const thumbPath = (m: MachineId, id: string, board: string, version: number) =>
+/**
+ * The picture of a board. `fresh` waits for the picture of the board as it is now instead of an earlier one: for an
+ * address that already moves with the board's file (a deck's strip), which an earlier picture would otherwise keep.
+ */
+export const thumbPath = (m: MachineId, id: string, board: string, version: number | string, fresh = false) =>
   runtimePath(
     platformPath(
-      `/design/library/thumb?artifact=${encodeURIComponent(id)}&board=${encodeURIComponent(board)}&v=${version}`,
+      `/design/library/thumb?artifact=${encodeURIComponent(id)}&board=${encodeURIComponent(board)}&v=${encodeURIComponent(version)}${fresh ? '&fresh=1' : ''}`,
     ),
     m,
   );

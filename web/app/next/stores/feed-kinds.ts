@@ -16,6 +16,7 @@ export const DEFAULT_FEED_KINDS: FeedKinds = {
   doc: true,
   mr: true,
   stand: true,
+  delivery: true,
   file: false,
 } as const satisfies Record<FeedKind, boolean>;
 

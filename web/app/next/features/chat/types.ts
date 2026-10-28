@@ -193,7 +193,8 @@ export interface Message {
   resendable?: boolean;
 }
 
-export type PauseReason = 'interrupted' | 'user' | 'launch-failed' | 'agent-gone' | 'limited';
+export type PauseReason =
+  'interrupted' | 'user' | 'launch-failed' | 'agent-gone' | 'limited' | 'needs-target';
 
 export interface QueuePause {
   reason: PauseReason;

@@ -3,13 +3,15 @@ package wire
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // Designly: the machine's design library over v2. A project is made from the library's template and a v2 conversation
@@ -36,16 +38,94 @@ const (
 	DesignBoardsMax = 200
 )
 
+// DesignDeckTone is how a deck's speaker notes are written.
+type DesignDeckTone string
+
+// DesignDeckTones is every DesignDeckTone, in the schema's order.
+var DesignDeckTones = []DesignDeckTone{"talk", "biz", "short"}
+
+// The bounds of a new deck's settings and of what a new project's first message carries.
+const (
+	DesignDeckMinutesMin = 1
+	DesignDeckMinutesMax = 180
+	DesignDeckSlidesMin  = 2
+	DesignDeckSlidesMax  = 40
+	DesignDeckLayoutsMax = 200
+	DesignDeckVarsMax    = 32
+	DesignDeckVarMax     = 64
+	DesignAttachmentsMax = 20
+)
+
+// designDeckVar is the name of a deck's CSS variable a company template may set.
+var designDeckVar = regexp.MustCompile(`^--deck-[a-z0-9-]{1,32}$`)
+
+// DesignlyDeckStyle is the company template a new deck takes its look from: the file's name, the --deck-* variables
+// read from it (POST /design/deck/pptx-style) and its count of slide layouts.
+type DesignlyDeckStyle struct {
+	Source  string            `json:"source"`
+	Vars    map[string]string `json:"vars"`
+	Layouts int               `json:"layouts"`
+}
+
+func (s DesignlyDeckStyle) Validate() error {
+	errs := []error{need("source", s.Source)}
+	if utf8.RuneCountInString(s.Source) > DesignSystemMax {
+		errs = append(errs, errors.New("style.source: too long"))
+	}
+	if s.Layouts < 0 || s.Layouts > DesignDeckLayoutsMax {
+		errs = append(errs, errors.New("style.layouts: out of range"))
+	}
+	if len(s.Vars) > DesignDeckVarsMax {
+		errs = append(errs, errors.New("style.vars: too many"))
+	}
+	for k, v := range s.Vars {
+		if !designDeckVar.MatchString(k) {
+			errs = append(errs, errors.New("style.vars: not a --deck-* name"))
+		}
+		if v == "" || utf8.RuneCountInString(v) > DesignDeckVarMax {
+			errs = append(errs, errors.New("style.vars: bad value"))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// DesignlyDeck is what a new deck (kind slides) is asked to be: its length in minutes (0 or absent: the agent decides),
+// its slide count (nil: the agent picks), the tone of the notes, whether the agent writes notes at all, and the company template's style.
+type DesignlyDeck struct {
+	Minutes int                `json:"minutes"`
+	Slides  *int               `json:"slides"`
+	Tone    DesignDeckTone     `json:"tone"`
+	Script  bool               `json:"script"`
+	Style   *DesignlyDeckStyle `json:"style"`
+}
+
+func (d DesignlyDeck) Validate() error {
+	errs := []error{in("tone", d.Tone, DesignDeckTones)}
+	if d.Minutes != 0 && (d.Minutes < DesignDeckMinutesMin || d.Minutes > DesignDeckMinutesMax) {
+		errs = append(errs, errors.New("minutes: out of range"))
+	}
+	if d.Slides != nil && (*d.Slides < DesignDeckSlidesMin || *d.Slides > DesignDeckSlidesMax) {
+		errs = append(errs, errors.New("slides: out of range"))
+	}
+	if d.Style != nil {
+		errs = append(errs, d.Style.Validate())
+	}
+	return errors.Join(errs...)
+}
+
 // DesignlyCreate is the body of POST /api/v2/designly/create. Model nil: the agent's default; DesignSystem nil: the
-// library's own.
+// library's own. Deck is there only for the kind slides, and only from a page that knows decks. AttachmentIDs are
+// uploads (POST /api/v2/upload) the first message carries: the brief's files, a company template.
 type DesignlyCreate struct {
-	Title        string     `json:"title"`
-	Brief        string     `json:"brief"`
-	Kind         DesignKind `json:"kind"`
-	Provider     Provider   `json:"provider"`
-	Model        *string    `json:"model"`
-	Effort       *Effort    `json:"effort"`
-	DesignSystem *string    `json:"designSystem"`
+	Title         string        `json:"title"`
+	Brief         string        `json:"brief"`
+	Kind          DesignKind    `json:"kind"`
+	Provider      Provider      `json:"provider"`
+	Model         *string       `json:"model"`
+	Effort        *Effort       `json:"effort"`
+	DesignSystem  *string       `json:"designSystem"`
+	Deck          *DesignlyDeck `json:"deck,omitempty"`
+	AttachmentIDs []string      `json:"attachmentIds,omitempty"`
 }
 
 func (c DesignlyCreate) Validate() error {
@@ -62,6 +142,18 @@ func (c DesignlyCreate) Validate() error {
 	}
 	if c.DesignSystem != nil && utf8.RuneCountInString(*c.DesignSystem) > DesignSystemMax {
 		errs = append(errs, errors.New("designSystem: too long"))
+	}
+	if c.Deck != nil {
+		if c.Kind != DesignSlides {
+			errs = append(errs, errors.New("deck: only for kind slides"))
+		}
+		errs = append(errs, c.Deck.Validate())
+	}
+	if len(c.AttachmentIDs) > DesignAttachmentsMax {
+		errs = append(errs, errors.New("attachmentIds: too many"))
+	}
+	for i, id := range c.AttachmentIDs {
+		errs = append(errs, need(fmt.Sprintf("attachmentIds[%d]", i), id))
 	}
 	return errors.Join(errs...)
 }
@@ -318,7 +410,7 @@ func (s *Server) designlyRefusal(w http.ResponseWriter, r *http.Request, err err
 		if errors.Is(err, context.DeadlineExceeded) {
 			de = &DesignlyError{Code: RefuseTimeout, Message: "timeout"}
 		} else {
-			agent.Log("warn", "v2: designly failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+			jsonlog.Log("warn", "v2: designly failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 			de = &DesignlyError{Code: RefuseInternal, Message: "internal"}
 		}
 	}

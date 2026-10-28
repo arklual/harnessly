@@ -1,6 +1,7 @@
 package design
 
 import (
+	"context"
 	"io"
 	"io/fs"
 	"mime"
@@ -35,6 +36,9 @@ type API struct {
 	Push func(PushRequest) []int
 	// AppBase is the platform pages' mount point (a pushed board's link).
 	AppBase string
+	// OneShot is one tool-less, session-less call of the agent's model (a deck's dictation tidied into notes); nil
+	// while none is wired, and the tidy route then answers 503.
+	OneShot func(ctx context.Context, prompt string) (string, error)
 	// PublicToken checks the tokens of the public read (design-public).
 	PublicToken PublicConfig
 	// GuestApp is the built web page (web/dist): the guest page of a link without sign-in is served from it.

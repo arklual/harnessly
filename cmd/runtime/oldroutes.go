@@ -12,7 +12,7 @@ import (
 // "Not found" there, whoever asks.
 var oldRoutes = []string{
 	"/api/auth/login", "/api/auth/logout", "/api/auth/preflight", "/api/auth/setup", "/api/check-agent",
-	"/api/check-claude", "/api/cli/api-guide", "/api/cli/design", "/api/cli/design/claims", "/api/cli/design/history",
+	"/api/check-claude", "/api/cli/api-guide", "/api/cli/deliver", "/api/cli/design", "/api/cli/design/claims", "/api/cli/design/history",
 	"/api/cli/panel", "/api/cli/preview/clear", "/api/cli/preview/console", "/api/cli/preview/mcp",
 	"/api/cli/preview/network", "/api/cli/preview/server-log", "/api/cli/preview/settings", "/api/cli/preview/slots",
 	"/api/cli/tabs", "/api/cli/tabs/[tabId]", "/api/cli/tabs/[tabId]/browser/console",

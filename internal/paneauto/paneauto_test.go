@@ -161,3 +161,20 @@ func TestAnEntryIsLookedAtOnce(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestAHandedOverFileOpensOnce(t *testing.T) {
+	r := newRig(t)
+	if !OpenOnce(r.store, "tab-1", "files", "/w/report.zip") {
+		t.Fatal("the first delivery asks the pane")
+	}
+	if OpenOnce(r.store, "tab-1", "files", "/w/report.zip") {
+		t.Fatal("the same file does not ask twice")
+	}
+	if !OpenOnce(r.store, "tab-1", "files", "/w/other.md") || !OpenOnce(r.store, "tab-2", "files", "/w/report.zip") {
+		t.Fatal("another file or another chat asks")
+	}
+	list := r.store.List("tab-1")
+	if len(list) != 2 {
+		t.Fatalf("%d intents", len(list))
+	}
+}

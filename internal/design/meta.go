@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
@@ -65,12 +66,32 @@ func ULID(ms int64, entropy [10]byte) string {
 	return string(out)
 }
 
-// NewPageID is a fresh ULID of now.
+// NewPageID is a fresh ULID of now. IDs made in the same millisecond still sort in the order they were made: the
+// random part of the next one is the previous one plus one.
 func NewPageID() string {
-	var e [10]byte
-	_, _ = rand.Read(e[:])
-	return ULID(nowMs(), e)
+	idMu.Lock()
+	defer idMu.Unlock()
+	ms := nowMs()
+	if ms == idLastMs {
+		for i := len(idLast) - 1; i >= 0; i-- {
+			idLast[i]++
+			if idLast[i] != 0 {
+				break
+			}
+		}
+	} else {
+		_, _ = rand.Read(idLast[:])
+		idLast[0] &= 0x7f // room to count up within the millisecond
+	}
+	idLastMs = ms
+	return ULID(ms, idLast)
 }
+
+var (
+	idMu     sync.Mutex
+	idLastMs int64
+	idLast   [10]byte
+)
 
 // ProjectMeta is meta/project.json.
 type ProjectMeta struct {

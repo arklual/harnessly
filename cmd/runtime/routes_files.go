@@ -231,8 +231,14 @@ func uploadsRoute(r *http.Request) ([]string, string, bool) {
 	return parts[2:], apiPath, true
 }
 
+// workspaceAccess is which files the viewer shows, hands over and the agent delivers: the workspace's folders, the
+// shared projects and the temp folders, no secrets.
+func workspaceAccess(d deps) *files.Access {
+	return files.NewAccess([]string{d.WorkspaceRoot, sharedProjects, files.NodeTempDir(), "/tmp"}, splitList(os.Getenv("RUNTIME_SECRET_CONFIG_DIRS")))
+}
+
 func fileBodyRoutes(d deps) []gate.BodyRoute {
-	access := files.NewAccess([]string{d.WorkspaceRoot, sharedProjects, files.NodeTempDir(), "/tmp"}, splitList(os.Getenv("RUNTIME_SECRET_CONFIG_DIRS")))
+	access := workspaceAccess(d)
 	uploads := os.Getenv("RUNTIME_UPLOADS_DIR")
 	if uploads == "" {
 		uploads = filepath.Join(d.DataDir, "uploads")

@@ -35,7 +35,7 @@ import { UI_REQUEST, useContinueRequest, useUiRequest } from '@/next/stores/ui-r
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 
-const HANDOFF_MODES = [SHEET_MODE.excerpt, SHEET_MODE.note] as const;
+const HANDOFF_MODES = [SHEET_MODE.excerpt, SHEET_MODE.note, SHEET_MODE.history] as const;
 const MERGE_MODES = [SHEET_MODE.result] as const;
 
 interface ITarget {
@@ -189,16 +189,22 @@ export function useChatHandoff(
           onDraft={(mode: TSheetMode) =>
             draftOf(machine, conv, target ? draftRequestOf(mode, target.agent, target.model.id) : { mode })
           }
-          onSend={async (mode, text) => {
+          onSend={async (mode, text, artifactId) => {
             if (!target || mode === SHEET_MODE.result) return;
             const model = { id: target.model.id, effort: target.model.defaultEffort };
+            let context: Parameters<typeof handoffConversation>[3];
+            if (mode === SHEET_MODE.history) {
+              if (!artifactId) return;
+              context = { mode, artifactId };
+            } else {
+              context = { mode, text };
+            }
             await opened(
               handoffConversation(
                 machine,
                 conv,
                 { provider: target.agent.provider, profile: target.agent.profile ?? undefined, model },
-                mode,
-                text,
+                context,
               ),
             );
           }}

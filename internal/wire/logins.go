@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // Signing an agent in from the page. The CLI does the signing in (the runtime drives it through a terminal of its own);
@@ -299,7 +299,7 @@ func (s *Server) loginAnswer(w http.ResponseWriter, r *http.Request, v interface
 	case r.Context().Err() != nil || errors.Is(err, context.DeadlineExceeded):
 		refuse(w, RefuseTimeout)
 	default:
-		agent.Log("warn", "v2: the sign-in failed", agent.F{K: "path", V: r.URL.Path})
+		jsonlog.Log("warn", "v2: the sign-in failed", jsonlog.F{K: "path", V: r.URL.Path})
 		refuse(w, RefuseInternal)
 	}
 }

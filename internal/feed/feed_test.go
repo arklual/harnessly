@@ -530,3 +530,25 @@ func TestSendMessageStepCarriesTheAddresseeAndTheText(t *testing.T) {
 	}
 	t.Fatalf("no SendMessage step\n%s", shape(f))
 }
+
+// One Bash call logged twice (a resumed session copies its lines) is one step, and its result settles it.
+func TestAToolCallLoggedTwiceIsOneStep(t *testing.T) {
+	call := func(uuid string) string {
+		return `{"type":"assistant","uuid":"` + uuid + `","timestamp":"2026-10-12T10:00:01.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_dup","name":"Bash","input":{"command":"cd /work"}}]}}` + "\n"
+	}
+	text := `{"type":"user","timestamp":"2026-10-12T10:00:00.000Z","message":{"role":"user","content":"go"}}` + "\n" +
+		call("00000000-0000-4000-8000-000000000001") + call("00000000-0000-4000-8000-000000000002") +
+		`{"type":"user","timestamp":"2026-10-12T10:00:02.000Z","message":{"role":"user","content":[{"tool_use_id":"toolu_dup","type":"tool_result","content":"done","is_error":false}]}}` + "\n"
+	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: write(t, text)})
+	f.Load()
+	validate(t, f)
+	var tools []wire.Entry
+	for _, e := range f.b.entries {
+		if e.T == wire.EntryTool {
+			tools = append(tools, e)
+		}
+	}
+	if len(tools) != 1 || tools[0].OK == nil || !*tools[0].OK {
+		t.Fatalf("tool entries: %+v\n%s", tools, shape(f))
+	}
+}

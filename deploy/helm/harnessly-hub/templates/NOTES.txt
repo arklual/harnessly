@@ -1,0 +1,57 @@
+The harnessly hub is starting as {{ include "hub.fullname" . }} (one pod, replaced and not rolled on an upgrade).
+
+{{- if .Values.ingress.enabled }}
+
+Open {{ include "hub.publicUrl" . }}
+{{- if .Values.runtimeDomain }}
+Machines are served at https://<machine>.{{ .Values.runtimeDomain }}: keep a wildcard DNS record and a certificate for
+*.{{ .Values.runtimeDomain }} pointing at the ingress.
+{{- end }}
+{{- else }}
+
+Reach it from your machine:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "hub.fullname" . }} 8040:{{ .Values.service.port }}
+(then publicUrl must be http://localhost:8040, or the sign-in providers and the machines will look for another address)
+{{- end }}
+
+{{- if .Values.adminEmails }}
+
+Administrators: {{ join ", " .Values.adminEmails }}. An address counts once the person has proved it (a code by mail,
+or a sign-in provider that says it checked it).
+{{- else }}
+
+No administrators are named (adminEmails): the first account to sign in, with an address it has proved, becomes the
+administrator. Name them before the hub is reachable by anyone else.
+{{- end }}
+{{- if eq .Values.signup "open" }}
+Sign-up is open: anyone who can reach the hub can create an account.
+{{- else }}
+Sign-up is by invitation: only the administrators and people they invite can create an account.
+{{- end }}
+{{- if and .Values.ingress.enabled (not .Values.trustedProxies) }}
+
+trustedProxies is empty: the hub believes no X-Forwarded-For, so everyone shares the ingress controller's address and
+its sign-in limits. Set it to the controller's pod range (kubectl -n <ingress namespace> get pods -o wide) and keep
+externalTrafficPolicy: Local on the controller's Service, or the address it forwards is a node's.
+{{- end }}
+{{- if not .Values.runtimeDomain }}
+
+Machines are served on the hub's own address (<publicUrl>/m/<machine>/): the pages of a machine run with the hub's
+origin, so a machine whose owner or software you do not trust completely can act as the person who opened it. Set
+runtimeDomain (a domain of its own, with a wildcard record and certificate) to give each machine an origin of its own.
+{{- end }}
+{{- if not (or .Values.secrets.HUB_SMTP_URL .Values.existingSecret) }}
+No mail server is set (HUB_SMTP_URL in the Secret): the sign-in code is written to the log, marked DEV.
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "hub.fullname" . }} | grep "DEV email code"
+{{- end }}
+{{- if and (not .Values.persistence.enabled) .Values.ssh (not (or .Values.secrets.HUB_SECRET_KEY .Values.existingSecret)) }}
+
+Warning: persistence is off and the SSH way is on: the key that seals the spaces' SSH keys is made again at each
+restart, and the servers that trusted a space's key have to be told the new one. Turn persistence on, set
+HUB_SECRET_KEY in the Secret, or set ssh: false.
+{{- end }}
+{{- if and (not .Values.persistence.enabled) (not .Values.database.postgres.enabled) }}
+
+Warning: persistence is off and the database is the SQLite file: everything is lost when the pod is. Turn persistence
+on, or point HUB_DATABASE_URL (in the Secret) at Postgres.
+{{- end }}

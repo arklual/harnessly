@@ -200,7 +200,7 @@ func (a *API) Shot(w http.ResponseWriter, r *http.Request) {
 	image(w, r, data, immutableShot)
 }
 
-// Thumb is GET ?artifact=&board=&v=[&all=1] — the gallery picture of a board. An edited board answers at once with its
+// Thumb is GET ?artifact=&board=&v=[&all=1][&fresh=1] — the gallery picture of a board. An edited board answers at once with its
 // earlier picture, not to be kept, while the new one is drawn; all draws the project's other pictures ahead; 404 when
 // there is none yet or at all. In the shadow (a writer that cannot flush) nothing is drawn: only a picture already
 // there is served.
@@ -233,9 +233,12 @@ func (a *API) Thumb(w http.ResponseWriter, r *http.Request) {
 		go a.L.WarmThumbs(artifact)
 	}
 	file, current := ans.File, ans.Current
-	if file == "" && ans.Drawing != nil {
-		file, _ = ans.Drawing.Wait(thumbWait)
-		current = true
+	// fresh=1 (a deck's strip, whose address already moves with the board's file) waits for the picture of this
+	// version: the earlier one, served without being kept, would stay in the strip as long as the address does.
+	if ans.Drawing != nil && (file == "" || QueryString(r, "fresh") == "1") {
+		if drawn, done := ans.Drawing.Wait(thumbWait); done && drawn != "" || file == "" {
+			file, current = drawn, true
+		}
 	}
 	var data []byte
 	if file != "" {

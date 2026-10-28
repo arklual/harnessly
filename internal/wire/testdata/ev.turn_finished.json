@@ -18,7 +18,8 @@
       "files": [{"path": "internal/wire/codec.go", "op": "edited"}],
       "outputs": [
         {"kind": "artifact", "op": "created", "title": "Разбор кодека", "ref": "https://docs.example.com/a/codec"},
-        {"kind": "mr", "op": "created", "title": "harnessly !80", "ref": "https://gitlab.example.com/ly/harnessly/-/merge_requests/80"}
+        {"kind": "mr", "op": "created", "title": "harnessly !80", "ref": "https://gitlab.example.com/ly/harnessly/-/merge_requests/80"},
+        {"kind": "delivery", "op": "created", "title": "Отчёт", "ref": "/w/out/report.zip", "name": "report.zip", "mime": "application/zip", "size": 2048, "sha256": "0b1e5c2f"}
       ]
     }
   }

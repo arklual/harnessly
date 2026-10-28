@@ -9,7 +9,7 @@ import AttachmentThumb from '@/next/ui/attachment-thumb';
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { readAnnotated } from '@/next/features/designly/annotation';
 import { attachedOf, REF_ICON, refKey } from '@/next/features/chat/attached';
-import type { MessageRef } from '@/next/protocol/v2';
+import type { LaunchFailure, MessageRef } from '@/next/protocol/v2';
 import { NoteLine } from '@/next/features/designly/note-chip';
 import type { MessageFailure } from '@/next/features/chat/types';
 import {
@@ -71,9 +71,13 @@ const FAILURE_KEYS: Partial<Record<MessageFailure, string>> = {
 const PAUSE_KEYS: Partial<Record<QueuePause['reason'], string>> = {
   'launch-failed': 'next.queue.pausedLaunch',
   'agent-gone': 'next.queue.pausedGone',
+  'needs-target': 'next.queue.pausedTarget',
 } as const;
 
-const pauseNote = (pause: QueuePause | null): string => {
+const pauseNote = (pause: QueuePause | null, launchFailure: LaunchFailure | null): string => {
+  // A launch that failed because the machine is overloaded says so: the person waits instead of hunting for a fault.
+  if (pause?.reason === 'launch-failed' && launchFailure === 'machine-busy')
+    return t('next.queue.pausedBusy');
   const key = pause ? PAUSE_KEYS[pause.reason] : undefined;
   return t(key ?? 'next.queue.paused');
 };
@@ -93,6 +97,8 @@ const rowState = (row: QueueRow, paused: boolean, limit: boolean): TRowState => 
 interface IQueueProps {
   rows: QueueRow[];
   paused: QueuePause | null;
+  /** Why the agent did not start, while the conversation is in launch-failed. */
+  launchFailure?: LaunchFailure | null;
   /** The subscription's limit holds the queue until it is back. */
   waitingLimit: boolean;
   onRemove: (clientId: string) => Promise<unknown>;
@@ -147,7 +153,7 @@ const Row = ({
   const busy = isBusy(action.phase);
   const { onEdit, onSendNow } = props;
   let note = '';
-  if (state === 'paused') note = pauseNote(props.paused);
+  if (state === 'paused') note = pauseNote(props.paused, props.launchFailure ?? null);
   if (state === 'limit') note = t('next.queue.limit');
   if (state === 'sending') note = row.handed ? t('next.message.handed') : t('next.queue.sending');
   // Text in the terminal's input line that is not this message holds it back: the person sees why, not a silent wait.
@@ -217,7 +223,7 @@ const Row = ({
           ))}
         </span>
       )}
-      {state === 'paused' && first && (
+      {state === 'paused' && first && props.paused?.reason !== 'needs-target' && (
         <button
           type="button"
           className="hx-queue__steer"

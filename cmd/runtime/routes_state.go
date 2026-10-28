@@ -510,13 +510,26 @@ type signIn struct {
 
 func authRoutes(d deps, store *settings.Store, open func(settings.Handler) func(*http.Request) (int, any, http.Header)) []gate.JSONRoute {
 	s := &signIn{}
-	if p := os.Getenv("INIT_PASSWORD"); len(utf16.Encode([]rune(p))) >= 4 {
-		cfg, _ := store.ReadConfig().(*jsvalue.Object)
-		pw, _ := cfg.Get("authPassword")
-		secret, _ := cfg.Get("authSecret")
-		if !settings.IsHashedPassword(pw) || !jsvalue.Truthy(secret) {
+	initPW := os.Getenv("INIT_PASSWORD")
+	if len(utf16.Encode([]rune(initPW))) < 4 {
+		initPW = ""
+	}
+	cfg, _ := store.ReadConfig().(*jsvalue.Object)
+	pw, _ := cfg.Get("authPassword")
+	secret, _ := cfg.Get("authSecret")
+	if !settings.IsHashedPassword(pw) || !jsvalue.Truthy(secret) {
+		// Not set up yet. Without an INIT_PASSWORD a runtime that others can reach makes one, so the first visitor cannot
+		// choose the password (init_password.go).
+		generated := initPW == "" && wantsGeneratedInitPassword(d.Upstream)
+		if generated {
+			initPW = newInitPassword()
+		}
+		if initPW != "" {
 			s.initMode = true
-			s.initHash = settings.HashPassword(p)
+			s.initHash = settings.HashPassword(initPW)
+			if generated {
+				announceInitPassword(initPW)
+			}
 		}
 	}
 	route := func(p string, h settings.Handler) gate.JSONRoute {

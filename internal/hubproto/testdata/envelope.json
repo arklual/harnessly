@@ -1,0 +1,47 @@
+[
+  {
+    "machineId": "abcdefghijklmnopqrst",
+    "purpose": "key:claude",
+    "encPrivate": "ERERERERERERERERERERERERERERERERERERERERERE=",
+    "encKey": "e06Qm75//kTEZaIgA31gjuNYl9Me+XLwf3SJLLD3PxM=",
+    "ephemeralPrivate": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+    "nonce": "MzMzMzMzMzMzMzMz",
+    "plaintext": "sk-ant-api03-EXAMPLE-NOT-A-KEY",
+    "envelope": {
+      "v": 1,
+      "epk": "D6poTtKIZ7l/Smot7l34zpdOdrcBjj8iocTPJnhXDyA=",
+      "nonce": "MzMzMzMzMzMzMzMz",
+      "ct": "L9kXOUJEJYiMUNuln/zcCQm4rqrj10ESpzKzDwY1L0RtZ1hBP+IDPKaa9bxojw=="
+    }
+  },
+  {
+    "machineId": "abcdefghijklmnopqrst",
+    "purpose": "env:GH_TOKEN",
+    "encPrivate": "REREREREREREREREREREREREREREREREREREREREREQ=",
+    "encKey": "/y7kVgHsG2cxDHeQQEWFrmlzMe7hwfjPJBlzHB//Pms=",
+    "ephemeralPrivate": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=",
+    "nonce": "ZmZmZmZmZmZmZmZm",
+    "plaintext": "ghp_EXAMPLE_not_a_token_ключ",
+    "envelope": {
+      "v": 1,
+      "epk": "OKtmS9hvd9fma92a4HkpE6lP2LM6EmACfktGwfSITGc=",
+      "nonce": "ZmZmZmZmZmZmZmZm",
+      "ct": "0H+kydN1/Kmtiz9wCmMfNn0mx0OKf8F3Jv/KCrCo5oic7bjjUIbTBvVRx1XiHw2u"
+    }
+  },
+  {
+    "machineId": "tsrqponmlkjihgfedcba",
+    "purpose": "key:codex",
+    "encPrivate": "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3c=",
+    "encKey": "HPV5q6RaELodHvBtkfyiqp7QoRUFFWUxVUBdCxjLmmc=",
+    "ephemeralPrivate": "iIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIg=",
+    "nonce": "mZmZmZmZmZmZmZmZ",
+    "plaintext": "",
+    "envelope": {
+      "v": 1,
+      "epk": "MNPIZaSPzrPWEYV3zy5fIo1v9phmJkdXeFslPLekgGo=",
+      "nonce": "mZmZmZmZmZmZmZmZ",
+      "ct": "buThrBP1nFMC3YBkU98szg=="
+    }
+  }
+]

@@ -606,9 +606,8 @@ func TestCreateWithShippedTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	project := filepath.Join(p.Dir, ProjectDirname)
-	engine, _ := newProjectFiles.ReadFile("newproject/project/support.js")
-	if readFileT(t, filepath.Join(project, SupportJSName)) != string(engine) || len(engine) < 1000 {
-		t.Fatal("support.js is the shipped engine")
+	if readFileT(t, filepath.Join(project, SupportJSName)) != string(testEngine) {
+		t.Fatal("support.js is the machine's engine")
 	}
 	if !strings.Contains(readFileT(t, filepath.Join(project, "_board-template.html")), `<script src="./support.js"></script>`) {
 		t.Fatal("the board template pulls in support.js")

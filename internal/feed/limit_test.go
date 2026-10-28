@@ -84,6 +84,26 @@ func TestLimitEndOfAClaudeTurn(t *testing.T) {
 	}
 }
 
+func TestClaudeTerminalQuotaSignalKeepsTheHumanMessage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.jsonl")
+	body := `{"uuid":"00000000-0000-4000-8000-000000000001","timestamp":"2026-09-26T23:07:30.000Z","type":"user","message":{"role":"user","content":"go on"}}
+{"uuid":"00000000-0000-4000-8000-000000000002","parentUuid":"00000000-0000-4000-8000-000000000001","timestamp":"2026-09-26T23:07:36.830Z","type":"assistant","message":{"model":"<synthetic>","role":"assistant","type":"message","content":[{"type":"text","text":"Quota exhausted for this account"}]},"error":"rate_limit","isApiErrorMessage":true,"apiErrorStatus":429,"apiErrorIsTransient":false}
+`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	u := New("c1", wire.ProviderClaude, &ClaudeSource{Path: path}).Load()
+	for _, signal := range u.Signals {
+		if signal.K == SignalFailure {
+			if signal.Failure != "quota_exhausted" || signal.Detail != "Quota exhausted for this account" {
+				t.Fatalf("terminal failure signal: %+v", signal)
+			}
+			return
+		}
+	}
+	t.Fatal("no terminal failure signal")
+}
+
 // The vendors' words of a usage limit, and the 429s that are not one. Claude's words must not catch any of them.
 func TestVendorLimitText(t *testing.T) {
 	at := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)

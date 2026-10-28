@@ -422,6 +422,7 @@
 /* ── Segmented choice ────────────────────────────────── */
 .hx-segmented {
   display: inline-flex;
+  width: fit-content;
   padding: 2px;
   border-radius: var(--hx-radius-sm);
   background: var(--hx-bg-active);

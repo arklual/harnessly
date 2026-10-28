@@ -37,6 +37,12 @@ func people(v string) map[string]string {
 	return out
 }
 
+// designEngineDir is where this machine keeps the board engine its owner fetched (`harnessly design engine fetch`);
+// laid out as a mirror of releases, it is the releases folder unless the deployment names a mirror of its own.
+func designEngineDir(d deps) string {
+	return env("RUNTIME_DESIGN_ENGINE_DIR", design.DefaultEngineDir(d.DataDir))
+}
+
 func designConfig(d deps) design.Config {
 	port, _ := strconv.Atoi(os.Getenv("RUNTIME_DESIGN_LIBRARY_PORT"))
 	return design.Config{
@@ -50,7 +56,7 @@ func designConfig(d deps) design.Config {
 		HistoryDir:       os.Getenv("RUNTIME_DESIGN_HISTORY_DIR"),
 		KitsDir:          os.Getenv("RUNTIME_DESIGN_KITS_DIR"),
 		KitOrigins:       splitList(os.Getenv("RUNTIME_DESIGN_KIT_ORIGINS")),
-		ReleasesDir:      os.Getenv("RUNTIME_DESIGN_RELEASES_DIR"),
+		ReleasesDir:      env("RUNTIME_DESIGN_RELEASES_DIR", designEngineDir(d)),
 		Port:             port,
 		Chrome:           os.Getenv("RUNTIME_DESIGN_CHROME"),
 		PlatformAPI:      platformAPI,
@@ -136,9 +142,11 @@ func designRoutes(d deps) []gate.JSONRoute {
 		designRoute(platformAPI+"/design/library/locate", a.Locate),
 		designRoute(platformAPI+"/design/library/send", a.Send),
 		designRoute("/api/cli/design/pages", a.CLIPages),
+		designRoute("/api/cli/design/notes", a.CLINotes),
 		designRoute(platformAPI+"/design/library/releases", a.Releases),
 		designRoute(platformAPI+"/design/access", a.PostAccess),
 		designRoute(platformAPI+"/design/library/claim", a.ClaimProject),
+		designRoute(platformAPI+"/design/engine", a.EngineStatus),
 	}
 }
 

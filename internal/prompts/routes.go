@@ -2,11 +2,13 @@ package prompts
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"regexp"
 	"slices"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/chatguard"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/screen"
 )
@@ -117,6 +119,9 @@ func (s *Service) PromptQueue(body []byte) Response {
 		if _, known := s.cfg.Tabs.Tab(tabID); !known {
 			return fail(404, msgNoTab.String())
 		}
+		if s.cfg.TerminalOff() && chatguard.BashMode(f.text("text")) {
+			return fail(403, msgTerminalOff.String())
+		}
 		item, repeated, err := s.queue.AddOnce(tabID, f.text("clientId"), f.text("text"), images)
 		if err != nil {
 			return fail(409, err.Error())
@@ -186,6 +191,8 @@ func (s *Service) PromptText(body []byte) Response {
 		return fail(404, msgNoTab.String())
 	case err == ErrCodexNeedsSubmit:
 		return fail(400, msgCodexSubmit.String())
+	case errors.Is(err, ErrTerminalOff):
+		return fail(403, msgTerminalOff.String())
 	case err != nil:
 		return fail(500, msgTypeFailed.String())
 	case via == ViaFailed:
@@ -348,6 +355,9 @@ func (s *Service) CommandScreenKey(body []byte) Response {
 	if cmd := s.cfg.Panes.PaneCurrentCommand(session); cmd == "" || s.cfg.IsShell(cmd) {
 		return fail(409, msgAgentNotRunning.String())
 	}
+	if s.cfg.TerminalOff() && s.answersAnApproval(session) {
+		return fail(403, msgTerminalOff.String())
+	}
 	unlock := hold(session)
 	sent := s.cfg.Panes.SendRawKeys(session, key) == nil
 	if sent {
@@ -358,6 +368,14 @@ func (s *Service) CommandScreenKey(body []byte) Response {
 		return fail(500, msgKeyFailed.String())
 	}
 	return s.readMirror(session)
+}
+
+// answersAnApproval: the agent's screen asks to approve a tool call or a plan, and a mirror key (a digit, Enter) would
+// answer it. With the terminal off that is the owner's to press, as /api/v2/cmd/decide is: the mirror is for the menus
+// of slash commands. A screen that cannot be read is no proof that nothing is asked.
+func (s *Service) answersAnApproval(session string) bool {
+	content, captured := s.cfg.Panes.CaptureAtWidth(session, 120, 50)
+	return !captured || screen.HasPermissionPrompt(content) || len(screen.ParsePlanOptions(content)) > 0
 }
 
 // --- raw tmux routes ----------------------------------------------------------------------------------------------

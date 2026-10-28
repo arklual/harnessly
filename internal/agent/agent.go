@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 const (
@@ -34,13 +36,17 @@ var evalRunID = regexp.MustCompile(`^[0-9a-f-]{36}$`)
 type Agent struct {
 	cfg    Config
 	secret []byte
-	roots  Roots
-	hello  Hello
-	client *http.Client
+	// secretMu guards secret for a hub-mode agent, which starts before the runtime has written it.
+	secretMu sync.Mutex
+	roots    Roots
+	hello    Hello
+	client   *http.Client
 
 	tunnels     *tunnels
 	state       *stateFiles
 	transcripts *transcriptWatch
+	// hub is set when the agent dials a hub (machine.json); nil is the closed cluster's mode.
+	hub *hub
 
 	mu      sync.Mutex
 	clients map[*link]struct{}
@@ -48,9 +54,17 @@ type Agent struct {
 	automationTokens map[string]string
 	// pendingStates: a runtime's state commit or patch waiting for the cluster's state.result.
 	pendingStates map[string]chan StateResult
+	// pendingDocs: a doc.publish or doc.acl waiting for the cluster's doc.result, a notify.call for its
+	// notify.result.
+	pendingDocs map[string]chan DocResult
 
 	statusMu sync.Mutex
 	status   *websocket.Conn
+
+	// the chats of the runtime, forwarded to the cluster.
+	replica     *replica
+	replicaMu   sync.Mutex
+	replicaConn *websocket.Conn
 
 	localToken string
 }
@@ -58,8 +72,13 @@ type Agent struct {
 // New prepares the agent; Run starts it.
 func New(cfg Config) (*Agent, error) {
 	secret, err := cfg.LoadSecret()
-	if err != nil {
+	if err != nil && cfg.Machine == nil {
 		return nil, err
+	}
+	// A hub-mode agent starts without the runtime's secret: the runtime may not have written it yet, and what needs it
+	// (runtime.session, the agent's own calls) says so until it is there.
+	if err != nil {
+		secret = nil
 	}
 	username := ""
 	if u, err := user.Current(); err == nil {
@@ -68,7 +87,7 @@ func New(cfg Config) (*Agent, error) {
 	hostname, _ := os.Hostname()
 	features := []string{"transcripts", "state", "machine", "automations", "docs"}
 	if cfg.RuntimePort != 0 {
-		features = append(features, "status", "sync", "tunnel")
+		features = append(features, "status", "sync", "tunnel", "v2events")
 	}
 	a := &Agent{
 		cfg:              cfg,
@@ -80,10 +99,27 @@ func New(cfg Config) (*Agent, error) {
 		clients:          map[*link]struct{}{},
 		automationTokens: map[string]string{},
 		pendingStates:    map[string]chan StateResult{},
+		pendingDocs:      map[string]chan DocResult{},
 	}
 	a.state = newStateFiles(cfg.DataDir, cfg.ExtraStateFiles, a.broadcast, a.notifyRuntimeOfState)
 	a.transcripts = newTranscriptWatch(a.roots, a.broadcast)
+	if cfg.Machine != nil {
+		a.hub = newHub(a)
+	}
+	a.replica = newReplica(a)
 	return a, nil
+}
+
+// sessionSecret is the pair's secret. A hub-mode agent looks for it again until it is found; nil while it is not there.
+func (a *Agent) sessionSecret() []byte {
+	a.secretMu.Lock()
+	defer a.secretMu.Unlock()
+	if a.secret == nil && a.cfg.Machine != nil {
+		if s, err := a.cfg.LoadSecret(); err == nil {
+			a.secret = s
+		}
+	}
+	return a.secret
 }
 
 func (a *Agent) broadcast(ev any) {
@@ -99,7 +135,10 @@ func (a *Agent) broadcast(ev any) {
 	}
 	a.mu.Unlock()
 	for _, l := range links {
-		l.sendText(frame)
+		// A hub link is told protocol 2's events, by emitHub, and none of the closed cluster's.
+		if !l.hub {
+			l.sendText(frame)
+		}
 	}
 }
 
@@ -112,15 +151,27 @@ func (a *Agent) connected() bool {
 // serve runs one cluster session, whichever side dialled: the cluster asks, the agent answers and sends its events.
 // It returns the error that ended the session; every frame read is signalled on heard, if given.
 func (a *Agent) serve(conn *websocket.Conn, heard chan<- struct{}) error {
+	return a.serveLink(conn, heard, false)
+}
+
+// serveLink is serve for either kind of link: hub says the other end is a hub (protocol 2).
+func (a *Agent) serveLink(conn *websocket.Conn, heard chan<- struct{}, hub bool) error {
 	conn.SetReadLimit(MaxPayload)
 	l := newLink(conn)
+	l.hub = hub
 	a.mu.Lock()
 	a.clients[l] = struct{}{}
 	a.mu.Unlock()
+	if hub {
+		a.hub.linkUp(l)
+	}
 	defer func() {
 		a.mu.Lock()
 		delete(a.clients, l)
 		a.mu.Unlock()
+		if hub {
+			a.hub.linkDown(l)
+		}
 		if n := a.tunnels.DropLink(l); n > 0 {
 			Log("info", "tunnels closed with the link", F{"tunnels", n})
 		}
@@ -166,7 +217,20 @@ func (a *Agent) answer(l *link, req map[string]json.RawMessage) {
 	if id == nil {
 		id = json.RawMessage("null")
 	}
-	result, after, err := a.handle(l, req)
+	var result any
+	var after func()
+	var err error
+	if l.hub {
+		result, after, err = a.hub.handle(l, req)
+		if err != nil {
+			var he *hubproto.Error
+			if !errors.As(err, &he) {
+				err = hubproto.Errf(hubproto.CodeFailed, "%s", err.Error())
+			}
+		}
+	} else {
+		result, after, err = a.handle(l, req)
+	}
 	var frame []byte
 	if encode, ok := result.(frameEncoder); ok && err == nil {
 		l.sendText(encode(id))
@@ -263,6 +327,11 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 		}
 		a.settleState(requestID, res)
 		return map[string]bool{"settled": true}, nil, nil
+	case "doc.result", "notify.result":
+		requestID, _ := field[string](req, "requestId")
+		status, _ := field[float64](req, "status")
+		a.settleDoc(requestID, DocResult{Status: int(status), Body: req["body"]})
+		return map[string]bool{"settled": true}, nil, nil
 	case "transcripts.read":
 		path, _ := field[string](req, "path")
 		if !a.roots.IsTranscriptPath(path) {
@@ -342,6 +411,19 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 	case "status.send":
 		res, err := a.sendStatus(req["message"])
 		return res, nil, err
+	case "v2.start":
+		enabled, _ := field[bool](req, "enabled")
+		cursors, _ := field[map[string]cursor](req, "cursors")
+		known, _ := field[map[string]int64](req, "known")
+		a.replica.start(enabled, cursors, known)
+		return map[string]bool{"ok": true}, nil, nil
+	case "v2.ack":
+		ch, _ := field[string](req, "ch")
+		epoch, _ := field[string](req, "epoch")
+		ackSeq, _ := field[int64](req, "ackSeq")
+		gap, _ := field[bool](req, "gap")
+		a.replica.ack(ch, epoch, ackSeq, gap)
+		return map[string]bool{"ok": true}, nil, nil
 	case "eval.stop":
 		runID, _ := field[string](req, "runId")
 		if !evalRunID.MatchString(runID) {
@@ -359,13 +441,16 @@ func (a *Agent) runtimeURL(path string) string {
 }
 
 func (a *Agent) runtimeCookie() string {
-	return a.cfg.RuntimeCookie + "=" + SignHS256(a.secret, "machine-agent", "", 2*time.Minute)
+	return a.cfg.RuntimeCookie + "=" + SignHS256(a.sessionSecret(), "machine-agent", "", 2*time.Minute)
 }
 
 // callRuntime posts to the runtime next door over loopback, signed with the pair's secret as a page session would be.
 func (a *Agent) callRuntime(route string, payload any) (json.RawMessage, error) {
 	if a.cfg.RuntimePort == 0 {
 		return nil, errors.New("this runtime has no local API port configured")
+	}
+	if a.sessionSecret() == nil {
+		return nil, errors.New("the runtime has not written its secret yet")
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -468,6 +553,9 @@ func (a *Agent) settleState(requestID string, res StateResult) {
 
 // Run starts the loops, the loopback server and, when configured, the call to the cluster. It returns when ctx ends.
 func (a *Agent) Run(ctx context.Context) error {
+	if a.hub != nil {
+		return a.runHub(ctx)
+	}
 	a.transcripts.WatchRoots()
 	go every(ctx, a.cfg.ScanInterval, true, func() {
 		a.transcripts.WatchRoots()
@@ -479,6 +567,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.cfg.RuntimePort != 0 {
 		go every(ctx, machineEvery, false, a.machineSnapshot)
 		a.startRelays(ctx)
+		a.startReplica(ctx)
 	}
 	if a.cfg.ClusterURL != "" && a.cfg.RuntimeID != "" {
 		go a.dialCluster(ctx)
@@ -501,5 +590,30 @@ func every(ctx context.Context, d time.Duration, now bool, f func()) {
 		case <-t.C:
 			f()
 		}
+	}
+}
+
+// runHub is Run for a machine registered with a hub: no transcripts are read and no state is kept in step, only the
+// hub's operations are served, over the signed link the hub-side loop keeps.
+func (a *Agent) runHub(ctx context.Context) error {
+	if err := a.hub.start(ctx); err != nil {
+		return err
+	}
+	defer a.hub.stop()
+	// Run does not return before the dial loop has: a late write of agent-link.json or the audit log after stop would
+	// leave files behind (and a temp folder of a test that cannot be removed).
+	dialed := make(chan struct{})
+	go func() {
+		defer close(dialed)
+		a.hub.dialHub(ctx)
+	}()
+	defer func() { <-dialed }()
+	return a.listen(ctx)
+}
+
+// ReloadPolicy reads the policy file again (SIGHUP).
+func (a *Agent) ReloadPolicy() {
+	if a.hub != nil {
+		a.hub.policy.Reload(true)
 	}
 }

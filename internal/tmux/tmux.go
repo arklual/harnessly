@@ -6,13 +6,15 @@
 // session named with the legacy prefix lives wherever it is found (on the legacy server while it lives from before, on
 // the current one once it was started again), and the server it was last seen on is remembered.
 //
-// Every command runs `tmux` directly (no shell) with a 5 s timeout.
+// Every command runs `tmux` directly (no shell). A read (the polls) gets 5 s; a command a person waits on — a new
+// session, keys typed into a pane — gets 30 s, so a loaded machine starts the conversation late instead of not at all.
 package tmux
 
 import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
@@ -37,8 +39,10 @@ type Config struct {
 	ConfigFile string
 	// PaneBinDir comes first on a pane shell's PATH (wrappers such as a guarded tmux); "" adds nothing.
 	PaneBinDir string
-	// Nice is the niceness `nice -n` gives a server started by CreateSession (every program in it inherits it); 0 runs
-	// tmux directly. See ParseNiceness.
+	// Nice is the niceness `nice -n` gives every pane shell (and so every agent and build started in it); 0 runs the
+	// shell directly. The tmux server itself stays at the runtime's niceness: a niced server on a loaded machine answers
+	// the runtime's commands slower than their timeout, and a new conversation dies with "signal: killed". See
+	// ParseNiceness.
 	Nice int
 	// Env is the environment a pane shell takes its allow-listed variables from; nil means this process's.
 	Env []string
@@ -49,13 +53,30 @@ type Config struct {
 	PaneEnv func(tabID string) []string
 }
 
-const cmdTimeout = 5 * time.Second
+const (
+	cmdTimeout = 5 * time.Second
+	// writeTimeout is for a command that changes the server and that a person waits on: the start of a conversation
+	// must not fail because a loaded tmux answered in 7 s.
+	writeTimeout = 30 * time.Second
+)
+
+// SlowError is a command tmux did not answer in its time: the machine is overloaded, nothing is broken.
+type SlowError struct {
+	Command string        // the tmux command, e.g. new-session
+	After   time.Duration // how long it was given before it was killed
+}
+
+func (e *SlowError) Error() string {
+	return fmt.Sprintf("tmux %s did not answer in %s: the machine is overloaded", e.Command, e.After.Round(100*time.Millisecond))
+}
 
 // Tmux runs commands against the runtime's servers.
 type Tmux struct {
-	cfg   Config
-	run   runner
-	sleep func(time.Duration)
+	cfg Config
+	run runner // reads: cmdTimeout
+	// runWrite runs the commands a person waits on: writeTimeout.
+	runWrite runner
+	sleep    func(time.Duration)
 
 	mu sync.Mutex
 	// legacy remembers which server a legacy-named session was last seen on.
@@ -76,7 +97,7 @@ func NewConfig(cfg Config) *Tmux {
 	if cfg.Home == "" {
 		cfg.Home = "/"
 	}
-	return &Tmux{cfg: cfg, run: execRunner, sleep: time.Sleep, legacy: map[string]string{}}
+	return &Tmux{cfg: cfg, run: timedRunner(cmdTimeout), runWrite: timedRunner(writeTimeout), sleep: time.Sleep, legacy: map[string]string{}}
 }
 
 // Names are the servers and prefixes this Tmux works with.
@@ -86,14 +107,21 @@ func (t *Tmux) Names() Names { return t.cfg.Names }
 type result struct {
 	stdout, stderr string
 	err            error
-	timedOut       bool // killed at the timeout, as opposed to tmux answering with an error
+	timedOut       bool          // killed at the timeout, as opposed to tmux answering with an error
+	took           time.Duration // how long the command ran
 }
 
 // runner runs program with args in dir ("" = this process's folder).
 type runner func(dir, program string, args ...string) result
 
-func execRunner(dir, program string, args ...string) result {
-	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
+// timedRunner runs the command and kills it after timeout.
+func timedRunner(timeout time.Duration) runner {
+	return func(dir, program string, args ...string) result { return execRunner(timeout, dir, program, args...) }
+}
+
+func execRunner(timeout time.Duration, dir, program string, args ...string) result {
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, program, args...)
 	cmd.Dir = dir
@@ -101,7 +129,8 @@ func execRunner(dir, program string, args ...string) result {
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err := cmd.Run()
-	return result{stdout: out.String(), stderr: errOut.String(), err: err, timedOut: errors.Is(ctx.Err(), context.DeadlineExceeded)}
+	return result{stdout: out.String(), stderr: errOut.String(), err: err, timedOut: errors.Is(ctx.Err(), context.DeadlineExceeded),
+		took: time.Since(start)}
 }
 
 // tmux runs `tmux -u -L socket args…`. Without -u a runtime started under a C locale gets every tab of a -F format
@@ -112,6 +141,11 @@ func (t *Tmux) tmux(socket string, args ...string) result {
 
 // on runs a command for a session on the server it lives on.
 func (t *Tmux) on(name string, args ...string) result { return t.tmux(t.SocketOf(name), args...) }
+
+// onWrite is on for a command a person waits on: it gets writeTimeout.
+func (t *Tmux) onWrite(name string, args ...string) result {
+	return t.runWrite("", "tmux", append([]string{"-u", "-L", t.SocketOf(name)}, args...)...)
+}
 
 // Command runs any other tmux command on the server the session lives on and returns what it printed.
 func (t *Tmux) Command(session string, args ...string) (string, error) {

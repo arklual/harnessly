@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -28,6 +29,30 @@ type link struct {
 	data    chan []byte
 	done    chan struct{}
 	once    sync.Once
+
+	// hub: the link is a hub's (protocol 2), which gets the events of protocol 2 and no others.
+	hub bool
+	// events is the set a link.subscribe named; nil means every event.
+	events atomic.Pointer[map[string]struct{}]
+}
+
+// subscribe limits the link to the named events from now on.
+func (l *link) subscribe(names []string) {
+	set := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		set[n] = struct{}{}
+	}
+	l.events.Store(&set)
+}
+
+// wants says the link takes this event.
+func (l *link) wants(event string) bool {
+	set := l.events.Load()
+	if set == nil {
+		return true
+	}
+	_, ok := (*set)[event]
+	return ok
 }
 
 func newLink(conn *websocket.Conn) *link {
@@ -111,4 +136,15 @@ func (l *link) closed() bool {
 	default:
 		return false
 	}
+}
+
+// closeAfterFlush closes the link once the frames already queued have gone out (or a second has passed).
+func (l *link) closeAfterFlush(code websocket.StatusCode, reason string) {
+	deadline := time.Now().Add(time.Second)
+	for len(l.control) > 0 && time.Now().Before(deadline) && !l.closed() {
+		time.Sleep(10 * time.Millisecond)
+	}
+	// The last frame may be in the writer's hands; give it a moment.
+	time.Sleep(50 * time.Millisecond)
+	l.close(code, reason)
 }

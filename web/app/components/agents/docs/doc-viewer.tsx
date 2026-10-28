@@ -10,6 +10,7 @@ import {
   FileText,
   MessageSquare,
   MessageSquarePlus,
+  Pencil,
   RotateCcw,
   Search,
   Shapes,
@@ -23,6 +24,7 @@ import {
   docContentSrc,
   fetchDocDetail,
   fetchDocDiff,
+  fetchDocSource,
   fetchDocVersions,
   markDocRead,
   replyToDocThread,
@@ -31,7 +33,8 @@ import {
 import { DOC_THREAD_STATUS } from '@/types/doc-threads';
 import { MessageText, Pill } from '@/components/agents/docs/mention-field';
 import { plainMentions } from '@/lib/doc-mentions';
-import { ShareMenu } from '@/components/agents/docs/doc-share';
+import { DocShare } from '@/components/agents/docs/doc-share';
+import { DocEditorCard, useDocEditor, type IEditInfo } from '@/components/agents/docs/doc-editor';
 import { DiffPanel, VersionMenu, VersionNotice } from '@/components/agents/docs/doc-versions';
 import type { TDiffState } from '@/components/agents/docs/doc-versions';
 import { currentVersion, findVersion, orderedPair, previousVersion, versionId } from '@/lib/doc-versions';
@@ -86,28 +89,36 @@ const deliveryLabel = (
   return { state: 'pending', label: t('docs.docViewer.pending') };
 };
 
+/** How an author is named in a thread: an agent by its owner, a guest of a link as a guest. */
+const authorName = (author: TComment['author']): string => {
+  if (author.kind === 'agent') return t('docs.docViewer.agentAuthor', { name: author.name });
+  if (author.kind === 'guest') return t('docs.docViewer.guestAuthor', { name: author.name });
+  return author.name;
+};
+
 const Avatar = ({ comment }: { comment: TComment }) =>
   comment.author.kind === 'agent' ? (
     <span className="td-avatar is-agent" aria-hidden="true">
       <Bot />
     </span>
   ) : (
-    <span className="td-avatar" style={colorVar(personColor(comment.author.email))} aria-hidden="true">
+    <span
+      className="td-avatar"
+      style={colorVar(personColor(comment.author.email || comment.author.name))}
+      aria-hidden="true"
+    >
       {initial(comment.author.name)}
     </span>
   );
 
 const Message = ({ comment, withDelivery }: { comment: TComment; withDelivery: boolean }) => {
   const delivery = withDelivery ? deliveryLabel(comment) : null;
-  const isAgent = comment.author.kind === 'agent';
   return (
     <div className="td-message">
       <Avatar comment={comment} />
       <div className="td-message-body">
         <div className="td-message-head">
-          <span className="td-message-name">
-            {isAgent ? t('docs.docViewer.agentAuthor', { name: comment.author.name }) : comment.author.name}
-          </span>
+          <span className="td-message-name">{authorName(comment.author)}</span>
           <span className="td-message-time">{ago(comment.createdAt)}</span>
         </div>
         <MessageText className="td-message-text" body={comment.body} />
@@ -186,6 +197,8 @@ const placeOf = (thread: IDocThread, lost: boolean, isBoard: boolean): string =>
 };
 
 const BOARD_NOTE = t('docs.docViewer.boardNote');
+/** Keep in step with hl-docs.css: below this width the threads' rail is a sheet over the page. */
+const SHEET_RAIL = '(max-width: 767px)';
 const OLD_VERSION_NOTE = t('docs.docViewer.oldVersionNote');
 const VERSIONS_POLL_MS = 60_000;
 /** Keep in step with the exit animation of `.td-card` in hl-docs.css. */
@@ -270,6 +283,12 @@ const DocViewer = ({
   const [diff, setDiff] = useState<{ from: IDocVersion; to: IDocVersion } | null>(null);
   const [diffState, setDiffState] = useState<TDiffState>({ status: 'loading' });
   const diffTokenRef = useRef(0);
+  /** How the person may edit the current version; null until the gateway has said, or when they may not. */
+  const [editInfo, setEditInfo] = useState<IEditInfo | null>(null);
+  const editable = editInfo !== null;
+  /** Bumped by a saved edit: the page and the versions are read again. */
+  const [round, setRound] = useState(0);
+  const editableRef = useRef(false);
   const lockedRef = useRef(false);
   const leavingRef = useRef(false);
 
@@ -308,7 +327,37 @@ const DocViewer = ({
     selectionRef.current = selection;
     draftRef.current = draft;
     lockedRef.current = isOld;
-  }, [selection, draft, isOld]);
+    editableRef.current = editable;
+  }, [selection, draft, isOld, editable]);
+
+  const refresh = useCallback(() => setRound((n) => n + 1), []);
+  // On a phone the threads and an open thread are sheets over the page's bottom, where the edit's card sits: an edit makes room for itself.
+  const roomForEditor = useCallback(() => {
+    if (!window.matchMedia(SHEET_RAIL).matches) return;
+    setRailOpen(false);
+    setOpenThreadId(null);
+  }, []);
+  const toFrame = useCallback((message: TDocParentMessage) => {
+    iframeRef.current?.contentWindow?.postMessage(message, '*');
+  }, []);
+  const editor = useDocEditor(slug, editInfo, toFrame, refresh, refresh);
+  const { openAll: openEditor, openBlock, commit: commitBlock, dropped: editDropped } = editor;
+
+  // Who may edit is asked once per version on screen: a new version may have no Markdown, a changed role no rights.
+  const currentN = current?.n ?? null;
+  useEffect(() => {
+    if (!slug || !hasVersions) return undefined;
+    let cancelled = false;
+    fetchDocSource(slug).then(
+      (source) =>
+        !cancelled &&
+        setEditInfo(source.canEdit && source.mode ? { mode: source.mode, version: source.version } : null),
+      () => !cancelled && setEditInfo(null),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, hasVersions, currentN]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is invisible to the prerender; applied after hydration
@@ -377,7 +426,7 @@ const DocViewer = ({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [slug, hasVersions]);
+  }, [slug, hasVersions, round]);
 
   const postToFrame = useCallback((message: TDocParentMessage) => {
     iframeRef.current?.contentWindow?.postMessage(message, '*');
@@ -437,6 +486,19 @@ const DocViewer = ({
       } else if (data.type === 'doc:selection-cleared') setSelection(null);
       else if (data.type === 'doc:dismiss') cancelDraft();
       else if (data.type === 'doc:comment-key') startDraft();
+      else if (data.type === 'doc:edit-block') {
+        if (!editableRef.current || lockedRef.current) return;
+        setSelection(null);
+        roomForEditor();
+        openBlock({
+          tag: data.tag,
+          text: data.text,
+          ordinal: data.ordinal,
+          total: data.total,
+          index: data.index,
+        });
+      } else if (data.type === 'doc:edit-commit') commitBlock(data);
+      else if (data.type === 'doc:edit-cancel') editDropped();
       else if (data.type === 'doc:open') {
         setOpenThreadId(data.threadId);
         setSelection(null);
@@ -451,7 +513,7 @@ const DocViewer = ({
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [focusParam, postToFrame, cancelDraft, startDraft]);
+  }, [focusParam, postToFrame, cancelDraft, startDraft, openBlock, commitBlock, editDropped, roomForEditor]);
 
   // Keys and presses outside the frame: the same shortcut and the same «click away cancels».
   useEffect(() => {
@@ -591,20 +653,33 @@ const DocViewer = ({
             />
           )}
           <div className="td-bar-actions">
-            {detail &&
-              (isBoard ? (
-                <a
-                  className="td-icon"
-                  href={detail.doc.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={t('docs.docViewer.openInCatalog')}
-                >
-                  <ExternalLink />
-                </a>
-              ) : (
-                <ShareMenu slug={detail.doc.slug} />
-              ))}
+            {hasVersions && editable && !isOld && (
+              <button
+                type="button"
+                className="td-icon"
+                data-on={editor.editing !== null || undefined}
+                aria-pressed={editor.editing !== null}
+                title={t('docs.docEditor.edit')}
+                onClick={() => {
+                  roomForEditor();
+                  openEditor();
+                }}
+              >
+                <Pencil />
+              </button>
+            )}
+            {detail && isBoard && (
+              <a
+                className="td-icon"
+                href={detail.doc.url}
+                target="_blank"
+                rel="noreferrer"
+                title={t('docs.docViewer.openInCatalog')}
+              >
+                <ExternalLink />
+              </a>
+            )}
+            {detail && <DocShare slug={detail.doc.slug} title={detail.doc.title} kind={detail.doc.kind} />}
             <button
               type="button"
               className="td-comments-toggle"
@@ -665,7 +740,7 @@ const DocViewer = ({
                 {/* No sandbox attribute: the runtime redirects to the catalog's read link, which sandboxes the document
                     itself; a sandboxed parent gives that page an opaque origin and its document frame is refused. */}
                 <iframe
-                  key={contentVersion ?? 'current'}
+                  key={`${contentVersion ?? 'current'}:${round}`}
                   ref={iframeRef}
                   src={docContentSrc(slug, contentVersion)}
                   allow="fullscreen"
@@ -695,7 +770,7 @@ const DocViewer = ({
                         )}
                         style={{
                           ...coords({ top: rect.top, left: rect.left + rect.width }),
-                          ...colorVar(personColor(opener?.author.email ?? thread.id)),
+                          ...colorVar(personColor(opener?.author.email || opener?.author.name || thread.id)),
                         }}
                         onClick={() => focusThread(thread)}
                         aria-label={t('docs.docViewer.threadLabel', {
@@ -765,7 +840,9 @@ const DocViewer = ({
                     </div>
                   )}
 
-                  {selection && !draft && (
+                  <DocEditorCard editor={editor} />
+
+                  {selection && !draft && !editor.editing && (
                     <button
                       type="button"
                       className="td-selbtn"
@@ -867,7 +944,7 @@ const DocViewer = ({
                               <b>
                                 {opener.author.kind === 'agent'
                                   ? t('docs.docViewer.agent')
-                                  : opener.author.name}
+                                  : authorName(opener.author)}
                               </b>{' '}
                               ·{' '}
                               {ago(

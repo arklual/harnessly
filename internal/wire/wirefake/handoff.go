@@ -18,6 +18,8 @@ const fakeNote = "## Goal\nFinish what the conversation set out to do.\n\n## Dec
 // fakeResult is what the scripted agent of a fork writes to send back.
 const fakeResult = "Done in the branch: the scripted agent answered every message. No files were touched."
 
+const fakeHistoryArtifact = "0123456789abcdef0123456789abcdef"
+
 // noteDelay is how long the scripted agent takes to write a note.
 const noteDelay = 1500 * time.Millisecond
 
@@ -63,6 +65,9 @@ func (s *Service) HandoffDraft(ctx context.Context, id string, req wire.HandoffD
 		if !forked {
 			return wire.HandoffDraft{}, wire.ErrDraftUnsupported
 		}
+	case wire.DraftHistory:
+		return wire.HandoffDraft{Mode: req.Mode,
+			Artifact: &wire.HandoffArtifact{ID: fakeHistoryArtifact, Bytes: 292_552_704}}, nil
 	}
 	select {
 	case <-time.After(noteDelay):
@@ -140,6 +145,8 @@ func (s *Service) handoffTo(c wire.ConversationHandoffCmd) wire.CmdResult {
 	via := wire.ViaExcerpt
 	if c.Mode == wire.HandoffNote {
 		via = wire.ViaNote
+	} else if c.Mode == wire.HandoffHistory {
+		via = wire.ViaHistory
 	}
 	origin := wire.Origin{K: wire.OriginHandoff, FromID: src.rec.ID, FromTitle: src.rec.Title, FromProvider: src.rec.Provider,
 		FromModel: src.rec.Model, Via: via, At: s.now()}
@@ -147,7 +154,11 @@ func (s *Service) handoffTo(c wire.ConversationHandoffCmd) wire.CmdResult {
 	if src.rec.Model != nil {
 		from.Model = src.rec.Model.ID
 	}
-	first := &wire.FirstMessage{ClientID: c.OpID, Text: handoff.Handoff(from, c.Mode, false, c.Text), AttachmentIDs: []string{}}
+	firstText := handoff.Handoff(from, c.Mode, false, c.Text)
+	if c.Mode == wire.HandoffHistory {
+		firstText = handoff.Bootstrap(from, c.Mode, false, "/private/handoffs/"+c.ArtifactID+".jsonl")
+	}
+	first := &wire.FirstMessage{ClientID: c.OpID, Text: firstText, AttachmentIDs: []string{}}
 	return s.branch(src, c.Provider, c.Model, origin, first)
 }
 

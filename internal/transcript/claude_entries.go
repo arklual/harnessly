@@ -10,6 +10,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/terminalfailure"
 	"github.com/ly-solutions/harnessly/internal/workflows"
 )
 
@@ -213,6 +214,25 @@ func apiErrorNotice(raw any, ts float64) *jsvalue.Object {
 	e := obj("id", unsetID, "type", "error-notice", "timestamp", ts, "severity", severity, "message", message)
 	if code != "" {
 		e.Set("errorCode", code)
+	}
+	// Some OpenAI-compatible backends distinguish a throttle the CLI may retry from an account quota that it cannot.
+	// Keep the distinction provider-neutral for the conversation runtime; status 429 alone is deliberately not enough.
+	status, _ := get(raw, "apiErrorStatus").(float64)
+	var transient *bool
+	if v, ok := get(raw, "apiErrorIsTransient").(bool); ok {
+		transient = &v
+	}
+	retryAfter := coalesce(get(raw, "retryAfter"), get(raw, "retry_after"))
+	retry := ""
+	if !nullish(retryAfter) {
+		retry = fmt.Sprint(retryAfter)
+	}
+	if strings.Contains(strings.ToLower(message), "retry-after") {
+		retry = message
+	}
+	if failure, ok := terminalfailure.Classify(terminalfailure.Structured{Status: int(status), Code: code, Transient: transient,
+		RetryAfter: retry, Detail: message}); ok {
+		e.Set("terminalFailure", string(failure.Kind))
 	}
 	// A refusal for the plan's usage limit says when the limit resets (unix seconds) and which window it is.
 	if q, ok := get(raw, "quotaLimits").(*jsvalue.Object); ok && code == "rate_limit" && isStr(get(q, "status"), "rejected") {

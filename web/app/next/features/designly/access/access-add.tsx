@@ -15,6 +15,8 @@ const SEND_OUT_MS = 180;
 interface IAccessAddProps extends ISectionProps {
   /** The field, for the dialog's first focus on a wide window. */
   inputRef?: RefObject<HTMLInputElement | null>;
+  /** A narrow column (the deck's popover): the short words in the field on any window. */
+  compact?: boolean;
 }
 
 const AccessAdd = (props: IAccessAddProps) => {
@@ -25,7 +27,7 @@ const AccessAdd = (props: IAccessAddProps) => {
   const [bad, setBad] = useState(false);
   const idle = action.busy === null;
   // The phone's field is narrow: the short words fit beside the role.
-  const placeholder = t(usePhone() ? 'next.access.addPlaceholder' : 'next.access.addField');
+  const placeholder = t(usePhone() || props.compact ? 'next.access.addPlaceholder' : 'next.access.addField');
   // «Пригласить» comes in once there is someone to invite: the field has the whole width until then.
   const send = usePresence(who.trim() === '' ? null : true, SEND_OUT_MS);
 

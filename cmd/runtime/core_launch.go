@@ -81,6 +81,14 @@ func (c *core) keeperOf() launch.Keeper {
 	return nil
 }
 
+// envSource is the env files' prefix of a provider's launch ("" without a machine agent's files).
+func (c *core) envSource(provider string) string {
+	if c.agents == nil {
+		return ""
+	}
+	return c.agents.envSource(provider)
+}
+
 // newLauncher makes the core's starter and document inbox, and hands the agents their Go start and resume.
 func (c *core) newLauncher() {
 	lc := c.cfg.Launch
@@ -93,7 +101,7 @@ func (c *core) newLauncher() {
 	c.launcher = launch.New(launch.Config{
 		Store: c.store, Lines: lines, Availability: avail, Keeper: c.keeperOf,
 		WorkspaceRoot: lc.WorkspaceRoot, Home: c.cfg.Home, DataDir: c.cfg.DataDir, DataDirLabel: lc.DataDirLabel,
-		EnvPrefix: lc.EnvPrefix, PromptDir: filepath.Join(c.cfg.DataDir, "launch-prompts"), FirstWorkspaceName: lc.FirstWorkspaceName,
+		EnvPrefix: lc.EnvPrefix, EnvSource: c.envSource, PromptDir: filepath.Join(c.cfg.DataDir, "launch-prompts"), FirstWorkspaceName: lc.FirstWorkspaceName,
 	})
 	c.inbox = &launch.Inbox{Starter: c.launcher, Tmux: inboxTmux{c}, Log: coreLog,
 		Submit: func(session, text string) error {
@@ -115,7 +123,7 @@ func (l launchLines) Launch(provider, ws string, launch *agents.Launch, files []
 	return lines(l).Launch(provider, ws, launch, files)
 }
 func (l launchLines) Resume(provider, sid, ws string, launch *agents.Launch) (string, error) {
-	return l.a.ResumeLine(provider, sid, ws, launch)
+	return l.a.resumeLine(provider, sid, ws, launch)
 }
 func (l launchLines) Fork(provider, sid, ws string, launch *agents.Launch) (string, error) {
 	return l.a.ForkLine(provider, sid, ws, launch)

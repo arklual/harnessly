@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Composer, { type IComposerProps } from '@/next/features/composer/composer';
 import Queue from '@/next/features/composer/queue';
 import type { QueueRow } from '@/next/features/composer/types';
+import type { LaunchFailure } from '@/next/protocol/v2';
 
 beforeEach(() => {
   window.matchMedia = ((query: string) => ({
@@ -59,6 +60,17 @@ describe('Composer while the agent works', () => {
     expect(onSubmit).toHaveBeenLastCalledWith('now');
     fireEvent.keyDown(field, { key: 'Enter' });
     expect(onSubmit).toHaveBeenLastCalledWith('queue');
+  });
+});
+
+describe('Composer dictation', () => {
+  const rec = { startedAt: Date.now(), busy: false, level: null };
+
+  it('tells that the speech model is being downloaded while the machine prepares it, then asks to speak', () => {
+    const { rerender } = render(<Composer {...props({ recording: { ...rec, preparing: true } })} />);
+    expect(screen.getByPlaceholderText('Voice input is getting ready (downloading the model)…')).toBeTruthy();
+    rerender(<Composer {...props({ recording: rec })} />);
+    expect(screen.getByPlaceholderText('Speak — your words will appear here')).toBeTruthy();
   });
 });
 
@@ -143,11 +155,12 @@ describe('A paused queue row', () => {
     attachments: [],
     state: { k: 'queued', position: 1, reason: 'paused' },
   };
-  const paused = (reason: 'launch-failed' | 'user') =>
+  const paused = (reason: 'launch-failed' | 'user', launchFailure: LaunchFailure | null = null) =>
     render(
       <Queue
         rows={[row]}
         paused={{ reason, at: 1 }}
+        launchFailure={launchFailure}
         waitingLimit={false}
         onRemove={vi.fn()}
         onResume={vi.fn()}
@@ -160,9 +173,29 @@ describe('A paused queue row', () => {
     expect(screen.getByText('the agent did not start')).toBeTruthy();
   });
 
+  it('says the machine is overloaded when tmux was too slow to start the agent', () => {
+    paused('launch-failed', 'machine-busy');
+    expect(screen.getByText('the machine is overloaded · the agent did not start')).toBeTruthy();
+  });
+
   it('is only paused when the person paused it', () => {
     paused('user');
     expect(screen.getByText('paused')).toBeTruthy();
+  });
+
+  it('waits for a target choice without offering to resume on the failed target', () => {
+    render(
+      <Queue
+        rows={[row]}
+        paused={{ reason: 'needs-target', at: 1 }}
+        waitingLimit={false}
+        onRemove={vi.fn()}
+        onResume={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('waiting for another target')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Continue sending' })).toBeNull();
   });
 });
 

@@ -112,6 +112,19 @@ func (f *v2Files) File(ctx context.Context, conv, file string) (wire.FileContent
 	return fileContent(file, obj), nil
 }
 
+// Abs is the absolute, resolved path of a file as File would open it: what a document made of the file is bound to.
+func (f *v2Files) Abs(ctx context.Context, conv, file string) (string, error) {
+	root, rel, err := f.place(ctx, conv, file)
+	if err != nil {
+		return "", err
+	}
+	abs, ee := files.ProjectFilePath(root, rel)
+	if ee != nil {
+		return "", fileError(ee)
+	}
+	return abs, nil
+}
+
 // Save writes the text over the revision the page read; a file that changed since is a conflict.
 func (f *v2Files) Save(ctx context.Context, conv, file, content, revision string) (wire.FileContent, error) {
 	root, rel, err := f.place(ctx, conv, file)

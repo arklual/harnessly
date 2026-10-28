@@ -5,13 +5,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DesignlyHome, { type IDesignCard, type TDesignKind } from '@/next/features/designly/designly-home';
 import {
   createDesign,
+  fetchEngine,
   fetchLibrary,
   fetchSystems,
   pinDesign,
   thumbPath,
   type IDesign,
+  type IDesignEngine,
   type IDesignSystem,
 } from '@/next/features/designly/api';
+import type { IDesignlyNotice } from '@/next/features/designly/designly-home';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useConversationList } from '@/next/stores/conversations';
 import { bindDesignConv } from '@/next/bindings/design-conv';
@@ -19,9 +22,11 @@ import { designKey } from '@/next/features/designly/design-conv';
 import type { Conversation, MachineId } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { toast } from '@/next/ui/toast';
-import { firstChoice, pickerAgents, type IModelChoice } from '@/next/features/composer/agents';
+import { useStartChoice } from '@/next/bindings/use-start-choice';
+import { rememberChoice } from '@/next/features/composer/start-choice';
 import { useVoice } from '@/next/bindings/use-voice';
-import { useMachine } from '@/next/stores/machines';
+import { DECK_NEW_DRAFT } from '@/next/features/designly/deck/deck-create';
+import { setDraftText } from '@/next/stores/drafts';
 import { t } from '@/next/i18n';
 
 /** How often the library is asked again while an agent draws. */
@@ -129,6 +134,37 @@ const useDesignLibrary = (machine: MachineId) => {
   return { cards, error, now, load, onPin, onRetry };
 };
 
+/** The machine's engine, browser and ffmpeg; null until (or unless) the machine answered. */
+const useDesignEngine = (machine: MachineId): IDesignEngine | null => {
+  const [engine, setEngine] = useState<IDesignEngine | null>(null);
+  const restored = useLinkRestored(machine);
+  useEffect(() => {
+    const abort = new AbortController();
+    // An older runtime has no such route: nothing is said then.
+    fetchEngine(machine, abort.signal).then(setEngine, () => undefined);
+    return () => abort.abort();
+  }, [machine, restored]);
+  return engine;
+};
+
+/** What the person is told is missing: the engine first (nothing can be made without it), then the tools. */
+const noticeOf = (engine: IDesignEngine | null): IDesignlyNotice | null => {
+  if (engine === null) return null;
+  if (!engine.ready)
+    return {
+      title: t('next.designly.engine.missing'),
+      text: t('next.designly.engine.missingText'),
+      command: engine.fetch,
+    };
+  const tools = [!engine.chrome && 'Chromium', !engine.ffmpeg && 'ffmpeg'].filter(Boolean).join(', ');
+  if (!tools) return null;
+  return {
+    title: t('next.designly.engine.tools', { tools }),
+    text: t('next.designly.engine.toolsText'),
+    command: null,
+  };
+};
+
 interface IDesignlyLibraryProps {
   machine: MachineId;
   onOpen: (id: string) => void;
@@ -137,8 +173,10 @@ interface IDesignlyLibraryProps {
 /** The library alone, for the right pane: its chat is the field that starts a design, so there is none here. */
 export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
   const { cards, error, now, onPin, onRetry } = useDesignLibrary(machine);
+  const notice = noticeOf(useDesignEngine(machine));
   return (
     <DesignlyHome
+      notice={notice}
       cards={cards}
       error={error}
       now={now}
@@ -156,6 +194,7 @@ interface IDesignlyViewProps {
 
 const DesignlyView = ({ machine }: IDesignlyViewProps) => {
   const { cards, error, now, load, onPin, onRetry } = useDesignLibrary(machine);
+  const notice = noticeOf(useDesignEngine(machine));
   const [systems, setSystems] = useState<IDesignSystem[] | null>(null);
   const restored = useLinkRestored(machine);
 
@@ -169,21 +208,16 @@ const DesignlyView = ({ machine }: IDesignlyViewProps) => {
     return () => abort.abort();
   }, [machine, restored]);
 
-  // The agent that draws: the person's pick, else the first ready agent's first model, as a new chat does.
-  const machineView = useMachine(machine);
-  // A design starts through its own request, which has no backend profile: only the CLIs' own groups are offered.
-  const agents = pickerAgents(machineView?.machine.agents ?? []).filter((a) => !a.profile);
-  const [picked, setPicked] = useState<IModelChoice | null>(null);
-  const ready = agents.filter((a) => a.available);
-  let choice: IModelChoice | null = null;
-  if (picked && ready.some((a) => a.provider === picked.provider)) choice = picked;
-  else if (ready.length > 0) choice = firstChoice(ready[0]);
+  // The agent that draws starts the way a new chat does: the person's pick, else the CLI settings file's model and
+  // effort, else the last pick. A design starts through its own request, which has no backend profile.
+  const { choice, agents, onPick } = useStartChoice(machine, true);
 
   const [brief, setBrief] = useState('');
   const voice = useVoice(machine, brief, setBrief);
 
   const onCreate = async (brief: string, kind: TDesignKind, designSystem: string | null) => {
     const title = titleOf(brief);
+    if (choice) rememberChoice(choice);
     try {
       const created = await createDesign(machine, {
         title,
@@ -206,6 +240,7 @@ const DesignlyView = ({ machine }: IDesignlyViewProps) => {
 
   return (
     <DesignlyHome
+      notice={notice}
       cards={cards}
       error={error}
       now={now}
@@ -222,7 +257,13 @@ const DesignlyView = ({ machine }: IDesignlyViewProps) => {
           agents,
           locked: false,
           offersUltracode: false,
-          onChange: setPicked,
+          onChange: onPick,
+        },
+        onDeck: () => {
+          // The brief typed so far goes with the person to the deck's create screen.
+          if (brief.trim()) setDraftText(DECK_NEW_DRAFT, brief);
+          setBrief('');
+          goTo({ kind: ROUTE.designlyNew });
         },
         voice: {
           recording: voice.recording,

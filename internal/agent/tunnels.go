@@ -208,3 +208,18 @@ func (t *tunnels) DropLink(l *link) int {
 	}
 	return len(dropped)
 }
+
+// DropAll closes every connection to the runtime, whichever link carried it: the local policy narrowed, and what was
+// open under the old one must not outlive it. Each tunnel's reader then tells its link, as when a socket ends.
+func (t *tunnels) DropAll() int {
+	t.mu.Lock()
+	all := make([]*tunnel, 0, len(t.open))
+	for _, tn := range t.open {
+		all = append(all, tn)
+	}
+	t.mu.Unlock()
+	for _, tn := range all {
+		tn.close()
+	}
+	return len(all)
+}

@@ -582,6 +582,10 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     cannot be matched (an unknown dialog layout, a cut call), no key goes in and the gate opens again with
     `refused: "menu-unmatched"`. The card then says «decide in the terminal» and offers to open the chat's terminal on
     the agent's pane. The next state of the gate drops the field.
+    The runtime asks the same of an open tool permission whenever the screen is read, so `refused` is set as soon as the
+    menu cannot be matched (the card then offers the terminal and no buttons), not only after a press. An open gate may
+    also carry `autoDenyAt` (epoch ms, absent otherwise): Claude Code 2.1.311 says on the prompt of an unattended session
+    that it denies the request by itself in m:ss, and the card shows that countdown.
 56. **Stopping a chat's terminal.** `terminal.stop {opId, id, force?}` ends the conversation's terminal: the agent and
     everything under its pane get SIGTERM, what stays SIGKILL after 3 s, then the tmux session goes. The conversation
     and its history stay: the record goes out as a `conversation_upsert` on `convs` with `state` `stopped`

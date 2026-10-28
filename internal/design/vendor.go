@@ -80,9 +80,13 @@ func (f *vendorFile) body() []byte {
 
 // resourcesScript is the script that goes before the engine in a board.
 func resourcesScript() string {
+	return resourcesScriptAt(vendorPrefix)
+}
+
+func resourcesScriptAt(prefix string) string {
 	m := make(map[string]string, len(vendorFiles))
 	for url, f := range vendorFiles {
-		m[url] = vendorPrefix + f.Name
+		m[url] = prefix + f.Name
 	}
 	b, _ := json.Marshal(m) // sorted keys
 	return `<script>(function(){var m=` + string(b) + `,seen=false;Object.defineProperty(window,"__resources",{configurable:true,` +

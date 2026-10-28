@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // The Machine tool of the page's right pane: how busy the machine is now and was in the last hour, per core, over the
@@ -322,6 +322,6 @@ func (s *Server) machineToolFailed(w http.ResponseWriter, r *http.Request, err e
 		refuse(w, RefuseTimeout)
 		return
 	}
-	agent.Log("warn", "v2: the machine tool failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+	jsonlog.Log("warn", "v2: the machine tool failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 	refuse(w, RefuseInternal)
 }

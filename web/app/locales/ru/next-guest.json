@@ -11,5 +11,12 @@
   "next.guest.nameTitle": "Как вас зовут?",
   "next.guest.nameLead": "Под этим именем будут ваши комментарии. Спрашиваем один раз.",
   "next.guest.nameGo": "Продолжить",
-  "next.guest.account": "Ваше имя: {name}"
+  "next.guest.account": "Ваше имя: {name}",
+  "next.guest.full": "Во весь экран",
+  "next.guest.fullTip": "Только дизайн, на весь экран",
+  "next.guest.fullPhone": "Смотреть во весь экран",
+  "next.guest.exit": "Выйти",
+  "next.guest.newTab": "В новой вкладке",
+  "next.guest.holdHint": "Удерживайте палец на блоке, чтобы оставить комментарий",
+  "next.guest.dragHint": "Потяните ручку вниз, чтобы выйти"
 }

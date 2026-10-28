@@ -162,6 +162,7 @@ export default function useTimeline({
   sessionName,
   agentSessionId,
   panelType,
+  machineId,
   enabled = true,
 }: IUseTimelineOptions) {
   const [state, dispatch] = useReducer(reducer, initial);
@@ -180,6 +181,7 @@ export default function useTimeline({
         const sid = sessionRef.current;
         const params = new URLSearchParams({ session: sessionName, panelType });
         if (sid) params.set('agentSessionId', sid);
+        if (machineId) params.set('machine', machineId);
         return socketUrl(`/api/timeline?${params}`);
       },
       onOpen: () => dispatch({ kind: 'socket', status: 'connected' }),
@@ -206,7 +208,7 @@ export default function useTimeline({
       sock.close();
       if (socketRef.current === sock) socketRef.current = null;
     };
-  }, [sessionName, panelType, enabled, epoch]);
+  }, [sessionName, panelType, machineId, enabled, epoch]);
 
   const loadMore = useCallback(async () => {
     if (!state.jsonlPath || !state.hasMore) return;
@@ -215,6 +217,7 @@ export default function useTimeline({
       beforeByte: String(state.startByteOffset),
       limit: '128',
     });
+    if (machineId) params.set('machine', machineId);
     const res = await appFetch(`/api/timeline/entries?${params}`);
     if (!res.ok) return;
     const page = (await res.json()) as {
@@ -230,7 +233,7 @@ export default function useTimeline({
       hasMore: page.hasMore,
       replace: page.replaceEntries,
     });
-  }, [state.jsonlPath, state.hasMore, state.startByteOffset]);
+  }, [machineId, state.jsonlPath, state.hasMore, state.startByteOffset]);
 
   const tasks = useMemo(() => foldTasks(state.entries), [state.entries]);
 

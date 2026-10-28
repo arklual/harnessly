@@ -48,8 +48,12 @@ export interface ISidebarChat {
   canMerge?: boolean;
   /** «Продолжить в другой модели»: the chat has a turn to carry over and the machine can hand off. */
   canContinue?: boolean;
+  /** «Продолжить на другой ВМ»: the switch is on for the chat's machine and the chat has a turn to carry over. */
+  canMoveVm?: boolean;
   /** Set on a chat started with others by one prompt on several models: they stand together under the prompt. */
   launch?: ISidebarLaunch;
+  /** The machine the chat lives on, when it is not the one the person works on (the one list of every machine). */
+  machine?: string;
 }
 
 /** One of the chats a prompt started on several models: the launch it belongs to and the model it runs. */
@@ -201,5 +205,7 @@ export interface IChatActions {
   onMerge?: (id: string) => void;
   /** Opens the chat (if it is not open) and its sheet to continue it in another model. */
   onContinue?: (id: string) => void;
+  /** Opens the chat (if it is not open) and its sheet to continue it on another machine. */
+  onMoveVm?: (id: string) => void;
   onNewProject?: () => void;
 }

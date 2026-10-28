@@ -82,4 +82,33 @@ describe('what a turn made', () => {
     const { container } = render(<Outputs item={item([])} />);
     expect(container.innerHTML).toBe('');
   });
+
+  it('shows a file the agent handed over with its size: the card opens it, the icon downloads it', () => {
+    const zip: TurnOutput = {
+      kind: 'delivery',
+      op: 'created',
+      title: 'Отчёт',
+      ref: '/w/out/report.zip',
+      name: 'report.zip',
+      mime: 'application/zip',
+      size: 2048,
+      sha256: 'ab',
+    };
+    const onOpen = vi.fn();
+    render(
+      <OutputsContext
+        value={{ shown: SHOWN_BY_DEFAULT, onOpen, downloadUrl: (path) => `/save?path=${path}` }}
+      >
+        <Outputs item={item([zip])} />
+      </OutputsContext>,
+    );
+    expect(screen.getByText('2 KB')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Отчёт/ }));
+    expect(onOpen).toHaveBeenCalledWith(zip);
+    const save = screen.getByRole('link');
+    expect(save.getAttribute('href')).toBe('/save?path=/w/out/report.zip');
+    expect(save.hasAttribute('download')).toBe(true);
+    // The files the turn only wrote make no card of this kind.
+    expect(screen.queryByText('turn.tsx')).toBeNull();
+  });
 });

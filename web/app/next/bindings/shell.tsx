@@ -17,11 +17,14 @@ import { useTheme } from '@/platform/theme';
 import { useAgentTerminal } from '@/next/bindings/agent-terminal';
 import { useRightPane } from '@/next/bindings/right-pane';
 import { useChatBackground } from '@/next/bindings/chat-background';
+import { useCentralHistory } from '@/next/bindings/use-central';
 import ChatView from '@/next/bindings/chat-view';
 import HomeComposer from '@/next/bindings/home-composer';
-import { useShellModel } from '@/next/bindings/shell-model';
+import { machineSwitchLeavesChat, useShellModel, useTabChats } from '@/next/bindings/shell-model';
 import { bootNext, shutdownNext, useBoot } from '@/next/boot';
 import { markSeen, setGoal } from '@/next/commands';
+import { connectionStore } from '@/next/stores/connection';
+import { useAll } from '@/next/core/store';
 import { hub } from '@/next/core/realtime/hub';
 import ChatHeader from '@/next/features/header/chat-header';
 import type { IHeaderGoal } from '@/next/features/header/goal-dialog';
@@ -31,6 +34,7 @@ import { notificationsFromChats } from '@/next/features/notifications/from-chats
 import { notificationsFromMachines } from '@/next/features/notifications/from-machines';
 import NotificationCenter from '@/next/features/notifications/notification-center';
 import NoticeStack from '@/next/features/notifications/notice-stack';
+import { SecretAskHost } from '@/next/bindings/safe-asks';
 import { useNotices } from '@/next/bindings/notices';
 import { CHAT_SCOPES, messageGroups, recentChats, searchChats } from '@/next/features/search/search-chats';
 import { useMessageSearch } from '@/next/bindings/use-message-search';
@@ -43,6 +47,7 @@ import QuietChat from '@/next/bindings/quiet-chat';
 import { PHONE_QUERY } from '@/next/features/shell/gestures';
 import Greeting from '@/next/features/shell/greeting';
 import HomeTools, { type IHomeTool } from '@/next/features/shell/home-tools';
+import { PeopleBlock } from '@/next/bindings/asks';
 import RailChats from '@/next/features/sidebar/rail-chats';
 import { useShellTabs, wantsNewTab } from '@/next/bindings/tabs';
 import { useTopTabs } from '@/next/stores/tabs';
@@ -63,17 +68,24 @@ import { goTo, HOME, ROUTE, useRoute, type TRoute } from '@/next/routes/routes';
 import AppsScreen from '@/next/bindings/apps';
 import SettingsScreen from '@/next/bindings/settings';
 import DesignlyView from '@/next/bindings/designly';
+import DeckCreateView from '@/next/bindings/designly-deck-new';
 import DesignlySite from '@/next/bindings/designly-site';
+import SiteWait from '@/next/features/designly/site-wait';
 import InviteAccept from '@/next/features/designly/access/invite-accept';
 import { useProjectDialog, useResumeDialog } from '@/next/bindings/shell-dialogs';
 import { useAppUpdate } from '@/next/bindings/use-app-update';
+import { useRelease } from '@/next/bindings/use-release';
+import ReleaseNotice from '@/next/features/update/release-notice';
 import UpdateBanner from '@/next/features/update/update-banner';
+import WhatsNew from '@/next/features/whats-new/whats-new';
 import { REFS_MAX, type ConvId } from '@/next/protocol/v2';
 import { chatRef } from '@/next/features/composer/chat-sources';
 import { addDraftRef } from '@/next/stores/drafts';
 import { isUnread, useConversation, useConvsAnswered } from '@/next/stores/conversations';
 import { linkReason, useConnection } from '@/next/stores/connection';
 import { useMe } from '@/next/stores/me';
+import { useHomeMachine } from '@/next/stores/machines';
+import { useCentral } from '@/next/stores/central';
 import { useFeed } from '@/next/stores/conversation';
 import { newChatProjectStore, useNewChatProject } from '@/next/stores/new-chat';
 import { UI_REQUEST, useUiRequest } from '@/next/stores/ui-requests';
@@ -115,6 +127,17 @@ const RailSite = (props: Omit<ComponentProps<typeof DesignlySite>, 'maxed'>) => 
   <DesignlySite {...props} maxed={useRail()} />
 );
 
+/** The cluster's copy of the chats follows the links: asked again when one goes down or comes back. */
+const useCentralList = () => {
+  const links = useAll(connectionStore, (c) =>
+    [...c.keys()]
+      .map((m) => `${m}:${c.get(m)?.k}`)
+      .sort()
+      .join(','),
+  );
+  useCentralHistory(links);
+};
+
 const useClock = () => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -135,7 +158,12 @@ const isConvId = (id: string): id is ConvId => id.startsWith('tab-');
 
 /** Which of the sidebar's screens is on: Designly and its designs, Settings, or the chats. */
 const sidebarView = (route: TRoute) => {
-  if (route.kind === ROUTE.designly || route.kind === ROUTE.site || route.kind === ROUTE.invite)
+  if (
+    route.kind === ROUTE.designly ||
+    route.kind === ROUTE.designlyNew ||
+    route.kind === ROUTE.site ||
+    route.kind === ROUTE.invite
+  )
     return SIDEBAR_VIEW.designly;
   return route.kind === ROUTE.settings ? SIDEBAR_VIEW.settings : SIDEBAR_VIEW.chat;
 };
@@ -181,7 +209,9 @@ const Shell = ({ owner }: IShellProps) => {
   const route = useRoute();
   const me = useMe();
   const now = useClock();
+  useCentralList();
   const update = useAppUpdate();
+  const release = useRelease(model.active);
   const currentId = route.kind === ROUTE.chat ? route.id : null;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationsState | null>(null);
@@ -193,7 +223,7 @@ const Shell = ({ owner }: IShellProps) => {
   const login = owner.split('@')[0] ?? '';
   // The tabs over the window: a browser's, on a wide window, unless switched off in Settings.
   const phone = usePhone();
-  const tabs = useShellTabs(model.chats, useTopTabs() && !phone);
+  const tabs = useShellTabs(useTabChats(), useTopTabs() && !phone);
   const name = (me.k === 'ready' ? me.me.name : null) ?? appConfig().people[login] ?? null;
 
   // While the profile loads there is no name to show: the footer draws a placeholder, not the login.
@@ -238,10 +268,26 @@ const Shell = ({ owner }: IShellProps) => {
   const bg = useChatBackground(stageId && isConvId(stageId) ? stageId : null, chatMachine, now);
   const present = stageId !== null && chatMachine !== null;
 
-  // The machine of the open chat holds the open conversation's channel.
+  // The machine of the open chat holds the open conversation's channel. With the one list of every machine,
+  // the start page is the machine the person works on again, so a new chat starts there and not on the last one opened.
+  const home = useHomeMachine();
+  const oneList = useCentral().enabled;
   useEffect(() => {
     if (chatMachine) hub.setActive(chatMachine);
-  }, [chatMachine]);
+    else if (route.kind === ROUTE.home && oneList && home) hub.setActive(home);
+  }, [chatMachine, route.kind, oneList, home]);
+
+  // A machine picked in the sidebar while a chat of another one is on screen: the screen goes to the picked machine's
+  // start page (its tab, or a new one), so the list, the machine card and the screen are of one machine. Else the open
+  // chat would stay with the other machine's list beside it, and the next switch to it would swap the whole list back.
+  const { pickMachine: pickActive } = model;
+  const pickMachine = useCallback(
+    async (id: string) => {
+      await pickActive(id);
+      if (machineSwitchLeavesChat(chatMachine, id)) navigate({ kind: ROUTE.home });
+    },
+    [pickActive, chatMachine, navigate],
+  );
 
   // A chat the list does not have: wait for it, then say it is not there instead of a skeleton for ever.
   // (the list the browser kept draws at once, but only the machine's own answer says a chat is not in it)
@@ -425,6 +471,7 @@ const Shell = ({ owner }: IShellProps) => {
   const sidebar = (
     <Sidebar
       brand={appConfig().productName}
+      brandHref={appConfig().hubUrl ? `${appConfig().hubUrl}/` : null}
       chats={noV2 ? NO_CHATS : model.chats}
       projects={noV2 ? NO_PROJECTS : model.projects}
       favorites={model.favorites}
@@ -470,8 +517,9 @@ const Shell = ({ owner }: IShellProps) => {
       onNotifications={(anchor) => toggleNotifications(anchor, 'right')}
       onToggleRail={toggleRail}
       onCloseDrawer={() => setDrawerOpen(false)}
-      onPickMachine={model.pickMachine}
+      onPickMachine={pickMachine}
       onManageMachines={() => openScreen({ kind: ROUTE.settings, section: 'machines' })}
+      people={<PeopleBlock machine={noV2 ? null : model.active} />}
       rail={
         <RailChats
           chats={noV2 ? NO_CHATS : model.chats}
@@ -581,8 +629,11 @@ const Shell = ({ owner }: IShellProps) => {
         onDismiss={notices.onDismiss}
         onDismissAll={notices.onDismissAll}
       />
+      <SecretAskHost machine={boot.k === 'ready' ? model.active : null} />
       <ToastHost />
       <UpdateBanner available={update.available} onReload={update.reload} onDismiss={update.dismiss} />
+      <ReleaseNotice release={update.available ? null : release.release} onDismiss={release.dismiss} />
+      <WhatsNew ready={boot.k === 'ready'} updating={update.available} />
     </>
   );
 
@@ -694,6 +745,9 @@ const Shell = ({ owner }: IShellProps) => {
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.designly && model.active && (
         <DesignlyView key={model.active} machine={model.active} />
       )}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.designlyNew && model.active && (
+        <DeckCreateView key={model.active} machine={model.active} />
+      )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.apps && model.active && (
         <AppsScreen key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />
       )}
@@ -709,6 +763,7 @@ const Shell = ({ owner }: IShellProps) => {
       {route.kind === ROUTE.stats && <LegacyScreen screen={LEGACY_SCREEN.stats} />}
       {route.kind === ROUTE.efficiency && <LegacyScreen screen={LEGACY_SCREEN.efficiency} />}
       {route.kind === ROUTE.invite && <InviteAccept key={route.token} token={route.token} />}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.site && !model.active && <SiteWait />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.site && model.active && (
         <RailSite
           key={`${model.active}/${route.id}/${tabs.activeId}`}

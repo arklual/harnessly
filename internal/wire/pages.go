@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // Prefix is the path of the v2 API; the runtime answers it under /agents as well, like the rest of its API.
@@ -63,6 +63,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.meSettings(w, r)
 	case p == "socket":
 		s.Socket(w, r)
+	case p == "replica":
+		s.Replica(w, r)
 	case strings.HasPrefix(p, "cmd/"):
 		s.Cmd(w, r, Op(strings.TrimPrefix(p, "cmd/")))
 	case p == "uploads":
@@ -95,6 +97,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.logins(w, r, strings.TrimPrefix(p, "agents/"))
 	case strings.HasPrefix(p, "machine/"):
 		s.machineTool(w, r, strings.TrimPrefix(p, "machine/"))
+	case strings.HasPrefix(p, "move/"):
+		if s.Move == nil {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.Move.ServeHTTP(w, r)
 	case strings.HasPrefix(p, "conversations/"):
 		s.page(w, r, strings.Split(strings.TrimPrefix(p, "conversations/"), "/"))
 	default:
@@ -113,7 +121,7 @@ func (s *Server) machines(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	snap, err := s.Machine.Snapshot(ctx, false)
 	if err != nil {
-		agent.Log("warn", "v2: no machine for the fleet", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: no machine for the fleet", jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 		return
 	}
@@ -134,7 +142,7 @@ func (s *Server) dirs(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	list, err := s.Dirs(ctx)
 	if err != nil {
-		agent.Log("warn", "v2: no folders to offer", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: no folders to offer", jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 		return
 	}
@@ -143,7 +151,7 @@ func (s *Server) dirs(w http.ResponseWriter, r *http.Request) {
 		out = Dirs{}
 	}
 	if verr := out.Validate(); verr != nil {
-		agent.Log("error", "v2: the folders were out of contract", agent.F{K: "error", V: verr.Error()})
+		jsonlog.Log("error", "v2: the folders were out of contract", jsonlog.F{K: "error", V: verr.Error()})
 		refuse(w, RefuseInternal)
 		return
 	}
@@ -164,7 +172,7 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	list, err := s.Sessions(ctx)
 	if err != nil {
-		agent.Log("warn", "v2: no sessions to offer", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: no sessions to offer", jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 		return
 	}
@@ -173,7 +181,7 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 		out = AgentSessions{}
 	}
 	if verr := out.Validate(); verr != nil {
-		agent.Log("error", "v2: the sessions were out of contract", agent.F{K: "error", V: verr.Error()})
+		jsonlog.Log("error", "v2: the sessions were out of contract", jsonlog.F{K: "error", V: verr.Error()})
 		refuse(w, RefuseInternal)
 		return
 	}
@@ -315,11 +323,11 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 	case err != nil && ctx.Err() != nil:
 		refuse(w, RefuseTimeout)
 	case err != nil:
-		agent.Log("warn", "v2: page failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: page failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		if verr := v.Validate(); verr != nil {
-			agent.Log("error", "v2: a page answered out of contract", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: verr.Error()})
+			jsonlog.Log("error", "v2: a page answered out of contract", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: verr.Error()})
 			refuse(w, RefuseInternal)
 			return
 		}

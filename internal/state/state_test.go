@@ -463,6 +463,24 @@ func TestConcurrentTabsOnOneWorkspace(t *testing.T) {
 	}
 }
 
+// A tab whose session tmux made too late is not added, and the session it may have made goes: a launch retried on a
+// loaded machine leaves no idle shells behind.
+func TestAddTabEndsTheSessionOfAFailedCreate(t *testing.T) {
+	r := newRig(t)
+	r.writeLayout("ws-x", `{"root":{"type":"pane","id":"pane-a","tabs":[],"activeTabId":null},"activePaneId":"pane-a","updatedAt":"x"}`)
+	slow := &tmux.SlowError{Command: "new-session", After: time.Second}
+	r.tm.createErr = slow
+	if _, err := r.s.AddTab("ws-x", "pane-a", TabOptions{Command: "claude"}); !errors.Is(err, slow) {
+		t.Fatalf("err %v", err)
+	}
+	if left := r.tm.ListSessions(); len(left) != 0 {
+		t.Fatalf("left %v", left)
+	}
+	if n := len(tabsOf(root(r.s.Layout("ws-x")))); n != 0 {
+		t.Fatalf("%d tabs", n)
+	}
+}
+
 // fakeAgent is the machine agent's loopback state routes.
 type fakeAgent struct {
 	mu       sync.Mutex

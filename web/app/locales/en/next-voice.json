@@ -1,3 +1,4 @@
 {
-  "next.voice.listening": "Speak — your words will appear here"
+  "next.voice.listening": "Speak — your words will appear here",
+  "next.voice.preparing": "Voice input is getting ready (downloading the model)…"
 }

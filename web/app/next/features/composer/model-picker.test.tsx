@@ -108,6 +108,25 @@ describe('ultracode in the picker', () => {
     expect(open(choice()).pill.dataset.ultracode).toBeUndefined();
   });
 
+  it('names every stop under the slider and marks the chosen one', () => {
+    const { view } = open(choice());
+    const labels = Array.from(view.container.querySelectorAll<HTMLElement>('.hx-effort__label'));
+    expect(labels.map((label) => label.textContent)).toEqual([
+      'Low',
+      'Medium',
+      'High',
+      'Very high',
+      'Maximum',
+    ]);
+    expect(labels.map((label) => label.dataset.chosen)).toEqual([
+      undefined,
+      'true',
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
   it('leaves the depth a slider of the model’s stops, whatever the mode', () => {
     const { view, onChange } = open(choice({ ultracode: true }));
     const slider = view.getByRole('slider');

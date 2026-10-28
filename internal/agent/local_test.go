@@ -10,7 +10,7 @@ import (
 func testAgent(t *testing.T) *Agent {
 	t.Helper()
 	cfg := Config{Home: t.TempDir(), DataDir: t.TempDir(), LocalTokenHeader: "x-agent-local-token", ReportPortEnv: "AGENT_REPORT_PORT"}
-	return &Agent{cfg: cfg, clients: map[*link]struct{}{}, automationTokens: map[string]string{}, pendingStates: map[string]chan StateResult{}, localToken: "local-secret"}
+	return &Agent{cfg: cfg, clients: map[*link]struct{}{}, automationTokens: map[string]string{}, pendingStates: map[string]chan StateResult{}, pendingDocs: map[string]chan DocResult{}, localToken: "local-secret"}
 }
 
 func post(a *Agent, path, token, body string) *httptest.ResponseRecorder {

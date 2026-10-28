@@ -3,12 +3,10 @@ package agent
 import (
 	"bytes"
 	"encoding/json"
-	"os"
-	"sync"
 	"time"
-)
 
-var logMu sync.Mutex
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
+)
 
 // F is one extra field of a log line, kept in the order given.
 type F struct {
@@ -18,38 +16,13 @@ type F struct {
 
 // Log writes one JSON line: level, msg, the extra fields, time. Info goes to stdout, warn and error to stderr.
 func Log(level, msg string, fields ...F) {
-	var b bytes.Buffer
-	b.WriteString(`{"level":`)
-	writeJSON(&b, level)
-	b.WriteString(`,"msg":`)
-	writeJSON(&b, msg)
-	for _, f := range fields {
-		b.WriteByte(',')
-		writeJSON(&b, f.K)
-		b.WriteByte(':')
-		writeJSON(&b, f.V)
+	out := make([]jsonlog.F, len(fields))
+	for i, f := range fields {
+		out[i] = jsonlog.F{K: f.K, V: f.V}
 	}
-	b.WriteString(`,"time":`)
-	writeJSON(&b, isoNow())
-	b.WriteString("}\n")
-	out := os.Stdout
-	if level != "info" {
-		out = os.Stderr
-	}
-	logMu.Lock()
-	defer logMu.Unlock()
-	_, _ = out.Write(b.Bytes())
+	jsonlog.Log(level, msg, out...)
 }
 
-func writeJSON(b *bytes.Buffer, v any) {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		raw = []byte(`null`)
-	}
-	b.Write(raw)
-}
-
-// isoNow is the time as JavaScript's toISOString writes it.
 func isoNow() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000Z") }
 
 func jsonUnmarshal(raw []byte, v any) error { return json.Unmarshal(raw, v) }

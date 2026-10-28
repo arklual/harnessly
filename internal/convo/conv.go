@@ -4,14 +4,17 @@ import (
 	"math"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agentstate"
+	"github.com/ly-solutions/harnessly/internal/chatguard"
 	"github.com/ly-solutions/harnessly/internal/feed"
 	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/screen"
+	"github.com/ly-solutions/harnessly/internal/terminalfailure"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -73,6 +76,9 @@ type conv struct {
 	rec         wire.Conversation
 	box         *outbox.Box
 	fd          *feed.Feed
+	// handoffArtifact is private context used by the first prompt. It stays through launch and delivery retries, and is
+	// released only when that prompt's turn is terminal. Both fields are persisted for the same behavior after restart.
+	handoffArtifact, handoffArtifactClientID string
 	// indexSeen is the size of the transcript the search index followed the feed to (see indexUpdate).
 	indexSeen int64
 
@@ -132,6 +138,10 @@ type conv struct {
 	restartAt               time.Time
 	// limitLine is the line of a usage limit on Codex's screen last taken for a hold: the same line seen again is old.
 	limitLine string
+	// terminalFailureTurn is the turn whose terminal provider failure already ended and interrupted it: the transcript
+	// and the PTY may report the same failure, and the agent may write it more than once while its interrupt arrives.
+	terminalFailureTurn string
+	terminalFailures    *terminalfailure.Detector
 
 	// bg are the agent's background tasks as the page has them, bgStopped those we ended and the agent still lists,
 	// bgReading a read of them off the actor, bgAt when the last one began.
@@ -265,6 +275,7 @@ func (c *conv) change(ch outbox.Change, now time.Time) {
 		default:
 			continue
 		}
+		c.releaseHandoffArtifact(client, st)
 		if st.EntryID == nil {
 			continue
 		}
@@ -282,6 +293,22 @@ func (c *conv) change(ch outbox.Change, now time.Time) {
 	if ch.Resume {
 		c.resume(now)
 	}
+}
+
+func (c *conv) releaseHandoffArtifact(client string, st wire.MessageState) {
+	if c.handoffArtifact == "" || client != c.handoffArtifactClientID || c.d.Handoffs == nil {
+		return
+	}
+	terminal := st.K == wire.MsgDone || st.K == wire.MsgCancelled || st.K == wire.MsgFailed && !st.Retryable
+	if !terminal {
+		return
+	}
+	if err := c.d.Handoffs.Release(c.rec.ID, c.handoffArtifact); err != nil {
+		c.d.Log.Warn("handoff artifact not released", "conv", c.rec.ID, "err", err)
+		return
+	}
+	c.handoffArtifact, c.handoffArtifactClientID = "", ""
+	c.dirty = true
 }
 
 // touch marks the record changed: a conversation_upsert goes within StateCoalesce.
@@ -359,6 +386,15 @@ func (c *conv) effects(effects []agentstate.Effect, before wire.AgentState, now 
 		case agentstate.PromptSubmitted:
 			c.change(c.box.PromptSubmitted(c.rec.State.TurnID, before.K == wire.StateWorking, now), now)
 		case agentstate.TurnStarted:
+			c.terminalFailureTurn = ""
+			c.terminalFailures = terminalfailure.NewDetector()
+			if c.look != nil {
+				c.terminalFailures.PrimeScreen(c.look.Plain)
+			}
+			if c.rec.TerminalFailure != nil {
+				c.rec.TerminalFailure = nil
+				c.touch()
+			}
 			if t, ok := c.fd.Turn(e.ID); ok && c.rec.Limited != nil && t.StartedAt > c.rec.Limited.At {
 				// The agent took new work after all (the person typed into its terminal): the limit is behind it.
 				c.release(now)
@@ -407,7 +443,7 @@ func (c *conv) endTurn(id string, st wire.TurnStatus, failure *wire.TurnFailure,
 		id = c.fd.OpenTurn()
 	}
 	var limit *feed.Limit
-	if id != "" {
+	if id != "" && id != c.terminalFailureTurn {
 		st, failure, limit = c.limitEnd(id, st, failure)
 	}
 	if limit != nil {
@@ -627,6 +663,12 @@ func (c *conv) feedUpdateOf(u feed.Update, live, past bool, now time.Time) {
 	if live {
 		for _, e := range u.Events {
 			switch ev := e.(type) {
+			case wire.TurnFailedEv:
+				// A terminal failure ended the turn ahead of the CLI. Its trailing retry/error lines regrow that turn,
+				// but do not announce the same terminal outcome again.
+				if ev.Turn.ID != c.terminalFailureTurn {
+					c.emit(ev)
+				}
 			case wire.EntryUpdateEv:
 				c.emit(ev)
 				if ev.Entry.T == wire.EntryTool && ev.Entry.OK != nil && ev.Entry.ToolUseID != "" {
@@ -733,7 +775,38 @@ func (c *conv) signal(s feed.Signal, now time.Time) {
 		pause := c.interrupting
 		c.interrupting = false
 		c.input(agentstate.Input{K: agentstate.Interrupted, PauseQueue: pause}, now)
+	case feed.SignalFailure:
+		c.failTerminal(s.TurnID, s.Failure, s.Detail, now)
 	}
+}
+
+// failTerminal stops a turn on a provider failure the CLI cannot make progress on. Ctrl-C is the terminal's SIGINT
+// character, delivered by tmux to the foreground process group. The queue stays paused for a person's target choice.
+func (c *conv) failTerminal(turnID, failure, detail string, now time.Time) {
+	if failure != string(terminalfailure.QuotaExhausted) || turnID == "" || c.terminalFailureTurn == turnID {
+		return
+	}
+	c.terminalFailureTurn = turnID
+	marker := wire.TerminalFailure{Kind: wire.FailureQuotaExhausted, At: ms(now), Detail: detail, Terminal: true, NeedsTarget: true}
+	c.rec.TerminalFailure = &marker
+	c.touch()
+	c.emit(wire.QuotaExhaustedEv{Failure: marker})
+	c.change(c.box.Pause(wire.PausedNeedsTarget, now), now)
+	c.input(agentstate.Input{K: agentstate.StopFailure, TurnFailure: wire.TurnFailedRateLimit, TurnDetail: detail}, now)
+	pane := c.d.Machine.Pane(c.rec.Session)
+	if pane == nil {
+		return
+	}
+	session := c.rec.Session
+	c.spawn(func() any {
+		unlock := typist.Lock(session)
+		defer unlock()
+		return pane.Keys("C-c")
+	}, func(r any) {
+		if err, _ := r.(error); err != nil {
+			c.d.Log.Warn("terminal failure interrupt failed", "conv", c.rec.ID, "err", err)
+		}
+	})
 }
 
 // stopInput is the end of a turn ("" the open one), by the Stop hook or by the transcript's own line. Claude ends a
@@ -848,6 +921,15 @@ func (c *conv) seeing(s seen, now time.Time) {
 	if !look.Readable {
 		return
 	}
+	if turnID := c.fd.OpenTurn(); turnID != "" {
+		if c.terminalFailures == nil {
+			c.terminalFailures = terminalfailure.NewDetector()
+		}
+		if failure, ok := c.terminalFailures.ObserveScreen(look.Plain); ok {
+			c.failTerminal(turnID, string(failure.Kind), failure.Detail, now)
+			return
+		}
+	}
 	k := c.rec.State.K
 	if (k == wire.StateStarting || k == wire.StateStopped || k == wire.StateLaunchFailed) && look.PromptReady() && c.probe.Foreground {
 		// The input box is drawn before the TUI takes keys (it drops an Enter typed in the first moments), so the
@@ -939,9 +1021,12 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 		}
 	}
 	if id := c.rec.State.PermissionID; id != "" {
-		if g := c.openGate(id); g != nil && g.p != nil && len(g.p.Options) == 0 {
-			g.p.Options = permissionOptions(look.Options, false)
-			c.dirty = true
+		if g := c.openGate(id); g != nil && g.p != nil {
+			if len(g.p.Options) == 0 {
+				g.p.Options = permissionOptions(look.Options, false)
+				c.dirty = true
+			}
+			c.gateOnScreen(g, look, now)
 		}
 		return
 	}
@@ -968,8 +1053,56 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 	if g := c.gates[p.ID]; g != nil {
 		return
 	}
-	c.addGate(&gate{p: &p})
+	g := &gate{p: &p}
+	c.addGate(g)
 	c.input(agentstate.Input{K: agentstate.PermissionPrompt, GateID: p.ID}, now)
+	c.gateOnScreen(g, look, now)
+}
+
+// autoDenyDrift is how far the countdown on the screen may differ from the one the gate carries before it is said again.
+const autoDenyDrift = 3 * time.Second
+
+// gateOnScreen keeps an open permission's state true to the screen: «refused» while the menu on it is not the one the
+// card shows (no key would go in, so the card offers the terminal at once), and the moment Claude denies the request by
+// itself when its prompt says so.
+func (c *conv) gateOnScreen(g *gate, look typist.Screen, now time.Time) {
+	st := *g.state()
+	if st.K != wire.GateStateOpen || g.p == nil || g.p.Kind != wire.PermTool {
+		return
+	}
+	next := wire.GateState{K: wire.GateStateOpen}
+	for i, o := range g.p.Options {
+		want := typist.PickWant{N: i + 1, Label: o.Label, Cwd: c.rec.Cwd}
+		if n, err := strconv.Atoi(o.ID); err == nil {
+			want.N = n
+		}
+		if g.p.Command != nil {
+			want.Command = *g.p.Command
+		}
+		if err := typist.Shows(look, want); err != nil {
+			refused := wire.GateRefusedMenuUnmatched
+			next.Refused = &refused
+			break
+		}
+	}
+	if secs, ok := screen.AutoDenySeconds(look.Plain); ok {
+		at := ms(now.Add(time.Duration(secs) * time.Second))
+		if st.AutoDenyAt != nil && absMs(*st.AutoDenyAt-at) < wire.Ms(autoDenyDrift/time.Millisecond) {
+			at = *st.AutoDenyAt
+		}
+		next.AutoDenyAt = &at
+	}
+	if (st.Refused == nil) != (next.Refused == nil) || (st.AutoDenyAt == nil) != (next.AutoDenyAt == nil) ||
+		st.AutoDenyAt != nil && *st.AutoDenyAt != *next.AutoDenyAt {
+		c.setGateState(g, next, now)
+	}
+}
+
+func absMs(d wire.Ms) wire.Ms {
+	if d < 0 {
+		return -d
+	}
+	return d
 }
 
 func (c *conv) updateNow(now time.Time) {
@@ -1046,6 +1179,13 @@ func (c *conv) pumpWith(pane typist.Pane, look *typist.Screen, now time.Time) {
 	job.Message.HandOverOK = c.handable.Load
 	if pane == nil {
 		c.change(c.box.Typed(job.ClientID, typist.Result{Outcome: typist.Failed}, now), now)
+		return
+	}
+	if c.terminalOff() && chatguard.BashMode(job.Message.Text) {
+		// Queued before the terminal went off, or by something that does not go through send: not typed, and it fails
+		// as a message that cannot be typed does, after its tries.
+		c.d.Log.Warn("a queued message would start the agent's bash mode and the terminal is off; not typed", "conv", c.rec.ID)
+		c.change(c.box.Typed(job.ClientID, typist.Result{Outcome: typist.Failed, Err: chatguard.ErrTerminalOff}, now), now)
 		return
 	}
 	c.typing = true

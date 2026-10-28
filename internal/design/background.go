@@ -7,7 +7,8 @@ import (
 
 // What this runtime keeps doing for the shared library while its design slice runs, whether or not anyone has the
 // library open: the claims of its chats are refreshed or let go (only while the tab keeper runs: without it every
-// chat would look closed), and the files are saved to the history.
+// chat would look closed), the files are saved to the history, and the PDFs this runtime keeps for the guests of its
+// decks are built again when their decks change (deckpdfauto.go).
 
 const sweepEvery = 5 * time.Second
 
@@ -40,6 +41,7 @@ func (l *Library) StartBackground() {
 		b.missing = map[string]int64{}
 		b.warn = warn
 		go l.keepClaims(b.stop)
+		go l.keepDeckPdfs(b.stop)
 	}
 	b.mu.Unlock()
 	id, err := l.Identity()

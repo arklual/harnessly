@@ -45,6 +45,7 @@
     },
     "TitleSource": {"enum": ["user", "agent", "first-message"]},
     "TerminalStopBy": {"enum": ["person", "idle"]},
+    "TerminalFailureKind": {"enum": ["quota_exhausted"]},
     "Launch": {
       "type": "object",
       "required": ["id", "prompt"],
@@ -62,6 +63,18 @@
         "at": {"type": "integer", "minimum": 0},
         "by": {"$ref": "#/$defs/TerminalStopBy"},
         "idleMs": {"type": "integer", "minimum": 1}
+      }
+    },
+    "TerminalFailure": {
+      "type": "object",
+      "required": ["kind", "at", "detail", "terminal", "needsTarget"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"$ref": "#/$defs/TerminalFailureKind"},
+        "at": {"type": "integer", "minimum": 0},
+        "detail": {"type": "string"},
+        "terminal": {"const": true},
+        "needsTarget": {"const": true}
       }
     },
     "RewindMark": {
@@ -112,9 +125,9 @@
     },
     "IdleStop": {"enum": ["off", "1h", "2h", "6h"]},
     "OriginKind": {"enum": ["fork", "handoff"]},
-    "OriginVia": {"enum": ["session", "excerpt", "note"]},
-    "HandoffMode": {"enum": ["excerpt", "note"]},
-    "DraftMode": {"enum": ["excerpt", "note", "result"]},
+    "OriginVia": {"enum": ["session", "excerpt", "note", "history"]},
+    "HandoffMode": {"enum": ["excerpt", "note", "history"]},
+    "DraftMode": {"enum": ["excerpt", "note", "result", "history"]},
     "Origin": {
       "type": "object",
       "required": ["k", "fromId", "fromTitle", "fromProvider", "fromModel", "via", "at"],
@@ -130,16 +143,40 @@
         "at": {"type": "integer", "minimum": 0}
       }
     },
-    "HandoffDraft": {
+    "HandoffArtifact": {
       "type": "object",
-      "required": ["mode", "text", "tokens", "turns"],
+      "required": ["id", "bytes"],
       "additionalProperties": false,
       "properties": {
-        "mode": {"$ref": "#/$defs/DraftMode"},
-        "text": {"type": "string", "minLength": 1},
-        "tokens": {"type": "integer", "minimum": 0},
-        "turns": {"type": "integer", "minimum": 0}
+        "id": {"type": "string", "pattern": "^[a-f0-9]{32}$"},
+        "bytes": {"type": "integer", "minimum": 1}
       }
+    },
+    "HandoffDraft": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["mode", "artifact", "tokens", "turns"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {"const": "history"},
+            "artifact": {"$ref": "#/$defs/HandoffArtifact"},
+            "tokens": {"type": "integer", "minimum": 0},
+            "turns": {"type": "integer", "minimum": 0}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["mode", "text", "tokens", "turns"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {"enum": ["excerpt", "note", "result"]},
+            "text": {"type": "string", "minLength": 1},
+            "tokens": {"type": "integer", "minimum": 0},
+            "turns": {"type": "integer", "minimum": 0}
+          }
+        }
+      ]
     },
     "OnOff": {"enum": ["on", "off"]},
     "RuntimeSettings": {
@@ -195,12 +232,12 @@
       ]
     },
     "LaunchStep": {"enum": ["machine", "cli", "project", "prompt"]},
-    "LaunchFailure": {"enum": ["no-process", "exited", "no-prompt-box", "no-session", "cli-missing", "login-required"]},
+    "LaunchFailure": {"enum": ["no-process", "exited", "no-prompt-box", "no-session", "cli-missing", "login-required", "machine-busy"]},
     "GoneReason": {"enum": ["tab-closed", "tmux-lost"]},
     "TurnStatus": {"enum": ["live", "done", "interrupted", "failed"]},
     "TurnFailureCode": {"enum": ["api-error", "rate-limit", "context-overflow", "agent-exited", "unknown"]},
     "FileOp": {"enum": ["created", "edited", "read"]},
-    "OutputKind": {"enum": ["artifact", "design", "doc", "mr", "stand"]},
+    "OutputKind": {"enum": ["artifact", "design", "doc", "mr", "stand", "delivery"]},
     "OutputOp": {"enum": ["created", "changed"]},
     "EntryKind": {
       "enum": ["user", "say", "think", "tool", "subagent", "answers", "gate", "compaction", "notice", "interrupt", "peer"]
@@ -220,7 +257,7 @@
         "unconfirmed", "expired", "returned-to-input"
       ]
     },
-    "PauseReason": {"enum": ["interrupted", "user", "launch-failed", "agent-gone", "limited"]},
+    "PauseReason": {"enum": ["interrupted", "user", "launch-failed", "agent-gone", "limited", "needs-target"]},
     "GateKind": {"enum": ["question", "permission", "plan"]},
     "PermissionKind": {"enum": ["tool", "plan"]},
     "PermissionScope": {"enum": ["once", "always", "deny", "plan-auto", "plan-ask", "revise"]},
@@ -239,7 +276,7 @@
       "enum": [
         "turn_started", "step", "entry_update", "entry_replace", "now", "question_asked",
         "permission_requested", "plan_proposed", "gate_updated", "compaction", "turn_finished",
-        "turn_failed", "queue_changed", "prompt_state", "message_upsert", "background_upsert",
+        "turn_failed", "quota_exhausted", "queue_changed", "prompt_state", "message_upsert", "background_upsert",
         "background_removed", "shots_set", "pictures_set", "feed_reset"
       ]
     },
@@ -510,7 +547,32 @@
         "provider": {"$ref": "#/$defs/Provider"},
         "model": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
         "effort": {"oneOf": [{"$ref": "#/$defs/Effort"}, {"type": "null"}]},
-        "designSystem": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 200}, {"type": "null"}]}
+        "designSystem": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 200}, {"type": "null"}]},
+        "deck": {"$ref": "#/$defs/DesignlyDeck"},
+        "attachmentIds": {"type": "array", "maxItems": 20, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "DesignDeckTone": {"enum": ["talk", "biz", "short"]},
+    "DesignlyDeck": {
+      "type": "object",
+      "required": ["slides", "tone", "script", "style"],
+      "additionalProperties": false,
+      "properties": {
+        "minutes": {"type": "integer", "minimum": 0, "maximum": 180},
+        "slides": {"oneOf": [{"type": "integer", "minimum": 2, "maximum": 40}, {"type": "null"}]},
+        "tone": {"$ref": "#/$defs/DesignDeckTone"},
+        "script": {"type": "boolean"},
+        "style": {"oneOf": [{"$ref": "#/$defs/DesignlyDeckStyle"}, {"type": "null"}]}
+      }
+    },
+    "DesignlyDeckStyle": {
+      "type": "object",
+      "required": ["source", "vars", "layouts"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {"type": "string", "minLength": 1, "maxLength": 200},
+        "vars": {"type": "object"},
+        "layouts": {"type": "integer", "minimum": 0, "maximum": 200}
       }
     },
     "DesignlyCreated": {
@@ -1294,7 +1356,11 @@
         "kind": {"$ref": "#/$defs/OutputKind"},
         "op": {"$ref": "#/$defs/OutputOp"},
         "title": {"type": "string", "minLength": 1},
-        "ref": {"type": "string", "minLength": 1}
+        "ref": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "mime": {"type": "string", "minLength": 1},
+        "size": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "minLength": 1}
       }
     },
     "Turn": {
@@ -1394,6 +1460,7 @@
         "bgAgents": {"type": "integer", "minimum": 1},
         "bgWait": {"$ref": "#/$defs/BgWait"},
         "terminalStop": {"$ref": "#/$defs/TerminalStop"},
+        "terminalFailure": {"$ref": "#/$defs/TerminalFailure"},
         "rewinds": {"type": "array", "maxItems": 10, "items": {"$ref": "#/$defs/RewindMark"}},
         "origin": {"$ref": "#/$defs/Origin"},
         "limited": {"$ref": "#/$defs/LimitHold"},
@@ -1725,7 +1792,7 @@
           "type": "object",
           "required": ["k"],
           "additionalProperties": false,
-          "properties": {"k": {"const": "open"}, "refused": {"$ref": "#/$defs/GateRefusal"}}
+          "properties": {"k": {"const": "open"}, "refused": {"$ref": "#/$defs/GateRefusal"}, "autoDenyAt": {"type": "integer", "minimum": 0}}
         },
         {
           "type": "object",
@@ -2202,6 +2269,12 @@
           "required": ["type", "turn"],
           "additionalProperties": false,
           "properties": {"type": {"const": "turn_failed"}, "turn": {"$ref": "#/$defs/Turn"}}
+        },
+        {
+          "type": "object",
+          "required": ["type", "failure"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "quota_exhausted"}, "failure": {"$ref": "#/$defs/TerminalFailure"}}
         },
         {
           "type": "object",
@@ -2694,18 +2767,36 @@
       }
     },
     "Cmd_conversation_handoff": {
-      "type": "object",
-      "required": ["opId", "id", "provider", "model", "mode", "text"],
-      "additionalProperties": false,
-      "properties": {
-        "opId": {"type": "string", "minLength": 1},
-        "id": {"$ref": "#/$defs/ConvId"},
-        "provider": {"$ref": "#/$defs/Provider"},
-        "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
-        "profile": {"$ref": "#/$defs/ProfileId"},
-        "mode": {"$ref": "#/$defs/HandoffMode"},
-        "text": {"type": "string", "minLength": 1, "maxLength": 90000}
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["opId", "id", "provider", "model", "mode", "artifactId"],
+          "additionalProperties": false,
+          "properties": {
+            "opId": {"type": "string", "minLength": 1},
+            "id": {"$ref": "#/$defs/ConvId"},
+            "provider": {"$ref": "#/$defs/Provider"},
+            "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+            "profile": {"$ref": "#/$defs/ProfileId"},
+            "mode": {"const": "history"},
+            "artifactId": {"type": "string", "pattern": "^[a-f0-9]{32}$"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["opId", "id", "provider", "model", "mode", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "opId": {"type": "string", "minLength": 1},
+            "id": {"$ref": "#/$defs/ConvId"},
+            "provider": {"$ref": "#/$defs/Provider"},
+            "model": {"oneOf": [{"$ref": "#/$defs/Model"}, {"type": "null"}]},
+            "profile": {"$ref": "#/$defs/ProfileId"},
+            "mode": {"enum": ["excerpt", "note"]},
+            "text": {"type": "string", "minLength": 1, "maxLength": 90000}
+          }
+        }
+      ]
     },
     "Cmd_conversation_merge": {
       "type": "object",

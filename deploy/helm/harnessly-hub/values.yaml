@@ -1,0 +1,219 @@
+# The hub is one process with state in memory (the agents' links, the open event streams) and, by default, a SQLite
+# file: it runs as one replica that is replaced, not rolled (strategy: Recreate). Postgres holds the data, not the
+# links, so a second replica is not supported either way (docs/hub/architecture.md, "Not in this version").
+
+image:
+  # -- Image repository. Build the `hub` target of the Dockerfile; the image carries the binaries machines download.
+  repository: ghcr.io/ly-solutions/harnessly-hub
+  # -- Image tag; defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# -- The address people use, without a trailing slash (HUB_PUBLIC_URL): what sign-in providers call back, what machines
+# dial, what cookies are bound to. Required, e.g. https://hub.example.com. The ingress host is taken from it.
+publicUrl: ""
+# -- Give every machine an address of its own, <machine>.<runtimeDomain> (HUB_RUNTIME_DOMAIN): needs a wildcard DNS
+# record and certificate for *.<runtimeDomain>, which the ingress then routes to the hub. Use a domain of its own, not
+# a sibling of the hub's: names under one registrable domain (hub.example.com, m.example.com) are the same site, and a
+# browser sends a person's cookies between them (SameSite=Strict does not tell them apart). The hub checks this with
+# the public suffix list: a same-site domain is a warning, and edition: cloud does not start with one unless extraEnv
+# sets HUB_ALLOW_SAME_SITE_RUNTIME=1. A parent of the hub's host is refused. Required for edition: cloud. Empty serves
+# machines at
+# <publicUrl>/m/<machine>/ (path mode): then a machine's pages run on the hub's own origin, and only machines you
+# trust completely belong there: the hub opens only machines an administrator connected.
+runtimeDomain: ""
+
+# -- invite: only the administrators and people with an invitation (HUB_SIGNUP); open: anyone can create an account.
+signup: invite
+# -- Administrators of the installation (HUB_ADMIN_EMAILS); each must sign in with a verified address. Required while
+# the ingress is on (the chart refuses to render otherwise): empty would make the first account to arrive the
+# administrator, and with the ingress that can be anyone on the internet.
+adminEmails: []
+# -- self-hosted or cloud (HUB_EDITION). The cloud edition runs no OpenID Connect and no local machine, needs
+# runtimeDomain, and never lets the SSH way reach a private address.
+edition: self-hosted
+# -- Sign in with a passkey (HUB_PASSKEY). Needs a domain name in publicUrl.
+passkey: true
+# -- The name passkeys are bound to (HUB_RP_ID); empty: the host of publicUrl.
+rpId: ""
+# -- The hub may connect to a server once over SSH to install a machine (HUB_SSH). The key it connects with is the
+# space's own (one per space, kept sealed); the owner confirms the server's host key before anything is run.
+ssh: true
+# -- Let the SSH way reach servers that are not on the public internet: private, loopback and link-local addresses
+# (HUB_SSH_ALLOW_PRIVATE). Off by default; turn on only for a hub whose owners all may reach the network it sits in.
+# Ignored by the cloud edition.
+sshAllowPrivate: false
+# -- Offer the «В контейнере» way with this image (HUB_CONTAINER_IMAGE); empty hides it.
+containerImage: ""
+# -- Refuse agents older than this version (HUB_MIN_AGENT_VERSION).
+minAgentVersion: ""
+# -- Link to the terms shown at sign-in (HUB_TERMS_URL).
+termsUrl: ""
+# -- debug, info, warn or error (HUB_LOG_LEVEL).
+logLevel: info
+# -- Addresses allowed to tell the hub the client's address in X-Forwarded-For (HUB_TRUSTED_PROXIES): the ingress
+# controller's pods, as exactly as you can name them (a pod CIDR, not a private range: every pod in the cluster would
+# then be believed, and anything that can send the hub a request could pick its own address and slip past the
+# per-address limits). Empty trusts nobody: every person then shares the controller's address and its limits, which is
+# safe and only clumsy, so set it before real use. The controller sees the person's own address only when its Service
+# has externalTrafficPolicy: Local (or the load balancer speaks the PROXY protocol); without that the address in
+# X-Forwarded-For is a node's, whatever is trusted.
+trustedProxies: ""
+
+# -- Mail for sign-in codes and invitations: the sender (HUB_MAIL_FROM). The server, with its password, is HUB_SMTP_URL
+# in the Secret below. Required for an https publicUrl and for edition: cloud: without it the hub does not start (a code
+# in a log that others read is a sign-in as anyone), unless extraEnv sets HUB_MAIL_LOG=allow.
+mailFrom: ""
+
+# Sign-in providers. A provider shows up on the sign-in page when its settings are complete; the client secrets are
+# keys of the Secret (below), not values.
+github:
+  # -- GitHub OAuth app client id (HUB_GITHUB_CLIENT_ID); the secret is HUB_GITHUB_CLIENT_SECRET.
+  clientId: ""
+  # -- Base of a GitHub Enterprise server (HUB_GITHUB_URL); empty: https://github.com.
+  url: ""
+yandex:
+  # -- Yandex ID app client id (HUB_YANDEX_CLIENT_ID); the secret is HUB_YANDEX_CLIENT_SECRET.
+  clientId: ""
+# -- OpenID Connect providers. The secret of each is HUB_OIDC_<ID>_CLIENT_SECRET in the Secret (ID in capitals).
+oidc: []
+#  - id: keycloak              # [a-z0-9]+, also in the callback <publicUrl>/api/auth/oauth/keycloak/callback
+#    name: Corporate sign-in   # on the button
+#    issuer: https://sso.example.com/realms/team
+#    clientId: harnessly
+
+# -- A Secret whose keys are read as environment variables of the hub: HUB_DATABASE_URL, HUB_SMTP_URL,
+# HUB_GITHUB_CLIENT_SECRET, HUB_YANDEX_CLIENT_SECRET, HUB_OIDC_<ID>_CLIENT_SECRET and HUB_SECRET_KEY (what the SSH keys
+# of the spaces are sealed with, `openssl rand -base64 32`; without it the hub makes a key file in the data folder).
+# Empty: the chart creates one from `secrets`.
+existingSecret: ""
+# -- Values for the Secret the chart creates when existingSecret is empty. Keep real secrets out of Git: prefer
+# existingSecret (External Secrets, Sealed Secrets, or `kubectl create secret`).
+secrets: {}
+#  HUB_SMTP_URL: smtp://user:password@mail.example.com:587
+#  HUB_GITHUB_CLIENT_SECRET: ""
+#  HUB_SECRET_KEY: ""   # at least 32 characters; losing it makes the stored SSH keys useless (they are made again)
+
+# -- More environment for the hub (any HUB_* variable, docs/hub/deploy.md).
+extraEnv: []
+#  - name: HUB_MIN_AGENT_VERSION
+#    value: "1.2.0"
+# -- More environment from ConfigMaps or Secrets.
+extraEnvFrom: []
+
+database:
+  # -- Postgres held in the cluster by this chart: one StatefulSet pod with its own volume, for a try-out or a small
+  # team. For anything that matters point HUB_DATABASE_URL (in the Secret) at a database you back up, and leave this
+  # off. Off and no HUB_DATABASE_URL: SQLite in the data volume.
+  postgres:
+    enabled: false
+    image: postgres:17-alpine
+    size: 5Gi
+    storageClass: ""
+    # -- The database password; empty: generated once and kept across upgrades.
+    password: ""
+    # -- A Secret holding the password under the key `password`, instead of the value above.
+    existingSecret: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+
+persistence:
+  # -- The hub's data folder (HUB_DATA_DIR): the SQLite file and, unless HUB_SECRET_KEY is set, the key file that seals
+  # the SSH keys of the spaces. With Postgres and ssh: false (or HUB_SECRET_KEY set) it holds nothing and can be off.
+  enabled: true
+  size: 5Gi
+  # -- StorageClass; empty uses the cluster's default.
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  # -- Terminals and conversations are WebSockets that stay open: raise the proxy's timeouts (nginx shown; other
+  # controllers have their own settings).
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  # -- TLS secrets. The hub host and, with runtimeDomain, the wildcard *.<runtimeDomain> (its own certificate).
+  tls: []
+  #  - secretName: harnessly-hub-tls
+  #    hosts: [hub.example.com]
+  #  - secretName: harnessly-hub-machines-tls
+  #    hosts: ["*.run.example.net"]
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  # -- The hub does not talk to the cluster; leave the API token out.
+  automount: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsUser: 10002
+  runAsGroup: 10002
+  runAsNonRoot: true
+  fsGroup: 10002
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 1Gi
+
+# Up to a minute for a migration on a large database before the first answer.
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 3
+  failureThreshold: 20
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 20
+  timeoutSeconds: 3
+  failureThreshold: 3
+# The readiness probe asks the database too: a hub that cannot reach it leaves the Service.
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 4
+  failureThreshold: 3
+
+# -- Seconds the pod has to end its streams and agent links on a stop (the hub needs up to 20).
+terminationGracePeriodSeconds: 30
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

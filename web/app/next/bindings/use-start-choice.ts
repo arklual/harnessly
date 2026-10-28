@@ -7,9 +7,10 @@ import { useAgentSettings } from '@/next/bindings/settings-data';
 import type { MachineId } from '@/next/protocol/v2';
 import { useMachine } from '@/next/stores/machines';
 
-export const useStartChoice = (machine: MachineId | null) => {
+/** `plainOnly`: a start that has no backend profile (a design's own request) is offered the CLIs' own groups only. */
+export const useStartChoice = (machine: MachineId | null, plainOnly = false) => {
   const machineView = useMachine(machine);
-  const agents = pickerAgents(machineView?.machine.agents ?? []);
+  const agents = pickerAgents(machineView?.machine.agents ?? []).filter((a) => !plainOnly || !a.profile);
   const [picked, setPicked] = useState<IModelChoice | null>(null);
   const [last] = useState(readLastChoice);
   // A new chat starts on the person's pick, else the default of the agent's settings file, else the last pick, and

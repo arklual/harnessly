@@ -35,6 +35,13 @@
   font-weight: var(--hx-weight-semibold);
   letter-spacing: -0.01em;
 }
+a.hx-brand__name {
+  color: inherit;
+  text-decoration: none;
+}
+a.hx-brand__name:hover {
+  text-decoration: underline;
+}
 .hx-nav {
   display: flex;
   flex-direction: column;
@@ -148,6 +155,17 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* the machine of a chat that lives elsewhere, quiet beside its title; the title gives way first. */
+.hx-item__vm {
+  flex: none;
+  max-width: 40%;
+  margin-left: 8px;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -617,6 +635,22 @@
 }
 .hx-sidebar__list {
   overflow-x: hidden;
+}
+/* The list's scrollbar shows only while the pointer is over the list or it scrolls: a bar standing by the chats is noise. */
+.hx-root .hx-sidebar__list::-webkit-scrollbar-thumb {
+  background: transparent;
+  transition: background 200ms var(--hx-ease-out);
+}
+.hx-root .hx-sidebar__list:hover::-webkit-scrollbar-thumb {
+  background: var(--hx-scrollbar);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .hx-sidebar__list {
+    scrollbar-color: transparent transparent;
+  }
+  .hx-sidebar__list:hover {
+    scrollbar-color: var(--hx-scrollbar) transparent;
+  }
 }
 .hx-nav__label,
 .hx-brand__name,

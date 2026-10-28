@@ -228,7 +228,8 @@ describe('our agent’s message to another agent', () => {
   });
 
   it('is a step with the addressee and the delivery, never folded into actions', () => {
-    const bash = (id: string): ToolEntry => tool({ id, tool: 'Bash', summary: '$ ls', ok: true });
+    const bash = (id: string): ToolEntry =>
+      tool({ id, toolUseId: `tu-${id}`, tool: 'Bash', summary: '$ ls', ok: true });
     render(<Steps steps={[bash('a'), bash('b'), tool({}), bash('c'), bash('d')]} live={false} />);
     expect(screen.getByText('Wrote to agent')).toBeTruthy();
     expect(screen.getByText('acme-ui-kit')).toBeTruthy();

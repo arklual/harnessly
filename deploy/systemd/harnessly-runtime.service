@@ -1,0 +1,28 @@
+# The runtime of a machine that a harnessly hub carries, as a systemd user service (profile full of the installer,
+# docs/hub/machine.md). The installer writes this file and runtime.env next to it; to do it by hand:
+#   install -Dm755 harnessly-runtime ~/.local/bin/harnessly-runtime
+#   install -Dm644 deploy/systemd/harnessly-runtime.service ~/.config/systemd/user/harnessly-runtime.service
+#   install -Dm644 runtime.env ~/.config/harnessly/runtime.env     # RUNTIME_GATE_LISTEN, RUNTIME_APP_BASE_PATH, RUNTIME_HUB_URL…
+#   systemctl --user daemon-reload && systemctl --user enable --now harnessly-runtime
+# The profile dir (a user of its own, hardening) is written by the installer only: its units name that user.
+[Unit]
+Description=harnessly runtime: terminals and coding agents of %u
+Documentation=https://github.com/ly-solutions/harnessly/blob/main/docs/hub/machine.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/harnessly/runtime.env
+WorkingDirectory=%h
+ExecStart=%h/.local/bin/harnessly-runtime
+# Only the runtime stops with the service: the tmux server and the agents in it keep working through a restart or an
+# upgrade, and the next runtime picks them up.
+KillMode=process
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=15
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

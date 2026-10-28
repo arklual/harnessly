@@ -1,0 +1,170 @@
+/* The safe: Settings → Safe (the secrets as rows of one card, the name above everything else; a new value opens under
+   its row, removal folds it with .hx-reveal) and «Положить в сейф», the dialog an agent's ask opens. */
+
+.hx-safe-wrap + .hx-safe-wrap .hx-safe,
+.hx-safe-wrap + .hx-safe-add,
+.hx-safe-empty + .hx-safe-add {
+  border-top: 1px solid var(--hx-border);
+}
+.hx-safe-empty {
+  margin: 0;
+  padding: 16px 16px 14px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+
+.hx-safe__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 12px 10px 16px;
+}
+.hx-safe__ic {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-2);
+}
+.hx-safe__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-safe__name {
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-safe__sub {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-safe__actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.hx-safe__form {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px 60px;
+}
+.hx-safe__err {
+  padding: 0 16px 14px 60px;
+}
+.hx-safe__field {
+  display: grid;
+  gap: 6px;
+}
+.hx-safe__label {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-safe__hint {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.5;
+}
+.hx-safe__field input[aria-invalid] + .hx-safe__hint {
+  color: var(--hx-danger);
+}
+
+.hx-safe-add__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 0 0 16px 16px;
+  background: none;
+  color: var(--hx-accent);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--hx-dur-xs) ease;
+}
+.hx-safe-add__btn:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-safe-add:only-child .hx-safe-add__btn,
+.hx-safe-empty + .hx-safe-add .hx-safe-add__btn {
+  border-radius: 0 0 16px 16px;
+}
+.hx-safe-add:only-child .hx-safe-add__btn {
+  border-radius: 16px;
+}
+.hx-safe__form.hx-safe-add__form {
+  padding: 14px 16px 16px;
+}
+
+/* «Положить в сейф» */
+.hx-safe-ask {
+  width: min(460px, 100%);
+}
+.hx-safe-ask__body {
+  display: grid;
+  gap: 12px;
+}
+.hx-safe-ask__why,
+.hx-safe-ask__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+.hx-safe-ask__why {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  overflow-wrap: anywhere;
+}
+.hx-safe-ask__note {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-safe-ask__why .hx-icon,
+.hx-safe-ask__note .hx-icon {
+  margin-top: 2px;
+  color: var(--hx-fg-3);
+}
+.hx-safe-ask__more {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+}
+
+@media (max-width: 600px) {
+  .hx-safe__head {
+    flex-wrap: wrap;
+  }
+  .hx-safe__actions {
+    width: 100%;
+    padding-left: 44px;
+  }
+  .hx-safe__form,
+  .hx-safe__err {
+    padding-left: 16px;
+  }
+}

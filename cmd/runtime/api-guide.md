@@ -59,6 +59,42 @@ Between machines the message goes through the fleet's gateway (`RUNTIME_PEER_REL
 the request with its own secret, the gateway checks it and forwards it signed with the receiving runtime's secret
 (`POST /api/peers/inbox`, `GET /api/peers/directory`). No other token exists, and an agent never sees one.
 
+## Telegram notifications
+
+The person connects their Telegram to harnessly's shared bot in Settings → Notifications, with one instruction of when
+agents should write; where allowed, they may also link bots of their own, each with its instruction.
+`harnessly notify` and `harnessly notify send [--bot NAME] TEXT` are clients of these routes. No answer carries a token,
+and the shared bot's token is never on the machine.
+
+| Route | What |
+| --- | --- |
+| `GET /api/cli/notify/bots` | `{bots: [{id, name, username, chat, bound, instruction}], shared: {enabled, bot, linked, chat, instruction}}`: `shared` is the person's Telegram through the shared bot; `bots` are the person's own (empty while those are off), `chat` the bound chat's title, `bound` false while the person has not bound one |
+| `POST /api/cli/notify/send` | body `{bot?, text, silent?, session?}`: without `bot` the text goes to the person's Telegram through the shared bot; `bot` is a bot of their own by name (any case), `@username` or id. `text` is markdown-ish (`**bold**`, `` `code` ``, fenced blocks, `[links](https://…)`), sent as Telegram HTML, as several messages when it is long. Answers `{bot, chat, messages}` |
+
+Refusals are `{error, detail?}`: `not-linked` (409, the person has not connected Telegram), `no-shared` (404, no shared
+bot here), `offline` (503, the platform did not answer), `disabled` (403, bots of the person's own are off), `not-found`,
+`ambiguous` (409), `not-bound`, `empty`, `too-long` (16000 characters at most), `rate-limited` (429, 20 messages a
+minute), `chat-gone` (the bot was removed from the chat or blocked), `invalid-token`, `unreachable` (502), `rejected`.
+Write only as the person's instruction says.
+
+## Asking a person
+
+`harnessly ask` is the client of these routes: a question or an approval goes through one of the same bots, with the
+person tagged and buttons to answer; the person answers in Telegram or in the page.
+
+| Route | What |
+| --- | --- |
+| `GET /api/cli/asks/people` | `{enabled, onlyContacts, defaultTimeoutMin, maxTimeoutMin, contacts: [{name, username?, note?, approver?}], bots: [{id, name, chat, bound}]}` |
+| `POST /api/cli/asks` | body `{kind: "question"\|"approval", question, details?, link?, options?: [≤6], to?, bot?, timeoutSec?, session}`: `to` is a contact's name or a Telegram `@username`. Answers `{ask}` |
+| `GET /api/cli/asks/<id>/wait?timeout=S` | holds up to 50 s; `{ask}` with `status` `waiting`, `answered`, `timeout`, `cancelled` or `failed`. A closed ask is marked as read by the agent |
+| `GET /api/cli/asks/<id>`, `GET /api/cli/asks` | one ask, every ask (newest first) |
+| `POST /api/cli/asks/<id>/cancel` | calls it off |
+
+An ask: `{id, kind, status, question, to: {name?, username?}, chat, deadline, decision: "approved"|"changes"|"comment"|"",
+answer: {from, text, choice, via}, replies: [...], seenReplies}`. Refusals are `{error, detail?}`: `disabled`, `no-bot`,
+`bot-not-found`, `unknown-person`, `bad-person`, `empty`, `too-long`, `rate-limited` (429), `not-found`, `closed` (409),
+and Telegram's own as for notify.
+
 ## The right pane of your own conversation
 
 `POST /api/cli/panel` with `{session: "<your tmux session>", command: {...}}`, from a tab that belongs to an agent

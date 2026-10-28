@@ -9,17 +9,22 @@ import {
   createGuestLink,
   createInvite,
   fetchAccess,
+  GUEST_VERSION,
+  isDocRef,
   revokeGuestLink,
   revokeInvite,
   type IGuestLink,
+  type IGuestLinkChange,
   type IInvite,
   type TGuestRights,
+  type TGuestVersion,
   type TInviteRole,
   type TTtlValue,
 } from '@/next/features/designly/access/api';
 import { copyText, isAlive } from '@/next/features/designly/access/copy-link';
 import { guestViewOf } from '@/next/features/designly/access/guest-view';
 import { INVITE_ROLES } from '@/next/features/designly/access/labels';
+import { PagesPicker, VersionPicker, type IScopePage } from '@/next/features/designly/access/link-scope';
 import RoleMenu from '@/next/features/designly/access/role-menu';
 import { change, type ISectionProps } from '@/next/features/designly/access/section';
 import TtlPicker, { STEPS } from '@/next/features/designly/access/ttl-picker';
@@ -30,7 +35,7 @@ import { t } from '@/next/i18n';
 
 const OUT_MS = 200;
 const INVITE_STEPS = ['1h', '1d', '7d'] as const;
-const GUEST_RIGHTS = ['view', 'comment'] as const satisfies readonly TGuestRights[];
+const GUEST_RIGHTS: readonly TGuestRights[] = ['view', 'comment'];
 const NOW_MS = 30_000;
 const WHO = { guest: 'guest', member: 'member' } as const;
 type TWho = (typeof WHO)[keyof typeof WHO];
@@ -45,21 +50,35 @@ const useNow = (every: number) => {
   return now;
 };
 
-const AccessLinks = (props: ISectionProps) => {
-  const { project, access, action } = props;
+interface IAccessLinksProps extends ISectionProps {
+  /** The design's pages, to limit a new link to some of them; fewer than two and there is nothing to choose. */
+  pages?: readonly IScopePage[];
+  /** What a link without sign-in may allow here; a board's guest page is read-only, so only «view». */
+  guestRights?: readonly TGuestRights[];
+}
+
+const NO_PAGES: readonly IScopePage[] = [];
+
+const AccessLinks = (props: IAccessLinksProps) => {
+  const { project, access, action, pages = NO_PAGES, guestRights = GUEST_RIGHTS } = props;
   const now = useNow(NOW_MS);
   const guests = useGuestLinks(project);
   const [who, setWho] = useState<TWho>(WHO.guest);
   const [title, setTitle] = useState('');
   const [rights, setRights] = useState<TGuestRights>('view');
   const [guestTtl, setGuestTtl] = useState<TTtlValue>('7d');
+  // A new link shows the design as it is when the link is made: the owner keeps editing, the guest does not see it.
+  const [version, setVersion] = useState<TGuestVersion>(GUEST_VERSION.pinned);
+  const [scope, setScope] = useState<string[] | null>(null);
   const [role, setRole] = useState<TInviteRole>('view');
   const [roleTtl, setRoleTtl] = useState<TTtlValue>(null);
   const [inviteTtl, setInviteTtl] = useState<TTtlValue>('7d');
   const [places, setPlaces] = useState('');
   const idle = action.busy === null;
   // Without the gateway's links there is only the invite.
-  const mode: TWho = guests.state.k === 'ready' ? who : WHO.member;
+  // A document has the links without sign-in only: no invitations yet.
+  const doc = isDocRef(project);
+  const mode: TWho = doc || guests.state.k === 'ready' ? who : WHO.member;
 
   // The list keeps its identity between renders: the leaving list compares it by reference.
   const items = useMemo<TLinkItem[]>(
@@ -84,6 +103,8 @@ const AccessLinks = (props: ISectionProps) => {
         title: title.trim(),
         rights,
         ttl: guestTtl,
+        version,
+        pages: scope,
         ...(view ? { view } : {}),
       });
       const copy = copyText(made.then((link) => link.url));
@@ -125,7 +146,7 @@ const AccessLinks = (props: ISectionProps) => {
     });
   };
 
-  const changeGuest = (link: IGuestLink, patch: { ttl?: TTtlValue; rights?: TGuestRights }) =>
+  const changeGuest = (link: IGuestLink, patch: IGuestLinkChange) =>
     void action.run(`g:${link.id}`, async () => {
       const next = await changeGuestLink(project, link.id, patch);
       guests.put(links.map((l) => (l.id === next.id ? next : l)));
@@ -155,6 +176,7 @@ const AccessLinks = (props: ISectionProps) => {
               onGuestChange={changeGuest}
               onGuestRevoke={revokeGuest}
               onInviteRevoke={revokeMember}
+              editable={!isDocRef(project)}
             />
           ))}
         </ul>
@@ -167,7 +189,7 @@ const AccessLinks = (props: ISectionProps) => {
           void (mode === WHO.guest ? makeGuest() : makeInvite());
         }}
       >
-        {guests.state.k === 'ready' && (
+        {guests.state.k === 'ready' && !doc && (
           <Segmented
             label={t('next.access.linkWho')}
             value={mode}
@@ -198,7 +220,7 @@ const AccessLinks = (props: ISectionProps) => {
               <RoleMenu
                 label={t('next.access.linkRole')}
                 role={rights}
-                roles={GUEST_RIGHTS}
+                roles={guestRights}
                 onRole={setRights}
                 disabled={!idle}
               />
@@ -210,6 +232,10 @@ const AccessLinks = (props: ISectionProps) => {
                 disabled={!idle}
                 onChange={setGuestTtl}
               />
+              <VersionPicker value={version} onChange={setVersion} disabled={!idle} />
+              {pages.length > 1 && (
+                <PagesPicker pages={pages} value={scope} onChange={setScope} disabled={!idle} />
+              )}
             </>
           ) : (
             <>

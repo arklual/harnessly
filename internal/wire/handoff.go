@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // ErrDraftUnsupported: the conversation has nothing a draft can be made of yet (no transcript, no agent session), or
@@ -54,7 +54,7 @@ func (s *Server) handoffDraft(w http.ResponseWriter, r *http.Request, conv strin
 	case err != nil && ctx.Err() != nil:
 		refuse(w, RefuseTimeout)
 	case err != nil:
-		agent.Log("warn", "v2: handoff draft failed", agent.F{K: "conversation", V: conv}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: handoff draft failed", jsonlog.F{K: "conversation", V: conv}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		s.writeChecked(w, r, out)

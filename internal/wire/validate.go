@@ -329,6 +329,9 @@ func (c Conversation) Validate() error {
 			errs = append(errs, errors.New("terminalStop.idleMs: negative"))
 		}
 	}
+	if f := c.TerminalFailure; f != nil {
+		errs = append(errs, under("terminalFailure", f.Validate()))
+	}
 	if p := c.PendingModel; p != nil {
 		errs = append(errs, need("pendingModel.id", p.ID))
 		if p.Effort != nil {
@@ -864,6 +867,25 @@ func (e TurnFailedEv) Validate() error {
 	return errors.Join(errs...)
 }
 
+func (f TerminalFailure) Validate() error {
+	errs := []error{in("kind", f.Kind, TerminalFailureKinds)}
+	if !f.Terminal {
+		errs = append(errs, errors.New("terminal: false"))
+	}
+	if !f.NeedsTarget {
+		errs = append(errs, errors.New("needsTarget: false"))
+	}
+	return errors.Join(errs...)
+}
+
+func (e QuotaExhaustedEv) Validate() error {
+	err := under("failure", e.Failure.Validate())
+	if e.Failure.Kind != FailureQuotaExhausted {
+		return errors.Join(err, fmt.Errorf("failure.kind: %s, not quota_exhausted", e.Failure.Kind))
+	}
+	return err
+}
+
 func (e QueueChangedEv) Validate() error { return under("queue", e.Queue.Validate()) }
 
 func (e PromptStateEv) Validate() error {
@@ -1051,9 +1073,32 @@ func handoffText(text string) error {
 	return nil
 }
 
+var handoffArtifactID = regexp.MustCompile(`^[a-f0-9]{32}$`)
+
+func artifactID(name, id string) error {
+	if !handoffArtifactID.MatchString(id) {
+		return fmt.Errorf("%s: not an artifact id", name)
+	}
+	return nil
+}
+
+func (a HandoffArtifact) Validate() error {
+	return errors.Join(artifactID("artifact.id", a.ID), positive("artifact.bytes", a.Bytes))
+}
+
 func (c ConversationHandoffCmd) Validate() error {
-	errs := []error{byID(c.OpID, c.ID), in("provider", c.Provider, Providers), in("mode", c.Mode, HandoffModes),
-		handoffText(c.Text)}
+	errs := []error{byID(c.OpID, c.ID), in("provider", c.Provider, Providers), in("mode", c.Mode, HandoffModes)}
+	if c.Mode == HandoffHistory {
+		errs = append(errs, artifactID("artifactId", c.ArtifactID))
+		if c.Text != "" {
+			errs = append(errs, errors.New("text: forbidden for history"))
+		}
+	} else {
+		errs = append(errs, handoffText(c.Text))
+		if c.ArtifactID != "" {
+			errs = append(errs, errors.New("artifactId: forbidden outside history"))
+		}
+	}
 	errs = append(errs, commandModel(c.Model, c.Profile)...)
 	return errors.Join(errs...)
 }
@@ -1063,7 +1108,22 @@ func (c ConversationMergeCmd) Validate() error {
 }
 
 func (d HandoffDraft) Validate() error {
-	errs := []error{in("mode", d.Mode, DraftModes), need("text", d.Text)}
+	errs := []error{in("mode", d.Mode, DraftModes)}
+	if d.Mode == DraftHistory {
+		if d.Artifact == nil {
+			errs = append(errs, errors.New("artifact: required for history"))
+		} else {
+			errs = append(errs, d.Artifact.Validate())
+		}
+		if d.Text != "" {
+			errs = append(errs, errors.New("text: forbidden for history"))
+		}
+	} else {
+		errs = append(errs, need("text", d.Text))
+		if d.Artifact != nil {
+			errs = append(errs, errors.New("artifact: forbidden outside history"))
+		}
+	}
 	if d.Tokens < 0 || d.Turns < 0 {
 		errs = append(errs, errors.New("tokens: negative"))
 	}

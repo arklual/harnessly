@@ -48,8 +48,27 @@ describe('GateCard', () => {
     expect(screen.getByRole('status').textContent).toContain('decide in the terminal');
     fireEvent.click(screen.getByText('Open the terminal'));
     expect(onOpenTerminal).toHaveBeenCalledOnce();
-    // The options stay: a decision may still be taken again from the page.
-    expect(screen.getByText('Yes')).toBeTruthy();
+    // No button that would do nothing: the terminal is the way.
+    expect(screen.queryByText('Yes')).toBeNull();
+    expect(screen.queryByText('No')).toBeNull();
+  });
+
+  it('draws a shell command with one prompt, not two', () => {
+    const shell: Permission = { ...permission({ k: 'open' }), tool: 'Bash', command: '$ rm -f food/*' };
+    render(<GateCard permission={shell} device="d1" decided={null} onDecide={() => Promise.resolve()} />);
+    expect(document.querySelector('.hx-gate__cmd')?.textContent).toBe('$rm -f food/*');
+  });
+
+  it("shows Claude's own countdown to denying the request", () => {
+    render(
+      <GateCard
+        permission={permission({ k: 'open', autoDenyAt: Date.now() + 77_000 })}
+        device="d1"
+        decided={null}
+        onDecide={() => Promise.resolve()}
+      />,
+    );
+    expect(screen.getByRole('timer').textContent).toMatch(/1:1[67]/);
   });
 
   it('says nothing of the terminal on an open gate', () => {

@@ -103,6 +103,7 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("It is on your PATH and finds the workspace by itself; there is nothing to log in to.\n\n")
 	b.WriteString("```bash\n" +
 		"harnessly open <link|file|port>   # show it to the person in the right pane (a document, a board, ./report.md, 4400)\n" +
+		"harnessly deliver <file>          # hand a file to the person (zip, docx, pdf, md): a card in the chat to open and download\n" +
 		"harnessly tab list                # the tabs of this workspace\n" +
 		"harnessly tab create -t codex-cli --prompt \"<the whole task>\"   # start another agent (claude-code | codex-cli | terminal)\n" +
 		"harnessly tab status <id>         # is it working or waiting\n" +
@@ -112,6 +113,11 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("Show the person what they should look at: after you publish a document or draw a board, or when a dev server is running, " +
 		"`harnessly open` it. Start another agent only with `tab create --prompt`; a `claude` or `codex` command typed into a shell tab " +
 		"starts it without the workspace's hooks.\n\n")
+	b.WriteString("## Handing files over\n\n")
+	b.WriteString("When the person asks you to send or collect a file (\"put it in a zip\", \"give me the docx\"), hand it over with " +
+		"`harnessly deliver <path>` (or the `deliver_file` tool): the chat gets a card that opens the file on the right and downloads it. " +
+		"Deliver only files the person asked to receive. Files you merely write or change while working make no card, so do not deliver them, " +
+		"and do not deliver the same file twice unless you changed it.\n\n")
 	b.WriteString("## How your answers render\n\n")
 	b.WriteString("The conversation draws two fenced blocks instead of showing them as code: a block marked `mermaid` becomes a diagram " +
 		"(flowchart, sequence, state, ER, gantt), and a block marked `html` becomes a page in a sandboxed frame, with a toggle to its source. " +

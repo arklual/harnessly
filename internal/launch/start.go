@@ -53,6 +53,9 @@ type Config struct {
 	DataDir, DataDirLabel string
 	// EnvPrefix starts every variable a launch may set (`<prefix>NAME='value' ` before the line).
 	EnvPrefix string
+	// EnvSource gives what goes before a provider's whole command so the CLI starts with the keys, secrets and proxy a
+	// hub left in the machine's env files (agents.EnvSourcePrefix); nil, or "", adds nothing.
+	EnvSource func(provider string) string
 	// PromptDir takes a prompt too long to type, read back and removed by the launch line.
 	PromptDir string
 	// FirstWorkspaceName names the workspace made for a machine that has none.
@@ -330,7 +333,7 @@ func (s *Starter) Start(o Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	command := env + agents.WithInitialPrompt(o.Provider, line, prompt, promptFile)
+	command := s.envSource(o.Provider) + env + agents.WithInitialPrompt(o.Provider, line, prompt, promptFile)
 	name := ""
 	if o.TabName != nil {
 		name = jscompat.Trim(*o.TabName)
@@ -426,3 +429,11 @@ var (
 	msgStartFailed     = locale.T("Could not start the session", "Не удалось запустить сессию")
 	msgMetaNotSaved    = locale.T("The conversation started, but its settings were not saved", "Диалог запущен, но его параметры не сохранились")
 )
+
+// envSource is the env files' prefix for a provider's launch; read at each launch, since keys arrive while it runs.
+func (s *Starter) envSource(provider string) string {
+	if s.cfg.EnvSource == nil {
+		return ""
+	}
+	return s.cfg.EnvSource(provider)
+}

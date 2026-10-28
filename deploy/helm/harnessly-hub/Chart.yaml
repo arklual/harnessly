@@ -1,0 +1,23 @@
+apiVersion: v2
+name: harnessly-hub
+description: The harnessly hub — sign-in, spaces and invitations, and the machines people connect, reached through one address.
+type: application
+version: 0.1.0
+# The hub image tag. No hub image is published yet: build the `hub` target of the Dockerfile and set image.repository
+# and image.tag, or put the release here when the hub ships.
+appVersion: "latest"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/ly-solutions/harnessly
+icon: https://raw.githubusercontent.com/ly-solutions/harnessly/main/docs/brand/harnessly-avatar.svg
+sources:
+  - https://github.com/ly-solutions/harnessly
+maintainers:
+  - name: Ly Solutions
+    url: https://github.com/ly-solutions
+keywords:
+  - ai-agents
+  - claude-code
+  - codex
+  - hub
+annotations:
+  artifacthub.io/license: Apache-2.0

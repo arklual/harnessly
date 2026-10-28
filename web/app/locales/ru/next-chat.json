@@ -82,6 +82,7 @@
   "next.outputs.changed": "обновлён",
   "next.files.edited": "изменён",
   "next.files.read": "прочитан",
+  "next.gate.autoDeny": "Claude откажет сам через {time}",
   "next.gate.closedChat": "Вы решили ответить в чате",
   "next.gate.refused": "Не удалось сопоставить запрос на экране — решите в терминале",
   "next.gate.openTerminal": "Открыть терминал",
@@ -166,7 +167,9 @@
   "next.queue.sendNow": "Отправить сейчас",
   "next.queue.paused": "на паузе",
   "next.queue.pausedLaunch": "агент не запустился",
+  "next.queue.pausedBusy": "машина перегружена · агент не запустился",
   "next.queue.pausedGone": "агента нет",
+  "next.queue.pausedTarget": "ждёт выбора другой модели",
   "next.queue.moveFailed": "Не получилось поменять порядок",
   "next.queue.reorder": "Перетащить, чтобы поменять порядок",
   "next.queue.remove": "Убрать из очереди",
@@ -463,6 +466,9 @@
   "next.limit.cancel": "Не продолжать",
   "next.limit.autoAt": "Продолжить {at}",
   "next.limit.failed": "Не получилось. Попробуйте ещё раз",
+  "next.terminalFailure.quota.title": "Квота провайдера исчерпана",
+  "next.terminalFailure.quota.lead": "Этот ход остановлен. Выберите другую доступную модель или профиль и продолжите вручную.",
+  "next.terminalFailure.choose": "Выбрать другую модель",
   "next.auto.limit.done": "Продолжил после сброса лимита",
   "next.auto.restart.done": "Прервано перезапуском · продолжил автоматически",
   "next.auto.limit.pending": "Лимит сброшен · продолжаю…",
@@ -470,5 +476,8 @@
   "next.composer.placeholderLimited": "Отправится после сброса лимита {at}",
   "next.composer.placeholderLimitedUnknown": "Отправится после сброса лимита",
   "next.dockBar.keyGone": "Ключ {vendor} удалён — добавьте его в «Модели и ключи» или продолжите в другой модели",
-  "next.dockBar.keyOpen": "Модели и ключи"
+  "next.dockBar.keyOpen": "Модели и ключи",
+  "next.outputs.kind.delivery": "Файл",
+  "next.delivered.save": "Скачать",
+  "next.dockBar.off": "Машина выключена — сообщение отправить нельзя"
 }

@@ -116,6 +116,8 @@ const renameOf = (renaming: { id: string; saving: boolean } | null, id: string):
 export interface ISidebarProps {
   /** The product's name at the top (RUNTIME_APP_NAME). */
   brand: string;
+  /** The hub the machine belongs to: the name at the top then links back to it. */
+  brandHref?: string | null;
   /** null while the list loads (a skeleton after 150 ms); [] is an empty list. */
   chats: readonly ISidebarChat[] | null;
   projects: readonly ISidebarProject[] | null;
@@ -155,6 +157,8 @@ export interface ISidebarProps {
   machineReveal?: number;
   /** What the folded rail lists in place of the projects (the live chats); shown only on the rail. */
   rail?: ReactNode;
+  /** The agents' questions to people («People»), under the favorites; hidden on the rail. */
+  people?: ReactNode;
   ref?: Ref<HTMLElement>;
 }
 
@@ -280,6 +284,7 @@ const ProfileButton = ({
  */
 const Sidebar = ({
   brand,
+  brandHref = null,
   chats,
   projects,
   favorites = NO_FAVORITES,
@@ -309,6 +314,7 @@ const Sidebar = ({
   onManageMachines,
   machineReveal = 0,
   rail,
+  people,
   ref,
 }: ISidebarProps) => {
   const { pending, run } = usePendingList();
@@ -387,13 +393,14 @@ const Sidebar = ({
   useLayoutEffect(() => {
     latest.current = { actions, run, onOpen, renameEnd, favView, toggleKids };
   });
-  const { onCopyLink, onOpenInNewTab, onTerminal, onStopTerminal, onFork, onContinue } = actions;
+  const { onCopyLink, onOpenInNewTab, onTerminal, onStopTerminal, onFork, onContinue, onMoveVm } = actions;
   const hasCopyLink = onCopyLink !== undefined;
   const hasNewTab = onOpenInNewTab !== undefined;
   const hasTerminal = onTerminal !== undefined;
   const hasStopTerminal = onStopTerminal !== undefined;
   const hasFork = onFork !== undefined;
   const hasContinue = onContinue !== undefined;
+  const hasMoveVm = onMoveVm !== undefined;
   const handlers = useMemo<IRowHandlers>(() => {
     const act = (id: string, failure: string, action: (now: IChatActions) => Promise<unknown> | undefined) =>
       void latest.current.run(id, failure, () => action(latest.current.actions) ?? Promise.resolve());
@@ -426,9 +433,10 @@ const Sidebar = ({
         : undefined,
       fork: hasFork ? (id) => act(id, t('next.handoff.forkFailed'), (now) => now.onFork?.(id)) : undefined,
       continueIn: hasContinue ? (id) => latest.current.actions.onContinue?.(id) : undefined,
+      moveVm: hasMoveVm ? (id) => latest.current.actions.onMoveVm?.(id) : undefined,
       toggleKids: (id) => latest.current.toggleKids(id),
     };
-  }, [hasCopyLink, hasNewTab, hasTerminal, hasStopTerminal, hasFork, hasContinue]);
+  }, [hasCopyLink, hasNewTab, hasTerminal, hasStopTerminal, hasFork, hasContinue, hasMoveVm]);
 
   const renderRow = (chat: ISidebarChat, variant: TRowVariant, enter?: IRowEnter, open?: boolean) => (
     <ChatRow
@@ -646,7 +654,13 @@ const Sidebar = ({
             <Icon name="panel-left" />
           </button>
         </span>
-        <span className="hx-brand__name">{brand}</span>
+        {brandHref ? (
+          <a className="hx-brand__name" href={brandHref} title={t('next.sidebar.backToHub')}>
+            {brand}
+          </a>
+        ) : (
+          <span className="hx-brand__name">{brand}</span>
+        )}
         <span className="hx-spacer" />
         <button
           type="button"
@@ -770,6 +784,8 @@ const Sidebar = ({
             pending={pending}
           />
         )}
+
+        {people}
 
         {sections && (sections.projects.length > 0 || actions.onNewProject) && (
           <section aria-label={t('next.sidebar.projects')} data-empty={sections.projects.length === 0}>

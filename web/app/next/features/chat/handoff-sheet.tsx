@@ -5,18 +5,14 @@ import { useEffect, useRef, useState } from 'react';
 import Modal from '@/next/features/shell/modal';
 import Segmented from '@/next/ui/segmented';
 import { Skeleton } from '@/next/ui/skeleton';
-import { HANDOFF_TEXT_MAX } from '@/next/protocol/v2';
+import { HANDOFF_TEXT_MAX, type HandoffDraft } from '@/next/protocol/v2';
 import { plural, t } from '@/next/i18n';
 import '@/next/styles/handoff.css';
 
-export const SHEET_MODE = { excerpt: 'excerpt', note: 'note', result: 'result' } as const;
+export const SHEET_MODE = { excerpt: 'excerpt', note: 'note', result: 'result', history: 'history' } as const;
 export type TSheetMode = (typeof SHEET_MODE)[keyof typeof SHEET_MODE];
 
-export interface ISheetDraft {
-  text: string;
-  tokens: number;
-  turns: number;
-}
+export type ISheetDraft = HandoffDraft;
 
 export type TDraftOutcome = { ok: true; draft: ISheetDraft } | { ok: false; reason: string };
 
@@ -32,8 +28,8 @@ export interface IHandoffSheetProps {
   modes: readonly TSheetMode[];
   /** Asks the machine for a draft of the kind. */
   onDraft: (mode: TSheetMode) => Promise<TDraftOutcome>;
-  /** Sends the approved text; rejects with the reason in words, and the sheet stays open. */
-  onSend: (mode: TSheetMode, text: string) => Promise<void>;
+  /** Sends approved text, or the opaque artifact id for full history; rejects and leaves the sheet open. */
+  onSend: (mode: TSheetMode, text: string, artifactId?: string) => Promise<void>;
   sendLabel: string;
 }
 
@@ -41,12 +37,14 @@ const MODE_LABEL: Record<TSheetMode, string> = {
   [SHEET_MODE.excerpt]: 'next.handoff.mode.excerpt',
   [SHEET_MODE.note]: 'next.handoff.mode.note',
   [SHEET_MODE.result]: 'next.handoff.mode.result',
+  [SHEET_MODE.history]: 'next.handoff.mode.history',
 } as const;
 
 const MODE_HINT: Record<TSheetMode, string> = {
   [SHEET_MODE.excerpt]: 'next.handoff.hint.excerpt',
   [SHEET_MODE.note]: 'next.handoff.hint.note',
   [SHEET_MODE.result]: 'next.handoff.hint.result',
+  [SHEET_MODE.history]: 'next.handoff.hint.history',
 } as const;
 
 /** What the runtime estimates too: about four characters a token. */
@@ -54,10 +52,25 @@ const tokensOf = (text: string): number => Math.ceil([...text].length / 4);
 
 /** «≈ 3 200 токенов · 6 ходов» of the text as it stands now. */
 const sizeOf = (state: Extract<TDraftState, { k: 'ready' }>): string => {
+  if (state.draft.mode === SHEET_MODE.history) {
+    return t('next.handoff.historySize', { n: state.draft.artifact.bytes.toLocaleString() });
+  }
   const tokens = state.text === state.draft.text ? state.draft.tokens : tokensOf(state.text);
   const parts = [t('next.handoff.tokens', { n: tokens.toLocaleString() })];
   if (state.draft.turns > 0) parts.push(plural(state.draft.turns, 'next.handoff.turns'));
   return parts.join(' · ');
+};
+
+const readyState = (outcome: Extract<TDraftOutcome, { ok: true }>): TDraftState => ({
+  k: 'ready',
+  draft: outcome.draft,
+  text: outcome.draft.mode === SHEET_MODE.history ? '' : outcome.draft.text,
+});
+
+const loadingLabel = (mode: TSheetMode): string => {
+  if (mode === SHEET_MODE.history) return t('next.handoff.loadingHistory');
+  if (mode === SHEET_MODE.excerpt) return t('next.handoff.loading');
+  return t('next.handoff.writing');
 };
 
 const SheetBody = ({
@@ -79,9 +92,7 @@ const SheetBody = ({
     void onDraft(which).then((outcome) =>
       setDrafts((now) => ({
         ...now,
-        [which]: outcome.ok
-          ? { k: 'ready', draft: outcome.draft, text: outcome.draft.text }
-          : { k: 'failed', reason: outcome.reason },
+        [which]: outcome.ok ? readyState(outcome) : { k: 'failed', reason: outcome.reason },
       })),
     );
   };
@@ -94,13 +105,16 @@ const SheetBody = ({
   const state = drafts[mode] ?? { k: 'loading' };
   const text = state.k === 'ready' ? state.text.trim() : '';
   const tooLong = [...text].length > HANDOFF_TEXT_MAX;
+  const historyReady = state.k === 'ready' && state.draft.mode === SHEET_MODE.history;
+  const canSend = state.k === 'ready' && (historyReady || (text !== '' && !tooLong));
 
   const send = async () => {
-    if (state.k !== 'ready' || text === '' || tooLong) return;
+    if (!canSend || state.k !== 'ready') return;
     setError(null);
     setSending(true);
     try {
-      await onSend(mode, text);
+      const artifactId = state.draft.mode === SHEET_MODE.history ? state.draft.artifact.id : undefined;
+      await onSend(mode, text, artifactId);
       onClose();
     } catch (failure) {
       setError(failure instanceof Error && failure.message ? failure.message : t('next.handoff.failed'));
@@ -133,7 +147,7 @@ const SheetBody = ({
         {state.k === 'loading' && (
           <div className="hx-hsheet__wait" role="status">
             <Skeleton className="hx-hsheet__sk" />
-            <span>{mode === SHEET_MODE.excerpt ? t('next.handoff.loading') : t('next.handoff.writing')}</span>
+            <span>{loadingLabel(mode)}</span>
           </div>
         )}
         {state.k === 'failed' && (
@@ -146,25 +160,34 @@ const SheetBody = ({
         )}
         {state.k === 'ready' && (
           <>
-            <textarea
-              className="hx-hsheet__text"
-              aria-label={t('next.handoff.textLabel')}
-              value={state.text}
-              disabled={sending}
-              onChange={(event) => {
-                const value = event.target.value;
-                setDrafts((now) => ({ ...now, [mode]: { ...state, text: value } }));
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-            />
-            <p className="hx-hsheet__size" data-over={tooLong || undefined}>
-              {tooLong ? t('next.handoff.tooLong') : sizeOf(state)}
-            </p>
+            {state.draft.mode === SHEET_MODE.history ? (
+              <div className="hx-hsheet__history">
+                <strong>{sizeOf(state)}</strong>
+                <span>{t('next.handoff.historyReady')}</span>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  className="hx-hsheet__text"
+                  aria-label={t('next.handoff.textLabel')}
+                  value={state.text}
+                  disabled={sending}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setDrafts((now) => ({ ...now, [mode]: { ...state, text: value } }));
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                />
+                <p className="hx-hsheet__size" data-over={tooLong || undefined}>
+                  {tooLong ? t('next.handoff.tooLong') : sizeOf(state)}
+                </p>
+              </>
+            )}
           </>
         )}
         {error && (
@@ -183,7 +206,7 @@ const SheetBody = ({
           className="hx-btn hx-create__ok"
           data-variant="primary"
           data-busy={sending}
-          disabled={state.k !== 'ready' || text === '' || tooLong || sending}
+          disabled={!canSend || sending}
         >
           <span>{sendLabel}</span>
           <span className="hx-gate__spin" aria-hidden="true" />

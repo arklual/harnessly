@@ -7,7 +7,7 @@
   "next.providers.vendor.kimi.sub": "Moonshot AI",
   "next.providers.vendor.glm.sub": "Z.ai",
   "next.providers.vendor.grok.sub": "xAI, через Codex",
-  "next.providers.off": "Не подключён",
+  "next.providers.off": "Не подключено",
   "next.providers.on": "Ключ · {tail}",
   "next.providers.onPreset": "{preset} · {tail}",
   "next.providers.onLogin": "Подписка · {account}",

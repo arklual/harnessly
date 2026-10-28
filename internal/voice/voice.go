@@ -3,7 +3,7 @@
 // answers with partial and final text. No audio is written to disk and no transcript is logged.
 //
 // The page sends {type: "start", lang}, binary audio, {type: "stop" | "abort"}; it gets {type: "ready" | "partial" |
-// "final" | "error"}, an error carrying code "unavailable" when this machine cannot recognize at all (the page then
+// "final" | "preparing" | "error"}, an error carrying code "unavailable" when this machine cannot recognize at all (the page then
 // tries another engine) and "failed" otherwise.
 package voice
 
@@ -77,6 +77,9 @@ func New(cfg Config) *Server {
 	}
 	return &Server{cfg: cfg}
 }
+
+// HasDecoder says ffmpeg is on this machine.
+func (s *Server) HasDecoder() bool { return s.ffmpeg() != "" }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
@@ -506,6 +509,19 @@ func (a *asrConn) handle(ss *session, ev event) {
 			a.timer.Stop()
 			ss.s.cfg.Log("info", "voice session ready in "+strconv.FormatInt(time.Since(ss.openedAt).Milliseconds(), 10)+" ms ("+a.lang+")")
 			ss.send(jsvalue.NewObject("type", "ready"))
+		case "preparing":
+			// The service is getting its model ready (a first-use download): the page is told how far it is, and the wait
+			// for ready starts over as long as there is progress.
+			if !a.ready {
+				a.timer.Reset(ss.s.cfg.ReadyTimeout)
+				o := jsvalue.NewObject("type", "preparing")
+				for _, k := range []string{"stage", "percent"} {
+					if v, has := ev.msg[k]; has {
+						o.Set(k, rawValue(v))
+					}
+				}
+				ss.send(o)
+			}
 		case "partial":
 			ss.send(withText("partial"))
 		case "final":
@@ -527,7 +543,12 @@ func (a *asrConn) handle(ss *session, ev event) {
 			if message, has := ev.msg["message"]; has {
 				m = rawValue(message)
 			}
-			a.fail(ss, m, a.code())
+			code := a.code()
+			var c string
+			if json.Unmarshal(ev.msg["code"], &c) == nil && c == "failed" {
+				code = c // the service says the recognition itself failed, not that it is missing
+			}
+			a.fail(ss, m, code)
 		}
 	}
 }

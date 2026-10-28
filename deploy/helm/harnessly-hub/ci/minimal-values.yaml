@@ -1,0 +1,2 @@
+# What `helm lint` and `helm template` need to render the chart: the one required value.
+publicUrl: https://hub.example.com

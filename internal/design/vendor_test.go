@@ -22,26 +22,35 @@ func engineConst(t *testing.T, src, name string) string {
 	return m[1]
 }
 
+// The vendored files are the bytes their SRI names. The engine is not in the tree (see engine.go): with
+// HARNESSLY_TEST_ENGINE naming a fetched support.js, the test also holds its URLs and SRIs to the vendored files.
 func TestVendorFilesMatchEngineSRI(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("newproject", "project", "support.js"))
+	if len(vendorFiles) != 3 {
+		t.Fatalf("vendorFiles has %d entries", len(vendorFiles))
+	}
+	for url, f := range vendorFiles {
+		sum := sha512.Sum384(f.body())
+		if got := "sha384-" + base64.StdEncoding.EncodeToString(sum[:]); got != f.SRI {
+			t.Fatalf("%s: file %s, declared %s", url, got, f.SRI)
+		}
+	}
+	engine := os.Getenv("HARNESSLY_TEST_ENGINE")
+	if engine == "" {
+		t.Skip("HARNESSLY_TEST_ENGINE names no engine: the vendored files are checked against their own SRI only")
+	}
+	raw, err := os.ReadFile(engine)
 	if err != nil {
 		t.Fatal(err)
 	}
 	src := string(raw)
-	want := map[string]string{"REACT": "", "REACT_DOM": "", "BABEL": ""}
-	if len(vendorFiles) != len(want) {
-		t.Fatalf("vendorFiles has %d entries", len(vendorFiles))
-	}
-	for prefix := range want {
+	for _, prefix := range []string{"REACT", "REACT_DOM", "BABEL"} {
 		url, sri := engineConst(t, src, prefix+"_URL"), engineConst(t, src, prefix+"_SRI")
 		f, ok := vendorFiles[url]
 		if !ok {
 			t.Fatalf("%s is not vendored", url)
 		}
-		sum := sha512.Sum384(f.body())
-		got := "sha384-" + base64.StdEncoding.EncodeToString(sum[:])
-		if got != sri || f.SRI != sri {
-			t.Fatalf("%s: file %s, declared %s, engine %s", url, got, f.SRI, sri)
+		if f.SRI != sri {
+			t.Fatalf("%s: declared %s, engine %s", url, f.SRI, sri)
 		}
 	}
 }

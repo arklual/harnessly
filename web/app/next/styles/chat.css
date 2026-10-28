@@ -1304,6 +1304,15 @@
     background 220ms var(--hx-ease-out),
     box-shadow 220ms var(--hx-ease-out);
 }
+.hx-ref {
+  max-width: 100%;
+}
+/* A long address stays inside the column: the chip is never wider than it and the label ends with an ellipsis. */
+.hx-ref__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .hx-ref:hover {
   background: var(--hx-bg-active);
   box-shadow: inset 0 0 0 1px var(--hx-p-gray-300);
@@ -1468,6 +1477,44 @@ html[data-theme='dark'] .hx-ref[data-type='link'] {
   outline: 2px solid var(--hx-focus);
   outline-offset: 1px;
 }
+/* A document card that can be shared: the card and «Поделиться» at its end, in one frame. */
+.hx-file--row {
+  padding: 0 var(--hx-space-2) 0 0;
+  gap: 0;
+}
+.hx-file__open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-2) var(--hx-space-2) var(--hx-space-2) var(--hx-space-3);
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-file__open:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -2px;
+}
+.hx-file__share {
+  flex: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.hx-file--row:hover .hx-file__share,
+.hx-file__share:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .hx-file__share {
+    opacity: 1;
+  }
+}
 .hx-file__ico {
   width: 36px;
   height: 36px;
@@ -1500,6 +1547,53 @@ html[data-theme='dark'] .hx-ref[data-type='link'] {
   white-space: nowrap;
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
+}
+
+/* A file handed over: the card opens it, the icon beside saves it. */
+.hx-file--delivery {
+  padding: 0 var(--hx-space-1) 0 0;
+  gap: 0;
+}
+.hx-file__open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-3);
+  padding: var(--hx-space-2) var(--hx-space-2) var(--hx-space-2) var(--hx-space-3);
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hx-file__open:focus-visible,
+.hx-file__save:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-file--delivery:has(.hx-file__open:hover) {
+  box-shadow:
+    0 0 0 1px var(--hx-border-strong),
+    var(--hx-shadow-sm);
+}
+.hx-file__save {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--hx-fg-3);
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-file__save:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
 }
 
 /* The turn's end: «Turn interrupted · reason» with Continue / Retry, or «Stopped by you». */

@@ -54,6 +54,8 @@ export type TitleSource = (typeof TITLE_SOURCES)[number];
 /** Who stopped a chat's terminal: the person (terminal.stop) or the runtime, for standing idle. */
 export const TERMINAL_STOP_BYS = ['person', 'idle'] as const;
 export type TerminalStopBy = (typeof TERMINAL_STOP_BYS)[number];
+export const TERMINAL_FAILURE_KINDS = ['quota_exhausted'] as const;
+export type TerminalFailureKind = (typeof TERMINAL_FAILURE_KINDS)[number];
 /** After how long without work the runtime stops a chat's terminal by itself. */
 export const IDLE_STOPS = ['off', '1h', '2h', '6h'] as const;
 export type IdleStop = (typeof IDLE_STOPS)[number];
@@ -64,12 +66,12 @@ export type FileChange = (typeof FILE_CHANGES)[number];
 export const ORIGIN_KINDS = ['fork', 'handoff'] as const;
 export type OriginKind = (typeof ORIGIN_KINDS)[number];
 /** How the context came over: the agent's own session copied, a budgeted excerpt of the turns, or a note the agent wrote. */
-export const ORIGIN_VIAS = ['session', 'excerpt', 'note'] as const;
+export const ORIGIN_VIAS = ['session', 'excerpt', 'note', 'history'] as const;
 export type OriginVia = (typeof ORIGIN_VIAS)[number];
-export const HANDOFF_MODES = ['excerpt', 'note'] as const;
+export const HANDOFF_MODES = ['excerpt', 'note', 'history'] as const;
 export type HandoffMode = (typeof HANDOFF_MODES)[number];
 /** What a draft is: an excerpt or a note for a handoff, or a fork's result to merge back. */
-export const DRAFT_MODES = ['excerpt', 'note', 'result'] as const;
+export const DRAFT_MODES = ['excerpt', 'note', 'result', 'history'] as const;
 export type DraftMode = (typeof DRAFT_MODES)[number];
 /** The longest text a handoff or a merge carries, in characters. */
 export const HANDOFF_TEXT_MAX = 90_000;
@@ -107,6 +109,7 @@ export const LAUNCH_FAILURES = [
   'no-session',
   'cli-missing',
   'login-required',
+  'machine-busy',
 ] as const;
 export type LaunchFailure = (typeof LAUNCH_FAILURES)[number];
 export const GONE_REASONS = ['tab-closed', 'tmux-lost'] as const;
@@ -123,17 +126,22 @@ export const TURN_FAILURE_CODES = [
 export type TurnFailureCode = (typeof TURN_FAILURE_CODES)[number];
 export const FILE_OPS = ['created', 'edited', 'read'] as const;
 export type FileOp = (typeof FILE_OPS)[number];
-/** What a turn made that the person opens: a published page, a design, a document, a merge request, a stand. */
-export const OUTPUT_KINDS = ['artifact', 'design', 'doc', 'mr', 'stand'] as const;
+/** What a turn made that the person opens: a published page, a design, a document, a merge request, a stand, a file handed over. */
+export const OUTPUT_KINDS = ['artifact', 'design', 'doc', 'mr', 'stand', 'delivery'] as const;
 export type OutputKind = (typeof OUTPUT_KINDS)[number];
 export const OUTPUT_OPS = ['created', 'changed'] as const;
 export type OutputOp = (typeof OUTPUT_OPS)[number];
-/** ref is a link (artifact, mr, stand), a design's id, or a file's path (doc). */
+/** ref is a link (artifact, mr, stand), a design's id, or a file's path (doc, delivery). */
 export interface TurnOutput {
   kind: OutputKind;
   op: OutputOp;
   title: string;
   ref: string;
+  /** A delivered file: its name, type, size in bytes and sha256 as the platform read them. */
+  name?: string;
+  mime?: string;
+  size?: number;
+  sha256?: string;
 }
 export const ENTRY_KINDS = [
   'user',
@@ -201,7 +209,14 @@ export const MESSAGE_FAILURES = [
   'returned-to-input',
 ] as const;
 export type MessageFailure = (typeof MESSAGE_FAILURES)[number];
-export const PAUSE_REASONS = ['interrupted', 'user', 'launch-failed', 'agent-gone', 'limited'] as const;
+export const PAUSE_REASONS = [
+  'interrupted',
+  'user',
+  'launch-failed',
+  'agent-gone',
+  'limited',
+  'needs-target',
+] as const;
 export type PauseReason = (typeof PAUSE_REASONS)[number];
 export const GATE_KINDS = ['question', 'permission', 'plan'] as const;
 export type GateKind = (typeof GATE_KINDS)[number];
@@ -265,6 +280,7 @@ export const CONV_EVENT_TYPES = [
   'compaction',
   'turn_finished',
   'turn_failed',
+  'quota_exhausted',
   'queue_changed',
   'prompt_state',
   'message_upsert',
@@ -602,6 +618,24 @@ export const DESIGN_KINDS: readonly DesignKind[] = ['site', 'slides', 'ds'];
 /** What a person may do in a project, weakest first. Absent from a runtime that does not restrict access. */
 export type DesignRole = 'view' | 'comment' | 'edit' | 'manage' | 'owner';
 export const DESIGN_ROLES: readonly DesignRole[] = ['view', 'comment', 'edit', 'manage', 'owner'];
+/** How a deck's speaker notes are written. */
+export type DesignDeckTone = 'talk' | 'biz' | 'short';
+export const DESIGN_DECK_TONES: readonly DesignDeckTone[] = ['talk', 'biz', 'short'];
+/** The company template a new deck takes its look from (POST /design/deck/pptx-style read it). */
+export interface DesignlyDeckStyle {
+  source: string;
+  /** `--deck-*` CSS variables. */
+  vars: Record<string, string>;
+  layouts: number;
+}
+/** What a new deck is asked to be: minutes 1..180 or 0 (the agent decides), slides 2..40 or null for the agent's pick. */
+export interface DesignlyDeck {
+  minutes: number;
+  slides: number | null;
+  tone: DesignDeckTone;
+  script: boolean;
+  style: DesignlyDeckStyle | null;
+}
 /** The body of POST /api/v2/designly/create. */
 export interface DesignlyCreate {
   title: string;
@@ -611,6 +645,10 @@ export interface DesignlyCreate {
   model: string | null;
   effort: Effort | null;
   designSystem: string | null;
+  /** Only for the kind `slides`; an older runtime refuses the field, so it is sent only for a deck. */
+  deck?: DesignlyDeck;
+  /** Uploads (POST /api/v2/upload) the first message carries, at most 20. */
+  attachmentIds?: string[];
 }
 /** The project made and the conversation opened in its folder. */
 export interface DesignlyCreated {
@@ -1153,6 +1191,7 @@ export interface Conversation {
   pendingModel?: PendingModel; // a model change that waits for the agent; absent when none does
   modelLog?: ModelSwitch[]; // the changes applied, oldest first (the last 20); absent when there were none
   terminalStop?: TerminalStop; // the terminal was stopped and the agent is not up again; absent otherwise
+  terminalFailure?: TerminalFailure; // the last turn cannot be retried on this target; the person chooses another
   rewinds?: RewindMark[]; // the rewinds to an earlier message, oldest first (the last 10); absent when there were none
   origin?: Origin; // the conversation this one was forked or handed off from; absent for one started anew
   limited?: LimitHold; // the last turn ended on the usage limit and the chat waits for its reset; absent otherwise
@@ -1216,12 +1255,17 @@ export interface Origin {
  * POST /conversations/{id}/handoff-draft: the text a handoff or a merge would carry, for the person to read and edit
  * before it goes. `tokens` is an estimate; `turns` is how many turns an excerpt kept (0 for a note).
  */
-export interface HandoffDraft {
-  mode: DraftMode;
-  text: string;
+export interface HandoffArtifact {
+  id: string;
+  bytes: number;
+}
+interface HandoffDraftBase {
   tokens: number;
   turns: number;
 }
+export type HandoffDraft =
+  | (HandoffDraftBase & { mode: 'history'; artifact: HandoffArtifact })
+  | (HandoffDraftBase & { mode: Exclude<DraftMode, 'history'>; text: string });
 export interface HandoffDraftRequest {
   mode: DraftMode;
   provider?: Provider;
@@ -1234,6 +1278,14 @@ export interface TerminalStop {
   at: Ms;
   by: TerminalStopBy;
   idleMs?: number;
+}
+/** A provider-neutral terminal failure. The runtime does not resend or pick another target by itself. */
+export interface TerminalFailure {
+  kind: TerminalFailureKind;
+  at: Ms;
+  detail: string;
+  terminal: true;
+  needsTarget: true;
 }
 /** GET and PUT /api/v2/runtime-settings: the runtime's own settings, the machine's and not the person's. */
 export interface RuntimeSettings {
@@ -1441,7 +1493,7 @@ export interface Permission {
   state: GateState;
 }
 export type GateState =
-  | { k: 'open'; refused?: GateRefusal } // refused: the page's decision did not reach the menu, decide in the terminal
+  | { k: 'open'; refused?: GateRefusal; autoDenyAt?: Ms } // refused: the menu on the screen is not the one the card shows, decide in the terminal; autoDenyAt: Claude denies the request by itself then
   | { k: 'answering'; opId: string; wait: Wait }
   | { k: 'answered'; at: Ms; byDevice: string } // «Вы ответили с другого устройства»
   | { k: 'closed'; reason: GateCloseReason };
@@ -1637,6 +1689,7 @@ export type ConvEvent =
   | { type: 'compaction'; phase: CompactionPhase; entry: Entry }
   | { type: 'turn_finished'; turn: Turn }
   | { type: 'turn_failed'; turn: Turn }
+  | { type: 'quota_exhausted'; failure: TerminalFailure }
   | { type: 'queue_changed'; queue: Queue }
   | { type: 'prompt_state'; clientId: ClientId; state: MessageState; rev: number }
   | { type: 'message_upsert'; message: Message }
@@ -1755,9 +1808,7 @@ export interface CommandBodies {
     model: Model | null;
     /** Starts the new chat on a backend profile; a handoff never inherits the profile it comes from. */
     profile?: ProfileId;
-    mode: HandoffMode;
-    text: string;
-  };
+  } & ({ mode: 'history'; artifactId: string } | { mode: Exclude<HandoffMode, 'history'>; text: string });
   /** Sends a fork's result into the queue of the conversation it came from. */
   'conversation.merge': OpBody & { id: ConvId; text: string };
   /** Decides what a chat held on its usage limit does (refused not-found when it is not held). */
@@ -1801,6 +1852,31 @@ export interface TurnsPage {
   turns: Turn[]; // oldest first
   entries: Entry[]; // their answer entries
   beforeTurnId: TurnId | null;
+}
+/**
+ * The cluster's own copy of the person's chats, read from the gateway (not from a machine): the list with whether
+ * each machine is on, and one chat as the turns page gives it, with the state of the machine it ran on.
+ */
+export const CENTRAL_STATES = ['online', 'offline'] as const;
+export type CentralState = (typeof CENTRAL_STATES)[number];
+export interface CentralList {
+  /** false: the copy is off for this person (nothing is stored, nothing is served). */
+  enabled: boolean;
+  machines: { id: MachineId; name: string; state: CentralState }[];
+  conversations: Conversation[];
+  /** The chats continued on another machine: the source is held and the target goes on (absent from an older gateway). */
+  moved?: CentralMove[];
+}
+export interface CentralMove {
+  machineId: MachineId;
+  convId: ConvId;
+  toMachineId: MachineId;
+  toConvId: ConvId;
+}
+export interface CentralChat extends TurnsPage {
+  machine: CentralState;
+  machineId: MachineId;
+  conversation: Conversation;
 }
 export interface EntriesPage {
   turnId: TurnId;
@@ -2115,7 +2191,12 @@ const turn: Decoder<Turn> = (v, p) => {
       files: array(object({ path: str, op: oneOf(FILE_OPS) })),
     },
     {
-      outputs: array(object({ kind: oneOf(OUTPUT_KINDS), op: oneOf(OUTPUT_OPS), title: str, ref: str })),
+      outputs: array(
+        object(
+          { kind: oneOf(OUTPUT_KINDS), op: oneOf(OUTPUT_OPS), title: str, ref: str },
+          { name: str, mime: str, size: int, sha256: str },
+        ),
+      ),
     },
   )(v, p);
   if ((t.status === 'failed') !== (t.failure !== null))
@@ -2407,6 +2488,13 @@ const bgWait: Decoder<BgWait> = object(
   { agents: int, teammates: int, commands: int, monitors: int, workflows: int, command: str, wakeupAt: ms },
 );
 const terminalStop: Decoder<TerminalStop> = object({ at: ms, by: oneOf(TERMINAL_STOP_BYS) }, { idleMs: int });
+const terminalFailure: Decoder<TerminalFailure> = object({
+  kind: oneOf(TERMINAL_FAILURE_KINDS),
+  at: ms,
+  detail: str,
+  terminal: constant(true),
+  needsTarget: constant(true),
+});
 const runtimeSettings: Decoder<RuntimeSettings> = object(
   { idleStop: oneOf(IDLE_STOPS) },
   {
@@ -2443,12 +2531,19 @@ const origin: Decoder<Origin> = object(
 );
 const handoffText: Decoder<string> = (v, p) =>
   [...id(v, p)].length <= HANDOFF_TEXT_MAX ? (v as string) : fail(p, 'too long');
-const handoffDraft: Decoder<HandoffDraft> = object({
-  mode: oneOf(DRAFT_MODES),
-  text: id,
-  tokens: int,
-  turns: int,
-});
+const artifactId: Decoder<string> = (v, p) =>
+  /^[a-f0-9]{32}$/.test(str(v, p)) ? (v as string) : fail(p, 'not an artifact id');
+const handoffArtifact: Decoder<HandoffArtifact> = object({ id: artifactId, bytes: seq });
+const handoffDraft: Decoder<HandoffDraft> = variants(
+  'mode',
+  {
+    excerpt: { text: id },
+    note: { text: id },
+    result: { text: id },
+    history: { artifact: handoffArtifact },
+  },
+  { tokens: int, turns: int },
+);
 const limitHold: Decoder<LimitHold> = object({
   provider: oneOf(PROVIDERS),
   window: oneOf(LIMIT_WINDOWS),
@@ -2490,6 +2585,7 @@ const conversation: Decoder<Conversation> = object(
     bgAgents: int,
     bgWait,
     terminalStop,
+    terminalFailure,
     rewinds: array(rewindMark),
     origin,
     limited: limitHold,
@@ -2640,7 +2736,7 @@ const gateStateKinds = {
   closed: { reason: oneOf(GATE_CLOSE_REASONS) },
 } satisfies Record<GateStateKind, Shape>;
 const gateState: Decoder<GateState> = variants('k', gateStateKinds, undefined, {
-  open: { refused: oneOf(GATE_REFUSALS) },
+  open: { refused: oneOf(GATE_REFUSALS), autoDenyAt: ms },
 });
 const question: Decoder<Question> = object({
   id: questionId,
@@ -2802,6 +2898,7 @@ const convEventKinds = {
   compaction: { phase: oneOf(COMPACTION_PHASES), entry: compactionEntry },
   turn_finished: { turn: finishedTurn },
   turn_failed: { turn: failedTurn },
+  quota_exhausted: { failure: terminalFailure },
   queue_changed: { queue },
   prompt_state: { clientId: id, state: messageState, rev: seq },
   message_upsert: { message },
@@ -2959,16 +3056,11 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   rewind: object({ opId: id, id: convId, entryId: turnId, text: id, files: bool }),
   'rewind.undo': object({ opId: id, id: convId }),
   'conversation.fork': object({ opId: id, id: convId }, { atTurn: turnId }),
-  'conversation.handoff': object(
-    {
-      opId: id,
-      id: convId,
-      provider,
-      model: nullable(model),
-      mode: oneOf(HANDOFF_MODES),
-      text: handoffText,
-    },
-    { profile: profileId },
+  'conversation.handoff': variants(
+    'mode',
+    { excerpt: { text: handoffText }, note: { text: handoffText }, history: { artifactId } },
+    { opId: id, id: convId, provider, model: nullable(model) },
+    { excerpt: { profile: profileId }, note: { profile: profileId }, history: { profile: profileId } },
   ),
   'conversation.merge': object({ opId: id, id: convId, text: handoffText }),
   limit: object({ opId: id, id: convId, action: oneOf(LIMIT_ACTIONS) }),
@@ -3031,6 +3123,30 @@ export function parseFileRefusal(v: unknown): FileRefusal {
 }
 
 /** Readers of the answers of the v2 HTTP pages. */
+const centralState: Decoder<CentralState> = oneOf(CENTRAL_STATES);
+const centralList: Decoder<CentralList> = object(
+  {
+    enabled: bool,
+    machines: array(object({ id, name: str, state: centralState })),
+    conversations: array(conversation),
+  },
+  { moved: array(object({ machineId: id, convId, toMachineId: id, toConvId: convId })) },
+);
+const centralChat: Decoder<CentralChat> = object({
+  machine: centralState,
+  machineId: id,
+  conversation,
+  turns: array(turn),
+  entries: array(entry),
+  beforeTurnId: nullable(turnId),
+});
+
+/** The gateway's answers about the person's chats on every machine: not runtime pages, so outside HttpKind. */
+export const parseCentral = {
+  list: (v: unknown): CentralList => centralList(v, '$'),
+  chat: (v: unknown): CentralChat => centralChat(v, '$'),
+};
+
 export const parsePage = {
   hello: (v: unknown): Hello => object({ proto: int, version: str, features: array(feature) })(v, '$'),
   turns: (v: unknown): TurnsPage =>

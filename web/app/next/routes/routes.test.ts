@@ -56,6 +56,10 @@ describe('routes', () => {
 
   it('reads a design with the chat it was opened from and writes it back the same', () => {
     expect(parseRoute('/designly/abc')).toEqual({ kind: ROUTE.site, id: 'abc' });
+    expect(parseRoute('/designly/new/slides')).toEqual({ kind: ROUTE.designlyNew });
+    expect(parseRoute('/designly/new/slides/')).toEqual({ kind: ROUTE.designlyNew });
+    expect(routePath({ kind: ROUTE.designlyNew })).toBe('/designly/new/slides');
+    expect(placeKeyOf('/designly/new/slides')).toBe('designlyNew');
     expect(parseRoute('/designly/abc?chat=tab-7')).toEqual({ kind: ROUTE.site, id: 'abc', chat: 'tab-7' });
     expect(routePath({ kind: ROUTE.site, id: 'abc', chat: 'agent:r:tab-1' })).toBe(
       '/designly/abc?chat=agent%3Ar%3Atab-1',

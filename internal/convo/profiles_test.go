@@ -2,7 +2,9 @@ package convo
 
 import (
 	"context"
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,7 +183,8 @@ func TestHandoffAmongProfiles(t *testing.T) {
 				continue
 			}
 			got := r.launcher.launched[len(r.launcher.launched)-1]
-			if got.Provider != c.cmd.Provider || (got.Model != nil && got.Model.Profile != c.want) || (got.Model == nil && c.want != "") {
+			if got.Provider != c.cmd.Provider || (got.Model != nil && got.Model.Profile != c.want) || (got.Model == nil && c.want != "") ||
+				!strings.HasPrefix(got.First, `<handoff from="`+r.id+`"`) {
 				t.Errorf("%s: launched %+v", name, got)
 			}
 			rec := r.recordOf(*res.ID)
@@ -189,6 +192,15 @@ func TestHandoffAmongProfiles(t *testing.T) {
 			if o == nil || o.K != wire.OriginHandoff || o.FromProvider != wire.ProviderClaude || profileOf(o.FromModel) != profileOf(from.model) ||
 				profileOf(rec.Model) != c.want {
 				t.Errorf("%s: origin %+v model %+v", name, o, rec.Model)
+			}
+			r.id = *res.ID
+			for i, mode := range []wire.MessageMode{wire.ModeNow, wire.ModeSteer} {
+				if sent := r.send(fmt.Sprintf("after-%d", i), "after handoff", mode); sent.R == wire.ResultRefused {
+					t.Errorf("%s: %s after handoff: %+v", name, mode, sent)
+				}
+			}
+			if len(r.launcher.launched) != 1 || r.launcher.launched[0].First != got.First {
+				t.Errorf("%s: a later message displaced the first prompt: %+v", name, r.launcher.launched)
 			}
 		}
 	}

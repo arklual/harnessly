@@ -17,7 +17,10 @@ import {
 import { NotePins, NOTE_OUT_MS } from '@/next/features/designly/site-notes';
 import { usePageDraft } from '@/next/features/designly/page-drafts';
 import type { ConvId } from '@/next/protocol/v2';
+import { DECK_CTX_ID } from '@/next/features/designly/deck/chat-context';
+import { sendMessage } from '@/next/commands';
 import { patchDesignNotes, useDesignNotes } from '@/next/stores/design-notes';
+import { useConversation } from '@/next/stores/conversations';
 import { draftsStore, setDraft } from '@/next/stores/drafts';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
 
@@ -26,7 +29,11 @@ let noteSeq = 0;
 /** `fromChat` is the chat the pane is beside: it gets the notes and the words. */
 export const usePaneStage = ({ machine, fromChat, pageUrl, port }: IStageOptions): ISiteStage => {
   const conv = fromChat as ConvId;
-  const all = useDesignNotes(conv);
+  // The host chat's agent at work: a deck shows its slides as being made meanwhile.
+  const agent = useConversation(conv)?.state.k;
+  // A deck's context chip is a note of the chat too, but it has no pin and no card.
+  const everything = useDesignNotes(conv);
+  const all = everything.filter((note) => note.id !== DECK_CTX_ID);
   // The pins and the looks are of the page on screen; the chips of the other pages stay in the field.
   const notes = all.filter((note) => note.page === pageUrl);
   // The card is the page's: another page hides it, the return brings it back.
@@ -50,9 +57,40 @@ export const usePaneStage = ({ machine, fromChat, pageUrl, port }: IStageOptions
 
   return {
     mode: 'island',
+    // The chip rides in the host chat's field as a note on the deck's slide; null takes it away.
+    context: (ctx) =>
+      patchDesignNotes(conv, (have) => {
+        const rest = have.filter((note) => note.id !== DECK_CTX_ID);
+        if (!ctx) return rest;
+        return [
+          ...rest,
+          {
+            id: DECK_CTX_ID,
+            picked: {
+              id: null,
+              look: null,
+              selector: 'slide',
+              tag: 'section',
+              text: ctx.text,
+              rect: { x: 0, y: 0, width: 0, height: 0 },
+              component: null,
+              html: '',
+            },
+            page: pageUrl,
+            text: '',
+            at: { x: 0, y: 0, right: false },
+            style: NO_EDIT,
+            port: port ?? 0,
+          },
+        ];
+      }),
+    ask: (words) => {
+      sendMessage(machine, { conversationId: conv, text: words, mode: 'queue' });
+    },
     onMode: () => undefined,
     min: false,
     run: 'idle',
+    busy: agent === 'starting' || agent === 'working',
     float: null,
     dock: 'left',
     chatW: 0,

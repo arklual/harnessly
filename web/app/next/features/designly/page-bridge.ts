@@ -110,7 +110,26 @@ export type TBridgeMessage =
   /** A pan of the canvas from the page, in the screen's pixels: a wheel it cannot scroll by, a drag with the middle button. */
   | { k: 'pan'; dx: number; dy: number; drag: boolean }
   /** Where the pinned blocks show now. */
-  | { k: 'anchored'; report: IAnchorReport };
+  | { k: 'anchored'; report: IAnchorReport }
+  /** A guest pressed a key of the guest page over the board (it opens and closes the full screen, the comments). */
+  | { k: 'key'; key: TGuestKey };
+
+/** The keys a guest's board passes to the page that frames it. */
+export const GUEST_KEYS = ['Escape', 'f', 'c', 'p', 'r', 'ArrowLeft', 'ArrowRight', 'Space'] as const;
+export type TGuestKey = (typeof GUEST_KEYS)[number];
+/** The key's place on the keyboard, which the guest page reads (a Russian layout gives other letters). */
+export const GUEST_KEY_CODE = {
+  Escape: 'Escape',
+  f: 'KeyF',
+  c: 'KeyC',
+  p: 'KeyP',
+  r: 'KeyR',
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Space: 'Space',
+} as const satisfies Record<TGuestKey, string>;
+/** The key's value as a keydown carries it (the board names the space bar). */
+export const guestKeyValue = (key: TGuestKey): string => (key === 'Space' ? ' ' : key);
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const clip = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
@@ -212,6 +231,10 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
     return { k: 'tweaks', controls: controls.filter((c) => c !== null) };
   }
   if (m.type === 'tk:pick' && m.on === false) return { k: 'pick-off' };
+  if (m.type === 'tk:key') {
+    const key = GUEST_KEYS.find((known) => known === m.key);
+    return key ? { k: 'key', key } : null;
+  }
   if (m.type === 'tk:styled') {
     if (!Array.isArray(m.gone)) return null;
     const gone = m.gone.filter((id): id is number => Number.isInteger(id) && id > 0 && id <= MAX_BLOCK_ID);

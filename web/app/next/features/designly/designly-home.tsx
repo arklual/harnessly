@@ -63,6 +63,8 @@ export interface IDesignlyCompose {
   picker: IModelPickerProps | null;
   /** Dictation into the brief; without onMic the microphone is not offered. */
   voice: IDesignlyVoice;
+  /** The Presentation tile: a deck is made on its own create screen, with the brief typed so far. */
+  onDeck?: () => void;
 }
 
 export interface IDesignlyHomeProps {
@@ -76,6 +78,14 @@ export interface IDesignlyHomeProps {
   onRetry: () => void;
   /** Where a project is started; null is the library alone (the right pane's: its chat is the field). */
   compose: IDesignlyCompose | null;
+  /** What the machine lacks for designs, with the command that fixes it; null when nothing is missing. */
+  notice?: IDesignlyNotice | null;
+}
+
+export interface IDesignlyNotice {
+  title: string;
+  text: string;
+  command: string | null;
 }
 
 export interface IDesignlyVoice {
@@ -170,7 +180,7 @@ interface IHeroProps extends IDesignlyCompose {
 }
 
 /** «Что нарисуем?»: the field with its model, design system and microphone, and the kinds under it. */
-const Hero = ({ systems, onCreate, brief, onBrief, picker, voice, inputRef }: IHeroProps) => {
+const Hero = ({ systems, onCreate, brief, onBrief, picker, voice, onDeck, inputRef }: IHeroProps) => {
   const [kind, setKind] = useState<TDesignKind>(DESIGN_KIND.site);
   const [ds, setDs] = useState<string | null>(null);
   const { value: bar, state: barState } = usePresence(voice.recording, REC_EXIT_MS);
@@ -303,6 +313,10 @@ const Hero = ({ systems, onCreate, brief, onBrief, picker, voice, inputRef }: IH
               role="radio"
               aria-checked={k === kind}
               onClick={() => {
+                if (k === DESIGN_KIND.slides && onDeck) {
+                  onDeck();
+                  return;
+                }
                 setKind(k);
                 inputRef.current?.focus();
               }}
@@ -322,7 +336,16 @@ const Hero = ({ systems, onCreate, brief, onBrief, picker, voice, inputRef }: IH
   );
 };
 
-const DesignlyHome = ({ cards, error, now, onPin, onOpen, onRetry, compose }: IDesignlyHomeProps) => {
+const DesignlyHome = ({
+  cards,
+  error,
+  now,
+  onPin,
+  onOpen,
+  onRetry,
+  compose,
+  notice = null,
+}: IDesignlyHomeProps) => {
   const [pinning, setPinning] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<TDesignScope>(DESIGN_SCOPE.all);
@@ -424,6 +447,13 @@ const DesignlyHome = ({ cards, error, now, onPin, onOpen, onRetry, compose }: ID
   return (
     <section className="hx-dl" ref={rootRef} data-library={compose === null}>
       {compose && <Hero {...compose} inputRef={inputRef} />}
+      {notice && (
+        <div className="hx-dl__notice" role="status">
+          <div className="hx-dl__notice-title">{notice.title}</div>
+          <div className="hx-dl__notice-text">{notice.text}</div>
+          {notice.command && <code className="hx-dl__notice-cmd">{notice.command}</code>}
+        </div>
+      )}
 
       <div className="hx-dl__body">
         <div className="hx-dl__toolbar">

@@ -11,9 +11,12 @@ import {
   type ReactNode,
 } from 'react';
 import PaneDrawer from '@/next/features/shell/pane-drawer';
+import { isShareable } from '@/next/features/filedoc/api';
+import { FileShareButton } from '@/next/features/filedoc/file-share';
 import ToolPane, { TOOLS_TAB, type IPaneTab } from '@/next/features/pane/tool-pane';
 import ToolsLauncher, { type ITool, type IToolGroup } from '@/next/features/pane/tools-launcher';
 import BrowserView from '@/next/features/pane/browser-view';
+import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
 import SideChat from '@/next/features/pane/side-chat';
 import { SideFloat } from '@/next/features/pane/side-float';
 import { onOpenSubagent, openSubagent } from '@/next/features/subagents/open';
@@ -70,6 +73,7 @@ const SubagentView = later(() => import('@/next/features/pane/subagent-view'));
 const MachineTab = later(() => import('@/next/bindings/machine-tab'));
 const DesignlyPane = later(() => import('@/next/bindings/designly-pane'));
 const FilesView = later(() => import('@/next/features/pane/files-view'));
+const DeliveredView = later(() => import('@/next/features/pane/delivered-view'));
 
 /** The launcher's tools in the design's order; one not named keeps its place after them. */
 const TOOL_ORDER = [
@@ -326,6 +330,8 @@ const FilesTab = ({
   onChange: (tab: Extract<TTab, { kind: 'files' }>) => void;
 }) => {
   const [shown, setShown] = useState<IShownFile | null>(null);
+  // A zip, a picture, a PDF or a file to be saved is not read as text: the pane shows it its own way.
+  const delivered = tab.file ? deliveredViewOf(tab.path) : null;
   // A new epoch is the disk's text read again over the editor's.
   const [epoch, setEpoch] = useState(0);
   // A folder is read again when the link comes back; a file is not, the text in the editor is the person's.
@@ -349,6 +355,7 @@ const FilesTab = ({
           : { key: asked, listing: null, file: null, initial: null, error: failure.message },
       );
     };
+    if (delivered) return undefined;
     if (tab.file)
       readFile(conv.machineId, conv.id, tab.path, abort.signal).then(
         (file) =>
@@ -370,7 +377,7 @@ const FilesTab = ({
         fail,
       );
     return () => abort.abort();
-  }, [conv.machineId, conv.id, tab.id, tab.path, tab.file, epoch, draftOf, listingAgain]);
+  }, [conv.machineId, conv.id, tab.id, tab.path, tab.file, epoch, draftOf, listingAgain, delivered]);
   const now = shown?.key === key ? shown : null;
 
   const save = async (text: string, revision: string, over: boolean) => {
@@ -394,6 +401,14 @@ const FilesTab = ({
         onState={(state) => edits.onState(tab.id, state)}
       />
     ) : null;
+  if (delivered)
+    return (
+      <DeliveredView
+        machine={conv.machineId}
+        path={tab.path.startsWith('/') ? tab.path : `${conv.cwd.replace(/\/+$/, '')}/${tab.path}`}
+        view={delivered}
+      />
+    );
   return (
     <FilesView
       root={conv.cwd}
@@ -673,17 +688,25 @@ const PaneBody = (props: IPaneBodyProps) => {
           </button>
         </>
       );
-    if (!saveButton || !tab) return null;
+    if (!tab || tab.kind !== 'files') return null;
+    // «Поделиться» of a file that can be a document, next to «Сохранить».
+    const share = tab.file && isShareable(tab.path) && (
+      <FileShareButton key={tab.path} machine={conv.machineId} conv={conv.id} path={tab.path} />
+    );
+    if (!saveButton) return share || null;
     return (
-      <Button
-        variant="primary"
-        size="sm"
-        busy={edits.live?.saving}
-        disabled={!edits.unsaved.has(tab.id)}
-        onClick={() => void edits.save()}
-      >
-        {t('next.editor.save')}
-      </Button>
+      <>
+        {share}
+        <Button
+          variant="primary"
+          size="sm"
+          busy={edits.live?.saving}
+          disabled={!edits.unsaved.has(tab.id)}
+          onClick={() => void edits.save()}
+        >
+          {t('next.editor.save')}
+        </Button>
+      </>
     );
   };
   const actions = paneActions();
@@ -1193,7 +1216,7 @@ export const useRightPane = (
   // Files, a page, a merge request or a stand where the runtime says (the catalogue's tab, GitLab, the browser).
   const openOutput = (output: TurnOutput) => {
     if (output.kind === 'design') openDesign(output.ref);
-    else if (output.kind === 'doc') openFile(output.ref);
+    else if (output.kind === 'doc' || output.kind === 'delivery') openFile(output.ref);
     else openRef(output.ref);
   };
 

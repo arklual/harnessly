@@ -36,6 +36,18 @@ describe('context blocks', () => {
     });
   });
 
+  it('reads a full-history bootstrap as a history card', () => {
+    const history =
+      '<handoff mode="history">\n<instructions>Use the approved context.</instructions>\n\n' +
+      'Private context file: /data/v2/handoffs/claimed/context.jsonl\n</handoff>';
+    expect(parseContextBlock(history)).toMatchObject({
+      mode: 'history',
+      fromId: '',
+      agent: null,
+      model: null,
+    });
+  });
+
   it('is null for the person’s own words, even when they mention the tag', () => {
     expect(parseContextBlock('see <handoff> in the docs')).toBeNull();
     expect(

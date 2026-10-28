@@ -6,3 +6,12 @@ docs/superpowers
 
 # The internal names the leak check refuses; publishing the list would publish the names.
 tools/oss-forbidden.txt
+
+# The internal GitLab pipeline, the service card and the runbook of the internal deployment: they name hosts, vaults
+# and people of the company, and mean nothing outside it.
+.gitlab-ci.yml
+service.yaml
+docs/hub/deploy-*.md
+
+# The working plan of the hub's first build (task keys, who owns which file); the public docs are architecture.md and api.md.
+docs/hub/plan.md

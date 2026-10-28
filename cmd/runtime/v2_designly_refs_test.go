@@ -62,3 +62,30 @@ func TestAChatKeepsItsNewestDesigns(t *testing.T) {
 		t.Fatalf("%d: %v", len(got), got[len(got)-1])
 	}
 }
+
+// a deck another runtime of the shared library made is a deck here too. This runtime's state file has no
+// kind for it; the deck's own settings file in the project's folder tells it.
+func TestADeckOfAnotherRuntimeIsADeck(t *testing.T) {
+	root, data := t.TempDir(), t.TempDir()
+	for _, id := range []string{"talk", "landing"} {
+		if err := os.MkdirAll(filepath.Join(root, id, "meta"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "talk", filepath.FromSlash(design.DeckSettingsFile)), []byte(`{"v":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lib := design.New(design.Config{LibraryDir: root, DataDir: data, Texts: design.Texts{Tag: "test-design", CLI: "acme"}})
+	t.Cleanup(lib.StopWatching)
+	var st designlyState
+	if got := kindOf(st, lib, "talk"); got != wire.DesignSlides {
+		t.Fatalf("a deck with no kind in the state: %q", got)
+	}
+	if got := kindOf(st, lib, "landing"); got != wire.DesignSite {
+		t.Fatalf("a site: %q", got)
+	}
+	st.Kinds = map[string]wire.DesignKind{"landing": wire.DesignSlides}
+	if got := kindOf(st, lib, "landing"); got != wire.DesignSlides {
+		t.Fatalf("the state's own kind: %q", got)
+	}
+}

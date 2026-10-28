@@ -42,4 +42,14 @@ regexes = [
   '''^13b2048f7d6b0de7660fa170f8f2cdde48a57ff7a3447cf88eeeef942671ff55$''',
   '''^glpat-abcdefgh12345678$''',
   '''^tok_12345678$''',
+  # The hub: made-up credentials the config test checks are never printed, the agent and relay tests' link
+  # secrets, and the X25519 keys of the published envelope test vectors (internal/hubproto/testdata/envelope.json).
+  '''^gh-secret-1234$''',
+  '''^oidc-secret-1234$''',
+  '''^smtp-pass-1234$''',
+  '''^db-pass-1234$''',
+  '''^0123456789abcdef0123456789abcdef-test-secret$''',
+  '''^ENVSECRET-ghp-0123456789$''',
+  '''^e06Qm75//kTEZaIgA31gjuNYl9Me\+XLwf3SJLLD3PxM=$''',
+  '''^HPV5q6RaELodHvBtkfyiqp7QoRUFFWUxVUBdCxjLmmc=$''',
 ]

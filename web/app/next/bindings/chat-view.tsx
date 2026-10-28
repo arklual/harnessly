@@ -17,27 +17,34 @@ import {
   retryMessage,
   rewind,
   sendMessage,
+  setGoal,
   undoRewind,
 } from '@/next/commands';
 import { machineNow } from '@/next/core/clock';
 import { deviceId } from '@/next/core/device';
 import { pageText, settled } from '@/next/bindings/outcome';
+import { useCentralFeed } from '@/next/bindings/use-central';
 import ChatDock, { type IDockExtra } from '@/next/bindings/chat-dock';
 import { uploadSrc } from '@/next/commands/uploads';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useFeedItems, withOrigin } from '@/next/bindings/feed-items';
 import { useChatHandoff } from '@/next/bindings/chat-handoff';
+import { useChatMove } from '@/next/bindings/chat-move';
+import MovedNote from '@/next/features/chat-move/moved-note';
 import { ChatLinks } from '@/next/features/chat/handoff';
 import { terminalStopText } from '@/next/bindings/shell-model';
 import { modelName, pickerAgentOf } from '@/next/features/composer/agents';
 import Feed from '@/next/features/chat/feed';
+import FileShare from '@/next/features/filedoc/file-share';
 import LimitCard from '@/next/features/chat/limit-card';
+import TerminalFailureCard from '@/next/features/chat/terminal-failure';
 import type { FeedItem } from '@/next/features/chat/types';
 import GateCard from '@/next/features/questions/gate-card';
 import type { PermissionScope } from '@/next/features/questions/types';
 import { useConversationChannel } from '@/next/core/realtime/hub';
 import type { ConvId, MachineId, TurnOutput } from '@/next/protocol/v2';
 import { useFeedKinds } from '@/next/stores/feed-kinds';
+import { downloadUrl } from '@/next/features/pane/delivered';
 import { linkReason, useConnection, useLinkRestored } from '@/next/stores/connection';
 import { useBackground, useFeed, useGates, usePictures } from '@/next/stores/conversation';
 import { runsByCall, WorkflowRuns } from '@/next/features/workflows/run';
@@ -45,6 +52,7 @@ import { machineApi } from '@/next/core/net/machine';
 import { MessagePictures, type IMessagePictures } from '@/next/features/chat/pictures';
 import { conversationsStore, useConversation, useConversationList } from '@/next/stores/conversations';
 import { convOfRef, parsePeer, PeerActions, type IPeerActions } from '@/next/features/chat/peer';
+import { AskSource, type IAskSource } from '@/next/features/asks/parse';
 import { RewindActions, type IRewindActions } from '@/next/features/chat/rewind';
 import { DelegatedChats } from '@/next/features/chat/delegation';
 import { sendPeer } from '@/next/features/peers/api';
@@ -57,6 +65,7 @@ import { doneReveal, useReveal } from '@/next/stores/reveal';
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
+import { requestContinue } from '@/next/stores/ui-requests';
 
 interface IChatViewProps {
   conv: ConvId;
@@ -122,12 +131,14 @@ const ChatView = ({
   onOpenTerminal = null,
 }: IChatViewProps) => {
   useConversationChannel(machine, conv);
+  useCentralFeed(machine, conv);
   const read = useFeedItems(conv, machine);
   const feed = useFeed(conv);
   const connection = useConnection(machine);
   const machineView = useMachine(machine);
   const record = useConversation(conv);
   const handoff = useChatHandoff(machine, conv, record);
+  const move = useChatMove(machine, conv);
   const hasOlderTurns = (feed?.beforeTurnId ?? null) !== null;
   const items = useMemo(
     () => (read ? [...withOrigin(read, handoff.origin, handoff.originTurn, hasOlderTurns)] : pendingItems),
@@ -144,6 +155,8 @@ const ChatView = ({
   const me = useMe();
   const reveal = useReveal(conv);
   const shown = useFeedKinds();
+  // A document file of a turn that is being shared: its card's «Поделиться» opens the dialog here.
+  const [sharing, setSharing] = useState<{ path: string; open: boolean } | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderFailed, setOlderFailed] = useState<string | null>(null);
   const [openedAt] = useState(() => Date.now());
@@ -305,81 +318,127 @@ const ChatView = ({
     [machine, conv],
   );
 
+  // The agent's questions to people (`harnessly ask`) read from this machine's list of asks.
+  const askSource = useMemo<IAskSource>(() => ({ machine, conversation: conv }), [machine, conv]);
+
+  const metGoal = record?.goal?.status === 'met' ? record.goal : null;
+  const goalReached =
+    metGoal === null
+      ? null
+      : {
+          text: metGoal.text,
+          onContinue: () => settled(setGoal(machine, conv, metGoal.text)),
+        };
+
   return (
     <AttachmentSrc.Provider value={srcOf}>
       <ChatLinks.Provider value={handoff.links}>
         <MessagePictures.Provider value={pictures}>
           <PeerActions.Provider value={peerActions}>
-            <RewindActions value={rewindActions}>
-              <DelegatedChats.Provider value={delegated}>
-                <WorkflowRuns value={workflowRuns}>
-                  <Feed
-                    items={items}
-                    failed={notFound || wait.expired}
-                    failedReason={notFound ? null : failedReason}
-                    onRetryLoad={() => {
-                      onRetryLoad();
-                      wait.restart();
-                    }}
-                    olderFailed={olderFailed}
-                    hasOlder={before !== null}
-                    loadingOlder={loadingOlder}
-                    catchingUp={catchingUp}
-                    onLoadOlder={onLoadOlder}
-                    reveal={reveal}
-                    onRevealed={doneReveal}
-                    density={density}
-                    offline={connection !== undefined && connection.k !== 'live'}
-                    enterAfter={feed?.subscribedAt ?? openedAt}
-                    machineName={machineView?.machine.name ?? machine}
-                    workingSince={workingSince}
-                    terminalStop={terminalStop}
-                    goalReached={record?.goal?.status === 'met' ? record.goal.text : null}
-                    limit={
-                      <LimitCard
-                        limited={limited}
-                        clock={machineClock}
-                        controls={machineView?.features.includes('auto-continue') ?? false}
-                        onDecide={(action) => settled(decideLimit(machine, conv, action))}
-                      />
-                    }
-                    waiting={
-                      waitingAgents.length > 0 ? { agents: waitingAgents, onOpen: onShowBackground } : null
-                    }
-                    modelLabel={modelLabel}
-                    onOpenFile={onOpenFile}
-                    onOpenOutput={onOpenOutput}
-                    shown={shown}
-                    onOpenRef={(kind, label, href) => {
-                      if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
-                      else onOpenRef?.(href ?? label);
-                    }}
-                    onLoadSteps={onLoadSteps}
-                    onContinueTurn={() => resend(t('next.turnEnd.continueText'))}
-                    onRetryTurn={(turnId) => resend(turnPrompt.get(turnId) ?? t('next.turnEnd.continueText'))}
-                    onRetryMessage={(clientId) => settled(retryMessage(clientId))}
-                    onResendMessage={(clientId) => {
-                      resendRefused(clientId);
-                      return Promise.resolve();
-                    }}
-                    onDeleteMessage={(clientId) => {
-                      const m = messagesStore.get(clientId);
-                      if (!m) return Promise.resolve();
-                      return settled(cancelMessage(clientId));
-                    }}
-                    renderGate={renderGate}
-                    onForkTurn={handoff.onForkTurn}
-                    dock={
-                      <ChatDock conv={conv} machine={machine} extra={dockExtra} handoff={handoff.handoff} />
-                    }
-                  />
-                </WorkflowRuns>
-              </DelegatedChats.Provider>
-            </RewindActions>
+            <AskSource.Provider value={askSource}>
+              <RewindActions value={rewindActions}>
+                <DelegatedChats.Provider value={delegated}>
+                  <WorkflowRuns value={workflowRuns}>
+                    <Feed
+                      items={items}
+                      failed={notFound || wait.expired}
+                      failedReason={notFound ? null : failedReason}
+                      onRetryLoad={() => {
+                        onRetryLoad();
+                        wait.restart();
+                      }}
+                      olderFailed={olderFailed}
+                      hasOlder={before !== null}
+                      loadingOlder={loadingOlder}
+                      catchingUp={catchingUp}
+                      onLoadOlder={onLoadOlder}
+                      reveal={reveal}
+                      onRevealed={doneReveal}
+                      density={density}
+                      offline={connection !== undefined && connection.k !== 'live'}
+                      enterAfter={feed?.subscribedAt ?? openedAt}
+                      machineName={machineView?.machine.name ?? machine}
+                      workingSince={workingSince}
+                      terminalStop={terminalStop}
+                      goalReached={goalReached}
+                      limit={
+                        <LimitCard
+                          limited={limited}
+                          clock={machineClock}
+                          controls={machineView?.features.includes('auto-continue') ?? false}
+                          onDecide={(action) => settled(decideLimit(machine, conv, action))}
+                        />
+                      }
+                      terminalFailure={
+                        <TerminalFailureCard
+                          failure={record?.terminalFailure ?? null}
+                          onChooseTarget={handoff.handoff ? () => requestContinue(conv) : null}
+                        />
+                      }
+                      waiting={
+                        waitingAgents.length > 0 ? { agents: waitingAgents, onOpen: onShowBackground } : null
+                      }
+                      modelLabel={modelLabel}
+                      onOpenFile={onOpenFile}
+                      onOpenOutput={onOpenOutput}
+                      onShareFile={(path) => setSharing({ path, open: true })}
+                      shown={shown}
+                      downloadUrl={(path) => downloadUrl(machine, path)}
+                      onOpenRef={(kind, label, href) => {
+                        if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
+                        else onOpenRef?.(href ?? label);
+                      }}
+                      onLoadSteps={onLoadSteps}
+                      onContinueTurn={() => resend(t('next.turnEnd.continueText'))}
+                      onRetryTurn={(turnId) =>
+                        resend(turnPrompt.get(turnId) ?? t('next.turnEnd.continueText'))
+                      }
+                      onRetryMessage={(clientId) => settled(retryMessage(clientId))}
+                      onResendMessage={(clientId) => {
+                        resendRefused(clientId);
+                        return Promise.resolve();
+                      }}
+                      onDeleteMessage={(clientId) => {
+                        const m = messagesStore.get(clientId);
+                        if (!m) return Promise.resolve();
+                        return settled(cancelMessage(clientId));
+                      }}
+                      renderGate={renderGate}
+                      onForkTurn={handoff.onForkTurn}
+                      dock={
+                        move.moved ? (
+                          <MovedNote moved={move.moved} onOpen={move.openMoved} />
+                        ) : (
+                          <>
+                            {move.here}
+                            <ChatDock
+                              conv={conv}
+                              machine={machine}
+                              extra={dockExtra}
+                              handoff={handoff.handoff}
+                            />
+                          </>
+                        )
+                      }
+                    />
+                  </WorkflowRuns>
+                </DelegatedChats.Provider>
+              </RewindActions>
+            </AskSource.Provider>
           </PeerActions.Provider>
         </MessagePictures.Provider>
       </ChatLinks.Provider>
       {handoff.sheets}
+      {move.sheet}
+      {sharing && (
+        <FileShare
+          machine={machine}
+          conv={conv}
+          path={sharing.path}
+          open={sharing.open}
+          onClose={() => setSharing({ path: sharing.path, open: false })}
+        />
+      )}
       <SelBar onAdd={(text, note) => addQuote(conv, text, note)} />
     </AttachmentSrc.Provider>
   );

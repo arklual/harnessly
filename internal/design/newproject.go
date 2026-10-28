@@ -4,15 +4,14 @@ import (
 	"embed"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"syscall"
 )
 
 // The new-project template the runtime ships, used when the library has no .template/ of its own: a board template
-// that pulls in ./support.js, and support.js, the board engine of the design tool's format (Anthropic's dc-runtime;
-// the deployment may point RUNTIME_DESIGN_ENGINE_FILE at another build of it). Every new project gets meta/ besides,
-// whichever template it came from.
+// that pulls in ./support.js. support.js itself, the board engine of the design tool's format, is not ours and is not
+// shipped: a new project gets the engine this machine has (engine.go), and without one it is refused with the command
+// that fetches it. Every new project gets meta/ besides, whichever template it came from.
 
 //go:embed all:newproject
 var newProjectFiles embed.FS
@@ -27,21 +26,6 @@ func defaultBoardTemplate() []byte {
 	return b
 }
 
-// engine is the support.js a new project gets from the shipped template.
-func (l *Library) engine() []byte {
-	if l.cfg.EngineFile != "" {
-		if b, err := readFileLimited(l.cfg.EngineFile, 16<<20); err == nil {
-			return b
-		}
-		l.warn("design: the configured board engine cannot be read, the shipped one is used", nil)
-	}
-	b, err := newProjectFiles.ReadFile(newProjectRoot + "/" + ProjectDirname + "/" + SupportJSName)
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
 // hasOwnTemplate: the library keeps its own .template/ folder (a link is judged by checkTemplate).
 func (l *Library) hasOwnTemplate() bool {
 	_, err := os.Lstat(l.TemplateDir())
@@ -50,7 +34,11 @@ func (l *Library) hasOwnTemplate() bool {
 
 // writeShippedTemplate puts the shipped template into a fresh folder opened as into.
 func (l *Library) writeShippedTemplate(into *os.File) error {
-	return fs.WalkDir(newProjectFiles, newProjectRoot, func(p string, d fs.DirEntry, err error) error {
+	engine, err := l.engineBytes()
+	if err != nil {
+		return l.noEngineErr()
+	}
+	err = fs.WalkDir(newProjectFiles, newProjectRoot, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || p == newProjectRoot {
 			return err
 		}
@@ -63,19 +51,25 @@ func (l *Library) writeShippedTemplate(into *os.File) error {
 		if err != nil {
 			return err
 		}
-		if path.Base(rel) == SupportJSName && path.Dir(rel) == ProjectDirname {
-			data = l.engine()
-		}
-		f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o666)
-		if err != nil {
-			return err
-		}
-		_, err = f.Write(data)
-		if cerr := f.Close(); err == nil {
-			err = cerr
-		}
-		return err
+		return writeNewFile(target, data)
 	})
+	if err != nil {
+		return err
+	}
+	return writeNewFile(viaFd(into, ProjectDirname+"/"+SupportJSName), engine)
+}
+
+// writeNewFile writes a file that must not exist yet, never through a link.
+func writeNewFile(target string, data []byte) error {
+	f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o666)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 // writeNewMeta gives the staged project its meta/: the template's own project.json settings (release, kits,

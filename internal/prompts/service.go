@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/chatguard"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/screen"
 	"github.com/ly-solutions/harnessly/internal/tmux"
@@ -56,6 +57,10 @@ type Config struct {
 	IsUploadImage func(path string) bool
 	// IsShell says whether a pane's foreground program is only its shell (tmux.SafeShells when nil).
 	IsShell func(command string) bool
+	// TerminalOff says that the machine's policy has switched the terminal off for the hub (nil: it is on). While it is,
+	// text goes only into a tab whose agent runs in the pane's foreground, and never as a bash-mode line ("!…"), because
+	// a bare shell would run what it is given: see internal/chatguard.
+	TerminalOff func() bool
 	// Log writes a log line with key/value pairs; nil logs nothing.
 	Log func(level, msg string, kv ...any)
 }
@@ -99,6 +104,9 @@ func New(cfg Config) *Service {
 	}
 	if cfg.IsUploadImage == nil {
 		cfg.IsUploadImage = func(string) bool { return false }
+	}
+	if cfg.TerminalOff == nil {
+		cfg.TerminalOff = func() bool { return false }
 	}
 	procs := machineProcs()
 	if cfg.Procs.Children != nil {
@@ -370,11 +378,23 @@ func (s *Service) deliverHead(tabID string) {
 	// message. A shell never gets it: its prompt may look like the agent's and the text would run as a command.
 	ready := MayDeliverQueue(tab.CliState, false) || (tab.CliState == StateUnknown && s.agentInForeground(tab.Session)) ||
 		(tab.CliState == StateNeedsInput && s.questionOnScreen(tab.Session))
-	head := ""
+	head, headText := "", ""
 	if items := s.queue.List(tabID); len(items) > 0 {
 		if i := slices.IndexFunc(items, Item.Waiting); i >= 0 {
-			head = items[i].ID
+			head, headText = items[i].ID, items[i].Text
 		}
+	}
+	if s.cfg.TerminalOff() {
+		// The terminal is off: a queued line that starts a bash mode is not typed (it may have been queued before the
+		// terminal went off), and nothing is typed into a pane whose agent is not in its foreground, whatever state the
+		// tab was last seen in.
+		if chatguard.BashMode(headText) {
+			s.warn("queued prompt would run as a shell command and the terminal is off; given up", "tabId", tabID, "promptId", head)
+			s.queue.Fail(tabID, ReasonNotDelivered, func(it Item) bool { return it.ID == head })
+			s.Schedule(tabID, retryDelay)
+			return
+		}
+		ready = ready && s.mayTypeAnything(tab)
 	}
 	outcome := s.Pump(tabID, ready, s.deliveryDriver(tab))
 	if outcome != PumpBlocked {
@@ -555,6 +575,18 @@ func (s *Service) Steer(tabID, id string) SteerResult {
 	if !ok || tab.Session == "" {
 		return SteerResult{Status: 404, Message: msgNoTab.String()}
 	}
+	if s.cfg.TerminalOff() {
+		// Looked at before the message is taken out of the queue: a refusal leaves it where it was.
+		text := ""
+		for _, it := range s.queue.List(tabID) {
+			if it.ID == id {
+				text = it.Text
+			}
+		}
+		if !s.mayType(tab, text) {
+			return SteerResult{Status: 403, Message: msgTerminalOff.String()}
+		}
+	}
 	var res SteerResult
 	if !s.flights.run(tabID, func() {
 		item, ok := s.queue.Take(tabID, id)
@@ -614,6 +646,9 @@ func (s *Service) SendNow(tabID, text string) (SendNowResult, bool) {
 	if !ok || tab.Session == "" {
 		return SendNowResult{}, false
 	}
+	if !s.mayType(tab, text) {
+		return sendNowFailure(403, msgTerminalOff.String(), false), true
+	}
 	var res SendNowResult
 	if !s.flights.run(tabID, func() {
 		id := "send-now:" + tabID + ":" + sha1Hex(text, 16)
@@ -640,6 +675,9 @@ var (
 	ErrNoTab = errors.New("no such tab")
 	// ErrCodexNeedsSubmit: Codex takes the composer's text only submitted.
 	ErrCodexNeedsSubmit = errors.New("codex text must be submitted")
+	// ErrTerminalOff: the machine's policy keeps the terminal off, and the text is a shell command (a bash-mode line) or
+	// the pane holds no agent that would read it.
+	ErrTerminalOff = chatguard.ErrTerminalOff
 )
 
 // Ways the composer's text went in.
@@ -663,6 +701,9 @@ func (s *Service) TypePrompt(tabID, text string, submit bool, messageID string, 
 	codex := tab.Provider == ProviderCodex
 	if codex && !submit {
 		return "", ErrCodexNeedsSubmit
+	}
+	if !s.mayType(tab, text) {
+		return "", ErrTerminalOff
 	}
 	if !s.reg.Claim(messageID, RoutePromptText, tabID, text) {
 		return ViaDuplicate, nil
@@ -777,6 +818,27 @@ func (s *Service) questionOnScreen(session string) bool {
 	}
 	present, _ := screen.ChatAboutRow(plain)
 	return present
+}
+
+// mayType says whether text may go into the tab's pane now. With the terminal on, always: what the pane holds is the
+// person's business. With it off, only an agent that runs under the pane and is in its foreground (not a shell, which
+// would run the text, and not a program the agent was left for) takes it, and a line that starts a bash mode is no text.
+func (s *Service) mayType(tab Tab, text string) bool {
+	if !s.cfg.TerminalOff() {
+		return true
+	}
+	if chatguard.BashMode(text) {
+		return false
+	}
+	return s.mayTypeAnything(tab)
+}
+
+// mayTypeAnything is mayType for what is not text (a key that would answer a prompt): the agent has to be there.
+func (s *Service) mayTypeAnything(tab Tab) bool {
+	if !s.cfg.TerminalOff() {
+		return true
+	}
+	return tab.Provider != "" && s.cfg.Agents.Running(tab) && s.agentInForeground(tab.Session)
 }
 
 // agentInForeground: a program other than a bare shell runs in the foreground of the session's pane; false when tmux

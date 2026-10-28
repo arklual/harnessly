@@ -1,0 +1,124 @@
+# A hub and one machine next to it, on one host: sign in, make a space, and use «Эта машина» to run agents at once.
+# Nothing is published as an image yet, so the first start builds both:
+#
+#   docker compose -f compose.hub.yaml up -d --build     then open http://hub.localhost:8040
+#
+# The first account to sign in is the administrator of the installation (it has to prove its email: the code from the
+# mail, or GitHub; set HUB_ADMIN_EMAILS to name the administrators instead). With no mail server set (HUB_SMTP_URL) the
+# sign-in code is in the hub's log, marked DEV (on plain http only: a hub on https needs HUB_SMTP_URL, or HUB_MAIL_LOG=allow
+# to accept a code in the log):
+#
+#   docker compose -f compose.hub.yaml logs hub | grep "DEV email code"
+#
+# On a server with a real name set HUB_PUBLIC_URL (https, TLS in front: docs/hub/deploy.md) and a mail server; see
+# .env.hub.example for every setting. The hub's port is bound to 127.0.0.1: a reverse proxy on the host publishes it.
+#
+# The machine is a separate container on a network of its own with the hub: it does not share the hub's network
+# namespace, so what runs in the machine cannot reach the hub's loopback or pose as the reverse proxy in front of it.
+# The address the hub announces to machines, HUB_PUBLIC_URL, has to work for the browser and for the machine alike, so
+# the try-out name is hub.localhost: browsers send *.localhost to the host's loopback, where the port is published, and
+# the machine's container is told (extra_hosts) that the name is the hub's address on their network. The port inside
+# is HUB_PORT too, for the same reason. The machine finds its one-time registration code in a file the hub keeps on a
+# volume they share, readable by the machine's group only; the machine cannot sign anyone in and the hub cannot read
+# the machine's home.
+#
+# The hub believes X-Forwarded-For from one address only: the gateway of that network, which is where a connection to
+# the published port (the reverse proxy on the host) comes from. HUB_NET is the first three bytes of the network's
+# addresses; change it if 172.29.40.0/24 is taken on your host.
+
+name: harnessly-hub
+
+x-hub-url: &hub-url ${HUB_PUBLIC_URL:-http://hub.localhost:${HUB_PORT:-8040}}
+
+networks:
+  hub:
+    ipam:
+      config:
+        - subnet: ${HUB_NET:-172.29.40}.0/24
+          gateway: ${HUB_NET:-172.29.40}.1
+
+services:
+  hub:
+    build:
+      context: .
+      target: hub
+    image: ${HUB_IMAGE:-ghcr.io/ly-solutions/harnessly-hub:local}
+    # The images are built here, not pulled: HARNESSLY_PULL_POLICY=missing uses published ones named by *_IMAGE.
+    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
+    environment:
+      HUB_PUBLIC_URL: *hub-url
+      HUB_LISTEN: 0.0.0.0:${HUB_PORT:-8040}
+      # The local machine: the hub keeps a registration code for it here (renewed whenever it is used or runs out),
+      # readable by the hub and by the machine's group (10001, `agent` in the machine image), and by nobody else.
+      HUB_LOCAL_CODE_FILE: /run/harnessly/local-code
+      HUB_LOCAL_CODE_GROUP: "10001"
+      # Who may create an account: invite (the administrators and people with an invitation) or open (anyone who finds
+      # the address). The try-out is invite: the first account is the administrator, the others come by invitation.
+      HUB_SIGNUP: ${HUB_SIGNUP:-invite}
+      HUB_ADMIN_EMAILS: ${HUB_ADMIN_EMAILS:-}
+      # Mail for sign-in codes and invitations. Empty: the code is written to the log, marked DEV, which a hub on https
+      # refuses unless HUB_MAIL_LOG=allow.
+      HUB_SMTP_URL: ${HUB_SMTP_URL:-}
+      HUB_MAIL_LOG: ${HUB_MAIL_LOG:-}
+      HUB_MAIL_FROM: ${HUB_MAIL_FROM:-}
+      # Sign in with GitHub, Yandex ID or an OpenID Connect provider appears when its settings are filled in.
+      HUB_GITHUB_CLIENT_ID: ${HUB_GITHUB_CLIENT_ID:-}
+      HUB_GITHUB_CLIENT_SECRET: ${HUB_GITHUB_CLIENT_SECRET:-}
+      HUB_YANDEX_CLIENT_ID: ${HUB_YANDEX_CLIENT_ID:-}
+      HUB_YANDEX_CLIENT_SECRET: ${HUB_YANDEX_CLIENT_SECRET:-}
+      # Any number of OpenID Connect providers: HUB_OIDC_PROVIDERS=keycloak and then, under environment here,
+      #   HUB_OIDC_KEYCLOAK_ISSUER, HUB_OIDC_KEYCLOAK_CLIENT_ID, HUB_OIDC_KEYCLOAK_CLIENT_SECRET, HUB_OIDC_KEYCLOAK_NAME
+      HUB_OIDC_PROVIDERS: ${HUB_OIDC_PROVIDERS:-}
+      HUB_PASSKEY: ${HUB_PASSKEY:-on}
+      HUB_RP_ID: ${HUB_RP_ID:-}
+      # Machines on their own addresses, <machine>.<this domain> (a wildcard record and certificate): see deploy.md.
+      HUB_RUNTIME_DOMAIN: ${HUB_RUNTIME_DOMAIN:-}
+      # The container way of connecting a machine is offered when this names an image the machines can pull.
+      HUB_CONTAINER_IMAGE: ${HUB_CONTAINER_IMAGE:-}
+      # The reverse proxy on the host reaches the container through the published port, from the gateway of the
+      # network: that one address is trusted for the client address in X-Forwarded-For. The port is bound to
+      # 127.0.0.1, so only the host itself can be that proxy; the machine is another address on the network.
+      HUB_TRUSTED_PROXIES: ${HUB_TRUSTED_PROXIES:-${HUB_NET:-172.29.40}.1/32}
+      HUB_LOG_LEVEL: ${HUB_LOG_LEVEL:-info}
+    # Member of the machine's group, so that it may give the registration code file to that group.
+    group_add:
+      - "10001"
+    networks:
+      hub:
+        ipv4_address: ${HUB_NET:-172.29.40}.2
+    ports:
+      - "127.0.0.1:${HUB_PORT:-8040}:${HUB_PORT:-8040}"
+    volumes:
+      - hub-data:/var/lib/harnessly-hub
+      - local-code:/run/harnessly
+    restart: unless-stopped
+
+  machine:
+    build:
+      context: .
+      target: machine
+    image: ${MACHINE_IMAGE:-ghcr.io/ly-solutions/harnessly-machine:local}
+    pull_policy: ${HARNESSLY_PULL_POLICY:-never}
+    networks:
+      - hub
+    # The name in HUB_PUBLIC_URL, when it is hub.localhost, is the hub on this network. A real name resolves as usual.
+    extra_hosts:
+      - "hub.localhost:${HUB_NET:-172.29.40}.2"
+    depends_on:
+      hub:
+        condition: service_healthy
+    environment:
+      AGENT_HUB_URL: *hub-url
+      AGENT_REGISTER_CODE_FILE: /run/harnessly/local-code
+      AGENT_REGISTER_PROFILE: container
+      AGENT_REGISTER_VIA: local
+      AGENT_REGISTER_NAME: ${MACHINE_NAME:-harnessly-local}
+    volumes:
+      - machine-home:/home/agent
+      - local-code:/run/harnessly:ro
+    restart: unless-stopped
+
+volumes:
+  hub-data:
+  local-code:
+  machine-home:

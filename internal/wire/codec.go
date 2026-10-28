@@ -173,7 +173,7 @@ func (s *MessageState) UnmarshalJSON(b []byte) error {
 }
 
 var gateStateFields = map[string]fieldSet{
-	string(GateStateOpen):      {"refused?"},
+	string(GateStateOpen):      {"refused?", "autoDenyAt?"},
 	string(GateStateAnswering): {"opId", "wait"},
 	string(GateStateAnswered):  {"at", "byDevice"},
 	string(GateStateClosed):    {"reason"},
@@ -392,6 +392,7 @@ var events = map[EventType]func([]byte) (Event, error){
 	EvCompaction:          as[CompactionEv, Event],
 	EvTurnFinished:        as[TurnFinishedEv, Event],
 	EvTurnFailed:          as[TurnFailedEv, Event],
+	EvQuotaExhausted:      as[QuotaExhaustedEv, Event],
 	EvQueueChanged:        as[QueueChangedEv, Event],
 	EvPromptState:         as[PromptStateEv, Event],
 	EvMessageUpsert:       as[MessageUpsertEv, Event],
@@ -562,6 +563,11 @@ func (e TurnFinishedEv) MarshalJSON() ([]byte, error) {
 
 func (e TurnFailedEv) MarshalJSON() ([]byte, error) {
 	type plain TurnFailedEv
+	return eventJSON(e, plain(e))
+}
+
+func (e QuotaExhaustedEv) MarshalJSON() ([]byte, error) {
+	type plain QuotaExhaustedEv
 	return eventJSON(e, plain(e))
 }
 

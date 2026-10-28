@@ -25,6 +25,8 @@ type fakeTmux struct {
 	cwd      *string
 	command  string
 	calls    [][]any
+	// createErr: CreateSession fails with it, the session made anyway (a tmux that answered too late).
+	createErr error
 }
 
 func newFakeTmux(home string) *fakeTmux {
@@ -43,7 +45,7 @@ func (f *fakeTmux) CreateSession(name string, cols, rows int, cwd string) error 
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, []any{"create", name, cols, rows, cwd})
 	f.sessions[name] = true
-	return nil
+	return f.createErr
 }
 func (f *fakeTmux) KillSession(name string) {
 	f.mu.Lock()

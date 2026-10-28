@@ -392,6 +392,10 @@
   "next.designly.empty": "Здесь появятся ваши макеты",
   "next.designly.emptyMine": "Здесь будут макеты, которые вы начнёте",
   "next.designly.emptyShared": "Макетов коллег пока нет",
+  "next.designly.engine.missing": "Для {design} на этой машине нужен движок досок",
+  "next.designly.engine.missingText": "Движок не входит в harnessly: получите его один раз через свой аккаунт Claude — выполните команду в терминале машины и обновите страницу.",
+  "next.designly.engine.tools": "На этой машине не установлено: {tools}",
+  "next.designly.engine.toolsText": "Макеты работают и без них; проверкам, картинкам и экспорту в PDF нужен Chromium, экспорту видео — ffmpeg.",
   "next.designly.createFailed": "Не получилось начать макет",
   "next.designly.started": "Рисую «{title}»…",
   "next.sidebar.designly": "{design}",
@@ -696,6 +700,10 @@
   "next.editor.saved": "Сохранён",
   "next.editor.saving": "Сохраняем…",
   "next.editor.save": "Сохранить",
+  "next.share.button": "Поделиться",
+  "next.share.unlink": "Отвязать от файла",
+  "next.share.unlinked": "Документ отвязан: правки файла в него больше не попадут",
+  "next.share.failed": "Не удалось поделиться",
   "next.editor.mode": "Режим",
   "next.editor.edit": "Правка",
   "next.editor.preview": "Просмотр",
@@ -892,5 +900,10 @@
   "next.sidebar.retitleFailed": "Не удалось обновить название",
   "next.chatStatus.limited": "Ждёт сброса лимита",
   "next.chatStatus.limitedUntil": "Ждёт сброса лимита до {when}",
-  "next.rowMenu.continue": "Продолжить в другой модели"
+  "next.rowMenu.continue": "Продолжить в другой модели",
+  "next.delivered.loading": "Читаем архив",
+  "next.delivered.zipFailed": "Архив не открылся",
+  "next.delivered.zipEmpty": "Архив пуст",
+  "next.delivered.saveOnly": "Этот файл открывается своей программой: скачайте его.",
+  "next.rowMenu.moveVm": "Продолжить на другой ВМ"
 }

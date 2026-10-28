@@ -1,4 +1,8 @@
-# GoReleaser v2: `goreleaser release --snapshot --clean` builds the same archives locally into dist/.
+# GoReleaser v2: `goreleaser release --snapshot --clean --skip=sign` builds the same archives locally into dist/.
+#
+# A tag vX.Y.Z (see .github/workflows/release.yml) produces, for linux and darwin on amd64 and arm64, one archive per
+# platform holding `harnessly` (the command line tool), `runtime` (with the web page compiled in) and `agent`, plus
+# checksums.txt and its keyless cosign signature checksums.txt.sigstore.json.
 version: 2
 
 project_name: harnessly
@@ -18,6 +22,7 @@ builds:
     goos: [linux, darwin]
     goarch: [amd64, arm64]
     flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion={{ .Version }}
   - id: harnessly
@@ -27,6 +32,7 @@ builds:
     goos: [linux, darwin]
     goarch: [amd64, arm64]
     flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/ly-solutions/harnessly/internal/hlcli.Version={{ .Version }}
   - id: runtime
@@ -37,6 +43,7 @@ builds:
     goarch: [amd64, arm64]
     flags: [-trimpath]
     tags: [webui]
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion={{ .Version }}
 
@@ -50,31 +57,75 @@ archives:
 
 checksum:
   name_template: checksums.txt
+  algorithm: sha256
+
+# Keyless: the signature is made with the workflow's GitHub OIDC identity (no key to keep), and the bundle carries the
+# certificate and the transparency log entry. Verify with `cosign verify-blob` (the release notes show the command).
+signs:
+  - id: checksums
+    cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - --yes
+      - --bundle=${signature}
+      - ${artifact}
+    output: true
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
+# The notes are the commits since the previous tag, grouped by conventional commit type. Housekeeping is left out.
 changelog:
   use: git
   sort: asc
+  abbrev: 7
   filters:
     exclude:
       - "^Merge "
+      - "^sync:"
+      - "^(docs|test|tests|chore|ci|build|style|refactor)(\\([^)]+\\))?!?:"
   groups:
-    - title: Features
-      regexp: '^.*?feat(\([^)]+\))?!?:.+$'
+    - title: Breaking changes
+      regexp: '^.*?(feat|fix|perf)(\([^)]+\))?!:.+$'
       order: 0
-    - title: Bug fixes
-      regexp: '^.*?fix(\([^)]+\))?!?:.+$'
+    - title: Features
+      regexp: '^.*?feat(\([^)]+\))?:.+$'
       order: 1
-    - title: Performance
-      regexp: '^.*?perf(\([^)]+\))?!?:.+$'
+    - title: Bug fixes
+      regexp: '^.*?fix(\([^)]+\))?:.+$'
       order: 2
+    - title: Performance
+      regexp: '^.*?perf(\([^)]+\))?:.+$'
+      order: 3
     - title: Other changes
       order: 999
 
+# A stable tag is published as the latest release (the runtime's "update available" check reads releases/latest); a tag with
+# a pre-release part (v1.2.3-rc.1) is marked a pre-release and never becomes the latest.
 release:
   github:
     owner: ly-solutions
     name: harnessly
   prerelease: auto
+  make_latest: "{{ if .Prerelease }}false{{ else }}true{{ end }}"
+  header: |
+    ## Install
+
+    Docker: `docker pull ghcr.io/ly-solutions/harnessly:{{ .Version }}` (the image is `latest` too, and `with-agents`
+    adds Claude Code and Codex). Binaries: take the archive of your system below, `harnessly_{{ .Version }}_<os>_<arch>.tar.gz`
+    (it holds `harnessly`, `runtime` and `agent`). How to run, verify and update:
+    [docs/deploy.md](https://github.com/ly-solutions/harnessly/blob/{{ .Tag }}/docs/deploy.md#quick-start).
+  footer: |
+    ## Verify
+
+    ```sh
+    cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
+      --certificate-identity "https://github.com/ly-solutions/harnessly/.github/workflows/release.yml@refs/tags/{{ .Tag }}" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
+    sha256sum --ignore-missing -c checksums.txt
+    gh attestation verify harnessly_{{ .Version }}_linux_amd64.tar.gz --repo ly-solutions/harnessly
+    ```
+
+    All changes, including those the notes leave out: [CHANGELOG.md](https://github.com/ly-solutions/harnessly/blob/{{ .Tag }}/CHANGELOG.md).

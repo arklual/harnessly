@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // LegacyTab is the answer of GET /api/v2/conversations/{id}/legacy: the Legacy tab a conversation runs in, which
@@ -35,7 +35,7 @@ func (s *Server) legacy(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	case err != nil && s.NotFound != nil && s.NotFound(err):
 		refuse(w, RefuseNotFound)
 	case err != nil:
-		agent.Log("warn", "v2: legacy tab failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: legacy tab failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		s.writeChecked(w, r, tab)

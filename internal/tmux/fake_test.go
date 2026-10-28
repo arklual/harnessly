@@ -2,6 +2,7 @@ package tmux
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // fakeTmux has servers by socket, each a list of [session, pane id]; a socket absent from servers has nothing listening.
@@ -27,6 +29,7 @@ type fakeTmux struct {
 type call struct {
 	dir, program string
 	args         []string
+	write        bool // run with the write timeout
 }
 
 func newFake() *fakeTmux {
@@ -38,6 +41,13 @@ var fakeNames = Names{Socket: "main", LegacySocket: "old", Prefix: "nw-", Legacy
 func (f *fakeTmux) tmux(cfg Config) *Tmux {
 	t := NewConfig(cfg)
 	t.run = f.run
+	t.runWrite = func(dir, program string, args ...string) result {
+		r := f.run(dir, program, args...)
+		f.mu.Lock()
+		f.calls[len(f.calls)-1].write = true
+		f.mu.Unlock()
+		return r
+	}
 	t.sleep = func(d time.Duration) { f.mu.Lock(); f.sleeps = append(f.sleeps, d); f.mu.Unlock() }
 	return t
 }
@@ -45,11 +55,11 @@ func (f *fakeTmux) tmux(cfg Config) *Tmux {
 func (f *fakeTmux) run(dir, program string, args ...string) result {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.calls = append(f.calls, call{dir, program, append([]string(nil), args...)})
+	f.calls = append(f.calls, call{dir: dir, program: program, args: append([]string(nil), args...)})
 	i := slices.Index(args, "-L")
 	socket := args[i+1]
 	if f.silent[socket] {
-		return result{err: errors.New("signal: killed"), timedOut: true}
+		return result{err: errors.New("signal: killed"), timedOut: true, took: writeTimeout}
 	}
 	if f.broken[socket] {
 		return result{err: errors.New("exit status 1"), stderr: "protocol version mismatch\n"}
@@ -306,12 +316,73 @@ func TestBracketedPasteFramesText(t *testing.T) {
 	}
 	want := [][]string{
 		{"copy-mode", "-q", "-t", "nw-s"},
-		{"send-keys", "-t", "nw-s", "-l", "\x1b[200~" + text + "\x1b[201~"},
+		{"send-keys", "-t", "nw-s", "-l", "--", "\x1b[200~" + text + "\x1b[201~"},
 		{"send-keys", "-t", "nw-s", "Enter"},
 		{"send-keys", "-t", "nw-s", "Enter"},
 	}
 	if !reflect.DeepEqual(seq, want) || !reflect.DeepEqual(f.sleeps, []time.Duration{600 * time.Millisecond}) {
 		t.Fatalf("calls %q sleeps %v", seq, f.sleeps)
+	}
+}
+
+// A paste over tmux's 16 KB command limit («command too long», exit 1, nothing typed) goes in several send-keys calls
+// inside one pair of brackets: no part over literalChunk, no character or bracket cut, a `-` or `;` at a cut kept.
+func TestBracketedPasteOfALongTextGoesInParts(t *testing.T) {
+	f, tm := sendRig(t)
+	var b strings.Builder
+	for i := 0; b.Len() < 3*literalChunk; i++ {
+		fmt.Fprintf(&b, "Строка %d: https://example.test/a%%2Fb%%2Fc?page=one.two.three \"q\" 'x';\n", i)
+	}
+	text := b.String()
+	if err := tm.SendBracketedPasteOnly("nw-s", text); err != nil {
+		t.Fatal(err)
+	}
+	parts := typed(f)
+	if len(parts) < 3 {
+		t.Fatalf("%d parts", len(parts))
+	}
+	var sends int
+	for _, c := range f.calls {
+		if slices.Contains(c.args, "send-keys") {
+			sends++
+			if !slices.Equal(c.args[3:7], []string{"send-keys", "-t", "nw-s", "-l"}) || c.args[7] != "--" {
+				t.Fatalf("args %q", c.args[3:8])
+			}
+		}
+	}
+	if sends != len(parts) || len(f.calls) != len(parts)+1 {
+		t.Fatalf("calls %d, parts %d", len(f.calls), len(parts))
+	}
+	var joined strings.Builder
+	for _, p := range parts {
+		if len(p) > literalChunk+len(pasteStart)+len(pasteEnd)+1 || !utf8.ValidString(p) {
+			t.Fatalf("part of %d bytes, valid %v", len(p), utf8.ValidString(p))
+		}
+		joined.WriteString(strings.ReplaceAll(p, `\;`, ";"))
+	}
+	if joined.String() != pasteStart+text+pasteEnd {
+		t.Fatal("the parts do not add up to the framed text")
+	}
+	if strings.Count(joined.String(), "\x1b") != 2 {
+		t.Fatal("a bracket was cut or doubled")
+	}
+}
+
+func TestSplitLiteral(t *testing.T) {
+	for _, c := range []struct {
+		in    string
+		limit int
+		want  []string
+	}{
+		{"", 4, []string{""}},
+		{"abcd", 4, []string{"abcd"}},
+		{"abcde", 4, []string{"abcd", "e"}},
+		{"aбв", 4, []string{"aб", "в"}}, // б is 2 bytes: a cut at 4 would split в
+		{"ббб", 3, []string{"б", "б", "б"}},
+	} {
+		if got := splitLiteral(c.in, c.limit); !slices.Equal(got, c.want) {
+			t.Errorf("splitLiteral(%q, %d) = %q, want %q", c.in, c.limit, got, c.want)
+		}
 	}
 }
 
@@ -441,8 +512,8 @@ func TestCreateSessionCommandLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := f.calls[0]
-	want := append([]string{"-n", "10", "tmux", "-u", "-L", "main", "-f", "/app/tmux.conf", "new-session", "-d", "-s", "nw-x", "-x", "120", "-y", "40"}, tm.ShellLaunchCommand())
-	if c.program != "nice" || c.dir != "/work" || !reflect.DeepEqual(c.args, want) {
+	want := append([]string{"-u", "-L", "main", "-f", "/app/tmux.conf", "new-session", "-d", "-s", "nw-x", "-x", "120", "-y", "40"}, tm.ShellLaunchCommand())
+	if c.program != "tmux" || c.dir != "/work" || !reflect.DeepEqual(c.args, want) || !strings.HasPrefix(want[len(want)-1], "nice -n 10 env -i ") {
 		t.Fatalf("%s in %s: %q", c.program, c.dir, c.args)
 	}
 	if got := f.calls[1].args; !reflect.DeepEqual(got, []string{"-u", "-L", "main", "source-file", "/app/tmux.conf"}) {
@@ -451,8 +522,46 @@ func TestCreateSessionCommandLine(t *testing.T) {
 	f.reset()
 	plain := f.tmux(Config{Names: fakeNames, Env: []string{"HOME=/home/u"}})
 	_ = plain.CreateSession("nw-y", 80, 24, "")
-	if c := f.calls[0]; c.program != "tmux" || c.dir != "/home/u" || slices.Contains(c.args, "-f") || len(f.calls) != 1 {
+	if c := f.calls[0]; c.program != "tmux" || c.dir != "/home/u" || slices.Contains(c.args, "-f") || len(f.calls) != 1 || strings.HasPrefix(c.args[len(c.args)-1], "nice") {
 		t.Fatalf("%s in %s: %q (+%d)", c.program, c.dir, c.args, len(f.calls)-1)
+	}
+}
+
+// A new session and typed keys wait as long as a loaded tmux needs; a poll does not. A tmux that does not answer at all
+// is told apart from a broken one: SlowError, the command and how long it was given.
+func TestWritesGetTheLongTimeoutAndSayTheMachineIsSlow(t *testing.T) {
+	f := newFake()
+	tm := f.tmux(Config{Names: fakeNames, Env: []string{"HOME=/home/u"}})
+	f.silent["main"] = true
+	err := tm.CreateSession("nw-x", 80, 24, "")
+	var slow *SlowError
+	if !errors.As(err, &slow) || slow.Command != "new-session" || slow.After != writeTimeout || !f.calls[0].write {
+		t.Fatalf("create: %v, %+v", err, f.calls[0])
+	}
+	if !strings.Contains(err.Error(), "overloaded") {
+		t.Fatalf("message %q", err)
+	}
+	f.reset()
+	if err := tm.SendKeys("nw-x", "ls"); !errors.As(err, &slow) || slow.Command != "send-keys" {
+		t.Fatalf("send: %v", err)
+	}
+	f.reset()
+	f.silent["main"] = false
+	tm.ListSessions()
+	for _, c := range f.calls {
+		if c.write {
+			t.Fatalf("a read ran with the write timeout: %q", c.args)
+		}
+	}
+}
+
+func TestTimedRunnerKillsAtItsTimeout(t *testing.T) {
+	r := timedRunner(200*time.Millisecond)("", "sleep", "5")
+	if !r.timedOut || r.err == nil || r.took < 200*time.Millisecond || r.took > 3*time.Second {
+		t.Fatalf("%+v", r)
+	}
+	if r := timedRunner(5*time.Second)("", "true"); r.timedOut || r.err != nil {
+		t.Fatalf("%+v", r)
 	}
 }
 

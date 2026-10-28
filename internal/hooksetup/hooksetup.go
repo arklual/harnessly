@@ -139,6 +139,8 @@ func (c Config) StatusHookScript() []byte {
 EVENT="${1:-poll}"
 ` + c.preamble() + `AT=$(date +%s%3N 2>/dev/null)
 case "$AT" in ''|*[!0-9]*) AT="" ;; esac
+# some date builds (uutils) ignore the width in %3N and print nanoseconds: keep the first 13 digits, milliseconds
+[ "${#AT}" -gt 13 ] && AT=$(printf '%.13s' "$AT")
 
 NOTIFICATION_TYPE=""
 if [ "$EVENT" = "notification" ]; then

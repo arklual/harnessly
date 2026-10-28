@@ -41,14 +41,18 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 	})
 	tmuxNames = tm
 	agentBin := filepath.Join(home, "fake-agent")
-	_ = os.WriteFile(agentBin, []byte("#!/bin/sh\necho \"fake agent started: $*\"\nsleep 30\n"), 0o700)
+	_ = os.WriteFile(agentBin, []byte("#!/bin/sh\necho \"fake agent started: $*\"\necho \"key=[$HL_TEST_KEY]\"\nsleep 30\n"), 0o700)
+	// A machine agent's env file: what the hub delivered reaches the launched CLI, on a start and on a resume.
+	envDir := filepath.Join(dir, "agent-env")
+	_ = os.MkdirAll(envDir, 0o700)
+	_ = os.WriteFile(filepath.Join(envDir, "all.env"), []byte("HL_TEST_KEY='it'\\''s secret'\n"), 0o600)
 	_ = os.WriteFile(filepath.Join(dir, "workspaces.json"), []byte(`{"workspaces":[{"id":"ws-a","name":"A","directories":["`+home+`"]}],"sidebarCollapsed":false,"sidebarWidth":240}`), 0o600)
 	mode := filepath.Join(dir, "state-mode.json")
 	_ = os.WriteFile(mode, []byte(`{"owned":false,"goSlices":["core","launch"]}`), 0o600)
 	_ = os.WriteFile(filepath.Join(dir, "cli-token"), []byte("tok"), 0o600)
 
 	ag := newCoreAgents(coreAgentsConfig{DataDir: dir, Home: home, ConfigFile: filepath.Join(dir, "config.json"),
-		ClaudeDir: filepath.Join(home, ".claude"), CodexDir: filepath.Join(home, ".codex"), DefaultsKey: "launchDefaults", Launcher: agentBin})
+		ClaudeDir: filepath.Join(home, ".claude"), CodexDir: filepath.Join(home, ".codex"), DefaultsKey: "launchDefaults", Launcher: agentBin, EnvDir: envDir})
 	ag.preflight = func() preflight.Result {
 		return preflight.Result{Claude: preflight.Claude{Installed: true}, Codex: preflight.Codex{Installed: true}}
 	}
@@ -106,13 +110,14 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 	var screen string
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		screen, _ = tm.Capture(info.TmuxSession)
-		if strings.Contains(screen, "fake agent started:") {
+		if strings.Contains(screen, "key=[") {
 			break
 		}
 	}
 	flat := strings.ReplaceAll(screen, "\n", "") // the pane wraps at 80 columns
 	if !strings.Contains(flat, "DISABLE_AUTOUPDATER=1 '"+agentBin+"' --settings "+filepath.Join(dir, "hooks.json")) ||
-		!strings.Contains(flat, "fake agent started:") || !strings.Contains(flat, "-- $'hello there'") {
+		!strings.Contains(flat, "fake agent started:") || !strings.Contains(flat, "-- $'hello there'") ||
+		!strings.Contains(flat, "key=[it's secret]") {
 		t.Fatalf("the launch line was not typed and run:\n%s", screen)
 	}
 	tab := func() *jsvalue.Object {
@@ -146,8 +151,10 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 			break
 		}
 	}
+	time.Sleep(300 * time.Millisecond)
+	screen, _ = tm.Capture(info.TmuxSession)
 	if flat := strings.ReplaceAll(screen, "\n", ""); !strings.Contains(flat, "DISABLE_AUTOUPDATER=1 '"+agentBin+"' --resume "+sid+" --settings") ||
-		!strings.Contains(flat, "fake agent started: --resume "+sid) {
+		!strings.Contains(flat, "fake agent started: --resume "+sid) || !strings.Contains(flat, "key=[it's secret]") {
 		t.Fatalf("the reset did not resume the agent:\n%s", screen)
 	}
 

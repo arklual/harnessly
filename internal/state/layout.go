@@ -180,10 +180,13 @@ func (s *Store) AddTab(wsID, paneID string, o TabOptions) (*jsvalue.Object, erro
 	web := o.PanelType == webBrowser
 	if !web {
 		if err := s.cfg.Tmux.CreateSession(session, cols, rows, o.Cwd); err != nil {
+			// A tmux that answered too late may still make the session: no tab will ever name it, so it goes.
+			s.cfg.Tmux.KillSession(session)
 			return nil, err
 		}
 		if o.Command != "" {
 			if err := s.cfg.Tmux.SendKeys(session, o.Command); err != nil {
+				s.cfg.Tmux.KillSession(session)
 				return nil, err
 			}
 		}

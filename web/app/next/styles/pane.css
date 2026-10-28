@@ -1412,3 +1412,43 @@ input.hx-tbrowser__url:focus {
 .hx-pane .hx-tab[data-still]:not([data-state='closing']) {
   animation: none;
 }
+
+/* A file that is not text, in the pane: its name biggest, the way to save it beside, the contents under. */
+.hx-deliv__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-deliv__save {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--hx-fg-3);
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-deliv__save:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-deliv__save:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-deliv__image {
+  max-width: 100%;
+  border-radius: var(--hx-radius-md);
+  align-self: flex-start;
+}
+.hx-deliv__pdf {
+  width: 100%;
+  height: 70vh;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-window);
+}

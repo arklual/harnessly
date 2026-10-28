@@ -38,6 +38,161 @@ func (r *rig) hitLimit() time.Time {
 	return reset
 }
 
+// A backend profile can say that a rate limit is final before Claude Code finishes its own retry loop. The runtime
+// ends the turn and sends one terminal interrupt at that line; a later copy and Stop do not end or interrupt it again.
+func TestNonTransientProfileQuotaStopsTheTurnOnce(t *testing.T) {
+	r := newRig(t)
+	r.working("big job")
+	r.line(`"type":"assistant","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Quota exhausted for this account"}]},"error":"rate_limit","isApiErrorMessage":true,"apiErrorStatus":429,"apiErrorIsTransient":false`)
+	r.tick(time.Second)
+
+	turns := r.snap().Turns
+	if len(turns) != 1 || turns[0].Status != wire.TurnFailed || turns[0].Failure == nil ||
+		turns[0].Failure.Code != wire.TurnFailedRateLimit {
+		t.Fatalf("after the quota signal: %+v", turns)
+	}
+	if got := r.pane.calls[len(r.pane.calls)-1]; got != "keys:C-c" {
+		t.Fatalf("the current process group was not interrupted: %v", r.pane.calls)
+	}
+	rec := r.record()
+	if rec.TerminalFailure == nil || rec.TerminalFailure.Kind != wire.FailureQuotaExhausted ||
+		!rec.TerminalFailure.Terminal || !rec.TerminalFailure.NeedsTarget {
+		t.Fatalf("terminal failure marker: %+v", rec.TerminalFailure)
+	}
+	if rec.TerminalFailure.Detail != "Quota exhausted for this account" {
+		t.Fatalf("terminal failure detail: %q", rec.TerminalFailure.Detail)
+	}
+	if rec.Queue.Paused == nil || rec.Queue.Paused.Reason != wire.PausedNeedsTarget {
+		t.Fatalf("queue after terminal failure: %+v", rec.Queue)
+	}
+	if n := len(r.events(wire.EvQuotaExhausted)); n != 1 {
+		t.Fatalf("%d quota_exhausted after the first signal", n)
+	}
+	if n := len(r.events(wire.EvTurnFailed)); n != 1 {
+		t.Fatalf("%d turn_failed after the first signal", n)
+	}
+
+	r.line(`"type":"assistant","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Quota exhausted for this account"}]},"error":"rate_limit","isApiErrorMessage":true,"apiErrorStatus":429,"apiErrorIsTransient":false`)
+	r.hook("stop")
+	r.tick(time.Second)
+	if n := len(r.events(wire.EvTurnFailed)); n != 1 {
+		t.Fatalf("%d turn_failed after JSONL and Stop", n)
+	}
+	if n := len(r.events(wire.EvQuotaExhausted)); n != 1 {
+		t.Fatalf("%d quota_exhausted after JSONL and Stop", n)
+	}
+	interrupts := 0
+	for _, call := range r.pane.calls {
+		if call == "keys:C-c" {
+			interrupts++
+		}
+	}
+	if interrupts != 1 {
+		t.Fatalf("%d interrupts: %v", interrupts, r.pane.calls)
+	}
+}
+
+// A turn the person starts later is a new detection scope: it clears the old marker and can report its own terminal
+// failure once. The needs-target pause itself never types or resends anything.
+func TestTerminalQuotaDedupeResetsForANewTurn(t *testing.T) {
+	r := newRig(t)
+	r.working("first job")
+	r.line(`"type":"assistant","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Quota exhausted first"}]},"error":"rate_limit","isApiErrorMessage":true,"apiErrorStatus":429,"apiErrorIsTransient":false`)
+	r.tick(time.Second)
+	typed := len(r.pane.calls)
+
+	// This represents an explicit action in the terminal or a manual handoff path, not a runtime resend.
+	r.user("try a chosen target")
+	r.tick(time.Second)
+	if got := r.record().TerminalFailure; got != nil {
+		t.Fatalf("old terminal marker after a new turn: %+v", got)
+	}
+	if got := r.typedLines(typed); len(got) != 0 {
+		t.Fatalf("runtime started work automatically: %v", got)
+	}
+
+	r.line(`"type":"assistant","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Quota exhausted second"}]},"error":"rate_limit","isApiErrorMessage":true,"apiErrorStatus":429,"apiErrorIsTransient":false`)
+	r.tick(time.Second)
+	if n := len(r.events(wire.EvQuotaExhausted)); n != 2 {
+		t.Fatalf("%d quota_exhausted events across two turns", n)
+	}
+}
+
+// A retryable throttle is not an exhausted quota, even when it uses status 429 and names Retry-After.
+func TestTransientProfile429DoesNotStopTheTurn(t *testing.T) {
+	r := newRig(t)
+	r.working("big job")
+	r.line(`"type":"assistant","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Rate limited; Retry-After: 30"}]},"error":"rate_limit","isApiErrorMessage":true,"apiErrorStatus":429,"apiErrorIsTransient":true`)
+	r.tick(time.Second)
+	if got := r.state().K; got != wire.StateWorking {
+		t.Fatalf("a transient 429 stopped the turn: %s", got)
+	}
+	for _, call := range r.pane.calls {
+		if call == "keys:C-c" {
+			t.Fatalf("a transient 429 interrupted the process group: %v", r.pane.calls)
+		}
+	}
+}
+
+// A terminal can print the non-retryable response before the JSONL writer reaches it. ANSI and read boundaries are
+// irrelevant; the later structured copy belongs to the same turn and cannot produce a second outcome or interrupt.
+func TestTerminalQuotaChunksAndJSONLAreDeduplicated(t *testing.T) {
+	r := newRig(t)
+	r.working("big job")
+	r.rt.TerminalOutput("s1", []byte("\x1b[31mAPI Error: 429 {\"error\":{\"type\":\"exceeded_cur"))
+	if got := r.state().K; got != wire.StateWorking {
+		t.Fatalf("an incomplete chunk stopped the turn: %s", got)
+	}
+	r.rt.TerminalOutput("s1", []byte("rent_quota_er"))
+	if got := r.state().K; got != wire.StateWorking {
+		t.Fatalf("an incomplete code stopped the turn: %s", got)
+	}
+	r.rt.TerminalOutput("s1", []byte("ror\"}}\x1b[0m\r\n"))
+	if got := r.state().K; got != wire.StateReady {
+		t.Fatalf("after terminal quota: %s", got)
+	}
+
+	r.line(`"type":"assistant","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Quota exhausted for this account"}]},"error":"rate_limit","isApiErrorMessage":true,"apiErrorStatus":429,"apiErrorIsTransient":false`)
+	r.tick(time.Second)
+	if n := len(r.events(wire.EvTurnFailed)); n != 1 {
+		t.Fatalf("%d turn_failed after PTY and JSONL", n)
+	}
+	interrupts := 0
+	for _, call := range r.pane.calls {
+		if call == "keys:C-c" {
+			interrupts++
+		}
+	}
+	if interrupts != 1 {
+		t.Fatalf("%d interrupts: %v", interrupts, r.pane.calls)
+	}
+}
+
+// The actor reads the pane on the server even when no browser terminal websocket is attached. A provider retry line
+// found by that look ends the turn through the same detector and sends one interrupt.
+func TestTerminalQuotaIsDetectedFromTheServerPaneWithoutABrowser(t *testing.T) {
+	r := newRig(t)
+	r.working("big job")
+	r.pane.screen = "✻ 429 You've reached your 5-hour usage limit. Your quota will reset when the current window ends. · Retrying in 23s · attempt 9/10"
+	r.tick(time.Second)
+
+	if got := r.state().K; got != wire.StateReady {
+		t.Fatalf("after server-side pane quota: %s", got)
+	}
+	if got := r.record().TerminalFailure; got == nil || got.Kind != wire.FailureQuotaExhausted || !got.NeedsTarget {
+		t.Fatalf("terminal failure marker: %+v", got)
+	}
+	interrupts := 0
+	for _, call := range r.pane.calls {
+		if call == "keys:C-c" {
+			interrupts++
+		}
+	}
+	if interrupts != 1 {
+		t.Fatalf("%d interrupts: %v", interrupts, r.pane.calls)
+	}
+}
+
 // typedLines are the texts typed into the pane since from.
 func (r *rig) typedLines(from int) []string {
 	var out []string

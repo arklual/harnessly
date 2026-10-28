@@ -119,10 +119,12 @@ export interface IFeedProps extends THandlers {
   waiting?: { agents: readonly BackgroundTask[]; onOpen: () => void } | null;
   /** The chat's terminal was ended and nothing runs it since: what the quiet line at the bottom says. */
   terminalStop?: string | null;
-  /** The chat's goal was reached: the divider after the last turn says what it was. */
-  goalReached?: string | null;
+  /** The chat's goal was reached: the divider after the last turn says what it was and can resume it. */
+  goalReached?: { text: string; onContinue: () => Promise<unknown> } | null;
   /** The card of a chat held on its usage limit, under the last turn; draws nothing when the chat is not held. */
   limit?: ReactNode;
+  /** A terminal provider failure which waits for a person's target choice. */
+  terminalFailure?: ReactNode;
   refs?: Readonly<Record<string, RefInfo>>;
   /** A model's id as people say it, for the lines of changed models. */
   modelLabel?: (id: string) => string;
@@ -131,8 +133,12 @@ export interface IFeedProps extends THandlers {
   onOpenFile?: (path: string) => void;
   /** A thing a turn made (a page, a design, a document, a merge request, a stand), in the right pane. */
   onOpenOutput?: (output: TurnOutput) => void;
+  /** A document file of a turn, shared (the dialog is the host's). */
+  onShareFile?: (path: string) => void;
   /** Which kinds of what a turn made get a card (Settings); everything but the plain files when not given. */
   shown?: TShownKinds;
+  /** Where a file the agent handed over is saved from. */
+  downloadUrl?: (path: string) => string;
   /** The chat the chips ask where a merge request opens; without it they ask nothing. */
   /** What stands over the bottom of the feed: questions, queue, composer. */
   dock?: ReactNode;
@@ -594,13 +600,16 @@ const Feed = (props: IFeedProps) => {
   );
 
   const shown = props.shown ?? SHOWN_BY_DEFAULT;
+  const canShare = props.onShareFile !== undefined;
   const outputsContext = useMemo<IOutputsContext>(
     () => ({
       shown,
       onOpen: (output) => latest.current.onOpenOutput?.(output),
       onOpenFile: (path) => latest.current.onOpenFile?.(path),
+      downloadUrl: (path) => latest.current.downloadUrl?.(path) ?? '',
+      onShareFile: canShare ? (path) => latest.current.onShareFile?.(path) : undefined,
     }),
-    [shown],
+    [shown, canShare],
   );
 
   const docs = useMemo(() => docPathsOf(items ?? []), [items]);
@@ -676,10 +685,11 @@ const Feed = (props: IFeedProps) => {
                     )}
                   {goalReached !== null && (
                     <div className="hx-turnwrap">
-                      <GoalNote text={goalReached} />
+                      <GoalNote text={goalReached.text} onContinue={goalReached.onContinue} />
                     </div>
                   )}
                   {props.limit}
+                  {props.terminalFailure}
                   {terminalStop !== null && (
                     <div className="hx-turnwrap">
                       <TerminalStopNote text={terminalStop} />

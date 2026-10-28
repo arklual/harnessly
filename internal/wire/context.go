@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // The agent's window: Claude's usual one, and the long one ([1m]) a model may run with.
@@ -45,7 +45,7 @@ func (s *Server) context(ctx context.Context, w http.ResponseWriter, r *http.Req
 	case err != nil && ctx.Err() != nil:
 		refuse(w, RefuseTimeout)
 	case err != nil:
-		agent.Log("warn", "v2: context failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: context failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		s.writeChecked(w, r, out)

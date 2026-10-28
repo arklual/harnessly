@@ -1,0 +1,38 @@
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.311
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mHaiku 5.5 · Claude Max[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/…/scratchpad/rm[39m
+[38;5;220m⚠[39m [38;5;220m9 MCP servers need authentication[38;5;246m · run /mcp[39m
+[38;5;246m[48;5;237m❯ [38;5;231mRun exactly this bash command, nothing else: cd [39m
+  [38;5;231m/tmp/claude-995/-var-lib-example-ai-profiles-sergey-projects[39m
+  [38;5;231m/37e6e6ec-765c-4a13-bd6b-d7b85c6c4365/scratchpad/rm && rm -f[39m
+  [38;5;231mfood/* && sed -i "s/^Q=.*/Q={'tapas':'tapas bar Barcelona [39m
+  [38;5;231mcounter','vermut':'vermut Barcelona'}/" /dev/null && timeout[39m
+  [38;5;231m200 python3 -I -c pass[39m
+[38;5;246m[49m [39m Running the exact user-specified command chain
+[38;5;246m  ⎿  $ rm -f food/* && sed -i "s/^Q=.*/Q={'tapas':'tapas bar [39m
+     [38;5;246mBarcelona counter','vermut':'vermut Barcelona'}/" [39m
+     [38;5;246m/dev/null && timeout 200 python3 -I -c pass[39m
+[38;5;153m───────────────────────────────────────────────────────────────
+[39m [1m[38;5;153mBash command[0m
+ [1mTip: auto mode handles these prompts for you — choose "switch[0m
+ [1mto auto mode" below[0m
+ [38;5;246mRun the exact user-specified command chain[39m
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m [2m│[0m rm -f food/* && sed -i "s/^Q=.*/Q={'tapas':'tapas bar
+ [2m│[0m Barcelona counter','vermut':'vermut Barcelona'}/" /dev/null
+ [2m│[0m && timeout 200 python3 -I -c pass
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m [2m│[0m Glob patterns are not allowed in write operations. Please
+ [2m│[0m specify an exact file path.
+ Do you want to proceed?
+ [38;5;153m❯[39m [38;5;246m1. [38;5;153mYes[39m
+   [38;5;246m2. [39mYes, and don't ask again for [1mrm -f food/*, "sed -i [0m
+      [1m\"s/^Q=.*/Q={'tapas':'tapas bar Barcelona [0m
+      [1mcounter','vermut':'vermut Barcelona'}/\" /dev/null"[0m, and
+      [1mtimeout 200 python3 -I -c pass[0m commands in
+      [1m/tmp/claude-995/-var-lib-example-ai-profiles-sergey-proje
+[0m      [1mcts/37e6e6ec-765c-4a13-bd6b-d7b85c6c4365/scratchpad/rm[0m
+   [38;5;246m3. [39mYes, and switch to auto mode[38;5;246m · auto mode handles these [39m
+      [38;5;246mprompts for you[39m
+   [38;5;246m4. [39mNo
+ [38;5;246mEsc to cancel · Tab to amend[39m

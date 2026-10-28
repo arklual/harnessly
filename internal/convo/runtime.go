@@ -19,6 +19,9 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agentstate"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/outbox"
+	"github.com/ly-solutions/harnessly/internal/terminalfailure"
 	"github.com/ly-solutions/harnessly/internal/typist"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -224,6 +227,7 @@ func (r *Runtime) restore(f convFile) {
 		rec.SeenAt = rec.LastActivityAt
 	}
 	c := newConv(&r.d, rec)
+	c.handoffArtifact, c.handoffArtifactClientID = f.HandoffArtifact, f.HandoffArtifactClientID
 	c.deletedAt = f.DeletedAt
 	c.rewinds, c.left = f.Rewinds, f.Left
 	c.rec.Rewinds = c.marks()
@@ -249,7 +253,14 @@ func (c *conv) restarted(now time.Time) {
 		c.rec.PendingModel = &again
 	}
 	was := c.rec.State
-	c.input(agentstate.Input{K: agentstate.Restart}, now)
+	// A failed first launch has no process or transcript to rediscover after a
+	// runtime restart. Keep that state so the persisted, paused first prompt can
+	// still be retried through freshLaunch. Turning it into unknown strands the
+	// prompt: there is neither a session to observe nor a failed-launch state to
+	// launch anew from.
+	if was.K != wire.StateLaunchFailed || c.rec.AgentSessionID != "" || c.rec.TranscriptPath != "" {
+		c.input(agentstate.Input{K: agentstate.Restart}, now)
+	}
 	c.cutAtRestart(was, now)
 	c.feedUpdate(c.fd.Load(), false, now)
 	for _, m := range c.box.Messages(now) {
@@ -534,6 +545,28 @@ func (r *Runtime) ConvOfSession(session string) string {
 	return r.bySession[session]
 }
 
+// TerminalOutput gives the conversation the bytes its agent printed to its PTY. Unknown sessions are ignored.
+func (r *Runtime) TerminalOutput(session string, data []byte) {
+	r.mu.Lock()
+	id := r.bySession[session]
+	a := r.actors[id]
+	r.mu.Unlock()
+	if a == nil || len(data) == 0 {
+		return
+	}
+	chunk := append([]byte(nil), data...)
+	_ = r.on(a, func(c *conv, now time.Time) {
+		if c.terminalFailures == nil {
+			c.terminalFailures = terminalfailure.NewDetector()
+		}
+		failure, ok := c.terminalFailures.Write(chunk)
+		if !ok {
+			return
+		}
+		c.failTerminal(c.fd.OpenTurn(), string(failure.Kind), failure.Detail, now)
+	})
+}
+
 // Attach names the tmux session and the transcript of a conversation once the launcher knows them. What it is not
 // told ("" for the transcript or the agent's session) stays as it was.
 func (r *Runtime) Attach(id, session, transcriptPath, agentSessionID string) error {
@@ -570,7 +603,8 @@ func (r *Runtime) Attach(id, session, transcriptPath, agentSessionID string) err
 
 func (c *conv) file() convFile {
 	return convFile{Conv: c.rec, Session: c.rec.Session, TranscriptPath: c.rec.TranscriptPath,
-		AgentSessionID: c.rec.AgentSessionID, Outbox: c.box.State(), Questions: c.questions(), Permissions: c.permissions(),
+		AgentSessionID: c.rec.AgentSessionID, HandoffArtifact: c.handoffArtifact,
+		HandoffArtifactClientID: c.handoffArtifactClientID, Outbox: c.box.State(), Questions: c.questions(), Permissions: c.permissions(),
 		DeletedAt: c.deletedAt, Rewinds: c.rewinds, Left: c.left}
 }
 
@@ -1216,7 +1250,7 @@ func (r *Runtime) create(m wire.ConversationCreateCmd) wire.CmdResult {
 	if t := strings.TrimSpace(m.Title); t != "" {
 		rec.Title, rec.TitleSource = t, wire.TitleFromUser
 	}
-	return r.openConv(rec, LaunchRequest{Cwd: cwd, Provider: m.Provider, Model: m.Model}, m.First)
+	return r.openConv(rec, LaunchRequest{Cwd: cwd, Provider: m.Provider, Model: m.Model}, m.First, false, "")
 }
 
 // onProfile is the model a conversation starts with: model, with the profile on it when one is named. The profile has to
@@ -1256,8 +1290,15 @@ func (r *Runtime) onProfile(p wire.Provider, model *wire.Model, profile string) 
 // openConv adds a conversation and asks the launcher for its agent: a fresh one whose first message (first, when
 // given) waits in the queue as queued{launching} and goes with the launch, or one resumed on a session it kept, whose
 // history the feed shows at once.
-func (r *Runtime) openConv(rec wire.Conversation, req LaunchRequest, first *wire.FirstMessage) wire.CmdResult {
+func (r *Runtime) openConv(rec wire.Conversation, req LaunchRequest, first *wire.FirstMessage, requireCarry bool, handoffArtifact string) wire.CmdResult {
+	if requireCarry && (first == nil || strings.TrimSpace(first.Text) == "" || jscompat.Len(first.Text) > outbox.MaxCarriedText ||
+		len(first.AttachmentIDs) > 0) {
+		return wire.Refused(wire.RefuseInternal)
+	}
 	c := newConv(&r.d, rec)
+	if handoffArtifact != "" && first != nil {
+		c.handoffArtifact, c.handoffArtifactClientID = handoffArtifact, first.ClientID
+	}
 	r.add(c)
 	id := rec.ID
 	req.ID = id
@@ -1367,7 +1408,7 @@ func (r *Runtime) resumeSession(m wire.ConversationResumeCmd) wire.CmdResult {
 	}
 	r.mu.Unlock()
 	return r.openConv(rec, LaunchRequest{Cwd: cwd, Provider: m.Provider, ResumeSessionID: m.SessionID,
-		TranscriptPath: s.TranscriptPath}, nil)
+		TranscriptPath: s.TranscriptPath}, nil, false, "")
 }
 
 // annotationRE is a note on a design's page as a message carries it (web/app/next/features/designly/annotation.ts):

@@ -21,12 +21,13 @@ describe('the goal bar', () => {
     expect(screen.getByRole('status').textContent).toContain('Goal paused: Ship it');
   });
 
-  it('keeps a met goal as a line the person hides', () => {
-    render(<GoalBar goal={{ text: 'Ship it', status: 'met', since: 1 }} onStop={vi.fn()} />);
-    expect(screen.getByRole('status').textContent).toContain('Goal reached: Ship it');
-    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
-    expect(screen.queryByRole('status')?.dataset.state ?? 'closing').toBe('closing');
+  it('keeps a met goal out of the composer after a remount', () => {
+    const goal = { text: 'Ship it', status: 'met', since: 1 } as const;
+    const first = render(<GoalBar goal={goal} onStop={vi.fn()} />);
+    expect(screen.queryByRole('status')).toBeNull();
+    first.unmount();
+    render(<GoalBar goal={goal} onStop={vi.fn()} />);
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('draws nothing without a goal', () => {

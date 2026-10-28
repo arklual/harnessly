@@ -1276,6 +1276,10 @@ html:has(.hx-app) body {
   .hx-app[data-drawer='open'] .hx-scrim {
     pointer-events: auto;
   }
+  /* Black on a dark window dims little: the drawer's backdrop is heavier there, so the window behind reads as shut. */
+  .dark .hx-scrim {
+    background: rgba(0, 0, 0, 0.62);
+  }
   .hx-app[data-ddrag] :is(.hx-sidebar, .hx-scrim) {
     transition: none;
   }

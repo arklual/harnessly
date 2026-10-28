@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -311,7 +312,7 @@ func (a *API) Continue(r *http.Request, resolveCwd func(string, []string) (strin
 	if Has(body, "prompt") && (!isPrompt || jscompat.Len(prompt) > 12000) {
 		return JSON(r, 400, errorBody(locale.Pick("The task is too long", "Задача слишком длинная")), h)
 	}
-	res := a.StartProjectDialog(id, prompt, resolveCwd)
+	res := a.StartProjectDialog(id, prompt, "", resolveCwd)
 	if res.TabID == "" {
 		return JSON(r, res.Status, errorBody(res.Error), h)
 	}
@@ -368,6 +369,9 @@ func (a *API) CLIDesign(r *http.Request) Answer {
 			Artifact string         `json:"artifact"`
 			Entries  []LiveLogEntry `json:"entries"`
 		}{id, a.L.LiveLog(id)}, h)
+	}
+	if r.Method == http.MethodGet && (len(q["timeline"]) == 1 || len(q["moment"]) == 1) {
+		return a.cliTimeline(r, q, h)
 	}
 	if r.Method == http.MethodGet && len(q["state"]) == 1 {
 		id := q["state"][0]
@@ -587,7 +591,7 @@ func (a *API) Create(r *http.Request, resolveCwd func(string, []string) (string,
 		return JSON(r, 500, errorBody(locale.Pick("Could not create the project", "Не удалось создать проект")), h)
 	}
 	a.L.AnnounceNew(project.ID)
-	res := a.StartProjectDialog(project.ID, a.L.NewProjectPrompt(project.Title, brief)+"\n\n"+a.L.PagesHint(project.ID), resolveCwd)
+	res := a.StartProjectDialog(project.ID, brief, a.L.NewProjectPrompt(project.Title, WordsAbove())+"\n\n"+a.L.PagesHint(project.ID), resolveCwd)
 	if res.TabID == "" {
 		return JSON(r, res.Status, struct {
 			Error string `json:"error"`
@@ -599,4 +603,51 @@ func (a *API) Create(r *http.Request, resolveCwd func(string, []string) (string,
 		Title string `json:"title"`
 		TabID string `json:"tabId"`
 	}{project.ID, project.Title, res.TabID}, h)
+}
+
+// cliTimeline answers ?timeline=<id>&from=&to= (the events between two times, ms) and ?moment=<id>&at=&window= (the
+// events around a time and the state before it): what the agent reads with `design timeline` and `design moment`.
+func (a *API) cliTimeline(r *http.Request, q map[string][]string, h http.Header) Answer {
+	id := ""
+	if len(q["moment"]) == 1 {
+		id = q["moment"][0]
+	} else {
+		id = q["timeline"][0]
+	}
+	if !IsLibraryID(id) {
+		return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), h)
+	}
+	if no := a.gate(r, id, RoleView); no != nil {
+		return *no
+	}
+	number := func(name string) (int64, bool) {
+		if len(q[name]) != 1 {
+			return 0, true
+		}
+		n, err := strconv.ParseInt(q[name][0], 10, 64)
+		return n, err == nil && n >= 0
+	}
+	if len(q["moment"]) == 1 {
+		at, okAt := number("at")
+		window, okWin := number("window")
+		if !okAt || !okWin || at == 0 {
+			return JSON(r, 400, errorBody(locale.Pick("A moment needs at= in milliseconds", "Для момента нужно at= в миллисекундах")), h)
+		}
+		if window == 0 {
+			window = 5000
+		}
+		return JSON(r, 200, struct {
+			Artifact string `json:"artifact"`
+			Moment
+		}{id, a.L.MomentAt(id, at, window)}, h)
+	}
+	from, okFrom := number("from")
+	to, okTo := number("to")
+	if !okFrom || !okTo {
+		return JSON(r, 400, errorBody(locale.Pick("from and to are milliseconds", "from и to задаются в миллисекундах")), h)
+	}
+	return JSON(r, 200, struct {
+		Artifact string          `json:"artifact"`
+		Events   []TimelineEvent `json:"events"`
+	}{id, a.L.Timeline(id, from, to)}, h)
 }

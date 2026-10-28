@@ -14,8 +14,9 @@
   "next.goal.since": "set {when}",
   "next.goalBar.active": "Goal:",
   "next.goalBar.paused": "Goal paused:",
-  "next.goalBar.met": "Goal reached:",
   "next.goalBar.stop": "Stop",
-  "next.goalBar.hide": "Hide",
-  "next.goalBar.reached": "Goal reached: {goal}"
+  "next.goalBar.reached": "Goal reached: {goal}",
+  "next.goalBar.continue": "Continue",
+  "next.goalBar.retry": "Retry",
+  "next.goalBar.continueFailed": "Could not continue the goal"
 }

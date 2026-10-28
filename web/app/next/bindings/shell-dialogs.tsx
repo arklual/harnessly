@@ -7,12 +7,12 @@ import { loadSessions } from '@/next/commands/pages';
 import NewProjectDialog from '@/next/features/sidebar/new-project-dialog';
 import ResumeDialog, { type IResumeSession } from '@/next/features/shell/resume-dialog';
 import type { AgentSession, ConvId, MachineId } from '@/next/protocol/v2';
-import { plural } from '@/next/i18n';
+import { plural, t } from '@/next/i18n';
 
 const sessionOf = (session: AgentSession, machine: string): IResumeSession => ({
   id: session.sessionId,
   provider: session.provider,
-  first: session.title,
+  first: session.title || t('next.shellData.untitled'),
   last: plural(session.turns, 'next.resume.turns'),
   dir: session.cwd,
   branch: null,

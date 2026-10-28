@@ -1,6 +1,7 @@
 // The pane's own tabs of a chat, and where a request to show something (the agent's `open`, what the runtime saw it
 // work on) puts it among them. Pure: the binding (right-pane.tsx) keeps the state and runs the effects.
 import { parseAddress, type IAddress } from '@/next/features/pane/address';
+import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
 import type { IPaneRequest, TLegacyKind } from '@/next/features/pane/intents';
 
 export type TTab =
@@ -101,6 +102,16 @@ const placeBrowser = (
 
 const placeFiles = (state: IPaneTabs, target: string | null, ctx: IPlaceContext): IPlaced => {
   const rel = target === null ? '' : inFolder(ctx.cwd, target);
+  // A file the agent handed over lies where it was made, maybe outside the chat's folder: it has its own view here.
+  if (rel === null && target !== null && deliveredViewOf(target) !== null) {
+    const have = state.tabs.find((x) => x.kind === 'files' && x.path === target);
+    if (have) return { next: front(state, have.id, ctx.busy), effect: null, show: true };
+    return {
+      next: added(state, { id: ctx.nextId(), kind: 'files', path: target, file: true }, ctx.busy),
+      effect: null,
+      show: true,
+    };
+  }
   // A file outside the chat's folder is Legacy's to show: the pane's own files tab reads only the folder.
   if (rel === null)
     return {

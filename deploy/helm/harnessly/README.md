@@ -13,7 +13,7 @@ helm install ada deploy/helm/harnessly \
   --set 'ingress.hosts[0].paths[0].path=/'
 ```
 
-The first visit sets the page's password. The default image has no agent CLIs: build the Dockerfile's `with-agents`
+The runtime prints a one-time initial password in its log (grep the pod's log for `password`, or set `INIT_PASSWORD`); the first visit signs in with it and sets the page's password. The default image has no agent CLIs: build the Dockerfile's `with-agents`
 target (Claude Code and Codex from npm) and set `image.repository`, or install them into the home volume from a
 terminal tab (`npm install -g --prefix ~/.local …`, or Claude Code's own installer).
 

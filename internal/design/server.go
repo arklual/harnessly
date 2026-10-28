@@ -301,7 +301,9 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 		if pathname == statePath {
 			l.RecordState(id, searchPtr(q, "s"))
 		} else {
+			// A batch of timeline events (`e`) rides the same request as a log line.
 			l.RecordLiveLog(id, searchPtr(q, "k"), searchPtr(q, "p"), searchPtr(q, "m"))
+			l.RecordTimeline(id, searchPtr(q, "p"), searchPtr(q, "e"))
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(204)
@@ -664,7 +666,13 @@ func (l *Library) serveStatic(w http.ResponseWriter, r *http.Request, file strin
 		return
 	}
 	if compressible[ext] && st.Size() >= gzipMinBytes && takesGzip(r) {
-		packed, err := l.srv.gz.get(file, st)
+		l.mu.Lock()
+		if l.srv == nil {
+			l.srv = &server{}
+		}
+		s := l.srv
+		l.mu.Unlock()
+		packed, err := s.gz.get(file, st)
 		if err == nil {
 			h.Set("Content-Type", typ)
 			h.Set("Content-Encoding", "gzip")
@@ -690,6 +698,61 @@ func (l *Library) serveStatic(w http.ResponseWriter, r *http.Request, file strin
 	_, _ = io.Copy(w, f)
 }
 
+// servePublicStatic is serveStatic for an untrusted public path. It reads only from the handle opened below the
+// project's os.Root, so a path or symlink swap between validation and response cannot change the bytes being served.
+// The gzip cache has a separate namespace and is populated only from that stable handle.
+func (l *Library) servePublicStatic(w http.ResponseWriter, r *http.Request, f *os.File, st os.FileInfo, file, typ, ext, cacheControl string, head bool) bool {
+	if st.Size() < 0 || st.Size() > PublicFileLimit {
+		return false
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return false
+	}
+	version := FileVersion(st)
+	etag := `W/"` + version + `"`
+	h := w.Header()
+	h.Set("ETag", etag)
+	h.Set("Last-Modified", st.ModTime().UTC().Format(http.TimeFormat))
+	h.Set("Cache-Control", cacheControl)
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Add("Vary", "Accept-Encoding")
+	if inm, ok := r.Header["If-None-Match"]; ok && strings.Join(inm, ", ") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+	if compressible[ext] && st.Size() >= gzipMinBytes && takesGzip(r) {
+		l.mu.Lock()
+		if l.srv == nil {
+			l.srv = &server{}
+		}
+		s := l.srv
+		l.mu.Unlock()
+		packed, err := s.gz.getWith("public-open\n"+file, st, func() ([]byte, error) {
+			return readPublicFile(f, PublicFileLimit)
+		})
+		if err == nil {
+			h.Set("Content-Type", typ)
+			h.Set("Content-Encoding", "gzip")
+			h.Set("Content-Length", strconv.Itoa(len(packed)))
+			w.WriteHeader(http.StatusOK)
+			if !head {
+				_, _ = w.Write(packed)
+			}
+			return true
+		}
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return false
+	}
+	h.Set("Content-Type", typ)
+	h.Set("Content-Length", strconv.FormatInt(st.Size(), 10))
+	w.WriteHeader(http.StatusOK)
+	if !head {
+		_, _ = io.CopyN(w, f, st.Size())
+	}
+	return true
+}
+
 // gzipCache keeps the compressed copy of a text asset by path, time and size, the least recently used dropped first.
 type gzipCache struct {
 	mu    sync.Mutex
@@ -704,6 +767,10 @@ type gzEntry struct {
 }
 
 func (c *gzipCache) get(file string, st os.FileInfo) ([]byte, error) {
+	return c.getWith(file, st, func() ([]byte, error) { return os.ReadFile(file) })
+}
+
+func (c *gzipCache) getWith(file string, st os.FileInfo, load func() ([]byte, error)) ([]byte, error) {
 	key := file + "\n" + strconv.FormatInt(st.ModTime().UnixNano(), 10) + "\n" + strconv.FormatInt(st.Size(), 10)
 	c.mu.Lock()
 	if c.items == nil {
@@ -716,7 +783,7 @@ func (c *gzipCache) get(file string, st os.FileInfo) ([]byte, error) {
 		return data, nil
 	}
 	c.mu.Unlock()
-	raw, err := os.ReadFile(file)
+	raw, err := load()
 	if err != nil {
 		return nil, err
 	}

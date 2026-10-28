@@ -181,6 +181,7 @@ func (l *Library) setAccess(s AccessSnapshot) error {
 	l.mu.Lock()
 	l.access.snap, l.access.have = s, true
 	l.mu.Unlock()
+	l.BackfillOwners(s)
 	file := l.accessPath()
 	if file == "" {
 		return nil

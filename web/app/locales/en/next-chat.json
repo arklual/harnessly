@@ -80,6 +80,7 @@
   "next.outputs.changed": "updated",
   "next.files.edited": "changed",
   "next.files.read": "read",
+  "next.gate.autoDeny": "Claude will deny it by itself in {time}",
   "next.gate.closedChat": "You chose to answer in the chat",
   "next.gate.refused": "Could not match the request on the screen — decide in the terminal",
   "next.gate.openTerminal": "Open the terminal",
@@ -164,7 +165,9 @@
   "next.queue.sendNow": "Send now",
   "next.queue.paused": "paused",
   "next.queue.pausedLaunch": "the agent did not start",
+  "next.queue.pausedBusy": "the machine is overloaded · the agent did not start",
   "next.queue.pausedGone": "the agent is gone",
+  "next.queue.pausedTarget": "waiting for another target",
   "next.queue.moveFailed": "Could not change the order",
   "next.queue.reorder": "Drag to change the order",
   "next.queue.remove": "Remove from the queue",
@@ -449,6 +452,9 @@
   "next.limit.cancel": "Don't continue",
   "next.limit.autoAt": "Continue {at}",
   "next.limit.failed": "It did not work. Try again",
+  "next.terminalFailure.quota.title": "Provider quota exhausted",
+  "next.terminalFailure.quota.lead": "This turn stopped. Choose another available model or profile to continue manually.",
+  "next.terminalFailure.choose": "Choose another model",
   "next.auto.limit.done": "Continued after the limit reset",
   "next.auto.restart.done": "Interrupted by a restart · continued by itself",
   "next.auto.limit.pending": "Limit reset · continuing…",
@@ -456,5 +462,8 @@
   "next.composer.placeholderLimited": "Will send when the limit resets {at}",
   "next.composer.placeholderLimitedUnknown": "Will send when the limit resets",
   "next.dockBar.keyGone": "The {vendor} key was removed — add it in Models and keys or continue in another model",
-  "next.dockBar.keyOpen": "Models and keys"
+  "next.dockBar.keyOpen": "Models and keys",
+  "next.outputs.kind.delivery": "File",
+  "next.delivered.save": "Download",
+  "next.dockBar.off": "The machine is off — a message cannot be sent"
 }

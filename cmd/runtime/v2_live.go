@@ -18,6 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/design"
+	"github.com/ly-solutions/harnessly/internal/handoff"
 	"github.com/ly-solutions/harnessly/internal/launch"
 	"github.com/ly-solutions/harnessly/internal/limits"
 	"github.com/ly-solutions/harnessly/internal/locale"
@@ -30,6 +31,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/sessionmeta"
 	"github.com/ly-solutions/harnessly/internal/shots"
 	"github.com/ly-solutions/harnessly/internal/state"
+	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/voice"
 	"github.com/ly-solutions/harnessly/internal/wire"
 	"github.com/ly-solutions/harnessly/internal/workflows"
@@ -73,6 +75,10 @@ type attachedAs struct{ transcript, agentSession string }
 
 func newV2Live(d deps, c *core) *v2Live {
 	v := &v2Live{c: c, d: d, kick: make(chan struct{}, 1), attached: map[string]attachedAs{}}
+	handoffs, err := handoff.NewArtifactStore(d.DataDir)
+	if err != nil {
+		agent.Log("warn", "v2: handoff artifacts are unavailable", agent.F{K: "error", V: err.Error()})
+	}
 	version := env("AGENT_VERSION", agent.BuildVersion)
 	features := slices.Clone(v2Features)
 	if c.cfg.Term != nil && c.cfg.Tmux != nil {
@@ -105,7 +111,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	features = append(features, wire.FeatureAutoContinue)
 	// Dictation is announced when this machine is set up for it at start: ffmpeg and the recognition service's socket.
 	var dictation *voice.Server
-	if dv := newVoice(); dv.Available() {
+	if dv := newVoice(d.DataDir); dv.Available() {
 		dictation = dv
 		features = append(features, wire.FeatureVoice)
 	}
@@ -117,7 +123,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.machine = newLiveMachine(v2Machine, version, features, d.DataDir, func() int { return v.rt.Busy() }, c.preflight, c.v2Models)
 	v.machine.offers = profileOffers(v.profiles)
 	v.hub = wire.NewHub(v.machine)
-	v.tm = &v2Tmux{tm: c.cfg.Tmux}
+	v.tm = &v2Tmux{tm: c.cfg.Tmux, guard: chatGuard}
 	v.starter = &v2Launcher{v: v}
 	uploads := &wire.Uploads{Dir: filepath.Join(d.DataDir, "v2", "uploads"), Limits: wire.DefaultLimits}
 	ses := newV2Sessions(d.Home, func() map[string]string { return v.rt.AttachedSessions() })
@@ -140,11 +146,13 @@ func newV2Live(d deps, c *core) *v2Live {
 			return v.rt.ChatDigest(ctx, conv, budget)
 		}
 	}
-	v.rt = convo.New(convo.Deps{Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter,
-		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir}, Titler: newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")).Title, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
+	moveStore := openMoveStore(d)
+	v.rt = convo.New(convo.Deps{Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Handoffs: handoffs,
+		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir}, Titler: newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"), agentEnvDir(d.DataDir)).Title, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
-		Rewinder: v2Rewinder{c},
-		Window:   v2Window(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),
+		TerminalOff: chatGuard.Off,
+		Rewinder:    v2Rewinder{c},
+		Window:      v2Window(&history.Stats{Dir: filepath.Join(d.DataDir, "session-stats")}),
 		AutoContinue: func() (bool, bool) {
 			s := runtimeSettings.RuntimeSettings()
 			return s.LimitContinue != wire.Off, s.RestartContinue != wire.Off
@@ -163,11 +171,16 @@ func newV2Live(d deps, c *core) *v2Live {
 	if dictation != nil {
 		v.srv.Voice = v2Voice(dictation)
 	}
-	sc := &v2SideChat{record: v.rt.Record, home: d.Home, runtimeFile: os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")}
+	sc := &v2SideChat{record: v.rt.Record, home: d.Home, runtimeFile: os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"), envDir: agentEnvDir(d.DataDir)}
 	if c.cfg.Tmux != nil {
 		sc.cwdOf = func(session string) string { return machine.SessionDir(c.cfg.Tmux, session) }
 	}
 	v.srv.SideChat = sc.Serve
+	if c.launcher != nil && c.agents != nil {
+		if svc := newV2Move(d, v.rt, v.machine, moveStore); svc != nil {
+			v.srv.Move = svc.Handler()
+		}
+	}
 	v.srv.HandoffDraft = (&v2Handoff{rt: v.rt, runtimeFile: os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")}).Draft
 	v.srv.Files = &v2Files{record: v.rt.Record, touched: v.rt.Touched}
 	v.srv.Tasks = v.rt.Tasks
@@ -613,6 +626,12 @@ func (l *v2Launcher) start(req convo.LaunchRequest, chosen *agents.Launch, promp
 		reason := wire.LaunchFailedNoSession
 		if !res.OK && res.Status == http.StatusConflict {
 			reason = wire.LaunchFailedCliMissing
+		}
+		var slow *tmux.SlowError
+		if errors.As(err, &slow) {
+			reason = wire.LaunchFailedMachineBusy
+			agent.Log("warn", "v2: tmux too slow to start the agent", agent.F{K: "conversation", V: req.ID},
+				agent.F{K: "command", V: slow.Command}, agent.F{K: "ms", V: slow.After.Milliseconds()})
 		}
 		msg := ""
 		if err != nil {

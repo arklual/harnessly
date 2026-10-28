@@ -8,6 +8,8 @@ import '@/next/styles/icons.css';
 import '@/next/styles/ui.css';
 import '@/next/styles/shell.css';
 import '@/next/styles/guest.css';
+import '@/next/styles/deck.css';
+import '@/next/styles/deck-media.css';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

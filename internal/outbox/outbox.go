@@ -112,6 +112,9 @@ type Record struct {
 	recheck   bool
 	// Carried: the message goes with the launch of the agent as its first prompt, never typed.
 	Carried bool `json:"carried"`
+	// First: the launch chose this message as its first prompt. If that launch fails, it stays ahead of later urgent
+	// messages until a retry carries it again; its public mode remains the mode the person sent (normally queue).
+	First bool `json:"first,omitempty"`
 	// Stalled: typed, and the agent did not take it within wire.ConfirmDeadline. It waits at the head of the line for
 	// the person (retry, promote, cancel) and is not typed again by itself. ClearBox: its text may still be in the
 	// agent's input box and is to be taken out of it at the next look, so no late Enter sends it behind our back.
@@ -326,6 +329,9 @@ func urgency(m wire.MessageMode) int {
 // two steers go in the order they were sent (Claude reads what is typed into its queue in order, too).
 func (b *Box) pushUrgent(id string, mode wire.MessageMode) {
 	at := 0
+	for at < len(b.items) && b.recs[b.items[at]].First {
+		at++
+	}
 	for at < len(b.items) && urgency(b.recs[b.items[at]].Message.Mode) <= urgency(mode) {
 		at++
 	}
@@ -487,7 +493,7 @@ func (b *Box) Carry(clientID string, now time.Time) (Change, bool) {
 	}
 	b.dropItem(clientID)
 	b.flight, b.typing = clientID, false
-	r.TypedOffset, r.TypedAt, r.Submitted, r.Carried = 0, now.UnixMilli(), false, true
+	r.TypedOffset, r.TypedAt, r.Submitted, r.Carried, r.First = 0, now.UnixMilli(), false, true, true
 	r.Rechecks, r.RecheckAt = maxRechecks, 0
 	b.set(&ch, r, wire.MessageState{K: wire.MsgInInput, Wait: wait(r.TypedAt, CarryDeadline)}, now)
 	ch.add(wire.QueueChangedEv{Queue: b.Queue()})

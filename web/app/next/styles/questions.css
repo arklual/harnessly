@@ -595,6 +595,15 @@
   color: var(--hx-fg-3);
   animation: hx-sk-in 220ms ease backwards;
 }
+.hx-gate__autodeny {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  font-variant-numeric: tabular-nums;
+}
 .hx-gate__refused {
   display: flex;
   align-items: center;
@@ -684,6 +693,7 @@
   }
   .hx-gate .hx-segmented {
     align-self: stretch;
+    width: 100%;
   }
   .hx-gate .hx-segmented > button {
     flex: 1;

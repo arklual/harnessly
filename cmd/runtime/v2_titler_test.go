@@ -27,7 +27,7 @@ func TestCleanTitleTakesTheTitleOutOfWhatTheAgentSaid(t *testing.T) {
 }
 
 func TestTitlerAsksOnceWithTheFirstExchangeAndCleansTheAnswer(t *testing.T) {
-	tt := newV2Titler("")
+	tt := newV2Titler("", "")
 	var prompt string
 	tt.run = func(_ context.Context, p wire.Provider, pr string) (string, error) {
 		prompt = pr

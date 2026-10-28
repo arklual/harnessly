@@ -123,6 +123,21 @@ export function applyConvEvent(machine: MachineId, conv: ConvId, e: ConvEvent): 
     case 'turn_failed':
       applyTurn(conv, e.turn);
       return;
+    case 'quota_exhausted':
+      conversationsStore.patch(conv, (c) => {
+        if (!c) return c;
+        const before = c.terminalFailure;
+        if (
+          before?.kind === e.failure.kind &&
+          before.at === e.failure.at &&
+          before.detail === e.failure.detail &&
+          before.terminal === e.failure.terminal &&
+          before.needsTarget === e.failure.needsTarget
+        )
+          return c;
+        return { ...c, terminalFailure: e.failure };
+      });
+      return;
     case 'step':
       applyStep(conv, e.entry, e.counts);
       noteLastEntry(machine, ch, e.entry.id);

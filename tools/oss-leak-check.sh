@@ -7,7 +7,7 @@
 #    skipped; or OSS_FORBIDDEN, a single regex), case-insensitive, in file contents (binary files too) and file paths. The words belong to the
 #    deployment, so they are passed in and not written here.
 # 2. Secrets: gitleaks over the directory with the tree's own .gitleaks.toml (GITLEAKS names the binary; required).
-# 3. Private network addresses (10/8, 172.16/12, 192.168/16, 100.64/10) other than the example ones tests use, outside
+# 3. Private network addresses (10/8, 172.16/12, 192.168/16, 100.64/10) other than the example ones tests use (and the hub compose network 172.29.40.0/24), outside
 #    minified vendor files. OSS_IP_ALLOW extends the allowed ones (an extended regex of whole addresses).
 # 4. Big files: a binary file over OSS_MAX_BINARY_KB (default 1024) or any file over OSS_MAX_FILE_KB (default 4096).
 set -euo pipefail
@@ -81,7 +81,7 @@ if ! "$gitleaks" dir . "${config[@]}" --no-banner --redact --log-level warn >&2;
 fi
 
 # 3. Private addresses. The allowed ones are the examples of tests and docs: the first hosts of a range, its bounds.
-ip_allow='10\.0\.0\.[0-9]{1,3}|10\.1\.2\.3|10\.[0-9]{1,3}\.0\.[01]|192\.168\.[01]\.[0-9]{1,3}|172\.16\.0\.[0-9]{1,3}|172\.31\.255\.255|100\.64\.0\.[0-9]{1,3}|100\.100\.[0-9]{1,3}\.[0-9]{1,3}|100\.127\.255\.255'
+ip_allow='10\.0\.0\.[0-9]{1,3}|10\.1\.2\.3|10\.[0-9]{1,3}\.0\.[01]|192\.168\.[01]\.[0-9]{1,3}|172\.16\.0\.[0-9]{1,3}|172\.31\.255\.255|172\.29\.40\.[0-9]{1,3}|100\.64\.0\.[0-9]{1,3}|100\.100\.[0-9]{1,3}\.[0-9]{1,3}|100\.127\.255\.255'
 [ -n "${OSS_IP_ALLOW:-}" ] && ip_allow="$ip_allow|$OSS_IP_ALLOW"
 private='(10\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])|192\.168|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7]))\.[0-9]{1,3}\.[0-9]{1,3}'
 mapfile -t ips < <(grep -rIoEn --exclude-dir=.git --exclude='*.min.js' -- "(^|[^0-9.])$private([^0-9.]|$)" . |

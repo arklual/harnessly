@@ -207,7 +207,6 @@
   "next.settings.accounts.signIn": "Subscription",
   "next.settings.accounts.signIn.claude": "Sign in in the machine’s terminal: claude auth login",
   "next.settings.accounts.signIn.codex": "Sign in in the machine’s terminal: codex login",
-  "next.settings.accounts.terminal": "A subscription signs in through the vendor's page, a key is typed here and is not shown after saving. Both are kept on this machine.",
   "next.settings.accounts.where": "Where requests go",
   "next.settings.accounts.direct": "Direct",
   "next.settings.accounts.viaProxy": "Through a proxy",
@@ -282,5 +281,7 @@
   "next.settings.accounts.method.key": "API key",
   "next.settings.accounts.keyHint.claude": "A key from console.anthropic.com, paid from the balance",
   "next.settings.accounts.keyHint.codex": "An OpenAI API key, paid from the balance",
-  "next.settings.accounts.method.console": "API billing"
+  "next.settings.accounts.method.console": "API billing",
+  "next.settings.general.feed.delivery": "Files",
+  "next.settings.general.feed.delivery.hint": "Files the agent handed over"
 }

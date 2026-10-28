@@ -51,6 +51,8 @@ test('a phone picks a Kimi Code model and effort, and Claude launches with both'
   const effort = page.getByRole('slider');
   await expect(effort).toHaveAttribute('aria-valuetext', 'High');
   await expect(effort.locator('.hx-effort__stop')).toHaveCount(3);
+  await expect(page.locator('.hx-effort__label')).toHaveText(['Low', 'High', 'Maximum']);
+  await expect(page.locator('.hx-effort__label[data-chosen="true"]')).toHaveText('High');
   await expect(effort.getByRole('button', { name: 'Low', exact: true })).toBeVisible();
   await expect(effort.getByRole('button', { name: 'High', exact: true })).toBeVisible();
   await expect(effort.getByRole('button', { name: 'Maximum', exact: true })).toBeVisible();

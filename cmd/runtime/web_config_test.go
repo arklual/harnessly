@@ -26,11 +26,12 @@ func TestPageConfigFromEnv(t *testing.T) {
 		"RUNTIME_LAYOUT_KEY":          "",
 		"RUNTIME_LAUNCH_DEFAULTS_KEY": "",
 		"RUNTIME_DESIGN_NAME":         "",
+		"RUNTIME_HUB_URL":             "",
 	} {
 		t.Setenv(k, v)
 	}
 	c := pageConfigFromEnv()
-	if c.ProductName != "Acme" || c.DesignName != "Designly" || c.Locale != "ru" || c.LayoutKey != "layout" || c.LaunchDefaultsKey != "launchDefaults" {
+	if c.ProductName != "Acme" || c.DesignName != "Sinopia Design" || c.Locale != "ru" || c.LayoutKey != "layout" || c.LaunchDefaultsKey != "launchDefaults" {
 		t.Fatalf("%+v", c)
 	}
 	if c.ArtifactsURL == nil || *c.ArtifactsURL != "https://docs.example.com" || c.BoardsURL == nil || *c.BoardsURL != "https://boards.example.com" {
@@ -51,5 +52,28 @@ func TestPageConfigFromEnv(t *testing.T) {
 	var back map[string]any
 	if err := json.Unmarshal([]byte(html.UnescapeString(pageConfigMeta(c))), &back); err != nil || back["productName"] != "Acme" {
 		t.Fatalf("meta: %v %v", err, back)
+	}
+	// No hub: the key is there and null, as the page reads it.
+	if v, ok := back["hubUrl"]; !ok || v != nil || c.HubURL != nil {
+		t.Fatalf("hubUrl without a hub: %v %v", v, ok)
+	}
+}
+
+func TestPageConfigHubURL(t *testing.T) {
+	for in, want := range map[string]string{"https://hub.example.com": "https://hub.example.com", " https://hub.example.com/ ": "https://hub.example.com",
+		"http://127.0.0.1:18540//": "http://127.0.0.1:18540"} {
+		t.Setenv("RUNTIME_HUB_URL", in)
+		c := pageConfigFromEnv()
+		if c.HubURL == nil || *c.HubURL != want {
+			t.Errorf("%q: %v", in, c.HubURL)
+		}
+		var back map[string]any
+		if err := json.Unmarshal([]byte(html.UnescapeString(pageConfigMeta(c))), &back); err != nil || back["hubUrl"] != want {
+			t.Errorf("%q: meta %v %v", in, err, back["hubUrl"])
+		}
+	}
+	t.Setenv("RUNTIME_HUB_URL", "  ")
+	if c := pageConfigFromEnv(); c.HubURL != nil {
+		t.Errorf("blank: %v", *c.HubURL)
 	}
 }

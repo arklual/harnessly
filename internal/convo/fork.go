@@ -11,6 +11,8 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/feed"
 	"github.com/ly-solutions/harnessly/internal/handoff"
+	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/outbox"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -76,6 +78,24 @@ func (r *Runtime) Excerpt(id string, provider wire.Provider, model, profile stri
 		return wire.HandoffDraft{}, ErrNoTranscript
 	}
 	return wire.HandoffDraft{Mode: wire.DraftExcerpt, Text: text, Tokens: handoff.Tokens(text), Turns: kept}, nil
+}
+
+// History snapshots every complete JSONL record without loading the transcript into the feed or requiring an agent
+// session. The destination id is reserved server-side and recovered from the opaque artifact when it is sent.
+func (r *Runtime) History(id string) (wire.HandoffDraft, error) {
+	rec, ok := r.Record(id)
+	if !ok {
+		return wire.HandoffDraft{}, ErrNotFound
+	}
+	if rec.TranscriptPath == "" || r.d.Handoffs == nil {
+		return wire.HandoffDraft{}, ErrNoTranscript
+	}
+	targetID := "tab-" + newID()
+	artifact, err := r.d.Handoffs.Snapshot(id, rec.TranscriptPath, targetID)
+	if err != nil {
+		return wire.HandoffDraft{}, err
+	}
+	return wire.HandoffDraft{Mode: wire.DraftHistory, Artifact: &artifact}, nil
 }
 
 // budgetFor is the tokens an excerpt for a model may take: by the window of the model, the vendor's own where the model
@@ -178,9 +198,9 @@ func (r *Runtime) fork(m wire.ConversationForkCmd) wire.CmdResult {
 		rec.Origin.Via = wire.ViaExcerpt
 		first := &wire.FirstMessage{ClientID: "fork-" + newID(), Text: handoff.Handoff(fromOf(src), wire.HandoffExcerpt, true, text),
 			AttachmentIDs: []string{}}
-		return r.openConv(rec, req, first)
+		return r.openConv(rec, req, first, false, "")
 	}
-	return r.openConv(rec, req, nil)
+	return r.openConv(rec, req, nil, false, "")
 }
 
 // handoff opens a conversation on another agent or model with the context of one: the text the person approved goes
@@ -200,17 +220,49 @@ func (r *Runtime) handoff(m wire.ConversationHandoffCmd) wire.CmdResult {
 	}
 	m.Model = model
 	now := r.d.Clock.Now()
+	targetID := "tab-" + newID()
+	var artifactPath string
+	if m.Mode == wire.HandoffHistory {
+		if r.d.Handoffs == nil {
+			return wire.Refused(wire.RefuseUnsupported)
+		}
+		var err error
+		targetID, err = r.d.Handoffs.Target(src.ID, m.ArtifactID)
+		if err != nil {
+			return wire.Refused(wire.RefuseNotFound)
+		}
+		artifactPath, _, err = r.d.Handoffs.Claim(src.ID, m.ArtifactID, targetID)
+		if err != nil {
+			return wire.Refused(wire.RefuseNotFound)
+		}
+	}
 	via := wire.ViaExcerpt
 	if m.Mode == wire.HandoffNote {
 		via = wire.ViaNote
+	} else if m.Mode == wire.HandoffHistory {
+		via = wire.ViaHistory
 	}
-	rec := wire.Conversation{ID: "tab-" + newID(), MachineID: r.d.MachineID, ProjectID: src.ProjectID, Cwd: src.Cwd,
+	rec := wire.Conversation{ID: targetID, MachineID: r.d.MachineID, ProjectID: src.ProjectID, Cwd: src.Cwd,
 		Provider: m.Provider, Model: m.Model, Title: src.Title, TitleSource: wire.TitleFromFirstMessage, CreatedAt: ms(now),
 		LastActivityAt: ms(now), LastPromptAt: ms(now), SeenAt: ms(now), State: wire.AgentState{K: wire.StateUnknown, Since: ms(now)},
 		Rev: 1, Origin: &wire.Origin{K: wire.OriginHandoff, FromID: src.ID, FromTitle: src.Title, FromProvider: src.Provider,
 			FromModel: src.Model, Via: via, At: ms(now)}}
-	first := &wire.FirstMessage{ClientID: m.OpID, Text: handoff.Handoff(fromOf(src), m.Mode, false, m.Text), AttachmentIDs: []string{}}
-	return r.openConv(rec, LaunchRequest{Cwd: src.Cwd, Provider: m.Provider, Model: m.Model}, first)
+	firstText := handoff.Handoff(fromOf(src), m.Mode, false, m.Text)
+	if m.Mode == wire.HandoffHistory {
+		firstText = handoff.Bootstrap(fromOf(src), m.Mode, false, artifactPath)
+	} else if jscompat.Len(firstText) > outbox.MaxCarriedText {
+		if r.d.Handoffs == nil {
+			return wire.Refused(wire.RefuseUnsupported)
+		}
+		var err error
+		artifactPath, _, err = r.d.Handoffs.PutText(targetID, m.Text)
+		if err != nil {
+			return wire.Refused(wire.RefuseInternal)
+		}
+		firstText = handoff.Bootstrap(fromOf(src), m.Mode, false, artifactPath)
+	}
+	first := &wire.FirstMessage{ClientID: m.OpID, Text: firstText, AttachmentIDs: []string{}}
+	return r.openConv(rec, LaunchRequest{Cwd: src.Cwd, Provider: m.Provider, Model: m.Model}, first, true, artifactPath)
 }
 
 // merge sends a fork's result into the conversation it came from, as a message of its queue: the answer is that

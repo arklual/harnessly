@@ -2,7 +2,7 @@
 // for the owner also «Правщики могут делиться», «Закрыть доступ всем» (the menu itself asks again before it does) and
 // «Передать владение…» (its own view, with a second step).
 import { useState } from 'react';
-import { revokeAll, setEditorsCanShare } from '@/next/features/designly/access/api';
+import { isDocRef, revokeAll, setEditorsCanShare } from '@/next/features/designly/access/api';
 import { change, type ISectionProps } from '@/next/features/designly/access/section';
 import Icon from '@/next/ui/icon';
 import Popover from '@/next/ui/popover';
@@ -12,14 +12,18 @@ export const SUB_VIEW = { log: 'log', links: 'links', transfer: 'transfer' } as 
 export type TSubView = (typeof SUB_VIEW)[keyof typeof SUB_VIEW];
 
 interface IShareMenuProps extends ISectionProps {
+  /** False where there are no links to set up (a board). */
+  links: boolean;
   onView: (view: TSubView) => void;
 }
 
 const ShareMenu = (props: IShareMenuProps) => {
-  const { project, access, action, onView } = props;
+  const { project, access, action, links, onView } = props;
   const [open, setOpen] = useState(false);
   const [asking, setAsking] = useState(false);
   const owner = access.role === 'owner';
+  // A document has no hand-over and no «close to all» yet: its links are revoked one by one in the link settings.
+  const wholeProject = !isDocRef(project);
   const idle = action.busy === null;
   const label = t('next.access.more');
   const close = () => {
@@ -84,10 +88,12 @@ const ShareMenu = (props: IShareMenuProps) => {
             <Icon name="history" size="sm" className="hx-acc-mi__icon" />
             <span className="hx-acc-mi__text">{t('next.access.history')}</span>
           </button>
-          <button type="button" role="menuitem" className="hx-acc-mi" onClick={() => go(SUB_VIEW.links)}>
-            <Icon name="link" size="sm" className="hx-acc-mi__icon" />
-            <span className="hx-acc-mi__text">{t('next.access.linkSettings')}</span>
-          </button>
+          {links && (
+            <button type="button" role="menuitem" className="hx-acc-mi" onClick={() => go(SUB_VIEW.links)}>
+              <Icon name="link" size="sm" className="hx-acc-mi__icon" />
+              <span className="hx-acc-mi__text">{t('next.access.linkSettings')}</span>
+            </button>
+          )}
           {owner && (
             <>
               <span className="hx-acc-mi__sep" role="separator" />
@@ -107,20 +113,24 @@ const ShareMenu = (props: IShareMenuProps) => {
                   <Icon name="check" size="sm" />
                 </span>
               </button>
-              <span className="hx-acc-mi__sep" role="separator" />
-              <button type="button" role="menuitem" className="hx-acc-mi" onClick={() => setAsking(true)}>
-                <Icon name="ban" size="sm" className="hx-acc-mi__icon" />
-                <span className="hx-acc-mi__text">{t('next.access.revokeAll')}</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="hx-acc-mi"
-                onClick={() => go(SUB_VIEW.transfer)}
-              >
-                <Icon name="arrow-right-left" size="sm" className="hx-acc-mi__icon" />
-                <span className="hx-acc-mi__text">{t('next.access.transferItem')}</span>
-              </button>
+              {wholeProject && (
+                <>
+                  <span className="hx-acc-mi__sep" role="separator" />
+                  <button type="button" role="menuitem" className="hx-acc-mi" onClick={() => setAsking(true)}>
+                    <Icon name="ban" size="sm" className="hx-acc-mi__icon" />
+                    <span className="hx-acc-mi__text">{t('next.access.revokeAll')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="hx-acc-mi"
+                    onClick={() => go(SUB_VIEW.transfer)}
+                  >
+                    <Icon name="arrow-right-left" size="sm" className="hx-acc-mi__icon" />
+                    <span className="hx-acc-mi__text">{t('next.access.transferItem')}</span>
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

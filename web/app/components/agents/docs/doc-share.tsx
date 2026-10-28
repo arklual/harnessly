@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Check, Copy, ExternalLink, Globe, Link2Off, Lock, Share2 } from 'lucide-react';
+import { prefixAppPath } from '@/lib/app-path';
 import { fetchDocAccess, setDocPublic } from '@/lib/doc-threads-client';
 import type { IDocAccess } from '@/types/doc-threads';
 import { t } from '@/lib/i18n';
+import { docRef, type TGuestRights } from '@/next/features/designly/access/api';
+import ShareDialog from '@/next/features/designly/access/share-dialog';
+import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
+import { usePortalContainer } from '@/next/ui/portal';
+import { toast } from '@/next/ui/toast';
+
+const DocShareHost = lazy(() => import('@/components/agents/docs/doc-share-host'));
 
 const COPIED_MS = 1800;
 
@@ -15,11 +23,10 @@ const messageOf = (err: unknown): string =>
   err instanceof Error && err.message ? err.message : t('docs.docShare.errorUnreachable');
 
 /**
- * «Share». A document is closed by default and a person opens it behind the login; this button is the one place
- * where somebody decides to give it out without a login. The link is read-only and carries no comments, and closing it revokes
- * the old address for good, so the menu says both before it asks for anything.
+ * The old «Share» of a portal without the gateway's access model (a standalone runtime): one public link, read-only and
+ * without comments, and closing it revokes the old address for good, so the menu says both before it asks for anything.
  */
-export const ShareMenu = ({ slug }: { slug: string }) => {
+const LegacyShareMenu = ({ slug }: { slug: string }) => {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<TState>(LOADING);
   const [attempt, setAttempt] = useState(0);
@@ -196,5 +203,150 @@ export const ShareMenu = ({ slug }: { slug: string }) => {
         </div>
       )}
     </div>
+  );
+};
+
+/** What a guest link may allow: a document is read or commented by a guest, a board is shown read-only. */
+const DOC_RIGHTS: readonly TGuestRights[] = ['view', 'comment'];
+const BOARD_RIGHTS: readonly TGuestRights[] = ['view'];
+
+type TLegacy =
+  { status: 'loading' } | { status: 'ready'; access: IDocAccess } | { status: 'failed'; message: string };
+
+/**
+ * The catalog's old public link of a document, shown in the dialog only while it is open: it opens
+ * the document without a login, besides the links with a term, and «Закрыть» revokes it for good. Nothing is shown while
+ * it is closed: new links are made in «Настройки ссылок».
+ */
+const LegacyPublicLink = ({ slug }: { slug: string }) => {
+  const [state, setState] = useState<TLegacy>({ status: 'loading' });
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    fetchDocAccess(slug).then(
+      (access) => current && setState({ status: 'ready', access }),
+      (err: unknown) => current && setState({ status: 'failed', message: messageOf(err) }),
+    );
+    return () => {
+      current = false;
+    };
+  }, [slug]);
+
+  if (state.status !== 'ready' || !state.access.public) return null;
+  const close = () => {
+    setPending(true);
+    setDocPublic(slug, false).then(
+      (access) => {
+        setPending(false);
+        setState({ status: 'ready', access });
+      },
+      (err: unknown) => {
+        setPending(false);
+        toast(t('docs.docShare.closeFailed'), { tone: 'error', description: messageOf(err) });
+      },
+    );
+  };
+  return (
+    <section className="hx-acc-sec" data-section="legacy">
+      <h3 className="hx-acc-sec__title">{t('docs.docShare.legacyTitle')}</h3>
+      <div className="hx-acc-row">
+        <span className="hx-acc-av" data-tone="team" aria-hidden="true">
+          <Globe />
+        </span>
+        <span className="hx-acc-row__who">
+          <span>{t('docs.docShare.isOpen')}</span>
+          <span className="hx-acc-row__sub">{t('docs.docShare.legacyNote')}</span>
+        </span>
+        <button
+          type="button"
+          className="hx-btn"
+          data-variant="ghost"
+          data-size="sm"
+          data-busy={pending || undefined}
+          disabled={pending}
+          onClick={close}
+        >
+          <span>{pending ? t('docs.docShare.closing') : t('docs.docShare.closeShort')}</span>
+        </button>
+      </div>
+    </section>
+  );
+};
+
+/** Where a document is read: the signed-in viewer, which asks for access when the person has none. */
+const docAddress = (slug: string): string =>
+  new URL(prefixAppPath(`/docs/${encodeURIComponent(slug)}`), window.location.href).href;
+
+interface IDocShareProps {
+  slug: string;
+  title: string;
+  kind: 'artifact' | 'board';
+}
+
+/**
+ * «Поделиться» of a document or a board: the same dialog as a design's — people with their roles, what the team may
+ * do («Только приглашённые» is «only me»), and links without sign-in with a term. Where the gateway
+ * has no access model (a standalone runtime) a document keeps its old one-link menu and a board has no button.
+ */
+export const DocShare = ({ slug, title, kind }: IDocShareProps) => {
+  const gate = useProjectAccess(docRef(slug));
+  const { reload } = gate;
+  const [open, setOpen] = useState(false);
+  // Inside the new interface's frame the dialog has its place; on a page of its own it brings one.
+  const framed = usePortalContainer() !== null;
+
+  if (gate.state.k === ACCESS.absent) return kind === 'artifact' ? <LegacyShareMenu slug={slug} /> : null;
+  const ready = gate.state.k === ACCESS.ready ? gate.state.access : null;
+
+  const copyLink = () => {
+    navigator.clipboard
+      ?.writeText(docAddress(slug))
+      .then(() => toast(t('next.site.linkCopied')))
+      .catch((failure: Error) =>
+        toast(t('next.site.copyFailed'), { tone: 'error', description: failure.message }),
+      );
+  };
+
+  const dialog = ready && (
+    <ShareDialog
+      open={open}
+      onClose={() => setOpen(false)}
+      project={docRef(slug)}
+      title={title}
+      access={ready}
+      onNext={gate.apply}
+      onCopyLink={copyLink}
+      onClaim={() => Promise.resolve()}
+      guestRights={kind === 'artifact' ? DOC_RIGHTS : BOARD_RIGHTS}
+      extra={kind === 'artifact' && open ? <LegacyPublicLink slug={slug} /> : null}
+    />
+  );
+
+  return (
+    <>
+      <button
+        type="button"
+        className="td-icon"
+        aria-haspopup="dialog"
+        title={t('docs.docShare.share')}
+        disabled={!ready}
+        onClick={() => {
+          // The dialog shows what the gateway holds now, not what it held when the document was opened.
+          reload();
+          setOpen(true);
+        }}
+      >
+        <Share2 />
+      </button>
+      {dialog &&
+        (framed ? (
+          dialog
+        ) : (
+          <Suspense fallback={null}>
+            <DocShareHost>{dialog}</DocShareHost>
+          </Suspense>
+        ))}
+    </>
   );
 };

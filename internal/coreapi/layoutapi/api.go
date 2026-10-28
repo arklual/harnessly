@@ -19,6 +19,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/machine"
@@ -131,6 +132,8 @@ type Deps struct {
 	Panel   *panel.Bridge
 	Vault   *vault.Bridge
 	Targets panel.Targets
+	// Deliver reads a file the agent hands over (the rules of the files the pane opens); nil: the machine delivers nothing.
+	Deliver func(path, title string) (delivery.Info, *delivery.Refusal)
 	// Session: the request carries a page session; CLIToken: it carries the runtime's cli-token (the first token
 	// header present decides).
 	Session  func(*http.Request) bool
@@ -501,6 +504,7 @@ func (a *api) table() []entry {
 	add("/api/cli/tabs/[tabId]/send", true, false, a.cliTabSend)
 	add("/api/cli/tabs/[tabId]/status", true, false, a.cliTabStatus)
 	add("/api/cli/panel", true, false, a.cliPanel)
+	add("/api/cli/deliver", true, false, a.cliDeliver)
 	add("/api/cli/vault", true, false, a.cliVault)
 	return t
 }

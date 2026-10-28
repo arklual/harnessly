@@ -39,6 +39,7 @@ import {
 import { locale, plural, t } from '@/next/i18n';
 import { goTo, routePath, ROUTE } from '@/next/routes/routes';
 import { requestContinue, requestUi, UI_REQUEST } from '@/next/stores/ui-requests';
+import { requestMoveVm, useMoveEnabledOn } from '@/next/stores/chat-move';
 import type {
   Conversation,
   HealthIssue,
@@ -48,9 +49,17 @@ import type {
   MachineLoad,
   Project,
 } from '@/next/protocol/v2';
-import { useConnection } from '@/next/stores/connection';
-import { conversationsStore, useConversationList } from '@/next/stores/conversations';
-import { useActiveMachine, useMachines, type MachineView } from '@/next/stores/machines';
+import { connectionStore, useConnection } from '@/next/stores/connection';
+import { byActivity, conversationsStore, useConversationList } from '@/next/stores/conversations';
+import { sameItems, useAll } from '@/next/core/store';
+import {
+  homeMachineStore,
+  useActiveMachine,
+  useHomeMachine,
+  useMachines,
+  type MachineView,
+} from '@/next/stores/machines';
+import { movedKey, useCentral, type CentralView } from '@/next/stores/central';
 import { useFavorites } from '@/next/stores/favorites';
 import { useProjects } from '@/next/stores/projects';
 
@@ -64,7 +73,7 @@ const gb = (bytes: number): string => {
 };
 
 /** A machine without a name of its own is called by the first label of its host, not the whole domain. */
-const machineName = (m: { name: string; host: string }): string =>
+export const machineName = (m: { name: string; host: string }): string =>
   m.name && m.name !== m.host ? m.name : m.host.split('.')[0] || m.host;
 
 const baseName = (path: string): string => path.split('/').filter(Boolean).pop() ?? path;
@@ -251,6 +260,77 @@ export const terminalStopText = (c: Pick<Conversation, 'state' | 'terminalStop'>
 const chatUrl = (id: string) =>
   `${window.location.origin}${appBasePath()}${routePath({ kind: ROUTE.chat, id })}`;
 
+/** A chat's status and what it waits for: the one reading of a conversation that the sidebar's row, the tab over the
+ *  window and the header all draw, so no two of them say different things about the same chat. */
+export const chatLookOf = (c: Conversation, online: boolean): Pick<ISidebarChat, 'status' | 'waitsFor'> => {
+  const status = chatStatusOf(c, online);
+  const waitsFor = statusNoteOf(c, status);
+  return waitsFor ? { status, waitsFor } : { status };
+};
+
+/** What a tab over the window shows of its chat. */
+export type ITabChat = Pick<ISidebarChat, 'id' | 'title' | 'status' | 'waitsFor'>;
+
+/**
+ * The chats of every machine for the tabs over the window: a tab may hold a chat of a machine other than the open one,
+ * and it shows that chat's own status, read against that machine's own link. (The sidebar lists only the open
+ * machine's chats; the tabs read them all, or a tab of another machine would lose its status on a switch.)
+ */
+/** Every machine's chats, newest first. */
+const useEveryChat = () => useAll(conversationsStore, (s) => [...s.values()].sort(byActivity), sameItems);
+
+/** The machines whose link is down, sorted (a stable list for the memos). */
+const useDownMachines = () =>
+  useAll(
+    connectionStore,
+    (s) =>
+      [...s.keys()]
+        .filter((m) => {
+          const k = s.get(m)?.k;
+          return k === 'stale' || k === 'offline';
+        })
+        .sort(),
+    sameItems,
+  );
+
+/**
+ * The one list of the person's chats on every machine: a chat continued on another machine gives its place
+ * to the chat it went on as (it stays reachable by its address, where it says where it went).
+ */
+export const oneListOf = (
+  convs: readonly Conversation[],
+  here: MachineId,
+  central: Pick<CentralView, 'on' | 'moved'>,
+): Conversation[] =>
+  convs.filter(
+    (c) =>
+      (c.machineId === here || central.on.has(c.machineId)) &&
+      !central.moved.has(movedKey(c.machineId, c.id)),
+  );
+
+export function useTabChats(): ReadonlyMap<string, ITabChat> {
+  const convs = useEveryChat();
+  const down = useDownMachines();
+  return useMemo(() => {
+    const away = new Set(down);
+    return new Map(
+      convs.map((c): [string, ITabChat] => [
+        c.id,
+        {
+          id: c.id,
+          title: c.title || t('next.shellData.untitled'),
+          ...chatLookOf(c, !away.has(c.machineId)),
+        },
+      ]),
+    );
+  }, [convs, down]);
+}
+
+/** Picking another machine while a chat of the open one is on screen: the screen goes to the picked machine's start
+ *  page, so the sidebar, the machine card and the screen are of one machine (the chat stays in its tab). */
+export const machineSwitchLeavesChat = (chatMachine: MachineId | null, picked: string): boolean =>
+  chatMachine !== null && chatMachine !== picked;
+
 export interface IShellModel {
   active: MachineId | null;
   chats: readonly ISidebarChat[] | null;
@@ -270,89 +350,116 @@ export interface IShellModel {
 export function useShellModel(): IShellModel {
   const { retitle } = useBeta();
   const active = useActiveMachine();
+  const home = useHomeMachine();
+  const central = useCentral();
   const machines = useMachines();
-  const convs = useConversationList(active);
-  const connection = useConnection(active);
+  // with the cluster's copy on, the list is the person's, not a machine's: the chats of every machine the
+  // copy is on for, a chat of another machine than the one the person works on («здесь») named by its machine. The
+  // card, the projects and the favorites stay this machine's.
+  const unified = central.enabled && home !== null;
+  const here = unified ? home : active;
+  const own = useConversationList(here);
+  const every = useEveryChat();
+  const convs = useMemo(
+    () => own && (unified && here ? oneListOf(every, here, central) : own),
+    [own, unified, here, every, central],
+  );
+  const chatMachines = useMemo(() => [...new Set((convs ?? []).map((c) => c.machineId))].sort(), [convs]);
+  const moveOn = useMoveEnabledOn(chatMachines);
+  const connection = useConnection(here);
   const linkDown = connection?.k === 'stale' || connection?.k === 'offline';
+  const down = useDownMachines();
 
-  const features = machines?.find((v) => v.machine.id === active)?.features;
-  const canStop = features?.includes('terminal-stop') ?? false;
-  const canFork = features?.includes('fork') ?? false;
-  const canHandoff = features?.includes('handoff') ?? false;
-  const chats = useMemo<readonly ISidebarChat[] | null>(
+  const chats = useMemo<readonly ISidebarChat[] | null>(() => {
+    if (!convs) return null;
+    const away = new Set(down);
+    const views = new Map((machines ?? []).map((v) => [v.machine.id, v]));
+    const nameOf = (m: MachineId): string => {
+      const view = views.get(m);
+      return view ? machineName(view.machine) : (central.names.get(m) ?? m);
+    };
+    return convs.map((c) => {
+      const features = views.get(c.machineId)?.features ?? [];
+      const canStop = features.includes('terminal-stop');
+      const canFork = features.includes('fork');
+      const canHandoff = features.includes('handoff');
+      const terminal = terminalRuns(c);
+      return {
+        id: c.id,
+        title: c.title || t('next.shellData.untitled'),
+        ...chatLookOf(c, c.machineId === here ? !linkDown : !away.has(c.machineId)),
+        ...(c.machineId !== here ? { machine: nameOf(c.machineId) } : {}),
+        ...(c.parentId ? { parentId: c.parentId } : {}),
+        pinned: c.pinned,
+        // A project of another machine is not one of this machine's: its chat stands outside the groups.
+        projectId: c.machineId === here ? c.projectId : null,
+        createdAt: c.createdAt,
+        lastPromptAt: c.lastPromptAt,
+        lastActivityAt: c.lastActivityAt,
+        terminal,
+        canStopTerminal: canStop && terminal && c.state.k !== 'starting',
+        ...(c.launch
+          ? {
+              launch: {
+                id: c.launch.id,
+                prompt: c.launch.prompt,
+                model: c.model ? shortModelName(c.model.id) : c.provider,
+              },
+            }
+          : {}),
+        canFork: canFork && c.lastTurn !== null,
+        canMerge: canFork && c.origin?.k === 'fork',
+        canContinue: canHandoff && c.lastTurn !== null,
+        canMoveVm: moveOn.has(c.machineId) && c.lastTurn !== null,
+      };
+    });
+  }, [convs, here, linkDown, down, machines, central.names, moveOn]);
+  const favorites = useFavorites(here);
+  const listedProjects = useProjects(here);
+  const projects = useMemo(
     () =>
       convs &&
-      convs.map((c) => {
-        const terminal = terminalRuns(c);
-        const status = chatStatusOf(c, !linkDown);
-        const waitsFor = statusNoteOf(c, status);
-        return {
-          id: c.id,
-          title: c.title || t('next.shellData.untitled'),
-          status,
-          ...(waitsFor ? { waitsFor } : {}),
-          ...(c.parentId ? { parentId: c.parentId } : {}),
-          pinned: c.pinned,
-          projectId: c.projectId,
-          createdAt: c.createdAt,
-          lastPromptAt: c.lastPromptAt,
-          lastActivityAt: c.lastActivityAt,
-          terminal,
-          canStopTerminal: canStop && terminal && c.state.k !== 'starting',
-          ...(c.launch
-            ? {
-                launch: {
-                  id: c.launch.id,
-                  prompt: c.launch.prompt,
-                  model: c.model ? shortModelName(c.model.id) : c.provider,
-                },
-              }
-            : {}),
-          canFork: canFork && c.lastTurn !== null,
-          canMerge: canFork && c.origin?.k === 'fork',
-          canContinue: canHandoff && c.lastTurn !== null,
-        };
-      }),
-    [convs, linkDown, canStop, canFork, canHandoff],
+      projectsOf(
+        convs.filter((c) => c.machineId === here),
+        listedProjects,
+      ),
+    [convs, here, listedProjects],
   );
-  const favorites = useFavorites(active);
-  const listedProjects = useProjects(active);
-  const projects = useMemo(() => convs && projectsOf(convs, listedProjects), [convs, listedProjects]);
 
-  const activeView = machines?.find((v) => v.machine.id === active) ?? null;
+  const activeView = machines?.find((v) => v.machine.id === here) ?? null;
   const machine = useMemo(() => (activeView ? cardOf(activeView, linkDown) : null), [activeView, linkDown]);
   const otherMachines = useMemo(
-    () => (machines ?? []).filter((v) => v.machine.id !== active).map(choiceOf),
-    [machines, active],
+    () => (machines ?? []).filter((v) => v.machine.id !== here).map(choiceOf),
+    [machines, here],
   );
   const machineNotices = useMemo(
     () =>
       [...(activeView ? [activeView] : []), ...(machines ?? []).filter((v) => v !== activeView)].flatMap(
         ({ machine: m }): IMachineNotice[] => {
-          const alert = alertOf(m, m.id === active && linkDown);
+          const alert = alertOf(m, m.id === here && linkDown);
           return alert && m.health ? [{ id: m.id, name: machineName(m), alert, since: m.health.since }] : [];
         },
       ),
-    [machines, activeView, active, linkDown],
+    [machines, activeView, here, linkDown],
   );
 
   const actions = useMemo<IChatActions>(() => {
     const chat = (id: string) => id as Conversation['id'];
     // The groups of the favorites belong to the machine that is open; without one there is nothing to group.
-    const groups: IChatActions = active
+    const groups: IChatActions = here
       ? {
           onPlaceFavorite: (id, groupId, beforeId) =>
             settled(
               placeFavorite(machineOfChat(id), chat(id), groupId, beforeId === null ? null : chat(beforeId)),
             ),
           onCreateGroup: async (name) => {
-            const st = await createFavGroup(active, name).done;
+            const st = await createFavGroup(here, name).done;
             if (st.k === 'failed') throw new Error(failureText(st.failure));
             return st.k === 'done' ? (st.result.id ?? null) : null;
           },
-          onRenameGroup: (id, name) => settled(renameFavGroup(active, id, name)),
-          onDeleteGroup: (id) => settled(deleteFavGroup(active, id)),
-          onMoveGroup: (id, beforeId) => settled(moveFavGroup(active, id, beforeId)),
+          onRenameGroup: (id, name) => settled(renameFavGroup(here, id, name)),
+          onDeleteGroup: (id) => settled(deleteFavGroup(here, id)),
+          onMoveGroup: (id, beforeId) => settled(moveFavGroup(here, id, beforeId)),
         }
       : {};
     return {
@@ -380,10 +487,15 @@ export function useShellModel(): IShellModel {
         goTo({ kind: ROUTE.chat, id });
         requestContinue(id);
       },
+      onMoveVm: (id) => {
+        goTo({ kind: ROUTE.chat, id });
+        requestMoveVm(id);
+      },
     };
-  }, [active, retitle]);
+  }, [here, retitle]);
 
   const pickMachine = useCallback((id: string) => {
+    homeMachineStore.set(id);
     hub.setActive(id);
     return Promise.resolve();
   }, []);

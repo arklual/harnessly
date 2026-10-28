@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -29,6 +30,8 @@ var (
 	standNameRe = regexp.MustCompile(`^[\w-]+$`)
 	// A dev server the agent shows: `harnessly open http://localhost:5173`.
 	openCmdRe = regexp.MustCompile(`(?:^|[\s;&|(])harnessly\s+open\s+['"]?(https?://[^\s'"]+)`)
+	// A file handed to the person: `harnessly deliver <path>`.
+	deliverCmdRe = regexp.MustCompile(`(?:^|[\s;&|(])(?:harnessly)\s+deliver\b`)
 	// --title "…", --title='…', -t "…".
 	titleFlagRe = regexp.MustCompile(`(?:--title|\s-t)[=\s]+(?:"([^"]+)"|'([^']+)'|(\S+))`)
 	// The folder of a design of the library: …/design-artifacts/<id>/….
@@ -41,7 +44,14 @@ type call struct {
 	tool    string
 	command string
 	publish *jsvalue.Object
+	// deliver: the call is the MCP tool that hands a file over.
+	deliver bool
 	turn    *turn
+}
+
+// isDeliverTool: the MCP tool deliver_file, under whatever name its server is given.
+func isDeliverTool(tool string) bool {
+	return tool == "deliver_file" || strings.HasSuffix(tool, "__deliver_file")
 }
 
 // remember keeps what a call's result will need to tell what it made; only the calls that may make something.
@@ -57,7 +67,8 @@ func (b *builder) remember(o *jsvalue.Object, use, tool, summary string) {
 	if tool == "Bash" {
 		c.command = strings.TrimPrefix(summary, "$ ")
 	}
-	if c.publish == nil && c.command == "" {
+	c.deliver = isDeliverTool(tool)
+	if c.publish == nil && c.command == "" && !c.deliver {
 		return
 	}
 	b.calls[use] = c
@@ -112,6 +123,18 @@ func made(c call, links []string) []wire.TurnOutput {
 		return artifactOf(c.publish, links)
 	}
 	cmd := c.command
+	if c.deliver || deliverCmdRe.MatchString(cmd) {
+		// Only the record the tool wrote counts: a file the call merely names is not one the person was given.
+		if info, ok := delivery.LinkIn(links); ok {
+			title := info.Title
+			if title == "" {
+				title = info.Name
+			}
+			return []wire.TurnOutput{{Kind: wire.OutputDelivery, Op: wire.OutputCreated, Ref: info.Path, Title: title,
+				Name: info.Name, Mime: info.Mime, Size: info.Size, SHA256: info.SHA256}}
+		}
+		return nil
+	}
 	switch {
 	case artifactCmdRe.MatchString(cmd):
 		if link := first(links, artifactLink); link != "" {

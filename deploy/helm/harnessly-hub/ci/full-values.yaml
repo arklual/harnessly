@@ -1,0 +1,29 @@
+# Everything on, to render every template: bundled Postgres, wildcard ingress, three kinds of sign-in.
+publicUrl: https://hub.example.com
+runtimeDomain: run.example.net
+signup: invite
+adminEmails: [you@example.com]
+mailFrom: "harnessly <no-reply@example.com>"
+containerImage: ghcr.io/ly-solutions/harnessly-machine:latest
+github:
+  clientId: gh-client
+yandex:
+  clientId: ya-client
+oidc:
+  - id: keycloak
+    name: Corporate sign-in
+    issuer: https://sso.example.com/realms/team
+    clientId: harnessly
+secrets:
+  HUB_SMTP_URL: smtp://user:password@mail.example.com:587
+database:
+  postgres:
+    enabled: true
+ingress:
+  enabled: true
+  className: nginx
+  tls:
+    - secretName: hub-tls
+      hosts: [hub.example.com]
+    - secretName: hub-machines-tls
+      hosts: ["*.run.example.net"]

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // ErrVoiceUnavailable is a machine that cannot recognize speech right now (no decoder, no recognition service); the
@@ -76,7 +76,7 @@ func (s *Server) voice(w http.ResponseWriter, r *http.Request) {
 			refuse(w, RefuseAttachmentTooLarge)
 			return
 		}
-		agent.Log("warn", "v2: a recording was not recognized", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: a recording was not recognized", jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	}
 }

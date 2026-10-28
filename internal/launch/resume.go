@@ -203,7 +203,7 @@ func (s *Starter) sendResume(rc ResumeConfig, t Target) bool {
 	}
 	line, err := s.cfg.Lines.Resume(t.Provider, t.SessionID, t.WorkspaceID, t.Launch)
 	if err == nil {
-		err = rc.Tmux.SendKeysSeparated(t.TmuxSession, line)
+		err = rc.Tmux.SendKeysSeparated(t.TmuxSession, s.envSource(t.Provider)+line)
 	}
 	if err != nil {
 		s.log(rc, "error", "resume failed", "session", t.TmuxSession, "err", err.Error())

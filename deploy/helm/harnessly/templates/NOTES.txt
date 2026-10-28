@@ -12,7 +12,7 @@ Reach it from your machine:
   open http://127.0.0.1:8022{{ include "harnessly.basePath" . | trimSuffix "/" }}/
 {{- end }}
 
-The first visit sets the password. Agent CLIs: use an image built with the Dockerfile's with-agents target, or
+The runtime logs a one-time initial password (INIT_PASSWORD, when set, is used instead); the first visit signs in with it and sets the password. Agent CLIs: use an image built with the Dockerfile's with-agents target, or
 install them into the home volume from a terminal tab (docs/deploy.md).
 {{- if or .Values.integrations.boards.url .Values.integrations.artifacts.url }}
 

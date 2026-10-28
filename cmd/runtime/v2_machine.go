@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/chatguard"
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/machines"
 	"github.com/ly-solutions/harnessly/internal/preflight"
@@ -39,32 +40,88 @@ func (p v2Pane) Keys(keys ...string) error     { return p.tm.SendKeySequence(p.s
 // the look before agreed: one call that failed on a loaded machine must not stop a working agent.
 type v2Tmux struct {
 	tm *tmux.Tmux
+	// guard says whether the terminal is off: then the pane takes no write while a shell is in its foreground.
+	guard *chatguard.Guard
+
+	// probe answers the looks; nil means tm.
+	probe probeTmux
 
 	mu    sync.Mutex
 	doubt map[string]doubt
+
+	// snap is one list-panes of every server, shared by the looks of all conversations for snapEvery: a look per
+	// conversation per second, each a tmux client of its own, kept ~100 clients waiting on a loaded server.
+	snapMu sync.Mutex
+	snap   paneSnap
 }
 
 type doubt struct{ noSession, shell bool }
+
+// probeTmux is what a look asks tmux.
+type probeTmux interface {
+	ReadAllPanes() (map[string]tmux.PaneInfo, bool)
+	HasSession(name string) bool
+}
+
+type paneSnap struct {
+	at    time.Time
+	panes map[string]tmux.PaneInfo
+	ok    bool
+}
+
+// snapEvery is how old a shared snapshot may be: the fastest look (a working agent) is once a second.
+const snapEvery = time.Second
+
+func (m *v2Tmux) prober() probeTmux {
+	if m.probe != nil {
+		return m.probe
+	}
+	return m.tm
+}
+
+// panes is the shared snapshot, read again when older than snapEvery; the looks that ask while it is read wait for it
+// instead of starting their own.
+func (m *v2Tmux) panes() (map[string]tmux.PaneInfo, bool) {
+	m.snapMu.Lock()
+	defer m.snapMu.Unlock()
+	if m.snap.at.IsZero() || time.Since(m.snap.at) >= snapEvery {
+		panes, ok := m.prober().ReadAllPanes()
+		m.snap = paneSnap{at: time.Now(), panes: panes, ok: ok}
+	}
+	return m.snap.panes, m.snap.ok
+}
 
 func (m *v2Tmux) Pane(session string) typist.Pane {
 	if session == "" {
 		return nil
 	}
-	return v2Pane{tm: m.tm, session: session}
+	// While the terminal is off every write is checked against what is in the pane's foreground: text that reaches a
+	// bare shell runs as commands (see internal/chatguard).
+	return chatguard.Guarded(v2Pane{tm: m.tm, session: session}, m.guard, func() string { return m.tm.PaneCurrentCommand(session) })
 }
 
 // Probe: what runs in the session. A look that says "no session" or "a shell" is reported only when the previous look
 // said so too; the first is reported as the agent still running.
+//
+// The look reads the shared snapshot; only a session that was there and is missing from it is asked about on its own
+// (a pane between two programs may list without a command), so a conversation without a session costs nothing.
 func (m *v2Tmux) Probe(session string) convo.Probe {
-	cmd := m.tm.PaneCurrentCommand(session)
-	has := cmd != "" || m.tm.HasSession(session)
-	// tmux that did not answer (a loaded machine) said nothing about the foreground: not a shell.
-	shell := tmux.SafeShells[cmd]
 	m.mu.Lock()
 	if m.doubt == nil {
 		m.doubt = map[string]doubt{}
 	}
 	prev := m.doubt[session]
+	m.mu.Unlock()
+	cmd, has := "", true // tmux that did not answer (a loaded machine) said nothing: not gone, not a shell
+	if panes, ok := m.panes(); ok {
+		p, found := panes[session]
+		cmd, has = p.Command, found
+		if !found && !prev.noSession {
+			has = m.prober().HasSession(session)
+		}
+	}
+	shell := tmux.SafeShells[cmd]
+	m.mu.Lock()
 	m.doubt[session] = doubt{noSession: !has, shell: shell}
 	m.mu.Unlock()
 	switch {

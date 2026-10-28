@@ -30,6 +30,11 @@ export const machinesStore = createKeyedStore<MachineId, MachineView>();
 export const machineOrderStore = createStore<MachineId[] | null>(null);
 /** The machine whose chat is open: it holds machine, convs and the open conv; the rest hold only convs. */
 export const activeMachineStore = createStore<MachineId | null>(null);
+/**
+ * The machine the person works on: the default one at start, then the one picked in the sidebar. Opening a
+ * chat of another machine makes that one active (its channel), not this one: «здесь» of «Продолжить здесь».
+ */
+export const homeMachineStore = createStore<MachineId | null>(null);
 
 export function putMachines(list: Machine[]): void {
   for (const m of list) {
@@ -49,6 +54,7 @@ export const hasFeature = (m: MachineId, f: Feature): boolean =>
 
 export const useMachine = (m: MachineId | null) => useKey(machinesStore, m);
 export const useActiveMachine = () => useStore(activeMachineStore);
+export const useHomeMachine = () => useStore(homeMachineStore);
 
 /** The machines in fleet order; null while loading. */
 export function useMachines(): MachineView[] | null {

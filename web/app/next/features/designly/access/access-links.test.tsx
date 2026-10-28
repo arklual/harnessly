@@ -83,6 +83,12 @@ const props = (access: IProjectAccess) => ({
   onClaim: vi.fn().mockResolvedValue(undefined),
 });
 
+const pages = [
+  { path: 'Home.dc.html', title: 'Home' },
+  { path: 'Pricing.dc.html', title: 'Pricing' },
+  { path: 'About.dc.html', title: 'About' },
+];
+
 const calls = (mock: ReturnType<typeof vi.fn>) =>
   (mock.mock.calls as unknown as [string, RequestInit | undefined][]).map(([url, init]) => [
     url,
@@ -200,6 +206,8 @@ describe('the links screen', () => {
       title: 'Agency',
       rights: 'view',
       ttl: '7d',
+      version: 'pinned',
+      pages: null,
       view: {
         v: 1,
         device: 'ip15',
@@ -231,7 +239,74 @@ describe('the links screen', () => {
     const post = calls(fetchMock).find(
       ([url, method]) => String(url).includes('/p1/shares') && method === 'POST',
     );
-    expect(post?.[2]).toEqual({ title: '', rights: 'view', ttl: '7d' });
+    expect(post?.[2]).toEqual({ title: '', rights: 'view', ttl: '7d', version: 'pinned', pages: null });
+  });
+
+  it('offers this version first and sends «always the latest» when the owner picks it', async () => {
+    const fetchMock = gateway([]);
+    vi.stubGlobal('fetch', fetchMock);
+    inRoot(<ShareDialog {...props(owner)} pages={pages} />);
+    await openLinks();
+    const version = await screen.findByRole('button', { name: t('next.access.version') });
+    expect(version.textContent).toContain(t('next.access.version.pinned'));
+    fireEvent.click(version);
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: t('next.access.version.latest') }));
+    fireEvent.click(screen.getByRole('button', { name: t('next.access.linkMake') }));
+    await waitFor(() => expect(written).toHaveBeenCalled());
+    const post = calls(fetchMock).find(
+      ([url, method]) => String(url).includes('/p1/shares') && method === 'POST',
+    );
+    expect(post?.[2]).toMatchObject({ version: 'latest', pages: null });
+  });
+
+  it('limits a link to the chosen pages and falls back to all when none is left', async () => {
+    const fetchMock = gateway([]);
+    vi.stubGlobal('fetch', fetchMock);
+    inRoot(<ShareDialog {...props(owner)} pages={pages} />);
+    await openLinks();
+    const picker = await screen.findByRole('button', { name: t('next.access.pages') });
+    expect(picker.textContent).toContain(t('next.access.pages.all'));
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Pricing' }));
+    expect(screen.getByRole('button', { name: t('next.access.pages') }).textContent).toContain('Pricing');
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'About' }));
+    expect(screen.getByRole('button', { name: t('next.access.pages') }).textContent).toContain(
+      t('next.access.pages.some', { n: 2 }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: t('next.access.linkMake') }));
+    await waitFor(() => expect(written).toHaveBeenCalled());
+    const post = calls(fetchMock).find(
+      ([url, method]) => String(url).includes('/p1/shares') && method === 'POST',
+    );
+    expect(post?.[2]).toMatchObject({ pages: ['Pricing.dc.html', 'About.dc.html'] });
+  });
+
+  it('has no page choice for a design with a single page', async () => {
+    vi.stubGlobal('fetch', gateway([]));
+    inRoot(<ShareDialog {...props(owner)} pages={pages.slice(0, 1)} />);
+    await openLinks();
+    await screen.findByRole('button', { name: t('next.access.version') });
+    expect(screen.queryByRole('button', { name: t('next.access.pages') })).toBeNull();
+  });
+
+  it('moves a pinned link to the current version and offers that only for pinned links', async () => {
+    const fetchMock = gateway([link({ version: 'pinned' }), link({ id: 'g3', title: 'Old' })]);
+    vi.stubGlobal('fetch', fetchMock);
+    inRoot(<ShareDialog {...props(owner)} />);
+    await openLinks();
+    await screen.findByText('Client');
+    const menus = screen.getAllByRole('button', { name: t('next.access.guest.actions') });
+    fireEvent.click(menus[1]!);
+    expect(screen.queryByRole('menuitem', { name: t('next.access.guest.refresh') })).toBeNull();
+    fireEvent.click(menus[0]!);
+    fireEvent.click(await screen.findByRole('menuitem', { name: t('next.access.guest.refresh') }));
+    await waitFor(() =>
+      expect(calls(fetchMock)).toContainEqual([
+        expect.stringContaining('/shares/g1'),
+        'PATCH',
+        { refresh: true },
+      ]),
+    );
   });
 
   it('makes an invite for the signed-in from the same form and copies it', async () => {

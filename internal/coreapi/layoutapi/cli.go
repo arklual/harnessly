@@ -6,8 +6,10 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
+	"github.com/ly-solutions/harnessly/internal/paneauto"
 	"github.com/ly-solutions/harnessly/internal/paneintents"
 	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/state"
@@ -566,6 +568,37 @@ func (a *api) cliPanel(c *call) {
 			c.reply(status, out)
 		}
 	}
+}
+
+// POST /api/cli/deliver: the agent hands a file to the person. The answer carries the record the conversation's card is
+// made of; the pane opens the file once, off the finished call.
+func (a *api) cliDeliver(c *call) {
+	path, title := "", ""
+	tabID := c.agentGuard(func() bool {
+		v, _ := c.field("path")
+		path, _ = v.(string)
+		t, _ := c.field("title")
+		title, _ = t.(string)
+		if path == "" || a.d.Deliver == nil {
+			c.fail(400, locale.Pick("The path of the file is required", "Нужен путь файла"))
+			return false
+		}
+		return true
+	}, locale.Pick("This session does not belong to an agent tab: a file is handed over by an agent from its own tab", "Эта сессия не принадлежит вкладке агента: файл отдаёт агент из своей вкладки"))
+	if tabID == "" {
+		return
+	}
+	info, refusal := a.d.Deliver(path, title)
+	if refusal != nil {
+		c.fail(refusal.Status, refusal.Text)
+		return
+	}
+	// The pane opens a file it can show, once, like anything the agent asks it to open.
+	if info.Opens() && a.d.Intents != nil && paneauto.OpenOnce(a.d.Intents, tabID, "files", info.Path) {
+		a.d.Sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tabID))
+	}
+	c.reply(200, jsvalue.NewObject("ok", true, "name", info.Name, "size", float64(info.Size), "mime", info.Mime, "sha256", info.SHA256,
+		"message", delivery.Message(info)))
 }
 
 // POST /api/cli/vault: the agent asks the person's page to log in on a site with the safe.

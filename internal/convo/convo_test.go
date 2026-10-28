@@ -935,8 +935,8 @@ func TestImportedTitlesAreLegacys(t *testing.T) {
 		t.Fatalf("from the summary: %+v", got)
 	}
 	bare := jsvalue.NewObject("id", "tab-x2", "name", "Claude Code", "title", "acme", "panelType", "claude-code")
-	if got, _ := TabFromLayout(bare, "/w"); got.Title != "acme" {
-		t.Fatalf("from the tab's title: %+v", got)
+	if got, _ := TabFromLayout(bare, "/w"); got.Title != "" || got.Pane != "acme" {
+		t.Fatalf("the tab's terminal title names no chat: %+v", got)
 	}
 
 	r := newRig(t)
@@ -952,6 +952,39 @@ func TestImportedTitlesAreLegacys(t *testing.T) {
 	r.rt.RetitleImported(ImportTab{ID: r.id, Title: "Другое", Name: "Claude Code"})
 	if c := r.rec(); c.Title != "Мой чат" {
 		t.Fatalf("typed by the person: %q", c.Title)
+	}
+}
+
+// A tab with no title of the agent and no message of its own is named by its first message, never by what the terminal
+// shows («claude», the folder): imported so, and renamed so when an earlier import took the label.
+func TestImportedChatWithoutTitleTakesItsFirstMessage(t *testing.T) {
+	r := newRig(t)
+	r.user("Почини сборку в CI")
+	r.say("Смотрю")
+	r.rt.Import([]ImportTab{{ID: r.id, Session: "s1", Name: "claude", Pane: "projects", Provider: wire.ProviderClaude,
+		Cwd: "/home/x/projects", TranscriptPath: r.path}}, nil)
+	if c := r.rec(); c.Title != "Почини сборку в CI" || c.TitleSource != wire.TitleFromFirstMessage {
+		t.Fatalf("named by the first message: %q %s", c.Title, c.TitleSource)
+	}
+
+	// An earlier import left the terminal's label as the title; the next one puts the first message there.
+	old := newRig(t)
+	old.user("Сделай отчёт")
+	old.say("Готовлю")
+	old.rt.Import([]ImportTab{{ID: old.id, Session: "s1", Title: "projects", Provider: wire.ProviderClaude,
+		Cwd: "/home/x/projects", TranscriptPath: old.path}}, nil)
+	if c := old.rec(); c.Title != "projects" {
+		t.Fatalf("the setup keeps the label: %q", c.Title)
+	}
+	old.rt.RetitleImported(ImportTab{ID: old.id, Name: "claude", Pane: "projects", Cwd: "/home/x/projects"})
+	if c := old.rec(); c.Title != "Сделай отчёт" {
+		t.Fatalf("the label is replaced: %q", c.Title)
+	}
+	// A title the person typed is never replaced by the message.
+	old.do(wire.ConversationRenameCmd{OpID: "rn", ID: old.id, Title: "Мой отчёт"})
+	old.rt.RetitleImported(ImportTab{ID: old.id, Name: "claude", Pane: "projects"})
+	if c := old.rec(); c.Title != "Мой отчёт" {
+		t.Fatalf("the person's title stays: %q", c.Title)
 	}
 }
 

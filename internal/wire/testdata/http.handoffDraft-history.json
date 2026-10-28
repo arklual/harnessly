@@ -1,0 +1,9 @@
+{
+  "http": "handoffDraft",
+  "response": {
+    "mode": "history",
+    "tokens": 0,
+    "turns": 0,
+    "artifact": {"id": "0123456789abcdef0123456789abcdef", "bytes": 292552704}
+  }
+}

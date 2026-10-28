@@ -6,7 +6,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactNod
 import Router from '@/platform/router';
 import TabStrip, { PACE, type IStripTab, type TPace } from '@/next/features/shell/tab-strip';
 import { STATUS_LOOK } from '@/next/features/sidebar/status';
-import { CHAT_STATUS, type ISidebarChat } from '@/next/features/sidebar/types';
+import { CHAT_STATUS } from '@/next/features/sidebar/types';
+import type { ITabChat } from '@/next/bindings/shell-model';
 import { t } from '@/next/i18n';
 import { goTo, parseRoute, ROUTE, routePath, useRoute, type TRoute } from '@/next/routes/routes';
 import {
@@ -36,6 +37,7 @@ const paceOf = (status: string): TPace | null => {
 const FIXED: Record<Exclude<TRoute['kind'], 'chat' | 'site'>, { icon: string; title: () => string }> = {
   [ROUTE.home]: { icon: 'house', title: () => t('next.tabs.home') },
   [ROUTE.designly]: { icon: 'palette', title: () => t('next.tabs.designly') },
+  [ROUTE.designlyNew]: { icon: 'presentation', title: () => t('next.deck.create.title') },
   [ROUTE.invite]: { icon: 'palette', title: () => t('next.tabs.designly') },
   [ROUTE.apps]: { icon: 'app-window', title: () => t('next.sidebar.apps') },
   [ROUTE.settings]: { icon: 'settings', title: () => t('next.shell.settings') },
@@ -44,7 +46,7 @@ const FIXED: Record<Exclude<TRoute['kind'], 'chat' | 'site'>, { icon: string; ti
 };
 
 /** What the strip shows for a tab: its place's icon and name, a chat's status. */
-export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ISidebarChat>): IStripTab => {
+export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): IStripTab => {
   const route = parseRoute(tab.path);
   if (route.kind === ROUTE.chat) {
     const chat = chats.get(route.id);
@@ -130,7 +132,8 @@ export interface IShellTabs {
   openInNewTab: (route: TRoute, background?: boolean) => void;
 }
 
-export const useShellTabs = (chats: readonly ISidebarChat[] | null, enabled: boolean): IShellTabs => {
+/** `byId`: the chats of every machine (useTabChats), so a tab of a machine other than the open one keeps its status. */
+export const useShellTabs = (byId: ReadonlyMap<string, ITabChat>, enabled: boolean): IShellTabs => {
   const route = useRoute();
   const path = routePath(route);
   const state = useTabs();
@@ -273,7 +276,6 @@ export const useShellTabs = (chats: readonly ISidebarChat[] | null, enabled: boo
   }, [enabled, switchTo, newTab, close]);
 
   // A chat's tab keeps its last title, to draw it before the list comes after a reload.
-  const byId = useMemo(() => new Map((chats ?? []).map((chat) => [chat.id, chat])), [chats]);
   useEffect(() => {
     for (const tab of state.tabs) {
       const r = parseRoute(tab.path);

@@ -74,6 +74,10 @@ func sendFile(w http.ResponseWriter, status int, path string, start, length int6
 func (a *Access) ServePreview(w http.ResponseWriter, r *http.Request, q Query) {
 	w.Header().Set("Cache-Control", "no-store")
 	requested, _ := q.String("path")
+	if z, _ := q.String("zip"); z == "list" || z == "entry" {
+		a.ServeZip(w, r, q)
+		return
+	}
 	if d, _ := q.String("download"); d == "1" {
 		t := a.Download(requested)
 		if !t.OK {

@@ -1,13 +1,17 @@
 // Dictation over the machine's socket (/api/voice, internal/voice): the page sends {type: 'start', lang}, then the
 // recorder's chunks as they come, then {type: 'stop' | 'abort'}; it gets ready, partial (the whole text so far),
 // final and error back. An error with code `unavailable` (or a socket that never opened) means this machine cannot
-// recognize on the fly — the caller falls back to sending the whole recording.
+// recognize on the fly — the caller falls back to sending the whole recording. While the machine gets its speech
+// model ready (the first dictation on a machine that has none yet downloads it) it sends `preparing` with the stage
+// and how far it is; the recording waits for ready and goes on as soon as it comes.
 import { runtimeSocket } from '@/next/core/net/machine';
 import type { MachineId } from '@/next/protocol/v2';
 import type { TLang } from '@/next/i18n';
 
 /** The model may be loading on the machine; the recording waits for it, so this is generous. */
 const CONNECT_MS = 35_000;
+/** A download that says nothing for this long is given up; every `preparing` message starts it over. */
+const PREPARE_MS = 60_000;
 
 export interface IDictationFailure {
   /** The words of the machine, or '' when it said none. */
@@ -18,6 +22,8 @@ export interface IDictationFailure {
 
 export interface IDictationEvents {
   onReady: () => void;
+  /** The machine is getting its model ready (a first-use download): `stage` is what, `percent` how far (0..100). */
+  onPreparing?: (stage: string, percent: number) => void;
   /** The whole text recognized so far; it replaces the previous partial. */
   onPartial: (text: string) => void;
   /** The dictation is over and this is its whole text. */
@@ -41,6 +47,8 @@ interface IServerMessage {
   text?: string;
   message?: string;
   code?: string;
+  stage?: string;
+  percent?: number;
 }
 
 const parse = (data: unknown): IServerMessage | null => {
@@ -91,6 +99,10 @@ export const openDictation = (m: MachineId, lang: TLang, events: IDictationEvent
       if (timer) clearTimeout(timer);
       timer = null;
       events.onReady();
+    } else if (msg.type === 'preparing' && !ready) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fail({ message: '', unavailable: true }), PREPARE_MS);
+      events.onPreparing?.(msg.stage ?? '', typeof msg.percent === 'number' ? msg.percent : 0);
     } else if (msg.type === 'partial' && typeof msg.text === 'string') {
       events.onPartial(msg.text);
     } else if (msg.type === 'final' && typeof msg.text === 'string') {

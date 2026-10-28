@@ -4,6 +4,7 @@ import {
   browserOf,
   deviceOf,
   FILL_INSET,
+  overviewBox,
   overviewOf,
   SCROLL_START,
   trackScroll,
@@ -101,5 +102,16 @@ describe('the phone interface', () => {
     expect(track.bars).toBe(BARS.full);
     track = trackScroll(trackScroll(track, 300), 5);
     expect(track.bars).toBe(BARS.full);
+  });
+});
+
+describe('overviewBox', () => {
+  it('is the drawn row: the screens, the gaps, the labels and the padding, with room for the field', () => {
+    const cards = overviewOf({ w: 1400, h: 700 }, false);
+    const box = overviewBox(cards, false);
+    const across = cards.reduce((t, c) => t + c.w * c.scale, 0);
+    expect(box.w).toBeCloseTo(48 + across + 28 * (cards.length - 1));
+    expect(overviewBox(cards, true).h - box.h).toBe(76);
+    expect(overviewBox([], true)).toEqual({ w: 0, h: 0 });
   });
 });

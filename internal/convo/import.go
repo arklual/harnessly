@@ -22,9 +22,12 @@ import (
 type ImportTab struct {
 	ID      string
 	Session string
-	// Title is what Legacy shows for the tab (launch.Starter.Conversations): the agent's title of the transcript, its
-	// summary, the last message, the tab's title, and the tab's name, the first that is there.
+	// Title is what names the tab's conversation: the agent's title of the transcript, its summary, the last message,
+	// the first that is there. The tab's own title and name are not in it: they are what the terminal shows (the
+	// agent's process, the folder), not what the chat is about. A conversation with none is named by its first message.
 	Title string
+	// Pane is the tab's terminal title, kept only to recognise it as a name an earlier import took by mistake.
+	Pane string
 	// Name is the tab's own name, "Claude Code" until the person renames it.
 	Name           string
 	Provider       wire.Provider
@@ -48,7 +51,8 @@ func TabFromLayout(tab *jsvalue.Object, cwd string) (ImportTab, bool) {
 		return s
 	}
 	t := ImportTab{ID: str(tab, "id"), Session: str(tab, "sessionName"), Name: str(tab, "name"), Cwd: cwd}
-	t.Title = firstOf(str(tab.Object("agentState"), "summary"), str(tab, "lastUserMessage"), str(tab, "title"), t.Name)
+	t.Pane = str(tab, "title")
+	t.Title = firstOf(str(tab.Object("agentState"), "summary"), str(tab, "lastUserMessage"))
 	switch str(tab, "panelType") {
 	case "claude-code":
 		t.Provider = wire.ProviderClaude
@@ -99,6 +103,13 @@ func (r *Runtime) RetitleImported(t ImportTab) {
 	_ = r.call(context.Background(), t.ID, func(c *conv, now time.Time) {
 		c.launchUltracode = t.LaunchUltracode // the tab's launch is Legacy's to remember, and may be read again
 		if title == "" {
+			// A chat an earlier import named by the terminal's label (the agent's process, the folder) gets its first message.
+			if c.rec.TitleSource == wire.TitleFromAgent && c.labelTitled(t) {
+				if first, _ := c.firstExchange(); first != "" {
+					c.rec.Title, c.rec.TitleSource = titleOf(first), wire.TitleFromFirstMessage
+					c.recResult(now)
+				}
+			}
 			return
 		}
 		fromName := c.rec.TitleSource == wire.TitleFromUser && c.rec.Title == t.Name
@@ -195,6 +206,11 @@ func (r *Runtime) Import(tabs []ImportTab, queues map[string][]outbox.LegacyItem
 				c.rec.LastActivityAt = t.StartedAt
 			}
 			c.lastTurn()
+			if c.rec.Title == "" {
+				if first, _ := c.firstExchange(); first != "" {
+					c.rec.Title, c.rec.TitleSource = titleOf(first), wire.TitleFromFirstMessage
+				}
+			}
 			c.change(c.box.Import(items, now), now)
 			c.recDirty = true
 			c.flush(now, true)
@@ -204,4 +220,14 @@ func (r *Runtime) Import(tabs []ImportTab, queues map[string][]outbox.LegacyItem
 		n++
 	}
 	return n
+}
+
+// labelTitled: the conversation's title is what the terminal shows for its tab, not a name of the chat: the tab's name
+// or title (the agent's process, «claude») or the folder it runs in.
+func (c *conv) labelTitled(t ImportTab) bool {
+	title := c.rec.Title
+	if title == "" {
+		return false
+	}
+	return title == t.Name || title == t.Pane || c.rec.Cwd != "" && title == path.Base(c.rec.Cwd)
 }

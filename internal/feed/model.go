@@ -16,14 +16,15 @@ import (
 type SignalKind string
 
 const (
-	SignalUser         SignalKind = "user"          // a user entry: maybe the message on its way
-	SignalTurnOpened   SignalKind = "turn-opened"   // a user entry (or a task's notification between turns) opened a turn
-	SignalTurnEnded    SignalKind = "turn-ended"    // the transcript's end of a turn
-	SignalQuestion     SignalKind = "question"      // an AskUserQuestion without its answer
-	SignalPlan         SignalKind = "plan"          // ExitPlanMode waiting for approval
-	SignalPermission   SignalKind = "permission"    // Codex asks to approve a command or a patch
-	SignalGateResolved SignalKind = "gate-resolved" // the tool result of a question, a plan or an approval
-	SignalInterrupt    SignalKind = "interrupt"     // the transcript shows the turn interrupted
+	SignalUser         SignalKind = "user"             // a user entry: maybe the message on its way
+	SignalTurnOpened   SignalKind = "turn-opened"      // a user entry (or a task's notification between turns) opened a turn
+	SignalTurnEnded    SignalKind = "turn-ended"       // the transcript's end of a turn
+	SignalQuestion     SignalKind = "question"         // an AskUserQuestion without its answer
+	SignalPlan         SignalKind = "plan"             // ExitPlanMode waiting for approval
+	SignalPermission   SignalKind = "permission"       // Codex asks to approve a command or a patch
+	SignalGateResolved SignalKind = "gate-resolved"    // the tool result of a question, a plan or an approval
+	SignalInterrupt    SignalKind = "interrupt"        // the transcript shows the turn interrupted
+	SignalFailure      SignalKind = "terminal-failure" // a non-retryable provider failure: the current turn must stop
 )
 
 // Signal is one such thing; Offset is a lower bound of where its line starts (-1 unknown).
@@ -36,6 +37,8 @@ type Signal struct {
 	At         wire.Ms
 	Question   *wire.Question
 	Permission *wire.Permission
+	Failure    string
+	Detail     string
 }
 
 // turn is a turn being built: its record, and where its entries are.
@@ -218,6 +221,10 @@ func (b *builder) add(o *jsvalue.Object, offset int64) step {
 			Detail: sptr(str(o, "message"))}, offset)
 		if l, ok := limitOf(o, b.provider, b.vendor, at); ok {
 			b.limits[id] = l
+		}
+		if failure := str(o, "terminalFailure"); failure != "" && b.open != nil {
+			s.signals = append(s.signals, Signal{K: SignalFailure, TurnID: b.openID(), At: at, Failure: failure,
+				Detail: str(o, "message")})
 		}
 	case "session-exit":
 		b.push(&s, wire.Entry{ID: id, At: at, Rev: 1, T: wire.EntryNotice, Level: wire.NoticeInfo, Code: "session-exit"}, offset)
@@ -422,6 +429,14 @@ func (b *builder) tool(s *step, o *jsvalue.Object, typ, id string, at wire.Ms, o
 	}
 	if use == "" {
 		use = id
+	}
+	// A call the transcript logs again (a resumed or copied session) is the same step: one entry, and its result settles it.
+	if typ == "tool-call" {
+		if prev, again := b.tools[use]; again && prev != id {
+			if i, has := b.byID[prev]; has && b.entries[i].T == wire.EntryTool && b.entries[i].Tool == name {
+				return
+			}
+		}
 	}
 	if a, isAgent := o.Get("agent"); isAgent && typ == "tool-call" {
 		if call, isObj := a.(*jsvalue.Object); isObj {

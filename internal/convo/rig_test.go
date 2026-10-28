@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,8 +40,9 @@ func withInput(t *testing.T, text string) string {
 const permissionScreen = `● Bash(rm -rf build)
 
  Bash command
-
-   rm -rf build
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ │ rm -rf build
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 
  Do you want to proceed?
  ❯ 1. Yes
@@ -131,11 +133,12 @@ func (m *fakeMachine) Probe(session string) Probe { return m.probes[session] }
 type fakeLauncher struct {
 	launched []LaunchRequest
 	resumed  []string
+	err      error
 }
 
 func (l *fakeLauncher) Launch(req LaunchRequest) error {
 	l.launched = append(l.launched, req)
-	return nil
+	return l.err
 }
 func (l *fakeLauncher) Resume(c wire.Conversation) error {
 	l.resumed = append(l.resumed, c.ID)
@@ -156,6 +159,8 @@ type rig struct {
 	id       string
 	// deps, when set, changes what the runtime is made with (and made again with on a restart).
 	deps func(*Deps)
+	// termOff is the machine's terminal policy the runtime is asked about (off: false, the usual).
+	termOff atomic.Bool
 }
 
 const convID = "tab-one"
@@ -177,7 +182,7 @@ func newRig(t *testing.T) *rig {
 
 func (r *rig) runtime() *Runtime {
 	d := Deps{MachineID: "m1", Publisher: r.pub, Machine: r.machine, Launcher: r.launcher, Clock: r.clock,
-		Store: NewStore(filepath.Join(r.dir, "v2")), Limits: wire.DefaultLimits}
+		Store: NewStore(filepath.Join(r.dir, "v2")), Limits: wire.DefaultLimits, TerminalOff: r.termOff.Load}
 	if r.deps != nil {
 		r.deps(&d)
 	}

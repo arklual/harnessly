@@ -14,6 +14,11 @@ const picked = {
 };
 
 describe('readBridgeMessage', () => {
+  it('takes only the keys a guest page knows', () => {
+    expect(readBridgeMessage({ type: 'tk:key', key: 'f' })).toEqual({ k: 'key', key: 'f' });
+    expect(readBridgeMessage({ type: 'tk:key', key: 'Escape' })).toEqual({ k: 'key', key: 'Escape' });
+    expect(readBridgeMessage({ type: 'tk:key', key: 'Enter' })).toBeNull();
+  });
   it('reads a pick with only the fields the design uses', () => {
     expect(readBridgeMessage(picked)).toEqual({
       k: 'picked',

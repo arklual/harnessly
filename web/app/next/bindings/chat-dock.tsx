@@ -33,6 +33,7 @@ import type { ISlashActions } from '@/next/features/composer/slash-model';
 import { failureText, settled } from '@/next/bindings/outcome';
 import { isHanded } from '@/next/bindings/feed-items';
 import { useUploads } from '@/next/bindings/use-uploads';
+import { useCentral } from '@/next/stores/central';
 import ConnectionBanner from '@/next/features/connection/banner';
 import {
   pickerAgentOf,
@@ -115,6 +116,8 @@ export interface IDockExtra {
   /** The message went: the host lets go of what it added. */
   onSent: () => void;
   tools?: ReactNode;
+  /** The field's placeholder in place of the usual one (a deck's: what to change on the slide). */
+  placeholder?: string;
 }
 
 interface IChatDockProps {
@@ -166,17 +169,22 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const goneVendor = record
     ? removedKeyOf(machineView?.machine.agents ?? [], record.provider, record.model?.profile)
     : null;
+  // the machine is off and the chat is the cluster's copy: nothing can be sent.
+  const central = useCentral();
+  const machineOff = central.enabled && central.off.has(machine) && connection?.k !== 'live';
   const keyNotice = useMemo<DockNotice | null>(
     () =>
-      goneVendor === null
-        ? null
-        : {
-            kind: 'key',
-            vendor: goneVendor,
-            onOpen: () => goTo({ kind: ROUTE.settings, section: 'accounts' }),
-            onContinue: handoff ? () => requestContinue(conv) : null,
-          },
-    [goneVendor, handoff, conv],
+      machineOff
+        ? { kind: 'off' }
+        : goneVendor === null
+          ? null
+          : {
+              kind: 'key',
+              vendor: goneVendor,
+              onOpen: () => goTo({ kind: ROUTE.settings, section: 'accounts' }),
+              onContinue: handoff ? () => requestContinue(conv) : null,
+            },
+    [machineOff, goneVendor, handoff, conv],
   );
 
   // Held on the usage limit: the queue waits for the reset by itself, so it is not a pause to resume. The card in the
@@ -369,7 +377,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   return (
     <>
       <ConnectionBanner
-        connection={connection}
+        connection={machineOff ? undefined : connection}
         machineName={machineView?.machine.name ?? machine}
         onRetryNow={() => reconnectNow(machine)}
       />
@@ -391,6 +399,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       <Queue
         rows={rows}
         paused={queue?.paused?.reason === 'limited' ? null : (queue?.paused ?? null)}
+        launchFailure={record?.state.k === 'launch-failed' ? record.state.reason : null}
         waitingLimit={heldOnLimit}
         onRemove={(id) => settled(cancelMessage(id))}
         onEdit={onEdit}
@@ -406,8 +415,8 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         inputRef={field}
         onSubmit={onSubmit}
         mode={mode}
-        placeholder={hint}
-        quiet={goneVendor !== null}
+        placeholder={hint ?? extra?.placeholder}
+        quiet={goneVendor !== null || machineOff}
         onStop={() => settled(interrupt(machine, conv))}
         waiting={waitingAgents.length > 0}
         picker={

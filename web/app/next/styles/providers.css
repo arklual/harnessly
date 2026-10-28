@@ -165,5 +165,13 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 4px;
+  margin: 0 16px 18px 64px;
+}
+.hx-acct__how .hx-segmented {
+  align-self: flex-start;
+}
+@media (max-width: 600px) {
+  .hx-acct__how {
+    margin-left: 16px;
+  }
 }

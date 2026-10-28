@@ -132,6 +132,10 @@ func TestRealCreateSessionStartsTheCleanLoginShell(t *testing.T) {
 		if got, want := niceOf(t, strconv.Itoa(d.PID)), min(19, niceOf(t, "self")+3); got != want {
 			t.Fatalf("pane niceness %d, want %d", got, want)
 		}
+		server, _ := tm.Command(name, "display-message", "-p", "-t", name, "#{pid}")
+		if got, want := niceOf(t, strings.TrimSpace(server)), niceOf(t, "self"); got != want {
+			t.Fatalf("server niceness %d, want %d", got, want)
+		}
 	}
 	tm.KillSession(name)
 	if tm.HasSession(name) {
@@ -223,6 +227,39 @@ func TestRealBracketedPasteIntoAProgram(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, 5*time.Second, "cat to end", func() bool { return !tm.HasSession("hs-cat") })
+}
+
+// A message of 26.10 (122 lines, 21 KB of links, tokens and quotes) never reached the agent: one send-keys of it was
+// over tmux's 16 KB command limit, and tmux answered «command too long» on every try. It reaches a program whole now.
+func TestRealLongBracketedPasteArrivesWhole(t *testing.T) {
+	r := newRealRig(t)
+	tm := New(r.names())
+	out := filepath.Join(t.TempDir(), "got")
+	r.raw(r.main, "hs-raw", "stty raw -echo; exec dd bs=1 of="+out+" 2>/dev/null")
+	var b strings.Builder
+	for i := 0; b.Len() < 21_000; i++ {
+		fmt.Fprintf(&b, "%d. Ссылка https://example.test/x?next=%%2Fa%%2Fb%%2Fc&jwt=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln \"q\" 'x' -- `y`;\n", i)
+	}
+	text := strings.TrimSuffix(b.String(), "\n") + ";"
+	want := pasteStart + text + pasteEnd
+	waitFor(t, 5*time.Second, "the reader", func() bool { _, err := os.Stat(out); return err == nil })
+	if err := tm.SendBracketedPasteOnly("hs-raw", text); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, 10*time.Second, "the whole paste", func() bool { got, _ := os.ReadFile(out); return len(got) >= len(want) })
+	got, _ := os.ReadFile(out)
+	if string(got) != want {
+		t.Fatalf("got %d bytes, want %d; differs from byte %d", len(got), len(want), firstDiff(string(got), want))
+	}
+}
+
+func firstDiff(a, b string) int {
+	for i := range min(len(a), len(b)) {
+		if a[i] != b[i] {
+			return i
+		}
+	}
+	return min(len(a), len(b))
 }
 
 func TestRealTwoServers(t *testing.T) {

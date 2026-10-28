@@ -18,6 +18,7 @@ import {
 } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { bootNext, shutdownNext } from '@/next/boot';
+import { appConfig } from '@/platform/config';
 import { hasFeature, useMachines } from '@/next/stores/machines';
 import { useDeadline } from '@/next/ui/use-deadline';
 import {
@@ -90,6 +91,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
   const email = me.k === 'ready' ? me.me.email : null;
   const { run, pending: waiting } = pending;
   const failure = t('next.settings.failed');
+  const hubUrl = appConfig().hubUrl;
 
   const hint = email ?? (password ? t('next.settings.general.byPassword') : null);
   return (
@@ -101,7 +103,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
       paneAuto={paneAuto}
       feedKinds={feedKinds}
       language={locale()}
-      account={{ name, hint, canSignOut: password }}
+      account={{ name, hint, canSignOut: password || hubUrl !== null }}
       idleStop={runtime.value?.idleStop ?? null}
       limitContinue={runtime.value?.limitContinue ?? null}
       restartContinue={runtime.value?.restartContinue ?? null}
@@ -125,8 +127,11 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
       }
       onSignOut={() => {
         void signOut(machine).then((res) => {
-          if ('ok' in res) window.location.reload();
-          else toast(t('next.settings.general.signOutFailed'), { tone: 'error' });
+          if ('ok' in res) {
+            // Behind a hub the session is the hub's: signing out lands on its sign-in page.
+            if (hubUrl) window.location.assign(`${hubUrl}/signin`);
+            else window.location.reload();
+          } else toast(t('next.settings.general.signOutFailed'), { tone: 'error' });
         });
       }}
     />

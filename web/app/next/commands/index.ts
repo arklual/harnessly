@@ -176,13 +176,15 @@ function opening(m: MachineId, handle: OpHandle): OpHandle & { conversation: Pro
 export const forkConversation = (m: MachineId, id: ConvId, atTurn?: TurnId) =>
   opening(m, runCommand(m, 'conversation.fork', atTurn ? { id, atTurn } : { id }));
 
-/** A new conversation on another agent or model that starts from `text`, the context the person approved. */
+type HandoffContext =
+  { mode: 'history'; artifactId: string } | { mode: Exclude<HandoffMode, 'history'>; text: string };
+
+/** A new conversation on another agent or model that starts from approved text or a private history artifact. */
 export const handoffConversation = (
   m: MachineId,
   id: ConvId,
   to: { provider: Provider; profile?: ProfileId; model: Model | null },
-  mode: HandoffMode,
-  text: string,
+  context: HandoffContext,
 ) =>
   opening(
     m,
@@ -191,8 +193,7 @@ export const handoffConversation = (
       provider: to.provider,
       model: to.model,
       ...(to.profile ? { profile: to.profile } : {}),
-      mode,
-      text,
+      ...context,
     }),
   );
 

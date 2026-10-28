@@ -3,7 +3,7 @@ package wire
 import (
 	"net/http"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // sideChat serves POST /api/v2/conversations/{id}/side-chat {question, excerpts?, history?, model?}: a side question
@@ -30,7 +30,7 @@ func (s *Server) sideChat(w http.ResponseWriter, r *http.Request, conv string) {
 	case s.NotFound != nil && s.NotFound(err):
 		refuse(w, RefuseNotFound)
 	default:
-		agent.Log("warn", "v2: side chat failed", agent.F{K: "conversation", V: conv}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: side chat failed", jsonlog.F{K: "conversation", V: conv}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	}
 }

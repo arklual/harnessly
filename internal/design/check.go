@@ -88,7 +88,11 @@ const (
 	reportName       = "report.json"
 )
 
-var chromeCandidates = []string{"/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser"}
+var chromeCandidates = []string{"/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser",
+	"/snap/bin/chromium", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"}
+
+// chromeNames are looked up on PATH when none of the usual places has a browser.
+var chromeNames = []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"}
 
 // checkState is a library's running checks and the order of its report saves.
 type checkState struct {
@@ -175,6 +179,11 @@ func (l *Library) findChrome() string {
 			}
 		}
 	}
+	for _, name := range chromeNames {
+		if p := lookPathOr(name); p != "" {
+			return p
+		}
+	}
 	return ""
 }
 
@@ -202,8 +211,12 @@ func (l *Library) launchBrowser(bin string) (*browser, error) {
 		_ = os.RemoveAll(profile)
 		return nil, err
 	}
-	cmd := exec.Command(bin, "--headless=new", "--remote-debugging-pipe", "--user-data-dir="+profile, "--no-first-run", "--no-default-browser-check",
-		"--disable-dev-shm-usage", "--hide-scrollbars", "--mute-audio", "--lang=ru-RU", "about:blank")
+	args := []string{"--headless=new", "--remote-debugging-pipe", "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check",
+		"--disable-dev-shm-usage", "--hide-scrollbars", "--mute-audio", "--lang=ru-RU"}
+	// RUNTIME_DESIGN_CHROME_ARGS adds the browser's switches a machine needs, such as --no-sandbox in a container
+	// that gives no user namespaces to an unprivileged user (the image sets it).
+	args = append(append(args, strings.Fields(os.Getenv("RUNTIME_DESIGN_CHROME_ARGS"))...), "about:blank")
+	cmd := exec.Command(bin, args...)
 	cmd.ExtraFiles = []*os.File{toChrome, fromChrome}
 	if err := cmd.Start(); err != nil {
 		for _, f := range []*os.File{toChrome, ours, theirs, fromChrome} {

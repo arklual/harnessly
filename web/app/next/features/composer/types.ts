@@ -47,6 +47,8 @@ export interface QueueRow {
 
 /** A one-line notice over the field: the machine stopped answering, or the subscription's limit ran out. */
 export type DockNotice =
+  /** The machine of the chat is switched off: the chat is a read-only copy. */
+  | { kind: 'off' }
   | { kind: 'machine'; machine: string; onStop: () => Promise<unknown> }
   /** The key of the chat's vendor was removed: it can be added again or the chat continued in another model. */
   | { kind: 'key'; vendor: string; onOpen: () => void; onContinue: (() => void) | null }
@@ -67,6 +69,8 @@ export interface Recording {
   startedAt: Ms;
   /** Stopped: the machine is turning it into text. */
   busy: boolean;
+  /** The machine is downloading its speech model (the first dictation on it): the words come once it is there. */
+  preparing?: boolean;
   /** The microphone's loudness now, 0..1, read once per frame; null when the browser gave no meter. */
   level: (() => number) | null;
 }

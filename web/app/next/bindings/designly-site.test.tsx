@@ -31,7 +31,7 @@ vi.mock('@/next/stores/tabs', () => ({
 }));
 vi.mock('@/next/features/designly/api', async (original) => ({
   ...(await original<typeof import('@/next/features/designly/api')>()),
-  keptLibrary: () => library,
+  keptLibrary: () => kept,
   fetchLibrary: () => Promise.resolve(shown),
 }));
 vi.mock('@/next/features/designly/access/api', async (original) => ({
@@ -71,6 +71,8 @@ const library = {
 
 // What the library holds now, and what the gateway says of the project.
 let shown: typeof library = library;
+// What the home's last read left: a link opened from outside starts with none.
+let kept: typeof library | null = library;
 let gateway: IProjectAccess | null = null;
 
 import DesignlySite from '@/next/bindings/designly-site';
@@ -112,6 +114,7 @@ beforeEach(() => {
   })) as unknown as typeof window.matchMedia;
   n = 0;
   shown = library;
+  kept = library;
   gateway = null;
   open.mockReset();
   localStorage.clear();
@@ -255,16 +258,38 @@ describe('DesignlySite project not in the library', () => {
     expect(src()).toBe(`${ORIGIN}/enter?t=1`);
   });
 
-  it('gives up after about fifteen seconds', async () => {
+  // the wait shows the design's frame with its loader, never an empty screen.
+  it('stands on the frame while it waits', async () => {
+    kept = null;
+    shown = { ...library, designs: [] };
+    gateway = granted;
+    mount();
+    await act(async () => {});
+    await pass(2000);
+    expect(screen.getByTestId('src').textContent).toBe('');
+  });
+
+  // after about fifteen seconds the project is somewhere the library does not reach: a card says so, with
+  // a new look and a way back, instead of leaving or staying empty.
+  it('says the project is away after about fifteen seconds and looks again on demand', async () => {
+    kept = null;
     shown = { ...library, designs: [] };
     gateway = granted;
     const missing = vi.fn();
     mount(missing);
     await act(async () => {});
     await pass(10_000);
-    expect(missing).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
     await pass(10_000);
-    expect(missing).toHaveBeenCalledTimes(1);
+    expect(missing).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toContain('K');
+    shown = library;
+    await act(async () => {
+      screen.getAllByRole('button')[0].click();
+    });
+    await pass(1000);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(src()).toBe(`${ORIGIN}/enter?t=1`);
   });
 
   it('leaves at once where the gateway knows no role of its own', async () => {

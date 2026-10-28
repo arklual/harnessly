@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"unicode/utf8"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // OpenTab is the tab of the right pane a link or a name of the chat opens in: a tracker task, a GitLab merge request or
@@ -113,7 +113,7 @@ func (s *Server) open(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	case errors.Is(err, ErrNothingToOpen), err != nil && s.NotFound != nil && s.NotFound(err):
 		refuse(w, RefuseNotFound)
 	case err != nil:
-		agent.Log("warn", "v2: open failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: open failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		s.writeChecked(w, r, target)
@@ -164,7 +164,7 @@ func (s *Server) openRefs(ctx context.Context, w http.ResponseWriter, r *http.Re
 	case err != nil && s.NotFound != nil && s.NotFound(err):
 		refuse(w, RefuseNotFound)
 	case err != nil:
-		agent.Log("warn", "v2: open-refs failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: open-refs failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		out := OpenedRefs{Refs: make([]OpenedRef, len(refs))}

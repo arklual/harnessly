@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // Search over the messages of the conversations: the person's lines and the agent's answers, not the tool output.
@@ -117,7 +117,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	case err != nil && ctx.Err() != nil:
 		refuse(w, RefuseTimeout)
 	case err != nil:
-		agent.Log("warn", "v2: search failed", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: search failed", jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		if out.Hits == nil {
@@ -150,7 +150,7 @@ func (s *Server) digest(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	case err != nil && ctx.Err() != nil:
 		refuse(w, RefuseTimeout)
 	case err != nil:
-		agent.Log("warn", "v2: digest failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: digest failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	default:
 		s.writeChecked(w, r, out)

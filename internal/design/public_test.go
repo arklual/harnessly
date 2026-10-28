@@ -1,11 +1,13 @@
 package design
 
 import (
+	"compress/gzip"
 	"crypto/hkdf"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -70,10 +72,19 @@ func publicAPI(t *testing.T, mirror string) (*API, string) {
 }
 
 func publicGet(a *API, method, path, token string) *httptest.ResponseRecorder {
+	return publicRequest(a, method, path, token, nil)
+}
+
+func publicRequest(a *API, method, path, token string, headers http.Header) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(method, "/agents/api/acme/design-public/"+path, nil)
 	if token != "" {
 		r.Header.Set(testHeader, token)
+	}
+	for key, values := range headers {
+		for _, value := range values {
+			r.Header.Add(key, value)
+		}
 	}
 	if !a.PublicMatch(r) {
 		panic("no match")
@@ -133,6 +144,9 @@ func TestPublicIndexListsBoards(t *testing.T) {
 	if !strings.HasPrefix(w.Header().Get("Content-Type"), "application/json") {
 		t.Fatal(w.Header())
 	}
+	if w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("index cache: %q", w.Header().Get("Cache-Control"))
+	}
 }
 
 func TestPublicFilesStayInTheProject(t *testing.T) {
@@ -164,8 +178,10 @@ func TestPublicFilesStayInTheProject(t *testing.T) {
 		t.Errorf("project path: %d", w.Code)
 	}
 	w := publicGet(a, "GET", "p1/index.html", tok)
-	wantIndex := `<script data-artifact="p1" data-guest="1" src="__guest/client.js"></script><html>index</html>`
-	if w.Body.String() != wantIndex || w.Header().Get("Content-Type") != "text/html; charset=utf-8" || w.Header().Get("Content-Length") != strconv.Itoa(len(wantIndex)) {
+	wantIndex := w.Body.String()
+	if !strings.HasPrefix(wantIndex, `<script data-artifact="p1" data-guest="1" src="__guest/client.js"></script><script>`) ||
+		!strings.HasSuffix(wantIndex, `<html>index</html>`) || w.Header().Get("Content-Type") != "text/html; charset=utf-8" ||
+		w.Header().Get("Content-Length") != strconv.Itoa(len(wantIndex)) {
 		t.Fatalf("index.html: %q %v", w.Body.String(), w.Header())
 	}
 	if w := publicGet(a, "HEAD", "p1/index.html", tok); w.Code != 200 || w.Body.Len() != 0 {
@@ -187,6 +203,94 @@ func TestPublicSizeCap(t *testing.T) {
 	f.Close()
 	if w := publicGet(a, "GET", "p1/big.txt", tok); w.Code != 404 {
 		t.Fatalf("over the cap: %d", w.Code)
+	}
+}
+
+func TestPublicOpenHandleSurvivesPathSwap(t *testing.T) {
+	a, root := publicAPI(t, "")
+	outside := filepath.Join(root, "outside", "private.txt")
+	writeFile(t, outside, "private")
+	public := filepath.Join(root, "p1", "project", "assets", "a.css")
+	want := strings.Repeat("body { color: green; }\n", 200)
+	writeFile(t, public, want)
+
+	f, st, path, ok := a.openPublic(a.L, "p1", []string{"assets", "a.css"})
+	if !ok {
+		t.Fatal("open public file")
+	}
+	defer f.Close()
+	if err := os.Remove(public); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, public); err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/assets/a.css", nil)
+	r.Header.Set("Accept-Encoding", "gzip")
+	a.L.servePublicStatic(w, r, f, st, path, "text/css; charset=utf-8", ".css", "private, no-cache", false)
+	if w.Code != http.StatusOK || w.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("served swapped path: %d %v", w.Code, w.Header())
+	}
+	zr, err := gzip.NewReader(w.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != want {
+		t.Fatalf("served swapped bytes: got %q", body)
+	}
+}
+
+func TestPublicProjectRootSymlinkCannotEscapeLibrary(t *testing.T) {
+	a, root := publicAPI(t, "")
+	tok := publicToken(t, "pair-secret", "acme", "p1", nil)
+	outside := filepath.Join(t.TempDir(), "outside")
+	writeFile(t, filepath.Join(outside, "index.html"), "private")
+	project := filepath.Join(root, "p1", "project")
+	if err := os.Rename(project, project+"-safe"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, project); err != nil {
+		t.Fatal(err)
+	}
+
+	w := publicGet(a, http.MethodGet, "p1/index.html", tok)
+	if w.Code != http.StatusNotFound || w.Body.String() != "Not found" {
+		t.Fatalf("project root symlink escaped library: %d %q", w.Code, w.Body.String())
+	}
+}
+
+func TestPublicHTMLReadStaysBoundedAfterOpen(t *testing.T) {
+	a, root := publicAPI(t, "")
+	path := filepath.Join(root, "p1", "project", "index.html")
+	f, _, _, ok := a.openPublic(a.L, "p1", []string{"index.html"})
+	if !ok {
+		t.Fatal("open public html")
+	}
+	defer f.Close()
+	if err := os.Truncate(path, PublicFileLimit+1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readPublicFile(f, PublicFileLimit); err == nil {
+		t.Fatal("grown HTML was read past the public limit")
+	}
+}
+
+func TestPublicHTMLResponseStaysWithinFileLimit(t *testing.T) {
+	a, root := publicAPI(t, "")
+	tok := publicToken(t, "pair-secret", "acme", "p1", nil)
+	body := []byte("<html>" + strings.Repeat("x", PublicFileLimit-len("<html>")))
+	if err := os.WriteFile(filepath.Join(root, "p1", "project", "large.html"), body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w := publicGet(a, http.MethodGet, "p1/large.html", tok)
+	if w.Code != http.StatusNotFound || w.Body.String() != "Not found" {
+		t.Fatalf("expanded HTML exceeded public limit: %d bytes=%d", w.Code, w.Body.Len())
 	}
 }
 
@@ -229,12 +333,71 @@ func TestPublicBoardsGetTheGuestScriptRelativeToThemselves(t *testing.T) {
 	a, root := publicAPI(t, "")
 	tok := publicToken(t, "pair-secret", "acme", "p1", nil)
 	body := publicGet(a, "GET", "p1/Main.dc.html", tok).Body.String()
-	if !strings.Contains(body, `<head><script data-artifact="p1" data-guest="1" src="__guest/client.js"></script><script src="./support.js">`) {
+	guest := strings.Index(body, `<script data-artifact="p1" data-guest="1" src="__guest/client.js"></script>`)
+	resources := strings.Index(body, `"__resources"`)
+	engine := strings.Index(body, `src="./support.js?tkv=`)
+	if guest < 0 || resources < 0 || engine < 0 || guest > engine || resources > engine {
 		t.Fatalf("head of a board: %q", body)
 	}
+	for _, f := range vendorFiles {
+		if !strings.Contains(body, `"`+f.URL+`":"__vendor/`+f.Name+`"`) {
+			t.Fatalf("no public mapping for %s in %q", f.URL, body)
+		}
+		w := publicGet(a, "GET", "p1/__vendor/"+f.Name, tok)
+		if w.Code != 200 || w.Header().Get("ETag") == "" {
+			t.Fatalf("public vendor %s: %d %v", f.Name, w.Code, w.Header())
+		}
+	}
 	writeFile(t, filepath.Join(root, "p1", "project", "lib", "deep", "page.html"), `<body>x</body>`)
-	if body := publicGet(a, "GET", "p1/lib/deep/page.html", tok).Body.String(); !strings.HasPrefix(body, `<script data-artifact="p1" data-guest="1" src="../../__guest/client.js"></script>`) {
+	if body := publicGet(a, "GET", "p1/lib/deep/page.html", tok).Body.String(); !strings.HasPrefix(body, `<script data-artifact="p1" data-guest="1" src="../../__guest/client.js"></script>`) ||
+		!strings.Contains(body, `":"../../__vendor/`) {
 		t.Fatalf("nested board: %q", body)
+	}
+}
+
+func TestPublicStaticUsesPrivateVersionsETagAndGzip(t *testing.T) {
+	a, root := publicAPI(t, "")
+	tok := publicToken(t, "pair-secret", "acme", "p1", nil)
+	file := filepath.Join(root, "p1", "project", "assets", "large.js")
+	body := strings.Repeat("const example = 1;\n", 200)
+	writeFile(t, file, body)
+	st, err := os.Stat(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := FileVersion(st)
+
+	unversioned := publicGet(a, "GET", "p1/assets/large.js", tok)
+	if unversioned.Code != 200 || unversioned.Header().Get("Cache-Control") != "private, no-cache" || unversioned.Header().Get("ETag") == "" {
+		t.Fatalf("unversioned: %d %v", unversioned.Code, unversioned.Header())
+	}
+	versioned := publicGet(a, "GET", "p1/assets/large.js?tkv="+version, tok)
+	if versioned.Code != 200 || versioned.Header().Get("Cache-Control") != "private, max-age=31536000, immutable" {
+		t.Fatalf("versioned: %d %v", versioned.Code, versioned.Header())
+	}
+	etag := versioned.Header().Get("ETag")
+	notModified := publicRequest(a, "GET", "p1/assets/large.js?tkv="+version, tok, http.Header{"If-None-Match": {etag}})
+	if notModified.Code != http.StatusNotModified || notModified.Body.Len() != 0 {
+		t.Fatalf("not modified: %d %q", notModified.Code, notModified.Body.String())
+	}
+	packed := publicRequest(a, "GET", "p1/assets/large.js?tkv="+version, tok, http.Header{"Accept-Encoding": {"gzip"}})
+	if packed.Code != 200 || packed.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("gzip: %d %v", packed.Code, packed.Header())
+	}
+	zr, err := gzip.NewReader(packed.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(plain) != body {
+		t.Fatal("gzip body differs")
+	}
+	html := publicGet(a, "GET", "p1/Main.dc.html", tok)
+	if html.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("html cache: %q", html.Header().Get("Cache-Control"))
 	}
 }
 

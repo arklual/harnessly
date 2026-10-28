@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { groupSteps } from '@/next/features/chat/steps';
-import type { Entry, SubagentEntry } from '@/next/features/chat/types';
+import { dedupeTools, groupSteps } from '@/next/features/chat/steps';
+import type { Entry, SubagentEntry, ToolEntry } from '@/next/features/chat/types';
 
 const agent = (id: string): SubagentEntry => ({
   id,
@@ -23,5 +23,24 @@ describe('grouping the steps of a turn', () => {
     const nodes = groupSteps([agent('a'), agent('b'), say('s'), agent('c')], false);
     expect(nodes.map((node) => node.kind)).toEqual(['subs', 'entry', 'subs']);
     expect(nodes[0]).toMatchObject({ agents: [{ id: 'a' }, { id: 'b' }] });
+  });
+
+  it('shows one step for a tool call logged twice, settled by the result of either', () => {
+    const call = (id: string, ok: boolean | null): ToolEntry => ({
+      id,
+      turnId: null,
+      at: 1,
+      rev: 1,
+      t: 'tool',
+      toolUseId: 'toolu_1',
+      tool: 'Bash',
+      summary: '$ cd /work',
+      ok,
+      output: null,
+    });
+    const nodes = groupSteps([call('a', null), say('s'), call('b', true)], false);
+    expect(nodes.map((node) => node.kind)).toEqual(['entry', 'entry']);
+    expect(nodes[0]).toMatchObject({ entry: { id: 'a', ok: true } });
+    expect(dedupeTools([call('a', null), call('b', null)])).toHaveLength(1);
   });
 });

@@ -279,37 +279,54 @@ const ModelPicker = ({
                 </button>
               </div>
               {stops.length > 1 && (
-                <div
-                  ref={sliderRef}
-                  className="hx-effort"
-                  data-n={stops.length}
-                  data-p={step < 0 ? undefined : step}
-                  data-frozen={frozen || undefined}
-                  role="slider"
-                  aria-label={t('next.picker.effortLabel')}
-                  aria-valuemin={0}
-                  aria-valuemax={stops.length - 1}
-                  aria-valuenow={step < 0 ? undefined : step}
-                  aria-valuetext={effort ? effortLabel(effort) : t('next.picker.effortUnknown')}
-                  aria-disabled={frozen || undefined}
-                  onPointerDown={onSliderDown}
-                  onPointerMove={onSliderMove}
-                >
-                  <div className="hx-effort__fill" />
-                  {stops.map((stop, i) => (
-                    <button
-                      key={stop}
-                      type="button"
-                      tabIndex={-1}
-                      className="hx-effort__stop"
-                      data-k={i}
-                      ref={(el) => el?.style.setProperty('--k', along(i))}
-                      data-on={i <= step}
-                      aria-label={effortLabel(stop)}
-                    />
-                  ))}
-                  <div className="hx-effort__thumb" />
-                </div>
+                <>
+                  <div
+                    ref={sliderRef}
+                    className="hx-effort"
+                    data-n={stops.length}
+                    data-p={step < 0 ? undefined : step}
+                    data-frozen={frozen || undefined}
+                    role="slider"
+                    aria-label={t('next.picker.effortLabel')}
+                    aria-valuemin={0}
+                    aria-valuemax={stops.length - 1}
+                    aria-valuenow={step < 0 ? undefined : step}
+                    aria-valuetext={effort ? effortLabel(effort) : t('next.picker.effortUnknown')}
+                    aria-disabled={frozen || undefined}
+                    onPointerDown={onSliderDown}
+                    onPointerMove={onSliderMove}
+                  >
+                    <div className="hx-effort__fill" />
+                    {stops.map((stop, i) => (
+                      <button
+                        key={stop}
+                        type="button"
+                        tabIndex={-1}
+                        className="hx-effort__stop"
+                        data-k={i}
+                        ref={(el) => el?.style.setProperty('--k', along(i))}
+                        data-on={i <= step}
+                        aria-label={effortLabel(stop)}
+                      />
+                    ))}
+                    <div className="hx-effort__thumb" />
+                  </div>
+                  <div
+                    className="hx-effort__labels"
+                    ref={(el) => el?.style.setProperty('--n', String(stops.length))}
+                    aria-hidden="true"
+                  >
+                    {stops.map((stop) => (
+                      <span
+                        key={stop}
+                        className="hx-effort__label"
+                        data-chosen={stop === effort || undefined}
+                      >
+                        {effortLabel(stop)}
+                      </span>
+                    ))}
+                  </div>
+                </>
               )}
               <div className="hx-picker__hint">{hint()}</div>
               {ultracodeOffered && (

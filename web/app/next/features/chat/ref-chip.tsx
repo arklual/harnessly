@@ -59,7 +59,7 @@ const RefChip = ({ kind, label, href = null, text }: IRefChipProps) => {
       }}
     >
       <Icon name={ICONS[kind]} size="sm" />
-      {text ?? info.label}
+      <span className="hx-ref__label">{text ?? info.label}</span>
       {info.title && (
         <span className="hx-ref__card" role="tooltip">
           <span className="hx-ref__kind">

@@ -86,6 +86,14 @@ describe('placeRequest: a request becomes the pane’s state', () => {
     expect(placed.next.unread).toEqual(['t1']);
   });
 
+  it('a file handed over outside the chat’s folder opens in the pane’s own view, a text file there stays Legacy’s', () => {
+    const zip = place(empty, { kind: 'open', tab: 'files', target: '/tmp/report.zip' });
+    expect(zip.next.tabs).toEqual([{ id: 't1', kind: 'files', path: '/tmp/report.zip', file: true }]);
+    expect(zip.effect).toBeNull();
+    const text = place(empty, { kind: 'open', tab: 'files', target: '/tmp/notes.txt' });
+    expect(text.effect).toMatchObject({ k: 'legacy', kind: 'files' });
+  });
+
   it('a file of the chat’s folder opens in the pane’s files tab; one outside it in Legacy’s', () => {
     const inside = place(empty, { kind: 'open', tab: 'files', target: '/home/me/work/docs/plan.md' });
     expect(inside.next.tabs).toEqual([{ id: 't1', kind: 'files', path: 'docs/plan.md', file: true }]);

@@ -11,6 +11,7 @@ import Icon from '@/next/ui/icon';
 const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent: 'claude' | 'codex' }>> = {
   general: { icon: 'sliders-horizontal' },
   notifications: { icon: 'bell' },
+  safe: { icon: 'lock' },
   accounts: { icon: 'key-round' },
   claude: { agent: 'claude' },
   codex: { agent: 'codex' },

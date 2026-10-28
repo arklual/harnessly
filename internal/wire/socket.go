@@ -12,7 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // Service is what the protocol asks of the conversations: convo.Service, which imports this package, has exactly
@@ -63,6 +63,9 @@ type Server struct {
 	// HandoffDraft writes the text a handoff or a merge of a conversation carries (an excerpt, a note, a fork's result);
 	// ErrDraftUnsupported when there is nothing to make it of. nil: POST …/handoff-draft is a 404.
 	HandoffDraft func(ctx context.Context, conv string, req HandoffDraftRequest) (HandoffDraft, error)
+	// Move serves /api/v2/move/*: a conversation carried to another machine of the person. It is the cluster's
+	// to call, not the page's; nil answers not-found.
+	Move http.Handler
 	// Tasks is the agent's task list of a conversation; nil: .../tasks is a 404.
 	Tasks func(ctx context.Context, conv string) ([]Task, error)
 	// Context is how full a conversation's agent window is; nil: .../context is a 404.
@@ -211,7 +214,7 @@ func (c *client) deliver(s *subscription, frame []byte) {
 func (c *client) send(v any) {
 	b, err := Marshal(v)
 	if err != nil {
-		agent.Log("error", "v2: frame does not encode", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("error", "v2: frame does not encode", jsonlog.F{K: "error", V: err.Error()})
 		return
 	}
 	c.enqueue(b)
@@ -362,7 +365,7 @@ func (s *Server) hello(ctx context.Context, c *client) bool {
 	c.device = hello.Device
 	snap, err := s.Machine.Snapshot(ctx, false)
 	if err != nil {
-		agent.Log("warn", "v2: no machine for welcome", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: no machine for welcome", jsonlog.F{K: "error", V: err.Error()})
 		c.kill(websocket.StatusInternalError, "no machine")
 		return false
 	}
@@ -433,7 +436,7 @@ func (s *Server) sub(ctx context.Context, c *client, f SubFrame) {
 	}
 	b, err := Marshal(snapshotFor(snap, c.caps))
 	if err != nil {
-		agent.Log("error", "v2: snapshot does not encode", agent.F{K: "ch", V: string(f.Ch)}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("error", "v2: snapshot does not encode", jsonlog.F{K: "ch", V: string(f.Ch)}, jsonlog.F{K: "error", V: err.Error()})
 		s.Hub.unsubscribe(c, f.Ch)
 		c.send(ErrorFrame{Ch: f.Ch, Code: FrameErrNotFound})
 		return
@@ -494,7 +497,7 @@ func (s *Server) snapshot(ctx context.Context, f SubFrame, seq int64, load bool)
 		}
 		if err != nil {
 			if !s.NotFound(err) {
-				agent.Log("warn", "v2: conversation snapshot failed", agent.F{K: "ch", V: string(f.Ch)}, agent.F{K: "error", V: err.Error()})
+				jsonlog.Log("warn", "v2: conversation snapshot failed", jsonlog.F{K: "ch", V: string(f.Ch)}, jsonlog.F{K: "error", V: err.Error()})
 			}
 			return snap, FrameErrNotFound
 		}

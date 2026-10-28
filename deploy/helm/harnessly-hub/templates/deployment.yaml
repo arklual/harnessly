@@ -1,0 +1,189 @@
+{{- include "hub.validate" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hub.fullname" . }}
+  labels:
+    {{- include "hub.labels" . | nindent 4 }}
+spec:
+  # One replica, replaced and not rolled: a second hub on the same SQLite file would corrupt it, and agent links and
+  # event streams live in the process.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "hub.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if not .Values.existingSecret }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "hub.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "hub.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: hub
+          image: "{{ .Values.image.repository }}:{{ include "hub.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8040
+              protocol: TCP
+          env:
+            - name: HUB_PUBLIC_URL
+              value: {{ include "hub.publicUrl" . | quote }}
+            - name: HUB_LISTEN
+              value: "0.0.0.0:8040"
+            - name: HUB_DATA_DIR
+              value: /var/lib/harnessly-hub
+            - name: HUB_SIGNUP
+              value: {{ .Values.signup | quote }}
+            - name: HUB_EDITION
+              value: {{ .Values.edition | quote }}
+            - name: HUB_PASSKEY
+              value: {{ ternary "on" "off" .Values.passkey | quote }}
+            - name: HUB_SSH
+              value: {{ ternary "on" "off" .Values.ssh | quote }}
+            - name: HUB_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            {{- with .Values.trustedProxies }}
+            - name: HUB_TRUSTED_PROXIES
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if and .Values.sshAllowPrivate (ne .Values.edition "cloud") }}
+            - name: HUB_SSH_ALLOW_PRIVATE
+              value: "on"
+            {{- end }}
+            {{- with .Values.adminEmails }}
+            - name: HUB_ADMIN_EMAILS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- with .Values.runtimeDomain }}
+            - name: HUB_RUNTIME_DOMAIN
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.rpId }}
+            - name: HUB_RP_ID
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.mailFrom }}
+            - name: HUB_MAIL_FROM
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.containerImage }}
+            - name: HUB_CONTAINER_IMAGE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.minAgentVersion }}
+            - name: HUB_MIN_AGENT_VERSION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.termsUrl }}
+            - name: HUB_TERMS_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.github.clientId }}
+            - name: HUB_GITHUB_CLIENT_ID
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.github.url }}
+            - name: HUB_GITHUB_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.yandex.clientId }}
+            - name: HUB_YANDEX_CLIENT_ID
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.oidc }}
+            {{- $ids := list }}
+            {{- range .Values.oidc }}
+            {{- $ids = append $ids (required "oidc: id is required" .id) }}
+            {{- end }}
+            - name: HUB_OIDC_PROVIDERS
+              value: {{ join "," $ids | quote }}
+            {{- end }}
+            {{- range .Values.oidc }}
+            {{- $prefix := printf "HUB_OIDC_%s_" (upper .id) }}
+            - name: {{ $prefix }}ISSUER
+              value: {{ required "oidc: issuer is required" .issuer | quote }}
+            - name: {{ $prefix }}CLIENT_ID
+              value: {{ required "oidc: clientId is required" .clientId | quote }}
+            {{- with .name }}
+            - name: {{ $prefix }}NAME
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.database.postgres.enabled }}
+            # Defined before HUB_DATABASE_URL: Kubernetes expands $(NAME) from the variables above it.
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hub.postgresSecretName" . }}
+                  key: password
+            - name: HUB_DATABASE_URL
+              value: "postgres://harnessly:$(POSTGRES_PASSWORD)@{{ include "hub.postgresName" . }}:5432/harnessly?sslmode=disable"
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ include "hub.secretName" . }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/harnessly-hub
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "hub.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

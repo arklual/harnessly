@@ -1,12 +1,15 @@
 package agent
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/agents"
 )
 
 // Config is everything the agent takes from its environment. Names a particular platform gives its routes, headers
@@ -43,7 +46,9 @@ type Config struct {
 	StateChangedPath string
 	StatusPath       string
 	SyncPath         string
-	RuntimeCookie    string
+	// V2Path is the runtime's v2 API: <prefix>/replica, <prefix>/conversations/<id>/turns.
+	V2Path        string
+	RuntimeCookie string
 	// CLITokenHeaders carry the runtime's cli-token when the agent tells it a state file changed.
 	CLITokenHeaders []string
 
@@ -53,7 +58,25 @@ type Config struct {
 	ReportPortEnv string
 	// ExtraStateFiles are files of the data directory's root the platform also keeps a copy of.
 	ExtraStateFiles []string
+
+	// Auth is AGENT_AUTH: "auto" (a hub when machine.json exists, else the closed cluster), "ed25519" or "hs256".
+	Auth string
+	// Machine is machine.json when the agent dials a hub (nil: it does not).
+	Machine     *MachineFile
+	MachineFile string
+	// PolicyFile is AGENT_POLICY_FILE ("": /etc/harnessly/policy.toml if there is one, else the account's).
+	PolicyFile string
+	// EnvDir holds the env files the agents' launches source; WorkDir is the folder whose disk the preflight reports.
+	EnvDir  string
+	WorkDir string
 }
+
+// Authentication of the dial.
+const (
+	AuthAuto    = "auto"
+	AuthEd25519 = "ed25519"
+	AuthHS256   = "hs256"
+)
 
 const (
 	ListenPath = "/v1"
@@ -121,10 +144,40 @@ func LoadConfig() (Config, error) {
 	c.RuntimeID = env("AGENT_RUNTIME_ID", "")
 	c.ListenAudience = env("AGENT_AUDIENCE", "agent")
 	c.DialAudience = env("AGENT_DIAL_AUDIENCE", "ingest")
-	c.RuntimeAPI = strings.TrimRight(env("AGENT_RUNTIME_API", "/api/agent"), "/")
+	c.Auth = env("AGENT_AUTH", AuthAuto)
+	c.MachineFile = env("AGENT_MACHINE_FILE", DefaultMachineFile(c.DataDir))
+	switch c.Auth {
+	case AuthAuto:
+		m, err := LoadMachine(c.MachineFile)
+		switch {
+		case err == nil:
+			c.Machine = m
+		case !errors.Is(err, os.ErrNotExist):
+			return c, err
+		}
+	case AuthEd25519:
+		m, err := LoadMachine(c.MachineFile)
+		if err != nil {
+			return c, fmt.Errorf("AGENT_AUTH=ed25519 needs a registered machine: %w", err)
+		}
+		c.Machine = m
+	case AuthHS256:
+	default:
+		return c, fmt.Errorf("AGENT_AUTH is %q, expected auto, ed25519 or hs256", c.Auth)
+	}
+	// A hub's runtime answers its API under its base path, so the routes the agent calls itself start with it.
+	base := ""
+	if c.Machine != nil {
+		base = c.Machine.RuntimeBasePath
+	}
+	c.RuntimeAPI = strings.TrimRight(env("AGENT_RUNTIME_API", base+"/api/agent"), "/")
 	c.StateChangedPath = env("AGENT_RUNTIME_STATE_CHANGED", c.RuntimeAPI+"/state-changed")
-	c.StatusPath = env("AGENT_RUNTIME_STATUS", "/api/status")
-	c.SyncPath = env("AGENT_RUNTIME_SYNC", "/api/sync")
+	c.StatusPath = env("AGENT_RUNTIME_STATUS", base+"/api/status")
+	c.SyncPath = env("AGENT_RUNTIME_SYNC", base+"/api/sync")
+	c.PolicyFile = env("AGENT_POLICY_FILE", "")
+	c.EnvDir = env("AGENT_ENV_DIR", filepath.Join(c.DataDir, agents.EnvDirName))
+	c.WorkDir = env("AGENT_WORK_DIR", env("RUNTIME_WORKSPACE_DIR", home))
+	c.V2Path = strings.TrimRight(env("AGENT_RUNTIME_V2", base+"/api/v2"), "/")
 	c.RuntimeCookie = env("AGENT_RUNTIME_COOKIE", "session-token")
 	for _, h := range strings.Split(env("AGENT_RUNTIME_CLI_HEADERS", "x-cli-token"), ",") {
 		if h = strings.TrimSpace(h); h != "" {

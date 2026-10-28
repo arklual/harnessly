@@ -67,7 +67,9 @@ func (l *Library) agentChats() map[string]Chat {
 }
 
 // Identity tells the runtimes of a shared folder apart (Runtime, the Unix user) and names the person behind it.
-type Identity struct{ Runtime, Person string }
+// PersonID is the stable key of that person across machines: the owner's whole address, lower case (the local part alone repeats across tenants);
+// empty when the runtime knows no address (the Unix name is no person: self-hosted machines share one).
+type Identity struct{ Runtime, Person, PersonID string }
 
 type identityCache struct {
 	mu sync.Mutex
@@ -121,7 +123,8 @@ func (l *Library) Identity() (Identity, error) {
 	if !ok {
 		person = u.Username
 	}
-	c.v, c.at = Identity{Runtime: u.Username, Person: person}, time.Now()
+	personID, _ := CleanText(strings.ToLower(strings.TrimSpace(l.ownerEmail())), 128)
+	c.v, c.at = Identity{Runtime: u.Username, Person: person, PersonID: personID}, time.Now()
 	return c.v, nil
 }
 

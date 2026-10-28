@@ -250,6 +250,29 @@
   opacity: 0.55;
 }
 
+.hx-effort__labels {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  margin-top: -4px;
+  color: var(--hx-fg-3);
+  font-size: 9px;
+  line-height: 12px;
+  text-align: center;
+}
+.hx-effort__label {
+  min-width: 0;
+}
+.hx-effort__label:first-child {
+  text-align: left;
+}
+.hx-effort__label:last-child {
+  text-align: right;
+}
+.hx-effort__label[data-chosen='true'] {
+  color: var(--hx-accent);
+  font-weight: var(--hx-weight-semibold);
+}
+
 /* Agent segments: the backing slides under the chosen one */
 .hx-seg {
   position: relative;

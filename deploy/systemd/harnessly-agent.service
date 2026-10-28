@@ -1,0 +1,25 @@
+# The agent of a machine that a harnessly hub carries, as a systemd user service (profile full of the installer,
+# docs/hub/machine.md): the link between this machine and its hub. Register first, then:
+#   harnessly-agent register --hub https://hub.example.com --token <code> --profile full
+#   install -Dm755 harnessly-agent ~/.local/bin/harnessly-agent
+#   install -Dm644 deploy/systemd/harnessly-agent.service ~/.config/systemd/user/harnessly-agent.service
+#   install -Dm644 agent.env ~/.config/harnessly/agent.env         # AGENT_PORT, RUNTIME_PORT (the runtime's port)
+#   systemctl --user daemon-reload && systemctl --user enable --now harnessly-agent
+[Unit]
+Description=harnessly agent: the link between the machine of %u and its hub
+Documentation=https://github.com/ly-solutions/harnessly/blob/main/docs/hub/machine.md
+After=network-online.target harnessly-runtime.service
+Wants=network-online.target harnessly-runtime.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/harnessly/agent.env
+WorkingDirectory=%h
+ExecStart=%h/.local/bin/harnessly-agent
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

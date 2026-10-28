@@ -1,0 +1,25 @@
+[38;5;246m⎿  $ cd /tmp/claude-995/-var-lib-example-ai-profiles-sergey-pr[39m
+[38;5;153m───────────────────────────────────────────────────────────────[39m
+[39m [1m[38;5;153mBash command[0m
+ [38;5;246mFetch food images for the Barcelona board[39m
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌[39m
+[39m [2m│[0m cd /tmp/claude-995/-var-lib-example-ai-profiles-sergey-proje
+[39m [2m│[0m cts/2f3c3409-3642-4b42-a945-ff3388519f95/scratchpad && rm -f
+[39m [2m│[0m food/* && sed -i "s/^Q=.*/Q={'tapas':'tapas bar Barcelona
+[39m [2m│[0m counter','vermut':'vermut Barcelona','paella':'paella
+[39m [2m│[0m Barceloneta','xocolata':'xocolata amb
+[39m [2m│[0m melindros','bomba':'bomba Barceloneta
+[39m [2m│[0m tapa','pintxos':'pintxos Barcelona','cova':'La Cova
+[39m [2m│[0m Fumada'}/" food_fetch.py && timeout 200 python3 -I
+[39m [2m│[0m food_fetch.py
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌[39m
+[39m [2m│[0m Dangerous rm operation on statically-unresolvable target:
+[39m [2m│[0m /var/lib/example-ai/profiles/sergey/projects/food/*
+[38;5;220m⚠[39m [38;5;220mClaude Code will automatically deny this request in 1:17, to[39m
+ [38;5;220mavoid blocking progress on an unattended session[39m
+
+ Do you want to proceed?
+ [38;5;153m❯[39m [38;5;246m1. [38;5;153mYes[39m
+   [38;5;246m2. [39mNo
+
+ [38;5;246mEsc to cancel · Tab to amend[39m

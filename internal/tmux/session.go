@@ -76,6 +76,7 @@ func (t *Tmux) shellEnv() [][2]string {
 // ShellLaunchCommand is the command a new session runs: the login shell under `env -i` with the allow-listed
 // environment, so neither the tmux server's cached environment nor the runtime's own variables reach the pane. TMUX and
 // TMUX_PANE, set by tmux for the pane, are expanded by the shell tmux runs the command with and so survive `env -i`.
+// With a niceness configured the shell runs under `nice`, so the panes yield the CPU and the server does not.
 // Every way of starting a pane shell must go through it.
 func (t *Tmux) ShellLaunchCommand() string { return t.shellLaunchCommand(nil) }
 
@@ -83,6 +84,9 @@ func (t *Tmux) ShellLaunchCommand() string { return t.shellLaunchCommand(nil) }
 // is not a valid variable name is dropped.
 func (t *Tmux) shellLaunchCommand(extra []string) string {
 	var b strings.Builder
+	if t.cfg.Nice > 0 {
+		b.WriteString("nice -n " + strconv.Itoa(t.cfg.Nice) + " ")
+	}
 	b.WriteString(`env -i TMUX="$TMUX" TMUX_PANE="$TMUX_PANE"`)
 	for _, kv := range t.shellEnv() {
 		b.WriteString(" " + kv[0] + "=" + shQuote(kv[1]))
@@ -125,7 +129,8 @@ func ParseNiceness(raw string, set bool) int {
 }
 
 // CreateSession starts a detached session of cols×rows running the pane shell in cwd (else Home), always on the current
-// server, under `nice` when configured; then the config is re-read on that server.
+// server; then the config is re-read on that server. The server this may start is not niced (the pane shell is): it
+// answers every command of the runtime, each with a few seconds to do it.
 func (t *Tmux) CreateSession(name string, cols, rows int, cwd string) error {
 	if cwd == "" {
 		cwd = t.cfg.Home
@@ -137,13 +142,11 @@ func (t *Tmux) CreateSession(name string, cols, rows int, cwd string) error {
 	}
 	args = append(args, "new-session", "-d", "-s", name, "-x", strconv.Itoa(cols), "-y", strconv.Itoa(rows), t.shellLaunchCommand(t.paneEnv(name)))
 	program := "tmux"
-	if t.cfg.Nice > 0 {
-		program = "nice"
-		args = append([]string{"-n", strconv.Itoa(t.cfg.Nice), "tmux"}, args...)
-	}
 	// The server this may start, and every pane on it, is what the OOM killer should take before the runtime.
 	program, args = oomguard.Unprotected(program, args...)
-	if r := t.run(cwd, program, args...); r.err != nil {
+	if r := t.runWrite(cwd, program, args...); r.timedOut {
+		return &SlowError{Command: "new-session", After: r.took}
+	} else if r.err != nil {
 		return r.err
 	}
 	if t.legacyName(name) {

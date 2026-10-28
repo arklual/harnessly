@@ -196,6 +196,9 @@ type Conversation struct {
 	// TerminalStop says the conversation's terminal was stopped — by the person or for standing idle — while the agent
 	// is not running again; the feed ends with a quiet row about it. Absent otherwise.
 	TerminalStop *TerminalStop `json:"terminalStop,omitempty"`
+	// TerminalFailure is a provider-neutral, non-retryable failure of the last turn. NeedsTarget means the runtime
+	// will not retry or move the conversation itself: the person must choose where to continue.
+	TerminalFailure *TerminalFailure `json:"terminalFailure,omitempty"`
 	// Rewinds are the person's rewinds of the conversation to an earlier message of theirs, oldest first, the last
 	// RewindsMax of them: the feed folds what each left behind where it was cut. Absent when there were none.
 	Rewinds []RewindMark `json:"rewinds,omitempty"`
@@ -225,6 +228,15 @@ type TerminalStop struct {
 	At     Ms             `json:"at"`
 	By     TerminalStopBy `json:"by"`
 	IdleMs int64          `json:"idleMs,omitempty"`
+}
+
+// TerminalFailure is a provider failure which ended a turn and requires an explicit target choice.
+type TerminalFailure struct {
+	Kind        TerminalFailureKind `json:"kind"`
+	At          Ms                  `json:"at"`
+	Detail      string              `json:"detail"`
+	Terminal    bool                `json:"terminal"`
+	NeedsTarget bool                `json:"needsTarget"`
 }
 
 // RewindMark is one rewind: the conversation went on from before one of the person's messages, with other words, and
@@ -334,10 +346,11 @@ const (
 	ViaSession OriginVia = "session"
 	ViaExcerpt OriginVia = "excerpt"
 	ViaNote    OriginVia = "note"
+	ViaHistory OriginVia = "history"
 )
 
 // OriginVias is every OriginVia, in the schema's order.
-var OriginVias = []OriginVia{ViaSession, ViaExcerpt, ViaNote}
+var OriginVias = []OriginVia{ViaSession, ViaExcerpt, ViaNote, ViaHistory}
 
 // HandoffMode is how a conversation's context goes to a new one on another agent or model: an excerpt of its
 // transcript, or a note its own agent writes for the next one.
@@ -346,10 +359,11 @@ type HandoffMode string
 const (
 	HandoffExcerpt HandoffMode = "excerpt"
 	HandoffNote    HandoffMode = "note"
+	HandoffHistory HandoffMode = "history"
 )
 
 // HandoffModes is every HandoffMode, in the schema's order.
-var HandoffModes = []HandoffMode{HandoffExcerpt, HandoffNote}
+var HandoffModes = []HandoffMode{HandoffExcerpt, HandoffNote, HandoffHistory}
 
 // DraftMode is the text a handoff draft is: an excerpt or a note for a handoff, or the result note a fork sends back
 // into the conversation it came from.
@@ -359,19 +373,28 @@ const (
 	DraftExcerpt DraftMode = "excerpt"
 	DraftNote    DraftMode = "note"
 	DraftResult  DraftMode = "result"
+	DraftHistory DraftMode = "history"
 )
 
 // DraftModes is every DraftMode, in the schema's order.
-var DraftModes = []DraftMode{DraftExcerpt, DraftNote, DraftResult}
+var DraftModes = []DraftMode{DraftExcerpt, DraftNote, DraftResult, DraftHistory}
 
 // HandoffDraft answers POST /api/v2/conversations/{id}/handoff-draft {mode, provider?, model?}: the text a handoff
 // or a merge would carry, for the page to show and the person to edit before it goes. Tokens is its size as the
 // runtime estimates it (about four characters a token); Turns is how many of the conversation's turns an excerpt holds.
 type HandoffDraft struct {
-	Mode   DraftMode `json:"mode"`
-	Text   string    `json:"text"`
-	Tokens int       `json:"tokens"`
-	Turns  int       `json:"turns"`
+	Mode     DraftMode        `json:"mode"`
+	Text     string           `json:"text,omitempty"`
+	Tokens   int              `json:"tokens"`
+	Turns    int              `json:"turns"`
+	Artifact *HandoffArtifact `json:"artifact,omitempty"`
+}
+
+// HandoffArtifact is private handoff material held by the runtime. The page receives only its opaque ID and size,
+// never the filesystem path.
+type HandoffArtifact struct {
+	ID    string `json:"id"`
+	Bytes int64  `json:"bytes"`
 }
 
 // HandoffTextMax is the longest text a handoff or a merge carries, in characters: the message it goes in, with its
@@ -639,6 +662,11 @@ type TurnOutput struct {
 	Op    OutputOp   `json:"op"`
 	Title string     `json:"title"`
 	Ref   string     `json:"ref"`
+	// A delivered file (kind delivery): Ref is its path; its name, type, size in bytes and sha256 as the platform read them.
+	Name   string `json:"name,omitempty"`
+	Mime   string `json:"mime,omitempty"`
+	Size   int64  `json:"size,omitempty"`
+	SHA256 string `json:"sha256,omitempty"`
 }
 
 // TurnSummary is a turn as the sidebar row and the notifications need it.
@@ -968,6 +996,9 @@ type GateState struct {
 	// Refused: an open gate the page decided on whose menu the machine could not match on the agent's screen; no key
 	// went in, the person decides in the terminal. Absent otherwise.
 	Refused *GateRefusal `json:"refused"`
+	// AutoDenyAt: an open permission whose prompt says Claude denies it by itself (an unattended session) — when it
+	// does (epoch ms), read off the screen. Absent otherwise.
+	AutoDenyAt *Ms `json:"autoDenyAt"`
 }
 
 // BgWait is what an agent whose prompt is free still waits for, by kind; the counts that are 0 are absent. Its parts
@@ -1452,6 +1483,12 @@ type TurnFailedEv struct {
 	Turn Turn `json:"turn"`
 }
 
+// QuotaExhaustedEv says the provider cannot accept another request on the current target. It is emitted once for the
+// failed turn; the conversation record carries the durable marker.
+type QuotaExhaustedEv struct {
+	Failure TerminalFailure `json:"failure"`
+}
+
 // QueueChangedEv is the conversation's whole queue.
 type QueueChangedEv struct {
 	Queue Queue `json:"queue"`
@@ -1500,6 +1537,7 @@ func (GateUpdatedEv) EventType() EventType         { return EvGateUpdated }
 func (CompactionEv) EventType() EventType          { return EvCompaction }
 func (TurnFinishedEv) EventType() EventType        { return EvTurnFinished }
 func (TurnFailedEv) EventType() EventType          { return EvTurnFailed }
+func (QuotaExhaustedEv) EventType() EventType      { return EvQuotaExhausted }
 func (QueueChangedEv) EventType() EventType        { return EvQueueChanged }
 func (PromptStateEv) EventType() EventType         { return EvPromptState }
 func (MessageUpsertEv) EventType() EventType       { return EvMessageUpsert }
@@ -1732,7 +1770,9 @@ type ConversationHandoffCmd struct {
 	// another one.
 	Profile string      `json:"profile,omitempty"`
 	Mode    HandoffMode `json:"mode"`
-	Text    string      `json:"text"`
+	Text    string      `json:"text,omitempty"`
+	// ArtifactID is the opaque server-owned history artifact. It is present only in history mode.
+	ArtifactID string `json:"artifactId,omitempty"`
 }
 
 // ConversationMergeCmd sends a fork's result back into the conversation it came from: Text (the note the fork's agent
@@ -2153,10 +2193,12 @@ const (
 	LaunchFailedNoSession     LaunchFailure = "no-session"
 	LaunchFailedCliMissing    LaunchFailure = "cli-missing"
 	LaunchFailedLoginRequired LaunchFailure = "login-required"
+	// LaunchFailedMachineBusy: tmux did not answer in time, the machine is overloaded; the same launch may go later.
+	LaunchFailedMachineBusy LaunchFailure = "machine-busy"
 )
 
 // LaunchFailures is every LaunchFailure, in the schema's order.
-var LaunchFailures = []LaunchFailure{LaunchFailedNoProcess, LaunchFailedExited, LaunchFailedNoPromptBox, LaunchFailedNoSession, LaunchFailedCliMissing, LaunchFailedLoginRequired}
+var LaunchFailures = []LaunchFailure{LaunchFailedNoProcess, LaunchFailedExited, LaunchFailedNoPromptBox, LaunchFailedNoSession, LaunchFailedCliMissing, LaunchFailedLoginRequired, LaunchFailedMachineBusy}
 
 // GoneReason is why a conversation's tab is gone.
 type GoneReason string
@@ -2218,10 +2260,12 @@ const (
 	OutputDoc      OutputKind = "doc"
 	OutputMR       OutputKind = "mr"
 	OutputStand    OutputKind = "stand"
+	// OutputDelivery is a file the agent handed to the person on purpose (harnessly deliver).
+	OutputDelivery OutputKind = "delivery"
 )
 
 // OutputKinds is every OutputKind, in the schema's order.
-var OutputKinds = []OutputKind{OutputArtifact, OutputDesign, OutputDoc, OutputMR, OutputStand}
+var OutputKinds = []OutputKind{OutputArtifact, OutputDesign, OutputDoc, OutputMR, OutputStand, OutputDelivery}
 
 // OutputOp is whether the turn made the thing or changed one there was.
 type OutputOp string
@@ -2396,10 +2440,21 @@ const (
 	PausedLaunchFailed PauseReason = "launch-failed"
 	PausedAgentGone    PauseReason = "agent-gone"
 	PausedLimited      PauseReason = "limited" // the agent hit its usage limit: the queue waits for the reset
+	PausedNeedsTarget  PauseReason = "needs-target"
 )
 
 // PauseReasons is every PauseReason, in the schema's order.
-var PauseReasons = []PauseReason{PausedInterrupted, PausedUser, PausedLaunchFailed, PausedAgentGone, PausedLimited}
+var PauseReasons = []PauseReason{PausedInterrupted, PausedUser, PausedLaunchFailed, PausedAgentGone, PausedLimited, PausedNeedsTarget}
+
+// TerminalFailureKind is a stable, provider-neutral terminal outcome.
+type TerminalFailureKind string
+
+const (
+	FailureQuotaExhausted TerminalFailureKind = "quota_exhausted"
+)
+
+// TerminalFailureKinds is every TerminalFailureKind, in the schema's order.
+var TerminalFailureKinds = []TerminalFailureKind{FailureQuotaExhausted}
 
 // GateKind is the kind of an open gate on a conversation.
 type GateKind string
@@ -2590,6 +2645,7 @@ const (
 	EvCompaction          EventType = "compaction"
 	EvTurnFinished        EventType = "turn_finished"
 	EvTurnFailed          EventType = "turn_failed"
+	EvQuotaExhausted      EventType = "quota_exhausted"
 	EvQueueChanged        EventType = "queue_changed"
 	EvPromptState         EventType = "prompt_state"
 	EvMessageUpsert       EventType = "message_upsert"
@@ -2601,7 +2657,7 @@ const (
 )
 
 // ConvEventTypes is every ConvEventType, in the schema's order.
-var ConvEventTypes = []EventType{EvTurnStarted, EvStep, EvEntryUpdate, EvEntryReplace, EvNow, EvQuestionAsked, EvPermissionRequested, EvPlanProposed, EvGateUpdated, EvCompaction, EvTurnFinished, EvTurnFailed, EvQueueChanged, EvPromptState, EvMessageUpsert, EvBackgroundUpsert, EvBackgroundRemoved, EvShotsSet, EvPicturesSet, EvFeedReset}
+var ConvEventTypes = []EventType{EvTurnStarted, EvStep, EvEntryUpdate, EvEntryReplace, EvNow, EvQuestionAsked, EvPermissionRequested, EvPlanProposed, EvGateUpdated, EvCompaction, EvTurnFinished, EvTurnFailed, EvQuotaExhausted, EvQueueChanged, EvPromptState, EvMessageUpsert, EvBackgroundUpsert, EvBackgroundRemoved, EvShotsSet, EvPicturesSet, EvFeedReset}
 
 // CompactionPhase is the start or the end of a compaction.
 type CompactionPhase string

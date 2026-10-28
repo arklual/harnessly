@@ -484,7 +484,7 @@
     "restoredSame": true,
     "boardAfter": true,
     "log": "Вернул «Board 2» к версии db127bd\nRuntime: rt\nEditor: Ann · чат «Чат» (rt)\n\nacme-design <design@example.local>\n--\nПравки: «Board 2»\nRuntime: rt\nEditor: Ann · чат «Чат» (rt)\n\nacme-design <design@example.local>\n--\nНачальный снимок библиотеки\nRuntime: rt\n\nacme-design <design@example.local>\n--\n",
-    "exclude": "# acme-design-library-history v2\n.git\n.claims/\n.check/\n.thumbs/\n.trash/\n.claude/\n.playwright-mcp/\n.remember/\nnode_modules/\n.importing-*/\n.creating-*/\n*.tmp\n",
+    "exclude": "# acme-design-library-history v2\n.git\n.claims/\n.check/\n.thumbs/\n.trash/\n.media/\n.claude/\n.playwright-mcp/\n.remember/\nnode_modules/\n.importing-*/\n.creating-*/\n*.tmp\n",
     "config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = false\n\tbare = false\n\tlogallrefupdates = true\n[gc]\n\tautoDetach = false\n"
   }
 }

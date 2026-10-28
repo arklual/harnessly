@@ -84,6 +84,10 @@ export interface IInviteMade {
 
 export type TGuestRights = 'view' | 'comment';
 
+/** Which design a guest link shows: the one as its owner has it now, or the one it was made (or last updated) at. */
+export const GUEST_VERSION = { latest: 'latest', pinned: 'pinned' } as const;
+export type TGuestVersion = (typeof GUEST_VERSION)[keyof typeof GUEST_VERSION];
+
 /** A link that opens the design without signing in (`…/shares`); `comments` is how many guests wrote under it. */
 export interface IGuestLink {
   id: string;
@@ -95,6 +99,12 @@ export interface IGuestLink {
   createdAt: string;
   url: string;
   comments: number;
+  /** An older gateway, and every link made before the setting, has none: it shows the latest version. */
+  version?: TGuestVersion;
+  /** The pages (board paths) the guest may open; null or absent is all of them. */
+  pages?: string[] | null;
+  /** What the link carries as it was made, where the gateway hands it back (a deck's flags are read from it). */
+  view?: Record<string, unknown> | null;
 }
 
 /** How the owner looks at the design, for a guest link to open the same way (the contract is in access/guest-view.ts). */
@@ -114,12 +124,29 @@ export interface IGuestView {
   page: string | null;
 }
 
+/** A deck link's `view`: how it opens and the flags its files and counting are gated by (deck/deck-link-view.ts). */
+export interface IGuestDeckView {
+  v: 1;
+  deck: 'slides' | 'full' | 'video';
+  pdf: boolean;
+  video: boolean;
+  stats: boolean;
+}
+
 export interface IGuestLinkInput {
   title: string;
   rights: TGuestRights;
   ttl: TTtlValue;
-  /** The owner's remembered look; absent when the design has none. */
-  view?: IGuestView;
+  /** The owner's remembered look (a design) or the deck's flags; absent when there is none. */
+  view?: IGuestView | IGuestDeckView;
+  version?: TGuestVersion;
+  /** Board paths; null is all of the pages. */
+  pages?: string[] | null;
+}
+
+/** What a change of a link may carry: `refresh` moves a pinned link to the design as it is now. */
+export interface IGuestLinkChange extends Partial<IGuestLinkInput> {
+  refresh?: true;
 }
 
 export interface IPersonHit {
@@ -184,7 +211,16 @@ const send = async (
   );
 };
 
-const at = (project: string) => `${BASE}/${encodeURIComponent(project)}` as const;
+/** The resource the dialog is about, as one string: a design is its project id, a catalog document is `doc:<slug>`
+ * . The gateway's routes differ by kind, the rules and the screens are the same. */
+export const DOC_PREFIX = 'doc:';
+export const docRef = (slug: string): string => `${DOC_PREFIX}${slug}`;
+export const isDocRef = (project: string): boolean => project.startsWith(DOC_PREFIX);
+
+const at = (project: string) =>
+  (isDocRef(project)
+    ? `/docs/${encodeURIComponent(project.slice(DOC_PREFIX.length))}/acl`
+    : `${BASE}/${encodeURIComponent(project)}`) as `/${string}`;
 
 const isAccess = (v: unknown): v is IProjectAccess =>
   typeof v === 'object' && v !== null && 'team' in v && 'canManage' in v;
@@ -242,12 +278,13 @@ export const createInvite = async (project: string, input: IInviteInput): Promis
 export const revokeInvite = (project: string, id: string) =>
   fresh(send('DELETE', `${at(project)}/invites/${encodeURIComponent(id)}`));
 
+/** A link of a document has no address after it was made (the gateway keeps only a hash of it), so `url` may be absent
+ *  there; it is then empty and the row offers no copy. */
 const isGuestLink = (v: unknown): v is IGuestLink =>
-  typeof v === 'object' &&
-  v !== null &&
-  'id' in v &&
-  'rights' in v &&
-  typeof (v as IGuestLink).url === 'string';
+  typeof v === 'object' && v !== null && 'id' in v && 'rights' in v;
+
+const withUrl = (link: IGuestLink): IGuestLink =>
+  typeof link.url === 'string' ? link : { ...link, url: '' };
 
 const guestLink = (answer: unknown): IGuestLink => {
   if (!isGuestLink(answer)) throw new AccessError(t('next.failure.http'), 'unknown', 0);
@@ -261,7 +298,66 @@ export const fetchGuestLinks = async (
 ): Promise<IGuestLink[] | null> => {
   try {
     const answer = await send('GET', `${at(project)}/shares`, undefined, signal);
-    return Array.isArray(answer) ? answer.filter(isGuestLink) : null;
+    // A document's gateway answers {shares: [...]}, a design's a bare list.
+    const list =
+      typeof answer === 'object' && answer !== null && 'shares' in answer
+        ? (answer as { shares: unknown }).shares
+        : answer;
+    return Array.isArray(list) ? list.filter(isGuestLink).map(withUrl) : null;
+  } catch (failure) {
+    if (signal?.aborted) throw failure;
+    return null;
+  }
+};
+
+/** A comment a guest left under one of the project's links, as the owner's route lists it. `x` and `y` are 0..1 of the
+ *  board, null for a comment on a block without a point. */
+export interface IGuestCommentOwned {
+  id: number;
+  linkId: string;
+  linkTitle: string;
+  /** The board's path. */
+  board: string;
+  x: number | null;
+  y: number | null;
+  text: string;
+  name: string;
+  at: string;
+  /** What the guest picked: the block's label ('' when there was none). */
+  label: string;
+}
+
+const fraction = (v: unknown): number | null => (typeof v === 'number' && v >= 0 && v <= 1 ? v : null);
+
+const guestCommentOf = (v: unknown): IGuestCommentOwned | null => {
+  if (typeof v !== 'object' || v === null) return null;
+  const c = v as Record<string, unknown>;
+  if (typeof c.id !== 'number' || typeof c.board !== 'string' || typeof c.text !== 'string') return null;
+  const anchor =
+    typeof c.anchor === 'object' && c.anchor !== null ? (c.anchor as Record<string, unknown>) : {};
+  return {
+    id: c.id,
+    linkId: typeof c.linkId === 'string' ? c.linkId : '',
+    linkTitle: typeof c.linkTitle === 'string' ? c.linkTitle : '',
+    board: c.board,
+    x: fraction(c.x),
+    y: fraction(c.y),
+    text: c.text,
+    name: typeof c.name === 'string' ? c.name : '',
+    at: typeof c.at === 'string' ? c.at : '',
+    label: typeof anchor.label === 'string' ? anchor.label : '',
+  };
+};
+
+/** What guests left under any link of the project (newest first), or null where the gateway has none (standalone, an
+ *  old one, no answer): the deck then lists only the team's comments. */
+export const fetchGuestComments = async (
+  project: string,
+  signal?: AbortSignal,
+): Promise<IGuestCommentOwned[] | null> => {
+  try {
+    const answer = await send('GET', `${at(project)}/guest-comments`, undefined, signal);
+    return Array.isArray(answer) ? answer.flatMap((item) => guestCommentOf(item) ?? []) : null;
   } catch (failure) {
     if (signal?.aborted) throw failure;
     return null;
@@ -275,7 +371,7 @@ export const createGuestLink = async (project: string, input: IGuestLinkInput): 
 export const changeGuestLink = async (
   project: string,
   id: string,
-  change: Partial<IGuestLinkInput>,
+  change: IGuestLinkChange,
 ): Promise<IGuestLink> =>
   guestLink(await send('PATCH', `${at(project)}/shares/${encodeURIComponent(id)}`, change));
 

@@ -51,6 +51,9 @@ export interface IAppConfig {
   speedPosthogKey: string | null;
   /** Key of the remembered launch choice in the runtime's config (RUNTIME_LAUNCH_DEFAULTS_KEY). */
   launchDefaultsKey: string;
+  /** The hub this machine is connected to (RUNTIME_HUB_URL), no trailing slash: the page links back to it and signing out
+   *  goes through it. null: the runtime is reached directly. */
+  hubUrl: string | null;
 }
 
 const DEFAULTS: IAppConfig = {
@@ -79,6 +82,7 @@ const DEFAULTS: IAppConfig = {
   speedPosthogKey: null,
   layoutKey: 'layout',
   launchDefaultsKey: 'launchDefaults',
+  hubUrl: null,
 };
 
 let cached: IAppConfig | null = null;
@@ -118,6 +122,7 @@ export const appConfig = (): IAppConfig => {
     copy: read.copy ?? {},
     basePath: (read.basePath ?? baseHref ?? DEFAULTS.basePath).replace(/\/+$/, ''),
     platformApi: (read.platformApi ?? platformMeta ?? DEFAULTS.platformApi).replace(/\/+$/, ''),
+    hubUrl: typeof read.hubUrl === 'string' && read.hubUrl ? read.hubUrl.replace(/\/+$/, '') : null,
   };
   return cached;
 };

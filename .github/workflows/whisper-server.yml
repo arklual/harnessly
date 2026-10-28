@@ -1,0 +1,66 @@
+# The speech recognition server of the runtime's microphone (internal/voice/engine): whisper.cpp's whisper-server, built
+# from the pinned commit in the Dockerfile's `whisper` stage for linux amd64 and arm64, published with a checksum list
+# as a GitHub release. The runtime downloads it on the first dictation and checks it against the list; the release tag
+# is the one engine.BinaryBase names. Run it by hand (or push a whisper-server-* tag) when WHISPER_COMMIT changes, and
+# bump the revision suffix in engine.BinaryBase with it.
+name: whisper-server
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        default: whisper-server-v1.9.5-r1
+  push:
+    tags: ["whisper-server-*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        run: |
+          docker buildx build --target whisper-server --platform linux/${{ matrix.arch }} --output type=local,dest=out .
+          mv out/whisper-server whisper-server-linux-${{ matrix.arch }}
+          chmod 0755 whisper-server-linux-${{ matrix.arch }}
+          # It must start on this runner (a missing library or instruction set would not).
+          ./whisper-server-linux-${{ matrix.arch }} -h >/dev/null 2>&1
+      - uses: actions/upload-artifact@v5
+        with:
+          name: whisper-server-linux-${{ matrix.arch }}
+          path: whisper-server-linux-${{ matrix.arch }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          cd dist
+          sha256sum whisper-server-linux-* > whisper-server.sha256
+          cat whisper-server.sha256
+          notes="whisper.cpp (MIT) whisper-server, built from the commit pinned in the Dockerfile."
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes "$notes" --latest=false whisper-server-linux-* whisper-server.sha256 \
+            || gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber whisper-server-linux-* whisper-server.sha256

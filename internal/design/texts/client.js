@@ -46,6 +46,275 @@
     }, 0);
   });
 
+  // The timeline of this design, for the agent to read later with `{{cli}} design timeline` and `{{cli}} design moment`:
+  // what the owner did and what the page suffered, each event with its time. Nothing here reads what a person types, and
+  // nothing runs for a guest. It must not cost frames: every listener is passive, bursts are throttled, events wait in
+  // a queue and leave in small batches when the browser is idle, and the volume of one page load is capped.
+  var noteTweak = function () {};
+  if (!guest) (function () {
+    var FLUSH_MS = 2000, BATCH_EVENTS = 20, URL_CHARS = 5200, MAX_EVENTS = 3000, QUEUE_MAX = 200;
+    var SCROLL_MS = 250, RESIZE_MS = 300, SLOW_REQUEST_MS = 1500, JANK_GAP_MS = 50, JANK_MAX = 300, ACTIVE_TAIL_MS = 700;
+    var queue = [], taken = 0, flushTimer = 0;
+    function pageName() { return location.pathname.replace(/^\/a\/[^/]+\/p\//, '') + location.search; }
+    function clip(value, max) { value = String(value == null ? '' : value).replace(/\s+/g, ' ').trim(); return value.length > max ? value.slice(0, max) : value; }
+    function note(kind, fields, at) {
+      if (taken >= MAX_EVENTS) return;
+      taken += 1;
+      var event = fields || {};
+      event.k = kind;
+      event.t = Math.round(at || Date.now());
+      queue.push(event);
+      if (queue.length > QUEUE_MAX) queue.splice(0, queue.length - QUEUE_MAX);
+      if (queue.length >= BATCH_EVENTS) later(0, true); else later(FLUSH_MS, false);
+    }
+    // A full batch does not wait for the slow timer that an earlier event set.
+    function later(ms, urgent) {
+      if (flushTimer && !urgent) return;
+      clearTimeout(flushTimer);
+      flushTimer = setTimeout(function () {
+        flushTimer = 0;
+        if (window.requestIdleCallback) requestIdleCallback(function () { flush(); }, { timeout: 1000 }); else flush();
+      }, ms);
+    }
+    // The batch rides a GET like the log line does; the part that does not fit the address waits for the next request.
+    function flush() {
+      var page = encodeURIComponent(pageName());
+      while (queue.length) {
+        var count = 0, text = '[';
+        while (count < queue.length && count < BATCH_EVENTS * 2) {
+          var piece = JSON.stringify(queue[count]);
+          if (count && encodeURIComponent(text + ',' + piece).length > URL_CHARS) break;
+          text += (count ? ',' : '') + piece;
+          count += 1;
+        }
+        queue.splice(0, count);
+        try { fetch('/__lib/log?a=' + encodeURIComponent(id) + '&p=' + page + '&e=' + encodeURIComponent(text + ']'), { cache: 'no-store', keepalive: true }).catch(function () {}); } catch (e) {}
+      }
+    }
+
+    // Where an element is, as a short selector: its tag, id and first classes, with up to two parents.
+    function describe(node) {
+      var parts = [];
+      for (var depth = 0; node && node.nodeType === 1 && depth < 3; depth += 1, node = node.parentElement) {
+        var part = node.tagName.toLowerCase();
+        if (node.id) part += '#' + clip(node.id, 30);
+        else if (typeof node.className === 'string' && node.className.trim()) part += '.' + node.className.trim().split(/\s+/).slice(0, 2).map(function (name) { return clip(name, 30); }).join('.');
+        parts.unshift(part);
+        if (node.id) break;
+      }
+      return parts.join(' > ');
+    }
+    // What a person would call the element. The value of a field is never read: a field is named by its label only.
+    function label(node) {
+      var tag = node.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return clip(node.getAttribute('aria-label') || node.getAttribute('placeholder') || node.name || node.type, 80);
+      if (node.isContentEditable) return clip(node.getAttribute('aria-label'), 80);
+      return clip(node.getAttribute('aria-label') || node.textContent, 80);
+    }
+
+    // Navigation and the viewport.
+    function navigated() { note('nav', { u: pageName(), w: innerWidth, h: innerHeight, dpr: window.devicePixelRatio || 1 }); }
+    navigated();
+    window.addEventListener('popstate', navigated, { passive: true });
+    window.addEventListener('hashchange', navigated, { passive: true });
+    ['pushState', 'replaceState'].forEach(function (name) {
+      var original = history[name];
+      if (typeof original !== 'function') return;
+      history[name] = function () {
+        var result = original.apply(this, arguments);
+        try { navigated(); } catch (e) {}
+        return result;
+      };
+    });
+    var resizeTimer = 0;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () { note('vp', { w: innerWidth, h: innerHeight, dpr: window.devicePixelRatio || 1 }); }, RESIZE_MS);
+    }, { passive: true });
+
+    // Clicks and taps, and scrolling (the last position of a burst).
+    document.addEventListener('click', function (event) {
+      var target = event.target;
+      if (!target || target.nodeType !== 1) return;
+      var node = target.closest ? (target.closest('a,button,input,select,textarea,label,summary,[role="button"],[role="tab"],[role="link"],[onclick]') || target) : target;
+      note('click', { tag: node.tagName.toLowerCase(), sel: describe(node), tx: label(node), x: Math.round(event.clientX), y: Math.round(event.clientY) });
+    }, { capture: true, passive: true });
+    var scrollTimer = 0, scrollTarget = null;
+    document.addEventListener('scroll', function (event) {
+      scrollTarget = event.target;
+      if (scrollTimer) return;
+      scrollTimer = setTimeout(function () {
+        scrollTimer = 0;
+        var node = scrollTarget;
+        if (!node || node === document || node === document.documentElement || node === document.body) {
+          var root = document.scrollingElement || document.documentElement;
+          note('scroll', { y: Math.round(root.scrollTop), max: Math.max(0, Math.round(root.scrollHeight - innerHeight)) });
+        } else if (node.nodeType === 1) {
+          note('scroll', { sel: describe(node), y: Math.round(node.scrollTop), max: Math.max(0, Math.round(node.scrollHeight - node.clientHeight)) });
+        }
+      }, SCROLL_MS);
+    }, { capture: true, passive: true });
+
+    // Tweak changes are noted where the board script applies them (setControl calls noteTweak).
+    noteTweak = function (name, value) { note('tweak', { n: clip(name, 40), v: clip(value, 60) }); };
+
+    // The console: errors and warnings only, with the first arguments as text.
+    ['error', 'warn'].forEach(function (level) {
+      var original = console[level];
+      if (typeof original !== 'function') return;
+      console[level] = function () {
+        try {
+          note('console', { l: level, m: clip(Array.prototype.slice.call(arguments, 0, 4).map(function (arg) {
+            if (arg && arg.stack) return arg.stack;
+            if (arg && typeof arg === 'object') { try { return JSON.stringify(arg); } catch (e) { return String(arg); } }
+            return String(arg);
+          }).join(' '), 400) });
+        } catch (e) {}
+        return original.apply(this, arguments);
+      };
+    });
+    window.addEventListener('error', function (event) {
+      var target = event.target;
+      if (target && target !== window && target.nodeType === 1) {
+        // A picture, script or style that did not load: the error event of an element does not bubble, so it is caught on the way down.
+        var source = target.currentSrc || target.src || target.href;
+        if (source) note('req', { me: 'GET', u: requestName(source), st: 0, d: 0, x: target.tagName.toLowerCase() });
+        return;
+      }
+      note('err', { l: 'error', m: clip(event.message || (event.error && event.error.message) || 'Script error', 300) });
+    }, true);
+    window.addEventListener('unhandledrejection', function (event) {
+      var reason = event.reason || {};
+      note('err', { l: 'rejection', m: clip(reason.message || reason, 300) });
+    }, { passive: true });
+
+    // Requests: those that failed or took long. The address loses its query (it may hold tokens).
+    function requestName(address) {
+      try {
+        var u = new URL(address, location.href);
+        return clip((u.origin === location.origin ? '' : u.origin) + u.pathname, 120);
+      } catch (e) { return clip(address, 120); }
+    }
+    function ours(address) { return String(address).indexOf('/__lib/') >= 0; }
+    if (typeof window.fetch === 'function') {
+      var nativeFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var address = input && input.url || input;
+        var method = (init && init.method || input && input.method || 'GET').toUpperCase();
+        if (ours(address)) return nativeFetch.apply(this, arguments);
+        var began = performance.now();
+        var result = nativeFetch.apply(this, arguments);
+        result.then(function (response) {
+          var took = performance.now() - began;
+          if (!response.ok || took >= SLOW_REQUEST_MS) note('req', { me: method, u: requestName(address), st: response.status, d: Math.round(took), x: 'fetch' });
+        }, function () {
+          note('req', { me: method, u: requestName(address), st: 0, d: Math.round(performance.now() - began), x: 'fetch' });
+        });
+        return result;
+      };
+    }
+    if (window.XMLHttpRequest) {
+      var nativeOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, address) {
+        var request = this, began = 0;
+        if (!ours(address)) {
+          request.addEventListener('loadstart', function () { began = performance.now(); });
+          request.addEventListener('loadend', function () {
+            var took = performance.now() - began;
+            if (request.status === 0 || request.status >= 400 || took >= SLOW_REQUEST_MS) note('req', { me: String(method).toUpperCase(), u: requestName(address), st: request.status, d: Math.round(took), x: 'xhr' });
+          });
+        }
+        return nativeOpen.apply(this, arguments);
+      };
+    }
+
+    // Long tasks, slow input, layout shifts and the vitals, from the browser's own observers.
+    function observe(type, handler, extra) {
+      try {
+        var options = { type: type, buffered: true };
+        for (var key in extra || {}) options[key] = extra[key];
+        new PerformanceObserver(function (list) { list.getEntries().forEach(handler); }).observe(options);
+      } catch (e) {}
+    }
+    function wall(entry) { return performance.timeOrigin + entry.startTime; }
+    observe('longtask', function (entry) { note('lt', { d: Math.round(entry.duration) }, wall(entry)); });
+    observe('resource', function (entry) {
+      if (entry.initiatorType === 'fetch' || entry.initiatorType === 'xmlhttprequest' || ours(entry.name)) return;
+      var failed = typeof entry.responseStatus === 'number' && entry.responseStatus >= 400;
+      if (failed || entry.duration >= SLOW_REQUEST_MS) note('req', { me: 'GET', u: requestName(entry.name), st: entry.responseStatus || 200, d: Math.round(entry.duration), x: entry.initiatorType }, wall(entry));
+    });
+    var lcp = 0, cls = 0, worstInput = 0;
+    observe('largest-contentful-paint', function (entry) { lcp = entry.startTime; });
+    observe('layout-shift', function (entry) {
+      if (entry.hadRecentInput) return;
+      cls += entry.value;
+      if (entry.value >= 0.1) {
+        var source = entry.sources && entry.sources[0] && entry.sources[0].node;
+        note('shift', { v: Math.round(entry.value * 1000) / 1000, sel: source && source.nodeType === 1 ? describe(source) : '' }, wall(entry));
+      }
+    });
+    observe('event', function (entry) {
+      if (!entry.interactionId) return;
+      if (entry.duration > worstInput) worstInput = entry.duration;
+      if (entry.duration >= 200) note('inp', { n: entry.name, d: Math.round(entry.duration), sel: entry.target && entry.target.nodeType === 1 ? describe(entry.target) : '' }, wall(entry));
+    }, { durationThreshold: 40 });
+    var vitalsSent = false;
+    function sendVitals() {
+      if (vitalsSent) return;
+      vitalsSent = true;
+      if (lcp) note('vital', { n: 'LCP', v: Math.round(lcp) });
+      note('vital', { n: 'CLS', v: Math.round(cls * 1000) / 1000 });
+      if (worstInput) note('vital', { n: 'INP', v: Math.round(worstInput) });
+    }
+
+    // Dropped frames. A frame loop runs only while something moves: after a scroll, a pointer or key event, a resize,
+    // a transition or an animation, and stops 0.7 s after the last of them and when no animation is running.
+    var loopOn = false, lastActive = 0, lastFrame = 0, burst = null, jankCount = 0;
+    function endBurst(now) {
+      if (burst && now - burst.began >= 400 && burst.frames > 4) {
+        var fps = burst.frames / ((now - burst.began) / 1000);
+        if (burst.janky > 0 || fps < 50) note('fps', { d: Math.round(now - burst.began), f: Math.round(fps), j: burst.janky, w: Math.round(burst.worst) });
+      }
+      burst = null;
+    }
+    function frame(now) {
+      if (document.hidden) { lastFrame = 0; burst = null; loopOn = false; return; }
+      if (lastFrame) {
+        var gap = now - lastFrame;
+        if (!burst) burst = { began: lastFrame, frames: 0, janky: 0, worst: 0 };
+        burst.frames += 1;
+        if (gap > JANK_GAP_MS) {
+          burst.janky += 1;
+          if (gap > burst.worst) burst.worst = gap;
+          if (jankCount < JANK_MAX) { jankCount += 1; note('jank', { d: Math.round(gap), n: Math.max(1, Math.round(gap / 16.7) - 1) }); }
+        }
+      }
+      lastFrame = now;
+      var animating = false;
+      try { animating = !!(document.getAnimations && now - lastActive > 200 && document.getAnimations().length); } catch (e) {}
+      if (now - lastActive < ACTIVE_TAIL_MS || animating) { requestAnimationFrame(frame); return; }
+      endBurst(now);
+      lastFrame = 0;
+      loopOn = false;
+    }
+    function active() {
+      lastActive = performance.now();
+      if (loopOn) return;
+      loopOn = true;
+      lastFrame = 0;
+      requestAnimationFrame(frame);
+    }
+    ['scroll', 'pointerdown', 'pointermove', 'keydown', 'wheel', 'touchmove', 'resize', 'transitionstart', 'animationstart'].forEach(function (name) {
+      var last = 0;
+      // A busy stream of moves wakes the loop at most every 100 ms.
+      document.addEventListener(name, function () { var t = performance.now(); if (t - last > 100) { last = t; active(); } }, { capture: true, passive: true });
+    });
+
+    // The queue leaves when the page is hidden or closed, and the vitals with it.
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { sendVitals(); flush(); } }, { passive: true });
+    window.addEventListener('pagehide', function () { sendVitals(); flush(); }, { passive: true });
+  })();
+
   var current = null;
   var scrollKey = function () { return 'tk-lib-scroll:' + location.pathname + location.search; };
   try {
@@ -438,6 +707,7 @@
     return items;
   }
   function setControl(item, value) {
+    noteTweak(item.name, value);
     if (item.live) {
       var name = window.__dcRootName();
       var entry = window.__dcRegistry && window.__dcRegistry[name];
@@ -1245,6 +1515,17 @@
     tellHostDom({ type: 'tk:styled', gone: missing });
   }
   if (parentWin && !slotBridge) {
+    // point: where the block was clicked or held, in the board's pixels.
+    var tellPicked = function (el, x, y) {
+      var box = el.getBoundingClientRect();
+      tellHostDom({
+        type: 'tk:picked', pick: rememberPicked(el), look: readLook(el), selector: pickSelector(el), tag: String(el.tagName).toLowerCase(),
+        text: String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+        rect: { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) },
+        outerHTML: String(el.outerHTML || '').slice(0, 2048), component: null, url: location.href, viewport: { w: innerWidth, h: innerHeight },
+        point: [Math.round(x + scrollX), Math.round(y + scrollY)]
+      });
+    };
     var swallowPick = function (event) {
       if (!picking) return;
       event.preventDefault();
@@ -1264,13 +1545,7 @@
       swallowPick(event);
       var el = pickTarget(event);
       if (!pickable(el)) return;
-      var box = el.getBoundingClientRect();
-      tellHostDom({
-        type: 'tk:picked', pick: rememberPicked(el), look: readLook(el), selector: pickSelector(el), tag: String(el.tagName).toLowerCase(),
-        text: String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
-        rect: { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) },
-        outerHTML: String(el.outerHTML || '').slice(0, 2048), component: null, url: location.href, viewport: { w: innerWidth, h: innerHeight }
-      });
+      tellPicked(el, event.clientX, event.clientY);
       setPicking(false, true);
     }, true);
     window.addEventListener('keydown', function (event) {
@@ -1280,16 +1555,639 @@
     }, true);
     // Another board or address ends the pick, as the bridge's navigation does.
     window.addEventListener('popstate', function () { setPicking(false, true); });
+    // A guest on a touch screen comments by holding a finger on a block (`tk:hold {on}` arms it): a ring fills under the
+    // finger, and after HOLD_MS without moving the block is picked as a click picks it; the click and the menu the
+    // press would give are swallowed. Text is not selected and links give no preview while it is armed.
+    var HOLD_MS = 600;
+    var HOLD_SLOP = 10;
+    var holdOn = false;
+    var held = null;
+    var holdQuiet = 0;
+    var holdCss = null;
+    var holdRing = null;
+    function holdStyle(on) {
+      var touch = !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (on && touch && !holdCss) {
+        holdCss = document.createElement('style');
+        holdCss.textContent = 'html{-webkit-touch-callout:none}html :not(input):not(textarea):not([contenteditable]){-webkit-user-select:none;user-select:none}'
+          + '@keyframes tk-hold{from{transform:scale(.4);opacity:.2}to{transform:scale(1);opacity:1}}';
+        document.documentElement.appendChild(holdCss);
+      }
+      if (!on && holdCss) { holdCss.remove(); holdCss = null; }
+    }
+    function holdEnd() {
+      if (!held) return;
+      clearTimeout(held.timer);
+      held = null;
+      if (holdRing) { holdRing.remove(); holdRing = null; }
+    }
+    function holdFire() {
+      if (!held) return;
+      var el = held.el;
+      var x = held.x;
+      var y = held.y;
+      holdEnd();
+      if (!pickable(el)) return;
+      holdQuiet = Date.now() + 900;
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+      tellPicked(el, x, y);
+    }
+    window.addEventListener('pointerdown', function (event) {
+      holdEnd();
+      if (!holdOn || picking || event.pointerType === 'mouse' || !event.isPrimary) return;
+      var el = pickTarget(event);
+      if (!pickable(el)) return;
+      held = { x: event.clientX, y: event.clientY, el: el, timer: setTimeout(holdFire, HOLD_MS) };
+      holdRing = document.createElement('div');
+      holdRing.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;'
+        + 'border:3px solid #8b5cf6;background:rgba(139,92,246,.14);animation:tk-hold ' + HOLD_MS + 'ms ease-out both;left:' + event.clientX + 'px;top:' + event.clientY + 'px';
+      document.documentElement.appendChild(holdRing);
+    }, true);
+    window.addEventListener('pointermove', function (event) {
+      if (held && Math.abs(event.clientX - held.x) + Math.abs(event.clientY - held.y) > HOLD_SLOP) holdEnd();
+    }, true);
+    ['pointerup', 'pointercancel', 'scroll'].forEach(function (type) { window.addEventListener(type, holdEnd, true); });
+    // A phone gives its menu before the hold is done: the menu is the hold's then, and the block is picked at once.
+    window.addEventListener('contextmenu', function (event) {
+      if (!held && Date.now() > holdQuiet) return;
+      event.preventDefault();
+      holdFire();
+    }, true);
+    window.addEventListener('click', function (event) {
+      if (Date.now() > holdQuiet) return;
+      holdQuiet = 0;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+    }, true);
+    // A guest's keys go to the page that frames the board, where they open and close the full screen and the comments and
+    // step through a deck's slides (a deck's own keys are sent by the deck below).
+    if (guest) {
+      window.addEventListener('keydown', function (event) {
+        var target = event.target;
+        if (deckOn || picking || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+        if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || ''))) return;
+        var key = DECK_KEYS[event.code];
+        if (key) tellHostDom({ type: 'tk:key', key: key });
+      });
+    }
     window.addEventListener('message', function (event) {
       var data = event.data;
       if (event.source !== parentWin || event.origin !== hostOrigin || !data || typeof data !== 'object') return;
       if (data.type === 'tk:pick' && typeof data.on === 'boolean') setPicking(data.on, false);
+      if (data.type === 'tk:hold' && typeof data.on === 'boolean') {
+        holdOn = data.on;
+        holdStyle(data.on);
+        if (!data.on) holdEnd();
+      }
       if (data.type === 'tk:styles') {
         var items = readStyles(data.items);
         if (items) setStyles(items);
       }
     });
   }
+  // A presentation's slide (the deck): the host that frames it turns the deck on (`tk:deck {on, mode}`) and the board
+  // then tells what is under the pointer (`tk:deck-hover`: the block, its box, whether it was moved and may be), lets
+  // the person edit a text in place where the template's text is plain (`tk:deck-select`, `tk:deck-text` on leaving it,
+  // `tk:deck-dynamic` for a text the board's code fills), drags a free block with snapping to the centre and the 7% field
+  // (`tk:deck-drag`), answers what is at a point (`tk:deck-hit`), shows the steps up to n (`tk:deck-step`), streams the
+  // pointer while asked (`tk:deck-pointer`) and turns a touch held on the slide into a pick of that place (a ring at
+  // 250 ms, `tk:deck-press`; the pick at 730 ms, `tk:picked` with its point; moving more than 10 px cancels). The host
+  // previews styles and moves on a block (`tk:deck-style`, `tk:deck-move`), ends an edit in place (`tk:deck-done`) and
+  // writes every change into the board's source itself.
+  // Numbers are the engine's data-dc-tpl; places and sizes are the board's pixels.
+  var DECK_INLINE = { b: 1, strong: 1, i: 1, em: 1, u: 1, s: 1, br: 1 };
+  var DECK_MODES = { edit: 1, show: 1, rec: 1, guest: 1 };
+  var DECK_SNAP = 6;
+  var DECK_FIELD = 0.07;
+  var DECK_DRAG_SLOP = 3;
+  var DECK_RING_MS = 250;
+  var DECK_OPEN_MS = 730;
+  var DECK_PRESS_SLOP = 10;
+  var DECK_HTML_MAX = 20000;
+  var DECK_KEYS = { Escape: 'Escape', KeyF: 'f', KeyC: 'c', KeyP: 'p', KeyR: 'r', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Space: 'Space' };
+  var deckOn = false;
+  var deckMode = 'edit';
+  var deckStep = null;
+  var deckPointer = false;
+  var deckCss = null;
+  var deckTpl = { src: null, nodes: null };
+  var deckEditing = null;
+  var deckHovered;
+  var deckDrag = null;
+  var deckPress = null;
+  var deckSwallowClick = 0;
+  var deckObserver = null;
+  var deckTimer = 0;
+  var deckReady = '';
+  var deckPointerAt = 0;
+  function tellDeck(message) { tellHostDom(message); }
+  function deckRound(v) { return Math.round(v * 10) / 10; }
+  function deckRect(el) {
+    var r = el.getBoundingClientRect();
+    return [deckRound(r.left + scrollX), deckRound(r.top + scrollY), deckRound(r.width), deckRound(r.height)];
+  }
+  function deckNumber(el) {
+    var n = el && el.getAttribute ? Number(el.getAttribute('data-dc-tpl')) : NaN;
+    return isFinite(n) && n >= 0 && n % 1 === 0 && el.getAttribute('data-dc-tpl') !== '' ? n : null;
+  }
+  // The template as the engine numbered it, parsed once per version: what each number's source holds.
+  function deckTemplate() {
+    if (typeof window.__dcAnnotatedTemplate !== 'function' || typeof window.__dcRootName !== 'function') return null;
+    var src;
+    try { src = window.__dcAnnotatedTemplate(window.__dcRootName()); } catch (e) { return null; }
+    if (typeof src !== 'string') return null;
+    if (src !== deckTpl.src) {
+      var holder = document.createElement('template');
+      //! nosemgrep: direct-inner-html-assignment
+      holder.innerHTML = src; // the engine's own template, inert inside a <template>
+      var nodes = {};
+      Array.prototype.forEach.call(holder.content.querySelectorAll('[data-dc-tpl]'), function (node) {
+        var n = node.getAttribute('data-dc-tpl');
+        if (!(n in nodes)) nodes[n] = node;
+      });
+      deckTpl = { src: src, nodes: nodes };
+    }
+    return deckTpl.nodes;
+  }
+  function deckSourceOf(el) {
+    var nodes = deckTemplate();
+    var n = deckNumber(el);
+    return nodes && n !== null ? nodes[n] || null : null;
+  }
+  // A text the deck edits in place: text and b strong i em u s br without attributes, nothing filled in by {{ }}.
+  var DECK_RAW_TEXT = { script: 1, style: 1, textarea: 1, title: 1, xmp: 1, iframe: 1, noembed: 1, noframes: 1, noscript: 1, plaintext: 1 };
+  function deckPlain(node) {
+    if (DECK_RAW_TEXT[node.localName]) return false;
+    for (var c = node.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) { if (String(c.nodeValue).indexOf('{{') >= 0) return false; continue; }
+      if (c.nodeType === 8) continue;
+      if (c.nodeType !== 1 || !DECK_INLINE[c.localName]) return false;
+      for (var i = 0; i < c.attributes.length; i += 1) if (c.attributes[i].name !== 'data-dc-tpl') return false;
+      if (!deckPlain(c)) return false;
+    }
+    return true;
+  }
+  function deckWords(node) { return String(node.textContent || '').replace(/\s+/g, ' ').trim(); }
+  function deckOwnWords(node) {
+    return Array.prototype.some.call(node.childNodes, function (c) { return c.nodeType === 3 && String(c.nodeValue).trim() !== ''; });
+  }
+  function deckEditable(el) {
+    var source = deckSourceOf(el);
+    return !!source && deckPlain(source) && deckWords(source) !== '';
+  }
+  function deckSlide() {
+    var el = document.getElementById('dc-root');
+    for (var depth = 0; el && depth < 6; depth += 1) {
+      var kids = Array.prototype.filter.call(el.children, function (child) { return !/^(STYLE|SCRIPT|LINK|META|TEMPLATE|TITLE)$/.test(child.tagName) && !domOurs(child); });
+      if (kids.length !== 1) break;
+      el = kids[0];
+    }
+    return el;
+  }
+  // The outermost plain text around a node: a click on a bold word edits the whole line.
+  function deckTextAt(node) {
+    var slide = deckSlide();
+    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
+    el = el && el.closest ? el.closest('[data-dc-tpl]') : null;
+    var found = null;
+    for (; el && el !== slide && el !== document.body; el = el.parentElement) {
+      if (deckNumber(el) === null) break;
+      if (deckEditable(el)) found = el; else if (found) break;
+    }
+    return found;
+  }
+  // Blocks: the elements named with data-block; without any, the slide's own positioned children of 4% or more of it.
+  function deckBlocks() {
+    var slide = deckSlide();
+    if (!slide) return [];
+    var named = slide.querySelectorAll('[data-block]');
+    if (named.length) return Array.prototype.slice.call(named);
+    var box = slide.getBoundingClientRect();
+    return Array.prototype.filter.call(slide.children, function (child) {
+      if (deckNumber(child) === null || domOurs(child)) return false;
+      var r = child.getBoundingClientRect();
+      return getComputedStyle(child).position !== 'static' && r.width >= box.width * 0.04 && r.height >= box.height * 0.04;
+    });
+  }
+  function deckBlockAt(node) {
+    var blocks = deckBlocks();
+    for (var el = node && node.nodeType === 1 ? node : node && node.parentElement; el; el = el.parentElement) {
+      if (blocks.indexOf(el) >= 0) return el;
+    }
+    return null;
+  }
+  function deckName(el) {
+    var named = el.getAttribute('data-block');
+    if (named) return named.slice(0, 120);
+    var words = deckWords(el);
+    return (words || String(el.localName)).slice(0, 60);
+  }
+  function deckFree(el) { return el.hasAttribute('data-free') || el.hasAttribute('data-block-free'); }
+  function deckMovable(el) {
+    var source = deckSourceOf(el);
+    return !!source && String(source.getAttribute('style') || '').indexOf('{{') < 0;
+  }
+  function deckShift(el) {
+    var parts = String(getComputedStyle(el).translate || '').split(/\s+/).map(parseFloat);
+    return { x: isFinite(parts[0]) ? parts[0] : 0, y: isFinite(parts[1]) ? parts[1] : 0 };
+  }
+  // What the template says the element is (its name, then the engine's contentKey hash of its style attribute and its
+  // words): the host sends it back as `was` of a style, move or reset, and the runtime finds the same element by it
+  // (deckpatch.go deckFingerprint).
+  function deckFingerprint(el) {
+    var source = deckSourceOf(el);
+    if (!source) return '';
+    var text = source.localName === 'template' ? '' : String(source.textContent || '');
+    var s = (source.getAttribute('style') || '') + '\n' + text.replace(/[\t\n\f\r ]+/g, ' ').trim();
+    var h = 5381;
+    for (var i = 0; i < s.length; i += 1) h = (h << 5) + h + s.charCodeAt(i) | 0;
+    return source.localName + ':' + (h >>> 0).toString(36);
+  }
+  // A block inside a size container of its own (narrower than the board) moves in px: cqw there is the container's.
+  function deckInContainer(el) {
+    for (var node = el.parentElement; node && node !== document.documentElement; node = node.parentElement) {
+      var type = getComputedStyle(node).containerType;
+      if (type && type !== 'normal' && Math.abs(node.getBoundingClientRect().width - innerWidth) > 1) return true;
+    }
+    return false;
+  }
+  function deckSame(n) { return Array.prototype.slice.call(document.querySelectorAll('[data-dc-tpl="' + n + '"]')); }
+  function deckClean(markup) {
+    return String(markup).slice(0, DECK_HTML_MAX).replace(/<\/?([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>/g, function (tag, name) {
+      var lower = name.toLowerCase();
+      if (!DECK_INLINE[lower]) return '';
+      if (lower === 'br') return '<br>';
+      return tag.charAt(1) === '/' ? '</' + lower + '>' : '<' + lower + '>';
+    });
+  }
+  function deckSteps() {
+    var most = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('#dc-root [data-step]'), function (el) {
+      var n = Number(el.getAttribute('data-step'));
+      if (isFinite(n) && n > most) most = Math.min(200, Math.floor(n));
+    });
+    return most;
+  }
+  function deckApplySteps() {
+    Array.prototype.forEach.call(document.querySelectorAll('#dc-root [data-step]'), function (el) {
+      var on = deckStep === null || Number(el.getAttribute('data-step')) <= deckStep;
+      if (on && !el.hasAttribute('data-step-on')) el.setAttribute('data-step-on', '');
+      if (!on && el.hasAttribute('data-step-on')) el.removeAttribute('data-step-on');
+    });
+  }
+  function deckMark() {
+    var marked = document.querySelectorAll('[data-tk-deck-text]');
+    Array.prototype.forEach.call(marked, function (el) { if (!deckOn || deckMode !== 'edit' || !deckEditable(el)) el.removeAttribute('data-tk-deck-text'); });
+    if (!deckOn || deckMode !== 'edit') return;
+    Array.prototype.forEach.call(document.querySelectorAll('#dc-root [data-dc-tpl]'), function (el) {
+      if (!el.hasAttribute('data-tk-deck-text') && deckEditable(el)) el.setAttribute('data-tk-deck-text', '');
+    });
+  }
+  function deckTellReady() {
+    var message = { type: 'tk:deck-ready', w: innerWidth, h: innerHeight, steps: deckSteps() };
+    var signature = JSON.stringify(message);
+    if (signature === deckReady) return;
+    deckReady = signature;
+    tellDeck(message);
+  }
+  // The engine draws again on every change of the board: marks and steps are put back, the size and steps told again.
+  function deckRefresh() {
+    deckTimer = 0;
+    if (!deckOn) return;
+    deckApplySteps();
+    deckMark();
+    deckTellReady();
+  }
+  function deckSoon() { if (!deckTimer) deckTimer = setTimeout(deckRefresh, 120); }
+  function deckStyle() {
+    var css = 'html[data-tk-deck="edit"] [data-tk-deck-text]{cursor:text}'
+      + 'html[data-tk-deck="edit"] [data-free],html[data-tk-deck="edit"] [data-block-free]{cursor:grab}'
+      + 'html[data-tk-deck-drag] *{cursor:grabbing !important;user-select:none !important}'
+      + '[data-tk-deck-text][contenteditable="true"]{outline:none;-webkit-user-modify:read-write}'
+      + '[data-tk-deck-text][contenteditable="true"]:focus{background:rgba(123,97,255,.07);box-shadow:0 0 0 .5cqw rgba(123,97,255,.07);border-radius:.4cqw}';
+    if (deckMode !== 'edit' && deckStep !== null) css += '[data-step]:not([data-step-on]){opacity:.18;transition:opacity 400ms ease}[data-step]{transition:opacity 400ms ease}';
+    if (deckMode !== 'edit') css += 'html,body{cursor:default}';
+    if (!deckCss) {
+      deckCss = document.createElement('style');
+      deckCss.setAttribute('data-tk-library-mark', '');
+      document.documentElement.appendChild(deckCss);
+    }
+    deckCss.textContent = css;
+  }
+  function deckSet(on, mode) {
+    if (!on) {
+      deckLeave(true);
+      deckEnd(null, true);
+      deckPressEnd();
+      deckOn = false;
+      deckStep = null;
+      deckPointer = false;
+      deckReady = '';
+      deckHovered = undefined;
+      if (deckObserver) { deckObserver.disconnect(); deckObserver = null; }
+      if (deckCss) { deckCss.remove(); deckCss = null; }
+      document.documentElement.removeAttribute('data-tk-deck');
+      deckApplySteps();
+      deckMark();
+      return;
+    }
+    if (deckMode !== mode) { deckLeave(true); deckStep = null; }
+    deckOn = true;
+    deckMode = mode;
+    document.documentElement.setAttribute('data-tk-deck', mode);
+    deckStyle();
+    if (!deckObserver && window.MutationObserver) {
+      deckObserver = new MutationObserver(function (records) {
+        if (records.some(function (record) { return !domOurs(record.target); })) deckSoon();
+      });
+      deckObserver.observe(document.documentElement, { childList: true, subtree: true });
+    }
+    deckReady = '';
+    deckRefresh();
+  }
+  // Editing a text in place.
+  function deckEdit(el, x, y) {
+    if (deckEditing && deckEditing.el === el) return;
+    deckLeave(false);
+    var n = deckNumber(el);
+    el.setAttribute('data-tk-deck-text', '');
+    el.setAttribute('contenteditable', 'true');
+    el.setAttribute('spellcheck', 'false');
+    deckEditing = { el: el, tpl: n, was: deckClean(el.innerHTML), raw: el.innerHTML, cancel: false };
+    el.focus({ preventScroll: true });
+    var range = typeof x === 'number' && document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
+    var selection = getSelection();
+    if (selection) {
+      if (!range || !el.contains(range.startContainer)) { range = document.createRange(); range.selectNodeContents(el); range.collapse(false); }
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    deckTellSelect();
+  }
+  function deckTellSelect() {
+    if (!deckEditing) return;
+    var el = deckEditing.el;
+    var size = parseFloat(getComputedStyle(el).fontSize) || 0;
+    var title = /^h[1-3]$/.test(el.localName) || size >= innerWidth * 0.025;
+    var block = deckBlockAt(el);
+    var label = block && block.getAttribute('data-block') ? deckName(block) : deckName(el);
+    tellDeck({ type: 'tk:deck-select', tpl: deckEditing.tpl, label: label, kind: title ? 'title' : 'text', size: deckRound(size), rect: deckRect(el),
+      was: deckFingerprint(el) });
+  }
+  function deckCommit() {
+    if (!deckEditing || deckEditing.cancel) return;
+    var html = deckClean(deckEditing.el.innerHTML);
+    if (html === deckEditing.was) return;
+    tellDeck({ type: 'tk:deck-text', tpl: deckEditing.tpl, was: deckEditing.was, html: html });
+    deckEditing.was = html;
+  }
+  function deckLeave(cancel) {
+    if (!deckEditing) return;
+    var editing = deckEditing;
+    if (cancel) { editing.cancel = true; editing.el.innerHTML = editing.raw; } else deckCommit();
+    deckEditing = null;
+    editing.el.removeAttribute('contenteditable');
+    editing.el.removeAttribute('spellcheck');
+    if (document.activeElement === editing.el) editing.el.blur();
+    tellDeck({ type: 'tk:deck-deselect' });
+  }
+  // Leaving the frame (a button of the host's toolbar) saves the text so far and keeps the edit: the person comes back to
+  // it. Focus moved inside the board ends it; so does the host (`tk:deck-done`).
+  document.addEventListener('focusout', function (event) {
+    if (!deckEditing || event.target !== deckEditing.el) return;
+    var editing = deckEditing;
+    setTimeout(function () {
+      if (deckEditing !== editing) return;
+      if (document.hasFocus()) deckLeave(false); else deckCommit();
+    }, 0);
+  }, true);
+  var deckSelectFrame = 0;
+  document.addEventListener('input', function (event) {
+    if (!deckEditing || event.target !== deckEditing.el || deckSelectFrame) return;
+    deckSelectFrame = requestAnimationFrame(function () { deckSelectFrame = 0; deckTellSelect(); });
+  }, true);
+  document.addEventListener('paste', function (event) {
+    if (!deckEditing || !deckEditing.el.contains(event.target)) return;
+    event.preventDefault();
+    var text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+    document.execCommand('insertText', false, text.replace(/\s+/g, ' '));
+  }, true);
+  document.addEventListener('keydown', function (event) {
+    if (!deckEditing || !deckEditing.el.contains(event.target)) return;
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); deckLeave(true); }
+    else if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); deckLeave(false); }
+  }, true);
+  // The block under the pointer.
+  function deckHover(block) {
+    var n = block ? deckNumber(block) : null;
+    var rect = block ? deckRect(block) : null;
+    var signature = n === null ? 'none' : n + ':' + rect.join(',');
+    if (signature === deckHovered) return;
+    deckHovered = signature;
+    if (n === null) { tellDeck({ type: 'tk:deck-hover', tpl: null, name: '', rect: null, moved: false, movable: false, was: '', px: false, tx: 0, ty: 0 }); return; }
+    var shift = deckShift(block);
+    tellDeck({ type: 'tk:deck-hover', tpl: n, name: deckName(block), rect: rect, moved: shift.x !== 0 || shift.y !== 0, movable: deckMovable(block),
+      was: deckFingerprint(block), px: deckInContainer(block), tx: deckRound(shift.x), ty: deckRound(shift.y) });
+  }
+  // Dragging a free block: pointer px become the block's translate, snapped to the slide's centre and 7% field.
+  function deckDragStart(block, event) {
+    var slide = deckSlide();
+    var box = slide ? slide.getBoundingClientRect() : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+    var r = block.getBoundingClientRect();
+    var base = deckShift(block);
+    deckDrag = { el: block, tpl: deckNumber(block), was: deckFingerprint(block), px: deckInContainer(block), id: event.pointerId, sx: event.clientX, sy: event.clientY, base: base, live: false,
+      r: { x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height }, box: box, x: base.x, y: base.y, frame: 0, guides: [] };
+  }
+  function deckDragTo(event) {
+    var d = deckDrag;
+    var dx = event.clientX - d.sx;
+    var dy = event.clientY - d.sy;
+    if (!d.live) {
+      if (Math.abs(dx) + Math.abs(dy) < DECK_DRAG_SLOP) return;
+      d.live = true;
+      deckLeave(false);
+      document.documentElement.setAttribute('data-tk-deck-drag', '');
+    }
+    var W = d.box.width;
+    var H = d.box.height;
+    var guides = [];
+    var cx = d.r.x + d.r.w / 2 + dx;
+    var cy = d.r.y + d.r.h / 2 + dy;
+    var lx = d.r.x + dx;
+    if (Math.abs(cx - W / 2) < DECK_SNAP) { dx += W / 2 - cx; guides.push({ v: 1, at: deckRound(d.box.left + scrollX + W / 2) }); }
+    else if (Math.abs(lx - W * DECK_FIELD) < DECK_SNAP) { dx += W * DECK_FIELD - lx; guides.push({ v: 1, at: deckRound(d.box.left + scrollX + W * DECK_FIELD) }); }
+    if (Math.abs(cy - H / 2) < DECK_SNAP) { dy += H / 2 - cy; guides.push({ v: 0, at: deckRound(d.box.top + scrollY + H / 2) }); }
+    d.x = deckRound(d.base.x + dx);
+    d.y = deckRound(d.base.y + dy);
+    d.guides = guides;
+    deckSame(d.tpl).forEach(function (el) { el.style.setProperty('translate', d.x + 'px ' + d.y + 'px'); });
+    if (!d.frame) {
+      d.frame = requestAnimationFrame(function () {
+        d.frame = 0;
+        if (deckDrag === d) tellDeck({ type: 'tk:deck-drag', tpl: d.tpl, x: d.x, y: d.y, guides: d.guides, end: false, was: d.was, px: d.px });
+      });
+    }
+  }
+  function deckEnd(event, quiet) {
+    var d = deckDrag;
+    if (!d) return;
+    deckDrag = null;
+    if (d.frame) cancelAnimationFrame(d.frame);
+    document.documentElement.removeAttribute('data-tk-deck-drag');
+    if (!d.live) return;
+    deckSwallowClick = Date.now() + 400;
+    if (quiet) return;
+    tellDeck({ type: 'tk:deck-drag', tpl: d.tpl, x: d.x, y: d.y, guides: [], end: true, was: d.was, px: d.px });
+    deckHovered = undefined;
+    deckHover(d.el);
+  }
+  // A touch held on the slide: the ring, then the pick of that place; a short tap on a text opens its editing.
+  function deckPressEnd() {
+    if (!deckPress) return;
+    clearTimeout(deckPress.ring);
+    clearTimeout(deckPress.open);
+    if (deckPress.ringing) tellDeck({ type: 'tk:deck-press', x: deckPress.x, y: deckPress.y, phase: 'cancel' });
+    deckPress = null;
+  }
+  function deckPick(el, x, y) {
+    var box = el.getBoundingClientRect();
+    tellDeck({
+      type: 'tk:picked', pick: rememberPicked(el), look: readLook(el), selector: pickSelector(el), tag: String(el.tagName).toLowerCase(),
+      text: String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+      rect: { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) },
+      outerHTML: String(el.outerHTML || '').slice(0, 2048), component: null, url: location.href, viewport: { w: innerWidth, h: innerHeight },
+      point: [deckRound(x + scrollX), deckRound(y + scrollY)]
+    });
+  }
+  window.addEventListener('pointerdown', function (event) {
+    if (!deckOn || picking || !event.isPrimary) return;
+    if (deckPointer) tellDeck({ type: 'tk:deck-pointer', x: deckRound(event.clientX + scrollX), y: deckRound(event.clientY + scrollY), down: true });
+    deckPressEnd();
+    if (event.pointerType !== 'mouse' && (deckMode === 'edit' || deckMode === 'guest')) {
+      var target = pickTarget(event);
+      var press = { x: event.clientX, y: event.clientY, el: target, ringing: false, held: false };
+      press.ring = setTimeout(function () {
+        if (deckPress !== press) return;
+        press.ringing = true;
+        tellDeck({ type: 'tk:deck-press', x: deckRound(press.x + scrollX), y: deckRound(press.y + scrollY), phase: 'ring' });
+      }, DECK_RING_MS);
+      press.open = setTimeout(function () {
+        if (deckPress !== press) return;
+        press.held = true;
+        press.ringing = false;
+        deckPress = null;
+        deckSwallowClick = Date.now() + 900;
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+        deckLeave(false);
+        if (pickable(press.el)) deckPick(press.el, press.x, press.y);
+      }, DECK_OPEN_MS);
+      deckPress = press;
+      return;
+    }
+    if (deckMode !== 'edit' || event.button !== 0) return;
+    var block = deckBlockAt(pickTarget(event));
+    if (block && deckFree(block) && deckMovable(block) && !(deckEditing && deckEditing.el.contains(event.target))) deckDragStart(block, event);
+  }, true);
+  window.addEventListener('pointermove', function (event) {
+    if (!deckOn) return;
+    if (deckPointer && event.isPrimary) {
+      var now = Date.now();
+      if (now - deckPointerAt >= 33) {
+        deckPointerAt = now;
+        tellDeck({ type: 'tk:deck-pointer', x: deckRound(event.clientX + scrollX), y: deckRound(event.clientY + scrollY), down: event.buttons > 0 });
+      }
+    }
+    if (deckPress && Math.hypot(event.clientX - deckPress.x, event.clientY - deckPress.y) > DECK_PRESS_SLOP) deckPressEnd();
+    if (deckDrag && event.pointerId === deckDrag.id) { deckDragTo(event); event.preventDefault(); return; }
+    if (deckMode === 'edit' && event.pointerType === 'mouse' && !picking) deckHover(deckBlockAt(pickTarget(event)));
+  }, true);
+  window.addEventListener('pointerup', function (event) {
+    if (!deckOn) return;
+    if (deckPointer && event.isPrimary) tellDeck({ type: 'tk:deck-pointer', x: deckRound(event.clientX + scrollX), y: deckRound(event.clientY + scrollY), down: false });
+    var press = deckPress;
+    if (press) {
+      deckPressEnd();
+      var text = deckMode === 'edit' && !press.held ? deckTextAt(press.el) : null;
+      if (text) {
+        tellDeck({ type: 'tk:deck-tap', x: deckRound(press.x + scrollX), y: deckRound(press.y + scrollY), text: deckWords(text).slice(0, 400) });
+      }
+    }
+    if (deckDrag && event.pointerId === deckDrag.id) deckEnd(event, false);
+  }, true);
+  window.addEventListener('pointercancel', function () { deckPressEnd(); deckEnd(null, false); }, true);
+  window.addEventListener('scroll', deckPressEnd, true);
+  window.addEventListener('mouseout', function (event) { if (!event.relatedTarget && deckOn && deckMode === 'edit' && !deckDrag) deckHover(null); });
+  window.addEventListener('contextmenu', function (event) {
+    if (deckOn && (deckPress || Date.now() < deckSwallowClick)) event.preventDefault();
+  }, true);
+  window.addEventListener('click', function (event) {
+    if (!deckOn || picking) return;
+    if (Date.now() < deckSwallowClick) {
+      deckSwallowClick = 0;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (deckMode !== 'edit') return;
+    var target = pickTarget(event);
+    if (deckEditing && deckEditing.el.contains(target)) return;
+    var text = deckTextAt(target);
+    if (text) {
+      event.preventDefault();
+      deckEdit(text, event.clientX, event.clientY);
+      return;
+    }
+    deckLeave(false);
+    var el = target && target.closest ? target.closest('[data-dc-tpl]') : null;
+    var source = el && deckOwnWords(el) ? deckSourceOf(el) : null;
+    if (source && String(source.textContent).indexOf('{{') >= 0) tellDeck({ type: 'tk:deck-dynamic', tpl: deckNumber(el) });
+  }, true);
+  // The deck's keys go to the host (show, record, comment, full screen, the slides), unless a text is being typed.
+  window.addEventListener('keydown', function (event) {
+    if (!deckOn || picking || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+    var target = event.target;
+    if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || ''))) return;
+    var key = DECK_KEYS[event.code];
+    if (!key) return;
+    if (key === 'Space' || key === 'ArrowLeft' || key === 'ArrowRight') event.preventDefault();
+    tellDeck({ type: 'tk:key', key: key });
+  });
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!parentWin || event.source !== parentWin || event.origin !== hostOrigin || !data || typeof data !== 'object' || typeof data.type !== 'string') return;
+    if (data.type === 'tk:deck' && typeof data.on === 'boolean') {
+      deckSet(data.on, DECK_MODES[data.mode] ? data.mode : 'edit');
+      return;
+    }
+    if (!deckOn) return;
+    if (data.type === 'tk:deck-step' && typeof data.n === 'number' && isFinite(data.n)) {
+      deckStep = Math.max(0, Math.floor(data.n));
+      deckStyle();
+      deckApplySteps();
+    }
+    if (data.type === 'tk:deck-hit' && typeof data.req === 'number' && typeof data.x === 'number' && typeof data.y === 'number') {
+      var hit = document.elementFromPoint(data.x - scrollX, data.y - scrollY);
+      var block = hit ? deckBlockAt(hit) : null;
+      var near = block || (hit && hit.closest ? hit.closest('[data-dc-tpl]') : null);
+      tellDeck({ type: 'tk:deck-hit', req: data.req, label: near ? deckName(near) : '', tpl: near ? deckNumber(near) : null });
+    }
+    if (data.type === 'tk:deck-style' && typeof data.tpl === 'number' && typeof data.prop === 'string' && /^(--[\w-]{1,60}|-?[a-z][a-z-]{0,60})$/.test(data.prop)) {
+      var value = data.value;
+      if (value !== null && (typeof value !== 'string' || value.length > 300 || /[;{}<>]/.test(value))) return;
+      deckSame(data.tpl).forEach(function (el) { if (value === null) el.style.removeProperty(data.prop); else el.style.setProperty(data.prop, value); });
+      if (deckEditing && deckEditing.tpl === data.tpl) requestAnimationFrame(deckTellSelect);
+    }
+    if (data.type === 'tk:deck-move' && typeof data.tpl === 'number' && typeof data.x === 'number' && typeof data.y === 'number' && isFinite(data.x) && isFinite(data.y)) {
+      var x = deckRound(data.x);
+      var y = deckRound(data.y);
+      deckSame(data.tpl).forEach(function (el) {
+        if (x === 0 && y === 0) el.style.removeProperty('translate'); else el.style.setProperty('translate', x + 'px ' + y + 'px');
+      });
+    }
+    if (data.type === 'tk:deck-pointer' && typeof data.on === 'boolean') deckPointer = data.on;
+    if (data.type === 'tk:deck-done') deckLeave(false);
+  });
   function showTweaks(open) {
     if (hosted) { try { parentWin.postMessage({ type: 'tk:tweaks-panel', open: open }, hostOrigin); } catch (e) {} return; }
     tweaksOpen = open;

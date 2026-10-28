@@ -185,13 +185,14 @@ func (l *CodexLister) Find(id string) (Recent, bool) {
 	return Recent{}, false
 }
 
-// titleOf is what a list line says of a session: the agent's name for it, else the first thing asked, else its folder.
-func titleOf(name, first, cwd string) string {
+// titleOf is what a list line says of a session: the agent's name for it, else the first thing asked; never its folder,
+// which names where it ran, not what it was about (a line without a title is drawn by the page as an untitled chat).
+func titleOf(name, first, _ string) string {
 	switch {
 	case name != "":
 		return name
 	case strings.TrimSpace(first) != "":
 		return first
 	}
-	return filepath.Base(cwd)
+	return ""
 }

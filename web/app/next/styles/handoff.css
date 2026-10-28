@@ -6,7 +6,7 @@
 .hx-msg[data-kind='context'] {
   align-items: stretch;
 }
-.hx-ctx {
+.hx-hcard {
   display: flex;
   flex-direction: column;
   gap: var(--hx-space-2);
@@ -15,7 +15,7 @@
   padding: 2px 0 2px var(--hx-space-4);
   border-left: 2px solid color-mix(in srgb, var(--hx-accent) 55%, transparent);
 }
-.hx-ctx__head {
+.hx-hcard__head {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
@@ -23,39 +23,39 @@
   min-width: 0;
   font-size: var(--hx-text-xs);
 }
-.hx-ctx__ic {
+.hx-hcard__ic {
   align-self: center;
   color: var(--hx-accent);
 }
-.hx-ctx__title {
+.hx-hcard__title {
   font-weight: var(--hx-weight-semibold);
   color: var(--hx-fg-1);
 }
-.hx-ctx__line {
+.hx-hcard__line {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--hx-fg-3);
 }
-.hx-ctx__text {
+.hx-hcard__text {
   max-height: 14em;
   overflow: hidden;
   mask-image: linear-gradient(to bottom, #000 70%, transparent);
   transition: max-height 320ms var(--hx-ease-out);
 }
-.hx-ctx__body[data-open='true'] .hx-ctx__text {
+.hx-hcard__body[data-open='true'] .hx-hcard__text {
   max-height: none;
   mask-image: none;
 }
-.hx-ctx__foot {
+.hx-hcard__foot {
   display: flex;
   align-items: center;
   gap: 4px 10px;
   min-height: 24px;
   font-size: 12px;
 }
-.hx-ctx__act {
+.hx-hcard__act {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -71,7 +71,7 @@
     background 160ms ease,
     color 160ms ease;
 }
-.hx-ctx__act:hover {
+.hx-hcard__act:hover {
   background: var(--hx-bg-hover);
   color: var(--hx-fg-1);
 }
@@ -206,6 +206,21 @@
   background: color-mix(in srgb, var(--hx-danger) 8%, transparent);
   color: var(--hx-fg-1);
   font-size: var(--hx-text-sm);
+}
+.hx-hsheet__history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: var(--hx-bg-subtle);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-hsheet__history strong {
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-semibold);
 }
 .hx-hsheet__text {
   width: 100%;

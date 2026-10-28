@@ -41,9 +41,10 @@ const permissionScreen = `● I'll clean the build folder.
 
 ────────────────────────────────────────────────────────────────────────────────
  Bash command
-
-   rm -rf build
-   Remove the build output
+ Remove the build output
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ │ rm -rf build
+ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
 
  Do you want to proceed?
  ❯ 1. Yes

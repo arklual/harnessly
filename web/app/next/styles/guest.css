@@ -34,14 +34,228 @@ body,
   font-size: var(--hx-text-md);
 }
 
-/* The list of the comments sits over the page, at the bottom, where the owner's island is. */
-.hx-guest__strip {
-  position: absolute;
-  inset: auto 0 12px;
+/* Under the page: «Смотреть во весь экран» on a phone and the list of the comments, where the owner's island is. */
+.hx-guest__dock {
+  position: fixed;
+  inset: auto 0 calc(16px + env(safe-area-inset-bottom));
+  z-index: 20;
   display: flex;
+  gap: 8px;
+  align-items: center;
   justify-content: center;
   pointer-events: none;
 }
-.hx-guest__strip > * {
+.hx-guest__dock > * {
   pointer-events: auto;
+}
+/* In the window's frame the page ends 23 px above the window's edge: the list stays whole inside it. */
+@media (min-width: 701px) {
+  .hx-guest:not([data-full='true']) .hx-guest__dock {
+    bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+}
+.hx-guest__go {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-window);
+  font: inherit;
+  font-size: var(--hx-text-md);
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  animation: hx-gfull-pop 260ms var(--hx-ease-out) backwards;
+}
+.hx-guest__go:active {
+  transform: scale(0.97);
+}
+
+/* The full screen: the page alone. The bar, the device, the zoom and the pins step aside; the page settles in. */
+.hx-guest .hx-main {
+  transition:
+    margin 260ms var(--hx-ease-out),
+    border-radius 260ms var(--hx-ease-out);
+}
+.hx-guest[data-full='on'] .hx-main {
+  margin: 0;
+  border-radius: 0;
+}
+.hx-site[data-full='true']
+  :is(.hx-strip, .hx-browser__bar, .hx-vpzoom, .hx-vpgrab, .hx-vpshield, .hx-site__pins) {
+  display: none;
+}
+.hx-guest .hx-site[data-full='true'] {
+  padding: 0;
+}
+.hx-site[data-full='true'] .hx-browser {
+  border: 0;
+  border-radius: 0;
+}
+.hx-site[data-full='true'] .hx-vparea[data-dev] {
+  padding: 0;
+  cursor: auto;
+}
+.hx-site[data-full='true'] .hx-vparea[data-dev] .hx-bare {
+  border-radius: 0;
+  box-shadow: none;
+}
+.hx-guest[data-full='on'] .hx-browser__page {
+  transform: translateY(calc(var(--hx-pull, 0px) * 0.6));
+  animation: hx-gfull-in 300ms var(--hx-ease-out);
+}
+.hx-guest[data-full='left'] .hx-browser__page {
+  animation: hx-gfull-back 260ms var(--hx-ease-out);
+}
+@keyframes hx-gfull-in {
+  from {
+    opacity: 0.4;
+    transform: scale(0.96);
+  }
+}
+@keyframes hx-gfull-back {
+  from {
+    opacity: 0.5;
+    transform: scale(1.03);
+  }
+}
+@keyframes hx-gfull-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* A computer's way out: a strip along the top edge calls the capsule. */
+.hx-gfull__edge {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 30;
+  height: 10px;
+}
+/* A phone's: a handle at the top, pulled down. */
+.hx-gfull__handle {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 50%;
+  z-index: 30;
+  width: 88px;
+  height: 28px;
+  margin-left: -44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+  transform: translateY(var(--hx-pull, 0px));
+  cursor: grab;
+}
+.hx-gfull__handle::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 40px;
+  height: 5px;
+  margin-left: -20px;
+  border-radius: 3px;
+  background: rgba(20, 20, 24, 0.55);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.7);
+  transition:
+    width 160ms var(--hx-ease-out),
+    background 160ms var(--hx-ease-out);
+}
+.hx-gfull__handle[data-ready='true']::after {
+  width: 56px;
+  margin-left: -28px;
+  background: var(--hx-accent);
+}
+.hx-gfull__capsule {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 31;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(24, 24, 28, 0.88);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+  animation: hx-gfull-drop 200ms var(--hx-ease-out);
+}
+.hx-gfull[data-touch='true'] .hx-gfull__capsule {
+  top: calc(36px + env(safe-area-inset-top));
+}
+.hx-gfull__capsule[data-state='closing'] {
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    transform 160ms var(--hx-ease-out);
+}
+@keyframes hx-gfull-drop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+.hx-gfull__btn {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hx-gfull__btn:hover,
+.hx-gfull__btn[aria-pressed='true'] {
+  background: rgba(255, 255, 255, 0.14);
+}
+.hx-gfull__btn kbd {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  font: inherit;
+  font-size: 11px;
+  opacity: 0.8;
+}
+@media (max-width: 480px) {
+  .hx-gfull__capsule {
+    max-width: calc(100vw - 24px);
+  }
+  .hx-gfull__btn {
+    padding: 0 12px;
+  }
+  /* Only the way out and the comment keep their words on a phone; the new tab is its icon. */
+  .hx-gfull__btn[data-short='true'] > span {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-guest[data-full] .hx-browser__page,
+  .hx-gfull__capsule,
+  .hx-guest__go {
+    animation: none;
+  }
+}
+
+/* On a phone the notices stand above the dock, not over it. */
+@media (max-width: 900px) {
+  .hx-guest:has(.hx-guest__dock > *) .hx-toasts {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
 }

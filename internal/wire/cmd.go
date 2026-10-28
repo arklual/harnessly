@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // The answers of opIds are kept OpsKeep, at most OpsMax of them (§3, §4.5).
@@ -57,7 +57,7 @@ func NewOpLog(path string) *OpLog {
 	}
 	var kept map[string]*opEntry
 	if err := json.Unmarshal(raw, &kept); err != nil {
-		agent.Log("warn", "v2: kept command answers unreadable, starting empty", agent.F{K: "file", V: path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: kept command answers unreadable, starting empty", jsonlog.F{K: "file", V: path}, jsonlog.F{K: "error", V: err.Error()})
 		return o
 	}
 	cutoff := o.now().Add(-OpsKeep).UnixMilli()
@@ -172,7 +172,7 @@ func (o *OpLog) save() {
 		err = writeFileAtomic(o.path, raw)
 	}
 	if err != nil {
-		agent.Log("warn", "v2: command answers not kept", agent.F{K: "file", V: o.path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: command answers not kept", jsonlog.F{K: "file", V: o.path}, jsonlog.F{K: "error", V: err.Error()})
 	}
 }
 
@@ -224,7 +224,7 @@ func (s *Server) Cmd(w http.ResponseWriter, r *http.Request, op Op) {
 		return s.Service.Do(ctx, device, cmd)
 	})
 	if err := res.Validate(); err != nil {
-		agent.Log("error", "v2: a command answered out of contract", agent.F{K: "op", V: string(op)}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("error", "v2: a command answered out of contract", jsonlog.F{K: "op", V: string(op)}, jsonlog.F{K: "error", V: err.Error()})
 		res = Refused(RefuseInternal)
 	}
 	writeJSON(w, http.StatusOK, res)

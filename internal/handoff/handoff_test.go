@@ -87,6 +87,19 @@ func TestBlocksSayWhereTheyComeFromAndCannotBeClosedEarly(t *testing.T) {
 	}
 }
 
+func TestArtifactBootstrapDoesNotIdentifyTheSourceAgent(t *testing.T) {
+	from := From{ID: "tab-source", Title: "Secret source chat", Provider: wire.ProviderClaude, Model: "claude-opus-5-5"}
+	msg := Bootstrap(from, wire.HandoffHistory, false, "/private/history.jsonl")
+	for _, secret := range []string{from.ID, from.Title, string(from.Provider), from.Model, "another one", "agent there"} {
+		if strings.Contains(strings.ToLower(msg), strings.ToLower(secret)) {
+			t.Fatalf("bootstrap disclosed %q:\n%s", secret, msg)
+		}
+	}
+	if !strings.Contains(msg, `mode="history"`) || !strings.Contains(msg, "Private context file: /private/history.jsonl") {
+		t.Fatalf("bootstrap lost its mode or path:\n%s", msg)
+	}
+}
+
 const (
 	oldSID = "11111111-1111-4111-8111-111111111111"
 	newSID = "22222222-2222-4222-8222-222222222222"

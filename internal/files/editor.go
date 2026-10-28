@@ -136,6 +136,15 @@ func resolveInProject(root, relative string) (realRoot, target string, err error
 	return realRoot, target, nil
 }
 
+// ProjectFilePath is the absolute, resolved path of a file of a tab's project, under the same refusals as the editor's.
+func ProjectFilePath(root, relative string) (string, *EditorError) {
+	_, target, err := resolveInProject(root, relative)
+	if err != nil {
+		return "", editorFail(err)
+	}
+	return target, nil
+}
+
 // ListProject is one folder of a tab's project for the editor: folders first, then files, by name; links are left
 // out; at most 2000 entries are looked at.
 func ListProject(root, relative string) (Object, *EditorError) {

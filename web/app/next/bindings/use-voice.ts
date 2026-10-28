@@ -227,8 +227,13 @@ export const useVoice = (
       spoken: '',
     };
     session.dictation = openDictation(m, locale(), {
+      onPreparing: () => {
+        if (session.closed || live.current !== session) return;
+        setRecording((now) => (now && !now.preparing ? { ...now, preparing: true } : now));
+      },
       onReady: () => {
         if (session.closed) return;
+        setRecording((now) => (now?.preparing ? { ...now, preparing: false } : now));
         flush(session);
         if (session.recorded) askFinal(m, session);
       },

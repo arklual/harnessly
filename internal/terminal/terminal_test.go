@@ -26,6 +26,7 @@ type fakeBridge struct {
 	claimed   map[string]bool
 	enters    []string
 	reconcile []string
+	output    []string
 }
 
 func (b *fakeBridge) ClaimPrompt(id, session, text string) bool {
@@ -47,6 +48,12 @@ func (b *fakeBridge) PromptEnter(session string) {
 func (b *fakeBridge) ReconcileCwd(session string) {
 	b.mu.Lock()
 	b.reconcile = append(b.reconcile, session)
+	b.mu.Unlock()
+}
+
+func (b *fakeBridge) TerminalOutput(session string, data []byte) {
+	b.mu.Lock()
+	b.output = append(b.output, session+":"+string(data))
 	b.mu.Unlock()
 }
 
@@ -140,6 +147,12 @@ func TestTypesAndShowsOutput(t *testing.T) {
 	c := r.dial("session=hs-a&cols=100&rows=30&clientId=p1")
 	send(t, c, frame(msgStdin, "hello-from-page\r"))
 	until(t, c, msgStdout, "hello-from-page", 5*time.Second)
+	r.bridge.mu.Lock()
+	observed := strings.Join(r.bridge.output, "")
+	r.bridge.mu.Unlock()
+	if !strings.Contains(observed, "hs-a:") || !strings.Contains(observed, "hello-from-page") {
+		t.Fatalf("PTY output was not observed: %q", observed)
+	}
 
 	send(t, c, []byte{msgHeartbeat})
 	until(t, c, msgHeartbeat, "", 3*time.Second)

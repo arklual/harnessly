@@ -2253,3 +2253,41 @@ test('12. Settings opens from the profile menu, the Apps screen and the machine 
   await expect(page).toHaveURL(/\/settings\/machines$/);
   await expect(nav.filter({ hasText: 'Machines' })).toHaveAttribute('aria-current', 'true');
 });
+
+test('13. segmented controls fit their choices except the mobile plan gate', async () => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`${rt.url}/`);
+  const setup = page.getByTestId('setup-form');
+  if ((await setup.count()) > 0) {
+    await setup.locator('input[name=password]').fill(PASSWORD);
+    await setup.locator('input[name=confirm]').fill(PASSWORD);
+    await setup.locator('button[type=submit]').click();
+    await expect(page.locator('.hx-app')).toBeVisible();
+  }
+  const base = new URL(page.url()).pathname;
+  await page.goto(`${rt.url}${base}?dev=chat&scene=handoff-sheet&chrome=0&lang=en`);
+
+  const handoff = page.locator('.hx-hsheet .hx-segmented');
+  await expect(handoff).toBeVisible();
+  const handoffBox = await handoff.boundingBox();
+  const handoffButtonWidths = await handoff
+    .locator('button')
+    .evaluateAll((buttons) =>
+      buttons.reduce((width, button) => width + button.getBoundingClientRect().width, 0),
+    );
+  expect(handoffBox).not.toBeNull();
+  expect(Math.abs(handoffBox!.width - handoffButtonWidths - 4)).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${rt.url}${base}?dev=chat&scene=permission&chrome=0&lang=en`);
+
+  const plan = page.locator('.hx-gate[data-gate="plan"]');
+  const actions = plan.locator('.hx-gate__acts');
+  const planModes = actions.locator('.hx-segmented');
+  await expect(planModes).toBeVisible();
+  const actionsBox = await actions.boundingBox();
+  const planModesBox = await planModes.boundingBox();
+  expect(actionsBox).not.toBeNull();
+  expect(planModesBox).not.toBeNull();
+  expect(Math.abs(planModesBox!.width - actionsBox!.width)).toBeLessThanOrEqual(1);
+});

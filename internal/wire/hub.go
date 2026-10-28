@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // Hub numbers the events of every channel, keeps their rings and hands each event to the sockets subscribed to it.
@@ -29,6 +29,7 @@ type Hub struct {
 
 	// The machine source is subscribed while any socket holds the machine channel, with load while any asked for it.
 	machine     MachineSource
+	taps        map[*tap]struct{} // the observers of the conversation channels (Tap), under mu
 	srcMu       sync.Mutex
 	srcCancel   func()
 	srcLoad     bool
@@ -53,7 +54,29 @@ type subscription struct {
 // NewHub starts a hub with a new epoch; machine may be nil when nothing serves the machine channel.
 func NewHub(machine MachineSource) *Hub {
 	return &Hub{now: time.Now, epoch: NewEpoch(), chans: map[Channel]*hubChannel{}, clients: map[*client]struct{}{},
-		machine: machine, machineSubs: map[*subscription]bool{}}
+		machine: machine, machineSubs: map[*subscription]bool{}, taps: map[*tap]struct{}{}}
+}
+
+// tap is an observer of the conversation channels that is not a subscription: it holds no channel, so it does not make
+// a chat "watched" (Subscribers) and asks for no snapshot.
+type tap struct {
+	fn  func(ch Channel, seq int64, frame []byte)
+	end func()
+}
+
+// Tap calls fn with every event published on `convs` and on the conversations' channels from now on — its channel, its
+// seq and the frame as the newest page reads it — in publish order, and returns the function that ends it. fn runs under
+// the hub's lock: it must not wait. end is called when the hub starts a new epoch or stops: the seqs the tap saw end there.
+func (h *Hub) Tap(fn func(ch Channel, seq int64, frame []byte), end func()) (stop func()) {
+	t := &tap{fn: fn, end: end}
+	h.mu.Lock()
+	h.taps[t] = struct{}{}
+	h.mu.Unlock()
+	return func() {
+		h.mu.Lock()
+		delete(h.taps, t)
+		h.mu.Unlock()
+	}
 }
 
 // NewEpoch is a new epoch: "ep-" and 16 random base32 characters.
@@ -93,7 +116,7 @@ func (h *Hub) channel(ch Channel) *hubChannel {
 // that does not go on ch, or does not encode, is a bug of the caller: it is logged and dropped, and the seq is 0.
 func (h *Hub) Publish(ch Channel, e Event) (seq int64) {
 	if e == nil || !slices.Contains(ChannelEvents(ch), e.EventType()) {
-		agent.Log("error", "v2: event dropped, not of its channel", agent.F{K: "ch", V: string(ch)}, agent.F{K: "event", V: fmt.Sprintf("%T", e)})
+		jsonlog.Log("error", "v2: event dropped, not of its channel", jsonlog.F{K: "ch", V: string(ch)}, jsonlog.F{K: "event", V: fmt.Sprintf("%T", e)})
 		return 0
 	}
 	h.mu.Lock()
@@ -101,7 +124,7 @@ func (h *Hub) Publish(ch Channel, e Event) (seq int64) {
 	c := h.channel(ch)
 	frame, err := Marshal(EvFrame{Ch: ch, Seq: c.seq + 1, E: e})
 	if err != nil {
-		agent.Log("error", "v2: event dropped, does not encode", agent.F{K: "ch", V: string(ch)}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("error", "v2: event dropped, does not encode", jsonlog.F{K: "ch", V: string(ch)}, jsonlog.F{K: "error", V: err.Error()})
 		return 0
 	}
 	var older map[Caps][]byte
@@ -112,7 +135,7 @@ func (h *Hub) Publish(ch Channel, e Event) (seq int64) {
 		}
 		b, err := Marshal(EvFrame{Ch: ch, Seq: c.seq + 1, E: old})
 		if err != nil {
-			agent.Log("error", "v2: event dropped, its older form does not encode", agent.F{K: "ch", V: string(ch)}, agent.F{K: "error", V: err.Error()})
+			jsonlog.Log("error", "v2: event dropped, its older form does not encode", jsonlog.F{K: "ch", V: string(ch)}, jsonlog.F{K: "error", V: err.Error()})
 			return 0
 		}
 		if older == nil {
@@ -125,6 +148,11 @@ func (h *Hub) Publish(ch Channel, e Event) (seq int64) {
 	c.ring.push(it)
 	for s := range c.subs {
 		s.c.deliver(s, it.forCaps(s.c.caps))
+	}
+	if ch != ChannelMachine {
+		for t := range h.taps {
+			t.fn(ch, c.seq, frame)
+		}
 	}
 	return c.seq
 }
@@ -237,10 +265,12 @@ func (h *Hub) Reset() {
 	for c := range h.clients {
 		clients = append(clients, c)
 	}
+	taps := h.tapList()
 	h.mu.Unlock()
 	for _, c := range clients {
 		c.kill(closeRestart, "restart")
 	}
+	endTaps(taps)
 }
 
 // Close closes every socket, as the runtime stops.
@@ -253,6 +283,27 @@ func (h *Hub) Close() {
 	h.mu.Unlock()
 	for _, c := range clients {
 		c.kill(closeGoingAway, "shutting down")
+	}
+	h.mu.Lock()
+	taps := h.tapList()
+	h.mu.Unlock()
+	endTaps(taps)
+}
+
+// tapList is the taps, under mu.
+func (h *Hub) tapList() []*tap {
+	taps := make([]*tap, 0, len(h.taps))
+	for t := range h.taps {
+		taps = append(taps, t)
+	}
+	return taps
+}
+
+func endTaps(taps []*tap) {
+	for _, t := range taps {
+		if t.end != nil {
+			t.end()
+		}
 	}
 }
 

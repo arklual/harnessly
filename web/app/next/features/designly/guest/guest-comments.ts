@@ -19,6 +19,8 @@ export interface IGuestComment {
   name: string;
   at: string;
   anchor: IGuestAnchor | null;
+  /** Where on a slide a deck comment is, as fractions 0..1 of the slide; null for a comment on a block. */
+  point: { x: number; y: number } | null;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -53,6 +55,10 @@ const commentOf = (v: unknown): IGuestComment | null => {
     name: str(v.name),
     at: str(v.at),
     anchor: anchorOf(v.anchor),
+    point:
+      typeof v.x === 'number' && typeof v.y === 'number' && v.x >= 0 && v.x <= 1 && v.y >= 0 && v.y <= 1
+        ? { x: v.x, y: v.y }
+        : null,
   };
 };
 
@@ -139,6 +145,8 @@ export interface INewComment {
   text: string;
   board: string;
   anchor: IGuestAnchor | null;
+  /** The place on a slide, fractions 0..1; absent for a comment on a block. */
+  point?: { x: number; y: number };
 }
 
 /** Sends a comment and waits for the gateway: the comment as it was taken. */
@@ -153,8 +161,8 @@ export const postComment = async (url: string, input: INewComment): Promise<IGue
         name: input.who.name,
         text: input.text,
         board: input.board,
-        x: null,
-        y: null,
+        x: input.point?.x ?? null,
+        y: input.point?.y ?? null,
         hp: '',
         anchor: input.anchor,
       }),
@@ -174,6 +182,7 @@ export const postComment = async (url: string, input: INewComment): Promise<IGue
       name: input.who.name,
       at: new Date().toISOString(),
       anchor: input.anchor,
+      point: input.point ?? null,
     }
   );
 };

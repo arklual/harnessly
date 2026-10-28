@@ -58,6 +58,7 @@ func (b v2Background) Tasks(c wire.Conversation, pane string) []wire.BackgroundT
 			task.Kind, task.Stoppable = wire.BgCommand, t.StartedAt > 0
 			task.Monitor = t.Kind == background.Monitor
 			task.DevServer = devServer.MatchString(t.Label)
+			describeAsk(&task) // a `harnessly ask` waiting for a person's answer
 			if task.Title == "" {
 				task.Title = "Background command"
 			}

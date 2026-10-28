@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/screen"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -52,6 +53,8 @@ type PickWant struct {
 	Plan bool
 	// Command is the tool call the permission asks about ("" for a plan, or when the gate did not know it).
 	Command string
+	// Cwd is the session's working directory: the one a «cd <dir> &&» of the command may be left out for.
+	Cwd string
 }
 
 // OptionLabel is a menu line's text without its number: "2. Yes, and don't ask again" → "Yes, and don't ask again".
@@ -79,19 +82,88 @@ func optionOf(options []string, n int) (string, bool) {
 	return "", false
 }
 
-// commandKeys are the pieces of a tool call's summary a dialog shows: the start of its first line, and, for a path the
-// dialog shortens from the left, its end. A dialog that wraps or truncates a long command still carries one of them.
-func commandKeys(summary string) []string {
-	line, _, _ := strings.Cut(strings.TrimSpace(summary), "\n")
-	rs := []rune(strings.Join(strings.Fields(strings.TrimPrefix(strings.TrimSpace(line), "$ ")), " "))
-	if len(rs) == 0 {
-		return nil
+// The command of a shell call as the dialog draws it, checked whole. Claude 2.1.311 draws it under the dialog's solid
+// rule, in a gutter («│ » on every line) or indented, wrapped at the pane's width — at a space, which the break eats,
+// or inside a word — and above the question's options. Nothing else is vouched for: the command must be on the screen
+// from its first character to its last, line after line, every character equal; only where a line breaks may differ
+// from the summary (a space eaten or not, a newline). A command the dialog cuts or rewrites is the person's to decide
+// in the terminal. A leading «cd <dir> &&» is dropped from the summary only when <dir> is the session's own directory,
+// the one Claude leaves out.
+var (
+	gutterRE    = regexp.MustCompile(`^` + sp + `*│` + sp + `?`)
+	firstOptRE  = regexp.MustCompile(`^` + sp + `*(?:[❯›>]` + sp + `*)?1\.` + sp + `*\S`)
+	cdCommandRE = regexp.MustCompile(`^cd` + sp + `+("[^"]*"|'[^']*'|[^\s&;"']+)` + sp + `*&&` + sp + `*`)
+)
+
+// shellCommand is the command of a shell summary ("$ rm -rf build"), whole.
+func shellCommand(summary string) string {
+	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(summary), "$ "))
+}
+
+// withoutOwnCd drops a leading «cd <cwd> &&»; a cd anywhere else stays.
+func withoutOwnCd(command, cwd string) (string, bool) {
+	m := cdCommandRE.FindStringSubmatch(command)
+	if m == nil || cwd == "" || strings.Trim(m[1], `"'`) != cwd {
+		return "", false
 	}
-	head := string(rs[:min(len(rs), 40)])
-	if len(rs) <= 40 {
-		return []string{head}
+	return command[len(m[0]):], true
+}
+
+// commandBlock is the first run of gutter lines under the dialog's last solid rule and above its first option: the
+// box Claude draws the command in (the warnings and the timer come in a box of their own after it). Gutters are off.
+func commandBlock(plain string) []string {
+	lines := strings.Split(plain, "\n")
+	start := 0
+	for i := len(lines) - 1; i >= 0; i-- {
+		if solidRuleRE.MatchString(lines[i]) {
+			start = i + 1
+			break
+		}
 	}
-	return []string{head, string(rs[len(rs)-25:])}
+	var block []string
+	for _, l := range lines[start:] {
+		if firstOptRE.MatchString(l) {
+			break
+		}
+		if !gutterRE.MatchString(l) {
+			if len(block) > 0 {
+				break
+			}
+			continue
+		}
+		block = append(block, strings.TrimSpace(gutterRE.ReplaceAllString(l, "")))
+	}
+	return block
+}
+
+// unwraps: the lines of the block, joined as the dialog wraps them (a break eats a space or none), are exactly the
+// command — no line before, none after, no character more or less.
+func unwraps(block []string, command string) bool {
+	if len(block) == 0 {
+		return false
+	}
+	rest := command
+	for _, line := range block {
+		if line == "" || !strings.HasPrefix(rest, line) {
+			return false
+		}
+		rest = strings.TrimLeftFunc(rest[len(line):], jscompat.IsSpace)
+	}
+	return rest == ""
+}
+
+// shellDrawn: the dialog on the screen draws this shell command, whole and alone in its box.
+func shellDrawn(plain, summary, cwd string) bool {
+	command := shellCommand(summary)
+	if command == "" {
+		return false
+	}
+	block := commandBlock(plain)
+	if unwraps(block, command) {
+		return true
+	}
+	rest, ok := withoutOwnCd(command, cwd)
+	return ok && rest != "" && unwraps(block, rest)
 }
 
 // A summary that names its tool first ("Read /a/b.png") is not what the dialog draws. Claude 2.1.310 draws the
@@ -179,14 +251,16 @@ func (w PickWant) matches(s Screen) error {
 		if !drawnCall(s.styled, tool, arg) {
 			return ErrMenuChanged
 		}
-	} else if keys := commandKeys(w.Command); len(keys) > 0 {
-		plain := strings.Join(strings.Fields(s.Plain), " ")
-		if !slices.ContainsFunc(keys, func(k string) bool { return strings.Contains(plain, k) }) {
-			return ErrMenuChanged
-		}
+	} else if strings.TrimSpace(w.Command) != "" && !shellDrawn(s.Plain, w.Command, w.Cwd) {
+		return ErrMenuChanged
 	}
 	return nil
 }
+
+// Shows reports whether the screen shows the menu the person decided on — the check Pick makes before it presses a key
+// (ErrMenuChanged when it does not). The runtime asks it of an open gate as the screen changes, so a card whose menu
+// cannot be matched says so at once and not after a press that did nothing.
+func Shows(s Screen, want PickWant) error { return want.matches(s) }
 
 // Pick presses the chosen option of a permission or a plan menu and waits for the menu to go. It looks at the screen
 // first, under the lock the caller holds: a menu that changed since the person decided (another tool call, other

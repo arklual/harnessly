@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/delegation"
+	"github.com/ly-solutions/harnessly/internal/delivery"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
+	"github.com/ly-solutions/harnessly/internal/paneauto"
 	"github.com/ly-solutions/harnessly/internal/proc"
 	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/tmux"
@@ -58,14 +63,20 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 	if v.delegation == nil {
 		return
 	}
+	access := workspaceAccess(v.d)
 	callers := &callerCache{panes: v.c.cfg.Tmux, convOf: v.rt.ConvOfSession}
 	tools := func(r *http.Request) mcpserver.Toolset {
 		id, why := callers.of(r)
 		t := delegation.Tools{S: v.delegation, Caller: id, Why: why}
+		hand := delivery.Tools{Access: access}
+		if id != "" {
+			hand.Handed = func(info delivery.Info) { v.openDelivered(id, info) }
+		}
 		if rec, ok := v.rt.Record(id); ok {
 			t.Provider = rec.Provider
+			hand.Cwd = rec.Cwd
 		}
-		return t
+		return toolsets{t, hand}
 	}
 	set := previewOf(v.d)
 	set.agentTools.Store(&tools)
@@ -80,6 +91,61 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 			v.delegation.Sweep()
 		}
 	}
+}
+
+// openDelivered opens a file the agent handed over in its conversation's pane, once: the request is kept with the
+// conversation (the page applies it when it is there), as the agent's `open` is.
+func (v *v2Live) openDelivered(conv string, info delivery.Info) {
+	c := v.c
+	if !info.Opens() || c.cfg.Tmux == nil || c.intents == nil || v.rt == nil {
+		return
+	}
+	tab, err := legacyTabOf(v.rt.Record, c.cfg.Tmux.ParseSessionName, conv)
+	if err != nil || tab.TabID == "" {
+		return
+	}
+	if paneauto.OpenOnce(c.intents, tab.TabID, "files", info.Path) && c.sync != nil {
+		c.sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tab.TabID))
+	}
+}
+
+// toolsets are several groups of tools served as one.
+type toolsets []mcpserver.Toolset
+
+var _ mcpserver.Toolset = toolsets(nil)
+
+func (ts toolsets) Instructions() string {
+	parts := make([]string, 0, len(ts))
+	for _, t := range ts {
+		parts = append(parts, t.Instructions())
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+func (ts toolsets) Tools() []any {
+	var out []any
+	for _, t := range ts {
+		out = append(out, t.Tools()...)
+	}
+	return out
+}
+
+func (ts toolsets) Has(name string) bool {
+	for _, t := range ts {
+		if t.Has(name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (ts toolsets) Call(ctx context.Context, name string, args *jsvalue.Object) *jsvalue.Object {
+	for _, t := range ts {
+		if t.Has(name) {
+			return t.Call(ctx, name, args)
+		}
+	}
+	return mcpserver.TextResult("no tool "+name, true)
 }
 
 // callerCache finds the conversation whose agent made a request, by the connection. Each call reads which socket the

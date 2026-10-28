@@ -103,10 +103,11 @@ that write it (a redirect, `tee`, `sed -i`, `mv`/`cp`/`rm`, a script that writes
 ## New projects
 
 A new project is a copy of `<library>/.template/` when the library has one, else of the template the runtime ships:
-`project/_board-template.html` (a minimal board that pulls in `./support.js`) and `project/support.js`, the design
-tool's board engine (Anthropic's dc-runtime, shipped as is; `RUNTIME_DESIGN_ENGINE_FILE` points at another build). Every
-new project gets `meta/` with release `legacy`; a template's own `meta/project.json` settings (release, kits, tailwind)
-are kept, its pages never are.
+`project/_board-template.html` (a minimal board that pulls in `./support.js`), with the board engine this machine has as
+`project/support.js`: `RUNTIME_DESIGN_ENGINE_FILE`, else the engine of the release new projects start on. The engine is
+not shipped with the runtime; without one a new project is refused (see [the board engine](design-engine.md)). Every
+new project gets `meta/` with the release new projects start on (`legacy` without releases); a template's own
+`meta/project.json` settings (release, kits, tailwind) are kept, its pages never are.
 
 ## Speed
 
@@ -151,3 +152,27 @@ steps one after another: the wrapper's runtime boots (about 1.2 s before it open
 start (about 1.1 s later), and `pages.js`, the design system bundle and React render (about 2 s), most of it script
 execution (`pages.js` 0.9 s, `_ds_bundle.js` 0.6 s, `react.js` 0.3 s of the profile) and the rest waiting between steps.
 What is left to the board's own boot, not to what the library serves.
+
+Public boards had a separate serving path and therefore missed both optimizations: their HTML kept the engine's
+React/ReactDOM/Babel URLs on the third-party CDN, and every project asset was `no-store`. The browser consequently
+downloaded the same large scripts again on every warm load. Public HTML now applies the same resource map and `tkv`
+asset versions as the owner path. The token-protected assets use private immutable caching for a matching version,
+private revalidation otherwise, and the same ETag and gzip responder; board HTML and the project index stay
+`no-store`.
+
+Numbers of 26.10.2026 for the public route, using an isolated runtime and a copied `acme-admin` fixture, board
+«Выплаты - Выплата», medians of 3 runs. Before is `main` at `454db21d`; after is this branch. A local header-injecting
+proxy represented the guest gateway without changing response caching.
+
+| | before | after |
+|---|---:|---:|
+| cold, ms | 6487 | 7248 |
+| warm, ms | 5950 | 6252 |
+| warm requests / bytes | 36 / 22.45 MB | 18 / 14 KB |
+| cold requests / bytes (last run) | 41 / 22.59 MB | 39 / 3.29 MB |
+| cold third-party calls | 3 | 1 |
+
+The public-specific fault was the missing transforms and static response path: the warm transfer fell by more than
+99.9%, and React/ReactDOM stopped depending on unpkg. It was not the remaining wall-clock bottleneck. On this shared
+machine the timings stayed within run-to-run noise and still followed the board's sequential wrapper, engine and page
+script execution described above; optimizing that board boot is separate from the public transport fix.

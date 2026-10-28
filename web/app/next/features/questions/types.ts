@@ -7,7 +7,7 @@ export type GateCloseReason = 'agent-moved-on' | 'chat-about' | 'turn-ended' | '
 export type GateRefusal = 'menu-unmatched';
 
 export type GateState =
-  | { k: 'open'; refused?: GateRefusal }
+  | { k: 'open'; refused?: GateRefusal; autoDenyAt?: Ms }
   | { k: 'answering'; opId: string }
   | { k: 'answered'; at: Ms; byDevice: string }
   | { k: 'closed'; reason: GateCloseReason };

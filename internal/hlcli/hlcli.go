@@ -34,13 +34,18 @@ type Env struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	Client *http.Client
+	// Now is the clock (the zone of its times is the zone times are read and written in); nil is time.Now.
+	Now func() time.Time
+	// Environ is the environment a command started by `secret run` inherits; nil is os.Environ.
+	Environ func() []string
 }
 
 // OSEnv is the process's own environment.
 func OSEnv() Env {
 	home, _ := os.UserHomeDir()
 	cwd, _ := os.Getwd()
-	return Env{Getenv: os.Getenv, Home: home, Session: tmuxSession, Cwd: cwd, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr}
+	return Env{Getenv: os.Getenv, Home: home, Session: tmuxSession, Cwd: cwd, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr,
+		Environ: os.Environ}
 }
 
 // tmuxSession asks tmux for the session of the pane this process runs in. $TMUX names the server's socket, so the
@@ -93,6 +98,19 @@ func Run(args []string, env Env) int {
 		return exitOK
 	case errors.Is(err, errHelp):
 		return exitOK
+	}
+	var ask askExit
+	if errors.As(err, &ask) {
+		if ask.msg != "" {
+			fmt.Fprintln(env.Stderr, "harnessly: "+ask.msg)
+		}
+		return ask.code
+	}
+	var exit exitCode
+	if errors.As(err, &exit) {
+		return int(exit)
+	}
+	switch {
 	case errors.Is(err, errUsage):
 		fmt.Fprintln(env.Stderr, "harnessly: "+strings.TrimPrefix(err.Error(), errUsage.Error()+": "))
 		fmt.Fprintln(env.Stderr, "Run `harnessly --help` for the commands.")
@@ -175,6 +193,8 @@ func (c *cli) run(args []string) error {
 		return c.open(rest)
 	case "panel":
 		return c.panel(rest)
+	case "deliver":
+		return c.deliver(rest)
 	case "status":
 		return c.status()
 	case "api-guide":
@@ -183,8 +203,14 @@ func (c *cli) run(args []string) error {
 		return c.design(rest)
 	case "hook":
 		return c.hook(rest)
+	case "notify":
+		return c.notify(rest)
+	case "ask":
+		return c.ask(rest)
 	case "peers", "peer":
 		return c.peers(rest)
+	case "secret", "secrets":
+		return c.secret(rest)
 	}
 	return usageErr("unknown command %q", cmd)
 }
@@ -867,6 +893,38 @@ func (c *cli) open(args []string) error {
 		return err
 	}
 	c.printPane(raw)
+	return nil
+}
+
+// deliver hands a file to the person: a card in the conversation, to open on the right and to download.
+func (c *cli) deliver(args []string) error {
+	f, err := parseFlags(args, map[string]string{"title": "title", "t": "title"})
+	if err != nil {
+		return err
+	}
+	if len(f.pos) != 1 {
+		return usageErr("deliver <path> [--title TITLE]")
+	}
+	session := c.session()
+	if session == "" {
+		return errNoPane
+	}
+	raw, err := c.request("POST", "/api/cli/deliver", nil, map[string]any{"session": session, "path": c.absPath(f.pos[0]), "title": f.values["title"]})
+	if err != nil {
+		return err
+	}
+	if c.json {
+		c.printRaw(raw)
+		return nil
+	}
+	var out struct {
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(raw, &out) != nil || out.Message == "" {
+		c.printRaw(raw)
+		return nil
+	}
+	c.out("%s\n", out.Message)
 	return nil
 }
 

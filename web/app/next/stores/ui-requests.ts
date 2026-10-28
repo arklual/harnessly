@@ -3,7 +3,13 @@
 // with nobody listening is lost, which is right: there is nothing to open.
 import { useEffect, useRef } from 'react';
 
-export const UI_REQUEST = { goal: 'goal', resume: 'resume', merge: 'merge', continue: 'continue' } as const;
+export const UI_REQUEST = {
+  goal: 'goal',
+  resume: 'resume',
+  merge: 'merge',
+  continue: 'continue',
+  moveVm: 'move-vm',
+} as const;
 export type TUiRequest = (typeof UI_REQUEST)[keyof typeof UI_REQUEST];
 
 const listeners = new Map<TUiRequest, Set<() => void>>();

@@ -14,8 +14,9 @@
   "next.goal.since": "задана {when}",
   "next.goalBar.active": "Цель:",
   "next.goalBar.paused": "Цель на паузе:",
-  "next.goalBar.met": "Цель достигнута:",
   "next.goalBar.stop": "Остановить",
-  "next.goalBar.hide": "Скрыть",
-  "next.goalBar.reached": "Цель достигнута: {goal}"
+  "next.goalBar.reached": "Цель достигнута: {goal}",
+  "next.goalBar.continue": "Продолжить",
+  "next.goalBar.retry": "Повторить",
+  "next.goalBar.continueFailed": "Не удалось продолжить цель"
 }

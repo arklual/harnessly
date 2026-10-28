@@ -4,16 +4,16 @@ GO            ?= go
 GOLANGCI_LINT ?= golangci-lint
 BIN           ?= bin
 VERSION       ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo dev)
-LDFLAGS       := -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=$(or $(VERSION),dev) -X github.com/ly-solutions/harnessly/internal/hlcli.Version=$(or $(VERSION),dev)
+LDFLAGS       := -s -w -X github.com/ly-solutions/harnessly/internal/agent.BuildVersion=$(or $(VERSION),dev) -X github.com/ly-solutions/harnessly/internal/hlcli.Version=$(or $(VERSION),dev) -X github.com/ly-solutions/harnessly/internal/hub/buildinfo.Version=$(or $(VERSION),dev)
 CROSS         := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
 .DEFAULT_GOAL := help
-.PHONY: skills-sync skills-check help build test test-race lint fmt fmt-check vet cover cross clean web web-check web-browser-test runtime-web build-webui test-webui release-snapshot run install install-systemd image compose-up compose-down
+.PHONY: skills-sync skills-check help build test test-race lint fmt fmt-check vet cover cross clean web web-check web-browser-test runtime-web build-webui test-webui release-snapshot run install install-systemd image compose-up compose-down hub-web hub hub-dist hub-image machine-image hub-compose-up hub-compose-down
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  \033[1m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-build: ## Build agent, harnessly, runtime and agentprobe into ./bin (static, no cgo; the runtime without the page)
+build: ## Build agent, harnessly, runtime, agentprobe and hub into ./bin (static, no cgo; the runtime and the hub without their pages)
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN)/ ./cmd/...
 
 test: ## Run the tests
@@ -78,6 +78,41 @@ release-snapshot: ## Build the release archives locally into dist/ with GoReleas
 
 web-browser-test: web ## Drive the page in headless Chrome against a standalone runtime (E2E_BOARDS_DIR, E2E_ARTIFACTS_DIR: also the side pane)
 	cd web && $(PNPM) e2e
+
+# --- the hub (docs/hub/deploy.md) -------------------------------------------------------------------------------------
+
+# Where hub-dist puts what the hub serves to machines (HUB_DIST_DIR of the hub), and for which systems.
+HUB_DIST      ?= $(BIN)/hub-dist
+HUB_TARGETS   ?= $(CROSS)
+HUB_IMAGE     ?= ghcr.io/ly-solutions/harnessly-hub:latest
+MACHINE_IMAGE ?= ghcr.io/ly-solutions/harnessly-machine:latest
+
+hub-web: web/node_modules ## Build the hub page into web/dist-hub
+	cd web && $(PNPM) build:hub
+
+hub: hub-web ## Build bin/hub with the hub page compiled in (the hubui tag)
+	CGO_ENABLED=0 $(GO) build -trimpath -tags hubui -ldflags "$(LDFLAGS)" -o $(BIN)/hub ./cmd/hub
+
+hub-dist: web ## Build what a hub serves to its machines into HUB_DIST: runtime-<os>-<arch>, agent-<os>-<arch>, install.sh (HUB_TARGETS=linux/amd64 for one system)
+	@mkdir -p $(HUB_DIST)
+	@for target in $(HUB_TARGETS); do \
+		os=$${target%/*}; arch=$${target#*/}; echo "hub-dist $$os/$$arch"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath -tags webui -ldflags "$(LDFLAGS)" -o $(HUB_DIST)/runtime-$$os-$$arch ./cmd/runtime || exit 1; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o $(HUB_DIST)/agent-$$os-$$arch ./cmd/agent || exit 1; \
+	done
+	@if [ -f deploy/install/install.sh ]; then install -m755 deploy/install/install.sh $(HUB_DIST)/install.sh; else echo "deploy/install/install.sh is missing: /install will answer 404 until it is in $(HUB_DIST)"; fi
+
+hub-image: ## Build the hub image (binary, page, and the machine binaries it serves)
+	docker build --build-arg VERSION=$(VERSION) --target hub -t $(HUB_IMAGE) .
+
+machine-image: ## Build the machine image (runtime and agent with Claude Code and Codex, registers with a hub at start)
+	docker build --build-arg VERSION=$(VERSION) --target machine -t $(MACHINE_IMAGE) .
+
+hub-compose-up: ## Build and start a hub and a machine next to it with docker compose (compose.hub.yaml; http://127.0.0.1:8040)
+	docker compose -f compose.hub.yaml up --build -d
+
+hub-compose-down: ## Stop the hub and its machine (volumes stay)
+	docker compose -f compose.hub.yaml down
 
 # --- running it -----------------------------------------------------------------------------------------------------
 

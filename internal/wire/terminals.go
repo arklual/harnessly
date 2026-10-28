@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // ErrTerminalLimit is a conversation that already has TerminalsMax own terminals.
@@ -100,7 +100,7 @@ func (s *Server) terminalRefusal(w http.ResponseWriter, r *http.Request, err err
 	case errors.Is(err, context.DeadlineExceeded):
 		refuse(w, RefuseTimeout)
 	default:
-		agent.Log("warn", "v2: terminals failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: terminals failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 	}
 }
@@ -108,7 +108,7 @@ func (s *Server) terminalRefusal(w http.ResponseWriter, r *http.Request, err err
 // writeChecked answers 200 with v, or an internal refusal when v is out of contract.
 func (s *Server) writeChecked(w http.ResponseWriter, r *http.Request, v interface{ Validate() error }) {
 	if verr := v.Validate(); verr != nil {
-		agent.Log("error", "v2: an answer out of contract", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: verr.Error()})
+		jsonlog.Log("error", "v2: an answer out of contract", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: verr.Error()})
 		refuse(w, RefuseInternal)
 		return
 	}

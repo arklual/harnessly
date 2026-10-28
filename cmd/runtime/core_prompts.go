@@ -192,7 +192,8 @@ func (c *core) newPrompts(w *promptWiring) *prompts.Service {
 		IsUploadImage: func(p string) bool {
 			return isUploadImage(cfg.UploadsDir, p)
 		},
-		Log: coreLog,
+		TerminalOff: chatGuard.Off,
+		Log:         coreLog,
 	})
 }
 

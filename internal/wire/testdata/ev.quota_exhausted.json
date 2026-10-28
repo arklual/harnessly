@@ -1,0 +1,15 @@
+{
+  "f": "ev",
+  "ch": "conv:tab-k3Jx9QmZ",
+  "seq": 526,
+  "e": {
+    "type": "quota_exhausted",
+    "failure": {
+      "kind": "quota_exhausted",
+      "at": 1792655999000,
+      "detail": "Quota exhausted for this account",
+      "terminal": true,
+      "needsTarget": true
+    }
+  }
+}

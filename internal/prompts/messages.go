@@ -26,6 +26,8 @@ var (
 	msgKeyNotAllowed   = locale.T("This key cannot be pressed from the web", "Эту клавишу из веба нажать нельзя")
 	msgAgentNotRunning = locale.T("The agent is not running in this conversation", "Агент в этом диалоге не запущен")
 	msgKeyFailed       = locale.T("Could not press the key", "Не получилось нажать клавишу")
+	msgTerminalOff     = locale.T("The terminal is switched off on this machine: a message goes only to a running agent, and not as a shell command (a line starting with \"!\")",
+		"На этой машине терминал выключен: сообщение уходит только работающему агенту и не как команда оболочки (строка, начинающаяся с «!»)")
 
 	msgNoTab = locale.T("Tab not found", "Вкладка не найдена")
 

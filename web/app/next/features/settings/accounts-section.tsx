@@ -40,6 +40,9 @@ export const isProxyUrl = (value: string): boolean => {
   }
 };
 
+/** Where a card's requests go. */
+const WHERE = { direct: 'direct', proxy: 'proxy' } as const;
+
 export type AccountCard =
   | { provider: Provider; k: 'loading' }
   | { provider: Provider; k: 'failed'; text: string }
@@ -138,7 +141,6 @@ const SignIn = ({ settings, credentials }: { settings: AgentSettings; credential
           </div>
         )}
       </div>
-      <p className="hx-acct__note">{t('next.settings.accounts.terminal')}</p>
     </>
   );
 };
@@ -191,14 +193,18 @@ const Proxy = ({ settings, busy, onBaseUrl }: IProxyProps) => {
     <>
       <div className="hx-acct__label">{t('next.settings.accounts.where')}</div>
       <div className="hx-proxy" data-on={on}>
-        <div className="hx-proxy__seg" role="radiogroup" aria-label={t('next.settings.accounts.where')}>
-          <button type="button" role="radio" aria-checked={!on} onClick={() => void direct()}>
-            {t('next.settings.accounts.direct')}
-          </button>
-          <button type="button" role="radio" aria-checked={on} onClick={on ? undefined : edit}>
-            {t('next.settings.accounts.viaProxy')}
-          </button>
-        </div>
+        <Segmented
+          label={t('next.settings.accounts.where')}
+          value={on ? WHERE.proxy : WHERE.direct}
+          options={[
+            { value: WHERE.direct, label: t('next.settings.accounts.direct') },
+            { value: WHERE.proxy, label: t('next.settings.accounts.viaProxy') },
+          ]}
+          onChange={(value) => {
+            if (value === WHERE.direct) void direct();
+            else if (!on) edit();
+          }}
+        />
         <div className="hx-proxy__body">
           <div>
             {editing && (
@@ -282,7 +288,6 @@ const Card = ({
           <span className="hx-acct__name">{t(`next.settings.accounts.name.${card.provider}`)}</span>
           <span className="hx-acct__status">{status}</span>
         </span>
-        <span className="hx-acct__dot" data-on={connected} />
         <Icon name="chevron-down" size="sm" className="hx-acct__chev" />
       </button>
       <div className="hx-acct__body">

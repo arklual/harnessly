@@ -44,6 +44,12 @@ import {
 import type { IFloat, TDock, TZone } from '@/next/features/designly/site-drag';
 import type { ISiteStage } from '@/next/features/designly/site-view';
 import { formatAnnotation, withAnnotations } from '@/next/features/designly/annotation';
+import {
+  DECK_CTX_ID,
+  deckContextQuote,
+  formatDeckContext,
+  type IDeckChatContext,
+} from '@/next/features/designly/deck/chat-context';
 import { anchorItems } from '@/next/features/designly/note-anchor';
 import { itemsOf, NO_EDIT } from '@/next/features/designly/element-style';
 import {
@@ -247,6 +253,7 @@ const NewDesignChat = ({ machine, draftKey, creating, start, extra, onFirst }: I
             quotes={extra.quotes}
             onRemoveQuote={extra.onRemoveQuote}
             tools={extra.tools}
+            placeholder={extra.placeholder}
             attachments={uploads.attachments}
             onFiles={uploads.onFiles}
             onRemoveAttachment={uploads.onRemove}
@@ -389,6 +396,8 @@ export const useSiteStage = ({
   const voice = useVoice(machine, text, setText);
 
   const [notes, setNotes] = useState<INote[]>([]);
+  // A deck's slide (and block) the chat is about: one chip that goes with the next message, then lets go.
+  const [deckCtx, setDeckCtx] = useState<IDeckChatContext | null>(null);
   // The card is the page's: another page hides it, the return brings it back.
   const [noteDraft, setNoteDraft] = usePageDraft(pageUrl);
   const card = usePresence(noteDraft, NOTE_OUT_MS);
@@ -408,9 +417,8 @@ export const useSiteStage = ({
 
   /** The typed words with the notes as the agent reads them. */
   const wrap = (words: string) =>
-    withAnnotations(
-      words,
-      notes.map((note, i) =>
+    withAnnotations(words, [
+      ...notes.map((note, i) =>
         formatAnnotation({
           n: i + 1,
           picked: note.picked,
@@ -420,7 +428,8 @@ export const useSiteStage = ({
           port: port ?? 0,
         }),
       ),
-    );
+      ...(deckCtx ? [formatDeckContext(notes.length + 1, deckCtx.text)] : []),
+    ]);
   const afterSend = () => {
     setSawRun(false);
     setNotes([]);
@@ -528,8 +537,14 @@ export const useSiteStage = ({
     </button>
   ) : null;
   const extra: IDockExtra = {
-    quotes: notes.map((note, i) => noteQuote(note, i + 1)),
-    onRemoveQuote: removeNote,
+    quotes: [
+      ...notes.map((note, i) => noteQuote(note, i + 1)),
+      ...(deckCtx ? [deckContextQuote(deckCtx)] : []),
+    ],
+    placeholder: deckCtx
+      ? t(deckCtx.selected ? 'next.deck.chat.placeholderSelected' : 'next.deck.chat.placeholder')
+      : undefined,
+    onRemoveQuote: (id) => (id === DECK_CTX_ID ? setDeckCtx(null) : removeNote(id)),
     wrap,
     onSent: afterSend,
     tools: pickTool,
@@ -582,6 +597,7 @@ export const useSiteStage = ({
     },
     min: mode === 'island' && min,
     run: runOf(status),
+    busy: status?.k === ISLAND_STATUS.run,
     // «Правки» pick all the time, but not while a note is being written.
     pick: bridged && noteDraft === null && (mode === 'notes' || picking),
     // The browser bar's «Выделить» and the field's button are one switch; null until the page has its bridge.
@@ -652,6 +668,31 @@ export const useSiteStage = ({
     float,
     dock,
     chatW,
+    context: (ctx) =>
+      setDeckCtx((have) =>
+        have?.label === ctx?.label && have?.text === ctx?.text && have?.selected === ctx?.selected
+          ? have
+          : ctx && { ...ctx, selected: ctx.selected === true },
+      ),
+    ask: (words) => {
+      if (convId) {
+        sendMessage(machine, { conversationId: convId, text: words, mode: 'queue' });
+        return;
+      }
+      sendFirst(words, []);
+    },
+    deckChat: (
+      <DesignChat
+        picked={swap.shown}
+        designDraft={designDraft}
+        machine={machine}
+        creating={creating}
+        start={start}
+        extra={extra}
+        onFirst={sendFirst}
+        onOpenChat={openChatPage}
+      />
+    ),
     chat: (
       <SiteChat {...chat}>
         <DesignChat

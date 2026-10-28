@@ -100,6 +100,14 @@ describe('apply', () => {
     rt.emit('convs', { ...st, rev: before.rev + 1 });
     expect(conversationsStore.get(st.id)!.state).toEqual(st.state);
   });
+
+  it('makes a terminal quota marker visible before the coalesced conversation upsert', async () => {
+    const { rt } = await openChat();
+    const failure = ev<Extract<ConvEvent, { type: 'quota_exhausted' }>>('ev.quota_exhausted');
+    expect(conversationsStore.get(CONV)?.terminalFailure).toBeUndefined();
+    rt.emit(CH, failure);
+    expect(conversationsStore.get(CONV)?.terminalFailure).toEqual(failure.failure);
+  });
 });
 
 describe('a conversation belongs to the machine of its channel', () => {

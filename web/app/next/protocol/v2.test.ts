@@ -95,6 +95,7 @@ describe('v2 closed lists', () => {
     QueueReason: v2.QUEUE_REASONS,
     MessageFailure: v2.MESSAGE_FAILURES,
     PauseReason: v2.PAUSE_REASONS,
+    TerminalFailureKind: v2.TERMINAL_FAILURE_KINDS,
     GateKind: v2.GATE_KINDS,
     PermissionKind: v2.PERMISSION_KINDS,
     PermissionScope: v2.PERMISSION_SCOPES,
@@ -118,6 +119,7 @@ describe('v2 closed lists', () => {
     RefuseCode: v2.REFUSE_CODES,
     RetryableRefuseCode: v2.RETRYABLE_REFUSE_CODES,
     DesignKind: v2.DESIGN_KINDS,
+    DesignDeckTone: v2.DESIGN_DECK_TONES,
     DesignRole: v2.DESIGN_ROLES,
     FileKind: v2.FILE_KINDS,
     AppID: v2.APP_IDS,
@@ -517,5 +519,48 @@ describe('backend profiles', () => {
   });
   it('asks for the cap', () => {
     expect(v2.CAPS_QUERY).toBe('caps=delegation,workflows,profiles,msgstatus');
+  });
+});
+
+describe('handoff history protocol', () => {
+  const fixture = (n: string) =>
+    Object.entries(fixtures).find(([p]) => name(p) === n)![1] as {
+      body?: unknown;
+      response?: unknown;
+    };
+
+  it('reads metadata-only history drafts and commands', () => {
+    expect(parsePage.handoffDraft(fixture('http.handoffDraft-history').response)).toEqual({
+      mode: 'history',
+      tokens: 0,
+      turns: 0,
+      artifact: { id: '0123456789abcdef0123456789abcdef', bytes: 292552704 },
+    });
+    expect(
+      parseCommand('conversation.handoff', fixture('cmd.conversation.handoff-history').body).body,
+    ).toMatchObject({ mode: 'history', artifactId: '0123456789abcdef0123456789abcdef' });
+  });
+
+  it('refuses text in history and artifacts in editable modes', () => {
+    expect(() =>
+      parsePage.handoffDraft({
+        mode: 'history',
+        text: 'must not cross the browser',
+        tokens: 0,
+        turns: 0,
+        artifact: { id: '0123456789abcdef0123456789abcdef', bytes: 42 },
+      }),
+    ).toThrow(ProtocolError);
+    expect(() =>
+      parseCommand('conversation.handoff', {
+        opId: 'h1',
+        id: 'tab-source_123',
+        provider: 'codex',
+        model: null,
+        mode: 'excerpt',
+        text: 'context',
+        artifactId: '0123456789abcdef0123456789abcdef',
+      }),
+    ).toThrow(ProtocolError);
   });
 });

@@ -6,9 +6,7 @@
 </p>
 
 <p align="center">
-  <strong>The open core of a workspace for people and coding agents.</strong><br>
-  Claude Code and Codex run in tmux on your machines; harnessly knows what each of them is doing<br>
-  and serves it all through one HTTP and WebSocket API.
+  <strong>The open core of a workspace for people and coding agents.</strong>
 </p>
 
 <p align="center">
@@ -23,247 +21,212 @@
 </p>
 
 <p align="center">
+  <a href="#features">Features</a> ·
   <a href="#quick-start">Quick start</a> ·
-  <a href="#ways-to-run">Ways to run</a> ·
+  <a href="#self-hosted-hub">Hub</a> ·
+  <a href="#releases-and-verification">Releases</a> ·
   <a href="docs/README.md">Docs</a> ·
-  <a href="#architecture">Architecture</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 ---
 
-## Why harnessly
-
-- **Agents work where the code is.** Claude Code and Codex run as the real CLIs in tmux panes on the machine, next to
-  its repositories and tools, and keep running when nobody has a page open.
-- **You always know what every agent is doing.** A tab's state (`busy`, `needs-input`, `ready-for-review`, ...) is
-  derived from the agent's hooks, status line, transcript, screen and process tree, and pushed live to every client.
-- **Small static binaries, no inbound access.** The runtime (one per person) and the machine agent (one per Unix
-  account) are single Go binaries without cgo. The agent keeps one WebSocket link to the cluster and tunnels the rest,
-  so nothing has to reach into the machine.
-- **An API first.** Workspaces, tabs, prompts, terminals, files and conversations are HTTP and WebSocket routes, so a
-  web UI, a cluster or your own scripts drive the same thing.
-- **Boards and documents beside the conversation.** Agents draw on [boards](https://github.com/ly-solutions/boards)
-  and publish to [artifacts](https://github.com/ly-solutions/artifacts) with the addresses and tokens the runtime gives
-  them; their links open in a side pane of the page, signed in, next to the conversation that made them.
-- **Runs the way you run things.** A release binary, a systemd user service, a container, `docker compose up` for the
-  whole workspace, a Helm chart or an Argo CD app of apps.
-- **Moves in without a big bang.** In gate mode the runtime sits in front of an older runtime and takes over one slice
-  of routes at a time, each compared in shadow first. In standalone mode it needs nothing else.
+harnessly is a workspace where people and coding agents work side by side. Claude Code and Codex run as the real CLIs in
+tmux panes on your machines, next to your repositories and tools, and keep running when nobody has a page open.
+harnessly knows what each agent is doing and serves it through one HTTP and WebSocket API and a web UI. It is a Go
+runtime plus a machine agent on the user's machine (small static binaries, no cgo), a web UI compiled into the runtime,
+and an optional hub for teams: sign-in, spaces, and machines connected through one address.
 
 ## Features
 
-| | |
-| --- | --- |
-| **Agent tabs in tmux** | Claude Code, Codex and shells in tabs on the runtime's own tmux server; a terminal socket attaches a pty to any of them. |
-| **Live tab states** | One keeper for all tabs, fed by hooks, status line, transcripts, screens and the process tree; `/api/status` and `/api/sync` sockets. |
-| **Prompt delivery** | A per-tab queue that types messages and keys into an agent's pane, long prompts through an editor hand-off. |
-| **Launch and resume** | Starts conversations with the runtime's hooks and settings, resumes agents that were working after a restart or a tmux reset. |
-| **Idle sleep and push** | Stops Claude agents idle too long to free memory (the next prompt resumes them); web push when a turn ends or an agent asks. |
-| **Conversations** | A timeline socket over the agents' transcripts, token and cost economics, subagents, turn checkpoints as git snapshots. |
-| **Files and git** | Editor reads and saves, changed files and diffs, uploads, a repository sync with its upstream. |
-| **Usage and limits** | Usage reports and statistics from the transcripts, provider limits with a forecast, machine load. |
-| **Preview proxy** | A reverse proxy for dev servers with a DevTools record that agents can read through an MCP server. |
-| **Machine agent** | Transcripts, state files with versioned writes, socket relay and TCP tunnels over a single WebSocket link. |
-| **Gate and shadow** | Per-machine slice switches re-read every second, shadow comparison of answers, per-path proxy statistics. |
-| **Web page** | Sign-in, workspaces, split panes with terminal and agent tabs, the conversation with live state, the machine's load; compiled into release runtimes. |
-| **Boards and documents** | Agents get `BOARDS_URL`, `ARTIFACTS_URL`, tokens and their conversation id; board and document links become chips that open in a side pane, which also lists the conversation's documents. |
-| **Ways to run** | Dockerfile, docker compose with boards and artifacts (MinIO optional), a Helm chart, Argo CD examples, a systemd unit and `make` targets. |
-| **Byte-for-byte compatible** | Status codes, JSON key order, headers and ETags pinned by golden tests recorded from the previous implementation. |
+### Agents and chats
+
+- Claude Code, Codex and plain shells in tabs on the runtime's own tmux server. A terminal socket attaches a pty to any
+  of them.
+- Live tab states (`busy`, `needs-input`, `ready-for-review`, ...), derived from the agent's hooks, status line,
+  transcript, screen and process tree and pushed to every client.
+- Conversations: a timeline over the agents' transcripts (turns, tool runs, plans, questions), subagents, token and
+  cost economics, turn checkpoints as git snapshots. The composer takes slash commands, files, context and dictation.
+- Prompt delivery through a per-tab queue; launch and resume of agents after a restart; Claude agents idle for too long
+  are stopped to free memory and resumed by the next prompt.
+- Usage statistics and provider limits with a forecast, from the transcripts.
+- Agents can start, brief and read other agents in new tabs with the `harnessly` command line tool
+  (`harnessly tab ...`, `harnessly peers`).
+
+### Files, changes, terminal and browser pane
+
+The right pane of a conversation holds a terminal, a file editor, changed files and diffs, a browser for the machine's
+dev servers (a reverse proxy with a DevTools record that agents read through an MCP server), documents and boards
+([integrations](docs/integrations.md)), GitHub and GitLab, subagents and the session's cost. Agents can open a tab of
+the pane for you.
+
+### Sinopia Design
+
+A design space for prototypes, sites and presentations. Every design is a plain folder on your machine, with its page
+model, history and exports (PDF, PNG, PowerPoint, one offline HTML file for a deck). The board engine is not part of
+harnessly: you bring your own. Each machine fetches it once with the owner's own Claude account, through the Claude
+CLI installed and logged in on that machine:
+
+```sh
+harnessly design engine fetch
+harnessly design engine status      # what the machine has: engine, browser, ffmpeg
+```
+
+Details: [docs/design-engine.md](docs/design-engine.md), [docs/design-pages.md](docs/design-pages.md).
+
+### Voice input
+
+A microphone in the message field. The recording is turned into text on the machine by a built-in
+[whisper.cpp](https://github.com/ggml-org/whisper.cpp) server; nothing is sent to an outside service. The model is
+downloaded once, on the first dictation (`base` or `small`, by processor count). Needs `ffmpeg` (included in the Docker
+images) and `https://` or `localhost`. Turn it off with `RUNTIME_VOICE_ENGINE=off`. See [docs/voice.md](docs/voice.md).
+
+### Ask a human
+
+An agent can ask a person a question or request an approval, from the shell:
+
+```sh
+harnessly ask people                                  # who may be tagged, who may approve
+harnessly ask --to NAME --option A --option B QUESTION...
+harnessly ask approve --to NAME --link URL WHAT...
+```
+
+The question goes to a Telegram chat through a bot you linked, with the person tagged and answer buttons; the person
+answers in Telegram or on the page. `harnessly ask` waits for the answer (exit 4 when it does not come in time; for
+`approve`, exit 0 means approved). Bots, contacts and approvers are set in Settings, Notifications, in the People
+section. Agents can also send plain messages with `harnessly notify send`.
+
+### Notifications and the update notice
+
+- Web push when a turn ends or an agent asks for input; Telegram bots as above.
+- A standalone runtime built from a release checks the project's GitHub releases at start and every 12 hours and shows
+  a quiet "new version" notice with a link to the notes. The check sends nothing but the standard request headers;
+  `RUNTIME_UPDATE_CHECK=0` turns it off. See [Updates](docs/deploy.md#updates).
+
+### Hub
+
+For a team, the hub is the one address people sign in at.
+
+- Spaces and invitations (by email or by link); `HUB_SIGNUP=invite` limits sign-up to administrators and invited people.
+- Sign-in by email code, passkey, GitHub or Yandex ID (and any OIDC provider). A way without its settings is not offered.
+- Machines connect outbound with one command, so they need no open port. In subdomain mode (`HUB_RUNTIME_DOMAIN`) a
+  machine opens at `<id>.<machines domain>`, one origin per machine; otherwise at `/m/<id>/` on the hub.
 
 ## Quick start
 
-You need Go (the version in [`go.mod`](go.mod)), `tmux`, `curl` and `jq`, on Linux or macOS.
+### Docker
 
 ```sh
-git clone https://github.com/ly-solutions/harnessly.git
-cd harnessly
-make build                     # bin/runtime, bin/agent, bin/agentprobe
+docker run -d --name harnessly -p 127.0.0.1:8022:8022 -v harnessly-home:/home/agent ghcr.io/ly-solutions/harnessly:latest
+docker logs harnessly | grep -i password
 ```
 
-Run the runtime standalone against a throwaway home and its own tmux server, so nothing of yours is touched:
+Open <http://127.0.0.1:8022>, enter the `Initial password` the second command printed, and choose your own. Workspaces,
+data and the agents' logins live on the `harnessly-home` volume. The image has no agent CLIs; use
+`ghcr.io/ly-solutions/harnessly:with-agents` for Claude Code and Codex. Tags: `X.Y.Z` (pin this in production), `X.Y`,
+`latest`, and the same with a `-with-agents` suffix. Images are for linux/amd64 and linux/arm64.
+
+### Release binary
+
+Needs `tmux` and `git`. Each [release](https://github.com/ly-solutions/harnessly/releases) has
+`harnessly_<version>_<os>_<arch>.tar.gz` for `linux` and `darwin` on `amd64` and `arm64`, with the `runtime` (the page
+is compiled in), the `agent` and the `harnessly` command line tool.
 
 ```sh
-export DEMO_HOME=$(mktemp -d)
-HOME=$DEMO_HOME RUNTIME_GATE_LISTEN=127.0.0.1:4321 RUNTIME_TMUX_SOCKET=harnessly-demo \
-  ./bin/runtime > "$DEMO_HOME/runtime.log" 2>&1 &
-sleep 1
-curl -s 127.0.0.1:4321/api/health
+VERSION=0.15.47 OS=linux ARCH=amd64     # the version of the latest release; OS: linux or darwin; ARCH: amd64 or arm64
+BASE=https://github.com/ly-solutions/harnessly/releases/download/v$VERSION
+ARCHIVE=harnessly_${VERSION}_${OS}_${ARCH}.tar.gz
+curl -fsSLO "$BASE/$ARCHIVE" -O "$BASE/checksums.txt" -O "$BASE/checksums.txt.sigstore.json"
+# verify first, see "Releases and verification" below
+tar xzf "$ARCHIVE"
+RUNTIME_GATE_LISTEN=127.0.0.1:8022 RUNTIME_GATE_UPSTREAM= RUNTIME_APP_BASE_PATH=/ ./runtime
 ```
 
-```json
-{"app":"harnessly","version":"0.0.0-development","commit":null}
-```
+Open <http://127.0.0.1:8022> and choose your password. Read [the first visit](docs/deploy.md#the-first-visit) before
+you listen on anything other than `127.0.0.1`. To keep it running, use
+[systemd](docs/deploy.md#systemd-one-host-one-account).
 
-On its first start the runtime wrote its config, the hook scripts and a `cli-token` into `$DEMO_HOME/.harnessly`.
-Use the token to make a workspace and open a terminal tab in it:
+### From source
 
 ```sh
-TOKEN=$(cat "$DEMO_HOME/.harnessly/cli-token")
-API=(-s -H "x-cli-token: $TOKEN" -H "content-type: application/json")
-mkdir "$DEMO_HOME/project"
-
-WS=$(curl "${API[@]}" 127.0.0.1:4321/api/workspace \
-  -d "{\"name\":\"demo\",\"directory\":\"$DEMO_HOME/project\"}" | jq -r .id)
-
-curl "${API[@]}" 127.0.0.1:4321/api/cli/tabs -d "{\"workspaceId\":\"$WS\",\"name\":\"shell\"}" \
-  | tee "$DEMO_HOME/tab.json" | jq .
+git clone https://github.com/ly-solutions/harnessly.git && cd harnessly
+make run        # builds web/ and the runtime with the page, serves http://127.0.0.1:8022
 ```
 
-```json
-{
-  "tabId": "tab-zLTjzM",
-  "workspaceId": "ws--i5OEb",
-  "paneId": "pane-dnZ6sA",
-  "sessionName": "hs-ws--i5OEb-pane-dnZ6sA-tab-zLTjzM",
-  "name": "shell",
-  "panelType": "terminal",
-  "agentProviderId": null,
-  "agentSessionId": null
-}
-```
+Needs Go (the version in [`go.mod`](go.mod)), Node.js 22 with pnpm, tmux and git. `docker compose up -d --build` starts
+the whole workspace with boards and artifacts on <http://localhost:8022>; Helm and Argo CD examples are in
+[docs/deploy.md](docs/deploy.md). To drive the runtime's HTTP API by hand against a throwaway home, see
+[Getting started](docs/getting-started.md).
 
-Type into the tab and read its screen back:
+Agents need their CLIs installed and logged in where the runtime runs (`npm install -g @anthropic-ai/claude-code`,
+`npm install -g @openai/codex`); see [what the agents need](docs/deploy.md#what-the-agents-need).
+
+## Self-hosted hub
 
 ```sh
-TAB=$(jq -r .tabId "$DEMO_HOME/tab.json")
-curl "${API[@]}" "127.0.0.1:4321/api/cli/tabs/$TAB/send?workspaceId=$WS" -d '{"content":"echo hello from tmux\n"}'; echo
-sleep 1
-curl "${API[@]}" "127.0.0.1:4321/api/cli/tabs/$TAB/result?workspaceId=$WS" | jq -r .content | grep -x 'hello from tmux'
+git clone https://github.com/ly-solutions/harnessly && cd harnessly
+docker compose -f compose.hub.yaml up -d --build      # the hub and one machine, http://hub.localhost:8040
 ```
 
-```text
-{"status":"sent"}
-hello from tmux
-```
-
-The tab is a real tmux session: `tmux -L harnessly-demo attach` shows it. Start the machine agent next to the
-runtime; it finds the runtime's secret in the same data directory and reports the version `make build` took from
-`git describe`:
+Only `HUB_PUBLIC_URL` is required. The hub image is built locally from this repository. Without a mail server the
+sign-in code is in the hub's log, marked `DEV`. Connect other machines with the installer the hub serves:
 
 ```sh
-HOME=$DEMO_HOME AGENT_PORT=4322 RUNTIME_PORT=4321 ./bin/agent > "$DEMO_HOME/agent.log" 2>&1 &
-sleep 1
-curl -s 127.0.0.1:4322/healthz
+curl -fsSL https://hub.example.com/install | sudo sh -s -- --token <code> --profile dir
 ```
 
-```json
-{"ok":true,"version":"0.9.0-18-g5c434a4"}
-```
+Profiles are `dir`, `container` and `full`. Caddy with automatic TLS, systemd, Helm and the subdomain mode:
+[docs/hub/deploy.md](docs/hub/deploy.md); connecting a machine: [docs/hub/machine.md](docs/hub/machine.md).
 
-Clean up:
+## Releases and verification
+
+A pushed `vX.Y.Z` tag runs the [release workflow](.github/workflows/release.yml):
+
+- GoReleaser builds the archives for linux and darwin (amd64, arm64) and makes a GitHub release with `checksums.txt`
+  and its keyless cosign signature `checksums.txt.sigstore.json`. The archives get a build provenance attestation.
+- A multi-arch image (linux/amd64, linux/arm64) is pushed to `ghcr.io/ly-solutions/harnessly`, signed keyless with
+  cosign and attested.
+- Nothing is signed with a key kept anywhere: signatures and attestations use the run's GitHub OIDC identity.
+
+Verify an archive (needs [cosign](https://docs.sigstore.dev/cosign/installation/) and, for provenance, the
+[GitHub CLI](https://cli.github.com/)):
 
 ```sh
-kill %1 %2
-tmux -L harnessly-demo kill-server >/dev/null 2>&1
-rm -rf "$DEMO_HOME"
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json \
+  --certificate-identity "https://github.com/ly-solutions/harnessly/.github/workflows/release.yml@refs/tags/v$VERSION" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+grep " $ARCHIVE\$" checksums.txt | sha256sum -c -          # on macOS: shasum -a 256 -c -
+gh attestation verify "$ARCHIVE" --repo ly-solutions/harnessly
 ```
 
-To run an agent instead of a shell, start the runtime with your own `HOME` (where Claude Code and Codex keep their
-logins) and ask for a `claude-code` or `codex-cli` tab, with a first prompt or without one:
-`{"workspaceId":"…","panelType":"claude-code","prompt":"…"}`. The tab's `cliState` in
-`/api/cli/tabs/<tab>/status` then follows the agent's turn, from `busy` to `ready-for-review`.
-
-More in [Getting started](docs/getting-started.md).
-
-## Ways to run
+Verify the image:
 
 ```sh
-make run                          # the runtime with the page on http://127.0.0.1:8022, data in ~/.harnessly
-docker compose up -d --build      # harnessly + boards + artifacts, built here, on http://localhost:8022
-helm install ada deploy/helm/harnessly --set ownerName=Ada
+cosign verify ghcr.io/ly-solutions/harnessly:latest \
+  --certificate-identity-regexp '^https://github.com/ly-solutions/harnessly/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/ly-solutions/harnessly:latest --repo ly-solutions/harnessly
 ```
 
-| | |
-| --- | --- |
-| Plain commands | `make run`, or a release binary: `RUNTIME_GATE_LISTEN=127.0.0.1:8022 RUNTIME_GATE_UPSTREAM= ./runtime` |
-| systemd | `make install install-systemd`, then `systemctl --user enable --now harnessly` — one service per Unix account; agents keep working through restarts |
-| Docker | `docker build -t harnessly .` (`--target with-agents` adds Claude Code and Codex), the home folder on a volume |
-| docker compose | [compose.yaml](compose.yaml): the whole workspace on one host, boards and documents wired in; MinIO as an option |
-| Kubernetes | [deploy/helm/harnessly](deploy/helm/harnessly): a StatefulSet per person with a PVC for its home |
-| Argo CD | [deploy/argocd](deploy/argocd): one Application, or an app of apps with boards and artifacts |
-
-All of them, how to give the runtime the agent CLIs and how to put it on a public server (three hostnames, Caddy,
-automatic TLS) are in [docs/deploy.md](docs/deploy.md). Nothing is published as an image yet: compose and Docker
-build locally, `docker compose up -d --build`.
-
-### The web page
-
-`web/` is the agents workspace in the browser: conversations with Claude Code and Codex in a sidebar with projects and
-pins, each agent's timeline (turns, tool runs, plans, questions) with a composer that takes slash commands, files,
-context and dictation, and a right pane with the terminal, a browser for the machine's dev servers, files, changes,
-documents and boards ([integrations](docs/integrations.md)), GitHub and GitLab, subagents and the session's cost.
-English by default, Russian with `RUNTIME_LOCALE=ru`. Release runtimes carry it; it is served at
-`RUNTIME_APP_BASE_PATH` (default `/agents`, and `/` redirects there):
-
-```sh
-make runtime-web               # pnpm build in web/, then bin/runtime with the page compiled in
-HOME=$(mktemp -d) RUNTIME_GATE_LISTEN=127.0.0.1:4321 ./bin/runtime &
-xdg-open http://127.0.0.1:4321/   # the first visit sets the machine's password
-```
-
-`make web-check` runs what CI runs for the page; `make web-browser-test` drives it in headless Chrome against a
-standalone runtime with stand-in agents (with `E2E_BOARDS_DIR` and `E2E_ARTIFACTS_DIR` naming checkouts of boards and
-artifacts, the side pane too). See [the page's settings](docs/configuration.md#web-page).
-
-## Architecture
-
-```mermaid
-flowchart LR
-    ui["Web UI"] --> hub["Cluster"]
-    hub <-->|"WebSocket /v1"| agent["agent"]
-    agent -->|"tunnels, socket relay"| gate["runtime gate"]
-    gate --> core["core slice<br/>tab states · layouts · prompts · hooks"]
-    gate --> slices["other slices<br/>terminal · files · conversations · ..."]
-    gate -.->|"gate mode: routes not switched on"| old[("previous runtime")]
-    core --> tmux["tmux panes<br/>Claude Code · Codex · shell"]
-    tmux -->|"hooks, status line"| gate
-```
-
-A request reaches the **runtime gate** on the runtime's port. The gate answers every route whose [slice](docs/slices.md)
-is on; in gate mode the rest goes to the previous runtime, in standalone mode there is no previous runtime and every
-slice is on. The **core** keeps the tabs: it starts tmux sessions, types prompts, and learns each agent's state from
-its hooks and files. The **machine agent** is the machine's only link to the cluster. Details in
-[docs/architecture.md](docs/architecture.md).
-
-## Documentation
+## Docs
 
 | | |
 | --- | --- |
 | [Getting started](docs/getting-started.md) | build, run standalone, open tabs, run agents, connect the machine agent |
-| [Architecture](docs/architecture.md) | the runtime gate, the core, tmux, the machine agent, the repository layout |
-| [Slices](docs/slices.md) | every slice of routes, switching them per machine, the shadow comparison |
+| [Deploy](docs/deploy.md) | quick start, verification, updating, systemd, Docker, compose, Helm, Argo CD |
 | [Configuration](docs/configuration.md) | every `RUNTIME_*` and `AGENT_*` variable |
-| [Deploy](docs/deploy.md) | plain commands, systemd, Docker, docker compose, Helm, Argo CD |
+| [Voice input](docs/voice.md) | the microphone, the built-in recognition, how to change or turn it off |
+| [Board engine](docs/design-engine.md) | fetching the design engine with your own Claude account |
+| [Design pages](docs/design-pages.md) | the page model of a design project and the page commands |
 | [Integrations](docs/integrations.md) | boards, artifacts and the agent skills |
-| [Contributing](CONTRIBUTING.md) | development setup, tests and golden files, commit convention |
+| [Architecture](docs/architecture.md) | the runtime gate, the core, tmux, the machine agent, the repository layout |
+| [Slices](docs/slices.md) | the slices of routes and switching them per machine |
+| [The hub](docs/hub/deploy.md) | [deploy](docs/hub/deploy.md), [connecting a machine](docs/hub/machine.md), [architecture](docs/hub/architecture.md), [API](docs/hub/api.md) |
+| [Changelog](CHANGELOG.md) | what changed in each version |
+| [Contributing](CONTRIBUTING.md) | development setup, tests, commit convention; [Security](SECURITY.md), [Code of Conduct](CODE_OF_CONDUCT.md) |
 
-## Status
-
-harnessly is young and moving fast; versions are `0.x` and the API follows the previous runtime it replaces.
-
-- **Here now:** the machine runtime, with every route of the previous runtime in Go, gate and standalone modes, the
-  machine agent (wire protocol v1), the web page on the project's own UI kit, and the boards and artifacts
-  integrations.
-- **Coming:** the cluster side (many machines and people behind one page), and the services' webhooks (board comments
-  routed to agents, live document updates).
-
-Follow the [changelog](CHANGELOG.md) and the [releases](https://github.com/ly-solutions/harnessly/releases).
-
-## Contributing
-
-Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; `make help` lists the developer
-tasks. Please report security problems privately, as [SECURITY.md](SECURITY.md) describes. Everyone taking part
-follows the [Code of Conduct](CODE_OF_CONDUCT.md).
-
-## Acknowledgements
-
-harnessly stands on [tmux](https://github.com/tmux/tmux) and drives
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [Codex](https://github.com/openai/codex). It uses
-[coder/websocket](https://github.com/coder/websocket), [creack/pty](https://github.com/creack/pty),
-[fsnotify](https://github.com/fsnotify/fsnotify), [goldmark](https://github.com/yuin/goldmark),
-[BurntSushi/toml](https://github.com/BurntSushi/toml) and [dlclark/regexp2](https://github.com/dlclark/regexp2).
+harnessly is young: versions are `0.x` and a minor version may change the API.
 
 ## License
 
-[Apache License 2.0](LICENSE).
+[Apache License 2.0](LICENSE). Third-party licences: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

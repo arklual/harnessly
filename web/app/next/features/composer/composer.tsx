@@ -546,7 +546,11 @@ const Composer = (props: IComposerProps) => {
               rows={1}
               disabled={props.quiet}
               value={value}
-              placeholder={bar ? t('next.voice.listening') : (props.placeholder ?? t(PLACEHOLDER_KEYS[mode]))}
+              placeholder={
+                bar
+                  ? t(bar.preparing ? 'next.voice.preparing' : 'next.voice.listening')
+                  : (props.placeholder ?? t(PLACEHOLDER_KEYS[mode]))
+              }
               aria-label={t('next.composer.label')}
               aria-invalid={tooLong || undefined}
               onChange={(event) => {

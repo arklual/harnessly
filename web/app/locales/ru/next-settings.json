@@ -209,7 +209,6 @@
   "next.settings.accounts.signIn": "Подписка",
   "next.settings.accounts.signIn.claude": "Войдите в терминале машины: claude auth login",
   "next.settings.accounts.signIn.codex": "Войдите в терминале машины: codex login",
-  "next.settings.accounts.terminal": "Подписка входит через страницу вендора, ключ вводится здесь и после сохранения не показывается. И то и другое хранится на этой машине.",
   "next.settings.accounts.where": "Куда идут запросы",
   "next.settings.accounts.direct": "Напрямую",
   "next.settings.accounts.viaProxy": "Через прокси",
@@ -284,5 +283,7 @@
   "next.settings.accounts.method.key": "Ключ API",
   "next.settings.accounts.keyHint.claude": "Ключ с console.anthropic.com, оплата с баланса",
   "next.settings.accounts.keyHint.codex": "Ключ API OpenAI, оплата с баланса",
-  "next.settings.accounts.method.console": "API-оплата"
+  "next.settings.accounts.method.console": "API-оплата",
+  "next.settings.general.feed.delivery": "Файлы",
+  "next.settings.general.feed.delivery.hint": "Файлы, которые агент отдал"
 }

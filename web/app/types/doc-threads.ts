@@ -3,7 +3,8 @@
 export const DOC_THREAD_STATUS = { open: 'open', resolved: 'resolved' } as const;
 export type TDocThreadStatus = (typeof DOC_THREAD_STATUS)[keyof typeof DOC_THREAD_STATUS];
 
-export const DOC_AUTHOR_KIND = { person: 'person', agent: 'agent' } as const;
+/** `guest`: somebody without a sign-in who wrote through a link with the right to comment; `email` is empty. */
+export const DOC_AUTHOR_KIND = { person: 'person', agent: 'agent', guest: 'guest' } as const;
 export type TDocAuthorKind = (typeof DOC_AUTHOR_KIND)[keyof typeof DOC_AUTHOR_KIND];
 
 /** W3C TextQuoteSelector plus the nearest heading, so a thread survives edits around its words. */
@@ -89,6 +90,22 @@ export interface IDocAccess {
   publicUrl: string | null;
 }
 
+/**
+ * How the current version is edited in place: `html` block by block in its own page (its markup and widgets stay),
+ * `markdown` as its Markdown text when the version has no page of its own.
+ */
+export const DOC_EDIT_MODE = { html: 'html', markdown: 'markdown' } as const;
+export type TDocEditMode = (typeof DOC_EDIT_MODE)[keyof typeof DOC_EDIT_MODE];
+
+/** What editing in place the current version allows; `markdown` is set in the `markdown` mode only. */
+export interface IDocSource {
+  mode: TDocEditMode | null;
+  markdown: string | null;
+  /** The number of the current version: the base an edit is saved against. */
+  version: number;
+  canEdit: boolean;
+}
+
 export interface IDocDetailResponse {
   doc: IDocSummary;
   threads: IDocThread[];
@@ -149,7 +166,24 @@ export type TDocFrameMessage =
   /** A press or Esc inside the document: cancels an open composer. */
   | { type: 'doc:dismiss' }
   /** Ctrl/Cmd+Alt+M inside the document. */
-  | { type: 'doc:comment-key' };
+  | { type: 'doc:comment-key' }
+  /**
+   * A double click on a block. `index`: the block's number in the page when it can be edited in place, null when it is
+   * markup or a widget. `ordinal`/`total`: its place among the page's blocks of the same kind, to find it in Markdown.
+   */
+  | {
+      type: 'doc:edit-block';
+      text: string;
+      tag: string;
+      rect: IDocRect;
+      index: number | null;
+      ordinal: number;
+      total: number;
+    }
+  /** The block being edited in place was finished (Enter): its new content and its text before the edit. */
+  | { type: 'doc:edit-commit'; index: number; html: string; before: string; changed: boolean }
+  /** Esc in the block being edited. */
+  | { type: 'doc:edit-cancel' };
 
 export type TDocParentMessage =
   | { type: 'doc:threads'; threads: { id: string; anchor: IDocAnchor; status: TDocThreadStatus }[] }
@@ -158,7 +192,13 @@ export type TDocParentMessage =
   | { type: 'doc:draft'; anchor: IDocAnchor }
   | { type: 'doc:draft-clear' }
   /** Scroll to this passage of the page and flash it (a changed block of a comparison). */
-  | { type: 'doc:find'; text: string };
+  | { type: 'doc:find'; text: string }
+  /** Make block `index` editable in place, with the caret in it. */
+  | { type: 'doc:edit-start'; index: number }
+  /** Finish the edit as if Enter was pressed (the viewer's «Сохранить»): the frame answers with `doc:edit-commit`. */
+  | { type: 'doc:edit-finish' }
+  /** Back to the page as published: the edit is dropped (cancelled or refused). */
+  | { type: 'doc:edit-revert' };
 
 export interface IDocRect {
   top: number;

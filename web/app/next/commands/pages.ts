@@ -1,6 +1,8 @@
 // The HTTP pages of a conversation (spec §2): older turns above the feed, a turn's steps when it unfolds, a tool's
 // full output. Each merges into the stores by id, so what is on screen keeps its place.
 
+import { gatewayPath } from '@/next/core/net/machine';
+import { isMachineOff, loadCentralChat } from '@/next/stores/central';
 import { getPage, sendBody, sendPage, type PageOutcome } from '@/next/core/net/http';
 import { machineApi } from '@/next/core/net/machine';
 import { batch } from '@/next/core/store';
@@ -36,6 +38,14 @@ export async function loadOlderTurns(
   before: TurnId,
   limit = 20,
 ): Promise<PageOutcome<true>> {
+  // A machine that is off: the older turns come from the cluster's copy.
+  if (isMachineOff(m)) {
+    const central = await loadCentralChat(conv, before, limit);
+    if (!('ok' in central)) return central;
+    const { turns, entries, beforeTurnId } = central.value;
+    batch(() => applyOlderTurns(conv, turns, entries, beforeTurnId));
+    return { ok: true, value: true };
+  }
   const url = machineApi(m).http(`/conversations/${enc(conv)}/turns?before=${enc(before)}&limit=${limit}`);
   const res = await getPage(url, parsePage.turns, limitsOf(m).cmdTimeoutMs);
   if (!('ok' in res)) return res;
@@ -44,7 +54,9 @@ export async function loadOlderTurns(
 }
 
 export async function loadEntries(m: MachineId, conv: ConvId, turn: TurnId): Promise<PageOutcome<true>> {
-  const url = machineApi(m).http(`/conversations/${enc(conv)}/turns/${enc(turn)}/entries`);
+  const url = isMachineOff(m)
+    ? gatewayPath(`/history/conversations/${enc(conv)}/turns/${enc(turn)}/entries`)
+    : machineApi(m).http(`/conversations/${enc(conv)}/turns/${enc(turn)}/entries`);
   const res = await getPage(url, parsePage.entries, limitsOf(m).cmdTimeoutMs);
   if (!('ok' in res)) return res;
   batch(() => applyTurnEntries(conv, res.value.turnId, res.value.entries));
@@ -171,7 +183,7 @@ export const loadLegacyTab = (m: MachineId, conv: ConvId): Promise<PageOutcome<L
 /** How long a draft may take: an excerpt is at once, a note is written by the agent (the runtime gives it 200 s). */
 export const HANDOFF_DRAFT_MS = 210_000;
 
-/** The text a handoff (an excerpt or the agent's note) or a fork's merge (its result) would carry, to read and edit. */
+/** The editable text or private full-history metadata a handoff draft carries. */
 export const loadHandoffDraft = (
   m: MachineId,
   conv: ConvId,

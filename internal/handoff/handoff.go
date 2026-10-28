@@ -97,6 +97,25 @@ func Handoff(from From, mode wire.HandoffMode, fork bool, text string) string {
 	return block(tagHandoff, attrs, instructions, text)
 }
 
+// Bootstrap is a short first prompt whose approved context is in a private runtime-owned file. The CLI receives the
+// path as prompt text, never as an argv substitution; the agent reads large files in bounded pieces.
+func Bootstrap(_ From, mode wire.HandoffMode, fork bool, path string) string {
+	attrs := attr("mode", string(mode))
+	lead := "Continue the work using the approved context"
+	if fork {
+		attrs += attr("kind", "fork")
+		lead = "Continue this branch using the approved context"
+	}
+	what := "the approved handoff context"
+	if mode == wire.HandoffHistory {
+		what = "the complete JSONL transcript"
+	}
+	instructions := lead + ". " + what + " is in the private file named below. Read the file in bounded parts, " +
+		"take over the work, say in a sentence or two what you took over, and wait for the person's next message; " +
+		"do not redo what is done."
+	return block(tagHandoff, attrs, instructions, "Private context file: "+path)
+}
+
 // Result is the message a fork sends back into the conversation it came from: the result note in a block that says
 // which branch it is.
 func Result(fork From, text string) string {

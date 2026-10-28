@@ -229,6 +229,7 @@ const ChatHeader = ({
             onContinue={
               actions.onContinue && chat.canContinue ? () => actions.onContinue?.(chat.id) : undefined
             }
+            onMoveVm={actions.onMoveVm && chat.canMoveVm ? () => actions.onMoveVm?.(chat.id) : undefined}
             onGoal={goal ? () => setGoalOpen(true) : undefined}
             trigger={
               <button

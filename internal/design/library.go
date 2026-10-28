@@ -85,25 +85,30 @@ type Config struct {
 type Library struct {
 	cfg Config
 
-	mu       sync.Mutex
-	locks    map[string]*sync.Mutex
-	listing  listingCache
-	srv      *server
-	bg       background
-	bgStarts sync.WaitGroup
-	live     liveState
-	tabs     func() ([]Chat, bool)
-	identity identityCache
-	hist     historyState
-	modes    modesState
-	sources  sourcesState
-	texts    sync.Map
-	releases releasesState
-	osUser   func() string
-	hashed   *hashIndex
-	access   accessState
-	now      func() time.Time           // tests; nil is time.Now
-	emitFn   func(kind, project string) // tests; nil sends to the agent
+	mu        sync.Mutex
+	locks     map[string]*sync.Mutex
+	listing   listingCache
+	srv       *server
+	bg        background
+	bgStarts  sync.WaitGroup
+	live      liveState
+	timeline  timelineState
+	tabs      func() ([]Chat, bool)
+	identity  identityCache
+	hist      historyState
+	modes     modesState
+	sources   sourcesState
+	texts     sync.Map
+	releases  releasesState
+	osUser    func() string
+	hashed    *hashIndex
+	pinned    pinnedState
+	pinMu     sync.Mutex
+	lastPin   string
+	lastPinAt time.Time
+	access    accessState
+	now       func() time.Time           // tests; nil is time.Now
+	emitFn    func(kind, project string) // tests; nil sends to the agent
 	// accessWrite orders snapshot posts so the file on disk is the snapshot in memory.
 	accessWrite sync.Mutex
 }

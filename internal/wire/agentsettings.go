@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // The Settings screen's pages for the agent CLIs: what Claude Code keeps in ~/.claude/settings.json and Codex in
@@ -497,6 +497,6 @@ func (s *Server) agentSettingsFailed(w http.ResponseWriter, r *http.Request, err
 		refuse(w, RefuseTimeout)
 		return
 	}
-	agent.Log("warn", "v2: the agent settings failed", agent.F{K: "path", V: r.URL.Path}, agent.F{K: "error", V: err.Error()})
+	jsonlog.Log("warn", "v2: the agent settings failed", jsonlog.F{K: "path", V: r.URL.Path}, jsonlog.F{K: "error", V: err.Error()})
 	refuse(w, RefuseInternal)
 }

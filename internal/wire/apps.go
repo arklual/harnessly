@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 // The Apps screen of «More»: the apps the machine is connected to, each as a whole section of its own. The tracker gives
@@ -337,7 +337,7 @@ func (s *Server) apps(w http.ResponseWriter, r *http.Request) {
 	}
 	feed, err := s.Apps.Feed(r.Context())
 	if err != nil {
-		agent.Log("warn", "v2: the apps feed failed", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "v2: the apps feed failed", jsonlog.F{K: "error", V: err.Error()})
 		refuse(w, RefuseInternal)
 		return
 	}

@@ -112,8 +112,31 @@
   color: var(--hx-accent);
 }
 /* Under «Нет связи» when both are up. */
-.hx-net ~ .hx-net[data-kind='update'] {
+.hx-net ~ .hx-net[data-kind='update'],
+.hx-net ~ .hx-net[data-kind='release'] {
   top: 58px;
+}
+/* «Доступна версия»: the same pill, quieter than «Вышла новая версия»: links, not a button. */
+.hx-net[data-kind='release'] {
+  padding-right: 4px;
+}
+.hx-net[data-kind='release'] .hx-net__icon {
+  color: var(--hx-accent);
+}
+.hx-net__link {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+.hx-net__link:hover {
+  color: var(--hx-fg-1);
+  text-decoration: underline;
+}
+.hx-net__link:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 .hx-net__x {
   display: inline-grid;

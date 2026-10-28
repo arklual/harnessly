@@ -1,0 +1,21 @@
+{
+  "next.whatsNew.title": "What's new",
+  "next.whatsNew.ok": "Got it",
+  "next.whatsNew.close": "Close",
+  "next.whatsNew.2026-10-28.one.title": "All your chats in one list",
+  "next.whatsNew.2026-10-28.one.text": "On any machine you see your chats from every machine — the others carry its name.",
+  "next.whatsNew.2026-10-28.here.title": "Continue here",
+  "next.whatsNew.2026-10-28.here.text": "Open a chat from another machine and press “Continue here” — it moves here with its history.",
+  "next.whatsNew.2026-10-28.off.title": "History without the machine on",
+  "next.whatsNew.2026-10-28.off.text": "A chat of a machine that is off opens read-only; continue once it is back on.",
+  "next.whatsNew.2026-10-27b.safe.title": "A safe for tokens",
+  "next.whatsNew.2026-10-27b.safe.text": "An agent asks for a token with a «Put in the safe» window, not in the chat: the value is kept encrypted on the machine and goes into its commands.",
+  "next.whatsNew.2026-10-27b.safeSettings.title": "Secrets in Settings",
+  "next.whatsNew.2026-10-27b.safeSettings.text": "Settings → Safe: what is there, who used it and when, replace or remove.",
+  "next.whatsNew.2026-10-27.telegram.title": "Notifications in Telegram",
+  "next.whatsNew.2026-10-27.telegram.text": "Link bots in Settings → Notifications — the agent writes when it is done or needs your answer.",
+  "next.whatsNew.2026-10-27.full.title": "Shared designs open full screen",
+  "next.whatsNew.2026-10-27.full.text": "Guests see the design without panels, and comment on a phone by pressing and holding.",
+  "next.whatsNew.2026-10-27.version.title": "Link to one version",
+  "next.whatsNew.2026-10-27.version.text": "In «Share»: always the latest or this version — and only the pages you choose."
+}

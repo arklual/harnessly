@@ -19,7 +19,12 @@ import {
 import { conversationsStore, convsCachedStore, convsLoadedStore } from '@/next/stores/conversations';
 import { draftsStore } from '@/next/stores/drafts';
 import { draftBaseStore } from '@/next/stores/draft-sync';
-import { activeMachineStore, machineOrderStore, machinesStore } from '@/next/stores/machines';
+import {
+  activeMachineStore,
+  homeMachineStore,
+  machineOrderStore,
+  machinesStore,
+} from '@/next/stores/machines';
 import { meStore } from '@/next/stores/me';
 import { convMessagesStore, messagesStore } from '@/next/stores/messages';
 import { opsStore } from '@/next/stores/ops';
@@ -58,6 +63,7 @@ export function clearPersonData(): void {
     }
     machineOrderStore.set(null);
     activeMachineStore.set(null);
+    homeMachineStore.set(null);
     meStore.set({ k: 'loading' });
   });
   flush();

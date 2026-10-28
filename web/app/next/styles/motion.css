@@ -241,6 +241,7 @@
   .hx-root
     :is(
       .hx-spin,
+      .hx-spin-ic,
       .hx-tool__spin,
       .hx-now__spin,
       .hx-now__star,

@@ -1,11 +1,15 @@
 package layoutapi
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/delivery"
+	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/panel"
 )
@@ -245,5 +249,39 @@ func TestCLIPanelOpensADesignOnce(t *testing.T) {
 	got := r.do("s", "GET", "/api/platform/pane-intents?tabId=tab-1", "")
 	if got.status != 200 || !strings.Contains(got.body, `"target":"landing"`) || !strings.Contains(got.body, `"appliedOn":"desktop"`) {
 		t.Fatal(got.body)
+	}
+}
+
+func TestCLIDeliverOpensTheFileOnceAndAnswersTheRecord(t *testing.T) {
+	r := panelRig(t)
+	root := t.TempDir()
+	access := files.NewAccess([]string{root}, nil)
+	r.deps.Deliver = func(path, title string) (delivery.Info, *delivery.Refusal) {
+		return delivery.Describe(access, path, title)
+	}
+	p := filepath.Join(root, "notes.md")
+	if err := os.WriteFile(p, []byte("# hi"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ask := func(path string) answer {
+		return r.do("t", "POST", "/api/cli/deliver", `{"session":"`+agentSession+`","path":"`+path+`","title":"Notes"}`)
+	}
+	r.want(r.do("", "POST", "/api/cli/deliver", `{"session":"`+agentSession+`","path":"`+p+`"}`), 403, `{"error":"Forbidden"}`)
+	a := ask(p)
+	r.want(a, 200, "*")
+	info, ok := delivery.ParseLink(strings.Fields(a.json(t).String("message"))[len(strings.Fields(a.json(t).String("message")))-1])
+	if !ok || info.Path != p || info.Title != "Notes" || info.Size != 4 {
+		t.Fatal(a.body)
+	}
+	ask(p)
+	intents := r.deps.Intents.List("tab-1")
+	if len(intents) != 1 || string(jsvalue.Stringify(intents[0].Object("command"), "")) != `{"kind":"open","tab":"files","target":"`+p+`","auto":true}` {
+		t.Fatal(intents)
+	}
+	// A file outside the workspace is refused, and asks nothing of the pane.
+	r.want(ask("/etc/passwd"), 403, "*")
+	r.want(r.do("t", "POST", "/api/cli/deliver", `{"session":"pt-ws-1-zzz","path":"`+p+`"}`), 404, "*")
+	if len(r.deps.Intents.List("tab-1")) != 1 {
+		t.Fatal("a refused file opened something")
 	}
 }

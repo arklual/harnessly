@@ -25,6 +25,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/tmux"
+	"github.com/ly-solutions/harnessly/internal/updatecheck"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -92,6 +93,14 @@ func (b terminalBridge) ReconcileCwd(session string) {
 	}
 }
 
+func (b terminalBridge) TerminalOutput(session string, data []byte) {
+	if c := b.core.running(); c != nil {
+		if v := c.v2.Load(); v != nil {
+			v.rt.TerminalOutput(session, data)
+		}
+	}
+}
+
 func isUpgrade(r *http.Request) bool { return strings.EqualFold(r.Header.Get("Upgrade"), "websocket") }
 
 func pathIs(r *http.Request, p string) bool {
@@ -105,6 +114,8 @@ type runtimeGate struct {
 	core  *coreRef
 	tmux  *tmux.Tmux
 	home  string
+	// update looks for a newer release; nil when this runtime does not.
+	update *updatecheck.Checker
 }
 
 // configFileOf is the runtime's config (the pair's secret, the person's settings).
@@ -164,6 +175,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		Hooks:   hooks,
 		Push:    pusher,
 		Agents: newCoreAgents(coreAgentsConfig{DataDir: cfg.DataDir, Home: home, ConfigFile: configFile,
+			EnvDir:    agentEnvDir(cfg.DataDir),
 			ClaudeDir: env("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude")), CodexDir: env("CODEX_HOME", filepath.Join(home, ".codex")),
 			DefaultsKey: env("RUNTIME_LAUNCH_DEFAULTS_KEY", "launchDefaults"), Launcher: os.Getenv("RUNTIME_CLAUDE_LAUNCHER"),
 			EditorScript: promptEditorScript(cfg.DataDir), HumanEditorVar: promptHumanEditorVar(),
@@ -171,6 +183,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			Port: listenPort(cfg.Listen), MCP: codex.MCP{Server: env("RUNTIME_MCP_SERVER", "harnessly"), TokenEnv: tokenEnv},
 			MCPPath: env("RUNTIME_MCP_PATH", "/api/cli/preview/mcp"), ScriptDataDirs: scriptDirs,
 			TokenHeaders: cli.Headers, SkillsPluginDir: skillsPluginDir(cfg.DataDir), PassServiceEnv: integ.Enabled(),
+			SafePrompt:            true,
 			CodexContainerSandbox: env("RUNTIME_CODEX_SANDBOX", "codex") == "container"}),
 		Launch:     launchConfigFromEnv(home, cfg.DataDir),
 		Timeline:   timelineConfigFromEnv(cfg.DataDir),
@@ -344,6 +357,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	if f.SliceOn("core") {
 		go ref.c.start()
 	}
+	f.Add(hubRoutes(d)...)
 	f.Add(f.AsRoutes(machineSliceRoutes(d, cfg.Listen, cfg.Upstream, pusher, hooks)...)...)
 	f.Add(voiceRoutes(d)...)
 	for _, group := range routeGroups {
@@ -358,8 +372,14 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(unshadowed(f, append(automationRoutes(d, settingsStore), ref.c.browserTabRoutes(d)...))...)
 	f.Add(integrationRoutes(d, integ)...)
 	f.Add(docsRoutes(d, integ)...)
+	f.Add(docShareRoutes(d, ref.c)...)
 	f.Add(githubRoutes(d, githubFromEnv())...)
 	f.Add(peerRoutes(d, ref.c)...)
+	checker, checkOn := newUpdateChecker(cfg.Standalone())
+	f.Add(updateRoutes(d, checker)...)
+	f.Add(notifyBotRoutes(d)...)
+	f.Add(askRoutes(d, ref.c)...)
+	f.Add(secretRoutes(d, ref.c)...)
 	f.Add(v2Routes(d, ref.c)...)
 	if w := webConfigFromEnv(cfg.Standalone()); w != nil {
 		f.Add(gate.Route{Match: w.matches, Handler: w.handler()})
@@ -370,7 +390,11 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		// The old runtime behind the gate does not get an install socket, or a socket of anyone without a session.
 		f.Add(upstreamGuard(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, previewOf(d).proxy.Matches))
 	}
-	return &runtimeGate{Gate: f, terms: terms, core: ref, tmux: tm, home: home}, nil
+	rg := &runtimeGate{Gate: f, terms: terms, core: ref, tmux: tm, home: home}
+	if checkOn {
+		rg.update = checker
+	}
+	return rg, nil
 }
 
 // defaultTmuxConf is the tmux.conf a standalone runtime writes when none is named: the page's terminals have tabs
@@ -454,6 +478,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		f.tmux.ApplyConfig("")
 		go alone.cleanUp(f.home, env("RUNTIME_UPLOADS_DIR", filepath.Join(cfg.DataDir, "uploads")))
 	}
+	f.startUpdateCheck(ctx)
 	terms := f.terms
 	var handler http.Handler = f
 	if cfg.Standalone() {
@@ -490,6 +515,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		defer cancel()
 		_ = srv.Shutdown(shutdown)
 		f.core.c.stop()
+		closeVoiceEngines()
 	}
 	return nil
 }

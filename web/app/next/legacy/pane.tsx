@@ -174,11 +174,12 @@ const LegacyStyles = ({ need, children }: { need: boolean; children: ReactNode }
 };
 
 /** Keeps the Legacy timeline of the conversation in the snapshot store while mounted: the contents read it there. */
-const Timeline = ({ tab, provider }: { tab: ITab; provider: string }) => {
+const Timeline = ({ tab, provider, machineId }: { tab: ITab; provider: string; machineId: string }) => {
   const timeline = useTimeline({
     sessionName: tab.sessionName,
     agentSessionId: tab.agentState?.sessionId ?? null,
     panelType: provider === 'codex' ? 'codex-cli' : 'claude-code',
+    machineId,
   });
   useEffect(() => {
     useTimelineSnapshotStore.getState().publish(tab.sessionName, {
@@ -326,7 +327,9 @@ export const useLegacyPane = (conv: Conversation | null, options: ILegacyPaneOpt
     },
     extras: (
       <>
-        {options.open && tab && conv && <Timeline tab={tab} provider={conv.provider} />}
+        {options.open && tab && conv && (
+          <Timeline tab={tab} provider={conv.provider} machineId={conv.machineId} />
+        )}
         <Suspense fallback={null}>
           <LegacyStyles need={contents.viewing !== null}>
             <FileViewer
