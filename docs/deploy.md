@@ -447,7 +447,8 @@ The check is skipped, and the notice never appears, for a `dev` build (`make run
 [hub](hub/machine.md) carries (the hub serves its machines' binaries), and when you set `RUNTIME_UPDATE_CHECK=0`.
 `RUNTIME_UPDATE_CHECK_URL` points the check at a mirror that answers like the GitHub API.
 
-Nothing updates itself: how you update is how you installed.
+A standalone runtime does not update itself (a machine of a hub does, see [hub/machine.md](hub/machine.md#upgrade-move-and-remove)):
+how you update is how you installed. Settings → General → Updates shows the version, the newer release and this table.
 
 | Installed with | Update |
 | --- | --- |

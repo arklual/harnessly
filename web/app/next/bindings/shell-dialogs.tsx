@@ -5,6 +5,8 @@ import { settled, pageText } from '@/next/bindings/outcome';
 import { createProject, resumeSession } from '@/next/commands';
 import { loadSessions } from '@/next/commands/pages';
 import NewProjectDialog from '@/next/features/sidebar/new-project-dialog';
+import { newProfileProjectId, withProject } from '@/next/features/sidebar/profile-layout';
+import { editProfileSidebar } from '@/next/stores/profile-sidebar';
 import ResumeDialog, { type IResumeSession } from '@/next/features/shell/resume-dialog';
 import type { AgentSession, ConvId, MachineId } from '@/next/protocol/v2';
 import { plural, t } from '@/next/i18n';
@@ -21,7 +23,8 @@ const sessionOf = (session: AgentSession, machine: string): IResumeSession => ({
   off: false,
 });
 
-export const useProjectDialog = (machine: MachineId | null) => {
+/** «Новый проект»: on the machine, or the person's, whose folders come on a machine as its chats do. */
+export const useProjectDialog = (machine: MachineId | null, person: boolean) => {
   const [open, setOpen] = useState(false);
 
   const show = () => {
@@ -33,6 +36,10 @@ export const useProjectDialog = (machine: MachineId | null) => {
       open={open}
       onClose={() => setOpen(false)}
       onCreate={async (name) => {
+        if (person) {
+          await editProfileSidebar((doc) => withProject(doc, name, newProfileProjectId(), Date.now()));
+          return;
+        }
         await settled(createProject(machine, name));
       }}
     />

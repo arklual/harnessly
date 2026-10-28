@@ -152,7 +152,8 @@ RUN set -e; \
     for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do \
       os=${target%/*}; arch=${target#*/}; \
       ( GOOS=$os GOARCH=$arch go build -trimpath -tags webui -ldflags "$ldflags" -o /out/dist/runtime-$os-$arch ./cmd/runtime \
-        && GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o /out/dist/agent-$os-$arch ./cmd/agent ) & pids="$pids $!"; \
+        && GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o /out/dist/agent-$os-$arch ./cmd/agent \
+        && GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$ldflags" -o /out/dist/harnessly-$os-$arch ./cmd/harnessly ) & pids="$pids $!"; \
     done; \
     for p in $pids; do wait "$p"; done; \
     install -m 0755 deploy/install/install.sh /out/dist/install.sh

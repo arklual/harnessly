@@ -34,7 +34,9 @@ type Screen struct {
 	Busy     bool
 	Menu     MenuKind
 	// Panel: a TUI panel or picker is open over the box (Claude's /effort slider, its /model picker).
-	Panel     bool
+	Panel bool
+	// Aside: one of those the person left open (Claude's /login, /model, /effort), which Esc closes safely.
+	Aside     screen.Aside
 	Options   []string // the menu's options as the screen shows them
 	Input     string
 	InputLine bool
@@ -81,6 +83,7 @@ func Read(styled string, provider wire.Provider) Screen {
 	}
 	if provider != wire.ProviderCodex {
 		s.Queued = screen.QueueInPromptBox(styled)
+		s.Aside = screen.ClaudeAside(st.Plain)
 	}
 	return s
 }

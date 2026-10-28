@@ -4,7 +4,10 @@
 import { createKeyedStore, sameItems, useAll, useKey } from '@/next/core/store';
 import type { MachineId, Project } from '@/next/protocol/v2';
 
+/** Keyed by machine and project (projectKey): two machines may name a project alike (one folder path, one Legacy id),
+ *  and one machine's project must not take the other's place. */
 export const projectsStore = createKeyedStore<string, Project>();
+export const projectKey = (machine: MachineId, id: string): string => `${machine}/${id}`;
 /** The folder a machine starts a chat in when none is picked; absent until its convs snapshot arrived. */
 export const defaultCwdStore = createKeyedStore<MachineId, string>();
 

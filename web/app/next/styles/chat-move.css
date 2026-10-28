@@ -144,49 +144,7 @@
   color: var(--hx-fg-2);
   font-size: var(--hx-text-sm);
 }
-/* over the field of a chat of another machine — where it lives and «Продолжить здесь». It comes in and
-   changes its words softly; it leaves with the chat. */
-.hx-here {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 auto 8px;
-  padding: 8px 8px 8px 14px;
-  max-width: 720px;
-  border-radius: 12px;
-  background: var(--hx-bg-subtle);
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-sm);
-  line-height: 20px;
-  animation: hx-here-in var(--hx-dur-md) var(--hx-ease-out);
-}
-.hx-here[data-phase='off'] {
-  padding-right: 14px;
-  color: var(--hx-fg-3);
-}
-.hx-here[data-phase='failed'] .hx-here__text {
-  color: var(--hx-danger);
-}
-.hx-here__text {
-  min-width: 0;
-  transition: color var(--hx-dur-md) var(--hx-ease-out);
-}
-.hx-here__go {
-  flex: none;
-  gap: 8px;
-}
-@keyframes hx-here-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .hx-here {
-    animation: none;
-  }
-  .hx-here__text,
   .hx-mv__vm,
   .hx-mv__model,
   .hx-mv__knob,

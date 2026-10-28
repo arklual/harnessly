@@ -28,6 +28,7 @@ import type {
   ModelSwitch,
   Now,
   RewindMark,
+  TerminalAside,
 } from '@/next/protocol/v2';
 import { connectionStore } from '@/next/stores/connection';
 import {
@@ -60,6 +61,7 @@ interface ICachedTurn {
   now: Now | null;
   wait: TurnItem['wait'];
   auto: AutoMark | undefined;
+  cleared: TerminalAside | undefined;
   item: TurnItem;
 }
 
@@ -345,7 +347,13 @@ export class ItemsBuilder {
       let item: OutgoingItem;
       if (have && have.source === m && have.handed === handed && have.item.auto === auto) item = have.item;
       else {
-        item = { kind: 'outgoing', key: id, message: messageOf(m, handed), ...(auto && { auto }) };
+        item = {
+          kind: 'outgoing',
+          key: id,
+          message: messageOf(m, handed),
+          ...(auto && { auto }),
+          ...(m.cleared && { cleared: m.cleared }),
+        };
         this.outgoing.set(id, { source: m, handed, item });
       }
       if (refusal) items.splice(placeOfRefused(items, m), 0, item);
@@ -474,7 +482,9 @@ export class ItemsBuilder {
     const nowOfTurn = now && now.turnId === id ? now : null;
     const wait = stalled ? 'machine' : null;
     const promptId = prompt?.clientId ?? null;
-    const auto = autoMarkOf(promptId, promptId === null ? undefined : messagesStore.get(promptId), goes);
+    const promptMessage = promptId === null ? undefined : messagesStore.get(promptId);
+    const auto = autoMarkOf(promptId, promptMessage, goes);
+    const cleared = promptMessage?.cleared;
 
     const have = this.turns.get(id);
     if (
@@ -488,6 +498,7 @@ export class ItemsBuilder {
       have.now === nowOfTurn &&
       have.wait === wait &&
       have.auto === auto &&
+      have.cleared === cleared &&
       sameList(have.steps, steps)
     ) {
       return have.item;
@@ -506,8 +517,22 @@ export class ItemsBuilder {
       wait,
       endNote: null,
       ...(auto && { auto }),
+      ...(cleared && { cleared }),
     };
-    this.turns.set(id, { view, prompt, woke, peer, note, answer, steps, now: nowOfTurn, wait, auto, item });
+    this.turns.set(id, {
+      view,
+      prompt,
+      woke,
+      peer,
+      note,
+      answer,
+      steps,
+      now: nowOfTurn,
+      wait,
+      auto,
+      cleared,
+      item,
+    });
     return item;
   }
 }

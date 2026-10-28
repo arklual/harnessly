@@ -61,8 +61,9 @@ func TestLaunchLinesMatchThePreviousRuntime(t *testing.T) {
 			continue
 		}
 		want := strings.NewReplacer("$DATA", data, "$EDITOR_VAR", "MY_EDITOR_VAR", "$EDITOR_NAME", "my-editor").Replace(*c.Line)
-		if err != nil || line != want {
-			t.Errorf("%s:\n got %q %v\nwant %q", c.Name, line, err, want)
+		// The golden lines are the sh lines; the line typed is that line for any shell.
+		if err != nil || line != agents.ForAnyShell(want) {
+			t.Errorf("%s:\n got %q %v\nwant %q", c.Name, line, err, agents.ForAnyShell(want))
 		}
 	}
 }

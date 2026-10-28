@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/agentstest"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
@@ -604,7 +605,11 @@ func TestConsoleLogin(t *testing.T) {
 			cmds := b.console
 			b.mu.Unlock()
 			want := map[string]string{"claude": "claude auth login --claudeai", "codex": "codex login --device-auth"}[provider]
-			if len(cmds) != 1 || !strings.HasPrefix(cmds[0], provider+": set -a; . '") || !strings.HasSuffix(cmds[0], "; set +a; "+want) {
+			inner := ""
+			if len(cmds) == 1 {
+				inner, _ = agents.UnwrapAnyShell(strings.TrimPrefix(cmds[0], provider+": "))
+			}
+			if !strings.HasPrefix(inner, "set -a; . '") || !strings.HasSuffix(inner, "; set +a; exec env "+want) {
 				t.Errorf("console asked for %v", cmds)
 			}
 		})

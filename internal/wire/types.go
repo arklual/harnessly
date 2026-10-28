@@ -455,6 +455,18 @@ const (
 // AutoContinueWhys is every AutoContinueWhy, in the schema's order.
 var AutoContinueWhys = []AutoContinueWhy{AutoAfterLimit, AutoAfterRestart}
 
+// TerminalAside is a screen of the agent's terminal over its input box that Esc closes without changing anything.
+type TerminalAside string
+
+const (
+	AsideLogin  TerminalAside = "login"
+	AsideModel  TerminalAside = "model"
+	AsideEffort TerminalAside = "effort"
+)
+
+// TerminalAsides is every TerminalAside, in the schema's order.
+var TerminalAsides = []TerminalAside{AsideLogin, AsideModel, AsideEffort}
+
 // AutoContinueMax is how many of its own continuations a conversation keeps.
 const AutoContinueMax = 20
 
@@ -884,11 +896,14 @@ type Message struct {
 	Kind MessageKind  `json:"kind"`
 	// Auto is set on a message the runtime wrote itself to go on (AutoContinue): the feed draws it as a quiet line,
 	// not as the person's words. Absent on the person's messages.
-	Auto      AutoContinueWhy `json:"auto,omitempty"`
-	CreatedAt Ms              `json:"createdAt"`
-	Attempts  int             `json:"attempts"`
-	State     MessageState    `json:"state"`
-	Rev       int64           `json:"rev"`
+	Auto AutoContinueWhy `json:"auto,omitempty"`
+	// Cleared is the screen the person left open in the agent's terminal (their /login, a picker) that was closed
+	// before the message went in: the chat says so under it. Absent when nothing was in the way.
+	Cleared   TerminalAside `json:"cleared,omitempty"`
+	CreatedAt Ms            `json:"createdAt"`
+	Attempts  int           `json:"attempts"`
+	State     MessageState  `json:"state"`
+	Rev       int64         `json:"rev"`
 
 	// Server only: when the text was typed and how long the transcript was then, to find its user entry.
 	TypedAt     Ms    `json:"-"`

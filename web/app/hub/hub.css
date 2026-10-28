@@ -1728,3 +1728,42 @@ a.k-btn {
 .hub-dev-index a {
   color: inherit;
 }
+
+/* ---------- Sites ---------- */
+.hub-site {
+  display: grid;
+  gap: 0.125rem;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease-out;
+}
+.hub-site:hover {
+  border-color: var(--k-border-strong, var(--k-border-default));
+}
+.hub-site__n {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.hub-site__a {
+  overflow: hidden;
+  color: var(--k-text-secondary);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-drop {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  border: 1.5px dashed var(--k-border-default);
+  border-radius: 1.125rem;
+  background: var(--k-surface-sunken);
+  text-align: center;
+  transition:
+    border-color 0.15s ease-out,
+    background-color 0.15s ease-out;
+}
+.hub-drop[data-over] {
+  border-color: var(--k-accent, currentColor);
+}

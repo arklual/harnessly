@@ -19,6 +19,7 @@ import { useSlashSource } from '@/next/bindings/slash-source';
 import { UI_REQUEST, requestUi } from '@/next/stores/ui-requests';
 import type { ISlashActions } from '@/next/features/composer/slash-model';
 import Composer from '@/next/features/composer/composer';
+import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import type { Conversation, ConvId, MachineId } from '@/next/protocol/v2';
 import { clearDraft, NEW_CHAT } from '@/next/stores/drafts';
 import { useDraftField } from '@/next/bindings/use-draft';
@@ -32,6 +33,8 @@ import {
 } from '@/next/stores/mentions';
 import { limitsOf } from '@/next/stores/machines';
 import { useVoice } from '@/next/bindings/use-voice';
+import { useTakesMenu } from '@/next/bindings/use-takes';
+import DockBar from '@/next/features/composer/dock-bar';
 import { useEnterSends } from '@/next/stores/me';
 import { useDefaultCwd } from '@/next/stores/projects';
 import { t } from '@/next/i18n';
@@ -54,12 +57,24 @@ interface IHomeComposerProps {
   conversations: readonly Conversation[] | null;
   /** The project the chat starts in (picked in the sidebar); without one it starts in the usual folder. */
   projectId?: string | null;
+  /** The project is the person's (the cluster keeps the sidebar): this gives its project on the machine the chat
+   *  starts on, made there when it has none. Without it the project is the machine's own. */
+  resolveProject?: (projectId: string, machine: MachineId) => Promise<string>;
   onCreated: (id: ConvId) => void;
+  /** The machine the chat starts on, picked in the model's popover; its agents are this machine's. */
+  machines?: IModelPickerProps['machine'];
 }
 
 const noChat = () => undefined;
 
-const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: IHomeComposerProps) => {
+const HomeComposer = ({
+  machine,
+  conversations,
+  projectId = null,
+  resolveProject,
+  onCreated,
+  machines = null,
+}: IHomeComposerProps) => {
   const enterSends = useEnterSends();
   // Arriving with something taken from the Apps screen, the person goes on in the field.
   const field = useRef<HTMLTextAreaElement>(null);
@@ -67,7 +82,8 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
   const mentions = useMentions(NEW_CHAT);
   const stash = useFieldStash(NEW_CHAT);
   const uploads = useUploads(machine, NEW_CHAT, files);
-  const voice = useVoice(machine, text, setText, read);
+  const { notice: voiceNotice, insert, ...voice } = useVoice(machine, text, setText, read);
+  const takes = useTakesMenu(insert);
   const [creating, setCreating] = useState(false);
   // Enter pressed before the machine's list arrives waits for it and then sends, instead of being lost.
   const waiting = useRef<(() => void) | null>(null);
@@ -137,67 +153,84 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
     }
     setCreating(true);
     if (choice) rememberChoice(choice);
-    if (choice && companions.length > 0) {
-      // One chat on each model, each in a worktree of its own, grouped under the prompt.
-      const launch = { id: uuidv7(), prompt: launchPrompt(text) };
-      const first = { text: withMentions(mentions, text.trim()), attachments: uploads.ready };
-      const started = [choice, ...companions].map((pick) =>
-        createConversation(machine, {
-          where,
-          provider: pick.provider,
-          ...(pick.profile ? { profile: pick.profile } : {}),
-          model: pick.model ? { id: pick.model, effort: pick.effort, ultracode: pick.ultracode } : null,
-          first,
-          launch,
-          worktree: true,
-        }),
-      );
-      void Promise.all(
-        started.map(async (one) => {
-          const [st, id] = await Promise.all([one.done, one.conversation]);
-          if (st.k === 'failed')
-            toast(t('next.newChat.failed'), { tone: 'error', description: failureText(st.failure) });
-          return id;
-        }),
-      ).then((ids) => {
-        const opened = ids.find((id): id is ConvId => !!id);
-        if (!opened) {
+    const on = machine;
+    if (projectId && resolveProject) {
+      resolveProject(projectId, on).then(
+        (own) => send(on, { projectId: own }),
+        (err: Error) => {
           setCreating(false);
-          return;
+          toast(t('next.newChat.failed'), { tone: 'error', description: err.message });
+        },
+      );
+      return;
+    }
+    send(on, where);
+
+    function send(target: MachineId, place: NewConversation['where']) {
+      if (choice && companions.length > 0) {
+        // One chat on each model, each in a worktree of its own, grouped under the prompt.
+        const launch = { id: uuidv7(), prompt: launchPrompt(text) };
+        const first = { text: withMentions(mentions, text.trim()), attachments: uploads.ready };
+        const started = [choice, ...companions].map((pick) =>
+          createConversation(target, {
+            where: place,
+            provider: pick.provider,
+            ...(pick.profile ? { profile: pick.profile } : {}),
+            model: pick.model ? { id: pick.model, effort: pick.effort, ultracode: pick.ultracode } : null,
+            first,
+            launch,
+            worktree: true,
+          }),
+        );
+        void Promise.all(
+          started.map(async (one) => {
+            const [st, id] = await Promise.all([one.done, one.conversation]);
+            if (st.k === 'failed')
+              toast(t('next.newChat.failed'), { tone: 'error', description: failureText(st.failure) });
+            return id;
+          }),
+        ).then((ids) => {
+          const opened = ids.find((id): id is ConvId => !!id);
+          if (!opened) {
+            setCreating(false);
+            return;
+          }
+          clearDraft(NEW_CHAT);
+          clearMentions(NEW_CHAT);
+          uploads.reset();
+          setMore([]);
+          setCreating(false);
+          onCreated(opened);
+        });
+        return;
+      }
+      const created = createConversation(target, {
+        where: place,
+        provider: choice?.provider ?? 'claude',
+        ...(choice?.profile ? { profile: choice.profile } : {}),
+        model: choice?.model
+          ? { id: choice.model, effort: choice.effort, ultracode: choice.ultracode }
+          : null,
+        first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready },
+      });
+      void created.done.then((st) => {
+        if (st.k === 'failed') {
+          setCreating(false);
+          toast(t('next.newChat.failed'), {
+            tone: 'error',
+            description: failureText(st.failure),
+          });
         }
+      });
+      void created.conversation.then((id) => {
+        if (!id) return;
         clearDraft(NEW_CHAT);
         clearMentions(NEW_CHAT);
         uploads.reset();
-        setMore([]);
         setCreating(false);
-        onCreated(opened);
+        onCreated(id);
       });
-      return;
     }
-    const created = createConversation(machine, {
-      where,
-      provider: choice?.provider ?? 'claude',
-      ...(choice?.profile ? { profile: choice.profile } : {}),
-      model: choice?.model ? { id: choice.model, effort: choice.effort, ultracode: choice.ultracode } : null,
-      first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready },
-    });
-    void created.done.then((st) => {
-      if (st.k === 'failed') {
-        setCreating(false);
-        toast(t('next.newChat.failed'), {
-          tone: 'error',
-          description: failureText(st.failure),
-        });
-      }
-    });
-    void created.conversation.then((id) => {
-      if (!id) return;
-      clearDraft(NEW_CHAT);
-      clearMentions(NEW_CHAT);
-      uploads.reset();
-      setCreating(false);
-      onCreated(id);
-    });
   }, [
     machine,
     creating,
@@ -211,6 +244,7 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
     companions,
     conversations,
     read,
+    resolveProject,
   ]);
   useLayoutEffect(() => {
     submitRef.current = onSubmit;
@@ -228,6 +262,7 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
     <AttachmentSrc.Provider value={srcOf}>
       <div className="hx-dock" data-creating={creating || undefined}>
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
+          <DockBar notice={voiceNotice} />
           <Composer
             enterSends={enterSends}
             value={text}
@@ -235,7 +270,16 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
             onSubmit={onSubmit}
             mode="new"
             onStop={() => Promise.resolve()}
-            picker={choice && { value: choice, agents, locked: false, onChange: onPickOne, multi }}
+            picker={
+              choice && {
+                value: choice,
+                agents,
+                locked: false,
+                onChange: onPickOne,
+                multi,
+                machine: machines,
+              }
+            }
             slash={slash}
             quotes={mentions.map((m) => ({
               id: m.id,
@@ -246,6 +290,7 @@ const HomeComposer = ({ machine, conversations, projectId = null, onCreated }: I
             onRemoveQuote={(id) => removeMention(NEW_CHAT, id)}
             inputRef={field}
             stash={stash}
+            takes={voice.onMic ? takes : null}
             attachments={uploads.attachments}
             onFiles={uploads.onFiles}
             onRemoveAttachment={uploads.onRemove}

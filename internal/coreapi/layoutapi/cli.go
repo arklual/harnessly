@@ -407,7 +407,7 @@ func (a *api) cliTabSend(c *call) {
 		if safe, _ := a.d.Tmux.CheckTerminalProcess(session); safe {
 			line, err := a.d.Agents.LaunchLine(provider, ws, launchOf(a.d.Store.TabLaunch(found.tab)))
 			must(err)
-			must(a.d.Tmux.SendBracketedPaste(session, line+args))
+			must(a.d.Tmux.SendBracketedPaste(session, agents.AppendArgs(line, args)))
 			a.markLaunch(found.tab.String("id"), true)
 			agent.Log("info", "tab send of a bare agent command started it the platform way", agent.F{K: "tabId", V: found.tab.String("id")})
 			c.reply(200, jsvalue.NewObject("status", "sent", "launched", "platform"))

@@ -16,7 +16,7 @@ import {
 } from '@/next/stores/conversation';
 import { conversationsStore } from '@/next/stores/conversations';
 import { favoritesStore } from '@/next/stores/favorites';
-import { defaultCwdStore, projectsStore } from '@/next/stores/projects';
+import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
 import type {
   ClientId,
   ConvChannel,
@@ -196,16 +196,32 @@ describe('projects come with the convs channel', () => {
       ch: 'convs',
       data: { conversations: [], projects: [p('p1', 'b'), p('p2', 'a')], defaultCwd: '/w' },
     } as never);
-    expect(projectsStore.get('p1')?.machineId).toBe(M);
+    expect(projectsStore.get(projectKey(M, 'p1'))?.machineId).toBe(M);
     expect(defaultCwdStore.get(M)).toBe('/w');
     storeSink.event(M, { ch: 'convs', e: { type: 'project_upsert', project: p('p3', 'c') } } as never);
-    expect(projectsStore.get('p3')?.name).toBe('c');
+    expect(projectsStore.get(projectKey(M, 'p3'))?.name).toBe('c');
     storeSink.snapshot(M, {
       ch: 'convs',
       data: { conversations: [], projects: [p('p3', 'c')], defaultCwd: '/w' },
     } as never);
-    expect(projectsStore.get('p1')).toBeUndefined();
-    expect(projectsStore.get('p3')).toBeDefined();
+    expect(projectsStore.get(projectKey(M, 'p1'))).toBeUndefined();
+    expect(projectsStore.get(projectKey(M, 'p3'))).toBeDefined();
+  });
+
+  it('keeps alike-named projects of two machines apart', () => {
+    const A = 'm-a' as never;
+    const B = 'm-b' as never;
+    const same = { id: 'prj-same', machineId: 'x', path: '/w/admin', name: 'admin', git: true, createdAt: 1 };
+    storeSink.snapshot(A, {
+      ch: 'convs',
+      data: { conversations: [], projects: [same], defaultCwd: '/w' },
+    } as never);
+    storeSink.snapshot(B, {
+      ch: 'convs',
+      data: { conversations: [], projects: [same], defaultCwd: '/w' },
+    } as never);
+    expect(projectsStore.get(projectKey(A, 'prj-same'))?.machineId).toBe(A);
+    expect(projectsStore.get(projectKey(B, 'prj-same'))?.machineId).toBe(B);
   });
 });
 

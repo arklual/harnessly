@@ -12,6 +12,12 @@ import { clock } from '@/next/i18n/format';
 
 export const DOCK_BAR_EXIT_MS = 240;
 
+/** 0:42, 12:05: the length of a recording. */
+const duration = (ms: number) => {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+};
+
 interface IAction {
   key: string;
   label: string;
@@ -25,7 +31,7 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
   const action = usePending<string>();
   if (!value) return null;
   const busy = isBusy(action.phase);
-  let icon: 'server' | 'gauge' | 'key-round' = 'server';
+  let icon: 'server' | 'gauge' | 'key-round' | 'mic' = 'server';
   let title = '';
   let sub: string | null = null;
   let quiet = false;
@@ -37,6 +43,14 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
     title = t('next.dockBar.machine', { machine: value.machine });
     sub = t('next.dockBar.machineSub');
     actions = [{ key: 'stop', label: t('next.dockBar.stop'), variant: 'ghost', run: value.onStop }];
+  } else if (value.kind === 'voice') {
+    icon = 'mic';
+    title = t('next.dockBar.voice', { length: duration(value.ms) });
+    sub = value.more > 0 ? t('next.dockBar.voiceMore', { n: value.more }) : t('next.dockBar.voiceSub');
+    actions = [
+      { key: 'retry', label: t('next.dockBar.voiceRetry'), run: value.onRetry },
+      { key: 'drop', label: t('next.dockBar.voiceDrop'), variant: 'ghost', run: value.onDrop },
+    ];
   } else if (value.kind === 'key') {
     icon = 'key-round';
     title = t('next.dockBar.keyGone', { vendor: value.vendor });

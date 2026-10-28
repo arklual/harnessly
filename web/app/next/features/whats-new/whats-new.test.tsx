@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createRef, type ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pinLocale } from '@/next/i18n';
+import { pinLocale, t } from '@/next/i18n';
 import { PortalContext } from '@/next/ui/portal';
 import WhatsNew from './whats-new';
 import { RELEASES, unseenRelease } from './releases';
@@ -58,7 +58,7 @@ describe('WhatsNew', () => {
     );
     settle();
     expect(screen.getByRole('dialog', { name: 'Что нового' })).toBeTruthy();
-    expect(screen.getByText('Продолжить здесь')).toBeTruthy();
+    expect(screen.getByText(t(`next.whatsNew.${latest}.${RELEASES[0].items[0].key}.title`))).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Понятно' }));
     expect(screen.getByRole('dialog').getAttribute('data-state')).toBe('closing');

@@ -434,6 +434,10 @@ type claimHolder struct {
 	Runtime   string `json:"runtime"`
 	ChatTitle string `json:"chatTitle"`
 	Since     int64  `json:"since"`
+	// Machine, LastEdit and TurnRunning are told by a lease of the design center.
+	Machine     string `json:"machine,omitempty"`
+	LastEdit    int64  `json:"lastEdit,omitempty"`
+	TurnRunning bool   `json:"turnRunning,omitempty"`
 }
 
 // CLIClaims is the agents' board claims: GET ?project= who holds what; POST {action:'claim', session, project, board}
@@ -501,7 +505,21 @@ func (a *API) CLIClaims(r *http.Request) Answer {
 			return JSON(r, 409, struct {
 				Error  string      `json:"error"`
 				Holder claimHolder `json:"holder"`
-			}{out.Message, claimHolder{o.User, o.Runtime, o.ChatTitle, out.Holder.Since}}, h)
+			}{out.Message, claimHolder{o.User, o.Runtime, o.ChatTitle, out.Holder.Since, o.Machine, out.Holder.LastEdit, out.Holder.TurnRunning}}, h)
+		}
+		if out.Lost || out.Notice != nil {
+			return JSON(r, 409, struct {
+				Error   string `json:"error"`
+				Lost    bool   `json:"lost,omitempty"`
+				Notice  string `json:"notice,omitempty"`
+				Variant string `json:"variant,omitempty"`
+			}{Error: out.Message, Lost: out.Lost, Notice: noticeKind(out.Notice), Variant: noticeVariant(out.Notice)}, h)
+		}
+		if out.Offline {
+			return JSON(r, 200, struct {
+				OK      bool `json:"ok"`
+				Offline bool `json:"offline"`
+			}{true, true}, h)
 		}
 		return JSON(r, 200, struct {
 			OK        bool   `json:"ok"`
@@ -650,4 +668,18 @@ func (a *API) cliTimeline(r *http.Request, q map[string][]string, h http.Header)
 		Artifact string          `json:"artifact"`
 		Events   []TimelineEvent `json:"events"`
 	}{id, a.L.Timeline(id, from, to)}, h)
+}
+
+func noticeKind(n *SyncNotice) string {
+	if n == nil {
+		return ""
+	}
+	return n.Kind
+}
+
+func noticeVariant(n *SyncNotice) string {
+	if n == nil {
+		return ""
+	}
+	return n.Variant
 }

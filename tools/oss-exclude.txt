@@ -15,3 +15,6 @@ docs/hub/deploy-*.md
 
 # The working plan of the hub's first build (task keys, who owns which file); the public docs are architecture.md and api.md.
 docs/hub/plan.md
+
+# The deck's PDF e2e drives the machine CLI of the internal deployment and names its hosts and headers.
+web/e2e/deck-share-pdf.spec.ts

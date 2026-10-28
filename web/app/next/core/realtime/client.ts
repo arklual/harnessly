@@ -101,7 +101,18 @@ interface Sub {
   cursor: Cursor | null;
   /** A gap was seen and a sub with the cursor went out: drop events until the replay closes the gap. */
   resyncing: boolean;
+  /** The runtime refused the channel this many times in a row; the sub goes again after a step of SUB_RETRY_MS. */
+  refusals?: number;
+  retry?: unknown;
 }
+
+/**
+ * A held channel the runtime refused (not-found, too-many-subs) is asked for again after these steps, then
+ * every 30 s while it is held: a loaded machine answers a conversation's snapshot past its budget with not-found, and a
+ * channel let go for that silently stops the chat's frames — the queue over the field keeps rows the agent answered
+ * long ago, the commands still work. Only a malformed channel (bad-channel) is let go for good.
+ */
+export const SUB_RETRY_MS = [2000, 5000, 15_000, 30_000] as const;
 
 interface SeqWaiter {
   ch: Channel;
@@ -286,7 +297,8 @@ export class RealtimeClient {
       case 'error':
         if (frame.ch) {
           this.o.sink.channelError(this.machine, frame.ch, frame.code);
-          if (frame.code === 'not-found' || frame.code === 'bad-channel') this.subs.delete(frame.ch);
+          if (frame.code === 'bad-channel') this.forget(frame.ch);
+          else this.subAgain(frame.ch);
           this.settleWaiters((w) => w.ch === frame.ch, 'gone');
           return;
         }
@@ -309,6 +321,8 @@ export class RealtimeClient {
       // cache kept. The runtime decides between a replay, a snapshot after afterEntryId, and a full one; a
       // conversation's replay ends with a snapshot "after" it that adds nothing, so the page knows it caught up.
       sub.resyncing = false;
+      this.o.clock.clearTimeout(sub.retry);
+      sub.retry = undefined;
       if (!sub.cursor) sub.cursor = this.o.sink.resumeOf(this.machine, ch).cursor;
       this.sendSub(ch);
     }
@@ -320,6 +334,7 @@ export class RealtimeClient {
     if (!sub || !this.epoch) return;
     sub.cursor = { epoch: this.epoch, seq: s.seq };
     sub.resyncing = false;
+    sub.refusals = 0;
     this.o.sink.snapshot(this.machine, s);
     this.o.sink.noteCursor(this.machine, s.ch, sub.cursor);
     this.settleWaiters((w) => w.ch === s.ch && w.seq <= s.seq, 'seen');
@@ -358,11 +373,36 @@ export class RealtimeClient {
     this.send(frame);
   }
 
+  /** The runtime refused a held channel: it is asked for again a step later, as long as someone holds it. */
+  private subAgain(ch: Channel): void {
+    const sub = this.subs.get(ch);
+    if (!sub) return;
+    this.o.clock.clearTimeout(sub.retry);
+    const n = sub.refusals ?? 0;
+    sub.refusals = n + 1;
+    sub.retry = this.o.clock.setTimeout(
+      () => {
+        sub.retry = undefined;
+        if (this.subs.get(ch) !== sub || this.stopped) return;
+        if (this.conn.k === 'live' || this.conn.k === 'stale') this.sendSub(ch);
+      },
+      SUB_RETRY_MS[Math.min(n, SUB_RETRY_MS.length - 1)],
+    );
+  }
+
+  private forget(ch: Channel): void {
+    const sub = this.subs.get(ch);
+    if (!sub) return;
+    this.o.clock.clearTimeout(sub.retry);
+    this.subs.delete(ch);
+  }
+
   private release(ch: Channel): void {
     const sub = this.subs.get(ch);
     if (!sub) return;
     sub.refs -= 1;
     if (sub.refs > 0) return;
+    this.o.clock.clearTimeout(sub.retry);
     this.subs.delete(ch);
     if (this.ws && this.conn.k !== 'connecting') this.send({ f: 'unsub', ch });
     this.settleWaiters((w) => w.ch === ch, 'gone');

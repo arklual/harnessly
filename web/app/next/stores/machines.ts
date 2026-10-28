@@ -32,7 +32,7 @@ export const machineOrderStore = createStore<MachineId[] | null>(null);
 export const activeMachineStore = createStore<MachineId | null>(null);
 /**
  * The machine the person works on: the default one at start, then the one picked in the sidebar. Opening a
- * chat of another machine makes that one active (its channel), not this one: «здесь» of «Продолжить здесь».
+ * chat of another machine makes that one active (its channel), not this one: the default machine of new chats.
  */
 export const homeMachineStore = createStore<MachineId | null>(null);
 

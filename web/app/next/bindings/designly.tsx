@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DesignlyHome, { type IDesignCard, type TDesignKind } from '@/next/features/designly/designly-home';
 import {
   createDesign,
+  deleteDesign,
   fetchEngine,
   fetchLibrary,
   fetchSystems,
@@ -40,6 +41,9 @@ const isDrawing = (design: IDesign, working: ReadonlySet<string>) =>
 const workingOf = (list: Conversation[] | null) =>
   new Set((list ?? []).filter((c) => c.state.k === 'starting' || c.state.k === 'working').map((c) => c.id));
 
+/** Only the owner deletes a project; a runtime that restricts nobody names no role, and then the owner is who made it. */
+const DELETERS: ReadonlySet<string> = new Set(['owner']);
+
 const titleOf = (brief: string) => (brief.length > TITLE_MAX ? `${brief.slice(0, TITLE_MAX)}…` : brief);
 
 const cardOf = (m: MachineId, design: IDesign, working: ReadonlySet<string>): IDesignCard => {
@@ -54,6 +58,7 @@ const cardOf = (m: MachineId, design: IDesign, working: ReadonlySet<string>): ID
     pinned: design.pinned,
     drawing: isDrawing(design, working),
     owner: design.owner ?? null,
+    canDelete: design.role === undefined ? design.owner?.me === true : DELETERS.has(design.role),
   };
 };
 
@@ -124,6 +129,16 @@ const useDesignLibrary = (machine: MachineId) => {
     setDesigns((list) => list?.map((d) => (d.id === id ? { ...d, pinned } : d)) ?? null);
   };
 
+  const onDelete = async (id: string) => {
+    try {
+      await deleteDesign(machine, id);
+    } catch (failure) {
+      toast(t('next.designly.deleteFailed'), { tone: 'error', description: (failure as Error).message });
+      throw failure;
+    }
+    setDesigns((list) => list?.filter((d) => d.id !== id) ?? null);
+  };
+
   const onRetry = () => {
     loaded.current = false;
     setDesigns(null);
@@ -131,7 +146,7 @@ const useDesignLibrary = (machine: MachineId) => {
     setAttempt((n) => n + 1);
   };
 
-  return { cards, error, now, load, onPin, onRetry };
+  return { cards, error, now, load, onPin, onDelete, onRetry };
 };
 
 /** The machine's engine, browser and ffmpeg; null until (or unless) the machine answered. */
@@ -172,7 +187,7 @@ interface IDesignlyLibraryProps {
 
 /** The library alone, for the right pane: its chat is the field that starts a design, so there is none here. */
 export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
-  const { cards, error, now, onPin, onRetry } = useDesignLibrary(machine);
+  const { cards, error, now, onPin, onDelete, onRetry } = useDesignLibrary(machine);
   const notice = noticeOf(useDesignEngine(machine));
   return (
     <DesignlyHome
@@ -181,6 +196,7 @@ export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
       error={error}
       now={now}
       onPin={onPin}
+      onDelete={onDelete}
       onOpen={onOpen}
       onRetry={onRetry}
       compose={null}
@@ -193,7 +209,7 @@ interface IDesignlyViewProps {
 }
 
 const DesignlyView = ({ machine }: IDesignlyViewProps) => {
-  const { cards, error, now, load, onPin, onRetry } = useDesignLibrary(machine);
+  const { cards, error, now, load, onPin, onDelete, onRetry } = useDesignLibrary(machine);
   const notice = noticeOf(useDesignEngine(machine));
   const [systems, setSystems] = useState<IDesignSystem[] | null>(null);
   const restored = useLinkRestored(machine);
@@ -245,6 +261,7 @@ const DesignlyView = ({ machine }: IDesignlyViewProps) => {
       error={error}
       now={now}
       onPin={onPin}
+      onDelete={onDelete}
       onOpen={(id) => goTo({ kind: ROUTE.site, id })}
       onRetry={onRetry}
       compose={{

@@ -52,8 +52,11 @@ export interface ISidebarChat {
   canMoveVm?: boolean;
   /** Set on a chat started with others by one prompt on several models: they stand together under the prompt. */
   launch?: ISidebarLaunch;
-  /** The machine the chat lives on, when it is not the one the person works on (the one list of every machine). */
+  /** The machine the chat lives on, said only in its menu (set when the person has several machines). */
   machine?: string;
+  /** The chat's projects are another machine's than the open one's (the person's sidebar off): it cannot move into
+   *  this one's. */
+  projectsElsewhere?: boolean;
 }
 
 /** One of the chats a prompt started on several models: the launch it belongs to and the model it runs. */

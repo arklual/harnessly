@@ -194,6 +194,9 @@ and the kill switch are in [hub/machine.md](hub/machine.md).
 | `RUNTIME_DESIGN_KIT_GLOBAL`, `RUNTIME_DESIGN_PAGES_GLOBAL`, `RUNTIME_DESIGN_ARGS_GLOBAL` | the window globals of a project's UI kit, its page renderer and the renderer's arguments (default `DesignKit`, `DesignPages`, `__DESIGN_ARGS`) |
 | `RUNTIME_DESIGN_CANVAS_KEY` | the key of a project's `project/canvas.json` under which the runtime keeps its page data (ids, routes); default `harnessly` (see [design pages](design-pages.md)) |
 | `RUNTIME_DESIGN_ENGINE_FILE` | the board engine (`support.js`) a new project gets when the library has no `.template/`; unset: the engine of the release new projects start on; none is shipped with the runtime (see [the board engine](design-engine.md)) |
+| `RUNTIME_DESIGN_LEASES` | where the leases on boards are kept: `folder` (default; `.claims` in the library, for runtimes that see one folder) or `center` (the design-sync center: every machine sees the same holder, a machine that went away frees its boards after two minutes, a person can take their own lease off by force). With `center`, the next three are required |
+| `RUNTIME_DESIGN_HUB_URL` | the base of the center's API for the room that holds the library, e.g. `https://design-sync.example.org/v1/rooms/design` (`/v1` alone is the room the token names first) |
+| `RUNTIME_DESIGN_HUB_TOKEN`, `RUNTIME_DESIGN_HUB_TOKEN_FILE` | this machine's token for the center: the value, or a file read on each call (the token file design-sync's agent reads, `<state>/token`); the value wins when both are set. An unreachable center, a refused token or an old center without leases never stops an edit: the board is edited without a lease until it answers |
 | `RUNTIME_PEOPLE` | names a claim shows, by the local part of the owner's address: `local=Name,local2=Name2` |
 
 ### Preview proxy

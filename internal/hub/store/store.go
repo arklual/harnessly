@@ -160,6 +160,10 @@ func (t txQ) QueryRow(ctx context.Context, q string, args ...any) *sql.Row {
 // Store is the typed queries over a Q.
 type Store struct{ q Q }
 
+// Q is what the typed queries run on, for packages that keep tables of their own (sites) and want the same
+// transaction.
+func (s Store) Q() Q { return s.q }
+
 // S returns the queries over the database.
 func (db *DB) S() Store { return Store{q: db} }
 

@@ -2,6 +2,8 @@
 // library below — the machine's designs as cards with their pictures. Scrolled, the field goes up and the library's
 // row sticks. A card opens the design; a brief sent starts a project and its agent, and its card draws while it works.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import Modal from '@/next/features/shell/modal';
+import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
 import DsPicker from '@/next/features/designly/ds-picker';
 import { RecordingTime, RecordingWave } from '@/next/features/composer/composer';
@@ -48,6 +50,8 @@ export interface IDesignCard {
   drawing: boolean;
   /** Who made it; null for a project older than owners. */
   owner: DesignOwner | null;
+  /** The person may edit it, so may delete it. */
+  canDelete?: boolean;
 }
 
 /** The start of a project: the brief's field, the kinds, the model and the design system. */
@@ -74,6 +78,8 @@ export interface IDesignlyHomeProps {
   now: number;
   /** Pins or unpins a card; resolves once the machine kept it. */
   onPin: (id: string, pinned: boolean) => Promise<void>;
+  /** Moves a project to the trash; resolves once the machine did, rejects (the caller says why) when it did not. */
+  onDelete?: (id: string) => Promise<void>;
   onOpen: (id: string) => void;
   onRetry: () => void;
   /** Where a project is started; null is the library alone (the right pane's: its chat is the field). */
@@ -94,6 +100,41 @@ export interface IDesignlyVoice {
   onCancel: () => void;
   onFinish: () => void;
 }
+
+/** The confirmation leaves this long (shell.css, .hx-modal). */
+const DELETE_EXIT_MS = 240;
+
+interface IDeleteConfirmProps {
+  card: IDesignCard | null;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+/** «Удалить проект?»: names the project, asks once; Esc and «Отмена» close it, nothing is done before the machine answers. */
+const DeleteConfirm = ({ card, busy, onCancel, onConfirm }: IDeleteConfirmProps) => {
+  const shown = usePresence(card, DELETE_EXIT_MS).value;
+  return (
+    <Modal
+      open={card !== null}
+      onClose={() => {
+        if (!busy) onCancel();
+      }}
+      title={t('next.designly.deleteTitle', { title: shown?.title ?? '' })}
+      lead={t('next.designly.deleteLead')}
+      boxClass="hx-leave"
+    >
+      <div className="hx-modal__foot">
+        <Button variant="ghost" disabled={busy} onClick={onCancel}>
+          {t('next.designly.deleteCancel')}
+        </Button>
+        <Button variant="danger" busy={busy} onClick={onConfirm}>
+          {t('next.designly.deleteConfirm')}
+        </Button>
+      </div>
+    </Modal>
+  );
+};
 
 /** The recording bar's exit, as long as hx-recbar-out in composer.css. */
 const REC_EXIT_MS = 180;
@@ -341,12 +382,15 @@ const DesignlyHome = ({
   error,
   now,
   onPin,
+  onDelete,
   onOpen,
   onRetry,
   compose,
   notice = null,
 }: IDesignlyHomeProps) => {
   const [pinning, setPinning] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<IDesignCard | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<TDesignScope>(DESIGN_SCOPE.all);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -444,6 +488,18 @@ const DesignlyHome = ({
       });
   };
 
+  const confirmDelete = () => {
+    if (!deleting || !onDelete || deleteBusy) return;
+    setDeleteBusy(true);
+    void onDelete(deleting.id)
+      // A refusal is said by the caller; the question stays so the person can try again or cancel.
+      .then(
+        () => setDeleting(null),
+        () => undefined,
+      )
+      .finally(() => setDeleteBusy(false));
+  };
+
   return (
     <section className="hx-dl" ref={rootRef} data-library={compose === null}>
       {compose && <Hero {...compose} inputRef={inputRef} />}
@@ -539,6 +595,22 @@ const DesignlyHome = ({
                           {card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
                         </span>
                       </button>
+                      {onDelete && card.canDelete && (
+                        <button
+                          type="button"
+                          className="hx-dl-card__del hx-tipped"
+                          aria-label={t('next.designly.delete')}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleting(card);
+                          }}
+                        >
+                          <Icon name="trash-2" size="sm" />
+                          <span className="hx-tip" data-pos="below" data-align="start">
+                            {t('next.designly.delete')}
+                          </span>
+                        </button>
+                      )}
                       <span className="hx-dl-card__gen">
                         <Icon name="loader-circle" size="sm" />
                         {t('next.designly.drawing')}
@@ -573,6 +645,12 @@ const DesignlyHome = ({
         )}
         {shown && shown.length === 0 && <div className="hx-dl__empty">{t(emptyKey(scope, q !== ''))}</div>}
       </div>
+      <DeleteConfirm
+        card={deleting}
+        busy={deleteBusy}
+        onCancel={() => setDeleting(null)}
+        onConfirm={confirmDelete}
+      />
     </section>
   );
 };

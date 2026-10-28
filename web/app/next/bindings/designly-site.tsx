@@ -11,6 +11,7 @@ import SiteView, {
 import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
 import { atLeast, claimOwnership, fetchAccess, isUnowned } from '@/next/features/designly/access/api';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
+import PublishDialog from '@/next/features/designly/publish/publish-dialog';
 import NoAccess from '@/next/features/designly/access/no-access';
 import ProjectAway from '@/next/features/designly/access/project-away';
 import {
@@ -161,6 +162,7 @@ const DesignlySiteBody = ({
   // Who may do what with the project, from the gateway; where there is none (standalone) the design is as it was.
   const gate = useProjectAccess(id);
   const [shareOpen, setShareOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const focusPending = useRef(accessFocus);
   const seeded = useRef(tabs.length > 0);
   // The link coming back reads the library again, quietly: the open design stays as it is.
@@ -486,6 +488,7 @@ const DesignlySiteBody = ({
       stage={stage}
       pane={pane && { onShare: copyLink, chat: paneChat }}
       access={shareButton}
+      publish={gated?.canManage ? { onOpen: () => setPublishOpen(true) } : undefined}
       devtools={{ machine, slot: slotOrigin, artifact: id }}
       memoryKey={id}
     />
@@ -520,6 +523,16 @@ const DesignlySiteBody = ({
         />
       ) : (
         site
+      )}
+      {gated?.canManage && project && project.design.kind !== 'slides' && (
+        <PublishDialog
+          open={publishOpen}
+          onClose={() => setPublishOpen(false)}
+          machine={machine}
+          project={id}
+          title={project.design.title}
+          pages={project.design.boards.map((b) => ({ path: b.path, title: b.title || b.path }))}
+        />
       )}
       {gated !== null && (
         <ShareDialog

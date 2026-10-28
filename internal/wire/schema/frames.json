@@ -213,6 +213,7 @@
       }
     },
     "AutoContinueWhy": {"enum": ["limit", "restart"]},
+    "TerminalAside": {"enum": ["login", "model", "effort"]},
     "AutoContinue": {
       "type": "object",
       "required": ["at", "why", "clientId"],
@@ -1769,6 +1770,7 @@
         "mode": {"$ref": "#/$defs/MessageMode"},
         "kind": {"$ref": "#/$defs/MessageKind"},
         "auto": {"$ref": "#/$defs/AutoContinueWhy"},
+        "cleared": {"$ref": "#/$defs/TerminalAside"},
         "createdAt": {"type": "integer", "minimum": 0},
         "attempts": {"type": "integer", "minimum": 0},
         "state": {"$ref": "#/$defs/MessageState"},

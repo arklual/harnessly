@@ -2,11 +2,11 @@
 // to the runtime's two minutes, so the page waits a little longer than that.
 import { wordedPage } from '@/next/core/net/worded';
 import { parsePage, parseRefusal, type MachineId } from '@/next/protocol/v2';
-import type { TLang } from '@/next/i18n';
+import type { TDictationLang } from '@/next/stores/voice';
 
 const RECOGNIZE_MS = 130_000;
 
-export const transcribe = (m: MachineId, recording: Blob, lang: TLang, signal: AbortSignal) =>
+export const transcribe = (m: MachineId, recording: Blob, lang: TDictationLang, signal: AbortSignal) =>
   wordedPage(m, `/voice?lang=${lang}`, parsePage.voice, (v) => ({ ...parseRefusal(v), message: '' }), {
     method: 'POST',
     body: recording,

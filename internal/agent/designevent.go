@@ -17,11 +17,12 @@ import (
 const (
 	DesignCreated = "design.created"
 	DesignClaim   = "design.claim"
+	DesignDeleted = "design.deleted"
 
 	designEventTO = 3 * time.Second
 )
 
-var designEventKinds = map[string]bool{DesignCreated: true, DesignClaim: true}
+var designEventKinds = map[string]bool{DesignCreated: true, DesignClaim: true, DesignDeleted: true}
 
 // designEventRoute is POST /design/event {kind, project}: the event goes to every cluster link. With no link it is
 // dropped (the gateway learns of the project when it lists them), and the answer says so.
@@ -34,7 +35,7 @@ func (a *Agent) designEventRoute(w http.ResponseWriter, r *http.Request) {
 	kind, _ := field[string](obj, "kind")
 	project := str(obj, "project", 128)
 	if obj == nil || !designEventKinds[kind] || project == nil {
-		reply(w, 400, map[string]string{"error": "kind (design.created or design.claim) and project are required"})
+		reply(w, 400, map[string]string{"error": "kind (design.created, design.claim or design.deleted) and project are required"})
 		return
 	}
 	sent := a.connected()
@@ -54,27 +55,8 @@ func EmitDesignEvent(dataDir, tokenHeader, kind, project string) {
 }
 
 func emitDesignEvent(dataDir, tokenHeader, kind, project string) {
-	raw, err := os.ReadFile(filepath.Join(dataDir, "agent.json"))
-	if err != nil {
-		return
-	}
-	var info struct {
-		Port  any    `json:"port"`
-		Token string `json:"token"`
-	}
-	if json.Unmarshal(raw, &info) != nil || info.Token == "" {
-		return
-	}
-	port := ""
-	switch p := info.Port.(type) {
-	case float64:
-		if p != 0 {
-			port = strconv.FormatFloat(p, 'f', -1, 64)
-		}
-	case string:
-		port = p
-	}
-	if port == "" {
+	port, token, ok := localAgent(dataDir)
+	if !ok {
 		return
 	}
 	body, _ := json.Marshal(map[string]string{"kind": kind, "project": project})
@@ -88,11 +70,36 @@ func emitDesignEvent(dataDir, tokenHeader, kind, project string) {
 	if tokenHeader == "" {
 		tokenHeader = "x-agent-local-token"
 	}
-	req.Header.Set(tokenHeader, info.Token)
+	req.Header.Set(tokenHeader, token)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		Log("warn", "design event not handed to the agent", F{"kind", kind}, F{"error", err.Error()})
 		return
 	}
 	res.Body.Close()
+}
+
+// localAgent reads where the machine agent whose agent.json lies in dataDir listens on the loopback and the token that
+// opens its local routes.
+func localAgent(dataDir string) (port, token string, ok bool) {
+	raw, err := os.ReadFile(filepath.Join(dataDir, "agent.json"))
+	if err != nil {
+		return "", "", false
+	}
+	var info struct {
+		Port  any    `json:"port"`
+		Token string `json:"token"`
+	}
+	if json.Unmarshal(raw, &info) != nil || info.Token == "" {
+		return "", "", false
+	}
+	switch p := info.Port.(type) {
+	case float64:
+		if p != 0 {
+			port = strconv.FormatFloat(p, 'f', -1, 64)
+		}
+	case string:
+		port = p
+	}
+	return port, info.Token, port != ""
 }

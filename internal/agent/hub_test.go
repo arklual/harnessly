@@ -1069,7 +1069,7 @@ INSTALLER`)
 	if waiting.State != "waiting" || waiting.ConsoleURL == nil || *waiting.ConsoleURL != "/m/abcdefghijklmnopqrst/?tab=t7" {
 		t.Fatalf("%+v", waiting)
 	}
-	if cmd := gotCommand.Load(); cmd == nil || !strings.HasSuffix(*cmd, "claude auth login --claudeai") {
+	if cmd := gotCommand.Load(); cmd == nil || !strings.Contains(*cmd, "exec env claude auth login --claudeai") {
 		t.Errorf("the tab was asked to run %v", cmd)
 	}
 	if _, e := c.call("login.cancel", map[string]any{"loginId": "nope"}); !strings.HasPrefix(e, "not_found: ") {

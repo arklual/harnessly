@@ -134,32 +134,6 @@ func SplitLauncherModel(s string) (profile, model string) {
 // ShellQuote single-quotes s for sh.
 func ShellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
-// ANSICQuote quotes s as $'…' so a multi-line prompt stays on one typed line (bash and zsh read it).
-func ANSICQuote(s string) string {
-	var b strings.Builder
-	b.WriteString("$'")
-	for _, r := range s {
-		switch {
-		case r == '\\':
-			b.WriteString(`\\`)
-		case r == '\'':
-			b.WriteString(`\'`)
-		case r == '\n':
-			b.WriteString(`\n`)
-		case r == '\r':
-			b.WriteString(`\r`)
-		case r == '\t':
-			b.WriteString(`\t`)
-		case r < 0x20 || r == 0x7f:
-			fmt.Fprintf(&b, `\x%02x`, r)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	b.WriteString("'")
-	return b.String()
-}
-
 const (
 	// MaxInitialPrompt caps an initial prompt, in UTF-16 units.
 	MaxInitialPrompt = 20_000
@@ -185,7 +159,7 @@ func WithInitialPrompt(provider, command, prompt, promptFile string) string {
 	if text == "" {
 		return command
 	}
-	arg := ANSICQuote(text)
+	arg := PrintfQuote(text)
 	if promptFile != "" {
 		arg = PromptFromFile(promptFile)
 	}

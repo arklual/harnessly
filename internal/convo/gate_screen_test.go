@@ -60,3 +60,54 @@ func TestPermissionOfAnotherCallIsRefusedAtOnce(t *testing.T) {
 		}
 	}
 }
+
+// a background agent asks after the chat's turn ended (Claude drew «This shell -c script runs rm and could
+// not be checked», two options). The chat waits for the answer with a card in its last turn, the card shows the
+// command the dialog draws, its «Yes» reaches the menu, and the chat leaves the wait once the menu is gone.
+func TestBackgroundAgentAsksAfterTheTurn(t *testing.T) {
+	r := newRig(t)
+	r.user("ship it in the background")
+	r.busy()
+	r.open()
+	r.settle(wire.StateWorking)
+	r.say("Started both in the background.")
+	r.turnEnd()
+	r.idle()
+	r.hook("stop")
+	if k := r.state().K; k != wire.StateReady {
+		t.Fatalf("after stop: %s", k)
+	}
+	r.pane.screen = tui(t, "claude-bash-shell-c-unchecked.txt")
+	r.tick(time.Second)
+	st := r.state()
+	snap := r.snap()
+	if st.K != wire.StateWaitingPermission || len(snap.Permissions) != 1 {
+		t.Fatalf("state %s, permissions %+v", st.K, snap.Permissions)
+	}
+	p := snap.Permissions[0]
+	if p.State.K != wire.GateStateOpen || p.State.Refused != nil || len(p.Options) != 2 || st.PermissionID != p.ID {
+		t.Fatalf("permission: %+v", p)
+	}
+	if p.TurnID == nil || len(snap.Turns) == 0 || *p.TurnID != snap.Turns[len(snap.Turns)-1].ID {
+		t.Fatalf("the card is not in the last turn: %v", p.TurnID)
+	}
+	if p.Command == nil || !strings.HasPrefix(*p.Command, "$ S=/tmp/") || !strings.HasSuffix(*p.Command, "; done") {
+		t.Fatalf("command: %v", p.Command)
+	}
+	r.pane.onSend = func(call string) {
+		if call == "keys:1" {
+			r.idle()
+		}
+	}
+	res := r.do(wire.DecideCmd{OpID: "d1", ConversationID: r.id, PermissionID: p.ID, OptionID: "1"})
+	if res.R != wire.ResultAccepted || !strings.Contains(strings.Join(r.pane.calls, ","), "keys:1") {
+		t.Fatalf("decide: %+v %v", res, r.pane.calls)
+	}
+	r.tick(time.Second)
+	if k := r.state().K; k == wire.StateWaitingPermission {
+		t.Fatalf("still waiting after the menu left: %s", k)
+	}
+	if g := r.snap().Permissions; len(g) != 1 || g[0].State.K != wire.GateStateAnswered {
+		t.Fatalf("gate: %+v", g)
+	}
+}

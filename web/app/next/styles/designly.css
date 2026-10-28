@@ -499,7 +499,38 @@
 .hx-dl-card__pin[aria-pressed='true'] .hx-icon {
   rotate: 45deg;
 }
-.hx-dl-card[data-state='gen'] .hx-dl-card__pin {
+.hx-dl-card__del {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: color-mix(in srgb, var(--hx-bg-raised) 88%, transparent);
+  color: var(--hx-fg-2);
+  box-shadow: 0 1px 3px rgba(12, 14, 34, 0.12);
+  cursor: pointer;
+  opacity: 0;
+  scale: 0.85;
+  transition:
+    opacity 220ms ease,
+    scale 320ms var(--dl-ease),
+    background 200ms ease,
+    color 200ms ease;
+}
+.hx-dl-card:is(:hover, :focus-within) .hx-dl-card__del {
+  opacity: 1;
+  scale: 1;
+}
+.hx-dl-card__del:hover {
+  color: var(--hx-danger);
+}
+.hx-dl-card[data-state='gen'] .hx-dl-card__pin,
+.hx-dl-card[data-state='gen'] .hx-dl-card__del {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {

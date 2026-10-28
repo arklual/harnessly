@@ -29,6 +29,10 @@ async function openChat() {
   return boot;
 }
 
+/** The asks about this test's messages: the fixture's own queued ones are asked about too. */
+const ours = (asks: string[][]) =>
+  asks.map((ids) => ids.filter((id) => id.startsWith('m-'))).filter((ids) => ids.length > 0);
+
 const record = (clientId: string, state: Message['state'], rev: number): Message => ({
   clientId,
   conversationId: CONV,
@@ -149,13 +153,28 @@ describe('the page asks the runtime where a late message is', () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(rt.statusAsks).toEqual([]);
     await vi.advanceTimersByTimeAsync(5_100);
-    expect(rt.statusAsks).toEqual([['m-typed', 'm-steer']]);
+    expect(ours(rt.statusAsks)).toEqual([['m-typed', 'm-steer']]);
     expect(msg('m-typed').state).toMatchObject({ k: 'queued', reason: 'stalled' });
     expect(waitsInQueue(msg('m-typed'), 'idle')).toBe(true);
     expect(msg('m-steer').state.k).toBe('in-input');
     // Still waiting: asked again, no oftener than every 30 s.
     await vi.advanceTimersByTimeAsync(STATUS_EVERY_MS);
-    expect(rt.statusAsks).toEqual([['m-typed', 'm-steer'], ['m-steer']]);
+    expect(ours(rt.statusAsks)).toEqual([['m-typed', 'm-steer'], ['m-steer']]);
+  });
+
+  it('a queued message whose frames the page missed is asked about too, and leaves the strip once done', async () => {
+    const { rt, m } = await openChat();
+    const data = rt.convs.get(CONV)!;
+    applyMessage(m, {
+      ...record('m-q', { k: 'queued', position: 1, reason: 'blocked-text', wait: null }, 2),
+    });
+    expect(waitsInQueue(msg('m-q'), 'working')).toBe(true);
+    // The agent took it and answered; the frames that said so never came (the chat's channel was refused).
+    data.messages = [record('m-q', { k: 'done', turnId: 'c:0f0e0d0c-0000-4000-8000-000000000003#0' }, 6)];
+    await vi.advanceTimersByTimeAsync(35_100);
+    expect(ours(rt.statusAsks)).toEqual([['m-q']]);
+    expect(msg('m-q')).toMatchObject({ rev: 6, state: { k: 'done' } });
+    expect(waitsInQueue(msg('m-q'), 'working')).toBe(false);
   });
 
   it('an older runtime without the status page decides nothing: the message waits and is asked about again later', async () => {

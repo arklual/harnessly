@@ -53,12 +53,17 @@ func claimErr(msg string) error { return &ClaimError{Msg: msg} }
 
 type ClaimOwner struct {
 	User, Runtime, TabID, ChatTitle string
+	// Machine is the machine the chat runs on, as the design center knows it; a folder claim has none.
+	Machine string
 }
 
 type Claim struct {
 	Project, Board   string
 	Owner            ClaimOwner
 	Since, Heartbeat int64
+	// LastEdit and TurnRunning come from a lease of the design center (a folder claim has neither).
+	LastEdit    int64
+	TurnRunning bool
 }
 
 // CleanBoardKey is a board key an agent or a person typed: one line, and no way to be a path.
@@ -310,6 +315,14 @@ type ClaimResult struct {
 // ClaimBoard takes a board for a chat: its own claim is refreshed (since stays), one held by another live chat is
 // refused with the holder, a stale or unreadable file is cleared away first.
 func (l *Library) ClaimBoard(project, board string, owner ClaimOwner, now int64) (ClaimResult, error) {
+	if c := l.center(); c != nil {
+		turn := "working"
+		if strings.HasPrefix(owner.TabID, leaseUIPrefix) {
+			turn = "idle" // a person editing in the page runs no agent turn
+		}
+		mine, held, err := c.take(project, board, owner, true, turn)
+		return ClaimResult{Claim: mine, Held: held, Refreshed: err == nil && held == nil && mine.Heartbeat > mine.Since}, err
+	}
 	var out ClaimResult
 	err := l.serialized(project, func() error {
 		dir, err := l.openProjectClaims(project, true)
@@ -440,6 +453,9 @@ func (l *Library) dropClaim(e claimEntry, now int64, onlyIfStale bool) bool {
 
 // LiveClaims are the live claims of a project ("" for all); the stale ones seen are removed.
 func (l *Library) LiveClaims(project string, now int64) []Claim {
+	if c := l.center(); c != nil {
+		return c.live(project, now)
+	}
 	var live []Claim
 	for _, e := range l.scanClaims(project) {
 		if IsClaimLive(e.claim.Heartbeat, now) {
@@ -459,6 +475,9 @@ type ReleaseFilter struct {
 
 // ReleaseClaims frees the claims that match and returns them.
 func (l *Library) ReleaseClaims(f ReleaseFilter, now int64) []Claim {
+	if c := l.center(); c != nil {
+		return c.release(f, now)
+	}
 	var out []Claim
 	for _, e := range l.scanClaims(f.Project) {
 		c := e.claim
@@ -507,6 +526,9 @@ type SweepResult struct {
 // keep the others fresh, clear anyone's claim nobody refreshes any more. missing remembers, between passes, since
 // when a claim's chat has been missing.
 func (l *Library) SweepClaims(now int64, runtime string, chat func(tabID string) (ChatView, bool), missing map[string]int64) SweepResult {
+	if c := l.center(); c != nil {
+		return c.sweep(l, now, runtime, chat, missing)
+	}
 	var res SweepResult
 	seen := map[string]bool{}
 	for _, e := range l.scanClaims("") {

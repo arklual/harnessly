@@ -1258,6 +1258,10 @@
 .hx-acct__inner > .hx-acct__label {
   margin: 4px 0 8px;
 }
+.hx-acct__inner > .hx-seen {
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
 .hx-acct__inner > .hx-acct__label ~ .hx-acct__label {
   margin-top: 20px;
 }
@@ -1504,6 +1508,7 @@
 }
 .hx-acct__inner > .hx-src,
 .hx-acct__inner > .hx-proxy,
+.hx-acct__inner > .hx-seen,
 .hx-acct__inner > .hx-acct__label {
   margin-left: 64px;
   margin-right: 16px;
@@ -1514,6 +1519,7 @@
 @media (max-width: 600px) {
   .hx-acct__inner > .hx-src,
   .hx-acct__inner > .hx-proxy,
+  .hx-acct__inner > .hx-seen,
   .hx-acct__inner > .hx-acct__label {
     margin-left: 16px;
   }

@@ -70,7 +70,7 @@ func builtinVoice(dataDir string) *voiceBuiltin {
 	threads, _ := strconv.Atoi(os.Getenv("RUNTIME_VOICE_THREADS"))
 	b.eng = engine.New(engine.Config{
 		Dir: filepath.Join(dataDir, "voice"), Bin: os.Getenv("RUNTIME_VOICE_WHISPER_BIN"), ModelFile: os.Getenv("RUNTIME_VOICE_MODEL_FILE"),
-		Model: os.Getenv("RUNTIME_VOICE_MODEL"), Threads: threads, NoDownload: os.Getenv("RUNTIME_VOICE_DOWNLOAD") == "off", Log: voiceLog,
+		Model: voiceModelOf(dataDir), Threads: threads, NoDownload: os.Getenv("RUNTIME_VOICE_DOWNLOAD") == "off", Log: voiceLog,
 	})
 	if err := b.eng.Eligible(); err != nil {
 		voiceLog("info", "dictation is off: "+err.Error())

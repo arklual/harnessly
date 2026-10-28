@@ -15,15 +15,21 @@ import (
 const tailBytes = 6 << 20
 
 type cursor struct {
-	ino     uint64
-	offset  int64 // always right after a newline, so a line being written is read whole next time
-	mtime   time.Time
-	size    int64
-	scan    *scan
-	tasks   []Task
-	ended   []Ended
-	team    []Teammate
+	progress
 	reading sync.Mutex
+}
+
+// progress is how far a cursor has read its transcript and what it found. A transcript that is gone starts it over;
+// the lock of the read under way stays held, so it is never part of what is reset.
+type progress struct {
+	ino    uint64
+	offset int64 // always right after a newline, so a line being written is read whole next time
+	mtime  time.Time
+	size   int64
+	scan   *scan
+	tasks  []Task
+	ended  []Ended
+	team   []Teammate
 }
 
 // Reader keeps one cursor per transcript: read once from its tail, then only what was appended since, so a busy
@@ -103,7 +109,7 @@ func (r *Reader) advance(path string, c *cursor) ([]Task, []Ended) {
 	st, err := os.Stat(path)
 	if err != nil {
 		r.Forget(path)
-		*c = cursor{}
+		c.progress = progress{}
 		return []Task{}, nil
 	}
 	if c.scan != nil && c.mtime.Equal(st.ModTime()) && c.size == st.Size() {

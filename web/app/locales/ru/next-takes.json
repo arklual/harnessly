@@ -1,0 +1,20 @@
+{
+  "next.settings.section.takes": "Записи",
+  "next.settings.lead.takes": "Голосовые записи и их расшифровки — со всех машин",
+  "next.takes.title": "Записи",
+  "next.takes.hint": "Голосовые записи",
+  "next.takes.loading": "Загружаем записи…",
+  "next.takes.empty": "Записей пока нет — нажмите микрофон и говорите",
+  "next.takes.failed": "не распознана",
+  "next.takes.textOnly": "аудио удалено",
+  "next.takes.noText": "Без расшифровки",
+  "next.takes.play": "Прослушать",
+  "next.takes.pause": "Пауза",
+  "next.takes.download": "Скачать",
+  "next.takes.insert": "Вставить текст в поле",
+  "next.takes.delete": "Удалить",
+  "next.takes.sure": "Точно удалить?",
+  "next.takes.file": "запись",
+  "next.takes.keep": "Аудио хранится 30 дней, расшифровки — всегда. Записи не зависят от машины: переживут её выключение.",
+  "next.takes.local": "Записи хранятся только в этом браузере: у этой установки нет общего хранилища."
+}

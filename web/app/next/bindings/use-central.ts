@@ -6,16 +6,19 @@ import { pageClock } from '@/next/core/clock';
 import { applyConvSnapshot } from '@/next/stores/conversation';
 import { isMachineOff, loadCentralChat, refreshCentral, useCentral } from '@/next/stores/central';
 import { useConnection } from '@/next/stores/connection';
+import { refreshProfileSidebar } from '@/next/stores/profile-sidebar';
 import type { ConvId, MachineId, Queue } from '@/next/protocol/v2';
 
 const REFRESH_MS = 30_000;
 
-/** The list: asked on mount, every half minute while the page is visible, and when a link goes down or comes back. */
+/** The list and the person's sidebar: asked on mount, every half minute while the page is visible, and when a link goes down or comes back. */
 export function useCentralHistory(links: string): void {
   useEffect(() => {
-    void refreshCentral();
+    // The person's sidebar (projects, favorites) comes with the list, on the same beat.
+    const refresh = () => Promise.all([refreshCentral(), refreshProfileSidebar()]);
+    void refresh();
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') void refreshCentral();
+      if (document.visibilityState === 'visible') void refresh();
     }, REFRESH_MS);
     return () => clearInterval(timer);
   }, [links]);

@@ -43,4 +43,17 @@ spec:
                 port:
                   number: {{ $port }}
     {{- end }}
+    {{- if and .Values.sitesDomain .Values.sites.enabled }}
+    # Each published site at <site>--<space>.<sitesDomain>.
+    - host: {{ printf "*.%s" (trimAll "." .Values.sitesDomain | lower) | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $port }}
+    {{- end }}
 {{- end }}

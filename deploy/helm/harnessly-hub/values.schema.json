@@ -19,6 +19,26 @@
       "type": "string",
       "pattern": "^$|^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$"
     },
+    "sitesDomain": {
+      "type": "string",
+      "pattern": "^$|^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$"
+    },
+    "sites": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "abuseUrl": { "type": "string", "pattern": "^$|^(https?://|mailto:)\\S+$" },
+        "s3": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string", "pattern": "^$|^https?://[^/?#@\\s]+$" },
+            "region": { "type": "string" },
+            "bucket": { "type": "string" },
+            "prefix": { "type": "string" }
+          }
+        }
+      }
+    },
     "signup": { "enum": ["open", "invite"] },
     "adminEmails": { "type": "array", "items": { "type": "string", "pattern": "^[^@\\s,]+@[^@\\s,]+$" } },
     "edition": { "enum": ["self-hosted", "cloud"] },

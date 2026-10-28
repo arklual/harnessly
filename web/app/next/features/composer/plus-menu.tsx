@@ -2,7 +2,7 @@
 // mention (project, task, design), and — in a chat — what the machine and the team have: a file of the project, a
 // design, a document, a board, a merge request or a task. Each of those opens its picker in the same panel (back with
 // ←). On a computer it is a small menu over the button; on a phone a sheet from the bottom with large tiles.
-import { useCallback, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import AttachPicker from '@/next/features/composer/attach-picker';
 import {
   ATTACH_KIND,
@@ -11,6 +11,7 @@ import {
   type TAttachKind,
 } from '@/next/features/composer/attach-sources';
 import StashList, { type IStash } from '@/next/features/composer/stash-list';
+import TakesList, { type ITakeRow } from '@/next/features/composer/takes-list';
 import { stashHint } from '@/next/features/composer/keys';
 import type { ComposerContext } from '@/next/features/composer/types';
 import Icon from '@/next/ui/icon';
@@ -49,6 +50,14 @@ export const ATTACH_ITEMS: readonly { kind: TAttachKind; icon: string; name: str
   },
 ] as const;
 
+/** «Записи»: the person's recordings; `onShow` says when the pane is on screen (its list is read then). */
+export interface IPlusTakes {
+  rows: readonly ITakeRow[];
+  loading: boolean;
+  onShow: (shown: boolean) => void;
+  onInsert: (text: string) => void;
+}
+
 /** What a chat's field can attach besides files: where to look, what is already there, and where a pick goes. */
 export interface IPlusAttach {
   scope: IAttachScope;
@@ -68,6 +77,8 @@ interface IPlusMenuProps {
   attach?: IPlusAttach | null;
   /** The drafts put aside in this field and the way to put one more; without it «+» has no such items. */
   stash?: IStash | null;
+  /** The person's recordings; without it «+» has no «Записи». */
+  takes?: IPlusTakes | null;
   disabled?: boolean;
 }
 
@@ -78,6 +89,7 @@ const PlusMenu = ({
   onPrompts,
   attach = null,
   stash = null,
+  takes = null,
   disabled = false,
 }: IPlusMenuProps) => {
   const phone = usePhone();
@@ -86,6 +98,13 @@ const PlusMenu = ({
   const [view, setView] = useState<TAttachKind | null>(null);
   // The list of stashed drafts, shown in the panel in the same place.
   const [stashOpen, setStashOpen] = useState(false);
+  // The person's recordings, shown in the panel in the same place.
+  const [takesOpen, setTakesOpen] = useState(false);
+  const takesShown = open && takesOpen;
+  const onShowTakes = takes?.onShow;
+  useEffect(() => {
+    onShowTakes?.(takesShown);
+  }, [takesShown, onShowTakes]);
   const [now, setNow] = useState(0);
   const [pickers, setPickers] = useState<Partial<Record<TFileKind, HTMLInputElement | null>>>({});
   const bindPhoto = useCallback(
@@ -106,6 +125,7 @@ const PlusMenu = ({
     if (next) {
       setView(null);
       setStashOpen(false);
+      setTakesOpen(false);
       setNow(Date.now());
     }
     setOpen(next);
@@ -232,7 +252,48 @@ const PlusMenu = ({
       }}
     />
   );
+  const takesItem = takes && (
+    <button
+      type="button"
+      className="hx-plus__item"
+      role="menuitem"
+      data-takes="list"
+      onClick={() => setTakesOpen(true)}
+    >
+      <Icon name="mic" size="sm" />
+      <span className="hx-plus__name">{t('next.takes.title')}</span>
+      {!phone && <span className="hx-plus__hint">{t('next.takes.hint')}</span>}
+      <Icon name="chevron-right" size="sm" className="hx-plus__chev" />
+    </button>
+  );
+  const takesPane = takes && takesOpen && (
+    <div className="hx-plus__pane hx-pick" data-sub="true" data-kind="takes">
+      <div className="hx-pick__head">
+        <button
+          type="button"
+          className="hx-pick__back"
+          aria-label={t('next.attach.back')}
+          onClick={() => setTakesOpen(false)}
+        >
+          <Icon name="chevron-left" size="sm" />
+        </button>
+        <span className="hx-pick__title">{t('next.takes.title')}</span>
+      </div>
+      <div className="hx-pick__list">
+        <TakesList
+          rows={takes.rows}
+          now={now}
+          loading={takes.loading}
+          onInsert={(text) => {
+            setOpen(false);
+            takes.onInsert(text);
+          }}
+        />
+      </div>
+    </div>
+  );
   const picker =
+    takesPane ||
     stashPane ||
     (attach && view && (
       <AttachPicker
@@ -286,6 +347,7 @@ const PlusMenu = ({
           <span className="hx-plus__name">{t('next.plus.prompts')}</span>
         </button>
         {stashItems}
+        {takesItem}
         {contextItems.length > 0 && <div className="hx-plus__sep" />}
         {contextItems}
       </>
@@ -338,6 +400,7 @@ const PlusMenu = ({
         <span className="hx-plus__hint">{t('next.plus.promptsHint')}</span>
       </button>
       {stashItems}
+      {takesItem}
       {contextItems.length > 0 && <div className="hx-plus__sep" />}
       {contextItems}
     </div>

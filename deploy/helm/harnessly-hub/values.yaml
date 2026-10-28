@@ -27,6 +27,25 @@ publicUrl: ""
 # trust completely belong there: the hub opens only machines an administrator connected.
 runtimeDomain: ""
 
+# -- Published sites (HARNESSLY_SITES_DOMAIN): give every site an address of its own, <site>--<space>.<sitesDomain>. Needs
+# a wildcard DNS record and certificate for *.<sitesDomain>, which the ingress then routes to the hub. Use a domain of its
+# own, not a sibling of the hub's or of runtimeDomain (the same checks as for runtimeDomain; a parent of the hub's host is
+# refused). Empty: a self-hosted hub serves sites under <publicUrl>/sites/<site>--<space>/, static only and sandboxed
+# (no allow-same-origin); the cloud edition then has no sites at all.
+sitesDomain: ""
+sites:
+  # -- off turns the feature off whatever the domain (HARNESSLY_SITES).
+  enabled: true
+  # -- Where the 404 page of the bare sites domain sends a complaint (HARNESSLY_SITES_ABUSE_URL): https:// or mailto:.
+  abuseUrl: ""
+  # -- Keep the sites' files in an S3-compatible bucket (MinIO, Selectel) instead of the data volume. The keys go in the
+  # Secret: HARNESSLY_SITES_S3_ACCESS_KEY and HARNESSLY_SITES_S3_SECRET_KEY.
+  s3:
+    endpoint: ""
+    region: ""
+    bucket: ""
+    prefix: ""
+
 # -- invite: only the administrators and people with an invitation (HUB_SIGNUP); open: anyone can create an account.
 signup: invite
 # -- Administrators of the installation (HUB_ADMIN_EMAILS); each must sign in with a verified address. Required while

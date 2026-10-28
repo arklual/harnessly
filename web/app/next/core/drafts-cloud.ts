@@ -61,6 +61,26 @@ const stateOf = (k: DraftKey): IKeyState => {
   return st;
 };
 
+/**
+ * The writes this page sent, the last few of each field: a draft the machine shows that is one of them is this
+ * page's own word coming back, never another device's. A write whose answer did not come (a loaded machine, the road)
+ * leaves the base behind it; the field sent meanwhile is empty again, as pristine as that base, and its own echo would
+ * otherwise «take» it — the words just sent come back into the field, files and all, and go a second time.
+ */
+const sentWrites = new Map<DraftKey, { rev: number; sig: string }[]>();
+const SENT_KEPT = 8;
+
+function noteSent(k: DraftKey, write: DraftField & { rev: number }): void {
+  const list = sentWrites.get(k) ?? [];
+  list.push({ rev: write.rev, sig: signature(write) });
+  sentWrites.set(k, list.slice(-SENT_KEPT));
+}
+
+const isOwnEcho = (k: DraftKey, d: Draft): boolean => {
+  const sig = signature(fieldOf(d));
+  return (sentWrites.get(k) ?? []).some((w) => w.rev === d.rev && w.sig === sig);
+};
+
 const EMPTY: DraftField = { text: '', attachments: [] };
 /** The field as it is now; a field without a draft is empty. */
 const fieldNow = (k: DraftKey): DraftField => draftsStore.get(k) ?? EMPTY;
@@ -97,6 +117,7 @@ async function push(k: DraftKey): Promise<void> {
   const write = nextWrite(fieldNow(k), draftBaseStore.get(k));
   if (!write || tooLong(write) || signature(write) === st.refused) return;
   st.busy = true;
+  noteSent(k, write);
   const handle = runCommand(m, 'draft.set', {
     key: k,
     text: write.text,
@@ -139,8 +160,10 @@ export function applyRemoteDraft(machine: MachineId, d: Draft): void {
   const st = stateOf(k);
   const local = fieldNow(k);
   const remote = fieldOf(d);
-  const verdict = judgeRemote(local, draftBaseStore.get(k), d, st.busy);
-  if (verdict === REMOTE.ignore) return;
+  const judged = judgeRemote(local, draftBaseStore.get(k), d, st.busy);
+  if (judged === REMOTE.ignore) return;
+  // This page's own write coming back moves the base only: the field keeps what it has now (cleared by a send).
+  const verdict = judged === REMOTE.take && isOwnEcho(k, d) ? REMOTE.keep : judged;
   st.behind = false;
   const differs = !sameField(local, remote);
   batch(() => {
@@ -186,5 +209,6 @@ export function startDraftSync(): () => void {
     const clock = pageClock();
     for (const st of states.values()) clock.clearTimeout(st.timer);
     states.clear();
+    sentWrites.clear();
   };
 }

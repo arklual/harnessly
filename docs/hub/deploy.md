@@ -201,6 +201,9 @@ secret; it exits with 2 and every problem it found when the settings are wrong. 
 | `HUB_OIDC_PROVIDERS`, `HUB_OIDC_<ID>_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_NAME`, `_SCOPES` | off | Any number of OpenID Connect providers |
 | `HUB_RUNTIME_DOMAIN` | path mode | [Machines at `<id>.<domain>`](#where-machines-open-path-or-subdomain): a domain of its own (not on the hub's registrable domain). Required by `HUB_EDITION=cloud` (the hub does not start without it); without it the hub logs a warning at start and `check-config` says so |
 | `HUB_ALLOW_SAME_SITE_RUNTIME` | `0` | `1`: let the cloud edition start with a `HUB_RUNTIME_DOMAIN` on the hub's own registrable domain (`m.example.com` for `hub.example.com`), which is one site, not two. The hub warns about it at every start. Elsewhere it is a warning with or without this |
+| `HARNESSLY_SITES_DOMAIN` | path fallback | [Published sites](sites.md) at `<site>--<space>.<domain>`: a domain of its own, with a wildcard record and certificate. Without it a self-hosted hub serves sites under `/sites/` sandboxed; the cloud edition serves none |
+| `HARNESSLY_SITES`, `HARNESSLY_SITES_ABUSE_URL` | `on`, none | `off` switches sites off; the complaint link on the 404 page of the bare sites domain |
+| `HARNESSLY_SITES_DIR`, `HARNESSLY_SITES_S3_ENDPOINT`, `_BUCKET`, `_ACCESS_KEY`, `_SECRET_KEY`, `_REGION`, `_PREFIX` | `<HUB_DATA_DIR>/sites` | Where the sites' files live: a folder, or an S3 bucket (MinIO, any S3) |
 | `HUB_SSH` | `on` | [The SSH way](#the-ssh-way) of connecting a server |
 | `HUB_SSH_ALLOW_PRIVATE` | `off` | Let the SSH way reach private, loopback and link-local addresses. Off in every edition by default; the cloud edition ignores it |
 | `HUB_SECRET_KEY` | a key file in the data folder | At least 32 characters (`openssl rand -base64 32`): what the spaces' SSH keys are sealed with. `_FILE` is read as a file name. Losing it makes the stored keys useless (they are made again) |

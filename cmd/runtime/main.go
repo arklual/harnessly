@@ -23,6 +23,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/limits"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/providers"
+	"github.com/ly-solutions/harnessly/internal/selfupdate"
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/updatecheck"
@@ -116,6 +117,8 @@ type runtimeGate struct {
 	home  string
 	// update looks for a newer release; nil when this runtime does not.
 	update *updatecheck.Checker
+	// self keeps the programs of a machine a hub carries the hub's; nil for any other runtime.
+	self *selfupdate.Updater
 }
 
 // configFileOf is the runtime's config (the pair's secret, the person's settings).
@@ -376,7 +379,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(githubRoutes(d, githubFromEnv())...)
 	f.Add(peerRoutes(d, ref.c)...)
 	checker, checkOn := newUpdateChecker(cfg.Standalone())
-	f.Add(updateRoutes(d, checker)...)
+	self := newSelfUpdater()
+	f.Add(updateRoutes(d, checker, checkOn, self)...)
 	f.Add(notifyBotRoutes(d)...)
 	f.Add(askRoutes(d, ref.c)...)
 	f.Add(secretRoutes(d, ref.c)...)
@@ -390,7 +394,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		// The old runtime behind the gate does not get an install socket, or a socket of anyone without a session.
 		f.Add(upstreamGuard(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, previewOf(d).proxy.Matches))
 	}
-	rg := &runtimeGate{Gate: f, terms: terms, core: ref, tmux: tm, home: home}
+	rg := &runtimeGate{Gate: f, terms: terms, core: ref, tmux: tm, home: home, self: self}
 	if checkOn {
 		rg.update = checker
 	}

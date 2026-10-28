@@ -10,6 +10,7 @@ import {
   waitPhase,
   type AttachmentRef,
   type AutoContinueWhy,
+  type TerminalAside,
   type ClientId,
   type ConvId,
   type LocalMessageState,
@@ -37,6 +38,8 @@ export interface MessageView {
   kind: MessageKind;
   /** Set on a message the runtime wrote itself to go on (after a limit's reset, after a restart); absent on the person's. */
   auto?: AutoContinueWhy;
+  /** The screen of the agent's terminal closed before the message went in (the person's /login, a picker). */
+  cleared?: TerminalAside;
   /**
    * Written while the agent was busy (the page's own fact, not on the wire): the message stands in the stack over the
    * field from the first moment until the agent has it, never in the feed on the way.
@@ -222,6 +225,7 @@ export function applyMessage(machine: MachineId, msg: Message): void {
     mode: msg.mode,
     kind: msg.kind,
     ...(msg.auto && { auto: msg.auto }),
+    ...(msg.cleared && { cleared: msg.cleared }),
     held: m?.held ?? false,
     createdAt: msg.createdAt,
     attempts: msg.attempts,

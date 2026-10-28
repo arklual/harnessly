@@ -27,9 +27,17 @@ func (s *Service) CSRF(next http.Handler) http.Handler {
 			httpx.WriteError(w, r, httpx.ErrCrossSite)
 			return
 		}
+		// A deploy token is no cookie: a page of another site cannot send an Authorization header without the
+		// API agreeing to it, which it does not.
+		if strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		// A body-less DELETE carries no Content-Type; every other change declares JSON.
 		hasBody := r.ContentLength != 0
-		if (r.Method != http.MethodDelete || hasBody) && !httpx.IsJSON(r) {
+		// X-Harnessly-Client is the other thing a plain HTML form cannot send: the page's own uploads of files (a site's
+		// zip, a blob) are not JSON.
+		if (r.Method != http.MethodDelete || hasBody) && !httpx.IsJSON(r) && r.Header.Get("X-Harnessly-Client") == "" {
 			httpx.WriteError(w, r, httpx.ErrCrossSite)
 			return
 		}

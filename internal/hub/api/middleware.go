@@ -99,7 +99,7 @@ func recoverer(log *slog.Logger, next http.Handler) http.Handler {
 // securityHeaders are set on everything the hub answers itself. What a machine's runtime answers keeps its own.
 func securityHeaders(secure bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/m/") {
+		if !strings.HasPrefix(r.URL.Path, "/m/") && !strings.HasPrefix(r.URL.Path, "/sites/") {
 			h := w.Header()
 			h.Set("X-Content-Type-Options", "nosniff")
 			h.Set("Referrer-Policy", "same-origin")

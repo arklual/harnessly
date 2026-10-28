@@ -1,0 +1,20 @@
+{
+  "next.settings.section.takes": "Recordings",
+  "next.settings.lead.takes": "Voice recordings and what was recognized — from every machine",
+  "next.takes.title": "Recordings",
+  "next.takes.hint": "Voice recordings",
+  "next.takes.loading": "Loading recordings…",
+  "next.takes.empty": "No recordings yet — press the microphone and speak",
+  "next.takes.failed": "not recognized",
+  "next.takes.textOnly": "audio deleted",
+  "next.takes.noText": "Nothing recognized",
+  "next.takes.play": "Play",
+  "next.takes.pause": "Pause",
+  "next.takes.download": "Download",
+  "next.takes.insert": "Put the text into the field",
+  "next.takes.delete": "Delete",
+  "next.takes.sure": "Delete for sure?",
+  "next.takes.file": "recording",
+  "next.takes.keep": "Audio is kept 30 days, the text for good. Recordings do not depend on the machine: they outlive it.",
+  "next.takes.local": "Recordings are kept in this browser only: this installation has no shared storage."
+}

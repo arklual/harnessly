@@ -445,7 +445,12 @@ func (f *Feed) FindUser(offset int64, at wire.Ms) (string, bool) {
 // carries its text, or its start when Claude cut the paste short. An entry of someone else — the person typing into the terminal, another tool — is never taken for it.
 func (f *Feed) FindUserText(offset int64, at wire.Ms, text string) (string, bool) {
 	for i, e := range f.b.entries {
-		if e.T != wire.EntryUser || e.ClientID != nil || !screen.SameMessage(e.Text, text) && !screen.CutShort(e.Text, text) {
+		if line := commandLineOf(e); line != "" {
+			// A command the person typed («! cmd», «/compact») is written as its command entry, not a user message.
+			if !screen.SameMessage(line, text) {
+				continue
+			}
+		} else if e.T != wire.EntryUser || e.ClientID != nil || !screen.SameMessage(e.Text, text) && !screen.CutShort(e.Text, text) {
 			continue
 		}
 		if off := f.b.offsets[i]; off >= 0 && off >= offset || off < 0 && e.At >= at-clockSkew {

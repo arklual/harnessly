@@ -35,7 +35,7 @@ import { draftsStore, emptyDraft, type Draft, type DraftKey } from '@/next/store
 import { stashStore, type StashItem } from '@/next/stores/stash';
 import { draftBaseStore, type DraftBase } from '@/next/stores/draft-sync';
 import { activeMachineStore } from '@/next/stores/machines';
-import { defaultCwdStore, projectsStore } from '@/next/stores/projects';
+import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
 import {
   convMessagesStore,
   isTerminal,
@@ -380,7 +380,10 @@ function importList(list: CachedList): void {
   const { machineId } = list;
   if (convsLoadedStore.has(machineId) || !Array.isArray(list.conversations)) return;
   for (const c of list.conversations) if (!conversationsStore.has(c.id)) conversationsStore.set(c.id, c);
-  for (const p of list.projects) if (!projectsStore.has(p.id)) projectsStore.set(p.id, p);
+  for (const p of list.projects) {
+    const key = projectKey(machineId, p.id);
+    if (!projectsStore.has(key)) projectsStore.set(key, { ...p, machineId });
+  }
   if (list.defaultCwd !== null && !defaultCwdStore.has(machineId))
     defaultCwdStore.set(machineId, list.defaultCwd);
   convsCachedStore.set(machineId, true);

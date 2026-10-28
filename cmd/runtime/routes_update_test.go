@@ -43,7 +43,7 @@ func TestUpdateCheckOn(t *testing.T) {
 func TestUpdateRoute(t *testing.T) {
 	c := &updatecheck.Checker{Current: "0.15.46"}
 	signed := false
-	routes := updateRoutes(deps{SessionOK: func(*http.Request) bool { return signed }}, c)
+	routes := updateRoutes(deps{SessionOK: func(*http.Request) bool { return signed }}, c, true, nil)
 	h := routes[0].Handler
 	req := func(method string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, platformAPI+"/update", nil)
@@ -62,7 +62,7 @@ func TestUpdateRoute(t *testing.T) {
 		t.Errorf("POST: %d", w.Code)
 	}
 	w := req(http.MethodGet)
-	if w.Code != http.StatusOK || w.Body.String() != "{\"current\":\"0.15.46\",\"updateAvailable\":false}\n" {
+	if w.Code != http.StatusOK || w.Body.String() != "{\"current\":\"0.15.46\",\"updateAvailable\":false,\"checking\":true}\n" {
 		t.Errorf("GET: %d %q", w.Code, w.Body.String())
 	}
 }

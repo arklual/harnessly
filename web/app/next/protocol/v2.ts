@@ -84,6 +84,9 @@ export type LimitWindow = (typeof LIMIT_WINDOWS)[number];
 /** Why the runtime went on by itself: the usage limit reset, or a restart cut a turn short. */
 export const AUTO_CONTINUE_WHYS = ['limit', 'restart'] as const;
 export type AutoContinueWhy = (typeof AUTO_CONTINUE_WHYS)[number];
+/** A screen the person left open in the agent's terminal (their /login, a picker) that was closed for a message. */
+export const TERMINAL_ASIDES = ['login', 'model', 'effort'] as const;
+export type TerminalAside = (typeof TERMINAL_ASIDES)[number];
 /** What `limit` asks of a chat held on its usage limit: go on now, do not go on by itself, go on by itself again. */
 export const LIMIT_ACTIONS = ['now', 'cancel', 'auto'] as const;
 export type LimitAction = (typeof LIMIT_ACTIONS)[number];
@@ -1032,6 +1035,15 @@ export interface AgentSettings {
   env: AgentEnvVar[];
   mcp: AgentMcp[];
 }
+/** An account an agent CLI was signed in with on one of the person's machines, as the cluster keeps it (the
+ *  CLI forgets an account once it signs out). */
+export interface AgentAccountNote {
+  machineId: MachineId;
+  provider: Provider;
+  who: string;
+  firstAt: Ms;
+  lastAt: Ms;
+}
 /** What a write changes; what it does not name stays as it is. A null option value unsets the option. */
 export interface AgentSettingsPatch {
   options?: AgentOption[];
@@ -1433,6 +1445,8 @@ export interface Message {
   kind: MessageKind;
   /** Set on a message the runtime wrote itself to go on: drawn as a quiet line, not as the person's words. */
   auto?: AutoContinueWhy;
+  /** The screen of the terminal that was closed before the message went in; absent when nothing was in the way. */
+  cleared?: TerminalAside;
   createdAt: Ms;
   attempts: number;
   state: MessageState;
@@ -1872,6 +1886,38 @@ export interface CentralMove {
   convId: ConvId;
   toMachineId: MachineId;
   toConvId: ConvId;
+}
+/**
+ * The person's sidebar the cluster keeps (not a machine's): the projects of the profile, each standing for
+ * projects of the machines (`members`), and where the favorites stand, by chat id. Which chats are favorites stays each
+ * chat's own `pinned`. `merged`: the machines whose own favorites' layout is already in.
+ */
+export interface ProfileMember {
+  machineId: MachineId;
+  projectId: string;
+}
+export interface ProfileProject {
+  id: string;
+  name: string;
+  createdAt: Ms;
+  members: ProfileMember[];
+}
+export interface ProfileSidebar {
+  projects: ProfileProject[];
+  favorites: Favorites;
+  merged: MachineId[];
+}
+/** The gateway's sidebar: off when the cluster keeps none for the person; revision 0 and no document before the first write. */
+export interface ProfileSidebarPage {
+  enabled: boolean;
+  rev: number;
+  doc: ProfileSidebar | null;
+}
+/** The answer to a write: its revision, or `conflict` with the document that stands now. */
+export interface ProfileSidebarWrite {
+  rev: number;
+  conflict?: boolean;
+  doc?: ProfileSidebar | null;
 }
 export interface CentralChat extends TurnsPage {
   machine: CentralState;
@@ -2704,7 +2750,7 @@ const message: Decoder<Message> = object(
     state: messageState,
     rev: seq,
   },
-  { refs: messageRefs, auto: oneOf(AUTO_CONTINUE_WHYS) },
+  { refs: messageRefs, auto: oneOf(AUTO_CONTINUE_WHYS), cleared: oneOf(TERMINAL_ASIDES) },
 );
 const messageHanded: Decoder<MessageHanded> = object({
   at: ms,
@@ -3141,10 +3187,32 @@ const centralChat: Decoder<CentralChat> = object({
   beforeTurnId: nullable(turnId),
 });
 
+const profileProject: Decoder<ProfileProject> = object({
+  id,
+  name: str,
+  createdAt: ms,
+  members: array(object({ machineId: id, projectId: id })),
+});
+const profileSidebar: Decoder<ProfileSidebar> = object({
+  projects: array(profileProject),
+  favorites,
+  merged: array(id),
+});
+
 /** The gateway's answers about the person's chats on every machine: not runtime pages, so outside HttpKind. */
 export const parseCentral = {
   list: (v: unknown): CentralList => centralList(v, '$'),
   chat: (v: unknown): CentralChat => centralChat(v, '$'),
+  sidebar: (v: unknown): ProfileSidebarPage =>
+    object({ enabled: bool, rev: int, doc: nullable(profileSidebar) })(v, '$'),
+  sidebarWrite: (v: unknown): ProfileSidebarWrite =>
+    object({ rev: int }, { conflict: bool, doc: nullable(profileSidebar) })(v, '$'),
+  agentAccounts: (v: unknown): AgentAccountNote[] =>
+    object({
+      accounts: array(
+        object({ machineId: id, provider: oneOf(PROVIDERS), who: id, firstAt: ms, lastAt: ms }),
+      ),
+    })(v, '$').accounts,
 };
 
 export const parsePage = {

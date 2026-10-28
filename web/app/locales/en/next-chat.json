@@ -252,6 +252,9 @@
   "next.picker.effortHint.ultra": "Beyond maximum: the slowest and the priciest",
   "next.picker.ultracode": "Ultracode",
   "next.picker.ultracodeHint": "Subagents on every task",
+  "next.picker.machineOn": "On {machine}",
+  "next.picker.machineTitle": "Machine for the new chat",
+  "next.picker.machineHint": "Agents and models are the ones signed in on that machine",
   "next.picker.ultracodeWaitsOn": "Turns on once the agent confirms",
   "next.picker.ultracodeWaitsOff": "Turns off once the agent confirms",
   "next.picker.ultracodeTitle": "Dynamic workflows with subagents on every task",
@@ -465,5 +468,13 @@
   "next.dockBar.keyOpen": "Models and keys",
   "next.outputs.kind.delivery": "File",
   "next.delivered.save": "Download",
-  "next.dockBar.off": "The machine is off — a message cannot be sent"
+  "next.dockBar.off": "The machine is off — a message cannot be sent",
+  "next.loginCard.title": "The {agent} sign-in has expired",
+  "next.loginCard.lead": "Sign in again right here — no terminal needed. Then send the message once more.",
+  "next.loginCard.doneTitle": "Signed in to {agent}",
+  "next.loginCard.doneLead": "You can go on: send the message again.",
+  "next.loginCard.retry": "Send again",
+  "next.cleared.login": "The sign-in menu was open in the terminal — closed it to send the message",
+  "next.cleared.model": "The model picker was open in the terminal — closed it to send the message",
+  "next.cleared.effort": "The effort setting was open in the terminal — closed it to send the message"
 }

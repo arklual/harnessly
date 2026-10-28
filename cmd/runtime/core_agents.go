@@ -386,7 +386,7 @@ func (a *coreAgents) LaunchLine(provider, workspaceID string, launch *agents.Lau
 	if err != nil {
 		return "", err
 	}
-	return a.envSource(provider) + line, nil
+	return agents.ForAnyShell(a.envSource(provider) + line), nil
 }
 
 // resumeLine is the line that resumes a conversation, bare: the starter puts the variables of a start and the env files
@@ -420,7 +420,7 @@ func (a *coreAgents) ResumeLine(provider, sessionID, workspaceID string, launch 
 	if err != nil {
 		return "", err
 	}
-	return a.envSource(provider) + line, nil
+	return agents.ForAnyShell(a.envSource(provider) + line), nil
 }
 
 func (a *coreAgents) launching() bool { return a.launchOn != nil && a.launchOn() && a.starter != nil }

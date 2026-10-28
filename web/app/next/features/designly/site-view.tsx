@@ -185,6 +185,8 @@ export interface ISiteViewProps {
   full?: boolean;
   /** Set where the gateway keeps the project's access and the person has something to do there. */
   access?: ISiteAccess;
+  /** Set where the person may publish the design as a site: the bar's «Опубликовать» opens the dialog. */
+  publish?: { onOpen: () => void };
   /** The page's preview slot, whose record DevTools read; without it the panel is not offered. */
   devtools?: {
     machine: MachineId;
@@ -326,6 +328,7 @@ const SiteView = ({
   stage,
   pane,
   access,
+  publish,
   devtools,
   memoryKey,
   viewSeed,
@@ -1471,6 +1474,19 @@ const SiteView = ({
                 <span className="hx-tip" data-pos="below" data-align="end">
                   {t('next.site.devtools')}
                   {keys && <kbd>⌥⌘I</kbd>}
+                </span>
+              </button>
+            )}
+            {publish && (
+              <button
+                type="button"
+                className="hx-head-btn hx-tipped hx-browser__publish"
+                aria-label={t('next.publish.button')}
+                onClick={publish.onOpen}
+              >
+                <Icon name="globe" />
+                <span className="hx-tip" data-pos="below" data-align="end">
+                  {t('next.publish.button')}
                 </span>
               </button>
             )}

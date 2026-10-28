@@ -184,7 +184,8 @@ describe('a steered message in the strip over the field', () => {
     await act(() => vi.advanceTimersByTimeAsync(30_000));
     expect(standing()).toBeDefined();
     await act(() => vi.advanceTimersByTimeAsync(5_050));
-    expect(rt.statusAsks).toEqual([[ID]]);
+    // The fixture's own queued messages are asked about as well: only this one matters here.
+    expect(rt.statusAsks.map((ids) => ids.filter((id) => id === ID))).toEqual([[ID]]);
     await leaves();
   });
 });

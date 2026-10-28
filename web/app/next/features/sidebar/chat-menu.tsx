@@ -47,6 +47,8 @@ export interface IChatMenuProps {
   onContinue?: () => void;
   /** «Продолжить на другой ВМ»: the chat goes on, with its history, on another machine of the person. */
   onMoveVm?: () => void;
+  /** The machine the chat lives on, said quietly at the top (only when the person has several). */
+  machine?: string;
   /** «Цель…»: the header's menu of a Claude chat opens the goal's dialog. */
   onGoal?: () => void;
   onOpenChange?: (open: boolean) => void;
@@ -83,6 +85,7 @@ const ChatMenu = ({
   onMerge,
   onContinue,
   onMoveVm,
+  machine,
   onGoal,
   onRetitle,
   onOpenChange,
@@ -116,6 +119,14 @@ const ChatMenu = ({
       >
         {view === VIEW.root && (
           <>
+            {machine && <div className="hx-cmenu__vm">{t('next.rowMenu.onVm', { machine })}</div>}
+            {onMoveVm && (
+              <Menu.Item className="hx-cmenu__item" onClick={onMoveVm}>
+                <Icon name="server" size="sm" />
+                <span className="hx-cmenu__txt">{t('next.rowMenu.moveVm')}</span>
+              </Menu.Item>
+            )}
+            {(machine || onMoveVm) && <Menu.Separator className="hx-cmenu__sep" />}
             {onTerminal && (
               <>
                 <Menu.Item className="hx-cmenu__item hx-cmenu__term" onClick={onTerminal}>
@@ -159,12 +170,6 @@ const ChatMenu = ({
               <Menu.Item className="hx-cmenu__item" onClick={onContinue}>
                 <Icon name="arrow-left-right" size="sm" />
                 <span className="hx-cmenu__txt">{t('next.rowMenu.continue')}</span>
-              </Menu.Item>
-            )}
-            {onMoveVm && (
-              <Menu.Item className="hx-cmenu__item" onClick={onMoveVm}>
-                <Icon name="server" size="sm" />
-                <span className="hx-cmenu__txt">{t('next.rowMenu.moveVm')}</span>
               </Menu.Item>
             )}
             {onGoal && (

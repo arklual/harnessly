@@ -38,6 +38,7 @@ import Feed from '@/next/features/chat/feed';
 import FileShare from '@/next/features/filedoc/file-share';
 import LimitCard from '@/next/features/chat/limit-card';
 import TerminalFailureCard from '@/next/features/chat/terminal-failure';
+import ChatLogin, { loginLostTurn } from '@/next/bindings/chat-login';
 import type { FeedItem } from '@/next/features/chat/types';
 import GateCard from '@/next/features/questions/gate-card';
 import type { PermissionScope } from '@/next/features/questions/types';
@@ -239,6 +240,8 @@ const ChatView = ({
     return byTurn;
   }, [items]);
 
+  const loginLost = useMemo(() => loginLostTurn(items), [items]);
+
   const srcOf = useCallback((item: { id: string }) => uploadSrc(machine, item), [machine]);
   // The pictures the messages name, by their id on the machine (never by their path).
   const listedPictures = usePictures(conv);
@@ -370,10 +373,20 @@ const ChatView = ({
                         />
                       }
                       terminalFailure={
-                        <TerminalFailureCard
-                          failure={record?.terminalFailure ?? null}
-                          onChooseTarget={handoff.handoff ? () => requestContinue(conv) : null}
-                        />
+                        <>
+                          <TerminalFailureCard
+                            failure={record?.terminalFailure ?? null}
+                            onChooseTarget={handoff.handoff ? () => requestContinue(conv) : null}
+                          />
+                          {loginLost && provider && (
+                            <ChatLogin
+                              key={loginLost.key}
+                              machine={machine}
+                              provider={provider}
+                              onRetry={loginLost.prompt ? () => resend(loginLost.prompt?.text ?? '') : null}
+                            />
+                          )}
+                        </>
                       }
                       waiting={
                         waitingAgents.length > 0 ? { agents: waitingAgents, onOpen: onShowBackground } : null
@@ -409,15 +422,12 @@ const ChatView = ({
                         move.moved ? (
                           <MovedNote moved={move.moved} onOpen={move.openMoved} />
                         ) : (
-                          <>
-                            {move.here}
-                            <ChatDock
-                              conv={conv}
-                              machine={machine}
-                              extra={dockExtra}
-                              handoff={handoff.handoff}
-                            />
-                          </>
+                          <ChatDock
+                            conv={conv}
+                            machine={machine}
+                            extra={dockExtra}
+                            handoff={handoff.handoff}
+                          />
                         )
                       }
                     />

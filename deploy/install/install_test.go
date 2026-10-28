@@ -400,6 +400,26 @@ func TestInstallAgainKeepsThePolicyAndTheManifest(t *testing.T) {
 	}
 }
 
+// --update takes neither a code nor a profile: the profile is the installed one, and the machine is kept.
+func TestUpdateNeedsNoCodeAndKeepsTheMachine(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	if r := e.run(nil, "--update", "--wait", "2"); r.code == 0 || !strings.Contains(r.err, "no harnessly install") {
+		t.Fatalf("an update of nothing went on: %d\n%s", r.code, r.err)
+	}
+	if r := e.run(nil, "--token", "hx_one", "--profile", "dir", "--wait", "2"); r.code != 0 {
+		t.Fatalf("%s\n%s", r.out, r.err)
+	}
+	_ = os.Truncate(e.calls, 0)
+	r := e.run([]string{"FAKE_USER_HOME=/var/lib/harnessly", "FAKE_LISTEN=127.0.0.1:18022 127.0.0.1:18023"}, "--update", "--wait", "2")
+	if r.code != 0 {
+		t.Fatalf("%s\n%s", r.out, r.err)
+	}
+	if !strings.Contains(e.calledWith(), "--profile dir --via command --reuse") {
+		t.Errorf("the update did not keep the machine:\n%s", e.calledWith())
+	}
+}
+
 // The service account owns its home, so it can put a link where the installer expects a folder of its own. Root works in
 // that home (it makes the folders, it removes what the installer made), so a link there is refused before anything is
 // written through it.
@@ -579,7 +599,8 @@ func TestInstallFullProfileOnLinux(t *testing.T) {
 	e := newEnv(t)
 	// A home of its own: the paths are the account's, no install root.
 	script := accountScript(e)
-	r := e.runScript([]byte(script), []string{"FAKE_UID=1000"}, "--token", "hx_full", "--profile", "full", "--wait", "2")
+	// An account without passwordless sudo: nothing goes through root.
+	r := e.runScript([]byte(script), []string{"FAKE_UID=1000", "FAKE_NO_SUDO=1"}, "--token", "hx_full", "--profile", "full", "--wait", "2")
 	if r.code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", r.code, r.out, r.err)
 	}
@@ -1352,6 +1373,23 @@ func TestPurgeKeepsAVolumeThatWasThereBefore(t *testing.T) {
 	}
 	mustContain(t, "calls", e.calledWith(), "agent unlink (container)\n")
 	mustNotContain(t, "calls", e.calledWith(), "volume rm")
+}
+
+// An account's install with passwordless sudo puts ffmpeg there for voice input, and nothing else through root.
+func TestInstallFullProfileInstallsFFmpegWithSudo(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	r := e.runScript([]byte(accountScript(e)), []string{"FAKE_UID=1000"}, "--token", "hx_full", "--profile", "full", "--wait", "2")
+	if r.code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", r.code, r.out, r.err)
+	}
+	calls := e.calledWith()
+	mustContain(t, "calls", calls, "sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y ffmpeg\n")
+	for _, line := range strings.Split(calls, "\n") {
+		if strings.HasPrefix(line, "sudo") && !strings.Contains(line, "apt-get") {
+			t.Errorf("through root besides ffmpeg: %s", line)
+		}
+	}
 }
 
 func TestInstallDesignToolsWhereItCan(t *testing.T) {

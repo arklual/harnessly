@@ -8,6 +8,27 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- «Сразу» (⌃↵ in the field, ↑ on a queued message) while several messages wait sends them all as one message now, in
+  the queue's order, a blank line between them, every attachment kept; the queue is empty after it. Commands («/…»,
+  «! …») still go alone.
+
+- No machine is picked in the sidebar any more while the cloud keeps the list: the chats, the projects and the favorites
+  are the person's whichever machine the page goes through, and the machine card at the bottom is the open chat's
+  machine (the default one on the start page) with its load. A new chat starts on the default machine; another is
+  picked in the model's popover («ВМ …» under the depth), which brings that machine's agents and models. The start
+  page's machine pill is gone.
+
+- A chat of another machine than the picked one is written to as it is, on its own machine: no bar over the field, no
+  «Продолжить здесь». The row is the chat's title alone; where the chat lives is the quiet first line of its menu, with
+  «Продолжить на другой ВМ» right under it.
+
+- The sidebar is the person's, not a machine's: the projects (folders) and the favorites' layout are one document the
+  cloud keeps per person (`GET/PUT …/history/sidebar`, written on its revision, a conflict taken and made again), the
+  same whichever machine is picked; a project of the person stands for projects of the machines and gets its folder on a
+  machine when a chat moves in or starts there. Each machine's own projects and favorites are merged in by name on first
+  sight, nothing lost. The start page picks the machine of a new chat (the default one is the machine picked in the
+  sidebar). Projects of two machines with the same id no longer take each other's place on the page.
+
 - Releases: a `vX.Y.Z` tag publishes archives for linux and macOS (amd64, arm64) with `checksums.txt` signed keyless with cosign
   (`checksums.txt.sigstore.json`) and a build provenance attestation, and a multi-arch container image
   `ghcr.io/ly-solutions/harnessly` (`X.Y.Z`, `X.Y`, `latest`, and `-with-agents`), signed and attested. `docs/deploy.md` starts
@@ -131,6 +152,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A message the agent took no longer stays in the queue over the field: a chat whose channel the machine refused (its
+  snapshot past the time budget on a loaded machine answers not-found) is asked for again instead of being let go, so its
+  frames come back; the page also asks the runtime about queued messages whose frames it missed.
+- A bash-mode line («! cmd») sent from the field is taken by its command entry in the transcript (no prompt-submit hook
+  fires for it): it is no longer «не дошло» with Повторить after it ran.
+- A send while the draft's write had no answer yet no longer brings the sent words and files back into the field from
+  the write's own late echo — the second send made two copies of one message.
 - Telegram notifications: a chat's title (set by whoever made the chat) reaches the agent as one quoted line of at most
   64 characters, so it cannot add lines of its own to the agent's instructions.
 - A long link in the agent's reply stays inside the chat column: its chip is never wider than the column and the address

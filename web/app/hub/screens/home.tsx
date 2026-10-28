@@ -13,6 +13,7 @@ import { AccountMenu, PlainPage } from '../ui/frame';
 import { Plus, Server, Settings } from '../ui/icons';
 import { MachineRow } from '../ui/machine-row';
 import { Msg, Pending } from '../ui/parts';
+import { SitesSection, useSitesOn } from './sites';
 import { useSpace } from './space';
 
 const STEP_OF = { machines: 'machines', agents: 'agents', access: 'access', done: 'done' } as const;
@@ -45,6 +46,7 @@ export const HomeScreen = () => {
   const env = useEnv();
   const { space, live, owner } = useSpace();
   const machines = live.state.machines;
+  const sitesOn = useSitesOn();
   const [opening, setOpening] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -150,6 +152,7 @@ export const HomeScreen = () => {
         {renderMachines()}
         {error && <Msg tone="danger">{error}</Msg>}
       </section>
+      {sitesOn && <SitesSection />}
     </PlainPage>
   );
 };

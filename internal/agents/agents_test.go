@@ -116,19 +116,26 @@ func bashPrintf(t *testing.T, quoted string) string {
 	return string(out)
 }
 
-// initial-prompt: round-trips quotes, backslashes and newlines through bash.
-func TestANSICQuoteRoundTrip(t *testing.T) {
-	text := "Привет, это 'тест'\nвторая строка \\ $HOME `id` \"q\"\tтаб\x01\x7f"
-	if got := bashPrintf(t, agents.ANSICQuote(text)); got != text {
+// initial-prompt: round-trips quotes, backslashes and newlines through sh and bash, on one typed line.
+func TestPrintfQuoteRoundTrip(t *testing.T) {
+	text := "Привет, это 'тест'\nвторая строка \\ $HOME `id` \"q\"\tтаб\x01\x7f %s \\c"
+	quoted := agents.PrintfQuote(text)
+	if strings.ContainsAny(quoted, "\n\t\x01\x7f") {
+		t.Fatalf("control characters in the typed line: %q", quoted)
+	}
+	if got := bashPrintf(t, quoted); got != text {
 		t.Fatalf("%q", got)
+	}
+	if out, err := exec.Command("sh", "-c", "printf %s "+quoted).Output(); err != nil || string(out) != text {
+		t.Fatalf("sh: %q %v", out, err)
 	}
 }
 
 // initial-prompt: appends the prompt per provider.
 func TestWithInitialPrompt(t *testing.T) {
 	for _, c := range []struct{ provider, cmd, prompt, want string }{
-		{"claude", "claude --x", " hi ", "claude --x -- $'hi'"},
-		{"codex", "node 'l.js'", "hi", "node 'l.js' --prompt $'hi'"},
+		{"claude", "claude --x", " hi ", `claude --x -- "$(printf %b 'hi')"`},
+		{"codex", "node 'l.js'", "hi", `node 'l.js' --prompt "$(printf %b 'hi')"`},
 		{"claude", "claude", "   ", "claude"},
 		{"claude", "claude", "", "claude"},
 		{"other", "x", "hi", "x"},

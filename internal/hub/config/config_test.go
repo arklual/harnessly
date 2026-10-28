@@ -276,3 +276,60 @@ func TestRuntimeDomainOfItsOwn(t *testing.T) {
 		t.Errorf("a machine host: %q", got)
 	}
 }
+
+func TestSitesConfig(t *testing.T) {
+	load := func(hub string, kv ...string) (*Config, error) {
+		m := map[string]string{"HUB_PUBLIC_URL": hub, "HUB_SMTP_URL": "smtp://mail.example.com"}
+		for i := 0; i+1 < len(kv); i += 2 {
+			m[kv[i]] = kv[i+1]
+		}
+		return Load(env(m))
+	}
+	// self-hosted without a domain: the path fallback; with one: subdomains; off on request
+	c, err := load("https://hub.example.com")
+	if err != nil || c.SitesMode() != "path" || c.SitesDir != "/var/lib/harnessly-hub/sites" {
+		t.Errorf("default: %v %v", err, c)
+	}
+	if c, err = load("https://hub.example.com", "HARNESSLY_SITES_DOMAIN", "Sites.Example.NET."); err != nil || c.SitesMode() != "subdomain" || c.SitesDomain != "sites.example.net" || len(c.Warnings) != 0 {
+		t.Errorf("own domain: %v %v", err, c)
+	}
+	if c, err = load("https://hub.example.com", "HARNESSLY_SITES", "off"); err != nil || c.SitesMode() != "off" {
+		t.Errorf("off: %v %v", err, c)
+	}
+	// the cloud has no path fallback: a stranger's page does not run on the hub's origin
+	if c, err = load("https://app.harnessly.ru", "HUB_EDITION", "cloud", "HUB_RUNTIME_DOMAIN", "run.harnessly-run.ru"); err != nil || c.SitesMode() != "off" {
+		t.Errorf("cloud without a domain: %v %v", err, c)
+	}
+	// the same registrable domain as the hub: a warning, a refusal in the cloud
+	c, err = load("https://app.harnessly.ru", "HARNESSLY_SITES_DOMAIN", "sites.harnessly.ru")
+	if err != nil || len(c.Warnings) != 1 || !strings.Contains(c.Warnings[0], "HARNESSLY_SITES_DOMAIN") {
+		t.Errorf("same site: %v %v", err, c)
+	}
+	if _, err = load("https://app.harnessly.ru", "HARNESSLY_SITES_DOMAIN", "sites.harnessly.ru", "HUB_EDITION", "cloud", "HUB_RUNTIME_DOMAIN", "run.harnessly-run.ru"); err == nil || !strings.Contains(err.Error(), "one registrable domain") {
+		t.Errorf("same site, cloud: %v", err)
+	}
+	// a parent of the hub's host, the hub's host itself, the runtime domain and its relatives
+	for _, d := range []string{"example.com", "hub.example.com"} {
+		if _, err = load("https://hub.example.com", "HARNESSLY_SITES_DOMAIN", d); err == nil {
+			t.Errorf("%s must be refused", d)
+		}
+	}
+	if _, err = load("https://hub.example.com", "HUB_RUNTIME_DOMAIN", "run.other.net", "HARNESSLY_SITES_DOMAIN", "x.run.other.net"); err == nil || !strings.Contains(err.Error(), "HUB_RUNTIME_DOMAIN") {
+		t.Errorf("under the runtime domain: %v", err)
+	}
+	if _, err = load("https://hub.example.com", "HARNESSLY_SITES_DOMAIN", "not a domain"); err == nil {
+		t.Error("not a domain")
+	}
+	// the port of a development hub goes on the sites host
+	c, err = load("http://localhost:8040", "HARNESSLY_SITES_DOMAIN", "sites.localhost")
+	if err != nil || c.SitesHost() != "sites.localhost:8040" || len(c.Warnings) != 0 {
+		t.Errorf("localhost: %v %v", err, c)
+	}
+	// a bucket needs its keys
+	if _, err = load("https://hub.example.com", "HARNESSLY_SITES_S3_ENDPOINT", "https://s3.example.com"); err == nil {
+		t.Error("an endpoint without a bucket and keys")
+	}
+	if _, err = load("https://hub.example.com", "HARNESSLY_SITES_ABUSE_URL", "javascript:alert(1)"); err == nil {
+		t.Error("abuse url scheme")
+	}
+}

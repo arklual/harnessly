@@ -4,6 +4,7 @@
 // is a setting of the CLI's file and is changed here.
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import LoginPanel from '@/next/features/accounts/login-panel';
+import SeenAccounts from '@/next/features/accounts/seen-accounts';
 import {
   METHODS_OF,
   type ICredentialActions,
@@ -52,6 +53,8 @@ export type AccountCard =
 export interface IAgentCredentials extends ICredentialActions {
   login: LoginState;
   key: ISavedKey;
+  /** The accounts the cluster saw this agent signed in with on this machine, newest first; undefined while unread. */
+  seen: readonly string[] | undefined;
 }
 
 /** The vendors' cards (Kimi, GLM, Grok): the presets as the runtime lists them, or why it has none to show. */
@@ -104,6 +107,7 @@ const SignIn = ({ settings, credentials }: { settings: AgentSettings; credential
   );
   return (
     <>
+      <SeenAccounts seen={credentials.seen} />
       <div className="hx-acct__label">{t('next.settings.accounts.how')}</div>
       <div className="hx-acct__how">
         <Segmented

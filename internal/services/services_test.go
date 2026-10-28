@@ -233,11 +233,13 @@ func TestArtifactTitleIsReadFromTheHeadOnly(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte("<html><head><title>План выката</title><meta name=\"description\" content=\"Что едет\"></head><body>"))
+		// 256 MiB behind the head, written until the client hangs up. What the server pushes before the hang-up
+		// lands in socket buffers (a few MiB, more under load); only a client reading the whole body gets near the end.
 		chunk := make([]byte, 64<<10)
-		for i := 0; i < 128; i++ { // 8 MB of body behind the head
+		for i := 0; i < 4096; i++ {
 			n, err := w.Write(chunk)
 			sent.Add(int64(n))
-			if err != nil {
+			if err != nil || r.Context().Err() != nil {
 				return
 			}
 		}
@@ -251,7 +253,7 @@ func TestArtifactTitleIsReadFromTheHeadOnly(t *testing.T) {
 	if opt(meta, "title") != "План выката" || opt(meta, "description") != "Что едет" {
 		t.Fatalf("meta = %v", meta)
 	}
-	if sent.Load() >= 8<<20 {
+	if sent.Load() >= 64<<20 {
 		t.Fatalf("the whole page went through (%d bytes): only its head was needed", sent.Load())
 	}
 }

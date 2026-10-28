@@ -154,8 +154,10 @@
   overflow-wrap: break-word;
   pointer-events: none;
 }
+/* Inline, as the field's own glyphs are: a word of its own box would wrap elsewhere than the field and leave the caret
+   behind the words it shows. */
 .hx-voice-word {
-  display: inline-block;
+  display: inline;
 }
 .hx-voice-word[data-fresh='true'] {
   animation: hx-voice-word 760ms var(--hx-ease-out) backwards;
@@ -1147,7 +1149,6 @@
 @keyframes hx-voice-word {
   from {
     opacity: 0;
-    transform: translateY(3px);
     filter: blur(2.5px);
     color: var(--hx-accent);
   }
@@ -2149,6 +2150,64 @@
   .hx-refchip[data-leaving] {
     animation: none;
   }
+}
+
+/* «Записи»: a recording's row — play, its text (a tap puts it into the field), download, delete. */
+.hx-takes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-takes__player {
+  display: none;
+}
+.hx-takes__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.hx-takes__row > .hx-pick__row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hx-takes__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+}
+.hx-takes__act {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm) ease-out,
+    color var(--hx-dur-sm) ease-out;
+}
+span.hx-takes__act {
+  cursor: default;
+}
+.hx-takes__act:is(button, a):hover,
+.hx-takes__act:is(button, a):focus-visible,
+.hx-takes__act[data-on] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  outline: none;
+}
+.hx-takes__act[data-sure] {
+  color: var(--hx-danger);
+}
+.hx-takes-card {
+  padding: 6px;
 }
 
 /* A stashed draft in «+»: the row that brings it back and the cross that forgets it. */

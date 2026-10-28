@@ -211,6 +211,8 @@ func (c *cli) run(args []string) error {
 		return c.peers(rest)
 	case "secret", "secrets":
 		return c.secret(rest)
+	case "site", "sites":
+		return c.site(rest)
 	}
 	return usageErr("unknown command %q", cmd)
 }

@@ -1,0 +1,34 @@
+[38;5;174mWelcome[39m [38;5;174mto[39m [38;5;174mClaude[39m [38;5;174mCode[39m [38;5;246mv2.1.312[39m
+..........................................................
+
+     *                                       █████▓▓░
+                                 *         ███▓░     ░░
+            ░░░░░░                        ███▓░
+    ░░░   ░░░░░░░░░░                      ███▓░
+   ░░░░░░░░░░░░░░░░░░░    [1m*[0m                ██▓░░      ▓
+                                             ░▓▓███▓▓░
+[38;5;246m *[39m                                 [38;5;246m░░░░[39m
+[38;5;246m [39m                                [38;5;246m░░░░░░░░[39m
+[38;5;246m [39m                              [38;5;246m░░░░░░░░░░░░░░░░[39m
+      [38;5;174m █████████[39m                                        [38;5;246m*[39m
+      [38;5;174m██▄█████▄██[39m                        [1m*[0m
+      [38;5;174m █████████[39m      *
+.......[38;5;174m█[39m [38;5;174m█[39m   [38;5;174m█[39m [38;5;174m█[39m..........................................
+
+ [38;5;246mBrowser[39m [38;5;246mdidn't[39m [38;5;246mopen?[39m [38;5;246mUse[39m [38;5;246mthe[39m [38;5;246murl[39m [38;5;246mbelow[39m [38;5;246mto[39m [38;5;246msign[39m [38;5;246min[39m [38;5;246m(c[39m [38;5;246mto[39m [38;5;246mcopy)[39m
+
+[38;5;246m]8;id=1mb4p7q;https://claude.com/cai/oauth/authorize?code=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&response_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3Acreate_api_key+user%3Aprofile+user%3Ainference+user%3Asessions%3Aclaude_code+user%3Amcp_servers+user%3Afile_upload+user%3Aplugins&code_challenge=REDACTED&code_challenge_method=S256&state=REDACTED\https://claude.com/cai/oauth/authorize?code=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&resp]8;;\
+onse_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3A
+create_api_key+user%3Aprofile+user%3Ainference+user%3Asessions%3Aclaude_code+user%3Amcp_servers+user
+%3Afile_upload+user%3Aplugins&code_challenge=REDACTED&code_challe
+nge_method=S256&state=REDACTED[39m
+
+
+ Paste code here if prompted >
+
+
+
+
+
+
+

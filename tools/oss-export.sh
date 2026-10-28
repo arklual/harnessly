@@ -84,7 +84,7 @@ if [ -n "$keys" ]; then
         s/ ?\((?:$k)(?:, (?:$k))*\)//g;
         s/\((?:$k)(?:, (?:$k))*[:;,] /(/g;
         s/, (?:$k)(?:, (?:$k))*\)/)/g;
-        s/^(\s*(?:\/\/|\/\*|\*|#)\s*)(?:$k)[:.] /$1/;
+        s/^(\s*(?:\/\/|\/\*\*?|\*|#)\s*)(?:$k)[:.] /$1/;
       }'
   # The index takes the files as they are now; only the stripped ones change.
   git -C "$src" --work-tree="$work/tree" add -A -f -- .

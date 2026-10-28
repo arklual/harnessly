@@ -114,6 +114,8 @@ type accessState struct {
 	claimed map[string]bool // projects the gateway was told this runtime owns (design.claim)
 	// projects the gateway was told again of after its snapshot had no row for them (design.created)
 	announced map[string]bool
+	// when the gateway was last told that a project went to the trash
+	deletedAt map[string]time.Time
 }
 
 func (l *Library) accessPath() string {
@@ -256,5 +258,6 @@ func (a *API) PostAccess(r *http.Request) Answer {
 		return JSON(r, http.StatusInternalServerError, errorBody("Internal Server Error"), h)
 	}
 	go a.L.ReannounceOwn()
+	go a.L.ReannounceDeleted()
 	return JSON(r, http.StatusOK, map[string]bool{"ok": true}, h)
 }

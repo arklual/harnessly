@@ -18,8 +18,10 @@ export const ROUTE = {
 /** The sections of the Settings screen, in the order of its list. */
 export const SETTINGS_SECTIONS = [
   'general',
+  'voice',
   'notifications',
   'safe',
+  'takes',
   'accounts',
   'claude',
   'codex',

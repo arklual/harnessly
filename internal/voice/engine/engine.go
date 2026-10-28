@@ -122,13 +122,39 @@ func New(cfg Config) *Engine {
 
 // model is the model to use: the named one, else "small" from four processors up and "base" below.
 func (e *Engine) pick() Model {
-	if m, ok := Models[e.cfg.Model]; ok {
+	e.mu.Lock()
+	name := e.cfg.Model
+	e.mu.Unlock()
+	if m, ok := Models[name]; ok {
 		return m
 	}
 	if runtime.NumCPU() >= 4 {
 		return Models["small"]
 	}
 	return Models["base"]
+}
+
+// SetModel changes the model ("tiny", "base", "small"; "" picks by the processor count). The next dictation gets it: a
+// ready engine goes back to idle and its server is stopped, so the next one prepares (downloads) the new model. A
+// preparation under way finishes with the model it started with. False when nothing changed.
+func (e *Engine) SetModel(name string) bool {
+	e.mu.Lock()
+	if e.cfg.Model == name {
+		e.mu.Unlock()
+		return false
+	}
+	e.cfg.Model = name
+	if e.cfg.ModelFile == "" && e.st.State != "preparing" {
+		e.st = Status{State: "idle"}
+	}
+	e.mu.Unlock()
+	e.srvMu.Lock()
+	if e.proc != nil {
+		e.kill(e.proc)
+		e.proc = nil
+	}
+	e.srvMu.Unlock()
+	return true
 }
 
 // Eligible is nil when this machine can recognize with the engine (maybe after a download), else why not.
@@ -338,7 +364,7 @@ func (e *Engine) startServer(ctx context.Context) (*server, error) {
 		return nil, err
 	}
 	args := []string{"-m", model, "--host", "127.0.0.1", "--port", strconv.Itoa(port), "-t", strconv.Itoa(e.cfg.Threads),
-		"-nt", "-sns", "-nc", "-nf", "-bo", "1"}
+		"-nt", "-sns", "-mc", "0", "-nf", "-bo", "1"}
 	var stderr tail
 	cmd := exec.Command(bin, args...)
 	cmd.Stderr = &stderr

@@ -176,6 +176,49 @@ export type Config = {
   profiles: { dir: true; container: boolean; full: true };
   runtimeMode: 'path' | 'subdomain';
   termsUrl: string | null;
+  sites?: { enabled: boolean; scheme?: 'subdomain' | 'path'; domain?: string };
+};
+
+export type SiteAccess = 'team' | 'link';
+export type SiteVersion = {
+  version: number;
+  url: string;
+  fileCount: number;
+  totalBytes: number;
+  source: string;
+  createdBy: string;
+  createdAt: string;
+  current: boolean;
+};
+export type Site = {
+  id: string;
+  space: string;
+  name: string;
+  address: string;
+  access: SiteAccess;
+  spa: boolean;
+  currentVersion: number;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  versions?: SiteVersion[];
+};
+export type SiteDeploy = {
+  version: number;
+  url: string;
+  versionUrl: string;
+  current: boolean;
+  fileCount: number;
+  totalBytes: number;
+};
+export type SiteToken = {
+  id: string;
+  name: string;
+  createdBy: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  token?: string;
 };
 
 export type SignedIn = { user: User; isNew: boolean; next: string };

@@ -247,3 +247,46 @@ func TestDesignTimelineAndMoment(t *testing.T) {
 		t.Errorf("bad id: %d %s", r.code, r.errs)
 	}
 }
+
+// The guard hook takes the lease on a board the agent is about to write, and passes the holder's words to the agent; a
+// runtime that does not answer lets the edit go on; the Stop hook lets go of the chat's leases.
+func TestDesignGuardHookTakesTheLeaseOnABoard(t *testing.T) {
+	root := designLibrary(t)
+	board := filepath.Join(root, "site", "project", "Home.dc.html")
+	var got []map[string]string
+	status := http.StatusOK
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var b map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		got = append(got, b)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(`{"error":"Доску «Home» правит Пётр в чате «Оплата» на vm-a, последняя правка 1 мин назад. Сделай вариант или займись другой доской."}`))
+	}))
+	t.Cleanup(srv.Close)
+	env := map[string]string{"HARNESSLY_URL": srv.URL, "HARNESSLY_CLI_TOKEN": "tok", "HARNESSLY_SESSION": "s-1"}
+	run := func(args []string, stdin []byte) (int, string) {
+		var out bytes.Buffer
+		code := Run(args, Env{Getenv: func(k string) string { return env[k] }, Stdin: bytes.NewReader(stdin), Stdout: &out, Cwd: root})
+		return code, out.String()
+	}
+	in, _ := json.Marshal(map[string]any{"tool_name": "Edit", "tool_input": map[string]any{"file_path": board}})
+	if code, out := run([]string{"hook", "design-guard"}, in); code != 0 || out != "" {
+		t.Fatalf("free board: %d %q", code, out)
+	}
+	if len(got) != 1 || got[0]["action"] != "claim" || got[0]["project"] != "site" || got[0]["board"] != "Home.dc.html" || got[0]["session"] != "s-1" {
+		t.Fatalf("the claim: %+v", got)
+	}
+	status = http.StatusConflict
+	if code, out := run([]string{"hook", "design-guard"}, in); code != 0 || !strings.Contains(out, `"permissionDecision":"deny"`) || !strings.Contains(out, "правит Пётр в чате «Оплата» на vm-a") {
+		t.Fatalf("held board: %d %q", code, out)
+	}
+	got = nil
+	if code, _ := run([]string{"hook", "design-release"}, nil); code != 0 || len(got) != 1 || got[0]["action"] != "release" {
+		t.Fatalf("release: %d %+v", code, got)
+	}
+	env["HARNESSLY_URL"] = "http://127.0.0.1:1"
+	if code, out := run([]string{"hook", "design-guard"}, in); code != 0 || out != "" {
+		t.Fatalf("a dead runtime lets the edit go on: %d %q", code, out)
+	}
+}

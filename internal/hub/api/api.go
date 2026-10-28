@@ -28,6 +28,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/sites"
 )
 
 // Options are what the hub is built from. Only Config, DB and Mailer are required.
@@ -48,6 +49,8 @@ type Options struct {
 	SSHDial sshinstall.Dialer
 	// SSHOnlineWait shortens the last step of an SSH install (tests).
 	SSHOnlineWait time.Duration
+	// SiteBlobs replaces the store of the sites' files (tests); nil: the configured folder or bucket.
+	SiteBlobs sites.Blobs
 	// AgentTimeout shortens every wait for an agent's answer in the owner endpoints (tests).
 	AgentTimeout time.Duration
 }
@@ -67,6 +70,8 @@ type Hub struct {
 	Registry *link.Registry
 	Events   *events.Broker
 	Tickets  *ticket.Store
+	// Sites is the published-sites module; nil when HARNESSLY_SITES is off.
+	Sites *sites.Service
 
 	cfg *config.Config
 	db  *store.DB
@@ -125,6 +130,10 @@ func New(o Options) (*Hub, error) {
 		MinAgentVersion: cfg.MinAgentVersion, ClientIP: h.Auth.ClientIP,
 	}
 
+	if err := h.newSites(o); err != nil {
+		return nil, err
+	}
+
 	var page http.Handler
 	switch {
 	case cfg.WebDir != "":
@@ -156,6 +165,15 @@ func New(o Options) (*Hub, error) {
 	h.Relay.Mount(mux)
 	h.Dist.Mount(mux)
 	h.Proxy.Mount(mux)
+	if h.Sites != nil {
+		h.Sites.Mount(mux)
+		mux.Handle("GET /api/site-entry", httpx.Handler(h.siteEntry))
+		mux.Handle("GET /api/site-check", httpx.Handler(h.siteCheck))
+		mux.Handle("POST /agent/sites", httpx.Handler(h.siteSession))
+		if !h.Sites.Subdomains() {
+			mux.Handle("/sites/", h.Sites.PathEdge())
+		}
+	}
 	mux.Handle("GET /agent/v1", h.Dialer)
 	mux.HandleFunc("DELETE /agent/v1", h.Dialer.ServeUnlink)
 	notFound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { httpx.WriteError(w, r, httpx.ErrNotFound) })
@@ -167,6 +185,9 @@ func New(o Options) (*Hub, error) {
 	csrf := h.Auth.CSRF(mux)
 	routed := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case h.Sites != nil && h.Sites.IsSiteHost(r.Host):
+			// A published site runs on its own origin and nothing of the hub: no API, no page, no sign-in.
+			h.Sites.Edge().ServeHTTP(w, r)
 		case cfg.MachineIDFromHost(r.Host) != "":
 			// A machine's own origin runs the machine and nothing of the hub: no API, no page, no sign-in.
 			h.Proxy.ServeHTTP(w, r)
@@ -176,7 +197,16 @@ func New(o Options) (*Hub, error) {
 			mux.ServeHTTP(w, r)
 		}
 	})
-	h.Handler = recoverer(log, accessLog(log, h.Auth.ClientIP, securityHeaders(cfg.Secure, routed)))
+	secured := securityHeaders(cfg.Secure, routed)
+	guarded := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.Sites != nil && h.Sites.IsSiteHost(r.Host) {
+			// A published page sets its own headers; the hub's (frame ban, referrer policy) are for the hub's pages.
+			routed.ServeHTTP(w, r)
+			return
+		}
+		secured.ServeHTTP(w, r)
+	})
+	h.Handler = recoverer(log, accessLog(log, h.Auth.ClientIP, guarded))
 	return h, nil
 }
 
@@ -198,6 +228,9 @@ func (h *Hub) readyz(w http.ResponseWriter, r *http.Request) {
 // expired (sessions, challenges, tickets, remembered nonces).
 func (h *Hub) Run(ctx context.Context) {
 	go h.Machines.RunLocalCode(ctx)
+	if h.Sites != nil {
+		go h.Sites.Run(ctx)
+	}
 	go func() { _, _ = h.Dist.Manifest() }() // warm the sums of the binaries before the first machine asks
 	tick := time.NewTicker(10 * time.Minute)
 	defer tick.Stop()

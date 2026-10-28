@@ -100,6 +100,12 @@
 .hx-picker__pane[data-pane='models'] {
   gap: 6px;
 }
+.hx-picker__pane[data-pane='machines'][data-active='false'] {
+  transform: translateX(28px);
+}
+.hx-picker__pane[data-pane='machines'] {
+  gap: 6px;
+}
 
 .hx-picker__top {
   display: flex;
@@ -533,6 +539,39 @@
   border-radius: 10px;
   transition: background var(--hx-dur-md) var(--hx-ease-out);
 }
+/* the machine a new chat starts on, a quiet row under the depth that opens the machines' screen. */
+.hx-picker__vm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--hx-dur-md) var(--hx-ease-out);
+}
+.hx-picker__vm:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-picker__vm-ic,
+.hx-picker__vm-chev {
+  flex: none;
+  color: var(--hx-fg-3);
+}
+.hx-picker__vm-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .hx-picker__ultra:hover {
   background: var(--hx-bg-hover);
 }
@@ -598,6 +637,9 @@
   }
   .hx-picker__ultra {
     min-height: 48px;
+  }
+  .hx-picker__vm {
+    min-height: 44px;
   }
   .hx-picker__ultra-hint {
     font-size: 13px;

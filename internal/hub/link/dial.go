@@ -170,6 +170,16 @@ func (d *Dialer) ServeUnlink(w http.ResponseWriter, r *http.Request) {
 	httpx.NoContent(w)
 }
 
+// AdmitSites checks the signed request of a machine for a publishing session (POST /agent/sites) and returns the
+// machine. Like an unlink it needs no live link, only the machine's key.
+func (d *Dialer) AdmitSites(r *http.Request) (store.Machine, error) {
+	m, err := d.admit(r, hubproto.VerifySites, false)
+	if err == nil && m.RevokedAt != nil {
+		err = errRevoked
+	}
+	return m, err
+}
+
 func describe(err error) string {
 	if err == nil {
 		return ""

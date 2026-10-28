@@ -312,12 +312,18 @@ func (s *scan) goalStatus(text string, met bool, at int64) {
 }
 
 type cursor struct {
-	ino     uint64
-	offset  int64
-	mtime   time.Time
-	size    int64
-	scan    *scan
+	progress
 	reading sync.Mutex
+}
+
+// progress is how far a cursor has read its transcript. A transcript that is gone starts it over; the lock of the read
+// under way stays held, so it is never part of what is reset.
+type progress struct {
+	ino    uint64
+	offset int64
+	mtime  time.Time
+	size   int64
+	scan   *scan
 }
 
 // Reader keeps one cursor per transcript.
@@ -360,7 +366,7 @@ func inode(st os.FileInfo) uint64 {
 func advance(path string, c *cursor) Info {
 	st, err := os.Stat(path)
 	if err != nil {
-		*c = cursor{}
+		c.progress = progress{}
 		return Info{}
 	}
 	if c.scan != nil && c.mtime.Equal(st.ModTime()) && c.size == st.Size() {

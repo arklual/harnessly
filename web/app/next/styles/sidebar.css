@@ -158,17 +158,6 @@ a.hx-brand__name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* the machine of a chat that lives elsewhere, quiet beside its title; the title gives way first. */
-.hx-item__vm {
-  flex: none;
-  max-width: 40%;
-  margin-left: 8px;
-  overflow: hidden;
-  color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .hx-nav__group[aria-expanded='true'] .hx-nav__kid {
   opacity: 1;
   transition-delay: calc(60ms + var(--j, 0) * 30ms), 0s, 0s;
@@ -1201,6 +1190,15 @@ button.hx-nav__add {
 }
 .hx-cmenu__item[aria-checked='true'] .hx-cmenu__check {
   opacity: 1;
+}
+/* The machine a chat lives on, at the top of its menu: a quiet line, not a choice. */
+.hx-cmenu__vm {
+  padding: 6px 10px 4px;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .hx-cmenu__sep {
   height: 1px;

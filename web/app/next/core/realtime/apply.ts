@@ -28,7 +28,7 @@ import {
 import { conversationsStore, convsCachedStore, convsLoadedStore } from '@/next/stores/conversations';
 import { favoritesStore } from '@/next/stores/favorites';
 import { applyRemoteDraft, applyRemoteDrafts } from '@/next/core/drafts-cloud';
-import { defaultCwdStore, projectsStore } from '@/next/stores/projects';
+import { defaultCwdStore, projectKey, projectsStore } from '@/next/stores/projects';
 import { machinesStore } from '@/next/stores/machines';
 import { applyMessage, applyPromptState, forgetEndedElsewhere } from '@/next/stores/messages';
 import { touchConversation } from '@/next/stores/cache';
@@ -104,7 +104,7 @@ export function applyConvsEvent(machine: MachineId, e: ConvsEvent): void {
       if (ownRecord(machine, e.id)) conversationsStore.delete(e.id);
       return;
     case 'project_upsert':
-      projectsStore.set(e.project.id, { ...e.project, machineId: machine });
+      projectsStore.set(projectKey(machine, e.project.id), { ...e.project, machineId: machine });
       return;
     case 'favorites_upsert':
       favoritesStore.set(machine, e.favorites);
@@ -226,9 +226,10 @@ export const storeSink: Sink = {
       for (const c of s.data.conversations) putConversation(machine, c);
       const projectIds = new Set(s.data.projects.map((p) => p.id));
       for (const p of [...projectsStore.values()]) {
-        if (p.machineId === machine && !projectIds.has(p.id)) projectsStore.delete(p.id);
+        if (p.machineId === machine && !projectIds.has(p.id)) projectsStore.delete(projectKey(machine, p.id));
       }
-      for (const p of s.data.projects) projectsStore.set(p.id, { ...p, machineId: machine });
+      for (const p of s.data.projects)
+        projectsStore.set(projectKey(machine, p.id), { ...p, machineId: machine });
       defaultCwdStore.set(machine, s.data.defaultCwd);
       if (s.data.favorites) favoritesStore.set(machine, s.data.favorites);
       else favoritesStore.delete(machine);

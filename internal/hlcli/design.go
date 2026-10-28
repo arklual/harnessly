@@ -261,8 +261,12 @@ func (c *cli) designMigrate(args []string) error {
 
 // hook runs a hook of an agent: its input on stdin, its answer on stdout.
 func (c *cli) hook(args []string) error {
-	if len(args) != 1 || args[0] != "design-guard" {
-		return usageErr("hook design-guard")
+	if len(args) != 1 || (args[0] != "design-guard" && args[0] != "design-release") {
+		return usageErr("hook design-guard|design-release")
+	}
+	if args[0] == "design-release" {
+		c.releaseLeases()
+		return nil
 	}
 	in := c.env.Stdin
 	if in == nil {
@@ -279,8 +283,59 @@ func (c *cli) hook(args []string) error {
 	}
 	if out := design.GuardHook(raw, design.GuardCLI(), design.GuardEnv{DataDir: c.dataDir(), LibraryDir: c.hookLibraryDir()}); out != nil {
 		_, _ = c.env.Stdout.Write(out)
+		return nil
+	}
+	if reason := c.leaseRefusal(raw); reason != "" {
+		_, _ = c.env.Stdout.Write(design.DenyAnswer(reason))
 	}
 	return nil
+}
+
+// hookSession is the tab's session when the hook can tell it; "" outside a tab.
+func (c *cli) hookSession() string {
+	if strings.TrimSpace(c.env.Getenv("HARNESSLY_SESSION")) == "" && c.env.Session == nil {
+		return ""
+	}
+	return c.session()
+}
+
+// leaseRefusal takes (or renews) the lease on every board the tool call writes, through the runtime, and returns the
+// words for the agent when another chat holds one or this chat's lease was gone in between.
+// Whatever goes wrong with the runtime or the center lets the edit go on: a lease must not stop work.
+func (c *cli) leaseRefusal(raw []byte) string {
+	var in design.GuardInput
+	if json.Unmarshal(raw, &in) != nil {
+		return ""
+	}
+	writes := design.BoardWrites(in)
+	if len(writes) == 0 {
+		return ""
+	}
+	session := c.hookSession()
+	if session == "" {
+		return ""
+	}
+	for _, w := range writes {
+		status, body, err := c.call(http.MethodPost, designCLIPath+"/claims", nil,
+			map[string]string{"action": "claim", "session": session, "project": w.Project, "board": w.File})
+		if err != nil || status != http.StatusConflict {
+			continue
+		}
+		var e struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(body, &e) == nil && e.Error != "" {
+			return e.Error
+		}
+	}
+	return ""
+}
+
+// releaseLeases is the Stop hook: the turn ended, so the chat's leases go.
+func (c *cli) releaseLeases() {
+	if session := c.hookSession(); session != "" {
+		_, _, _ = c.call(http.MethodPost, designCLIPath+"/claims", nil, map[string]string{"action": "release", "session": session})
+	}
 }
 
 // hookLibraryDir is the library the hook knows from the environment, "" when none is named.

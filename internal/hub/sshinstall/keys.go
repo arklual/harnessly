@@ -24,7 +24,10 @@ const SecretKeyFile = "secret_key"
 // (a Secret of the cluster, a file next to the database's credentials), else 32 random bytes in the data folder, made
 // on the first start (0600; O_EXCL, so that a second hub process starting at the same moment reads what the other
 // wrote). Either way it is not in the database: a copy of the database alone does not open the keys.
-func masterKey(dataDir, configured string) ([]byte, error) {
+func masterKey(dataDir, configured string) ([]byte, error) { return MasterKey(dataDir, configured) }
+
+// MasterKey is the key the hub derives its other secrets from (the sites' cookie key); see masterKey.
+func MasterKey(dataDir, configured string) ([]byte, error) {
 	if configured != "" {
 		sum := sha256.Sum256([]byte("harnessly-hub/secret-key/v1\x00" + configured))
 		return sum[:], nil

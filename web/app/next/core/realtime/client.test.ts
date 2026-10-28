@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hub } from '@/next/core/realtime/hub';
-import { BACKOFF_MS, DEAD_MS, STALE_MS } from '@/next/core/realtime/client';
+import { BACKOFF_MS, DEAD_MS, STALE_MS, SUB_RETRY_MS } from '@/next/core/realtime/client';
 import { fixture, FakeRuntime, type FakeSocket } from '@/next/core/testing/fake-runtime';
 import { bootFake, settle, useFakeTime } from '@/next/core/testing/setup';
 import { connectionStore, secondsToRetry } from '@/next/stores/connection';
@@ -203,6 +203,26 @@ describe('RealtimeClient', () => {
     expect(resub[1]).toMatchObject({ epoch: rt.epoch, afterSeq: 40 });
     expect(delivered).toEqual(['ev', 'snapshot']);
     expect(turnEntries()).toContain('x:30002#0');
+  });
+
+  it('a held chat the runtime refused (a snapshot past its budget) is asked for again, its frames come back', async () => {
+    const { rt, m } = await bootFake();
+    const release = hub.openConversation(m, CONV);
+    await settle();
+    const s = lastSocket(rt);
+    const before = subs(s).filter((f) => f.ch === CH).length;
+    s.deliver({ f: 'error', ch: CH, code: 'not-found' });
+    await settle();
+    await vi.advanceTimersByTimeAsync(SUB_RETRY_MS[0]);
+    await settle();
+    expect(subs(s).filter((f) => f.ch === CH).length).toBe(before + 1);
+    rt.emit(CH, step(7));
+    expect(turnEntries()).toContain('x:30007#0');
+    // A released channel is not asked for again.
+    release();
+    s.deliver({ f: 'error', ch: CH, code: 'not-found' });
+    await vi.advanceTimersByTimeAsync(SUB_RETRY_MS[SUB_RETRY_MS.length - 1]);
+    expect(subs(s).filter((f) => f.ch === CH).length).toBe(before + 1);
   });
 
   it('stops retrying on unauthorized', async () => {

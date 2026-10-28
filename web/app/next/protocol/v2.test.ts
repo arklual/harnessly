@@ -148,6 +148,7 @@ describe('v2 closed lists', () => {
     OnOff: v2.ON_OFFS,
     LimitWindow: v2.LIMIT_WINDOWS,
     AutoContinueWhy: v2.AUTO_CONTINUE_WHYS,
+    TerminalAside: v2.TERMINAL_ASIDES,
     LimitAction: v2.LIMIT_ACTIONS,
     ProfileVendor: v2.PROFILE_VENDORS,
     ProfileTestReason: v2.PROFILE_TEST_REASONS,

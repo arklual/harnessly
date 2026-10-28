@@ -21,6 +21,9 @@ import type {
   ProxySummary,
   Role,
   SignedIn,
+  Site,
+  SiteDeploy,
+  SiteToken,
   Space,
   SpaceRef,
   User,
@@ -137,9 +140,19 @@ const errorOf = async (res: Response): Promise<ApiError> => {
 const enc = encodeURIComponent;
 
 export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)) => {
-  const call = async <T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> => {
+  const call = async <T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    query?: Query,
+    raw?: { body: BodyInit; type: string },
+  ): Promise<T> => {
     const init: RequestInit = { method, credentials: 'same-origin', headers: { Accept: 'application/json' } };
-    if (method !== 'GET') {
+    if (raw) {
+      // A file is not JSON; the hub lets such a change in when the client names itself (docs/hub/sites.md).
+      init.headers = { ...init.headers, 'Content-Type': raw.type, 'X-Harnessly-Client': 'hub-ui' };
+      init.body = raw.body;
+    } else if (method !== 'GET') {
       // The hub refuses a change that is not JSON (cross_site), also one with no body.
       init.headers = { ...init.headers, 'Content-Type': 'application/json' };
       if (body !== undefined) init.body = JSON.stringify(body);
@@ -164,8 +177,46 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
   const put = <T>(path: string, body: unknown) => call<T>('PUT', path, body);
   const del = <T = void>(path: string, query?: Query) => call<T>('DELETE', path, undefined, query);
 
+  const site = (space: string, name: string) => `/api/sites/${enc(space)}/${enc(name)}`;
+
   return {
     config: () => get<Config>('/api/config'),
+
+    sites: {
+      list: (space: string) => get<{ sites: Site[] }>(`/api/sites/${enc(space)}`),
+      create: (space: string, req: { name: string; access: Site['access'] }) =>
+        post<Site>(`/api/sites/${enc(space)}`, req),
+      get: (space: string, name: string) => get<Site>(site(space, name)),
+      update: (space: string, name: string, req: { access?: Site['access']; spa?: boolean }) =>
+        patch<Site>(site(space, name), req),
+      remove: (space: string, name: string) => del(site(space, name)),
+      begin: (space: string, name: string, files: Record<string, { hash: string; size: number }>) =>
+        post<{ id: string; missing: string[] }>(`${site(space, name)}/deploys`, { files, source: 'upload' }),
+      blob: (space: string, name: string, deploy: string, hash: string, data: Blob) =>
+        call<void>(
+          'PUT',
+          `${site(space, name)}/deploys/${enc(deploy)}/blobs/${enc(hash)}`,
+          undefined,
+          undefined,
+          {
+            body: data,
+            type: 'application/octet-stream',
+          },
+        ),
+      commit: (space: string, name: string, deploy: string) =>
+        post<SiteDeploy>(`${site(space, name)}/deploys/${enc(deploy)}/commit`, {}),
+      upload: (space: string, name: string, zip: Blob) =>
+        call<SiteDeploy>('POST', `${site(space, name)}/upload`, undefined, undefined, {
+          body: zip,
+          type: 'application/zip',
+        }),
+      setCurrent: (space: string, name: string, version: number) =>
+        post<Site>(`${site(space, name)}/current`, { version }),
+      tokens: (space: string, name: string) => get<{ tokens: SiteToken[] }>(`${site(space, name)}/tokens`),
+      newToken: (space: string, name: string, tokenName: string) =>
+        post<SiteToken>(`${site(space, name)}/tokens`, { name: tokenName }),
+      removeToken: (space: string, name: string, id: string) => del(`${site(space, name)}/tokens/${enc(id)}`),
+    },
 
     auth: {
       emailStart: (email: string, intent: 'signin' | 'signup') =>

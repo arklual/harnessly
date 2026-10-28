@@ -191,7 +191,6 @@ const ChatRow = ({
       {rename === RENAME.off ? (
         <button type="button" className="hx-item__open" onClick={() => handlers.open(chat.id)}>
           <span className="hx-item__title">{chat.launch ? chat.launch.model : chat.title}</span>
-          {chat.machine && <span className="hx-item__vm">{chat.machine}</span>}
         </button>
       ) : (
         <RenameField
@@ -256,7 +255,8 @@ const ChatRow = ({
             pinned={chat.pinned}
             projectId={chat.projectId}
             projects={projects}
-            actions={chat.machine ? { ...actions, onMove: undefined } : actions}
+            actions={chat.projectsElsewhere ? { ...actions, onMove: undefined } : actions}
+            machine={chat.machine}
             favGroups={favGroups}
             slot={slot}
             onStartRename={() => {

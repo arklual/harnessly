@@ -283,7 +283,15 @@ To apply a policy to a container machine, mount a file at `/etc/harnessly/policy
 
 ## Upgrade, move and remove
 
-- **Upgrade**: run the install command again (the one you used before is fine: its code is not asked for again). It
+- **Updates by themselves**: the runtime compares its programs (`harnessly-runtime`, `harnessly-agent`, the `harnessly`
+  command) with the hub's `/dl/manifest.json` two minutes after a start and then every hour. Where it may write the
+  folder they are in (the `full` profile, `~/.local/bin`) it downloads what differs, checks it against the manifest's
+  SHA-256, puts it in place with a rename and restarts; tmux and the agents in it keep working. Settings → General →
+  Updates shows the state and has «Update now». `RUNTIME_AUTO_UPDATE=0` in `runtime.env` leaves it to the button. The
+  `dir` profile (`/usr/local/bin`, read-only to the services) and a container cannot update themselves: Settings shows
+  the command below.
+- **Upgrade by hand**: `curl -fsSL https://hub.example.com/install | sh -s -- --update` (`sudo sh` for `dir`): no code,
+  the profile it was installed with, the same machine. Running the install command again works too. It
   replaces the programs, keeps the policy, the ports and the machine, and restarts the services. A machine that is
   registered with this hub (a `machine.json` of the same hub and profile) stays one machine in the hub: nothing is sent
   to the hub and no second record appears. A running agent, tmux and what is in it survive the runtime's restart.

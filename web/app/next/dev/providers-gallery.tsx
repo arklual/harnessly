@@ -196,6 +196,7 @@ const SettingsScene = ({ state, check, login }: { state?: string; check?: string
   };
   const credentials = (key: { configured: boolean; tail: null }): IAgentCredentials => ({
     login: loginState,
+    seen: ['person@example.com', 'second@example.com'],
     key,
     onLogin: async () => {
       setLoginState({ k: 'starting' });

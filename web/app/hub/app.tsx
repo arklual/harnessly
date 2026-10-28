@@ -18,6 +18,7 @@ import { HomeScreen } from './screens/home';
 import { InviteScreen } from './screens/invite';
 import { MachinesScreen } from './screens/machines';
 import { NewSpaceScreen } from './screens/new-space';
+import { NewSiteScreen, SiteScreen, useSitesOn } from './screens/sites';
 import { SpaceProvider, useSpace } from './screens/space';
 import { SpaceSettingsScreen } from './screens/space-settings';
 import { PlainPage } from './ui/frame';
@@ -32,6 +33,8 @@ const ROUTES = [
   '/s/:slug',
   '/s/:slug/settings',
   '/s/:slug/setup/:step',
+  '/s/:slug/sites/new',
+  '/s/:slug/sites/:name',
 ] as const;
 
 const LAST_SPACE = 'hl-hub-space';
@@ -131,9 +134,22 @@ const SETUP = {
   done: <DoneScreen />,
 } as const;
 
-const SpaceRoutes = ({ sub, step }: { sub: 'home' | 'settings' | 'setup'; step: string | undefined }) => {
+const SpaceRoutes = ({
+  sub,
+  step,
+  site,
+}: {
+  sub: 'home' | 'settings' | 'setup' | 'site-new' | 'site';
+  step: string | undefined;
+  site?: string;
+}) => {
   const { space, owner } = useSpace();
+  const sitesOn = useSitesOn();
   useEffect(() => rememberSpace(space.slug), [space.slug]);
+  if (sub === 'site-new' || sub === 'site') {
+    if (!sitesOn) return <NotFound />;
+    return sub === 'site-new' ? <NewSiteScreen /> : <SiteScreen key={site} name={site ?? ''} />;
+  }
   if (sub === 'settings') return <SpaceSettingsScreen />;
   if (sub === 'home') return <HomeScreen />;
   const screen = step && step in SETUP ? SETUP[step as keyof typeof SETUP] : null;
@@ -158,10 +174,16 @@ const Routes = () => {
   if (route === '/new') return <NewSpaceScreen />;
   if (route === '/settings') return <AccountScreen />;
   const slug = params.slug ?? '';
-  const sub = route === '/s/:slug' ? 'home' : route === '/s/:slug/settings' ? 'settings' : 'setup';
+  const SUB = {
+    '/s/:slug': 'home',
+    '/s/:slug/settings': 'settings',
+    '/s/:slug/sites/new': 'site-new',
+    '/s/:slug/sites/:name': 'site',
+  } as const;
+  const sub = route in SUB ? SUB[route as keyof typeof SUB] : 'setup';
   return (
     <SpaceProvider slug={slug}>
-      <SpaceRoutes sub={sub} step={params.step} />
+      <SpaceRoutes sub={sub} step={params.step} site={params.name} />
     </SpaceProvider>
   );
 };

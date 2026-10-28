@@ -10,6 +10,7 @@ package outbox
 
 import (
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
@@ -303,6 +304,8 @@ func (b *Box) Send(d Draft, agent wire.AgentState, now time.Time) (Change, wire.
 	}, Images: d.Images, WaitSince: ms}
 	b.recs[d.ClientID] = r
 	if d.Mode == wire.ModeNow || d.Mode == wire.ModeSteer {
+		// «Сразу» while messages wait: they go with it as one message, theirs first, so nothing is held up behind it.
+		b.gather(&ch, r, now)
 		b.pushUrgent(d.ClientID, d.Mode)
 	} else {
 		b.items = append(b.items, d.ClientID)
@@ -434,6 +437,8 @@ func (b *Box) Promote(clientID string, to wire.PromoteTo, agent wire.AgentState,
 		}
 	}
 	r.Message.Mode = wire.MessageMode(to)
+	// The other messages that wait go with it, in the order of the line: one message now instead of one after another.
+	b.gather(&ch, r, now)
 	b.dropItem(clientID)
 	b.pushUrgent(clientID, r.Message.Mode)
 	b.rev++
@@ -441,6 +446,92 @@ func (b *Box) Promote(clientID string, to wire.PromoteTo, agent wire.AgentState,
 	ch.add(wire.MessageUpsertEv{Message: r.Message})
 	ch.add(wire.QueueChangedEv{Queue: b.Queue()})
 	return ch, ""
+}
+
+// gatherable: a message of the line that may go inside another — the person's words waiting their turn (one sent «now»
+// or into the turn is on its way already, in its own order); not a command
+// («/compact», «! ls» is typed alone), not one the runtime wrote itself, not the launch's first prompt, not one stalled
+// (the person decides on it).
+func (b *Box) gatherable(r *Record) bool {
+	return r.Message.State.K == wire.MsgQueued && r.Message.Mode == wire.ModeQueue && r.Message.Kind != wire.KindCommand &&
+		r.Message.Auto == "" && !r.First && !r.Carried && !r.Stalled
+}
+
+// gather makes into the one message of every gatherable one in the line, in the line's order — into at its own place
+// when it is in the line (promoted), after them all when it is new: their words joined by a blank line, their
+// attachments, pictures and places with them. Those taken in leave the line, cancelled; one that would make the
+// message too long or carry too many attachments stays in the line. A command into takes nobody in.
+func (b *Box) gather(ch *Change, into *Record, now time.Time) {
+	if into.Message.Kind == wire.KindCommand || into.Message.Auto != "" {
+		return
+	}
+	order := make([]*Record, 0, len(b.items)+1)
+	in := false
+	for _, id := range b.items {
+		r := b.recs[id]
+		if r == into {
+			in = true
+			order = append(order, r)
+		} else if r != nil && b.gatherable(r) {
+			order = append(order, r)
+		}
+	}
+	if !in {
+		order = append(order, into)
+	}
+	if len(order) < 2 {
+		return
+	}
+	// into keeps its own words whole; the others go in while the message stays within the limits.
+	size, count := jscompat.Len(into.Message.Text), len(into.Message.Attachments)
+	var taken []*Record
+	for _, r := range order {
+		if r != into {
+			add := jscompat.Len(r.Message.Text) + 2
+			if size+add > b.limits.MaxText || count+len(r.Message.Attachments) > b.limits.MaxAttachments {
+				continue
+			}
+			size, count = size+add, count+len(r.Message.Attachments)
+		}
+		taken = append(taken, r)
+	}
+	var texts []string
+	var atts []wire.AttachmentRef
+	var images []string
+	var refs []wire.MessageRef
+	for _, r := range taken {
+		m := r.Message
+		if !blankText(m.Text) {
+			texts = append(texts, m.Text)
+		}
+		atts = append(atts, m.Attachments...)
+		images = append(images, r.Images...)
+		for _, ref := range m.Refs {
+			if !slices.ContainsFunc(refs, func(x wire.MessageRef) bool { return x.Kind == ref.Kind && x.ID == ref.ID }) {
+				refs = append(refs, ref)
+			}
+		}
+	}
+	if len(taken) < 2 {
+		return
+	}
+	into.Message.Text = strings.Join(texts, "\n\n")
+	into.Message.Attachments = nonNil(atts)
+	into.Images = images
+	into.Message.Refs = refs
+	ids := make([]string, 0, len(taken)-1)
+	for _, r := range taken {
+		if r == into {
+			continue
+		}
+		ids = append(ids, r.Message.ClientID)
+		b.dropItem(r.Message.ClientID)
+		b.set(ch, r, wire.MessageState{K: wire.MsgCancelled, By: wire.CancelledByUser}, now)
+	}
+	if b.log != nil {
+		b.log.Info("queued messages sent as one", "conversationId", b.conv, "clientId", into.Message.ClientID,
+			"gathered", ids)
+	}
 }
 
 // Move puts a queued message right before another queued one (before "": at the end of the line). Only a message of the

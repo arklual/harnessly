@@ -56,6 +56,11 @@ TELEGRAM NOTIFICATIONS (the person's Telegram, connected in Settings → Notific
                                     long text goes as several messages. Write only as the instruction says. Prints
                                     "sent → …", or exits 1 with "refused: <reason> — <why>".
 
+PUBLISH A SITE
+  harnessly site deploy <dir> --name NAME   upload a folder (a build's dist/) as a site and print its address
+  harnessly site list|versions|rollback    see the sites, their versions, go back to an earlier one
+                                    needs --url (the hub) and a deploy token; harnessly site --help has the rest
+
 SECRETS (the safe of this machine: tokens and keys the person put in, outside the chat)
   harnessly secret list             the names in the safe and when each was put and last used (never a value)
   harnessly secret ask NAME --why "what it is for" [--replace]
@@ -214,11 +219,14 @@ artifact.json, never a board or an asset, and gives the same ids however often i
   harnessly design migrate --dry-run --library /srv/design
   harnessly design migrate --library /srv/design
 `,
-	"hook": `harnessly hook design-guard
+	"hook": `harnessly hook design-guard | design-release
 
-A Claude Code PreToolUse hook: reads the hook's JSON on stdin and refuses a Write, Edit or shell command that writes
-project/canvas.json of a design project, telling the agent to use "design page". Prints nothing otherwise. See
-docs/design-pages.md for the settings.json entry.
+design-guard is a Claude Code PreToolUse hook: reads the hook's JSON on stdin and refuses a Write, Edit or shell command
+that writes project/canvas.json of a design project, telling the agent to use "design page". It also takes (or renews)
+the chat's lease on a board (*.dc.html) the call writes, and refuses with the holder's name when another chat holds it,
+or when this chat's own lease was gone meanwhile (read the file again). Prints nothing otherwise.
+design-release is the Stop hook: the turn ended, the chat lets go of its leases. See docs/design-pages.md for the
+settings.json entries.
 `,
 	"peers": `harnessly peers [list] | harnessly peers send REF TEXT...
 

@@ -115,8 +115,9 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 		}
 	}
 	flat := strings.ReplaceAll(screen, "\n", "") // the pane wraps at 80 columns
-	if !strings.Contains(flat, "DISABLE_AUTOUPDATER=1 '"+agentBin+"' --settings "+filepath.Join(dir, "hooks.json")) ||
-		!strings.Contains(flat, "fake agent started:") || !strings.Contains(flat, "-- $'hello there'") ||
+	// The line is typed as `sh -c '…'`, so each quote of the sh line shows as '\''.
+	if !strings.Contains(flat, `exec env DISABLE_AUTOUPDATER=1 '\''`+agentBin+`'\'' --settings `+filepath.Join(dir, "hooks.json")) ||
+		!strings.Contains(flat, "fake agent started:") || !strings.Contains(flat, `-- "$(printf %b '\''hello there'\'')"`) ||
 		!strings.Contains(flat, "key=[it's secret]") {
 		t.Fatalf("the launch line was not typed and run:\n%s", screen)
 	}

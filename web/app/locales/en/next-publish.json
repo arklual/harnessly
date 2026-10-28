@@ -1,0 +1,17 @@
+{
+  "next.publish.title": "Publish “{name}”",
+  "next.publish.name": "Site name",
+  "next.publish.namePlaceholder": "for example, shop",
+  "next.publish.nameBad": "Latin letters, digits and a hyphen, up to 30 characters, no two hyphens in a row.",
+  "next.publish.access": "Who can open it",
+  "next.publish.access.team": "Team only",
+  "next.publish.access.link": "Anyone with the link",
+  "next.publish.teamNote": "The site opens after signing in, for the members of the space.",
+  "next.publish.linkNote": "The site opens for anyone you gave the address to. Search engines will not index it.",
+  "next.publish.go": "Publish",
+  "next.publish.done": "The site is published",
+  "next.publish.copy": "Copy",
+  "next.publish.copied": "Copied",
+  "next.publish.open": "Open",
+  "next.publish.button": "Publish"
+}

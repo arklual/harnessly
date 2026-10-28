@@ -20,6 +20,9 @@ const (
 	// UnlinkDomain is the first line of the message signed to unlink a machine from its hub: a signature made for the
 	// dial cannot remove a machine, nor the other way round.
 	UnlinkDomain = "harnessly-agent-unlink-v1"
+	// SitesDomain is the first line of the message signed to ask the hub for a publishing session of the machine's
+	// space: a signature made for the dial or the unlink is good for nothing here, and this one for nothing else.
+	SitesDomain = "harnessly-agent-sites-v1"
 	// DialWindow is how far the dial's time may be from the hub's clock, either way.
 	DialWindow = 120 * time.Second
 	// NonceMemory is how long the hub remembers a nonce of a machine: a dial replayed inside it is refused.
@@ -86,6 +89,11 @@ func SignDial(priv ed25519.PrivateKey, machineID string, now time.Time, host str
 // shape of a dial's, signed under UnlinkDomain.
 func SignUnlink(priv ed25519.PrivateKey, machineID string, now time.Time, host string) (string, error) {
 	return signHeader(UnlinkDomain, priv, machineID, now, host)
+}
+
+// SignSites makes the Authorization header value of the request for a publishing session (POST /agent/sites).
+func SignSites(priv ed25519.PrivateKey, machineID string, now time.Time, host string) (string, error) {
+	return signHeader(SitesDomain, priv, machineID, now, host)
 }
 
 func signHeader(domain string, priv ed25519.PrivateKey, machineID string, now time.Time, host string) (string, error) {
@@ -168,6 +176,11 @@ func VerifyDial(pub ed25519.PublicKey, a DialAuth, host string, now time.Time) e
 // VerifyUnlink is VerifyDial for the header SignUnlink made.
 func VerifyUnlink(pub ed25519.PublicKey, a DialAuth, host string, now time.Time) error {
 	return verifyHeader(UnlinkDomain, pub, a, host, now)
+}
+
+// VerifySites is VerifyDial for the header SignSites made.
+func VerifySites(pub ed25519.PublicKey, a DialAuth, host string, now time.Time) error {
+	return verifyHeader(SitesDomain, pub, a, host, now)
 }
 
 func verifyHeader(domain string, pub ed25519.PublicKey, a DialAuth, host string, now time.Time) error {

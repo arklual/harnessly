@@ -504,6 +504,10 @@ func (l *Library) TakenArtifactIDs() map[string]bool {
 			out[e.Name()] = true
 		}
 	}
+	// A deleted project's id stays taken: the gateway's grants and links for it may still be there.
+	for id := range l.trashedProjectIDs() {
+		out[id] = true
+	}
 	return out
 }
 

@@ -70,6 +70,12 @@
   margin-top: 2px;
   color: var(--hx-danger);
 }
+.hx-terminalfailure[data-tone='ok'] {
+  border-color: var(--hx-border);
+}
+.hx-terminalfailure[data-tone='ok'] .hx-terminalfailure__ic {
+  color: var(--hx-success);
+}
 .hx-terminalfailure__body {
   display: flex;
   flex: 1 1 260px;

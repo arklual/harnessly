@@ -109,5 +109,6 @@ func (c *core) designRoutes(f *gate.Gate, d deps, sender *push.Sender) []gate.Ro
 		at(platformAPI+"/design/library/create", func(r *http.Request) design.Answer { return a.Create(r, resolveCwd) }),
 		at("/api/cli/design", a.CLIDesign),
 		at("/api/cli/design/claims", a.CLIClaims),
+		at(platformAPI+"/design/library/leases", a.Leases),
 	)
 }

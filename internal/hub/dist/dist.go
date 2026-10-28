@@ -23,7 +23,7 @@ import (
 const maxInstaller = 1 << 20
 
 // binaryName is the file names under /dl/: runtime-<os>-<arch> and agent-<os>-<arch>.
-var binaryName = regexp.MustCompile(`^(runtime|agent)-(linux|darwin)-(amd64|arm64)$`)
+var binaryName = regexp.MustCompile(`^(runtime|agent|harnessly)-(linux|darwin)-(amd64|arm64)$`)
 
 // Handler serves the installer and the binaries from a folder.
 type Handler struct {

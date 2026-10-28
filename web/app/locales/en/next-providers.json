@@ -82,5 +82,8 @@
   "next.login.expired": "The sign-in timed out. Try again",
   "next.login.busy": "A sign-in is already running",
   "next.login.rateLimited": "Too often. Wait a little",
-  "next.login.unsupported": "This way of signing in is not available on this machine"
+  "next.login.unsupported": "This way of signing in is not available on this machine",
+  "next.seen.lead": "This machine was signed in as",
+  "next.seen.keep": "Sign in with the same account: a second account on one machine risks the subscription being blocked.",
+  "next.seen.mixed": "Different accounts signed in here — that can get the subscription blocked. Keep one account per machine."
 }

@@ -39,6 +39,30 @@ type Signal struct {
 	Permission *wire.Permission
 	Failure    string
 	Detail     string
+	// Text is the line a user signal stands for when its entry is not a user message (a command: «/compact», «! ls»).
+	Text string
+}
+
+// ShellCommand is the name the transcript gives a bash-mode line («! cmd»).
+const ShellCommand = "!"
+
+// CommandLine is a command as the person types it: «/name args», or «! args» for a bash-mode line.
+func CommandLine(name, args string) string {
+	if name == ShellCommand {
+		return strings.TrimSpace(ShellCommand + " " + args)
+	}
+	return strings.TrimSpace("/" + name + " " + args)
+}
+
+// commandLineOf is the line a command entry was typed as, from its summary («/! ls» is «! ls»); "" for any other entry.
+func commandLineOf(e wire.Entry) string {
+	if e.T != wire.EntryTool || e.Tool != "command" || e.ToolUseID != e.ID || !strings.HasPrefix(e.Summary, "/") {
+		return ""
+	}
+	if strings.HasPrefix(e.Summary, "/"+ShellCommand) {
+		return strings.TrimPrefix(e.Summary, "/")
+	}
+	return e.Summary
 }
 
 // turn is a turn being built: its record, and where its entries are.
@@ -273,6 +297,11 @@ func (b *builder) add(o *jsvalue.Object, offset int64) step {
 			e.Output, e.OK = b.output(id, text), okOf(!truthy(o, "isError"))
 		}
 		b.push(&s, e, offset)
+		// A command the person typed is the user line of a message too: no prompt-submit hook fires for a bash-mode line
+		// («! cmd»), and its record in the transcript is this entry, not a user message — the message on its way is taken
+		// by its words, as it was typed.
+		s.signals = append(s.signals, Signal{K: SignalUser, EntryID: id, TurnID: b.openID(), Offset: offset, At: at,
+			Text: CommandLine(str(o, "name"), str(o, "args"))})
 	case "command-output":
 		text := str(o, "output")
 		if i := b.commandForOutput(); i >= 0 {

@@ -44,7 +44,8 @@ var cells = []struct {
 	{"tick before it", Input{K: Tick, At: 1000}, "- · - · - · - · - · - · - · - · - · -"},
 	{"session-start", Input{K: SessionStart}, "idle+wake-queue · - · - · - · idle · idle · idle+wake-queue · idle+wake-queue · - · idle+wake-queue"},
 	{"prompt-submit", Input{K: PromptSubmit}, "working+prompt-submitted · working+prompt-submitted · working+prompt-submitted,gate-closed · working+prompt-submitted,gate-closed · working+prompt-submitted · working+prompt-submitted · - · - · - · working+prompt-submitted"},
-	{"permission-prompt", Input{K: PermissionPrompt, GateID: "p:tab-1:7"}, "- · waiting-permission+permission-requested · - · - · - · - · - · - · - · waiting-permission+permission-requested"},
+	// Ready and idle too: a background agent asks after the turn ended.
+	{"permission-prompt", Input{K: PermissionPrompt, GateID: "p:tab-1:7"}, "- · waiting-permission+permission-requested · - · - · waiting-permission+permission-requested · waiting-permission+permission-requested · - · - · - · waiting-permission+permission-requested"},
 	{"pre-compact", Input{K: PreCompact}, "- · working+compaction-started · - · - · working+compaction-started · working+compaction-started · - · - · - · working+compaction-started"},
 	{"post-compact", Input{K: PostCompact}, "- · working+compaction-finished · - · - · - · - · - · - · - · -"},
 	{"stop", Input{K: Stop}, "- · ready+turn-finished,wake-queue,notify · ready+gate-closed,turn-finished,wake-queue,notify · ready+gate-closed,turn-finished,wake-queue,notify · - · - · - · - · - · -"},

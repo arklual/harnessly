@@ -100,6 +100,28 @@ Claude Code hook refuses it and tells the agent to use `design page`. In the age
 that write it (a redirect, `tee`, `sed -i`, `mv`/`cp`/`rm`, a script that writes or dumps it) when the command names
 `project/canvas.json`. Reading is never refused. The shell check is a best effort, not a sandbox.
 
+### Leases on boards
+
+The same `design-guard` hook takes the chat's lease on every board (`*.dc.html`) the call writes, and the Stop hook lets
+go of them when the turn ends:
+
+```json
+{
+  "hooks": {
+    "Stop": [{ "hooks": [{ "type": "command", "command": "harnessly hook design-release" }] }]
+  }
+}
+```
+
+A board is held by one chat at a time. Another chat's edit is refused with «Доску «<name>» правит <who> в чате «<title>»
+на <machine>, последняя правка <N> мин назад. Сделай вариант или займись другой доской.» A lease runs out two minutes
+after its last sign of life (the runtime renews it while the chat's turn runs) and is let go of at the end of the turn.
+Where the leases are kept is `RUNTIME_DESIGN_LEASES` (see [configuration](configuration.md)): `folder` (default) or the
+design-sync `center`, which is what the machines of a synced library need. A lease that was taken off (the person pressed
+«Снять — это зависло» in another chat, or it ran out) is told to the old chat on its next edit once: it refuses that
+edit, asks to read the file again, and the retry goes through. The web page reaches the leases at
+`/api/design/library/leases` (see `internal/design/lease_routes.go`).
+
 ## New projects
 
 A new project is a copy of `<library>/.template/` when the library has one, else of the template the runtime ships:

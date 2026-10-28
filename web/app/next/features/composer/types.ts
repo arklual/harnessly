@@ -47,6 +47,8 @@ export interface QueueRow {
 
 /** A one-line notice over the field: the machine stopped answering, or the subscription's limit ran out. */
 export type DockNotice =
+  /** A dictation the machine could not recognize, kept in the browser; `more`: how many others wait after it. */
+  | { kind: 'voice'; ms: Ms; more: number; onRetry: () => Promise<unknown>; onDrop: () => Promise<unknown> }
   /** The machine of the chat is switched off: the chat is a read-only copy. */
   | { kind: 'off' }
   | { kind: 'machine'; machine: string; onStop: () => Promise<unknown> }

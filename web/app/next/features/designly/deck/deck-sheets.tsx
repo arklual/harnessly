@@ -82,7 +82,7 @@ export const EditSheet = ({ state, machine, n, onDone, onAsk, ...tools }: IEditS
             data-on={voice.recording ? '1' : '0'}
             aria-label={t('next.deck.sheets.mic')}
             aria-pressed={voice.recording !== null}
-            onClick={voice.recording ? voice.onFinishRecording : voice.onMic}
+            onClick={voice.recording ? voice.onFinishRecording : () => voice.onMic?.()}
           >
             <Icon name={voice.recording ? 'square' : 'mic'} size="sm" />
           </button>

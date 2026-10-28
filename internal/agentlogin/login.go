@@ -736,7 +736,7 @@ func (m *Manager) console(e *entry) {
 	if provider == hubproto.ProviderCodex {
 		command = "codex login --device-auth"
 	}
-	url, err := m.cfg.Console(e.ctx, provider, agents.EnvSourcePrefix(m.cfg.EnvDir, provider)+command)
+	url, err := m.cfg.Console(e.ctx, provider, agents.ForAnyShell(agents.EnvSourcePrefix(m.cfg.EnvDir, provider)+command))
 	if err != nil {
 		if !e.cancelled() {
 			e.finish(hubproto.LoginFailed, "Не удалось открыть консоль: "+scrub(err.Error(), ""), nil)

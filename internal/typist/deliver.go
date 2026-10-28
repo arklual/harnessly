@@ -59,7 +59,9 @@ type Result struct {
 	// Typed: keys went in (Sent, Stuck, a Failed after the first key). Own: the box held this message's pictures or
 	// text from an earlier try, and only the rest was typed. ChatAbout: the question dialog was closed first.
 	Typed, ChatAbout, HandedOver bool
-	Own                          bool
+	// Cleared: the screen the person left over the box (their /login, a picker) was closed by Esc first.
+	Cleared screen.Aside
+	Own     bool
 	// AsPath: Claude did not show a picture as a reference, and the message went with its path as text.
 	AsPath bool
 	Err    error
@@ -80,6 +82,8 @@ const (
 	confirmUnseen  = 600 * time.Millisecond
 	chatAboutMoves = 8
 	chatAboutStep  = 120 * time.Millisecond
+	dismissKeys    = 2
+	dismissStep    = 300 * time.Millisecond
 )
 
 // errPicture: the agent did not show a reference for every picture pasted.
@@ -95,6 +99,8 @@ type Plan struct {
 	Nothing bool
 	// ChatAbout: the question dialog is to be closed by «Chat about this» before the text goes in as the answer.
 	ChatAbout bool
+	// Dismiss: a screen the person left open in the terminal (/login, /model) is closed by Esc first.
+	Dismiss screen.Aside
 	// Clear: the box holds a setting command of the harness that did not go through, or picture paths the harness
 	// pasted that never became pictures; it is cleared first.
 	Clear string
@@ -109,6 +115,10 @@ func Decide(m Message, s Screen, provider wire.Provider) Plan {
 	// Claude still reads a paste of pictures: the box is not final, its references land later — nothing goes in now.
 	if provider != wire.ProviderCodex && s.Readable && Pasting(s.Plain) {
 		return Plan{Decision: DecideWait}
+	}
+	// The person opened /login or a picker in the terminal and left it: it is closed, then the message goes in.
+	if s.Readable && !s.Busy && s.Aside != screen.NoAside && provider != wire.ProviderCodex && !m.EnterOnly {
+		return Plan{Decision: DecideSend, Dismiss: s.Aside}
 	}
 	// The agent asks a question and the person wrote instead of picking: «Chat about this» closes the dialog and the
 	// message goes in as the reply.
@@ -162,6 +172,17 @@ func Type(m Message, provider wire.Provider, p Pane, c Clock) Result {
 		return res
 	}
 	plan := Decide(m, view, provider)
+	if plan.Dismiss != screen.NoAside {
+		if dismiss(p, c) {
+			res.Cleared = plan.Dismiss
+		}
+		view = Look(p, provider)
+		plan = Decide(m, view, provider)
+		if plan.Dismiss != screen.NoAside {
+			res.Outcome = BlockedMenu
+			return res
+		}
+	}
 	if plan.ChatAbout {
 		if chatAbout(p, c) {
 			res.ChatAbout = true
@@ -383,6 +404,28 @@ func chatAbout(p Pane, c Clock) bool {
 		c.Sleep(chatAboutStep)
 	}
 	return screen.WaitForQuestionGone(p.Capture, c.Sleep)
+}
+
+// dismiss presses Esc on an aside the person left over the box, at most twice and only while it is still up: a third
+// Esc would reach the agent itself, which takes it as «stop». True when it pressed Esc and the box is back.
+func dismiss(p Pane, c Clock) bool {
+	pressed := false
+	for range dismissKeys {
+		plain, ok := p.Capture()
+		if !ok {
+			return false
+		}
+		if screen.ClaudeAside(plain) == screen.NoAside {
+			return pressed
+		}
+		if p.Keys("Escape") != nil {
+			return false
+		}
+		pressed = true
+		c.Sleep(dismissStep)
+	}
+	plain, ok := p.Capture()
+	return ok && screen.ClaudeAside(plain) == screen.NoAside
 }
 
 // handOver presses Claude's chord ctrl+x ctrl+s once while its queue shows: a running Bash or MCP call goes to the

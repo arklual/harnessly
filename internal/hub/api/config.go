@@ -28,6 +28,10 @@ func (h *Hub) config(w http.ResponseWriter, r *http.Request) error {
 		terms = &h.cfg.TermsURL
 	}
 	type obj = map[string]any
+	sitesCfg := obj{"enabled": false}
+	if h.Sites != nil {
+		sitesCfg = obj{"enabled": true, "scheme": h.cfg.SitesMode(), "domain": h.cfg.SitesDomain}
+	}
 	httpx.WriteJSON(w, http.StatusOK, obj{
 		"version":   buildinfo.Version,
 		"publicUrl": h.cfg.PublicURL,
@@ -50,6 +54,7 @@ func (h *Hub) config(w http.ResponseWriter, r *http.Request) error {
 		},
 		"profiles":    obj{"dir": true, "container": h.cfg.ContainerImage != "", "full": true},
 		"runtimeMode": mode,
+		"sites":       sitesCfg,
 		"termsUrl":    terms,
 	})
 	return nil

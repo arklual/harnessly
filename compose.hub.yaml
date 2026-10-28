@@ -73,6 +73,18 @@ services:
       HUB_RP_ID: ${HUB_RP_ID:-}
       # Machines on their own addresses, <machine>.<this domain> (a wildcard record and certificate): see deploy.md.
       HUB_RUNTIME_DOMAIN: ${HUB_RUNTIME_DOMAIN:-}
+      # Published sites (docs/hub/sites.md). Empty domain: sites open at <this hub>/sites/<site>--<space>/, static only,
+      # sandboxed. With a domain (a wildcard record and certificate for *.<domain>): <site>--<space>.<domain>.
+      HARNESSLY_SITES: ${HARNESSLY_SITES:-on}
+      HARNESSLY_SITES_DOMAIN: ${HARNESSLY_SITES_DOMAIN:-}
+      HARNESSLY_SITES_ABUSE_URL: ${HARNESSLY_SITES_ABUSE_URL:-}
+      # The sites' files live in the hub's data volume unless a bucket (MinIO, any S3) is named.
+      HARNESSLY_SITES_S3_ENDPOINT: ${HARNESSLY_SITES_S3_ENDPOINT:-}
+      HARNESSLY_SITES_S3_REGION: ${HARNESSLY_SITES_S3_REGION:-}
+      HARNESSLY_SITES_S3_BUCKET: ${HARNESSLY_SITES_S3_BUCKET:-}
+      HARNESSLY_SITES_S3_PREFIX: ${HARNESSLY_SITES_S3_PREFIX:-}
+      HARNESSLY_SITES_S3_ACCESS_KEY: ${HARNESSLY_SITES_S3_ACCESS_KEY:-}
+      HARNESSLY_SITES_S3_SECRET_KEY: ${HARNESSLY_SITES_S3_SECRET_KEY:-}
       # The container way of connecting a machine is offered when this names an image the machines can pull.
       HUB_CONTAINER_IMAGE: ${HUB_CONTAINER_IMAGE:-}
       # The reverse proxy on the host reaches the container through the published port, from the gateway of the

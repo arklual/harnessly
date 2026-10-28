@@ -81,6 +81,34 @@ spec:
             - name: HUB_RUNTIME_DOMAIN
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.sitesDomain }}
+            - name: HARNESSLY_SITES_DOMAIN
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if not .Values.sites.enabled }}
+            - name: HARNESSLY_SITES
+              value: "off"
+            {{- end }}
+            {{- with .Values.sites.abuseUrl }}
+            - name: HARNESSLY_SITES_ABUSE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.sites.s3 }}
+            {{- if .endpoint }}
+            - name: HARNESSLY_SITES_S3_ENDPOINT
+              value: {{ .endpoint | quote }}
+            - name: HARNESSLY_SITES_S3_BUCKET
+              value: {{ required "sites.s3.bucket is required with sites.s3.endpoint" .bucket | quote }}
+            {{- with .region }}
+            - name: HARNESSLY_SITES_S3_REGION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .prefix }}
+            - name: HARNESSLY_SITES_S3_PREFIX
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
             {{- with .Values.rpId }}
             - name: HUB_RP_ID
               value: {{ . | quote }}

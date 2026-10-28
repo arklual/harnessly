@@ -113,6 +113,9 @@ type GuardEnv struct {
 	Now        time.Time
 }
 
+// DenyAnswer is the hook's refusal of a tool call, with the words for the agent.
+func DenyAnswer(reason string) []byte { return denyAnswer(reason) }
+
 func denyAnswer(reason string) []byte {
 	out, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{
 		"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason,

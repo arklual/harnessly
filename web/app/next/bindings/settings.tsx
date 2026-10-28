@@ -10,11 +10,13 @@ import {
   useAgentPages,
 } from '@/next/bindings/settings-agents';
 import { AppsPage, BetaPage, GeneralPage, MachinesPage } from '@/next/bindings/settings-general';
+import { VoicePage } from '@/next/bindings/settings-voice';
 import { NoticesPage } from '@/next/bindings/settings-notices';
 import { AsksSettingsPage } from '@/next/bindings/settings-asks';
 import { NotifyBotsPage } from '@/next/bindings/settings-notify-bots';
 import { PeersPage } from '@/next/bindings/settings-peers';
 import { SafePage } from '@/next/bindings/settings-safe';
+import { TakesPage } from '@/next/bindings/settings-takes';
 import SettingsShell from '@/next/features/settings/settings-shell';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
@@ -69,6 +71,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
 
   let body = null;
   if (active === 'general') body = <GeneralPage machine={machine} name={name} pending={pending} />;
+  else if (active === 'voice') body = <VoicePage machine={machine} />;
   else if (active === 'notifications')
     body = (
       <>
@@ -78,6 +81,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
       </>
     );
   else if (active === 'safe') body = <SafePage machine={machine} now={now} />;
+  else if (active === 'takes') body = <TakesPage now={now} />;
   else if (active === 'accounts') body = <AccountsPage machine={machine} pages={pages} pending={pending} />;
   else if (active === 'claude' || active === 'codex')
     body = (

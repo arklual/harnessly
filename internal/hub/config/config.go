@@ -63,6 +63,15 @@ type Config struct {
 	// registrable domain with the hub (app.example.com and run.example.com). Other editions only warn.
 	AllowSameSiteRuntime bool
 	DistDir              string
+
+	// Sites (internal/sites): published static sites. SitesDomain is the wildcard domain they live under
+	// (<site>--<space>.<domain>); without it a self-hosted hub serves them under /sites/ on its own origin, sandboxed.
+	SitesOff      bool
+	SitesDomain   string
+	SitesAbuseURL string
+	// SitesDir holds the sites' files when no bucket is set.
+	SitesDir string
+	SitesS3  SitesS3
 	// Warnings are what the hub starts with although its operator should look at it again: the binary logs each at
 	// error level and check-config prints them.
 	Warnings []string
@@ -82,6 +91,36 @@ type Config struct {
 	TermsURL        string
 	WebDir          string
 	LogLevel        string
+}
+
+// SitesS3 is an S3-compatible bucket for the sites' files (MinIO, Selectel). Endpoint empty: a folder.
+type SitesS3 struct{ Endpoint, Region, Bucket, Prefix, AccessKey, SecretKey string }
+
+// SitesMode says how published sites are reached: "subdomain" (own address per site under SitesDomain), "path"
+// (/sites/<site>--<space>/ on the hub's origin, sandboxed) or "off".
+func (c *Config) SitesMode() string {
+	switch {
+	case c.SitesOff:
+		return "off"
+	case c.SitesDomain != "":
+		return "subdomain"
+	case c.Edition == EditionCloud:
+		// A stranger's page on the cloud hub's own origin is not something a sandbox makes safe enough.
+		return "off"
+	}
+	return "path"
+}
+
+// SitesHost is the sites domain with the public URL's port when it has one (development).
+func (c *Config) SitesHost() string {
+	if c.SitesDomain == "" {
+		return ""
+	}
+	h := c.SitesDomain
+	if _, port, ok := strings.Cut(c.Host, ":"); ok && port != "" {
+		h += ":" + port
+	}
+	return h
 }
 
 // GitHub is the GitHub OAuth app. URL is the base of GitHub Enterprise, https://github.com by default.
@@ -207,6 +246,8 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		RPName:         def("HUB_RP_NAME", "harnessly"),
 		RuntimeDomain:  strings.ToLower(strings.Trim(get("HUB_RUNTIME_DOMAIN"), ".")),
 		DistDir:        def("HUB_DIST_DIR", "/opt/harnessly/dist"),
+		SitesDomain:    strings.ToLower(strings.Trim(get("HARNESSLY_SITES_DOMAIN"), ".")),
+		SitesAbuseURL:  get("HARNESSLY_SITES_ABUSE_URL"),
 		ContainerImage: get("HUB_CONTAINER_IMAGE"),
 		LocalCodeFile:  get("HUB_LOCAL_CODE_FILE"),
 		LocalCodeGID:   -1,
@@ -409,6 +450,7 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 			}
 		}
 	}
+	c.loadSites(get, def, bad)
 	if c.Edition == EditionCloud && c.RuntimeDomain == "" {
 		// The cloud's machines belong to people who do not trust each other (and the hub): a machine's page is its own
 		// script, and on the hub's origin it would act with the signed-in person's session.
@@ -462,4 +504,54 @@ func ParseIP(s string) net.IP {
 		s = s[:i]
 	}
 	return net.ParseIP(s)
+}
+
+// loadSites reads the HARNESSLY_SITES_* settings and checks the domain the way the runtime domain is checked: sites run
+// pages of strangers, so their domain must not be one the hub's cookies reach.
+func (c *Config) loadSites(get func(string) string, def func(string, string) string, bad func(string, ...any)) {
+	switch strings.ToLower(def("HARNESSLY_SITES", "on")) {
+	case "on", "true", "1", "yes":
+	case "off", "false", "0", "no":
+		c.SitesOff = true
+	default:
+		bad("HARNESSLY_SITES must be on or off")
+	}
+	c.SitesDir = def("HARNESSLY_SITES_DIR", filepath.Join(c.DataDir, "sites"))
+	c.SitesS3 = SitesS3{
+		Endpoint: get("HARNESSLY_SITES_S3_ENDPOINT"), Region: get("HARNESSLY_SITES_S3_REGION"), Bucket: get("HARNESSLY_SITES_S3_BUCKET"),
+		Prefix: get("HARNESSLY_SITES_S3_PREFIX"), AccessKey: get("HARNESSLY_SITES_S3_ACCESS_KEY"), SecretKey: get("HARNESSLY_SITES_S3_SECRET_KEY"),
+	}
+	if c.SitesS3.Endpoint != "" && (c.SitesS3.Bucket == "" || c.SitesS3.AccessKey == "" || c.SitesS3.SecretKey == "") {
+		bad("HARNESSLY_SITES_S3_ENDPOINT needs HARNESSLY_SITES_S3_BUCKET, HARNESSLY_SITES_S3_ACCESS_KEY and HARNESSLY_SITES_S3_SECRET_KEY")
+	}
+	if c.SitesAbuseURL != "" {
+		if u, err := url.Parse(c.SitesAbuseURL); err != nil || (u.Scheme != "https" && u.Scheme != "http" && u.Scheme != "mailto") {
+			bad("HARNESSLY_SITES_ABUSE_URL must be an http(s) or mailto: address")
+		}
+	}
+	if c.SitesDomain == "" {
+		return
+	}
+	if !domainName.MatchString(c.SitesDomain) {
+		bad("HARNESSLY_SITES_DOMAIN must be a domain name like sites.example.com")
+		return
+	}
+	hub := hostName(c.Host)
+	switch {
+	case hub == c.SitesDomain:
+		bad("HARNESSLY_SITES_DOMAIN must differ from the hub's own host")
+	case strings.HasSuffix(hub, "."+c.SitesDomain):
+		bad("HARNESSLY_SITES_DOMAIN %s is a parent of the hub's own host %s: use a domain that is not above it", c.SitesDomain, hub)
+	case c.RuntimeDomain != "" && (c.SitesDomain == c.RuntimeDomain || strings.HasSuffix(c.SitesDomain, "."+c.RuntimeDomain) || strings.HasSuffix(c.RuntimeDomain, "."+c.SitesDomain)):
+		bad("HARNESSLY_SITES_DOMAIN %s and HUB_RUNTIME_DOMAIN %s must not contain one another", c.SitesDomain, c.RuntimeDomain)
+	case sameSite(hub, c.SitesDomain):
+		msg := fmt.Sprintf("HARNESSLY_SITES_DOMAIN %s and the hub's host %s are on one registrable domain, so they are one site: "+
+			"a published page could set cookies for the whole domain and send the hub requests with a person's cookies. "+
+			"Use a domain of its own for sites, or get it onto the public suffix list", c.SitesDomain, hub)
+		if c.Edition == EditionCloud && !c.AllowSameSiteRuntime {
+			bad("%s (HUB_ALLOW_SAME_SITE_RUNTIME=1 accepts it in the cloud edition)", msg)
+		} else {
+			c.Warnings = append(c.Warnings, msg)
+		}
+	}
 }

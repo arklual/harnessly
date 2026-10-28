@@ -47,7 +47,7 @@ func voiceRoutes(d deps) []gate.Route {
 	dictation := newVoice(d.DataDir)
 	assets := &voice.Assets{CacheDir: filepath.Join(d.DataDir, "voice-assets"), ModelHost: "https://huggingface.co",
 		RuntimeHost: "https://cdn.jsdelivr.net", Log: voiceLog}
-	return []gate.Route{
+	return append([]gate.Route{
 		{
 			Slice: "voice",
 			Match: func(r *http.Request) bool { return pathIs(r, "/api/voice") && isUpgrade(r) },
@@ -71,5 +71,5 @@ func voiceRoutes(d deps) []gate.Route {
 				assets.Serve(w, r, segments)
 			}),
 		},
-	}
+	}, voiceEngineRoutes(d, dictation)...)
 }

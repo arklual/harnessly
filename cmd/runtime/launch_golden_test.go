@@ -379,7 +379,7 @@ func TestLaunchRoutesMatchThePreviousRuntime(t *testing.T) {
 			lastEtag = e
 		}
 		name := strconv.Itoa(i) + " " + g.Method + " " + g.URL
-		if res.StatusCode != g.Status || scrub(string(got)) != g.Answer {
+		if res.StatusCode != g.Status || previousAnswer(scrub(string(got))) != g.Answer {
 			t.Errorf("%s:\n got %d %s\nwant %d %s", name, res.StatusCode, scrub(string(got)), g.Status, g.Answer)
 		}
 		for _, k := range keep {
@@ -400,7 +400,7 @@ func TestLaunchRoutesMatchThePreviousRuntime(t *testing.T) {
 		tm.mu.Unlock()
 		for _, c := range calls {
 			for j := range c {
-				c[j] = scrub(c[j])
+				c[j] = previousLine(scrub(c[j]))
 			}
 		}
 		if gc, wc := normalCalls(calls), normalCalls(g.Calls); strings.Join(gc, "\n") != strings.Join(wc, "\n") {
@@ -421,7 +421,7 @@ func TestLaunchRoutesMatchThePreviousRuntime(t *testing.T) {
 	tm.mu.Unlock()
 	for _, c := range calls {
 		for j := range c {
-			c[j] = scrub(c[j])
+			c[j] = previousLine(scrub(c[j]))
 		}
 	}
 	gc, wc := normalCalls(calls), normalCalls(golden.Resume.Calls)
@@ -471,4 +471,87 @@ func sequentialIDs() func() string {
 		s := strconv.FormatInt(int64(n), 36)
 		return "id" + strings.Repeat("0", max(0, 4-len(s))) + s
 	}
+}
+
+// The previous runtime typed its lines for bash; this one types the same line for any shell (`sh -c '…; exec env …'`,
+// the prompt through printf). previousLine turns a line of this runtime back into the previous one's shape, so the
+// recordings still compare.
+var printfArg = regexp.MustCompile(`"\$\(printf %b '((?:[^']|'\\'')*)'\)"`)
+
+func previousLine(s string) string {
+	inner, ok := agents.UnwrapAnyShell(s)
+	if !ok {
+		return s
+	}
+	inner = strings.Replace(inner, "exec env ", "", 1)
+	return printfArg.ReplaceAllStringFunc(inner, func(m string) string {
+		return ansiCQuote(printfDecode(strings.ReplaceAll(printfArg.FindStringSubmatch(m)[1], `'\''`, "'")))
+	})
+}
+
+// previousAnswer is previousLine for the command of a launch-command answer.
+func previousAnswer(s string) string {
+	var a map[string]any
+	if !strings.HasPrefix(s, `{"command":"`) || json.Unmarshal([]byte(s), &a) != nil || len(a) != 1 {
+		return s
+	}
+	line, _ := a["command"].(string)
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if enc.Encode(map[string]string{"command": previousLine(line)}) != nil {
+		return s
+	}
+	return strings.TrimSuffix(b.String(), "\n")
+}
+
+// printfDecode reads the escapes agents.PrintfQuote writes.
+func printfDecode(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' || i+1 == len(s) {
+			b.WriteByte(s[i])
+			continue
+		}
+		i++
+		switch s[i] {
+		case 'n':
+			b.WriteByte('\n')
+		case 't':
+			b.WriteByte('\t')
+		case '0':
+			n, _ := strconv.ParseUint(s[i+1:i+4], 8, 8)
+			b.WriteByte(byte(n))
+			i += 3
+		default:
+			b.WriteByte(s[i])
+		}
+	}
+	return b.String()
+}
+
+// ansiCQuote is the previous runtime's $'…'.
+func ansiCQuote(s string) string {
+	var b strings.Builder
+	b.WriteString("$'")
+	for _, r := range s {
+		switch {
+		case r == '\\':
+			b.WriteString(`\\`)
+		case r == '\'':
+			b.WriteString(`\'`)
+		case r == '\n':
+			b.WriteString(`\n`)
+		case r == '\r':
+			b.WriteString(`\r`)
+		case r == '\t':
+			b.WriteString(`\t`)
+		case r < 0x20 || r == 0x7f:
+			b.WriteString(`\x` + strconv.FormatInt(int64(r)+0x100, 16)[1:])
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteString("'")
+	return b.String()
 }

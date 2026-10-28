@@ -1,0 +1,34 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.312[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mOpus 5.5 · Claude Max[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/…/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad[39m
+
+[38;5;174m▎[39m Your Max plan includes $200 a month in API credits to power your apps and agents. Claim them at
+[38;5;174m▎[39m [94m]8;id=11prv8b;https://clau.de/api-credits\https://clau.de/api-credits[39m]8;;\
+
+
+
+
+
+
+
+
+
+ [38;5;246mtmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus trac…[38;5;153m ▔
+[39m   [1m[38;5;153mLogin[0m
+
+   [38;5;246mBrowser didn't open? Use the url below to sign in (c to copy)[39m
+
+[38;5;246m]8;id=1d01rmx;https://claude.com/cai/oauth/authorize?code=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&response_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3Acreate_api_key+user%3Aprofile+user%3Ainference+user%3Asessions%3Aclaude_code+user%3Amcp_servers+user%3Afile_upload+user%3Aplugins&code_challenge=REDACTED&code_challenge_method=S256&state=REDACTED\https://claude.com/cai/oauth/authorize?code=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&resp]8;;\
+onse_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3A
+create_api_key+user%3Aprofile+user%3Ainference+user%3Asessions%3Aclaude_code+user%3Amcp_servers+user
+%3Afile_upload+user%3Aplugins&code_challenge=REDACTED&code_challe
+nge_method=S256&state=REDACTED[39m
+
+   [38;5;246mHold Shift (Option in iTerm2, Fn in Terminal.app) while selecting to use your terminal's [39m
+   [38;5;246mnative copy[39m
+
+
+   Paste code here if prompted >
+
+   [3m[38;5;246mEsc to cancel[0m

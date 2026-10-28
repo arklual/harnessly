@@ -36,6 +36,7 @@ import WaitingLine from '@/next/features/chat/waiting';
 import TurnView, { type ITurnHandlers } from '@/next/features/chat/turn';
 import type { FeedDensity, FeedItem, Ms, RefInfo, RefKind } from '@/next/features/chat/types';
 import AutoLine from '@/next/features/chat/auto-line';
+import ClearedLine from '@/next/features/chat/cleared-line';
 import ModelSwitchRow from '@/next/features/chat/model-switch';
 import OriginRow from '@/next/features/chat/origin-row';
 import PeerNotes from '@/next/features/chat/peer-note';
@@ -189,6 +190,9 @@ const Row = memo(({ item, open, enter, offline, machineName, handlers, modelLabe
       {/* The runtime went on by itself with this message: a quiet line, in place of the bubble when it wrote it. */}
       {(item.kind === 'turn' || item.kind === 'outgoing') && item.auto && (
         <AutoLine why={item.auto.why} pending={item.kind === 'outgoing'} />
+      )}
+      {(item.kind === 'turn' || item.kind === 'outgoing') && item.cleared && (
+        <ClearedLine what={item.cleared} />
       )}
       {/* The bubble is the same element going out and as the turn's prompt: it settles in place. */}
       {item.kind === 'outgoing'

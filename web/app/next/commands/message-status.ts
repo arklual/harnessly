@@ -55,7 +55,9 @@ function dueAt(m: MessageView): number | null {
     // A send on its way is the outbox's; one the runtime answered is asked about soon, one unanswered after 30 s.
     if (op?.k === 'pending') return null;
     at = op?.k === 'done' ? op.at + STATUS_SOON_MS : toPageTime(m.machineId, m.stateAt) + STATUS_AFTER_MS;
-  } else if (m.rev > 0 && (m.state.k === 'typing' || m.state.k === 'in-input')) {
+  } else if (m.rev > 0 && (m.state.k === 'typing' || m.state.k === 'in-input' || m.state.k === 'queued')) {
+    // a queued one too — it stands in the strip over the field until a frame moves it, and a chat whose
+    // frames stopped (its channel refused on a loaded machine) would keep a row the agent answered minutes ago.
     // A steer waits in the agent's own queue for minutes, and is asked about all that while: the frame that took it
     // into the turn may be the one the page missed, and the strip over the field must not hold it on a guess.
     at = toPageTime(m.machineId, m.stateAt) + STATUS_AFTER_MS + STATUS_GRACE_MS;

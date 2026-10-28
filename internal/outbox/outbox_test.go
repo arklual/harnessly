@@ -85,7 +85,11 @@ func TestNowAndSteer(t *testing.T) {
 	r := newRig(t, tui(t, "claude-busy-spinner.ansi.txt"), wire.StateWorking)
 	r.leaves()
 	r.send("m1", "queued first", wire.ModeQueue)
+	// A command goes alone: «now» does not take the queue with it (TestSendNowTakesTheWholeQueueAsOneMessage).
+	r.box.recs["m1"].Message.Kind = wire.KindCommand
 	r.send("m2", "now", wire.ModeNow)
+	r.box.recs["m1"].Message.Kind = wire.KindPrompt
+	r.box.recs["m2"].Message.Kind = wire.KindCommand
 	r.pump()
 	if q := r.box.Queue(); !reflect.DeepEqual(q.Items, []string{"m2", "m1"}) {
 		t.Fatalf("%v", q.Items)
@@ -711,6 +715,7 @@ func TestAQueuedMessageNeverSwingsBetweenItsReasons(t *testing.T) {
 	r := newRig(t, tui(t, "claude-busy-spinner.ansi.txt"), wire.StateIdle)
 	r.leaves()
 	r.send("m1", "queued first", wire.ModeQueue)
+	r.box.recs["m1"].Message.Kind = wire.KindCommand // stays in the line: «now» takes no command with it
 	r.pump()
 	r.send("m2", "now please", wire.ModeNow)
 	r.pump()
@@ -876,9 +881,10 @@ func TestMoveReordersTheLine(t *testing.T) {
 
 func TestMoveKeepsTheOrderOfUrgency(t *testing.T) {
 	r := newRig(t, tui(t, "claude-busy-spinner.ansi.txt"), wire.StateWorking)
+	// «now» sent while plain messages wait takes them with it (gather): it goes first here.
+	r.send("n1", "now", wire.ModeNow)
 	r.send("m1", "one", wire.ModeQueue)
 	r.send("m2", "two", wire.ModeQueue)
-	r.send("n1", "now", wire.ModeNow)
 	if q := r.box.Queue().Items; !reflect.DeepEqual(q, []string{"n1", "m1", "m2"}) {
 		t.Fatalf("%v", q)
 	}

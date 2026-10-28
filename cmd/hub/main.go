@@ -5,6 +5,7 @@
 //	hub                run the hub
 //	hub check-config   read the configuration and print what it switches on, without starting anything
 //	hub healthcheck    ask a running hub on this host whether it is up (for container health checks)
+//	hub sites          run the sites module on its own (docs/hub/sites.md)
 //	hub version
 package main
 
@@ -74,6 +75,8 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 			return 1
 		}
 		return 0
+	case "sites":
+		return runSites(ctx, args, lookup, stdout, stderr)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0
@@ -83,7 +86,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 }
 
-const usage = `usage: hub [serve | check-config | healthcheck | version]
+const usage = `usage: hub [serve | check-config | healthcheck | sites | version]
 
 The hub is configured by HUB_* environment variables; see docs/hub/deploy.md.
 `
@@ -242,6 +245,7 @@ func describe(w io.Writer, cfg *config.Config) {
 	for _, warning := range cfg.Warnings {
 		fmt.Fprintf(w, "WARNING        %s\n", warning)
 	}
+	describeSites(w, cfg)
 	fmt.Fprintf(w, "SSH install    %s\n", on(cfg.SSH))
 	fmt.Fprintf(w, "container      %s\n", on(cfg.ContainerImage != ""))
 	fmt.Fprintf(w, "local machine  %s\n", on(cfg.LocalCodeFile != ""))
@@ -282,4 +286,24 @@ func healthcheck(ctx context.Context, lookup func(string) (string, bool), stdout
 	}
 	fmt.Fprintln(stdout, "ok")
 	return 0
+}
+
+// describeSites says by which scheme published sites will be reached.
+func describeSites(w io.Writer, cfg *config.Config) {
+	files := "folder " + cfg.SitesDir
+	if cfg.SitesS3.Endpoint != "" {
+		files = "s3 " + cfg.SitesS3.Endpoint + "/" + cfg.SitesS3.Bucket
+	}
+	switch cfg.SitesMode() {
+	case "subdomain":
+		fmt.Fprintf(w, "sites          subdomain: <site>--<space>.%s, files in %s (the wildcard *.%s must reach the hub, with a certificate)\n", cfg.SitesDomain, files, cfg.SitesDomain)
+	case "path":
+		fmt.Fprintf(w, "sites          path: %s/sites/<site>--<space>/, static only, sandboxed without allow-same-origin, files in %s (set HARNESSLY_SITES_DOMAIN for an address per site)\n", cfg.PublicURL, files)
+	default:
+		if cfg.SitesOff {
+			fmt.Fprintln(w, "sites          off (HARNESSLY_SITES=off)")
+		} else {
+			fmt.Fprintln(w, "sites          off (the cloud edition publishes sites only on a domain of their own: set HARNESSLY_SITES_DOMAIN)")
+		}
+	}
 }

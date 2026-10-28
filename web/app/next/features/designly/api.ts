@@ -2,7 +2,7 @@
 // kinds and the conversations drawing them; a new project opens a conversation of an agent in its folder. The pictures
 // come from the runtime's library route; a board opens in a preview slot of its own origin.
 import { platformPath, runtimePath } from '@/next/core/net/machine';
-import { runtimeJson } from '@/next/core/net/runtime-json';
+import { postJson, runtimeJson } from '@/next/core/net/runtime-json';
 import { readCheck, readPageLog } from '@/next/features/designly/server-data';
 import { wordedPage } from '@/next/core/net/worded';
 import {
@@ -72,6 +72,11 @@ export const fetchEngine = (m: MachineId, signal?: AbortSignal) =>
 
 export const pinDesign = (m: MachineId, id: string, pinned: boolean) =>
   page(m, '/designly/pin', parsePage.designlyPin, { method: 'POST', body: { id, pinned } });
+
+/** The project goes to the machine's trash; resolves once the machine has moved it. */
+export const deleteDesign = async (m: MachineId, id: string): Promise<void> => {
+  await runtimeJson<unknown>(m, platformPath('/design/library/delete'), postJson({ project: id }));
+};
 
 /** The picture of a board for a card; `version` is the cache key (the project's last change). */
 /**

@@ -486,6 +486,9 @@ func (m Message) Validate() error {
 	if m.Auto != "" {
 		errs = append(errs, in("auto", m.Auto, AutoContinueWhys))
 	}
+	if m.Cleared != "" {
+		errs = append(errs, in("cleared", m.Cleared, TerminalAsides))
+	}
 	return errors.Join(errs...)
 }
 

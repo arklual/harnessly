@@ -19,7 +19,7 @@ import { isStashKey, KEY_ACTION, keyAction } from '@/next/features/composer/keys
 import LimitsChip from '@/next/features/limits/limits-chip';
 import type { LimitsView } from '@/next/features/limits/model';
 import ModelPicker, { type IModelPickerProps } from '@/next/features/composer/model-picker';
-import PlusMenu, { type IPlusAttach } from '@/next/features/composer/plus-menu';
+import PlusMenu, { type IPlusAttach, type IPlusTakes } from '@/next/features/composer/plus-menu';
 import type { IStash } from '@/next/features/composer/stash-list';
 import { RefChips, type IRefChip } from '@/next/features/chat/ref-chips';
 import { usePromptHistory } from '@/next/features/composer/prompt-history';
@@ -106,9 +106,13 @@ export interface IComposerProps {
   attach?: IPlusAttach | null;
   /** Drafts put aside («Отложить черновик», ⌘⇧S); without it the field has no such thing. */
   stash?: IStash | null;
+  /** The person's recordings in «+»; without it there is no «Записи». */
+  takes?: IPlusTakes | null;
   recording: Recording | null;
-  /** Voice input; without it the microphone is not offered. */
-  onMic?: () => void;
+  /** Voice input; without it the microphone is not offered. `at`: the caret in the field, where the words go. */
+  onMic?: (at?: number) => void;
+  /** Where the dictation wants the caret: after the words it put in. */
+  caret?: number | null;
   /** What is left of the agent's subscription, by the pill; no chip until the machine has answered. */
   limits?: LimitsView | null;
   /** How full the agent's window is; no ring until it is known. */
@@ -257,14 +261,43 @@ const Composer = (props: IComposerProps) => {
   // While it listens the layer over the field shows the same text: the newest words are in view, the layer scrolls with
   // the field and wraps where the field's scrollbar leaves room.
   const listening = bar !== null;
+  // The caret follows the dictated words until the person puts it somewhere with a key or the pointer; then it
+  // stays where they put it (the browser would move it to the end with every new text). On a desktop the field takes
+  // the focus when it starts listening, so the person can edit while speaking.
+  const ownCaret = useRef<{ moved: boolean; start: number; end: number }>({ moved: false, start: 0, end: 0 });
+  const startedListening = useRef(false);
   useLayoutEffect(() => {
     const input = fieldRef.current;
     const layer = mirrorRef.current;
-    if (!listening || !input || !layer) return;
-    input.scrollTop = input.scrollHeight;
+    if (!listening || !input || !layer) {
+      startedListening.current = false;
+      return;
+    }
+    if (!startedListening.current) {
+      startedListening.current = true;
+      ownCaret.current.moved = false;
+      if (window.matchMedia?.('(pointer: fine)').matches) input.focus({ preventScroll: true });
+    }
+    const own = ownCaret.current;
+    const at = props.caret ?? value.length;
+    if (document.activeElement === input) {
+      if (own.moved) input.setSelectionRange(own.start, own.end);
+      else input.setSelectionRange(at, at);
+    }
+    if (own.moved || at >= value.length) input.scrollTop = input.scrollHeight;
     layer.style.setProperty('--hx-sb', `${input.offsetWidth - input.clientWidth}px`);
     layer.scrollTop = input.scrollTop;
-  }, [listening, value]);
+  }, [listening, value, props.caret]);
+  // Where the caret stood when the field lost the focus to the microphone: a dictation started from there goes in there.
+  const blurCaret = useRef<{ value: string; at: number } | null>(null);
+  const onMicClick = () => {
+    const field = fieldRef.current;
+    const kept = blurCaret.current;
+    let at: number | undefined;
+    if (field && document.activeElement === field) at = field.selectionStart;
+    else if (kept && kept.value === value) at = kept.at;
+    props.onMic?.(at);
+  };
   useEffect(() => {
     const input = fieldRef.current;
     const layer = mirrorRef.current;
@@ -554,15 +587,31 @@ const Composer = (props: IComposerProps) => {
               aria-label={t('next.composer.label')}
               aria-invalid={tooLong || undefined}
               onChange={(event) => {
+                ownCaret.current.start = event.target.selectionStart;
+                ownCaret.current.end = event.target.selectionEnd;
                 onChange(event.target.value);
                 history.onInput(event.target.value);
                 palette.sync(event.target.value, event.target.selectionStart);
               }}
-              onSelect={(event) =>
-                palette.sync(event.currentTarget.value, event.currentTarget.selectionStart)
-              }
-              onKeyDown={onKeyDown}
+              onSelect={(event) => {
+                const field = event.currentTarget;
+                palette.sync(field.value, field.selectionStart);
+                ownCaret.current.start = field.selectionStart;
+                ownCaret.current.end = field.selectionEnd;
+              }}
+              onKeyDown={(event) => {
+                if (listening && event.key !== 'Enter' && event.key !== 'Escape')
+                  ownCaret.current.moved = true;
+                onKeyDown(event);
+              }}
+              onPointerDown={() => {
+                if (listening) ownCaret.current.moved = true;
+              }}
               onBlur={(event) => {
+                blurCaret.current = {
+                  value: event.currentTarget.value,
+                  at: event.currentTarget.selectionStart,
+                };
                 if (rootRef.current?.contains(event.relatedTarget)) return;
                 history.close();
                 palette.close();
@@ -628,13 +677,14 @@ const Composer = (props: IComposerProps) => {
               onPrompts={history.show}
               attach={props.attach}
               stash={props.stash}
+              takes={props.takes}
             />
             {picker && <ModelPicker {...picker} />}
             {props.limits && <LimitsChip view={props.limits} />}
             <span className="hx-spacer" />
             {props.contextRing && <ContextRing {...props.contextRing} />}
             {props.tools}
-            {props.onMic && <RoundButton icon="mic" label={t('next.composer.voice')} onClick={props.onMic} />}
+            {props.onMic && <RoundButton icon="mic" label={t('next.composer.voice')} onClick={onMicClick} />}
             {/* While the agent works the field shows one button: stop with an empty field, the arrow with a message
                 (↵ into the queue, ⌃↵ straight into its turn). */}
             {working && !hasContent && (

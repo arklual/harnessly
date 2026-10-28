@@ -290,6 +290,12 @@ func (b *Box) Typed(clientID string, res typist.Result, now time.Time) Change {
 		return ch
 	}
 	b.typing = false
+	if res.Cleared != "" && r.Message.Cleared == "" {
+		// The chat says under the message that the person's screen in the terminal was closed for it.
+		r.Message.Cleared = wire.TerminalAside(res.Cleared)
+		r.Message.Rev++
+		ch.add(wire.MessageUpsertEv{Message: r.Message})
+	}
 	if r.recheck {
 		// Its Enter again for a message in-input: the message is still waiting for the agent. A try that pressed it
 		// restarts the wait; one that did not (the screen changed, a key failed) leaves it be; one whose Enters all
@@ -475,6 +481,10 @@ func (b *Box) UserEntryText(entryID, text string, offset int64, turn *string, no
 			st.K == wire.MsgInInput && r.Steered && (text == "" || takes(text, r.Message.Text)) ||
 			st.K == wire.MsgAccepted && st.EntryID == nil
 		if !ours || offset < r.TypedOffset {
+			continue
+		}
+		if prefixed(text) && !takes(text, r.Message.Text) {
+			// A command line in the transcript («/compact», «! ls») is the message that was typed as it, nobody else's.
 			continue
 		}
 		if st.K == wire.MsgTyping {

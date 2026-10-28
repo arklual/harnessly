@@ -1,9 +1,11 @@
 package design
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -156,10 +158,12 @@ func (l *Library) SweepOwnClaims(missing map[string]int64) (SweepResult, error) 
 	if missing == nil {
 		missing = map[string]int64{}
 	}
-	return l.SweepClaims(nowMs(), id.Runtime, func(tab string) (ChatView, bool) {
+	res := l.SweepClaims(nowMs(), id.Runtime, func(tab string) (ChatView, bool) {
 		c, ok := chats[tab]
 		return ChatView{State: c.State, Title: c.Title()}, ok
-	}, missing), nil
+	}, missing)
+	l.leaseMem.forget(res.Released)
+	return res, nil
 }
 
 func stem(v string) string { return strings.TrimSuffix(v, dcSuffix) }
@@ -236,6 +240,13 @@ type ClaimOutcome struct {
 	Refreshed bool
 	Holder    *Claim
 	Message   string
+	// Lost: the chat held this board before and the lease is not the one it had (it was taken off, or ran out): the
+	// lease is taken again, but the chat has to read the file anew before it writes.
+	Lost bool
+	// Offline: the design center did not answer; the edit goes on without a lease.
+	Offline bool
+	// Notice: this chat's earlier edit of the board lost to another version by revision; told once.
+	Notice *SyncNotice
 }
 
 func (l *Library) ClaimForChat(session string, project, board any) (ClaimOutcome, error) {
@@ -259,6 +270,9 @@ func (l *Library) ClaimForChat(session string, project, board any) (ClaimOutcome
 	if _, err := l.SweepOwnClaims(l.keeperMissing()); err != nil {
 		return ClaimOutcome{}, err
 	}
+	if n := l.TakeSyncNotice(a.ID, boardFileOf(a, key)); n != nil {
+		return ClaimOutcome{Claim: Claim{Project: a.ID, Board: key}, Notice: n, Message: n.Message()}, nil
+	}
 	owner := ClaimOwner{User: id.Person, Runtime: id.Runtime, TabID: caller.TabID, ChatTitle: caller.ChatTitle}
 	// A runtime without meta/ claims the same page under its old key.
 	if legacy := legacyKeyOf(a, key); legacy != "" {
@@ -270,6 +284,9 @@ func (l *Library) ClaimForChat(session string, project, board any) (ClaimOutcome
 		}
 	}
 	res, err := l.ClaimBoard(a.ID, key, owner, nowMs())
+	if errors.Is(err, errLeaseOffline) {
+		return ClaimOutcome{Claim: Claim{Project: a.ID, Board: key}, Offline: true}, nil
+	}
 	if err != nil {
 		return ClaimOutcome{}, err
 	}
@@ -278,6 +295,9 @@ func (l *Library) ClaimForChat(session string, project, board any) (ClaimOutcome
 	}
 	out := ClaimOutcome{Claim: res.Claim, Refreshed: res.Refreshed}
 	out.Claim.Board, out.Page = claimShown(a, res.Claim.Board)
+	if l.leaseMem.lost(caller.TabID, a.ID, key, res.Claim.Since) {
+		out.Lost, out.Message = true, leaseLostMessage(out.Claim.Board)
+	}
 	return out, nil
 }
 
@@ -290,6 +310,9 @@ func (l *Library) claimRefused(a *Artifact, held *Claim, id Identity) (ClaimOutc
 		if c, ok := l.agentChats()[held.Owner.TabID]; ok {
 			local, ws = true, c.WorkspaceID
 		}
+	}
+	if shown.Owner.Machine != "" {
+		return ClaimOutcome{Holder: &shown, Message: leaseHeldMessage(shown, nowMs())}, nil
 	}
 	return ClaimOutcome{Holder: &shown, Message: l.conflictMessage(shown, local, ws, nowMs())}, nil
 }
@@ -321,10 +344,13 @@ func (l *Library) ReleaseForChat(session string, project, board any) ([]Claim, e
 				f.Board = legacy
 				released = append(released, l.ReleaseClaims(f, nowMs())...)
 			}
+			l.leaseMem.forget(released)
 			return l.shownClaims(released), nil
 		}
 	}
-	return l.shownClaims(l.ReleaseClaims(f, nowMs())), nil
+	released := l.ReleaseClaims(f, nowMs())
+	l.leaseMem.forget(released)
+	return l.shownClaims(released), nil
 }
 
 // ClaimLine is a claim as `who` prints it.
@@ -418,4 +444,12 @@ func (l *Library) shownClaims(claims []Claim) []Claim {
 		out = append(out, c)
 	}
 	return out
+}
+
+// boardFileOf is the file of the board a claim key names; the key itself when no board has it.
+func boardFileOf(a *Artifact, key string) string {
+	if b, ok := boardOfKey(a, key); ok && b.Path != "" {
+		return filepath.Base(b.Path)
+	}
+	return key + dcSuffix
 }

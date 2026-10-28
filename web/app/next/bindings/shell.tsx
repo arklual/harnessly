@@ -18,9 +18,15 @@ import { useAgentTerminal } from '@/next/bindings/agent-terminal';
 import { useRightPane } from '@/next/bindings/right-pane';
 import { useChatBackground } from '@/next/bindings/chat-background';
 import { useCentralHistory } from '@/next/bindings/use-central';
+import { useProfileSidebarMerge } from '@/next/bindings/use-profile-sidebar';
 import ChatView from '@/next/bindings/chat-view';
 import HomeComposer from '@/next/bindings/home-composer';
-import { machineSwitchLeavesChat, useShellModel, useTabChats } from '@/next/bindings/shell-model';
+import {
+  machineProjectOf,
+  machineSwitchLeavesChat,
+  useShellModel,
+  useTabChats,
+} from '@/next/bindings/shell-model';
 import { bootNext, shutdownNext, useBoot } from '@/next/boot';
 import { markSeen, setGoal } from '@/next/commands';
 import { connectionStore } from '@/next/stores/connection';
@@ -87,7 +93,12 @@ import { useMe } from '@/next/stores/me';
 import { useHomeMachine } from '@/next/stores/machines';
 import { useCentral } from '@/next/stores/central';
 import { useFeed } from '@/next/stores/conversation';
-import { newChatProjectStore, useNewChatProject } from '@/next/stores/new-chat';
+import {
+  newChatMachineStore,
+  newChatProjectStore,
+  useNewChatMachine,
+  useNewChatProject,
+} from '@/next/stores/new-chat';
 import { UI_REQUEST, useUiRequest } from '@/next/stores/ui-requests';
 import { ToastHost, toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
@@ -136,6 +147,7 @@ const useCentralList = () => {
       .join(','),
   );
   useCentralHistory(links);
+  useProfileSidebarMerge();
 };
 
 const useClock = () => {
@@ -436,13 +448,29 @@ const Shell = ({ owner }: IShellProps) => {
     term.reveal,
     paneStrip,
   );
-  const projectDialog = useProjectDialog(model.active);
+  const projectDialog = useProjectDialog(model.active, model.personSidebar);
   const resumeDialog = useResumeDialog(model.active, machineName, now, (id) =>
     navigate({ kind: ROUTE.chat, id }),
   );
   // «/resume» in the field opens the same list of earlier sessions as the start page's link.
   useUiRequest(UI_REQUEST.resume, resumeDialog.show);
   const newChatProject = useNewChatProject();
+  // the machine the next chat starts on, the default one unless another was picked for it; a
+  // pick of a machine that cannot take a chat now is no pick.
+  const newChatMachine = useNewChatMachine();
+  const startOn = model.startMachines.find((m) => m.id === newChatMachine && !m.off)?.id ?? model.active;
+  // Picked in the model's popover, for a person with several machines; the default one is no pick.
+  const startPick = useMemo(
+    () =>
+      startOn && model.startMachines.length > 1
+        ? {
+            current: startOn,
+            choices: model.startMachines,
+            onPick: (id: string) => newChatMachineStore.set(id === model.startMachines[0]?.id ? null : id),
+          }
+        : null,
+    [startOn, model.startMachines],
+  );
   // A project picked for the next chat that the list no longer has is no pick.
   const newChatInto = model.projects?.find((project) => project.id === newChatProject) ?? null;
   const newChatName = newChatInto?.name ?? null;
@@ -497,6 +525,7 @@ const Shell = ({ owner }: IShellProps) => {
       onOpen={openChat}
       onNewChat={() => {
         newChatProjectStore.set(null);
+        newChatMachineStore.set(null);
         // From Designly the field flies back down to the start page's.
         if (!tabs.enabled && route.kind === ROUTE.designly && !wantsNewTab())
           flyComposer(FLY_FIELD.designly, FLY_FIELD.home, () => goTo(HOME));
@@ -701,11 +730,14 @@ const Shell = ({ owner }: IShellProps) => {
           tools={<HomeTools tools={homeTools} />}
           composer={
             <HomeComposer
-              machine={model.active}
+              machine={startOn}
               conversations={model.conversations}
               projectId={newChatInto?.id ?? null}
+              resolveProject={model.personSidebar ? machineProjectOf : undefined}
+              machines={startPick}
               onCreated={(id) => {
                 newChatProjectStore.set(null);
+                newChatMachineStore.set(null);
                 goTo({ kind: ROUTE.chat, id });
               }}
             />

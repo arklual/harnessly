@@ -262,7 +262,7 @@ func TestLaunchLinesSourceTheEnvFiles(t *testing.T) {
 	if err != nil || !strings.HasPrefix(bare, "DISABLE_AUTOUPDATER=1 ") {
 		t.Fatalf("%q %v", bare, err)
 	}
-	if line, _ := ag.ResumeLine(agents.Claude, sid, "ws-a", nil); line != bare {
+	if line, _ := ag.ResumeLine(agents.Claude, sid, "ws-a", nil); line != agents.ForAnyShell(bare) {
 		t.Errorf("without env files: %q", line)
 	}
 
@@ -271,10 +271,10 @@ func TestLaunchLinesSourceTheEnvFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantAll := "set -a; . '" + all + "'; set +a; "
-	if line, _ := ag.ResumeLine(agents.Claude, sid, "ws-a", nil); line != wantAll+bare {
+	if line, _ := ag.ResumeLine(agents.Claude, sid, "ws-a", nil); line != agents.ForAnyShell(wantAll+bare) {
 		t.Errorf("resume: %q", line)
 	}
-	if line, err := ag.LaunchLine(agents.Claude, "ws-a", nil); err != nil || !strings.HasPrefix(line, wantAll+"DISABLE_AUTOUPDATER=1 ") {
+	if line, err := ag.LaunchLine(agents.Claude, "ws-a", nil); err != nil || !strings.HasPrefix(unwrapped(line), wantAll+"exec env DISABLE_AUTOUPDATER=1 ") {
 		t.Errorf("launch: %q %v", line, err)
 	}
 	// The starter's lines stay bare, the prefix is the starter's to place.
@@ -338,4 +338,10 @@ func TestHubPolicyRouteTellsTheChatGuard(t *testing.T) {
 	if rec := c.do("POST", "/api/policy", `{"terminal":true}`, asAgent); rec.Code != http.StatusTeapot {
 		t.Errorf("another path: %d", rec.Code)
 	}
+}
+
+// unwrapped is the sh line of a line written for any shell.
+func unwrapped(line string) string {
+	inner, _ := agents.UnwrapAnyShell(line)
+	return inner
 }

@@ -354,7 +354,7 @@ func (m *Manager) verify(provider string) (version, problem string) {
 const profileMarker = "# added by harnessly: the agent CLIs install into ~/.local/bin"
 
 // addLocalBinToProfile appends the PATH line to ~/.profile, and to ~/.zprofile when the account uses zsh, unless it is
-// there.
+// there; an account with fish gets it in fish's conf.d.
 func addLocalBinToProfile(home string) error {
 	if home == "" {
 		return errors.New("no home folder")
@@ -387,7 +387,26 @@ func addLocalBinToProfile(home string) error {
 			return werr
 		}
 	}
-	return nil
+	return addLocalBinToFish(home)
+}
+
+// fishProfile is where fish, which reads no ~/.profile, picks up the same PATH line.
+const fishProfile = ".config/fish/conf.d/harnessly-local-bin.fish"
+
+// addLocalBinToFish writes fishProfile when the account has a fish config, unless it is there.
+func addLocalBinToFish(home string) error {
+	if st, err := os.Stat(filepath.Join(home, ".config", "fish")); err != nil || !st.IsDir() {
+		return nil
+	}
+	path := filepath.Join(home, fishProfile)
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	// `contains … or set` and not fish_add_path: fish before 3.2 has no fish_add_path.
+	return os.WriteFile(path, []byte(profileMarker+"\ncontains -- $HOME/.local/bin $PATH; or set -gx PATH $HOME/.local/bin $PATH\n"), 0o644)
 }
 
 // The scripts. Each prints what went wrong on its output (2>&1) and exits non-zero; $HL_JOB_DIR is the job's folder.

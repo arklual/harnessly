@@ -333,7 +333,8 @@ func (s *Starter) Start(o Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	command := s.envSource(o.Provider) + env + agents.WithInitialPrompt(o.Provider, line, prompt, promptFile)
+	// Written for sh, typed into whatever shell the pane runs (fish too).
+	command := agents.ForAnyShell(s.envSource(o.Provider) + env + agents.WithInitialPrompt(o.Provider, line, prompt, promptFile))
 	name := ""
 	if o.TabName != nil {
 		name = jscompat.Trim(*o.TabName)

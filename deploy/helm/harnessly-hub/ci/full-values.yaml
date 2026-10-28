@@ -1,6 +1,12 @@
 # Everything on, to render every template: bundled Postgres, wildcard ingress, three kinds of sign-in.
 publicUrl: https://hub.example.com
 runtimeDomain: run.example.net
+sitesDomain: sites.example.org
+sites:
+  abuseUrl: mailto:abuse@example.com
+  s3:
+    endpoint: https://s3.example.com
+    bucket: hub-sites
 signup: invite
 adminEmails: [you@example.com]
 mailFrom: "harnessly <no-reply@example.com>"
@@ -27,3 +33,5 @@ ingress:
       hosts: [hub.example.com]
     - secretName: hub-machines-tls
       hosts: ["*.run.example.net"]
+    - secretName: hub-sites-tls
+      hosts: ["*.sites.example.org"]

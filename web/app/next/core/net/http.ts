@@ -124,6 +124,25 @@ export async function sendBody<T>(
   return answerPage(res, read);
 }
 
+/** A resource's PUT of raw bytes (a recording), typed as the blob is: the answer through the strict reader. */
+export async function sendBlob<T>(
+  url: string,
+  blob: Blob,
+  read: (v: unknown) => T,
+  timeoutMs: number,
+): Promise<PageOutcome<T>> {
+  const res = await timed(
+    url,
+    {
+      method: 'PUT',
+      headers: { ...headers(false), 'Content-Type': blob.type || 'application/octet-stream' },
+      body: blob,
+    },
+    timeoutMs,
+  );
+  return answerPage(res, read);
+}
+
 async function answerPage<T>(
   res: Response | 'timeout' | 'network',
   read: (v: unknown) => T,

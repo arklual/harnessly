@@ -5,7 +5,9 @@
 // it, on the models that run it, and on the pill a glow and a mark of its own beside «model · depth». The pill and the
 // row's glow are what the agent was last seen running; a turn of the switch the agent has not confirmed yet shows on the
 // switch and is said under it, never on the pill. On the phone it stays the same compact popover over the pill (the
-// design's mobile.css keeps it one), its rows a finger tall.
+// design's mobile.css keeps it one), its rows a finger tall. A new chat of a person with several machines also says
+// the machine it starts on, a row under the depth that opens a third screen of the machines: another one
+// brings that machine's agents and models, the ones logged in there.
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   agentKey,
@@ -24,12 +26,13 @@ import { EFFORTS, type AgentModel, type Effort } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import Switch from '@/next/ui/switch';
 import { usePresentFlag } from '@/next/ui/presence';
+import type { IMachineChoice } from '@/next/features/sidebar/types';
 import { t } from '@/next/i18n';
 import '@/next/styles/picker.css';
 
 const EXIT_MS = 240;
 
-const VIEW = { effort: 'effort', models: 'models' } as const;
+const VIEW = { effort: 'effort', models: 'models', machines: 'machines' } as const;
 type TView = (typeof VIEW)[keyof typeof VIEW];
 
 export interface IModelPickerProps {
@@ -61,6 +64,15 @@ export interface IModelPickerProps {
     agents: readonly IPickerAgent[];
     onPick: (target: IPickerAgent, model: AgentModel) => void;
   } | null;
+  /**
+   * The machine a new chat starts on, for a person with several: `choices` every machine, the default
+   * first; one that cannot take a chat now is dimmed with the word why. Absent: the row does not show.
+   */
+  machine?: {
+    current: string;
+    choices: readonly IMachineChoice[];
+    onPick: (id: string) => void;
+  } | null;
 }
 
 /** The stops of a model's slider, in the order of the protocol's efforts. */
@@ -84,6 +96,7 @@ const ModelPicker = ({
   onChange,
   multi,
   handoff = null,
+  machine = null,
 }: IModelPickerProps) => {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<TView>(VIEW.effort);
@@ -215,6 +228,7 @@ const ModelPicker = ({
       ? chosenKeys.has(choiceKey({ provider: target.provider, profile: target.profile, model: m.id }))
       : agentKey(target) === choiceAgentKey(value) && m.id === value.model;
   const more = multi ? multi.chosen.length - 1 : 0;
+  const startsOn = machine?.choices.find((c) => c.id === machine.current) ?? null;
 
   const hint = (): string => {
     if (blocked) return blocked;
@@ -349,6 +363,15 @@ const ModelPicker = ({
                   />
                 </div>
               )}
+              {machine && startsOn && (
+                <button type="button" className="hx-picker__vm" onClick={() => setView(VIEW.machines)}>
+                  <Icon name="server" size="sm" className="hx-picker__vm-ic" />
+                  <span className="hx-picker__vm-name">
+                    {t('next.picker.machineOn', { machine: startsOn.name })}
+                  </span>
+                  <Icon name="chevron-right" size="sm" className="hx-picker__vm-chev" />
+                </button>
+              )}
             </div>
 
             <div className="hx-picker__pane" data-pane="models" data-active={view === VIEW.models}>
@@ -447,6 +470,46 @@ const ModelPicker = ({
               {multi && <div className="hx-picker__hint">{t('next.picker.multiHint')}</div>}
               {blocked && <div className="hx-picker__hint">{blocked}</div>}
             </div>
+
+            {machine && (
+              <div className="hx-picker__pane" data-pane="machines" data-active={view === VIEW.machines}>
+                <div className="hx-picker__head">
+                  <button
+                    type="button"
+                    className="hx-picker__back"
+                    aria-label={t('next.picker.back')}
+                    onClick={() => setView(VIEW.effort)}
+                  >
+                    <Icon name="chevron-left" size="sm" />
+                    <span>{t('next.picker.machineTitle')}</span>
+                  </button>
+                </div>
+                <div className="hx-options" data-active="true" role="listbox">
+                  {machine.choices.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="option"
+                      className="hx-option"
+                      tabIndex={view === VIEW.machines ? 0 : -1}
+                      disabled={c.off}
+                      aria-selected={c.id === machine.current}
+                      onClick={() => {
+                        machine.onPick(c.id);
+                        setView(VIEW.effort);
+                      }}
+                    >
+                      <span className="hx-option__text">
+                        <span className="hx-option__name">{c.name}</span>
+                        {c.note && <span className="hx-option__desc">{c.note}</span>}
+                      </span>
+                      <Icon name="check" size="sm" className="hx-option__check" />
+                    </button>
+                  ))}
+                </div>
+                <div className="hx-picker__hint">{t('next.picker.machineHint')}</div>
+              </div>
+            )}
           </div>
         </div>
       )}

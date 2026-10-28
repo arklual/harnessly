@@ -168,8 +168,9 @@ var Rules = []Rule{
 
 	{In: QuestionAsked, From: kinds(wire.StateWorking, wire.StateUnknown), To: wire.StateWaitingQuestion,
 		Effects: []EffectKind{AskQuestion}},
-	{In: PermissionPrompt, From: kinds(wire.StateWorking, wire.StateUnknown), To: wire.StateWaitingPermission,
-		Effects: []EffectKind{RequestPermission}},
+	// A background agent asks after the chat's turn ended: the chat waits for the answer all the same.
+	{In: PermissionPrompt, From: kinds(wire.StateWorking, wire.StateUnknown, wire.StateIdle, wire.StateReady),
+		To: wire.StateWaitingPermission, Effects: []EffectKind{RequestPermission}},
 	// The spec has plan from working; a probe after a restart finds the plan menu of an unknown agent too.
 	{In: PlanProposed, From: kinds(wire.StateWorking, wire.StateUnknown), To: wire.StateWaitingPermission,
 		Effects: []EffectKind{ProposePlan}},

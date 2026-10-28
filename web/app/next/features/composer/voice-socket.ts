@@ -6,7 +6,7 @@
 // and how far it is; the recording waits for ready and goes on as soon as it comes.
 import { runtimeSocket } from '@/next/core/net/machine';
 import type { MachineId } from '@/next/protocol/v2';
-import type { TLang } from '@/next/i18n';
+import type { TDictationLang } from '@/next/stores/voice';
 
 /** The model may be loading on the machine; the recording waits for it, so this is generous. */
 const CONNECT_MS = 35_000;
@@ -61,7 +61,7 @@ const parse = (data: unknown): IServerMessage | null => {
   }
 };
 
-export const openDictation = (m: MachineId, lang: TLang, events: IDictationEvents): IDictation => {
+export const openDictation = (m: MachineId, lang: TDictationLang, events: IDictationEvents): IDictation => {
   let socket: WebSocket | null = null;
   let ready = false;
   let over = false;

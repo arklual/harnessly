@@ -14,6 +14,7 @@ import {
 import type { LoginState, LoginVia } from '@/next/features/accounts/model';
 import type { IAgentCredentials } from '@/next/features/settings/accounts-section';
 import { t } from '@/next/i18n';
+import { noteAgentAccount, refreshAgentAccounts, useMachineAccounts } from '@/next/stores/agent-accounts';
 import type { LoginFlow, LoginStatus, MachineId, Provider } from '@/next/protocol/v2';
 import type { AgentSettings } from '@/next/protocol/v2';
 
@@ -54,6 +55,12 @@ export const useAgentCredentials = (
   reload: () => void,
 ): IAgentCredentials => {
   const [login, setLogin] = useState<LoginState>(IDLE);
+  const seen = useMachineAccounts(machine, provider);
+  const who = settings?.account.who ?? null;
+  // The cluster keeps which account this machine was signed in with: the one the CLI holds now goes to it.
+  useEffect(() => {
+    void (who === null ? refreshAgentAccounts() : noteAgentAccount(machine, provider, who));
+  }, [machine, provider, who]);
   const flowId = useRef<string | null>(null);
   const running = login.k === 'starting' || login.k === 'waiting' || login.k === 'checking';
 
@@ -129,6 +136,7 @@ export const useAgentCredentials = (
 
   return {
     login,
+    seen,
     // The machine does not give a key back, not even its digits: only that the agent signed in with one.
     key: { configured: settings?.account.signedIn === true && settings.account.method === 'key', tail: null },
     onLogin,

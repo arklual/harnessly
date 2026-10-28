@@ -79,7 +79,7 @@ func TestStandaloneWritesTheCodexLauncherWithoutExtraEnv(t *testing.T) {
 		MCPPath:        "/api/cli/preview/mcp",
 		ScriptDataDirs: scriptDataDirs(data, home), TokenHeaders: []string{"x-cli-token"}})
 	line, err := a.LaunchLine(agents.Codex, "ws-1", nil)
-	if err != nil || !strings.HasPrefix(line, "node '"+filepath.Join(data, "codex-launcher.js")+"'") {
+	if err != nil || !strings.HasPrefix(unwrapped(line), "exec env node '"+filepath.Join(data, "codex-launcher.js")+"'") {
 		t.Fatalf("codex launch line: %q, %v", line, err)
 	}
 	if err := os.Remove(filepath.Join(data, "codex-launcher.js")); err != nil {

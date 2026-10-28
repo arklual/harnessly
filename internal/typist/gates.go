@@ -109,31 +109,58 @@ func withoutOwnCd(command, cwd string) (string, bool) {
 	return command[len(m[0]):], true
 }
 
-// commandBlock is the first run of gutter lines under the dialog's last solid rule and above its first option: the
-// box Claude draws the command in (the warnings and the timer come in a box of their own after it). Gutters are off.
+// commandBlock is the box Claude draws the command in, gutters off: the first run of gutter lines under the dialog's
+// last solid rule and above its first option (the warnings and the timer come in a box of their own after it). The
+// dialog of a command its checker could not read («This shell -c script runs rm and could not be checked») closes the
+// command's box with a solid rule of its own and puts the reason under it: then the box is the run under the rule
+// before, and it must end right at the last rule.
 func commandBlock(plain string) []string {
 	lines := strings.Split(plain, "\n")
-	start := 0
-	for i := len(lines) - 1; i >= 0; i-- {
-		if solidRuleRE.MatchString(lines[i]) {
-			start = i + 1
-			break
+	var rules []int
+	for i, l := range lines {
+		if solidRuleRE.MatchString(l) {
+			rules = append(rules, i)
 		}
 	}
+	if len(rules) == 0 {
+		block, _ := gutterRun(lines)
+		return block
+	}
+	last := rules[len(rules)-1]
+	if block, _ := gutterRun(lines[last+1:]); len(block) > 0 || len(rules) == 1 {
+		return block
+	}
+	prev := rules[len(rules)-2]
+	block, end := gutterRun(lines[prev+1 : last])
+	if prev+1+end != last {
+		return nil
+	}
+	return block
+}
+
+// gutterRun is the first run of gutter lines above the first option, gutters off, and the index of the line after it.
+func gutterRun(lines []string) ([]string, int) {
 	var block []string
-	for _, l := range lines[start:] {
+	for i, l := range lines {
 		if firstOptRE.MatchString(l) {
-			break
+			return block, i
 		}
 		if !gutterRE.MatchString(l) {
 			if len(block) > 0 {
-				break
+				return block, i
 			}
 			continue
 		}
 		block = append(block, strings.TrimSpace(gutterRE.ReplaceAllString(l, "")))
 	}
-	return block
+	return block, len(lines)
+}
+
+// DrawnCommand is the shell command the permission dialog on a plain screen draws, its wrapped lines joined by
+// newlines as drawn ("" when no command box is found). A gate made from the screen alone (the prompt of a background
+// agent: no call of the chat's own is pending) shows it and checks the menu against it before a key goes in.
+func DrawnCommand(plain string) string {
+	return strings.Join(commandBlock(plain), "\n")
 }
 
 // unwraps: the lines of the block, joined as the dialog wraps them (a break eats a space or none), are exactly the

@@ -13,6 +13,47 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-10-28i',
+    items: [
+      { key: 'same', icon: 'messages-square' },
+      { key: 'machine', icon: 'server' },
+      { key: 'publish', icon: 'globe' },
+    ],
+  },
+  {
+    id: '2026-10-28h',
+    items: [{ key: 'terminal', icon: 'square-terminal' }],
+  },
+  {
+    id: '2026-10-28g',
+    items: [{ key: 'account', icon: 'user' }],
+  },
+  {
+    id: '2026-10-28e',
+    items: [
+      { key: 'takes', icon: 'mic' },
+      { key: 'keep', icon: 'history' },
+    ],
+  },
+  {
+    id: '2026-10-28d',
+    items: [
+      { key: 'edit', icon: 'pencil' },
+      { key: 'kept', icon: 'mic' },
+    ],
+  },
+  {
+    id: '2026-10-28c',
+    items: [{ key: 'login', icon: 'log-in' }],
+  },
+  {
+    id: '2026-10-28b',
+    items: [
+      { key: 'folders', icon: 'folder' },
+      { key: 'machine', icon: 'server' },
+    ],
+  },
+  {
     id: '2026-10-28',
     items: [
       { key: 'one', icon: 'messages-square' },

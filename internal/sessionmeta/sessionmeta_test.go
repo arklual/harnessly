@@ -136,6 +136,30 @@ func TestReaderGoesOnFromWhatItRead(t *testing.T) {
 	}
 }
 
+// A chat can name its transcript before the agent writes it, and a transcript can go away: the read says nothing and
+// lives on, it does not take the runtime down.
+func TestReaderOutlivesAMissingTranscript(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	var r Reader
+	for range 2 {
+		if got := r.Read(path); got.Effort != "" || got.Goal != nil {
+			t.Fatalf("got %+v", got)
+		}
+	}
+	if err := os.WriteFile(path, []byte(request("high")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Read(path).Effort; got != "high" {
+		t.Fatalf("got %q", got)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Read(path).Effort; got != "" {
+		t.Fatalf("a gone transcript still says %q", got)
+	}
+}
+
 func TestAgentReadsItsFiles(t *testing.T) {
 	dir := t.TempDir()
 	transcript := filepath.Join(dir, "sess.jsonl")

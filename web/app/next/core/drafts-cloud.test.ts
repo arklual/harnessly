@@ -138,6 +138,28 @@ describe('drafts on the machine', () => {
     expect(book.get(CONV)).toMatchObject({ text: '', rev: 2 });
   });
 
+  it('a write whose answer was lost does not come back into the field after a send', async () => {
+    const { rt, book } = await start();
+    // The machine takes the write, its answer is lost and its event comes late (a loaded machine).
+    const takes = rt.handlers.get('draft.set')!;
+    rt.handlers.set('draft.set', (cmd) => {
+      const b = cmd.body as CommandBodies['draft.set'];
+      const d: Draft = { key: b.key, text: b.text, rev: b.rev, deviceId: 'dev-here', at: Date.now() };
+      book.set(b.key, d);
+      setTimeout(() => rt.emit('convs', { type: 'draft_upsert', draft: d }), 3000);
+      rt.handlers.set('draft.set', takes);
+      return { r: 'accepted', ch: 'convs', seq: 0, rev: b.rev };
+    });
+    rt.loseAnswers = 1;
+    await typing('отправлю сейчас');
+    clearDraft(CONV); // sent
+    await vi.advanceTimersByTimeAsync(3000);
+    await settle();
+    expect(draftsStore.has(CONV) ? draftText(CONV) : '').toBe('');
+    await vi.advanceTimersByTimeAsync(CLOUD_DELAY_MS + 50);
+    expect(book.get(CONV)).toMatchObject({ text: '', rev: 2 });
+  });
+
   it('the new-chat field goes to the active machine under its own key', async () => {
     const { book } = await start();
     await typing('новый чат про', NEW_CHAT);

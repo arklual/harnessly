@@ -258,6 +258,9 @@
   "next.picker.effortHint.ultra": "Выше максимума: самое долгое и дорогое",
   "next.picker.ultracode": "Ultracode",
   "next.picker.ultracodeHint": "Сабагенты на каждой задаче",
+  "next.picker.machineOn": "На ВМ {machine}",
+  "next.picker.machineTitle": "Машина нового чата",
+  "next.picker.machineHint": "Агенты и модели — те, что вошли на этой машине",
   "next.picker.ultracodeWaitsOn": "Включится, когда агент подтвердит",
   "next.picker.ultracodeWaitsOff": "Выключится, когда агент подтвердит",
   "next.picker.ultracodeTitle": "Динамические воркфлоу с сабагентами на каждой задаче",
@@ -479,5 +482,13 @@
   "next.dockBar.keyOpen": "Модели и ключи",
   "next.outputs.kind.delivery": "Файл",
   "next.delivered.save": "Скачать",
-  "next.dockBar.off": "Машина выключена — сообщение отправить нельзя"
+  "next.dockBar.off": "Машина выключена — сообщение отправить нельзя",
+  "next.loginCard.title": "Вход в {agent} истёк",
+  "next.loginCard.lead": "Войдите заново прямо здесь — терминал не нужен. Потом сообщение можно отправить ещё раз.",
+  "next.loginCard.doneTitle": "Вход в {agent} выполнен",
+  "next.loginCard.doneLead": "Можно продолжать: отправьте сообщение ещё раз.",
+  "next.loginCard.retry": "Отправить ещё раз",
+  "next.cleared.login": "В терминале было открыто меню входа — закрыл его, чтобы отправить сообщение",
+  "next.cleared.model": "В терминале был открыт выбор модели — закрыл его, чтобы отправить сообщение",
+  "next.cleared.effort": "В терминале была открыта настройка effort — закрыл её, чтобы отправить сообщение"
 }

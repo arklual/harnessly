@@ -637,8 +637,8 @@ func (c *conv) feedUpdateOf(u feed.Update, live, past bool, now time.Time) {
 			// A transcript read whole does not know where its entries began; the message in flight takes the first.
 			offset = math.MaxInt64
 		}
-		text := ""
-		if e, ok := c.fd.Entry(s.EntryID); ok {
+		text := s.Text
+		if e, ok := c.fd.Entry(s.EntryID); ok && text == "" {
 			text = e.Text
 		}
 		client, ch := c.box.UserEntryText(s.EntryID, text, offset, turn, now)
@@ -960,8 +960,9 @@ func (c *conv) seeing(s seen, now time.Time) {
 			}
 		}
 	}
-	if look.Busy && look.Menu == typist.NoMenu && k == wire.StateWaitingPermission {
-		// The prompt left and the agent works: it went past the permission.
+	if look.Menu == typist.NoMenu && k == wire.StateWaitingPermission && (look.Busy || look.InputLine && c.fd.OpenTurn() == "") {
+		// The prompt left and the agent works: it went past the permission. A prompt asked after the turn (a background
+		// agent's) leaves the input box behind, with no spinner of the chat's own.
 		c.input(agentstate.Input{K: agentstate.GateResolved}, now)
 	}
 	if look.Busy {
@@ -1010,6 +1011,11 @@ func (c *conv) compacting(now time.Time) bool {
 	return c.rec.State.K == wire.StateWorking && c.rec.State.Compacting && now.Sub(c.compactAt) < CompactHold
 }
 
+// screenGateFrom are the states a permission prompt on the screen opens a gate in: at work, unknown, and idle or ready —
+// the turn is over but a background agent of the chat still runs and asks.
+var screenGateFrom = map[wire.AgentStateKind]bool{wire.StateWorking: true, wire.StateUnknown: true, wire.StateIdle: true,
+	wire.StateReady: true}
+
 // permissionOnScreen: Claude's permission prompt is up. Its gate is the pending tool call's; the hook said so first,
 // or the screen does now.
 func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
@@ -1030,8 +1036,8 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 		}
 		return
 	}
-	k := c.rec.State.K
-	if k != wire.StateWorking && k != wire.StateUnknown {
+	// A chat whose turn is over asks too: its background agents run on and their prompts come up on the same screen.
+	if !screenGateFrom[c.rec.State.K] {
 		return
 	}
 	p := wire.Permission{ConversationID: c.rec.ID, Kind: wire.PermTool, AskedAt: ms(now),
@@ -1046,9 +1052,18 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 		}
 	} else {
 		p.ID = wire.PermissionID(c.rec.ID + ":" + itoa(c.seq+1))
+		// No call of the chat's own is pending (a background agent asks): the card shows the command the dialog draws.
+		if drawn := typist.DrawnCommand(look.Plain); drawn != "" {
+			sum := "$ " + drawn
+			p.Command = &sum
+		}
 	}
+	// The card stands in its turn: the open one, else the last (a background agent asks after it ended).
 	if open := c.fd.OpenTurn(); open != "" {
 		p.TurnID = &open
+	} else if last := c.fd.LastTurn(); last != nil {
+		id := last.ID
+		p.TurnID = &id
 	}
 	if g := c.gates[p.ID]; g != nil {
 		return

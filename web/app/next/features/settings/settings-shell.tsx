@@ -10,8 +10,10 @@ import Icon from '@/next/ui/icon';
 /** What a section's entry in the list draws: a glyph of the icon set, or the logo of an agent. */
 const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent: 'claude' | 'codex' }>> = {
   general: { icon: 'sliders-horizontal' },
+  voice: { icon: 'mic' },
   notifications: { icon: 'bell' },
   safe: { icon: 'lock' },
+  takes: { icon: 'mic' },
   accounts: { icon: 'key-round' },
   claude: { agent: 'claude' },
   codex: { agent: 'codex' },

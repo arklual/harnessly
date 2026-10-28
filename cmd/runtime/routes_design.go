@@ -63,6 +63,12 @@ func designConfig(d deps) design.Config {
 		OwnerEmail:       os.Getenv("RUNTIME_OWNER_EMAIL"),
 		CanvasKey:        os.Getenv("RUNTIME_DESIGN_CANVAS_KEY"),
 		EngineFile:       os.Getenv("RUNTIME_DESIGN_ENGINE_FILE"),
+		Leases: design.LeaseConfig{
+			Mode:      os.Getenv("RUNTIME_DESIGN_LEASES"),
+			HubURL:    os.Getenv("RUNTIME_DESIGN_HUB_URL"),
+			Token:     os.Getenv("RUNTIME_DESIGN_HUB_TOKEN"),
+			TokenFile: os.Getenv("RUNTIME_DESIGN_HUB_TOKEN_FILE"),
+		},
 		// The transcripts the listing reads to see who works on what: the agents' own folders under the home.
 		ClaudeProjects: filepath.Join(d.Home, ".claude", "projects"),
 		CodexSessions:  filepath.Join(d.Home, ".codex", "sessions"),
@@ -145,7 +151,9 @@ func designRoutes(d deps) []gate.JSONRoute {
 		designRoute("/api/cli/design/notes", a.CLINotes),
 		designRoute(platformAPI+"/design/library/releases", a.Releases),
 		designRoute(platformAPI+"/design/access", a.PostAccess),
+		designRoute(platformAPI+"/design/publish", a.Publish),
 		designRoute(platformAPI+"/design/library/claim", a.ClaimProject),
+		designRoute(platformAPI+"/design/library/delete", a.DeleteProject),
 		designRoute(platformAPI+"/design/engine", a.EngineStatus),
 	}
 }

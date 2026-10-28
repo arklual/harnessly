@@ -1,7 +1,7 @@
 // What the conversation view draws, as plain props. The wire types are a copy of the shapes in protocol/v2.ts (the v2
 // contract, internal/wire on the Go side) that this view reads; once protocol/v2.ts is on this branch they become
 // re-exports from it and nothing here changes shape. The view types below them are what the stores hand the feed.
-import type { AutoContinueWhy, Effort, MessageRef, TurnOutput } from '@/next/protocol/v2';
+import type { AutoContinueWhy, Effort, MessageRef, TerminalAside, TurnOutput } from '@/next/protocol/v2';
 
 export type { OutputKind, TurnOutput } from '@/next/protocol/v2';
 
@@ -238,6 +238,8 @@ export interface TurnItem {
   endNote: string | null;
   /** The prompt is a message the runtime sent to go on by itself; absent for any other turn. */
   auto?: AutoMark;
+  /** The screen of the agent's terminal closed before the message went in (the person's /login, a picker). */
+  cleared?: TerminalAside;
 }
 
 /** A message of the person that has no turn yet: going out, refused, or waiting for the network. */
@@ -247,6 +249,8 @@ export interface OutgoingItem {
   message: Message;
   /** The message is one the runtime sends to go on by itself; absent for any other. */
   auto?: AutoMark;
+  /** The screen of the agent's terminal closed before the message went in (the person's /login, a picker). */
+  cleared?: TerminalAside;
 }
 
 /** A model the conversation ran on, as the feed names it. */

@@ -1,0 +1,34 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.312[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mOpus 5.5 · Claude Max[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/…/-home-agent-workspace-example/52b6cf44-4863-493b-96ef-9dc9c2708101/scratchpad[39m
+
+[38;5;174m▎[39m Your Max plan includes $200 a month in API credits to power your apps and agents. Claim them at
+[38;5;174m▎[39m [94m]8;id=11prv8b;https://clau.de/api-credits\https://clau.de/api-credits[39m]8;;\
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ [38;5;246mtmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux.conf for wheel scroll[38;5;153m ▔
+[39m   [1m[38;5;153mLogin[0m
+
+   [1mClaude Code can be used with your Claude subscription or billed based on API usage through [0m
+   [1myour Console account.[0m
+
+   Select login method:
+
+   [38;5;153m❯[39m [38;5;246m1. [38;5;153mClaude account with subscription · [38;5;246mPro, Max, Team, or Enterprise[39m
+     [38;5;246m2. [39mAnthropic Console account · [38;5;246mAPI usage billing[39m
+     [38;5;246m3. [39m3rd-party platform · [38;5;246mAmazon Bedrock, Microsoft Foundry, Google Vertex AI[39m
+
+   [3m[38;5;246mEsc to cancel[0m

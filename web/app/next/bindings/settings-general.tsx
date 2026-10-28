@@ -4,6 +4,8 @@ import type { Pending } from '@/next/bindings/settings-agents';
 import AppsSection from '@/next/features/settings/apps-section';
 import BetaSection from '@/next/features/settings/beta-section';
 import GeneralSection from '@/next/features/settings/general-section';
+import UpdateGroup from '@/next/features/settings/update-group';
+import { applyMachineUpdate, loadUpdateInfo, type TUpdateInfo } from '@/next/features/update/machine-update';
 import { machineRows } from '@/next/features/settings/machines';
 import MachinesSection from '@/next/features/settings/machines-section';
 import { loadRuntimeSettings, saveRuntimeSettings, signOut } from '@/next/features/settings/api';
@@ -72,6 +74,44 @@ const useRuntimeSettings = (machine: MachineId) => {
   return { value, save };
 };
 
+/** «Обновления»: null until the runtime says, and on a runtime with nothing to tell. */
+const useUpdateInfo = (machine: MachineId) => {
+  const [read, setRead] = useState<{ machine: MachineId; value: TUpdateInfo } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void loadUpdateInfo(machine).then((value) => {
+      if (live && value) setRead({ machine, value });
+    });
+    return () => {
+      live = false;
+    };
+  }, [machine]);
+  const value = read?.machine === machine ? read.value : null;
+  const apply = async () => {
+    setBusy(true);
+    const next = await applyMachineUpdate(machine);
+    setBusy(false);
+    if (!next) {
+      toast(t('next.settings.update.noAnswer'), { tone: 'error' });
+      return;
+    }
+    const before = value?.kind === 'hub' ? value.machine : null;
+    setRead({ machine, value: { kind: 'hub', machine: next } });
+    // Programs were replaced: the runtime restarts by itself and the page comes back to it.
+    if (before && before.checked && !before.upToDate && next.upToDate && !next.error)
+      toast(t('next.settings.update.done'));
+  };
+  const copy = () => {
+    if (value?.kind !== 'hub') return;
+    void navigator.clipboard.writeText(value.machine.command).then(
+      () => toast(t('next.settings.update.copied')),
+      () => toast(t('next.shellData.noClipboard'), { tone: 'error' }),
+    );
+  };
+  return { value, busy, apply, copy };
+};
+
 interface IGeneralPageProps {
   machine: MachineId;
   /** The name the sidebar shows for the person. */
@@ -87,6 +127,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
   const paneAuto = usePaneAuto();
   const feedKinds = useFeedKinds();
   const runtime = useRuntimeSettings(machine);
+  const update = useUpdateInfo(machine);
   const settings = me.k === 'ready' ? me.me.settings : DEFAULT_SETTINGS;
   const email = me.k === 'ready' ? me.me.email : null;
   const { run, pending: waiting } = pending;
@@ -124,6 +165,16 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
       }
       onDelegation={(delegation: DelegationSettings) =>
         void run('delegation', failure, () => runtime.save({ delegation }))
+      }
+      updates={
+        update.value ? (
+          <UpdateGroup
+            info={update.value}
+            busy={update.busy}
+            onUpdate={() => void update.apply()}
+            onCopy={update.copy}
+          />
+        ) : null
       }
       onSignOut={() => {
         void signOut(machine).then((res) => {

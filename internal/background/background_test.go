@@ -139,6 +139,25 @@ func TestReaderReadsOnlyAppendedLines(t *testing.T) {
 	}
 }
 
+// A transcript not written yet, or gone, has no tasks and does not take the runtime down.
+func TestReaderOutlivesAMissingTranscript(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "session.jsonl")
+	r := &Reader{}
+	for range 2 {
+		if got := r.Read(file); len(got) != 0 {
+			t.Fatal(got)
+		}
+	}
+	ts := time.Now().UTC().Format(time.RFC3339)
+	body := line(`{"type":"tool_use","id":"t1","name":"Agent","input":{"description":"Research"}}`, ts) + "\n" + result("t1", "Async agent launched successfully. agentId: a1aaaaaaa (internal ID)", ts) + "\n"
+	if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(r.Read(file)); !reflect.DeepEqual(got, []string{"a1aaaaaaa"}) {
+		t.Fatal(got)
+	}
+}
+
 func TestReaderStartsALongTranscriptAtAWholeLine(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "long.jsonl")
 	ts := time.Now().UTC().Format(time.RFC3339)

@@ -7,6 +7,7 @@ import { useBeta } from '@/next/stores/beta';
 import { appBasePath } from '@/platform/config';
 import {
   createFavGroup,
+  createProject,
   deleteConversation,
   stopTerminal,
   forkConversation,
@@ -62,6 +63,19 @@ import {
 import { movedKey, useCentral, type CentralView } from '@/next/stores/central';
 import { useFavorites } from '@/next/stores/favorites';
 import { useProjects } from '@/next/stores/projects';
+import { editProfileSidebar, profileSidebarStore, useProfileSidebar } from '@/next/stores/profile-sidebar';
+import {
+  chatProjectOf,
+  favGroupAdded,
+  favGroupDeleted,
+  favGroupMoved,
+  favGroupRenamed,
+  favPlaced,
+  memberOn,
+  newFavGroupId,
+  profileProjectOf,
+  withMember,
+} from '@/next/features/sidebar/profile-layout';
 
 const GB = 1024 ** 3;
 const AGENT_NAME = { claude: 'Claude Code', codex: 'Codex' } as const;
@@ -331,6 +345,35 @@ export function useTabChats(): ReadonlyMap<string, ITabChat> {
 export const machineSwitchLeavesChat = (chatMachine: MachineId | null, picked: string): boolean =>
   chatMachine !== null && chatMachine !== picked;
 
+/** The person's sidebar as it stands now; a change of it is refused while it has not come. */
+const profileDoc = () => {
+  const st = profileSidebarStore.get();
+  if (st.k !== 'ready') throw new Error(t('next.profileSidebar.notReady'));
+  return st.doc;
+};
+
+/**
+ * The machine's project a project of the person stands for on `machine`: the one it has there, or a new one of
+ * its name made there now and recorded in the person's sidebar (a project of the profile gets its folders on a machine
+ * as its chats come there).
+ */
+export async function machineProjectOf(projectId: string, machine: MachineId): Promise<string> {
+  const have = memberOn(profileDoc(), projectId, machine);
+  if (have) return have;
+  const project = profileDoc().projects.find((p) => p.id === projectId);
+  if (!project) throw new Error(t('next.refuse.not-found'));
+  const st = await createProject(machine, project.name).done;
+  if (st.k === 'failed') throw new Error(failureText(st.failure));
+  const made = st.k === 'done' ? st.result.id : undefined;
+  if (!made) throw new Error(t('next.refuse.not-found'));
+  await editProfileSidebar((doc) => withMember(doc, projectId, { machineId: machine, projectId: made }));
+  return made;
+}
+
+/** A change of the favorites' layout of the person: refused with words when its group is gone. */
+const editFavorites = (edit: Parameters<typeof editProfileSidebar>[0]) =>
+  editProfileSidebar(edit).then(() => undefined);
+
 export interface IShellModel {
   active: MachineId | null;
   chats: readonly ISidebarChat[] | null;
@@ -338,6 +381,10 @@ export interface IShellModel {
   favorites: ISidebarFavorites;
   machine: IMachineCard | null;
   otherMachines: readonly IMachineChoice[];
+  /** Every machine a new chat may start on, the default one first. */
+  startMachines: readonly IMachineChoice[];
+  /** The projects and the favorites are the person's, kept by the cluster. */
+  personSidebar: boolean;
   /** The machines about to fail their work, the open one first, for the notification centre. */
   machineNotices: readonly IMachineNotice[];
   actions: IChatActions;
@@ -354,10 +401,19 @@ export function useShellModel(): IShellModel {
   const central = useCentral();
   const machines = useMachines();
   // with the cluster's copy on, the list is the person's, not a machine's: the chats of every machine the
-  // copy is on for, a chat of another machine than the one the person works on («здесь») named by its machine. The
-  // card, the projects and the favorites stay this machine's.
+  // copy is on for, the same list whichever machine the page goes through; a chat's machine is said in its menu only.
+  // No machine is picked in the sidebar then: the card is the open chat's machine (the default one on the start page),
+  // and a new chat's machine is picked in the model's popover. The projects and the favorites are the person's once
+  // the cluster keeps them (below).
   const unified = central.enabled && home !== null;
   const here = unified ? home : active;
+  // the projects and the favorites are the person's too when the cluster keeps them (profile-sidebar.ts):
+  // the same folders and the same favorites whichever machine is picked, a chat in a folder whatever machine it is on.
+  const profile = useProfileSidebar();
+  const shared = unified && profile.k === 'ready' ? profile.doc : null;
+  const sharedWaits = unified && profile.k === 'loading';
+  const sharedOn = shared !== null;
+  const projectIndex = useMemo(() => (shared ? profileProjectOf(shared) : null), [shared]);
   const own = useConversationList(here);
   const every = useEveryChat();
   const convs = useMemo(
@@ -378,6 +434,11 @@ export function useShellModel(): IShellModel {
       const view = views.get(m);
       return view ? machineName(view.machine) : (central.names.get(m) ?? m);
     };
+    const several = new Set([...views.keys(), ...convs.map((c) => c.machineId)]).size > 1;
+    const projectOfChat = (c: Conversation): string | null => {
+      if (projectIndex) return chatProjectOf(projectIndex, c.machineId, c.projectId);
+      return c.machineId === here ? c.projectId : null;
+    };
     return convs.map((c) => {
       const features = views.get(c.machineId)?.features ?? [];
       const canStop = features.includes('terminal-stop');
@@ -388,11 +449,14 @@ export function useShellModel(): IShellModel {
         id: c.id,
         title: c.title || t('next.shellData.untitled'),
         ...chatLookOf(c, c.machineId === here ? !linkDown : !away.has(c.machineId)),
-        ...(c.machineId !== here ? { machine: nameOf(c.machineId) } : {}),
+        // Where the chat lives is said in its menu only; the row is its title.
+        ...(several ? { machine: nameOf(c.machineId) } : {}),
+        ...(!projectIndex && c.machineId !== here ? { projectsElsewhere: true } : {}),
         ...(c.parentId ? { parentId: c.parentId } : {}),
         pinned: c.pinned,
-        // A project of another machine is not one of this machine's: its chat stands outside the groups.
-        projectId: c.machineId === here ? c.projectId : null,
+        // The person's projects hold the chats of every machine; a machine's own project (the person's sidebar off)
+        // is not one of another machine's, so such a chat stands outside the groups.
+        projectId: projectOfChat(c),
         createdAt: c.createdAt,
         lastPromptAt: c.lastPromptAt,
         lastActivityAt: c.lastActivityAt,
@@ -413,40 +477,75 @@ export function useShellModel(): IShellModel {
         canMoveVm: moveOn.has(c.machineId) && c.lastTurn !== null,
       };
     });
-  }, [convs, here, linkDown, down, machines, central.names, moveOn]);
-  const favorites = useFavorites(here);
+  }, [convs, here, linkDown, down, machines, central.names, moveOn, projectIndex]);
+  const machineFavorites = useFavorites(here);
+  const favorites = shared ? shared.favorites : machineFavorites;
   const listedProjects = useProjects(here);
-  const projects = useMemo(
-    () =>
-      convs &&
-      projectsOf(
-        convs.filter((c) => c.machineId === here),
-        listedProjects,
-      ),
-    [convs, here, listedProjects],
-  );
+  const projects = useMemo(() => {
+    if (!convs || sharedWaits) return null;
+    if (shared)
+      return shared.projects
+        .map((p) => ({ id: p.id, name: p.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    return projectsOf(
+      convs.filter((c) => c.machineId === here),
+      listedProjects,
+    );
+  }, [convs, sharedWaits, shared, here, listedProjects]);
 
-  const activeView = machines?.find((v) => v.machine.id === here) ?? null;
-  const machine = useMemo(() => (activeView ? cardOf(activeView, linkDown) : null), [activeView, linkDown]);
+  // The card is the machine the page works with now: the open chat's (the shell makes it the active one), else here.
+  const cardOn = active ?? here;
+  const cardConnection = useConnection(cardOn);
+  const cardDown = cardConnection?.k === 'stale' || cardConnection?.k === 'offline';
+  const activeView = machines?.find((v) => v.machine.id === cardOn) ?? null;
+  const machine = useMemo(() => (activeView ? cardOf(activeView, cardDown) : null), [activeView, cardDown]);
   const otherMachines = useMemo(
-    () => (machines ?? []).filter((v) => v.machine.id !== here).map(choiceOf),
+    () => (unified ? [] : (machines ?? []).filter((v) => v.machine.id !== here).map(choiceOf)),
+    [unified, machines, here],
+  );
+  const startMachines = useMemo(
+    () =>
+      [
+        ...(machines ?? []).filter((v) => v.machine.id === here),
+        ...(machines ?? []).filter((v) => v.machine.id !== here),
+      ].map(choiceOf),
     [machines, here],
   );
   const machineNotices = useMemo(
     () =>
       [...(activeView ? [activeView] : []), ...(machines ?? []).filter((v) => v !== activeView)].flatMap(
         ({ machine: m }): IMachineNotice[] => {
-          const alert = alertOf(m, m.id === here && linkDown);
+          const alert = alertOf(m, (m.id === cardOn && cardDown) || (m.id === here && linkDown));
           return alert && m.health ? [{ id: m.id, name: machineName(m), alert, since: m.health.since }] : [];
         },
       ),
-    [machines, activeView, here, linkDown],
+    [machines, activeView, cardOn, cardDown, here, linkDown],
   );
 
   const actions = useMemo<IChatActions>(() => {
     const chat = (id: string) => id as Conversation['id'];
-    // The groups of the favorites belong to the machine that is open; without one there is nothing to group.
-    const groups: IChatActions = here
+    // The groups of the favorites are the person's when the cluster keeps the sidebar: a chat is pinned on its own
+    // machine and placed in the person's layout. Otherwise they belong to the machine that is open; without one there
+    // is nothing to group.
+    const personGroups: IChatActions = {
+      onPlaceFavorite: async (id, groupId, beforeId) => {
+        const record = conversationsStore.get(chat(id));
+        if (!record) throw new Error(t('next.refuse.not-found'));
+        if (!record.pinned) await settled(pinConversation(record.machineId, chat(id), true));
+        await editFavorites((doc) =>
+          favPlaced(doc, chat(id), groupId, beforeId === null ? null : chat(beforeId)),
+        );
+      },
+      onCreateGroup: async (name) => {
+        const id = newFavGroupId();
+        await editFavorites((doc) => favGroupAdded(doc, id, name));
+        return id;
+      },
+      onRenameGroup: (id, name) => editFavorites((doc) => favGroupRenamed(doc, id, name)),
+      onDeleteGroup: (id) => editFavorites((doc) => favGroupDeleted(doc, id)),
+      onMoveGroup: (id, beforeId) => editFavorites((doc) => favGroupMoved(doc, id, beforeId)),
+    };
+    const machineGroups: IChatActions = here
       ? {
           onPlaceFavorite: (id, groupId, beforeId) =>
             settled(
@@ -463,15 +562,20 @@ export function useShellModel(): IShellModel {
         }
       : {};
     return {
-      ...groups,
+      ...(sharedOn ? personGroups : machineGroups),
       onRename: (id, title) =>
         settled(renameConversation(machineOfChat(id), id as Conversation['id'], title)),
       onRetitle: retitle
         ? (id) => settled(retitleConversation(machineOfChat(id), id as Conversation['id']))
         : undefined,
       onPin: (id, pinned) => settled(pinConversation(machineOfChat(id), id as Conversation['id'], pinned)),
-      onMove: (id, projectId) =>
-        settled(moveConversation(machineOfChat(id), id as Conversation['id'], projectId)),
+      onMove: async (id, projectId) => {
+        const machine = machineOfChat(id);
+        // A project of the person stands for a project of the chat's machine, made there when it has none yet.
+        const target =
+          sharedOn && projectId !== null ? await machineProjectOf(projectId, machine) : projectId;
+        await settled(moveConversation(machine, chat(id), target));
+      },
       onDelete: (id) => settled(deleteConversation(machineOfChat(id), id as Conversation['id'])),
       // The person confirmed in the menu, which says that work going on stops too.
       onStopTerminal: (id) => settled(stopTerminal(machineOfChat(id), id as Conversation['id'], true)),
@@ -492,7 +596,7 @@ export function useShellModel(): IShellModel {
         requestMoveVm(id);
       },
     };
-  }, [here, retitle]);
+  }, [here, retitle, sharedOn]);
 
   const pickMachine = useCallback((id: string) => {
     homeMachineStore.set(id);
@@ -507,6 +611,8 @@ export function useShellModel(): IShellModel {
     favorites,
     machine,
     otherMachines,
+    startMachines,
+    personSidebar: sharedOn,
     machineNotices,
     actions,
     conversations: convs,

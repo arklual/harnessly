@@ -47,6 +47,8 @@ type Config struct {
 	AgentTokenHeader string
 	// ConfigFile is the runtime's config (the owner's address).
 	ConfigFile string
+	// Leases chooses where the leases on boards are kept: the library's .claims folder (default) or the design center.
+	Leases LeaseConfig
 	// LibraryDir is an explicit library folder; WorkspaceDir (or the workspace root of WorkspaceConfig) holds
 	// design-artifacts otherwise; the data dir is the last resort.
 	LibraryDir, WorkspaceDir, AltWorkspaceDir, WorkspaceConfig string
@@ -111,6 +113,10 @@ type Library struct {
 	emitFn    func(kind, project string) // tests; nil sends to the agent
 	// accessWrite orders snapshot posts so the file on disk is the snapshot in memory.
 	accessWrite sync.Mutex
+	// The board leases of the design center (lease_center.go): the backend, made on first use, and what each chat held.
+	centerOnce sync.Once
+	centerV    *centerLeases
+	leaseMem   leaseMemory
 }
 
 func New(cfg Config) *Library {

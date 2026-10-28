@@ -83,6 +83,7 @@ import { useDraftField } from '@/next/bindings/use-draft';
 import { useFieldStash } from '@/next/bindings/use-stash';
 import { limitsOf, useMachine } from '@/next/stores/machines';
 import { useVoice } from '@/next/bindings/use-voice';
+import { useTakesMenu } from '@/next/bindings/use-takes';
 import { messagesStore, usePendingMessages, waitsInQueue, type MessageView } from '@/next/stores/messages';
 import { useWaitingAgents } from '@/next/bindings/waiting';
 import { t } from '@/next/i18n';
@@ -210,7 +211,8 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   );
   const canMove = machineView?.features.includes('queue-move') ?? false;
 
-  const voice = useVoice(machine, text, onChange, read);
+  const { notice: voiceNotice, insert, ...voice } = useVoice(machine, text, onChange, read);
+  const takes = useTakesMenu(insert);
   const window = useContextWindow(machine, conv, working);
   // The usage meter is Anthropic's (or Codex's) own: a chat on a vendor's profile has none.
   const limits = useAgentLimits(
@@ -391,6 +393,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         }}
       />
       <DockBar notice={keyNotice} />
+      <DockBar notice={voiceNotice} />
       <DockStatus pending={status.pending} steps={status.steps} />
       <GoalBar
         goal={provider === 'claude' ? (record?.goal ?? null) : null}
@@ -448,6 +451,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onRemoveRef={(ref) => removeDraftRef(conv, ref)}
         attach={attach}
         stash={stash}
+        takes={voice.onMic ? takes : null}
         acceptsChats
         quotes={[
           ...quotes.map((q) => ({

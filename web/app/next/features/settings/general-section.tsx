@@ -1,7 +1,7 @@
 // «General»: how the app looks and how the field sends, and the account. The theme lives only here (the sidebar has no
 // switch of its own) and is this browser's; the text size and
 // the Enter key are the person's settings and follow them to every device.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Group, LinkRow, MenuRow, SegRow, SwitchRow } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
 import type { PersonSettings } from '@/next/stores/me';
@@ -75,6 +75,8 @@ export interface IGeneralSectionProps {
   onRestartContinue: (on: boolean) => void;
   onDelegation: (value: DelegationSettings) => void;
   onSignOut: () => void;
+  /** «Обновления» of a machine a hub carries (update-group.tsx); null on any other machine. */
+  updates?: ReactNode;
 }
 
 const SignOutRow = ({ account, onSignOut }: Pick<IGeneralSectionProps, 'account' | 'onSignOut'>) => {
@@ -128,6 +130,7 @@ const GeneralSection = ({
   delegation,
   onDelegation,
   onSignOut,
+  updates = null,
 }: IGeneralSectionProps) => (
   <>
     <Group title={t('next.settings.general.look')}>
@@ -252,6 +255,7 @@ const GeneralSection = ({
         />
       ))}
     </Group>
+    {updates}
     <Group title={t('next.settings.general.account')}>
       <SignOutRow account={account} onSignOut={onSignOut} />
     </Group>

@@ -112,7 +112,7 @@ func TestFlagsBeforePrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 	command := agents.WithInitialPrompt("claude", line, "fix it -- now '$HOME'", "")
-	if command != editor+`DISABLE_AUTOUPDATER=1 claude --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md --model 'fable' --effort high -- $'fix it -- now \'$HOME\''` {
+	if command != editor+`DISABLE_AUTOUPDATER=1 claude --settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --append-system-prompt-file /tmp/prompt.md --model 'fable' --effort high -- "$(printf %b 'fix it -- now '\''$HOME'\''')"` {
 		t.Fatalf("%q", command)
 	}
 	if got := words(t, strings.TrimPrefix(strings.TrimPrefix(command, editor), "DISABLE_AUTOUPDATER=1 claude ")); !slices.Equal(got, []string{"--settings", "/tmp/hooks.json", "--mcp-config", "/tmp/preview-mcp.json", "--append-system-prompt-file", "/tmp/prompt.md", "--model", "fable", "--effort", "high", "--", "fix it -- now '$HOME'"}) {

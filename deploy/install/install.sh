@@ -2,6 +2,7 @@
 # harnessly machine installer: connects this machine to a harnessly hub.
 #
 #   curl -fsSL <hub>/install | sh -s -- --token <code> --profile dir|container|full [--name <n>] [--dry-run] [--uninstall]
+#   curl -fsSL <hub>/install | sh -s -- --update      (a machine installed before: the hub's latest programs, same machine)
 #
 # What it does, what it leaves behind and how to undo it is in docs/hub/machine.md. The hub serves this file with
 # HARNESSLY_HUB_URL (and HARNESSLY_IMAGE, when it has a machine image) set on the lines right below this one. Nothing
@@ -22,6 +23,8 @@ harnessly installer
   --uninstall        remove what an earlier run installed, and the machine from the hub's list (--purge: also the user,
                      home and work folder the installer made; what was there before is never removed)
   --re-register      register the machine anew; by default a machine already registered with this hub is kept
+  --update           update a machine installed before to the hub's programs: no code needed, the profile is the
+                     one it was installed with, and the machine stays the same in the hub
   --wait SECONDS     how long to wait for the machine to link to the hub (default 60)
   --hub URL          the hub's address (default: the one this script was served by)
   --image IMAGE      the machine image of the container profile (default: the hub's)
@@ -71,6 +74,7 @@ parse_args() {
 	UNINSTALL=0
 	PURGE=0
 	REREGISTER=0
+	UPDATE=0
 	WAIT=60
 	IMAGE=${HARNESSLY_IMAGE:-}
 	HUB_URL=${HARNESSLY_HUB_URL:-}
@@ -87,6 +91,7 @@ parse_args() {
 		--uninstall) UNINSTALL=1 ;;
 		--purge) PURGE=1 ;;
 		--re-register) REREGISTER=1 ;;
+		--update) UPDATE=1 ;;
 		-h | --help)
 			usage
 			exit 0
@@ -124,15 +129,31 @@ validate_args() {
 	case $NAME in *[[:cntrl:]]*) die "--name has control characters" "в --name есть управляющие символы" ;; esac
 	[ "${#NAME}" -le 100 ] || die "--name is longer than 100 characters" "--name длиннее 100 символов"
 	case $IMAGE in *[!A-Za-z0-9:/._@+-]*) die "--image has odd characters" "в --image странные символы" ;; esac
+	if [ "$UPDATE" = 1 ] && [ -z "$PROFILE" ]; then PROFILE=$(installed_profile); fi
 	case $PROFILE in
 	dir | container | full) ;;
-	'') [ "$UNINSTALL" = 1 ] || die "--profile dir, container or full is required" "нужен --profile dir, container или full" ;;
+	'') [ "$UPDATE" = 1 ] && die "no harnessly install found on this machine: take the command with a code from the hub" \
+		"на этой машине нет установки harnessly: возьмите в хабе команду с кодом"
+		[ "$UNINSTALL" = 1 ] || die "--profile dir, container or full is required" "нужен --profile dir, container или full" ;;
 	*) die "--profile must be dir, container or full" "--profile должен быть dir, container или full" ;;
 	esac
+	# An update keeps the registration (register --reuse does not look at the code): any code passes the checks.
+	if [ "$UPDATE" = 1 ] && [ -z "$TOKEN" ]; then TOKEN=update; fi
 	if [ "$UNINSTALL" = 0 ]; then
 		[ -n "$TOKEN" ] || die "--token is required: copy the command from the hub" "нужен --token: скопируйте команду из хаба"
 		[ "${#TOKEN}" -le 512 ] || die "the code is too long" "код слишком длинный"
 		case $TOKEN in *[!A-Za-z0-9._~+=/-]*) die "the code has odd characters" "в коде странные символы" ;; esac
+	fi
+}
+
+# installed_profile prints the profile an earlier run installed with, by its manifest; nothing when there is none.
+installed_profile() {
+	if [ -f "$(rp /etc/harnessly/install-manifest)" ]; then
+		echo dir
+	elif [ -f "$(rp "${HOME:-/nonexistent}/.harnessly/install-manifest")" ]; then
+		echo full
+	elif [ -f "$(rp "${HOME:-/nonexistent}/.harnessly/install-manifest-container")" ]; then
+		echo container
 	fi
 }
 
@@ -376,6 +397,11 @@ voice_tools() {
 		say "Installing ffmpeg (voice input)" "Ставим ffmpeg (голосовой ввод)"
 		(install_packages ffmpeg) || warn "ffmpeg was not installed: voice input stays off until you install it" \
 			"ffmpeg не установился: голосовой ввод выключен, пока его не поставите"
+	elif [ "$OS" = linux ] && { [ "$IS_ROOT" = 1 ] || { command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; }; }; then
+		# An account's install where root is at hand without a password (root itself, or sudo -n): the same package.
+		say "Installing ffmpeg (voice input)" "Ставим ffmpeg (голосовой ввод)"
+		(PRIV=1 install_packages ffmpeg) || warn "ffmpeg was not installed: voice input stays off until you install it" \
+			"ffmpeg не установился: голосовой ввод выключен, пока его не поставите"
 	elif [ "$OS" = darwin ]; then
 		say "Voice input: brew install ffmpeg whisper-cpp, then restart the runtime" "Голосовой ввод: brew install ffmpeg whisper-cpp, затем перезапустите runtime"
 	else
@@ -463,7 +489,7 @@ pick_ports() {
 download_binaries() {
 	step "Downloading harnessly from $HUB_URL" "Скачиваем harnessly с $HUB_URL"
 	if [ "$DRY" = 1 ]; then
-		plan "download $HUB_URL/dl/manifest.json, agent-$OS-$ARCH and runtime-$OS-$ARCH, and check their SHA-256"
+		plan "download $HUB_URL/dl/manifest.json, agent-$OS-$ARCH, runtime-$OS-$ARCH and harnessly-$OS-$ARCH, and check their SHA-256"
 		VERSION=dry-run
 		return 0
 	fi
@@ -473,9 +499,15 @@ download_binaries() {
 			"не удалось скачать $HUB_URL/dl/manifest.json: адрес верный, хаб работает?"
 	_compact=$(tr -d ' \n\r\t' <"$TMP/manifest.json")
 	VERSION=$(printf '%s' "$_compact" | sed -n 's/.*"version":"\([A-Za-z0-9._+-]*\)".*/\1/p' | head -n 1)
-	for _part in agent runtime; do
+	PARTS="agent runtime"
+	for _part in agent runtime harnessly; do
 		_file="$_part-$OS-$ARCH"
 		_want=$(printf '%s' "$_compact" | sed -n 's/.*"'"$_file"'":{[^}]*"sha256":"\([0-9a-fA-F]\{64\}\)".*/\1/p' | head -n 1 | tr '[:upper:]' '[:lower:]')
+		# The harnessly command (the agents' and the person's CLI) comes from hubs that serve it; an older hub does not.
+		if [ "$_part" = harnessly ]; then
+			[ -n "$_want" ] || continue
+			PARTS="$PARTS harnessly"
+		fi
 		[ -n "$_want" ] || die "$_file is not in the hub's manifest: this system is not served by the hub" \
 			"$_file нет в манифесте хаба: этот хаб не поставляет эту систему"
 		fetch "$HUB_URL/dl/$_file" "$TMP/$_file" || die "could not download $_file" "не удалось скачать $_file"
@@ -488,6 +520,7 @@ download_binaries() {
 # install_binary puts a downloaded binary in place with a rename, so a running one is replaced without a crash.
 install_binary() {
 	_dest="$BIN_DIR/harnessly-$1"
+	if [ "$1" = harnessly ]; then _dest="$BIN_DIR/harnessly"; fi
 	X cp "$TMP/$1-$OS-$ARCH" "$(rp "$_dest").new"
 	X chmod 0755 "$(rp "$_dest").new"
 	X mv -f "$(rp "$_dest").new" "$(rp "$_dest")"
@@ -500,8 +533,9 @@ install_binaries() {
 		TMP=/nonexistent
 	fi
 	mkd "$BIN_DIR" 0755
-	install_binary agent
-	install_binary runtime
+	for _part in ${PARTS:-agent runtime}; do
+		install_binary "$_part"
+	done
 }
 
 # --- configuration ------------------------------------------------------------------------------------------------
