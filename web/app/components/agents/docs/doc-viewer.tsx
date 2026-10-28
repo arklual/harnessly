@@ -321,7 +321,9 @@ const DocViewer = ({
   const versionMissing = Boolean(viewedSha && versions && !viewed);
   // A version that is not in the history is not asked for: the current page is shown with a note instead of the gateway's 404.
   const contentVersion = viewed ? versionId(viewed) : versions ? null : viewedSha;
-  const lockedNote = (isBoard && BOARD_NOTE) || (isOld && OLD_VERSION_NOTE) || null;
+  // A board's thread that came from the board itself is answered there; a guest's thread of a link is answered here.
+  const lockedNote = (thread: IDocThread) =>
+    (isBoard && thread.externalId !== null && BOARD_NOTE) || (isOld && OLD_VERSION_NOTE) || null;
 
   useEffect(() => {
     selectionRef.current = selection;
@@ -788,7 +790,7 @@ const DocViewer = ({
                       <Thread
                         thread={openThread}
                         number={numbers.get(openThread.id) ?? 0}
-                        lockedNote={lockedNote}
+                        lockedNote={lockedNote(openThread)}
                         delivers={detail?.doc.bound ?? false}
                         onClose={() => setOpenThreadId(null)}
                         onReply={onReply}
@@ -802,7 +804,7 @@ const DocViewer = ({
                       <Thread
                         thread={openThread}
                         number={numbers.get(openThread.id) ?? 0}
-                        lockedNote={lockedNote}
+                        lockedNote={lockedNote(openThread)}
                         delivers={detail?.doc.bound ?? false}
                         onClose={() => setOpenThreadId(null)}
                         onReply={onReply}
@@ -963,7 +965,7 @@ const DocViewer = ({
                           <Thread
                             thread={thread}
                             number={numbers.get(thread.id) ?? 0}
-                            lockedNote={lockedNote}
+                            lockedNote={lockedNote(thread)}
                             delivers={detail?.doc.bound ?? false}
                             onReply={onReply}
                             onSetStatus={onSetStatus}

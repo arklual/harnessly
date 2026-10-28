@@ -53,7 +53,7 @@ const useNow = (every: number) => {
 interface IAccessLinksProps extends ISectionProps {
   /** The design's pages, to limit a new link to some of them; fewer than two and there is nothing to choose. */
   pages?: readonly IScopePage[];
-  /** What a link without sign-in may allow here; a board's guest page is read-only, so only «view». */
+  /** What a link without sign-in may allow here. */
   guestRights?: readonly TGuestRights[];
 }
 

@@ -206,9 +206,8 @@ const LegacyShareMenu = ({ slug }: { slug: string }) => {
   );
 };
 
-/** What a guest link may allow: a document is read or commented by a guest, a board is shown read-only. */
-const DOC_RIGHTS: readonly TGuestRights[] = ['view', 'comment'];
-const BOARD_RIGHTS: readonly TGuestRights[] = ['view'];
+/** What a guest link may allow, a document's and a board's alike: read, or read and comment. */
+const GUEST_RIGHTS: readonly TGuestRights[] = ['view', 'comment'];
 
 type TLegacy =
   { status: 'loading' } | { status: 'ready'; access: IDocAccess } | { status: 'failed'; message: string };
@@ -318,7 +317,7 @@ export const DocShare = ({ slug, title, kind }: IDocShareProps) => {
       onNext={gate.apply}
       onCopyLink={copyLink}
       onClaim={() => Promise.resolve()}
-      guestRights={kind === 'artifact' ? DOC_RIGHTS : BOARD_RIGHTS}
+      guestRights={GUEST_RIGHTS}
       extra={kind === 'artifact' && open ? <LegacyPublicLink slug={slug} /> : null}
     />
   );
