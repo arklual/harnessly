@@ -27,7 +27,10 @@ require (
 	modernc.org/sqlite v1.61.0
 )
 
-require golang.org/x/net v0.60.0
+require (
+	github.com/minio/minio-go/v7 v7.0.99
+	golang.org/x/net v0.60.0
+)
 
 require (
 	github.com/go-ini/ini v1.67.0 // indirect
@@ -36,7 +39,6 @@ require (
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
-	github.com/minio/minio-go/v7 v7.0.99 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )
@@ -44,7 +46,7 @@ require (
 require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/x v0.3.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
