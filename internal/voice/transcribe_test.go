@@ -67,6 +67,32 @@ func TestTranscribeAWholeRecording(t *testing.T) {
 	}
 }
 
+// The page asks for the language of its interface; a Lang of the runtime's own wins over it.
+func TestLangOfTheRuntimeWins(t *testing.T) {
+	real, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		t.Skip("no ffmpeg")
+	}
+	audio, err := os.ReadFile("testdata/tone.webm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := &fakeService{path: filepath.Join(t.TempDir(), "asr.sock")}
+	svc.listen(t)
+	defer func() { _ = svc.ln.Close() }()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	for _, c := range []struct{ runtime, page, want string }{
+		{"auto", "en", "auto"}, {"ru", "en", "ru"}, {"", "en", "en"}, {"de", "en", "en"},
+	} {
+		s := New(Config{Socket: svc.path, FFmpeg: real, Lang: c.runtime})
+		text, err := s.Transcribe(ctx, bytes.NewReader(audio), c.page)
+		if err != nil || !strings.Contains(text, " "+c.want+" ") {
+			t.Errorf("runtime %q, page %q: heard %q, %v", c.runtime, c.page, text, err)
+		}
+	}
+}
+
 func TestTranscribeOnAMachineWithoutDictation(t *testing.T) {
 	dir := t.TempDir()
 	none := New(Config{Socket: filepath.Join(dir, "none.sock"), FFmpeg: "/nonexistent/ffmpeg"})
