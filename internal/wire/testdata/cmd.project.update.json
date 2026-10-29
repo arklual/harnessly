@@ -1,0 +1,5 @@
+{
+  "op": "project.update",
+  "body": {"opId": "op-pr2", "id": "prj-bebfdc1cc418", "path": "/home/coder/workspace/ostrovok"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1850}
+}

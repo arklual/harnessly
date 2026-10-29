@@ -195,6 +195,8 @@ export interface IChatActions {
   onMoveGroup?: (id: string, beforeId: string | null) => Promise<void>;
   /** A new chat in a project: the start page opens with the project chosen. */
   onNewChatIn?: (projectId: string) => void;
+  /** Opens the project's settings: its name and the folder its new chats start in. */
+  onProjectSettings?: (projectId: string) => void;
   onCopyLink?: (id: string) => Promise<void>;
   /** The chat in a tab of its own behind the one on screen; absent where there is no strip of tabs. */
   onOpenInNewTab?: (id: string) => void;

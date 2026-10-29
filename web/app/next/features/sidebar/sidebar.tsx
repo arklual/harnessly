@@ -835,6 +835,17 @@ const Sidebar = ({
                       <span className="hx-item__title">{project.name}</span>
                       <Icon name="chevron-right" size="sm" className="hx-nav__chev" />
                     </button>
+                    {actions.onProjectSettings && (
+                      <button
+                        type="button"
+                        className="hx-nav__add hx-project__add"
+                        aria-label={t('next.sidebar.projectSettings', { project: project.name })}
+                        title={t('next.sidebar.projectSettings', { project: project.name })}
+                        onClick={() => actions.onProjectSettings?.(project.id)}
+                      >
+                        <Icon name="settings" size="sm" />
+                      </button>
+                    )}
                     {actions.onNewChatIn && (
                       <button
                         type="button"

@@ -287,7 +287,7 @@
         "send", "cancel", "retry", "promote", "answer", "decide", "interrupt", "queue.resume", "seen",
         "conversation.create", "conversation.rename", "conversation.pin", "conversation.move",
         "conversation.delete", "conversation.restore", "conversation.resume", "model", "bg.stop",
-        "project.create", "favorites.group.create", "favorites.group.rename", "favorites.group.delete",
+        "project.create", "project.update", "favorites.group.create", "favorites.group.rename", "favorites.group.delete",
         "favorites.group.move", "favorites.place", "goal", "conversation.retitle", "draft.set", "queue.move", "terminal.stop", "rewind", "rewind.undo",
         "conversation.fork", "conversation.handoff", "conversation.merge",
         "limit"
@@ -2889,6 +2889,17 @@
         "name": {"type": "string", "minLength": 1, "maxLength": 120}
       }
     },
+    "Cmd_project_update": {
+      "type": "object",
+      "required": ["opId", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1, "maxLength": 120}
+      }
+    },
     "Cmd_favorites_group_create": {
       "type": "object",
       "required": ["opId", "name"],
@@ -3078,6 +3089,12 @@
           "required": ["op", "body"],
           "additionalProperties": false,
           "properties": {"op": {"const": "project.create"}, "body": {"$ref": "#/$defs/Cmd_project_create"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "project.update"}, "body": {"$ref": "#/$defs/Cmd_project_update"}}
         },
         {
           "type": "object",
@@ -3388,6 +3405,16 @@
           "properties": {
             "op": {"const": "project.create"},
             "body": {"$ref": "#/$defs/Cmd_project_create"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "project.update"},
+            "body": {"$ref": "#/$defs/Cmd_project_update"},
             "result": {"$ref": "#/$defs/CmdResult"}
           }
         },

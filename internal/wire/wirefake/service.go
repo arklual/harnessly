@@ -1010,6 +1010,19 @@ func (s *Service) Do(ctx context.Context, device string, cmd wire.Command) wire.
 		res := wire.Accepted(wire.ChannelConvs, s.pub(wire.ChannelConvs, wire.ProjectUpsertEv{Project: p}))
 		res.ID = &p.ID
 		return res
+	case wire.ProjectUpdateCmd:
+		p, ok := s.projects[c.ID]
+		if !ok || c.Path != "" && !filepath.IsAbs(c.Path) {
+			return wire.Refused(wire.RefuseNotFound)
+		}
+		if c.Path != "" {
+			p.Path = filepath.Clean(c.Path)
+		}
+		if name := strings.TrimSpace(c.Name); name != "" {
+			p.Name = name
+		}
+		s.projects[p.ID] = p
+		return wire.Accepted(wire.ChannelConvs, s.pub(wire.ChannelConvs, wire.ProjectUpsertEv{Project: p}))
 	}
 	return wire.Refused(wire.RefuseUnsupported)
 }

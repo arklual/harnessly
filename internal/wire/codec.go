@@ -632,6 +632,7 @@ var commands = map[Op]func([]byte) (Command, error){
 	OpModel:               as[ModelCmd, Command],
 	OpBgStop:              as[BgStopCmd, Command],
 	OpProjectCreate:       as[ProjectCreateCmd, Command],
+	OpProjectUpdate:       as[ProjectUpdateCmd, Command],
 	OpFavGroupCreate:      as[FavGroupCreateCmd, Command],
 	OpFavGroupRename:      as[FavGroupRenameCmd, Command],
 	OpFavGroupDelete:      as[FavGroupDeleteCmd, Command],

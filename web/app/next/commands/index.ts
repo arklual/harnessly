@@ -134,6 +134,9 @@ export const stopBackground = (m: MachineId, conversationId: ConvId, taskId: str
 export const setGoal = (m: MachineId, id: ConvId, text: string) => runCommand(m, 'goal', { id, text });
 /** A project of a name alone: its chats start in the machine's default folder. */
 export const createProject = (m: MachineId, name: string) => runCommand(m, 'project.create', { name });
+/** The folder a project's next chats start in (the chats it has stay where they are), and its name. */
+export const updateProject = (m: MachineId, id: string, change: { path?: string; name?: string }) =>
+  runCommand(m, 'project.update', { id, ...change });
 
 /** A group in the favorites; resolves with its id once the runtime answers. */
 export const createFavGroup = (m: MachineId, name: string) =>
