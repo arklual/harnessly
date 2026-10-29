@@ -205,11 +205,11 @@ func TestAProjectMovesToAnotherFolder(t *testing.T) {
 	if err := r.rt.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	folder := filepath.Join(r.dir, "ostrovok")
+	folder := filepath.Join(r.dir, "acme")
 	if err := os.MkdirAll(filepath.Join(folder, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	made := r.do(wire.ProjectCreateCmd{OpID: "p1", Name: "Островок"})
+	made := r.do(wire.ProjectCreateCmd{OpID: "p1", Name: "Витрина"})
 	if made.ID == nil {
 		t.Fatalf("project.create: %+v", made)
 	}
@@ -230,14 +230,14 @@ func TestAProjectMovesToAnotherFolder(t *testing.T) {
 	}
 	evs := r.events(wire.EvProjectUpsert)
 	got := evs[len(evs)-1].e.(wire.ProjectUpsertEv).Project
-	if evs[len(evs)-1].seq != res.Seq || got.ID != id || got.Path != folder || !got.Git || got.Name != "Островок" {
+	if evs[len(evs)-1].seq != res.Seq || got.ID != id || got.Path != folder || !got.Git || got.Name != "Витрина" {
 		t.Fatalf("published %+v at %d, answer %+v", got, evs[len(evs)-1].seq, res)
 	}
-	r.do(wire.ProjectUpdateCmd{OpID: "u2", ID: id, Name: " Островок 2 "})
+	r.do(wire.ProjectUpdateCmd{OpID: "u2", ID: id, Name: " Витрина 2 "})
 
 	r.restart()
 	snap, _ := r.rt.Conversations(context.Background())
-	if len(snap.Projects) != 1 || snap.Projects[0].ID != id || snap.Projects[0].Path != folder || snap.Projects[0].Name != "Островок 2" {
+	if len(snap.Projects) != 1 || snap.Projects[0].ID != id || snap.Projects[0].Path != folder || snap.Projects[0].Name != "Витрина 2" {
 		t.Fatalf("after the restart: %+v", snap.Projects)
 	}
 	r.do(wire.ConversationCreateCmd{OpID: "c2", ProjectID: id, Provider: wire.ProviderClaude})
