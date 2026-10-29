@@ -513,7 +513,7 @@ func TestCreateSessionCommandLine(t *testing.T) {
 	}
 	c := f.calls[0]
 	want := append([]string{"-u", "-L", "main", "-f", "/app/tmux.conf", "new-session", "-d", "-s", "nw-x", "-x", "120", "-y", "40"}, tm.ShellLaunchCommand())
-	if c.program != "tmux" || c.dir != "/work" || !reflect.DeepEqual(c.args, want) || !strings.HasPrefix(want[len(want)-1], "nice -n 10 env -i ") {
+	if c.program != "tmux" || c.dir != "/work" || !reflect.DeepEqual(c.args, want) || !strings.HasPrefix(want[len(want)-1], "exec nice -n 10 env -i ") {
 		t.Fatalf("%s in %s: %q", c.program, c.dir, c.args)
 	}
 	if got := f.calls[1].args; !reflect.DeepEqual(got, []string{"-u", "-L", "main", "source-file", "/app/tmux.conf"}) {
@@ -609,8 +609,29 @@ func TestShellLaunchCommandEnvironment(t *testing.T) {
 	if !reflect.DeepEqual(lines, want) {
 		t.Fatalf("%q", lines)
 	}
-	if !strings.HasPrefix(tm.ShellLaunchCommand(), `env -i TMUX="$TMUX" TMUX_PANE="$TMUX_PANE" HOME=`) || !strings.HasSuffix(tm.ShellLaunchCommand(), "'"+shell+"' -l") {
+	if !strings.HasPrefix(tm.ShellLaunchCommand(), `exec env -i TMUX="$TMUX" TMUX_PANE="$TMUX_PANE" HOME=`) || !strings.HasSuffix(tm.ShellLaunchCommand(), "'"+shell+"' -l") {
 		t.Fatalf("%s", tm.ShellLaunchCommand())
+	}
+}
+
+// tmux runs a pane's command with the person's SHELL as its default-shell; fish does not exec a last command by itself,
+// so without `exec` the login shell would sit under a second fish and the agents would not be the pane's children.
+func TestShellLaunchCommandExecsUnderFish(t *testing.T) {
+	if _, err := exec.LookPath("fish"); err != nil {
+		t.Skip("fish is not installed")
+	}
+	dir := t.TempDir()
+	shell := filepath.Join(dir, "ppid-shell")
+	if err := os.WriteFile(shell, []byte("#!/bin/sh\nprintf %s \"$PPID\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tm := NewConfig(Config{Names: Names{Socket: "main"}, Nice: 10, Env: []string{"HOME=" + dir, "SHELL=" + shell}})
+	out, err := exec.Command("fish", "--no-config", "-c", tm.ShellLaunchCommand()).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(out)); got != strconv.Itoa(os.Getpid()) {
+		t.Fatalf("the pane shell's parent is %s, not the process that started fish (%d)", got, os.Getpid())
 	}
 }
 
