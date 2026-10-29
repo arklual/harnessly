@@ -22,11 +22,12 @@ import (
 //	out {"type":"error","message":"…","code":"failed"}
 //	in  {"cmd":"status"} -> {"type":"status","ready":bool}   for health checks, no session
 //
-// Whisper takes a whole recording at a time, so a partial is the whole recording so far recognized again: one every
-// couple of seconds while the person speaks, none past the half minute whisper reads at once.
+// Whisper takes a whole recording at a time, so a partial is the whole recording so far recognized again (InferQuick):
+// one after each second of new speech, as soon as the previous pass is done, none past the half minute whisper reads at
+// once.
 
 const (
-	partialEvery = 2 * time.Second
+	partialEvery = 1 * time.Second
 	partialMax   = 30 * time.Second
 	// A recording longer than this is not taken any further.
 	pcmMax = 15 * 60 * sampleRate * 2
@@ -240,7 +241,7 @@ func (s *session) partials() {
 		var text string
 		var err error
 		if rms(snap) >= silenceRMS {
-			text, err = s.e.Infer(ctx, snap, s.lang)
+			text, err = s.e.InferQuick(ctx, snap, s.lang)
 		}
 		spent, lastEnd = time.Since(started), time.Now()
 		close(done)
