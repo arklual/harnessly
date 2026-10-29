@@ -75,7 +75,7 @@ func pageConfigFromEnv() pageConfig {
 		docsOrigin = "https://" + host
 	}
 	c := pageConfig{
-		ProductName:       env("RUNTIME_APP_NAME", "harnessly"),
+		ProductName:       env("RUNTIME_APP_NAME", "klodik"),
 		DesignName:        env("RUNTIME_DESIGN_NAME", "Sinopia Design"),
 		MarkURL:           optional(os.Getenv("RUNTIME_APP_MARK_URL")),
 		Locale:            env("RUNTIME_LOCALE", "en"),
