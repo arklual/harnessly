@@ -50,7 +50,11 @@ func TestMain(m *testing.M) {
 				http.Error(w, `{"error":"not a wav"}`, 400)
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]string{"text": " привет мир [" + r.FormValue("language") + "] "})
+			text := " привет мир [" + r.FormValue("language") + "] "
+			if ac := r.FormValue("audio_ctx"); ac != "" {
+				text += "ctx " + ac
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"text": text})
 		})
 		_ = http.ListenAndServe("127.0.0.1:"+port, mux)
 		os.Exit(0)
@@ -100,6 +104,12 @@ func TestHelpers(t *testing.T) {
 	}
 	if len(padPCM(nil)) < sampleRate*2 {
 		t.Fatal("padPCM")
+	}
+	// 20 ms a position and a second more; the whole window (0) when that is not shorter.
+	for n, want := range map[int]int{5 * 32000: 300, len(padPCM(nil)): 105, 28 * 32000: 1450, 29 * 32000: 0, 40 * 32000: 0, 32002: 101} {
+		if got := quickAudioCtx(n); got != want {
+			t.Errorf("quickAudioCtx(%d) = %d, want %d", n, got, want)
+		}
 	}
 }
 
@@ -213,6 +223,20 @@ func TestDictationOverTheSocket(t *testing.T) {
 	c.send(map[string]any{"cmd": "stop"})
 	final := c.until(t, "final")
 	if final["text"] != "привет мир [en]" {
+		t.Fatalf("final: %v", final)
+	}
+
+	// While the person speaks, the partials take the quick pass (an encoder context for the recording so far); the
+	// final one the whole window.
+	c = dial(t, sock)
+	c.send(map[string]any{"cmd": "start", "lang": "ru"})
+	c.until(t, "ready")
+	c.send(map[string]any{"cmd": "audio", "pcm": base64.StdEncoding.EncodeToString(tone(3))})
+	if partial := c.until(t, "partial"); partial["text"] != "привет мир [ru] ctx 200" {
+		t.Fatalf("partial: %v", partial)
+	}
+	c.send(map[string]any{"cmd": "stop"})
+	if final := c.until(t, "final"); final["text"] != "привет мир [ru]" {
 		t.Fatalf("final: %v", final)
 	}
 
