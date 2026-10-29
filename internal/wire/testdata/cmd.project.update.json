@@ -1,0 +1,5 @@
+{
+  "op": "project.update",
+  "body": {"opId": "op-pr2", "id": "prj-3f2a9c1e7b04", "path": "/home/agent/workspace/acme"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1850}
+}

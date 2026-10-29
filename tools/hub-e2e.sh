@@ -297,7 +297,8 @@ PIDS+=($!)
 	export AGENT_PORT="$AG_PORT" RUNTIME_PORT="$RT_PORT" AGENT_WORK_DIR="$MHOME/work"
 	exec "$T/bin/harnessly-agent"
 ) >"$T/agent.log" 2>&1 &
-PIDS+=($!)
+AGENT_PID=$!
+PIDS+=("$AGENT_PID")
 wait_for "the machine shows online in the hub" 40 machine_is "$OWNER" online || die "never online; agent log: $(tail -n 5 "$T/agent.log")"
 check "the agent says it is linked (harnessly-agent status)" machine_env "$T/bin/harnessly-agent" status
 call "$OWNER" GET "/api/machines/$MID"
@@ -446,7 +447,11 @@ expect "a shell route is refused by the machine" "$DENIED" 403
 call "$OWNER" POST "/api/machines/$MID/agents/claude/login" '{"method":"console"}'
 expect "a console login is refused too (it is a terminal)" "$(j .error)" machine_policy
 rm -f "$MHOME/policy.toml"
-wait_for "the policy is back to the defaults" 30 bash -c "curl -fsS -b '$OWNER' '$HUB/api/machines/$MID' | jq -e '.machine.policy.terminal == true'" || true
+# The agent's own account could write that file, so it only narrows on its own; opening up takes a person's SIGHUP.
+sleep 3
+check "without a SIGHUP the terminal stays off" bash -c "curl -fsS -b '$OWNER' '$HUB/api/machines/$MID' | jq -e '.machine.policy.terminal == false'"
+kill -HUP "$AGENT_PID"
+wait_for "after a SIGHUP the policy is back to the defaults" 30 bash -c "curl -fsS -b '$OWNER' '$HUB/api/machines/$MID' | jq -e '.machine.policy.terminal == true'" || true
 machine_env "$T/bin/harnessly-agent" off >/dev/null
 wait_for "the kill switch takes the machine offline" 40 machine_is "$OWNER" offline || true
 call "$OWNER" POST "/api/machines/$MID/preflight" '{}'

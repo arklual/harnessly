@@ -72,6 +72,13 @@ func Open(ctx context.Context, databaseURL string) (*DB, error) {
 				return nil, err
 			}
 		}
+		// SQLite makes the file with the process umask (0644 under the usual 022), and its -wal and -shm files take
+		// the mode of the main file: so the file is made 0600 first.
+		if f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600); err != nil {
+			return nil, err
+		} else if err := f.Close(); err != nil {
+			return nil, err
+		}
 		dsn := "file:" + path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_txlock=immediate"
 		raw, err := sql.Open("sqlite", dsn)
 		if err != nil {

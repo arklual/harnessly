@@ -154,7 +154,7 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 	}
 	time.Sleep(300 * time.Millisecond)
 	screen, _ = tm.Capture(info.TmuxSession)
-	if flat := strings.ReplaceAll(screen, "\n", ""); !strings.Contains(flat, "DISABLE_AUTOUPDATER=1 '"+agentBin+"' --resume "+sid+" --settings") ||
+	if flat := strings.ReplaceAll(screen, "\n", ""); !strings.Contains(flat, `exec env DISABLE_AUTOUPDATER=1 '\''`+agentBin+`'\'' --resume `+sid+" --settings") ||
 		!strings.Contains(flat, "fake agent started: --resume "+sid) || !strings.Contains(flat, "key=[it's secret]") {
 		t.Fatalf("the reset did not resume the agent:\n%s", screen)
 	}

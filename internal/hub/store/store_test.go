@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -462,5 +463,26 @@ func TestLockAccountCreationSerialisesTheFirstAccount(t *testing.T) {
 	// outside a transaction there is nothing to hold the lock for
 	if err := openTest(t).S().LockAccountCreation(context.Background()); err == nil {
 		t.Error("the lock outside a transaction was granted")
+	}
+}
+
+// The database file is private whatever the umask: SQLite alone makes it 0644 under the usual 022.
+func TestSQLiteFileIsPrivate(t *testing.T) {
+	old := syscall.Umask(0o022)
+	defer syscall.Umask(old)
+	path := filepath.Join(t.TempDir(), "hub.db")
+	db, err := Open(context.Background(), "sqlite://"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, f := range []string{path, path + "-wal"} {
+		st, err := os.Stat(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if mode := st.Mode().Perm(); mode != 0o600 {
+			t.Fatalf("%s: mode %o, want 600", filepath.Base(f), mode)
+		}
 	}
 }

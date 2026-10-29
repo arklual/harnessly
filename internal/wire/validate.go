@@ -1178,6 +1178,20 @@ func (c ProjectCreateCmd) Validate() error {
 	return errors.Join(errs...)
 }
 
+func (c ProjectUpdateCmd) Validate() error {
+	errs := []error{need("opId", c.OpID), need("id", c.ID)}
+	if c.Path == "" && strings.TrimSpace(c.Name) == "" {
+		errs = append(errs, errors.New("path or name: required"))
+	}
+	if c.Path != "" && !strings.HasPrefix(c.Path, "/") {
+		errs = append(errs, errors.New("path: must be absolute"))
+	}
+	if utf8.RuneCountInString(c.Name) > ProjectNameMax || strings.ContainsAny(c.Name, "\r\n") {
+		errs = append(errs, errors.New("name: one line of at most 120 characters"))
+	}
+	return errors.Join(errs...)
+}
+
 func (r CmdResult) Validate() error {
 	if err := in("r", r.R, ResultKinds); err != nil {
 		return err

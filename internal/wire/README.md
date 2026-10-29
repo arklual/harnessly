@@ -275,7 +275,10 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     {project}`, with the project's `id`; the same folder again is the same project, published again. The `convs`
     snapshot carries `projects` (oldest first) and `defaultCwd`, the folder a conversation starts in when the
     person names none — `conversation.create` takes `projectId` or `cwd`, never both, so the page offers
-    `defaultCwd` as the first choice. Projects are kept by the runtime across restarts.
+    `defaultCwd` as the first choice. Projects are kept by the runtime across restarts. `project.update {id, path?,
+    name?}` (at least one of the two) moves a project to another folder or renames it: its next conversations start
+    in the new folder, the ones it has stay where they started, the id stays. A folder that is not a directory, or an
+    unknown id, is `refused{not-found}`; else `accepted` on `convs` at the seq of the `project_upsert` it publishes.
 37. **Folders for a project.** `GET /api/v2/dirs` answers `[{path, name, git, branch, empty}]`: the folders one level
     below the machine's default folder (`defaultCwd`) and the git folders one level below those that are not git
     themselves; hidden folders and build outputs are left out, git folders come first, then by name, at most 200.

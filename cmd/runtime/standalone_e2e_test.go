@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -375,7 +376,9 @@ func TestStandaloneMachineEndToEnd(t *testing.T) {
 	waitFor("claude started with the hooks", 30*time.Second, func() bool {
 		return strings.Contains(read(filepath.Join(home, "claude-calls.log")), "--settings "+filepath.Join(data, "hooks.json"))
 	})
-	if !strings.Contains(read(filepath.Join(home, "claude-calls.log")), "--append-system-prompt-file "+filepath.Join(data, "workspaces", ws.ID, "claude-prompt.md")) {
+	// The safe is on, so the prompt file is the workspace prompt with the safe's block after it.
+	if m := regexp.MustCompile(`--append-system-prompt-file (\S+)`).FindStringSubmatch(read(filepath.Join(home, "claude-calls.log"))); m == nil ||
+		!strings.HasPrefix(read(m[1]), strings.TrimSpace(read(filepath.Join(data, "workspaces", ws.ID, "claude-prompt.md")))) {
 		t.Fatal("claude started without its workspace prompt")
 	}
 	// The workspace's skills: a Claude plugin loaded with --plugin-dir, Codex user skills, and the launchers on the PATH.
