@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { t } from '@/next/i18n';
 import Modal from '@/next/features/shell/modal';
 import { GIVE_UP_MS, SLOW_MS } from '@/next/ui/use-pending-list';
@@ -28,12 +28,15 @@ const ProjectSettingsDialog = ({ project, onClose, onSave }: IProjectSettingsDia
   const [state, setState] = useState<TState>(STATE.idle);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // a project opened (or changed on the machine) gives the fields their values again
+  const [shown, setShown] = useState<IProjectSettings | null>(null);
+  if (project !== shown) {
+    setShown(project);
     setName(project?.name ?? '');
     setPath(project?.path ?? '');
     setError(null);
     setState(STATE.idle);
-  }, [project]);
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
