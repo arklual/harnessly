@@ -58,6 +58,9 @@ type Config struct {
 	EnvSource func(provider string) string
 	// PromptDir takes a prompt too long to type, read back and removed by the launch line.
 	PromptDir string
+	// Shell is the panes' login shell (tmux.Shell), which the launch line is typed into: fish gets the prompt in its
+	// own quoting; "" is bash or zsh.
+	Shell string
 	// FirstWorkspaceName names the workspace made for a machine that has none.
 	FirstWorkspaceName string
 	// Now is the clock in epoch milliseconds.
@@ -333,7 +336,7 @@ func (s *Starter) Start(o Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	command := s.envSource(o.Provider) + env + agents.WithInitialPrompt(o.Provider, line, prompt, promptFile)
+	command := s.envSource(o.Provider) + env + agents.WithInitialPromptIn(s.cfg.Shell, o.Provider, line, prompt, promptFile)
 	name := ""
 	if o.TabName != nil {
 		name = jscompat.Trim(*o.TabName)

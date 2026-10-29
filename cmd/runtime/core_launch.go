@@ -89,6 +89,14 @@ func (c *core) envSource(provider string) string {
 	return c.agents.envSource(provider)
 }
 
+// paneShell is the login shell the panes run, which launch lines are typed into ("" without tmux).
+func (c *core) paneShell() string {
+	if c.cfg.Tmux == nil {
+		return ""
+	}
+	return c.cfg.Tmux.Shell()
+}
+
 // newLauncher makes the core's starter and document inbox, and hands the agents their Go start and resume.
 func (c *core) newLauncher() {
 	lc := c.cfg.Launch
@@ -102,6 +110,7 @@ func (c *core) newLauncher() {
 		Store: c.store, Lines: lines, Availability: avail, Keeper: c.keeperOf,
 		WorkspaceRoot: lc.WorkspaceRoot, Home: c.cfg.Home, DataDir: c.cfg.DataDir, DataDirLabel: lc.DataDirLabel,
 		EnvPrefix: lc.EnvPrefix, EnvSource: c.envSource, PromptDir: filepath.Join(c.cfg.DataDir, "launch-prompts"), FirstWorkspaceName: lc.FirstWorkspaceName,
+		Shell: c.paneShell(),
 	})
 	c.inbox = &launch.Inbox{Starter: c.launcher, Tmux: inboxTmux{c}, Log: coreLog,
 		Submit: func(session, text string) error {

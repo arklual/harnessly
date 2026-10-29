@@ -124,6 +124,56 @@ func TestANSICQuoteRoundTrip(t *testing.T) {
 	}
 }
 
+func fishPrintf(t *testing.T, quoted string) string {
+	t.Helper()
+	if _, err := exec.LookPath("fish"); err != nil {
+		t.Skip("fish is not installed")
+	}
+	out, err := exec.Command("fish", "--no-config", "-c", "printf %s "+quoted).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
+}
+
+// initial-prompt: round-trips quotes, backslashes and newlines through fish, which reads no $'…'.
+func TestFishQuoteRoundTrip(t *testing.T) {
+	for _, text := range []string{
+		"Привет, это 'тест'\nвторая строка \\ $HOME `id` \"q\"\tтаб\x01\x7f",
+		`\'`, `\\'\`, "\n", "a\n\nb", "{a,b} *.go ~ (echo x) $(echo y) %self", "'", "",
+	} {
+		if got := fishPrintf(t, agents.FishQuote(text)); got != text {
+			t.Errorf("%q: %q", text, got)
+		}
+		if strings.ContainsAny(agents.FishQuote(text), "\n\t\r") {
+			t.Errorf("%q: not one typed line", text)
+		}
+	}
+	long := strings.Repeat("я'\n", 2000) + "$HOME"
+	file, err := agents.WriteLongPrompt(filepath.Join(t.TempDir(), "d 'x'"), long)
+	if err != nil || file == "" {
+		t.Fatalf("%q %v", file, err)
+	}
+	if got := fishPrintf(t, agents.PromptFromFile(file)); got != long {
+		t.Fatal("fish reads the prompt file back")
+	}
+}
+
+// initial-prompt: the pane's shell picks the quoting.
+func TestWithInitialPromptIn(t *testing.T) {
+	for _, c := range []struct{ shell, want string }{
+		{"/usr/bin/fish", `claude -- 'a'\n'b'`},
+		{"fish", `claude -- 'a'\n'b'`},
+		{"/bin/bash", `claude -- $'a\nb'`},
+		{"/bin/zsh", `claude -- $'a\nb'`},
+		{"", `claude -- $'a\nb'`},
+	} {
+		if got := agents.WithInitialPromptIn(c.shell, "claude", "claude", "a\nb", ""); got != c.want {
+			t.Errorf("%q: %q", c.shell, got)
+		}
+	}
+}
+
 // initial-prompt: appends the prompt per provider.
 func TestWithInitialPrompt(t *testing.T) {
 	for _, c := range []struct{ provider, cmd, prompt, want string }{

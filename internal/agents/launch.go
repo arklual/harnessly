@@ -160,6 +160,60 @@ func ANSICQuote(s string) string {
 	return b.String()
 }
 
+// IsFish says whether a login shell (a path or a bare name) is fish, which reads no $'…'.
+func IsFish(shell string) bool { return filepath.Base(shell) == "fish" }
+
+// FishQuote quotes s for fish on one typed line: single-quoted runs (in which fish reads \\ and \' as escapes), with
+// newlines, tabs and the other control characters written between them as fish's own escapes ('a'\n'b').
+func FishQuote(s string) string {
+	var b strings.Builder
+	open := false
+	quoted := func(on bool) {
+		if on != open {
+			b.WriteByte('\'')
+			open = on
+		}
+	}
+	for _, r := range s {
+		switch {
+		case r == '\\':
+			quoted(true)
+			b.WriteString(`\\`)
+		case r == '\'':
+			quoted(true)
+			b.WriteString(`\'`)
+		case r == '\n':
+			quoted(false)
+			b.WriteString(`\n`)
+		case r == '\r':
+			quoted(false)
+			b.WriteString(`\r`)
+		case r == '\t':
+			quoted(false)
+			b.WriteString(`\t`)
+		case r < 0x20 || r == 0x7f:
+			quoted(false)
+			fmt.Fprintf(&b, `\x%02x`, r)
+		default:
+			quoted(true)
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return "''"
+	}
+	quoted(false)
+	return b.String()
+}
+
+// QuotePrompt quotes a prompt for the pane's login shell: fish's own quoting for fish, $'…' for the others.
+func QuotePrompt(shell, s string) string {
+	if IsFish(shell) {
+		return FishQuote(s)
+	}
+	return ANSICQuote(s)
+}
+
 const (
 	// MaxInitialPrompt caps an initial prompt, in UTF-16 units.
 	MaxInitialPrompt = 20_000
@@ -181,11 +235,16 @@ func PromptFromFile(file string) string {
 // WithInitialPrompt appends the initial prompt to a launch line: `-- <arg>` for Claude, `--prompt <arg>` for the Codex
 // launcher. promptFile, when set, is where WriteLongPrompt put a long prompt.
 func WithInitialPrompt(provider, command, prompt, promptFile string) string {
+	return WithInitialPromptIn("", provider, command, prompt, promptFile)
+}
+
+// WithInitialPromptIn is WithInitialPrompt for a line typed into shell, the pane's login shell ("": bash or zsh).
+func WithInitialPromptIn(shell, provider, command, prompt, promptFile string) string {
 	text := InitialPromptText(prompt)
 	if text == "" {
 		return command
 	}
-	arg := ANSICQuote(text)
+	arg := QuotePrompt(shell, text)
 	if promptFile != "" {
 		arg = PromptFromFile(promptFile)
 	}
