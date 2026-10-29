@@ -6,7 +6,8 @@
 </p>
 
 <p align="center">
-  <strong>The open core of a workspace for people and coding agents.</strong>
+  <strong>Run Claude Code and Codex on your own servers. They keep working with the laptop closed,<br>
+  you answer them from your phone, and you see what each one is doing and what it costs.</strong>
 </p>
 
 <p align="center">
@@ -25,9 +26,22 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#self-hosted-hub">Hub</a> ·
   <a href="#releases-and-verification">Releases</a> ·
+  <a href="docs/comparison.md">Compared</a> ·
   <a href="docs/README.md">Docs</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ly-solutions/harnessly/assets/demo.gif" alt="Three Claude Code agents work on one server; one asks a question and gets the answer from a phone; then the statistics page shows what they did and what it cost" width="960">
+</p>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh
+```
+
+One command for Linux and macOS: the latest signed release, checked, started as a service of your account on
+<http://127.0.0.1:8022>. Then open the page and choose your password. [Other ways](#quick-start) ·
+[how it compares](docs/comparison.md).
 
 ---
 
@@ -114,6 +128,19 @@ For a team, the hub is the one address people sign in at.
 
 ## Quick start
 
+### One command
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh
+```
+
+The installer puts the latest release into `~/.local/bin`, checks the archive against the release's `checksums.txt`
+(and its sigstore signature when `cosign` is installed), installs `tmux` and `git` when they are missing, and starts
+the runtime as a systemd user service on Linux or a launchd agent on macOS, listening on `127.0.0.1:8022` only. Run it
+again to update. Options go after `sh -s --`: `--version X.Y.Z`, `--port N`, `--no-service`, `--uninstall` (keeps
+your data in `~/.harnessly`); `--help` lists them all. On a remote server it prints the `ssh -L` command that brings
+the page to your computer. Details: [docs/deploy.md](docs/deploy.md#quick-start-with-the-installer).
+
 ### Docker
 
 ```sh
@@ -133,7 +160,8 @@ Needs `tmux` and `git`. Each [release](https://github.com/ly-solutions/harnessly
 is compiled in), the `agent` and the `harnessly` command line tool.
 
 ```sh
-VERSION=0.15.47 OS=linux ARCH=amd64     # the version of the latest release; OS: linux or darwin; ARCH: amd64 or arm64
+VERSION=$(curl -fsSL https://api.github.com/repos/ly-solutions/harnessly/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+OS=linux ARCH=amd64                     # OS: linux or darwin; ARCH: amd64 or arm64
 BASE=https://github.com/ly-solutions/harnessly/releases/download/v$VERSION
 ARCHIVE=harnessly_${VERSION}_${OS}_${ARCH}.tar.gz
 curl -fsSLO "$BASE/$ARCHIVE" -O "$BASE/checksums.txt" -O "$BASE/checksums.txt.sigstore.json"
@@ -212,6 +240,7 @@ gh attestation verify oci://ghcr.io/ly-solutions/harnessly:latest --repo ly-solu
 
 | | |
 | --- | --- |
+| [Compared](docs/comparison.md) | harnessly next to Happy, Paseo, T3 Code, Orca and Claude Code Remote Control |
 | [Getting started](docs/getting-started.md) | build, run standalone, open tabs, run agents, connect the machine agent |
 | [Deploy](docs/deploy.md) | quick start, verification, updating, systemd, Docker, compose, Helm, Argo CD |
 | [Configuration](docs/configuration.md) | every `RUNTIME_*` and `AGENT_*` variable |

@@ -15,13 +15,20 @@ import (
 
 const defaultPollWait = 25 * time.Second
 
-var errPause = 2 * time.Second
+const defaultErrPause = 2 * time.Second
 
 func (s *Service) pollWait() time.Duration {
 	if s.PollWait > 0 {
 		return s.PollWait
 	}
 	return defaultPollWait
+}
+
+func (s *Service) errPause() time.Duration {
+	if s.ErrPause > 0 {
+		return s.ErrPause
+	}
+	return defaultErrPause
 }
 
 // Start resumes the pollers of the asks that wait (after a restart of the runtime).
@@ -37,14 +44,16 @@ func (s *Service) Start() {
 	}
 }
 
-// Stop ends every poller (tests; the process ends with the runtime otherwise).
+// Stop ends every poller and waits until they are gone, so nothing writes to the store after it returns (tests; the
+// process ends with the runtime otherwise).
 func (s *Service) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for id, cancel := range s.pollers {
 		cancel()
 		delete(s.pollers, id)
 	}
+	s.mu.Unlock()
+	s.running.Wait() // outside the lock: a poller takes it on its way out
 }
 
 func (s *Service) ensurePoller(bot string) {
@@ -58,7 +67,11 @@ func (s *Service) ensurePoller(bot string) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s.pollers[bot] = cancel
-	go s.poll(ctx, bot)
+	s.running.Add(1)
+	go func() {
+		defer s.running.Done()
+		s.poll(ctx, bot)
+	}()
 }
 
 // waitingOn are the asks through a bot that wait, the overdue ones closed on the way.
@@ -121,11 +134,11 @@ func (s *Service) poll(ctx context.Context, botID string) {
 				continue
 			}
 			// The binding reads now, the webhook is set, a network hiccup or Telegram's 429: later.
-			pause(errPause)
+			pause(s.errPause())
 			continue
 		}
 		if len(updates) == 0 && time.Since(asked) < s.pollWait()/10 {
-			pause(errPause)
+			pause(s.errPause())
 		}
 		next := offset
 		for _, u := range updates {

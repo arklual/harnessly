@@ -1,6 +1,7 @@
 // The comments of a guest link over the gateway: the link's own address is the guest's right, no session. The guest's name
 // is asked once and kept in the browser with the id that tells one guest's comments from another's.
 import type { IPicked } from '@/next/features/designly/page-bridge';
+import { LINK_GONE } from '@/next/features/designly/guest/guest-gone';
 
 export interface IGuestAnchor {
   selector: string;
@@ -65,9 +66,17 @@ const commentOf = (v: unknown): IGuestComment | null => {
 export class GuestError extends Error {}
 
 /** The comments of the link; null where they cannot be read (the link does not take comments). */
-export const fetchComments = async (url: string, signal?: AbortSignal): Promise<IGuestComment[] | null> => {
+/** The comments of the link; null when they could not be read this time, 'gone' when the link is revoked or expired. */
+export const fetchComments = async (
+  url: string,
+  signal?: AbortSignal,
+): Promise<IGuestComment[] | null | 'gone'> => {
   try {
     const res = await fetch(url, { cache: 'no-store', signal });
+    if (res.status === LINK_GONE) {
+      void res.body?.cancel();
+      return 'gone';
+    }
     if (!res.ok) return null;
     const body: unknown = await res.json();
     return Array.isArray(body) ? body.map(commentOf).filter((c) => c !== null) : null;

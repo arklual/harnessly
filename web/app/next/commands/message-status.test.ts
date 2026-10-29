@@ -177,6 +177,19 @@ describe('the page asks the runtime where a late message is', () => {
     expect(waitsInQueue(msg('m-q'), 'working')).toBe(false);
   });
 
+  it('a failed copy the runtime queued again is asked about, and takes the runtime’s state', async () => {
+    const { rt, m } = await openChat();
+    const data = rt.convs.get(CONV)!;
+    applyMessage(m, {
+      ...record('m-f', { k: 'failed', code: 'returned-to-input', retryable: true, at: 1792600000000 }, 3),
+    });
+    // Retried on the runtime, held by the pause a Stop left; the frame that said so never came.
+    data.messages = [record('m-f', { k: 'queued', position: 1, reason: 'paused', wait: null }, 5)];
+    await vi.advanceTimersByTimeAsync(35_100);
+    expect(ours(rt.statusAsks)).toEqual([['m-f']]);
+    expect(msg('m-f')).toMatchObject({ rev: 5, state: { k: 'queued', reason: 'paused' } });
+  });
+
   it('an older runtime without the status page decides nothing: the message waits and is asked about again later', async () => {
     const { rt, m } = await openChat();
     rt.statusPage = false;

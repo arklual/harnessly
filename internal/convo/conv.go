@@ -102,7 +102,9 @@ type conv struct {
 	compactAt time.Time
 	// interrupting: we pressed Escape for a Stop that pauses the queue; the interrupt it brings pauses it.
 	interrupting bool
-	interruptAt  time.Time
+	// turnAfterStop: a turn began while the queue was paused by a Stop; its end lifts the pause (liftInterrupt).
+	turnAfterStop bool
+	interruptAt   time.Time
 
 	typing bool
 	// switching: a /model or /effort is being typed into the agent's box (off the actor); nothing else types meanwhile.
@@ -363,6 +365,9 @@ func (c *conv) input(in agentstate.Input, now time.Time) {
 		}
 	}
 	c.effects(effects, before, now)
+	if c.liftInterrupt(effects, now) {
+		c.pump(now)
+	}
 	if p := c.box.Paused(); p != nil && p.Reason == wire.PausedAgentGone && c.rec.State.K != wire.StateGone {
 		// The pause was for an agent that is gone; one that is back (found again, a restart) takes its queue — or, held
 		// on its usage limit, waits for the reset.
@@ -373,6 +378,36 @@ func (c *conv) input(in agentstate.Input, now time.Time) {
 			c.pump(now)
 		}
 	}
+}
+
+// liftInterrupt ends a pause a Stop left: once a turn began after it (the person typed in the terminal, or sent) and
+// the agent is idle again, the stop is history and the queue goes on. It once held the queue for good, through turns
+// that ended one after another (tab-as454dx7m, 29.10).
+func (c *conv) liftInterrupt(effects []agentstate.Effect, now time.Time) bool {
+	p := c.box.Paused()
+	if p == nil || p.Reason != wire.PausedInterrupted {
+		c.turnAfterStop = false
+		return false
+	}
+	for _, e := range effects {
+		if e.K == agentstate.TurnStarted {
+			c.turnAfterStop = true
+		}
+	}
+	if t := c.fd.LastTurn(); t != nil && t.StartedAt > p.At {
+		// A turn the transcript shows begun after the stop (a restart of the runtime forgot the flag).
+		c.turnAfterStop = true
+	}
+	if !c.turnAfterStop || (c.rec.State.K != wire.StateIdle && c.rec.State.K != wire.StateReady) {
+		return false
+	}
+	c.turnAfterStop = false
+	ch, ok := c.box.Resume(now)
+	if ok {
+		c.d.Log.Info("queue paused by a stop goes on: a turn ran since", "conv", c.rec.ID)
+		c.change(ch, now)
+	}
+	return ok
 }
 
 func (c *conv) effects(effects []agentstate.Effect, before wire.AgentState, now time.Time) {
@@ -1140,6 +1175,7 @@ func (c *conv) pump(now time.Time) {
 	if c.typing || c.switching || c.busyGate || c.deletedAt != 0 {
 		return
 	}
+	c.liftInterrupt(nil, now)
 	// A model change asked while the agent was away or at work goes in before the next message.
 	if c.applyPending(now) {
 		return

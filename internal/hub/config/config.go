@@ -72,6 +72,9 @@ type Config struct {
 	// SitesDir holds the sites' files when no bucket is set.
 	SitesDir string
 	SitesS3  SitesS3
+	// FleetSites lets a fleet gateway mint narrow publishing sessions without registering its machines in the hub.
+	FleetSitesSecret string
+	FleetSitesSpace  string
 	// Warnings are what the hub starts with although its operator should look at it again: the binary logs each at
 	// error level and check-config prints them.
 	Warnings []string
@@ -236,21 +239,23 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 
 	c := &Config{
-		Listen:         def("HUB_LISTEN", "0.0.0.0:8040"),
-		DataDir:        def("HUB_DATA_DIR", "/var/lib/harnessly-hub"),
-		Edition:        def("HUB_EDITION", EditionSelfHosted),
-		Signup:         def("HUB_SIGNUP", SignupOpen),
-		SMTPURL:        get("HUB_SMTP_URL"),
-		MailFrom:       get("HUB_MAIL_FROM"),
-		RPID:           get("HUB_RP_ID"),
-		RPName:         def("HUB_RP_NAME", "harnessly"),
-		RuntimeDomain:  strings.ToLower(strings.Trim(get("HUB_RUNTIME_DOMAIN"), ".")),
-		DistDir:        def("HUB_DIST_DIR", "/opt/harnessly/dist"),
-		SitesDomain:    strings.ToLower(strings.Trim(get("HARNESSLY_SITES_DOMAIN"), ".")),
-		SitesAbuseURL:  get("HARNESSLY_SITES_ABUSE_URL"),
-		ContainerImage: get("HUB_CONTAINER_IMAGE"),
-		LocalCodeFile:  get("HUB_LOCAL_CODE_FILE"),
-		LocalCodeGID:   -1,
+		Listen:           def("HUB_LISTEN", "0.0.0.0:8040"),
+		DataDir:          def("HUB_DATA_DIR", "/var/lib/harnessly-hub"),
+		Edition:          def("HUB_EDITION", EditionSelfHosted),
+		Signup:           def("HUB_SIGNUP", SignupOpen),
+		SMTPURL:          get("HUB_SMTP_URL"),
+		MailFrom:         get("HUB_MAIL_FROM"),
+		RPID:             get("HUB_RP_ID"),
+		RPName:           def("HUB_RP_NAME", "harnessly"),
+		RuntimeDomain:    strings.ToLower(strings.Trim(get("HUB_RUNTIME_DOMAIN"), ".")),
+		DistDir:          def("HUB_DIST_DIR", "/opt/harnessly/dist"),
+		SitesDomain:      strings.ToLower(strings.Trim(get("HARNESSLY_SITES_DOMAIN"), ".")),
+		SitesAbuseURL:    get("HARNESSLY_SITES_ABUSE_URL"),
+		FleetSitesSecret: get("HARNESSLY_FLEET_SITES_SECRET"),
+		FleetSitesSpace:  get("HARNESSLY_FLEET_SITES_SPACE"),
+		ContainerImage:   get("HUB_CONTAINER_IMAGE"),
+		LocalCodeFile:    get("HUB_LOCAL_CODE_FILE"),
+		LocalCodeGID:     -1,
 		MinAgentVersion: strings.TrimPrefix(
 			get("HUB_MIN_AGENT_VERSION"), "v"),
 		TermsURL: get("HUB_TERMS_URL"),
@@ -528,6 +533,12 @@ func (c *Config) loadSites(get func(string) string, def func(string, string) str
 		if u, err := url.Parse(c.SitesAbuseURL); err != nil || (u.Scheme != "https" && u.Scheme != "http" && u.Scheme != "mailto") {
 			bad("HARNESSLY_SITES_ABUSE_URL must be an http(s) or mailto: address")
 		}
+	}
+	if (c.FleetSitesSecret == "") != (c.FleetSitesSpace == "") {
+		bad("HARNESSLY_FLEET_SITES_SECRET and HARNESSLY_FLEET_SITES_SPACE must be set together")
+	}
+	if c.FleetSitesSecret != "" && len(c.FleetSitesSecret) < 32 {
+		bad("HARNESSLY_FLEET_SITES_SECRET must be at least 32 characters")
 	}
 	if c.SitesDomain == "" {
 		return

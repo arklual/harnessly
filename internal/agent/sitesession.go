@@ -84,22 +84,64 @@ func RequestSitesSession(ctx context.Context, m *MachineFile, client *http.Clien
 	return SitesSession{}, fmt.Errorf("the hub did not give a session: HTTP %d", res.StatusCode)
 }
 
-// sitesSessionRoute is POST /sites/session on the loopback: the runtime of this machine asks for the token it publishes
-// a site with. The machine is the agent's, not the runtime's, so the signature is made here.
+// fleetSitesSession asks the fleet gateway for the same short-lived session when this agent is not a hub machine.
+func (a *Agent) fleetSitesSession(ctx context.Context, person string) (SitesSession, error) {
+	u, err := url.Parse(a.cfg.ClusterURL)
+	if err != nil {
+		return SitesSession{}, err
+	}
+	switch u.Scheme {
+	case "wss":
+		u.Scheme = "https"
+	case "ws":
+		u.Scheme = "http"
+	}
+	u.Path, u.RawQuery = "/sites/session", ""
+	body, _ := json.Marshal(map[string]string{"person": person})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return SitesSession{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+SignHS256(a.sessionSecret(), a.cfg.RuntimeID, a.cfg.DialAudience, 5*time.Minute))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := (&http.Client{Timeout: sitesSessionTimeout}).Do(req)
+	if err != nil {
+		return SitesSession{}, err
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<16))
+	if res.StatusCode != http.StatusOK {
+		return SitesSession{}, fmt.Errorf("the fleet gateway did not give a session: HTTP %d", res.StatusCode)
+	}
+	var out SitesSession
+	if err := json.Unmarshal(raw, &out); err != nil || out.Token == "" || out.Space == "" {
+		return SitesSession{}, errors.New("the fleet gateway gave an answer that is not a publishing session")
+	}
+	return out, nil
+}
+
+// sitesSessionRoute is POST /sites/session on the loopback: the runtime of this machine asks for a publishing session.
+// The signature is made by the hub agent, or the request is authenticated to the fleet gateway with the fleet pair's secret.
 func (a *Agent) sitesSessionRoute(w http.ResponseWriter, r *http.Request) {
 	if !tokenMatches(r.Header.Get(a.cfg.LocalTokenHeader), a.localToken) {
 		reply(w, 403, map[string]string{"error": "no local agent token (agent.json in the data directory)"})
-		return
-	}
-	if a.cfg.Machine == nil {
-		reply(w, 409, map[string]string{"error": "this machine is not in a hub", "code": "no_hub"})
 		return
 	}
 	var in struct {
 		Person string `json:"person"`
 	}
 	_ = json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in)
-	s, err := RequestSitesSession(r.Context(), a.cfg.Machine, nil, time.Now(), in.Person)
+	var s SitesSession
+	var err error
+	switch {
+	case a.cfg.Machine != nil:
+		s, err = RequestSitesSession(r.Context(), a.cfg.Machine, nil, time.Now(), in.Person)
+	case a.cfg.ClusterURL != "" && a.cfg.RuntimeID != "":
+		s, err = a.fleetSitesSession(r.Context(), in.Person)
+	default:
+		reply(w, 409, map[string]string{"error": "this machine is not in a hub", "code": "no_hub"})
+		return
+	}
 	if err != nil {
 		reply(w, 502, map[string]string{"error": err.Error(), "code": "hub"})
 		return

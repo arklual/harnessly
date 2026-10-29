@@ -347,13 +347,18 @@ const Stack = ({ props, closing }: { props: IQueueProps; closing: boolean }) => 
   );
   useFlip(listRef, true);
 
+  // Продолжить stands on the first row the pause holds: a head that failed above it (a steer the Stop returned) must not
+  // take the only way on with it (tab-as454dx7m, 29.10).
+  const firstPaused =
+    list.find(({ item }) => rowState(item, props.paused !== null, props.waitingLimit) === 'paused')?.item
+      .clientId ?? null;
   const grip: IGrip | null = reorder ? { locked: movingId !== null, pending: false, onStep: step } : null;
   return (
     <>
       <div className="hx-qfold" data-state={closing ? PRESENCE.closing : undefined}>
         <div className="hx-qfold__in">
           <div ref={listRef} className="hx-queue" role="list" aria-label={t('next.queue.label')}>
-            {list.map(({ item, leaving }, index) => (
+            {list.map(({ item, leaving }) => (
               <div
                 key={item.clientId}
                 className="hx-queue__slot"
@@ -367,7 +372,7 @@ const Stack = ({ props, closing }: { props: IQueueProps; closing: boolean }) => 
                   <Row
                     row={item}
                     state={rowState(item, props.paused !== null, props.waitingLimit)}
-                    first={index === 0}
+                    first={item.clientId === firstPaused}
                     leaving={leaving}
                     grip={grip && { ...grip, pending: movingId === item.clientId }}
                     props={props}

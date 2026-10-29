@@ -66,3 +66,16 @@ func TestUpdateRoute(t *testing.T) {
 		t.Errorf("GET: %d %q", w.Code, w.Body.String())
 	}
 }
+
+func TestHealthFallbackVersionIsTheLinkedOne(t *testing.T) {
+	old := agent.BuildVersion
+	t.Cleanup(func() { agent.BuildVersion = old })
+	agent.BuildVersion = "0.16.16"
+	if got := healthFallbackVersion(); got != "0.16.16" {
+		t.Fatalf("a release build answers %q, want 0.16.16", got)
+	}
+	agent.BuildVersion = "dev"
+	if got := healthFallbackVersion(); got != "0.0.0-development" {
+		t.Fatalf("a source build answers %q, want 0.0.0-development", got)
+	}
+}

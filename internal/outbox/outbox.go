@@ -96,6 +96,9 @@ type Record struct {
 	WaitSince wire.Ms          `json:"waitSince"`
 	Reason    wire.QueueReason `json:"reason"`
 	Blocked   int              `json:"blocked"`
+	// BlockedSince: the first look that found someone's text in the box, for the term of that block (OccupiedTTL);
+	// 0 when the box is not known to be taken.
+	BlockedSince wire.Ms `json:"blockedSince,omitempty"`
 	// Submitted: the agent's prompt-submit came while the message was being typed.
 	Submitted bool `json:"submitted"`
 	// EnterOnly: a restart found the message's text in the box; the next try presses only its Enter.
@@ -406,7 +409,7 @@ func (b *Box) Retry(clientID string, find Find, now time.Time) (Change, wire.Ref
 		}
 	}
 	r.Message.Attempts++
-	r.Tries, r.NextTry, r.Blocked, r.WaitSince, r.EndedAt = 0, 0, 0, now.UnixMilli(), 0
+	r.Tries, r.NextTry, r.Blocked, r.BlockedSince, r.WaitSince, r.EndedAt = 0, 0, 0, 0, now.UnixMilli(), 0
 	b.items = append([]string{clientID}, b.items...)
 	b.rev++
 	b.set(&ch, r, wire.MessageState{K: wire.MsgQueued, Position: 1, Reason: wire.QueuedBehind}, now)

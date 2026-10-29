@@ -6,7 +6,36 @@ only the runtime.
 
 ## Quick start
 
-Three ways, the shortest first. All of them end the same way: open the page, sign in once, choose your password.
+Four ways, the shortest first. All of them end the same way: open the page, sign in once, choose your password.
+
+### Quick start with the installer
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh
+```
+
+For one person on one Linux or macOS machine, as an ordinary account (it uses `sudo` only to install missing
+packages). [`install.sh`](../install.sh):
+
+- downloads the latest release for the system into `~/.local/bin` as `harnessly-runtime`, `harnessly-agent` and
+  `harnessly`, after checking the archive against `checksums.txt`; when `cosign` is installed it also checks the
+  signature of `checksums.txt`, as in [the release binary](#quick-start-with-a-release-binary) below;
+- installs `tmux` and `git` with `apt`, `dnf`, `yum`, `zypper`, `pacman`, `apk` or `brew` when they are missing
+  (`--no-deps` only checks);
+- writes the settings to `~/.config/harnessly/env` and starts the runtime as a systemd user service with
+  lingering on Linux, a launchd agent on macOS, or a background process when neither is there, on `127.0.0.1:8022`;
+- waits for `/api/health` and prints the address, and on a machine reached over SSH the `ssh -L` command for your
+  computer.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh -s -- --port 8030
+curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh -s -- --version 0.16.16
+curl -fsSL https://raw.githubusercontent.com/ly-solutions/harnessly/main/install.sh | sh -s -- --uninstall
+```
+
+Running it again updates to the latest release. `--uninstall` stops the service and removes the programs; the data in
+`~/.harnessly`, the settings file and the tmux sessions stay. To link machines to a team hub, use the installer the hub
+serves instead ([connecting a machine](hub/machine.md)).
 
 ### Quick start with Docker
 
@@ -38,7 +67,8 @@ per system, `harnessly_<version>_<os>_<arch>.tar.gz` for `linux` and `darwin` on
 signature `checksums.txt.sigstore.json`.
 
 ```sh
-VERSION=0.15.47 OS=linux ARCH=amd64     # the version of the latest release; OS: linux or darwin; ARCH: amd64 or arm64
+VERSION=$(curl -fsSL https://api.github.com/repos/ly-solutions/harnessly/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+OS=linux ARCH=amd64                     # OS: linux or darwin; ARCH: amd64 or arm64
 BASE=https://github.com/ly-solutions/harnessly/releases/download/v$VERSION
 ARCHIVE=harnessly_${VERSION}_${OS}_${ARCH}.tar.gz
 curl -fsSLO "$BASE/$ARCHIVE" -O "$BASE/checksums.txt" -O "$BASE/checksums.txt.sigstore.json"
@@ -82,6 +112,7 @@ Needs Go (the version in [`go.mod`](../go.mod)), Node.js 22 with pnpm (corepack)
   ```
 
   With a pinned tag, put the new version in both places. With compose: `docker compose pull && docker compose up -d`.
+- **Installer**: run the same command again.
 - **Binary**: download and verify the new archive as above, replace `runtime` (and `agent`, `harnessly` if you use them)
   and restart it. The data in `~/.harnessly` is kept. Under [systemd](#systemd-one-host-one-account) the restart keeps
   tmux and the agents running.

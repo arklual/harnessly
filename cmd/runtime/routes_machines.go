@@ -15,6 +15,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/limits"
 	"github.com/ly-solutions/harnessly/internal/machines"
 	"github.com/ly-solutions/harnessly/internal/push"
+	"github.com/ly-solutions/harnessly/internal/updatecheck"
 )
 
 // The machines slice: the machine snapshot the machine agent polls, the machine load panel, health and the manifest,
@@ -145,7 +146,7 @@ func machineSliceRoutes(d deps, listen, upstream string, sender *push.Sender, ho
 		TagPrefix:   hooks.PushTagPrefix,
 		Health: machines.Health{
 			App:             env("RUNTIME_HEALTH_APP", "harnessly"),
-			FallbackVersion: "0.0.0-development",
+			FallbackVersion: healthFallbackVersion(),
 			ReleaseFile:     releaseFile,
 			Alive:           alive,
 		},
@@ -189,4 +190,13 @@ func releaseStatic(variable, name string) string {
 		return filepath.Join(filepath.Dir(rel), "runtime-static", name)
 	}
 	return ""
+}
+
+// healthFallbackVersion is the version the health route answers with when there is no release file: the one the build
+// was linked with (a release archive, an image), or "0.0.0-development" for a build from source.
+func healthFallbackVersion() string {
+	if updatecheck.Comparable(agent.BuildVersion) {
+		return agent.BuildVersion
+	}
+	return "0.0.0-development"
 }

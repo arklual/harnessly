@@ -97,8 +97,7 @@ func newRig(t *testing.T) *rig {
 	}
 	r := &rig{tg: tg, now: time.Now()}
 	r.svc = &Service{Store: Open(dir), Settings: OpenSettings(dir), Bots: bots, Telegram: &notifybots.Client{Base: srv.URL},
-		PollWait: 50 * time.Millisecond}
-	errPause = 20 * time.Millisecond
+		PollWait: 50 * time.Millisecond, ErrPause: 20 * time.Millisecond}
 	t.Cleanup(r.svc.Stop)
 	set := Defaults()
 	set.Contacts = []Contact{{Name: "Anna", Username: "anna_dev"}, {Name: "Lead", Username: "the_lead", CanApprove: true}}

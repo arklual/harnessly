@@ -89,10 +89,13 @@ type Service struct {
 	Changed func(before *Ask, after Ask)
 	// PollWait is the long poll of a bot's poller (25 s when zero); tests shorten it.
 	PollWait time.Duration
+	// ErrPause is the pause after a failed or empty poll (2 s when zero); tests shorten it.
+	ErrPause time.Duration
 
 	mu      sync.Mutex
 	waiters map[string][]chan struct{}
 	pollers map[string]context.CancelFunc
+	running sync.WaitGroup // the poller goroutines, for Stop
 }
 
 func (s *Service) now() time.Time {

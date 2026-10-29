@@ -97,12 +97,21 @@ describe('the comments over the gateway', () => {
     );
     const list = await fetchComments('/s/t/comments');
     expect(list).toHaveLength(1);
-    expect(list?.[0]).toMatchObject({ id: '3', name: 'Ann', anchor: { selector: 'p', state: {} } });
+    expect(Array.isArray(list) && list[0]).toMatchObject({
+      id: '3',
+      name: 'Ann',
+      anchor: { selector: 'p', state: {} },
+    });
   });
 
   it('are null where the link does not take them', async () => {
     vi.stubGlobal('fetch', answer(403, {}));
     expect(await fetchComments('/s/t/comments')).toBeNull();
+  });
+
+  it('say the link is gone when it is revoked or expired', async () => {
+    vi.stubGlobal('fetch', answer(410, {}));
+    expect(await fetchComments('/s/t/comments')).toBe('gone');
   });
 
   it('are posted with the guest, the board and the anchor', async () => {

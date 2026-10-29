@@ -61,10 +61,49 @@ func dropSpace(r rune) rune {
 // ours too), else nothing is pressed — row by row with ctrl+u, a reference ctrl+u leaves by Backspace, looking after
 // every key: it stops as soon as the box holds anything that is not ours (the person started typing). Never while
 // Claude still reads a paste of pictures: their references would land after the keys. True when the box ended empty.
-func ClearOwn(p Pane, c Clock, provider wire.Provider, text string, pictures bool) bool {
+// paths are picture paths of ours the box may hold besides (pasted, read late): they are cleared with the text.
+func ClearOwn(p Pane, c Clock, provider wire.Provider, text string, pictures bool, paths ...string) bool {
 	if provider == wire.ProviderCodex {
 		return false
 	}
+	return clearRows(p, c, provider, func(s Screen) bool {
+		left := withoutPaths(s, paths)
+		return blank(left.Box) || ours(left, text, pictures)
+	})
+}
+
+// wipeMaxKeys bounds the keys a wipe presses: a box of a few screens of text, row by row.
+const wipeMaxKeys = 120
+
+// Wipe empties the box whatever it holds — only on the person's word («Очистить поле и отправить»), never by itself:
+// Claude's row by row with ctrl+u (Backspace for a reference ctrl+u leaves), Codex's by ctrl+u. Never ctrl+c: in a
+// working agent it interrupts the turn. True when the box ended empty.
+func Wipe(p Pane, c Clock, provider wire.Provider) bool {
+	if provider == wire.ProviderCodex {
+		for range 3 {
+			view := Look(p, provider)
+			if !view.Readable || !view.InputLine {
+				return false
+			}
+			if blank(view.Input) {
+				return true
+			}
+			if p.Keys("C-u") != nil {
+				return false
+			}
+			c.Sleep(clearStep)
+		}
+		return blank(Look(p, provider).Input)
+	}
+	return clearRowsUpTo(p, c, provider, wipeMaxKeys, func(Screen) bool { return true })
+}
+
+// clearRows presses ctrl+u row by row while the box holds what mine says is ours, and stops at anything else.
+func clearRows(p Pane, c Clock, provider wire.Provider, mine func(Screen) bool) bool {
+	return clearRowsUpTo(p, c, provider, clearMaxKeys, mine)
+}
+
+func clearRowsUpTo(p Pane, c Clock, provider wire.Provider, maxKeys int, mine func(Screen) bool) bool {
 	last := ""
 	for keys := 0; ; keys++ {
 		view := Look(p, provider)
@@ -72,14 +111,14 @@ func ClearOwn(p Pane, c Clock, provider wire.Provider, text string, pictures boo
 		case !view.Readable || !view.InputLine:
 			return false
 		case Pasting(view.Plain):
-			if keys >= clearMaxKeys+pastingLooks {
+			if keys >= maxKeys+pastingLooks {
 				return false
 			}
 			c.Sleep(imagePoll)
 			continue
 		case blank(view.Input):
 			return true
-		case keys >= clearMaxKeys || !ours(view, text, pictures):
+		case keys >= maxKeys || !mine(view):
 			return false
 		}
 		key := "C-u"

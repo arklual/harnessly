@@ -32,6 +32,12 @@ type Message struct {
 	// Leftovers are the picture paths the harness pasted for its messages (this one's and earlier ones'). Claude reads
 	// a big picture late: a paste the typist gave up on lands after it, as path text, and is ours to clear.
 	Leftovers []string
+	// Typed are the texts of the earlier messages the harness typed (not this one's): what is left of one in the box,
+	// its paths and references aside, is ours to clear.
+	Typed []string
+	// Wipe: the person said to clear the box and send («Очистить поле и отправить»): text in the box that is not ours
+	// is taken out too, row by row, and the message goes.
+	Wipe bool
 }
 
 // Outcome is how one try ended.
@@ -64,7 +70,9 @@ type Result struct {
 	Own     bool
 	// AsPath: Claude did not show a picture as a reference, and the message went with its path as text.
 	AsPath bool
-	Err    error
+	// Wiped: the box held text not of ours, and the person's word cleared it (Message.Wipe).
+	Wiped bool
+	Err   error
 }
 
 const (
@@ -102,8 +110,12 @@ type Plan struct {
 	// Dismiss: a screen the person left open in the terminal (/login, /model) is closed by Esc first.
 	Dismiss screen.Aside
 	// Clear: the box holds a setting command of the harness that did not go through, or picture paths the harness
-	// pasted that never became pictures; it is cleared first.
-	Clear string
+	// pasted that never became pictures, or what is left of an earlier message of ours; it is cleared first, with its
+	// picture references when ClearRefs.
+	Clear     string
+	ClearRefs bool
+	// Wipe: the box holds text not of ours, and the message says to clear it all the same (Message.Wipe).
+	Wipe bool
 }
 
 // Own: the box holds some of the message already.
@@ -130,10 +142,16 @@ func Decide(m Message, s Screen, provider wire.Provider) Plan {
 	// pictures than the message has, or other text after them, are someone else's.
 	ownPictures := s.Readable && len(m.Images) > 0 && s.OnlyPictures && s.Pictures <= len(m.Images)
 	// A message an earlier try typed whose Enter was lost sits in the box (behind its pictures when it has them): it
-	// is ours too, and only its Enter is pressed again — it is never typed twice.
-	ownText := s.Readable && s.Input != "" && StillInBox(s, provider, m.Text)
+	// is ours too, and only its Enter is pressed again — it is never typed twice. A path of its pictures Claude read
+	// late may sit in the box with it: the path goes with the Enter, and Claude reads the picture by it.
+	own := withoutPaths(s, ownPaths(m))
+	ownText := own.Readable && own.Input != "" && StillInBox(own, provider, m.Text)
+	typed := ""
+	if !ownPictures && !ownText && !m.EnterOnly {
+		typed = TypedLeftover(own, provider, m.Typed)
+	}
 	leftover := !ownPictures && !ownText && !m.EnterOnly &&
-		(HarnessLeftover(s, provider) || PathLeftover(s, provider, m.Leftovers))
+		(HarnessLeftover(s, provider) || PathLeftover(s, provider, m.Leftovers) || typed != "")
 	view := s
 	if ownPictures || ownText || leftover {
 		view.Input = ""
@@ -143,7 +161,13 @@ func Decide(m Message, s Screen, provider wire.Provider) Plan {
 	}
 	p := Plan{Decision: Deliverable(view), OwnText: ownText}
 	if leftover {
-		p.Clear = s.Box
+		p.Clear, p.ClearRefs = s.Box, CountImageRefs(s.Box) > 0
+		if typed != "" {
+			p.Clear = typed
+		}
+	}
+	if m.Wipe && !m.EnterOnly && p.Decision == DecideBlockedText {
+		p.Decision, p.Wipe = DecideSend, true
 	}
 	if ownPictures && !ownText {
 		p.Landed = s.Pictures
@@ -162,9 +186,9 @@ func Type(m Message, provider wire.Provider, p Pane, c Clock) Result {
 	res := Result{Before: view}
 	if m.ClearOnly {
 		switch {
-		case !view.Readable || view.Input == "" || !StillInBox(view, provider, m.Text):
+		case !view.Readable || view.Input == "" || !StillInBox(withoutPaths(view, ownPaths(m)), provider, m.Text):
 			res.Outcome = Wait
-		case ClearOwn(p, c, provider, m.Text, len(m.Images) > 0):
+		case ClearOwn(p, c, provider, m.Text, len(m.Images) > 0, ownPaths(m)...):
 			res.Outcome = Sent
 		default:
 			res.Outcome = BlockedText
@@ -196,11 +220,23 @@ func Type(m Message, provider wire.Provider, p Pane, c Clock) Result {
 	}
 	if plan.Clear != "" && plan.Decision == DecideSend {
 		// A command of ours that did not go through sits in the box: it goes, then the box is looked at again.
-		if !ClearOwn(p, c, provider, plan.Clear, CountImageRefs(plan.Clear) > 0) {
+		if !ClearOwn(p, c, provider, plan.Clear, plan.ClearRefs, ownPaths(m)...) {
 			res.Outcome = BlockedText
 			return res
 		}
 		plan = Decide(m, Look(p, provider), provider)
+	}
+	if plan.Wipe {
+		// The person's word: the box is theirs to give up. It is emptied, then looked at again — for the message only,
+		// so nothing typed after the look is wiped in its turn.
+		if !Wipe(p, c, provider) {
+			res.Outcome = BlockedText
+			return res
+		}
+		res.Wiped = true
+		once := m
+		once.Wipe = false
+		plan = Decide(once, Look(p, provider), provider)
 	}
 	res.Own = plan.Own()
 	switch plan.Decision {
@@ -228,6 +264,15 @@ func Type(m Message, provider wire.Provider, p Pane, c Clock) Result {
 // typeRest types what the box does not have yet: landed pictures of the message are there already, and ownText says
 // the text is too.
 func typeRest(m Message, provider wire.Provider, p Pane, c Clock, landed int, ownText bool, typed, asPath *bool) (Outcome, error) {
+	if ownText && provider != wire.ProviderCodex && holdEnter(m.Text, p, c, ownPaths(m)...) != nil {
+		// The box holds the message cut short (an Enter took a part of it, a paste was read half): an Enter would send
+		// it so. It is cleared, its late paths too, and typed whole.
+		if !pastingEnds(p, c) || !ClearOwn(p, c, provider, m.Text, len(m.Images) > 0, ownPaths(m)...) {
+			return Failed, errPasteUnread
+		}
+		*typed = true
+		ownText, landed = false, 0
+	}
 	if len(m.Images) > landed && !ownText {
 		*typed = true
 		if err := pasteImages(m.Images[landed:], provider != wire.ProviderCodex, landed, p, c, provider); err != nil {
@@ -267,13 +312,15 @@ func typeRest(m Message, provider wire.Provider, p Pane, c Clock, landed int, ow
 			return Failed, err
 		}
 		c.Sleep(pasteSettle)
-		waitPasteRead(text, p, c)
+		if err := holdEnter(text, p, c); err != nil {
+			return Failed, err
+		}
 	}
 	*typed = true
 	if err := p.Keys("Enter"); err != nil {
 		return Failed, err
 	}
-	return confirmLeftBox(m.Text, len(m.Images) > 0, provider, p, c, true)
+	return confirmLeftBox(m.Text, len(m.Images) > 0, provider, p, c, true, ownPaths(m)...)
 }
 
 // typeLine types a line and its Enter. A pane that types the keys alone gets its Enter once the box has read the line
@@ -305,6 +352,61 @@ func waitPasteRead(text string, p Pane, c Clock) {
 	}
 }
 
+// errPasteUnread: Claude's box did not read the paste to its end (or still reads it): no Enter is pressed, the box
+// keeps what it has, and the next try finds it as the message's own and presses only its Enter.
+var errPasteUnread = errors.New("typist: the box did not read the paste to its end")
+
+// pastingEnds waits while Claude says it reads a paste («Pasting…»), up to imagePastingMax. False: it still does.
+func pastingEnds(p Pane, c Clock) bool {
+	for waited := time.Duration(0); ; waited += imagePoll {
+		view := Look(p, wire.ProviderClaude)
+		if !view.Readable || !Pasting(view.Plain) {
+			return true
+		}
+		if waited >= imagePastingMax {
+			return false
+		}
+		c.Sleep(imagePoll)
+	}
+}
+
+// holdEnter is the gate before a Claude message's Enter: never while Claude says it reads a paste («Pasting…»), and
+// not while the box shows text that stops short of the message's end (its last character too) — an Enter then submits
+// the box cut short and leaves the rest in it, in the way of every message after. A box that shows no text of it at all
+// (the screen read without it, pictures only) holds the Enter pasteReadLimit, as before; one that shows it cut short
+// holds it pasteCutLimit, then the try fails without an Enter and the next one finds the text as its own. A screen
+// that cannot be read does not hold the Enter back.
+func holdEnter(text string, p Pane, c Clock, paths ...string) error {
+	if !pastingEnds(p, c) {
+		return errPasteUnread
+	}
+	for waited := time.Duration(0); ; waited += pasteReadPoll {
+		view := withoutPaths(Look(p, wire.ProviderClaude), paths)
+		switch {
+		case !view.Readable || blank(text):
+			return nil
+		case Pasting(view.Plain):
+			if waited >= imagePastingMax {
+				return errPasteUnread
+			}
+		case !view.InputLine:
+			return nil
+		case screen.ClaudeBoxHoldsEnd(view.Box, text):
+			return nil
+		case blank(view.Input) || view.OnlyPictures:
+			if waited >= pasteReadLimit {
+				return nil
+			}
+		case waited >= pasteCutLimit:
+			return errPasteUnread
+		}
+		c.Sleep(pasteReadPoll)
+	}
+}
+
+// pasteCutLimit: the longest an Enter waits for a box that shows the message cut short to read it to its end.
+const pasteCutLimit = 4 * pasteReadLimit
+
 // sendAsPath sends a Claude message whose pictures did not show as references with their paths as text: Claude reads
 // a file by its path all the same, and a reference it makes of one late is as good. Paths the box lost (no path text,
 // no late reference) are pasted again, then the text, one Enter, and the whole line is what must leave the box.
@@ -314,6 +416,12 @@ func sendAsPath(m Message, landed int, p Pane, c Clock) (Outcome, error) {
 		escaped = append(escaped, EscapePathForPrompt(path))
 	}
 	paths := strings.Join(escaped, " ")
+	// A paste Claude still reads is not over: its paths land in the box later. Pasting them again meanwhile doubled
+	// them, and the Enter that followed took the box half read — a message of only «…/up_FQ5I5U64QSREFY7F.pn» went to
+	// the agent, the other paths left in the box (28.10).
+	if !pastingEnds(p, c) {
+		return Failed, errPasteUnread
+	}
 	view := Look(p, wire.ProviderClaude)
 	if !strings.Contains(noSpace(view.Box), noSpace(paths)) && CountImageRefs(view.Box) <= landed {
 		if err := p.Paste(paths); err != nil {
@@ -329,6 +437,9 @@ func sendAsPath(m Message, landed int, p Pane, c Clock) (Outcome, error) {
 		}
 		c.Sleep(pasteSettle)
 	}
+	if err := holdEnter(full, p, c); err != nil {
+		return Failed, err
+	}
 	if err := p.Keys("Enter"); err != nil {
 		return Failed, err
 	}
@@ -341,7 +452,7 @@ func sendAsPath(m Message, landed int, p Pane, c Clock) (Outcome, error) {
 // Still there after that: stuck — the next try finds the text as its own and presses only its Enter. A screen that
 // cannot be read is not held against the send: whether the agent took it is for the hook and the transcript to say.
 // A stuck text is cleared out of the box, row by row (ClearOwn), and the retry types it whole.
-func confirmLeftBox(text string, pictures bool, provider wire.Provider, p Pane, c Clock, entered bool) (Outcome, error) {
+func confirmLeftBox(text string, pictures bool, provider wire.Provider, p Pane, c Clock, entered bool, paths ...string) (Outcome, error) {
 	if blank(text) {
 		return Sent, nil
 	}
@@ -357,7 +468,7 @@ func confirmLeftBox(text string, pictures bool, provider wire.Provider, p Pane, 
 			continue
 		}
 		read = true
-		if !StillInBox(view, provider, text) {
+		if !StillInBox(withoutPaths(view, paths), provider, text) {
 			if seen || waited+confirmPoll >= confirmUnseen {
 				return Sent, nil
 			}
@@ -377,7 +488,7 @@ func confirmLeftBox(text string, pictures bool, provider wire.Provider, p Pane, 
 	}
 	// Three Enters and still there: the message fails (the person retries it), and the box is not left dirty — a text
 	// left behind would go with the next message, or reach the agent late, on someone else's Enter, as a copy.
-	ClearOwn(p, c, provider, text, pictures)
+	ClearOwn(p, c, provider, text, pictures, paths...)
 	return Stuck, nil
 }
 

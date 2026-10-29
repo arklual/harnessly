@@ -216,6 +216,12 @@ func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
 	if code == "" {
 		// The person wrote: the chat rises in the sidebar now, not when the transcript shows the line.
 		c.promptedAt(ms(now))
+		if p := c.box.Paused(); p != nil && p.Reason == wire.PausedInterrupted {
+			// The person stopped the turn and now writes again: the stop held the queue for this word.
+			if rc, ok := c.box.Resume(now); ok {
+				c.change(rc, now)
+			}
+		}
 		c.freshLaunch(now)
 		c.pump(now)
 	}

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -68,6 +69,9 @@ func notifyRig(t *testing.T) (func(method, path, body string, h map[string]strin
 	}, dir
 }
 
+// chatIDLeak is the chat's number as a whole token: a random bot id (nb_ + hex) may hold "77" inside it.
+var chatIDLeak = regexp.MustCompile(`\b77\b`)
+
 func TestNotifyBotRoutes(t *testing.T) {
 	sent := fakeBotAPI(t)
 	call, dir := notifyRig(t)
@@ -121,7 +125,7 @@ func TestNotifyBotRoutes(t *testing.T) {
 	}
 	code, body = call("GET", "/api/cli/notify/bots", "", cli)
 	if code != http.StatusOK || !strings.Contains(body, `"chat":"Анна"`) || !strings.Contains(body, `"bound":true`) || strings.Contains(body, "abcdefghij") ||
-		strings.Contains(body, "77") {
+		chatIDLeak.MatchString(body) {
 		t.Fatalf("agents' list: %d %s", code, body)
 	}
 	if code, body := call("POST", "/api/cli/notify/send", `{"bot":"ping","text":"**done**","silent":true}`, cli); code != http.StatusOK || !strings.Contains(body, `"messages":1`) {

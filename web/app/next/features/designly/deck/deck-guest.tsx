@@ -190,7 +190,8 @@ const DeckGuest = ({ title, slides, video, pdf, start, comments, onBack, onShown
   const onMessage = useEffectEvent((event: MessageEvent) => {
     if (event.source === null || event.source !== frame.current?.contentWindow) return;
     const deck = readDeckMessage(event.data);
-    if (deck) {
+    // A pick (a click while picking, or a held finger) reads as the deck's `held` too; here it opens the card below.
+    if (deck && deck.k !== 'held') {
       if (deck.k === 'ready') {
         setReady(true);
         setSteps(deck.steps);
@@ -209,12 +210,17 @@ const DeckGuest = ({ title, slides, video, pdf, start, comments, onBack, onShown
         new KeyboardEvent('keydown', { key: bridge.key, code: GUEST_KEY_CODE[bridge.key] }),
       );
     else if (bridge.k === 'pick-off') setPicking(false);
-    else if (bridge.k === 'picked' && comments)
-      place({
+    else if (bridge.k === 'picked' && comments) {
+      const at = {
         point: readPickedPoint(event.data),
         rect: bridge.picked.rect,
         label: bridge.picked.text || bridge.picked.component || '',
+      };
+      // A held finger comes without the button, so the name may still be missing.
+      void comments.ensureName().then((named) => {
+        if (named) place(at);
       });
+    }
   });
   useEffect(() => {
     window.addEventListener('message', onMessage);

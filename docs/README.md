@@ -2,6 +2,7 @@
 
 | Page | What it covers |
 | --- | --- |
+| [Compared](comparison.md) | harnessly next to Happy, Paseo, T3 Code, Orca and Claude Code Remote Control |
 | [Getting started](getting-started.md) | build, run the runtime standalone, open tabs, run agents, connect the machine agent |
 | [Architecture](architecture.md) | the runtime gate and its two modes, the core, tmux, the machine agent, the repository layout |
 | [Slices](slices.md) | the slices of routes, switching them per machine, the shadow comparison |

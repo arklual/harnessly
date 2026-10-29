@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -52,6 +53,9 @@ func (a siteAuthority) Role(ctx context.Context, personID, space string) (string
 // MachineOK: the machine is still the space's and not revoked, and the person it publishes for, if the session names
 // one, is still a member.
 func (a siteAuthority) MachineOK(ctx context.Context, machineID, personID, space string) bool {
+	if strings.HasPrefix(machineID, "fleet:") {
+		return personID == "" && space == a.h.cfg.FleetSitesSpace
+	}
 	st := a.h.db.S()
 	m, err := st.MachineByID(ctx, machineID)
 	if err != nil || m.RevokedAt != nil {
@@ -238,6 +242,37 @@ func (h *Hub) siteSession(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 	token, exp := h.Sites.NewMachineSession(ms)
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"space": sp.Slug, "token": token, "expiresAt": httpx.Time(exp), "url": h.cfg.PublicURL})
+	return nil
+}
+
+// fleetSiteSession lets a fleet gateway publish for its authenticated runtimes without making them hub machines.
+func (h *Hub) fleetSiteSession(w http.ResponseWriter, r *http.Request) error {
+	secret, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok || subtle.ConstantTimeCompare([]byte(secret), []byte(h.cfg.FleetSitesSecret)) != 1 {
+		return httpx.New(http.StatusUnauthorized, "unauthorized", "Нет доступа")
+	}
+	var body struct {
+		MachineID string `json:"machineId"`
+		Name      string `json:"name"`
+	}
+	if err := httpx.Decode(r, &body); err != nil {
+		return err
+	}
+	body.MachineID = strings.TrimSpace(body.MachineID)
+	body.Name = strings.TrimSpace(body.Name)
+	if body.MachineID == "" || len(body.MachineID) > 200 || len(body.Name) > 200 {
+		return httpx.Invalid("machineId", "Некорректная машина")
+	}
+	sp, err := h.db.S().SpaceBySlug(r.Context(), h.cfg.FleetSitesSpace)
+	if err != nil {
+		return err
+	}
+	if body.Name == "" {
+		body.Name = body.MachineID
+	}
+	token, exp := h.Sites.NewMachineSession(sites.MachineSession{Space: sp.Slug, MachineID: "fleet:" + body.MachineID, Name: body.Name})
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"space": sp.Slug, "token": token, "expiresAt": httpx.Time(exp), "url": h.cfg.PublicURL})
 	return nil

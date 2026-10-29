@@ -114,6 +114,8 @@ func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 		b.positions(&ch, p.reason, now)
 		return nil, ch
 	case !p.typing:
+		// The agent's own state holds the head, not the box: a block by someone's text, if any, starts over.
+		head.BlockedSince = 0
 		b.positions(&ch, p.reason, now)
 		return nil, ch
 	case head.NextTry > ms(now):
@@ -132,7 +134,7 @@ func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 		}
 	}
 	msg := typist.Message{Text: head.Message.Text, Images: head.Images, Steer: p.steer, HandOver: p.steer && a.HandOver,
-		Leftovers: b.pasted()}
+		Leftovers: b.pasted(), Typed: b.typedTexts(head.Message.ClientID)}
 	if a.Screen != nil {
 		switch typist.Decide(msg, *a.Screen, a.Provider).Decision {
 		case typist.DecideBlockedMenu:
@@ -149,6 +151,7 @@ func (b *Box) Pump(a Agent, size int64, now time.Time) (*Job, Change) {
 	}
 	b.items = b.items[1:]
 	b.rev++
+	head.BlockedSince = 0
 	b.flight, b.typing = head.Message.ClientID, true
 	head.TypedOffset, head.TypedAt, head.Submitted, head.Steered = size, ms(now), false, p.steer
 	deadline := wire.TypingDeadline + int64(len(head.Images))*1500
@@ -168,6 +171,24 @@ func (b *Box) pasted() []string {
 		}
 	}
 	return paths
+}
+
+// typedTexts are the texts of the messages this box typed and let go (taken, failed, cancelled), but one: what is left of them in the agent's box (an Enter
+// that took a part, a paste read half) is the harness's to clear, never someone's draft to wait on.
+func (b *Box) typedTexts(except string) []string {
+	var texts []string
+	for _, r := range b.sorted() {
+		switch r.Message.State.K {
+		case wire.MsgTyping, wire.MsgInInput, wire.MsgQueued:
+			// Still on its way, or waiting for its own word (a recheck's Enter, a stall's clearing): its text in the box
+			// is its own business.
+			continue
+		}
+		if r.Message.ClientID != except && (r.TypedAt > 0 || r.Message.Attempts > 0) && r.Message.Text != "" {
+			texts = append(texts, r.Message.Text)
+		}
+	}
+	return texts
 }
 
 // recheckDue: the message waits in-input and its box is to be looked at for it now.
@@ -218,6 +239,9 @@ func (b *Box) NeedsLook(now time.Time) bool {
 
 // blocked: a menu or someone's text stops the head; it is looked at again 1.5 → 3 → 6 → 10 s later.
 func (b *Box) blocked(ch *Change, r *Record, why wire.QueueReason, now time.Time) {
+	if why == wire.QueuedBlockedText && r.BlockedSince == 0 {
+		r.BlockedSince = ms(now)
+	}
 	r.Blocked++
 	r.NextTry = ms(now) + min(retryBase<<(r.Blocked-1), blockedMax).Milliseconds()
 	b.positions(ch, why, now)
@@ -245,6 +269,11 @@ func (b *Box) positions(ch *Change, reason wire.QueueReason, now time.Time) {
 			r.Reason, r.WaitSince = why, ms(now)
 		}
 		term := termOf(why, r.WaitSince)
+		if why == wire.QueuedBlockedText && r.BlockedSince > 0 {
+			// Someone's text holds the box: its term runs from the first look that found it, however often the head
+			// waited on the agent between looks (that reset WaitSince, and the term never came: 2165 looks, 28.10).
+			term = wait(r.BlockedSince, OccupiedTTL)
+		}
 		if why == wire.QueuedPaused && b.paused != nil && b.paused.Reason == wire.PausedLimited {
 			// Held on the usage limit, a message waits for the reset however far off: the person sent it for then.
 			term = nil
@@ -361,6 +390,9 @@ func (b *Box) Typed(clientID string, res typist.Result, now time.Time) Change {
 				"try", r.Tries, "nextMs", r.NextTry-ms(now), "err", errText(res.Err))
 		}
 	case typist.BlockedMenu, typist.BlockedText:
+		if res.Outcome == typist.BlockedText && r.BlockedSince == 0 {
+			r.BlockedSince = ms(now)
+		}
 		r.Blocked++
 		r.NextTry = ms(now) + min(retryBase<<(r.Blocked-1), blockedMax).Milliseconds()
 	default:
@@ -695,7 +727,7 @@ func (b *Box) unstall(r *Record, find Find, now time.Time) Change {
 	}
 	r.Stalled, r.ClearBox = false, false
 	r.Message.Attempts++
-	r.Tries, r.NextTry, r.Blocked, r.Waits, r.WaitSince = 0, 0, 0, 0, ms(now)
+	r.Tries, r.NextTry, r.Blocked, r.BlockedSince, r.Waits, r.WaitSince = 0, 0, 0, 0, 0, ms(now)
 	b.rev++
 	b.set(&ch, r, wire.MessageState{K: wire.MsgQueued, Position: 1, Reason: wire.QueuedBehind}, now)
 	ch.add(wire.QueueChangedEv{Queue: b.Queue()})

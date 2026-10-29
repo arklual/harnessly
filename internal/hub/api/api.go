@@ -170,6 +170,9 @@ func New(o Options) (*Hub, error) {
 		mux.Handle("GET /api/site-entry", httpx.Handler(h.siteEntry))
 		mux.Handle("GET /api/site-check", httpx.Handler(h.siteCheck))
 		mux.Handle("POST /agent/sites", httpx.Handler(h.siteSession))
+		if h.cfg.FleetSitesSecret != "" {
+			mux.Handle("POST /agent/fleet-sites", httpx.Handler(h.fleetSiteSession))
+		}
 		if !h.Sites.Subdomains() {
 			mux.Handle("/sites/", h.Sites.PathEdge())
 		}

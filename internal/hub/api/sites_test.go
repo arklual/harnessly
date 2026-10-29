@@ -473,6 +473,35 @@ func TestSitesMachineSessionEndsWithThePerson(t *testing.T) {
 	}
 }
 
+func TestFleetSitesSession(t *testing.T) {
+	secret := "0123456789012345678901234567890123456789"
+	s := hubtest.New(t,
+		hubtest.Env("HARNESSLY_SITES_DOMAIN", "sites.example.test"),
+		hubtest.Env("HARNESSLY_FLEET_SITES_SECRET", secret),
+		hubtest.Env("HARNESSLY_FLEET_SITES_SPACE", "acme"),
+	)
+	owner := s.SignIn("owner@example.com")
+	owner.NewSpace("Acme")
+	if r := s.Browser().Do("POST", "/agent/fleet-sites", map[string]any{"machineId": "runner-2/coder"}, "Authorization", "Bearer wrong"); r.Code != http.StatusUnauthorized {
+		t.Fatalf("bad secret: %s", r)
+	}
+	r := s.Browser().Do("POST", "/agent/fleet-sites", map[string]any{"machineId": "runner-2/coder", "name": "Sergey"}, "Authorization", "Bearer "+secret)
+	if r.Code != http.StatusOK {
+		t.Fatalf("session: %s", r)
+	}
+	var session struct {
+		Token, Space string
+	}
+	r.JSON(&session)
+	if session.Space != "acme" || !strings.HasPrefix(session.Token, "hsm_") {
+		t.Fatalf("session: %+v", session)
+	}
+	r = s.Browser().Do("POST", "/api/sites/acme", map[string]any{"name": "shop", "access": "link"}, "Authorization", "Bearer "+session.Token)
+	if r.Code != http.StatusCreated {
+		t.Fatalf("fleet session creates a site: %s", r)
+	}
+}
+
 // A hash another space uploaded proves nothing: the bytes must come from the space that publishes them.
 func TestSitesBlobsAreNotSharedAcrossSpaces(t *testing.T) {
 	s := hubtest.New(t, hubtest.Env("HARNESSLY_SITES_DOMAIN", "sites.example.test"))

@@ -152,6 +152,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A message with several pictures no longer goes to the agent cut in two: no Enter is pressed while Claude still reads a
+  paste («Pasting…»), nor while its box stops short of the message's end; the paths of a paste Claude reads late are
+  not pasted a second time. A message of only «…/up_….pn» went in, the other paths left in the box.
+
+- What is left in Claude's box of our own messages — their text with a picture path Claude read late, a part an Enter
+  did not take — no longer stops the queue as «в поле ввода терминала есть текст»: the message itself gets its Enter
+  (or, cut short, is cleared and typed whole), an earlier one's rest is cleared. A person's draft is still never
+  touched; a block by it ends after 10 minutes from the first look, however often the agent was busy between looks,
+  the message failed with «Повторить».
+
+- A Stop no longer pauses the queue for good: the pause ends when the person sends a message or a turn that began after
+  the Stop ends; «Продолжить» stands on the first paused row even when a failed one is above it, and a failed message
+  the runtime queued again is asked about, so the strip shows what the runtime holds.
+
 - A message the agent took no longer stays in the queue over the field: a chat whose channel the machine refused (its
   snapshot past the time budget on a loaded machine answers not-found) is asked for again instead of being let go, so its
   frames come back; the page also asks the runtime about queued messages whose frames it missed.

@@ -86,7 +86,7 @@ export type TDeckBoardMessage =
   | { k: 'tap'; x: number; y: number; text: string }
   /** A touch held on the slide (board px): the ring shows at 250 ms; a move or a lift cancels it. */
   | { k: 'press'; x: number; y: number; phase: TDeckPress }
-  /** The touch was held long enough (`tk:picked` with its `point`, board px): a comment opens there. */
+  /** A pick with its `point` (`tk:picked`, board px): a held finger or a click while picking; a comment opens there. */
   | { k: 'held'; x: number; y: number };
 
 const HTML_MAX = 20_000;
@@ -213,7 +213,7 @@ export const readDeckMessage = (data: unknown): TDeckBoardMessage | null => {
       return x === null || y === null || phase === null ? null : { k: 'press', x, y, phase };
     }
     case 'tk:picked': {
-      // A pick the deck asked for has no point; only the held touch of the deck has one.
+      // Every pick carries its point now (a click while picking and a held finger alike); an older board sends none.
       const point = readPickedPoint(m);
       return point === null ? null : { k: 'held', x: point[0], y: point[1] };
     }
