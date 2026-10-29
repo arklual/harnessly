@@ -78,7 +78,7 @@ import DeckCreateView from '@/next/bindings/designly-deck-new';
 import DesignlySite from '@/next/bindings/designly-site';
 import SiteWait from '@/next/features/designly/site-wait';
 import InviteAccept from '@/next/features/designly/access/invite-accept';
-import { useProjectDialog, useResumeDialog } from '@/next/bindings/shell-dialogs';
+import { useProjectDialog, useProjectSettingsDialog, useResumeDialog } from '@/next/bindings/shell-dialogs';
 import { useAppUpdate } from '@/next/bindings/use-app-update';
 import { useRelease } from '@/next/bindings/use-release';
 import ReleaseNotice from '@/next/features/update/release-notice';
@@ -449,6 +449,7 @@ const Shell = ({ owner }: IShellProps) => {
     paneStrip,
   );
   const projectDialog = useProjectDialog(model.active, model.personSidebar);
+  const projectSettings = useProjectSettingsDialog(model.active, model.personSidebar);
   const resumeDialog = useResumeDialog(model.active, machineName, now, (id) =>
     navigate({ kind: ROUTE.chat, id }),
   );
@@ -482,6 +483,7 @@ const Shell = ({ owner }: IShellProps) => {
     ...model.actions,
     onOpenInNewTab: tabs.enabled ? (id: string) => openInNewTab({ kind: ROUTE.chat, id }, true) : undefined,
     onNewProject: projectDialog.show,
+    onProjectSettings: projectSettings.show,
     onAttachChat:
       currentId !== null && isConvId(currentId)
         ? (id: string) => {
@@ -589,6 +591,7 @@ const Shell = ({ owner }: IShellProps) => {
   const overlays = (
     <>
       {projectDialog.dialog}
+      {projectSettings.dialog}
       {resumeDialog.dialog}
       <NotificationCenter
         open={notifications !== null}

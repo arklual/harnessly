@@ -953,6 +953,9 @@ func (r *Runtime) route(device string, cmd wire.Command, finish func(wire.CmdRes
 	case wire.ProjectCreateCmd:
 		finish(r.createProject(m))
 		return nil
+	case wire.ProjectUpdateCmd:
+		finish(r.updateProject(m))
+		return nil
 	case wire.FavGroupCreateCmd, wire.FavGroupRenameCmd, wire.FavGroupDeleteCmd, wire.FavGroupMoveCmd:
 		finish(r.favGroup(cmd))
 		return nil
@@ -1148,6 +1151,46 @@ func (r *Runtime) createGroup(name string) wire.CmdResult {
 	res := wire.Accepted(wire.ChannelConvs, seq)
 	res.ID = &p.ID
 	return res
+}
+
+// updateProject changes a project's folder or name and publishes it again as project_upsert. The folder is where its
+// next chats start; the chats it has keep theirs. The id stays: it was never the path's to be read from.
+func (r *Runtime) updateProject(m wire.ProjectUpdateCmd) wire.CmdResult {
+	path := ""
+	if m.Path != "" {
+		path = filepath.Clean(m.Path)
+		if st, err := os.Stat(path); err != nil || !st.IsDir() {
+			return wire.Refused(wire.RefuseNotFound)
+		}
+	}
+	git := false
+	if path != "" {
+		_, err := os.Stat(filepath.Join(path, ".git"))
+		git = err == nil
+	}
+	r.mu.Lock()
+	i := slices.IndexFunc(r.projects, func(p wire.Project) bool { return p.ID == m.ID })
+	if i < 0 {
+		r.mu.Unlock()
+		return wire.Refused(wire.RefuseNotFound)
+	}
+	p := r.projects[i]
+	if path != "" {
+		p.Path, p.Git = path, git
+	}
+	if name := strings.TrimSpace(m.Name); name != "" {
+		p.Name = name
+	}
+	r.projects[i] = p
+	saved := slices.Clone(r.projects)
+	r.mu.Unlock()
+	seq := r.d.Publisher.Publish(wire.ChannelConvs, wire.ProjectUpsertEv{Project: p})
+	if r.d.Store != nil {
+		if err := r.d.Store.saveProjects(saved); err != nil {
+			r.d.Log.Warn("projects not saved", "err", err)
+		}
+	}
+	return wire.Accepted(wire.ChannelConvs, seq)
 }
 
 // addProject publishes the project of want.Path, made from want when the folder is no project yet: its id taken

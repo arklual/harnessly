@@ -1900,6 +1900,15 @@ type ProjectCreateCmd struct {
 	Name string `json:"name,omitempty"`
 }
 
+// ProjectUpdateCmd changes a project: Path, the folder its new chats start in (chats already made stay where they
+// are); Name, what the person calls it. An empty field is left as it is, one of them is needed.
+type ProjectUpdateCmd struct {
+	OpID string `json:"opId"`
+	ID   string `json:"id"`
+	Path string `json:"path,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
 // FavGroupCreateCmd makes an empty group in the favorites; the accepted result's ID is the new group's id.
 type FavGroupCreateCmd struct {
 	OpID string `json:"opId"`
@@ -1964,6 +1973,7 @@ func (ConversationHandoffCmd) Op() Op { return OpConversationHandoff }
 func (ConversationMergeCmd) Op() Op   { return OpConversationMerge }
 func (BgStopCmd) Op() Op              { return OpBgStop }
 func (ProjectCreateCmd) Op() Op       { return OpProjectCreate }
+func (ProjectUpdateCmd) Op() Op       { return OpProjectUpdate }
 func (FavGroupCreateCmd) Op() Op      { return OpFavGroupCreate }
 func (FavGroupRenameCmd) Op() Op      { return OpFavGroupRename }
 func (FavGroupDeleteCmd) Op() Op      { return OpFavGroupDelete }
@@ -2000,6 +2010,7 @@ func (c ConversationHandoffCmd) OpKey() string { return c.OpID }
 func (c ConversationMergeCmd) OpKey() string   { return c.OpID }
 func (c BgStopCmd) OpKey() string              { return c.OpID }
 func (c ProjectCreateCmd) OpKey() string       { return c.OpID }
+func (c ProjectUpdateCmd) OpKey() string       { return c.OpID }
 func (c FavGroupCreateCmd) OpKey() string      { return c.OpID }
 func (c FavGroupRenameCmd) OpKey() string      { return c.OpID }
 func (c FavGroupDeleteCmd) OpKey() string      { return c.OpID }
@@ -2709,6 +2720,7 @@ const (
 	OpModel               Op = "model"
 	OpBgStop              Op = "bg.stop"
 	OpProjectCreate       Op = "project.create"
+	OpProjectUpdate       Op = "project.update"
 	OpFavGroupCreate      Op = "favorites.group.create"
 	OpFavGroupRename      Op = "favorites.group.rename"
 	OpFavGroupDelete      Op = "favorites.group.delete"
@@ -2727,7 +2739,7 @@ const (
 )
 
 // Ops is every Op, in the schema's order.
-var Ops = []Op{OpSend, OpCancel, OpRetry, OpPromote, OpAnswer, OpDecide, OpInterrupt, OpQueueResume, OpSeen, OpConversationCreate, OpConversationRename, OpConversationPin, OpConversationMove, OpConversationDelete, OpConversationRestore, OpConversationResume, OpModel, OpBgStop, OpProjectCreate, OpFavGroupCreate, OpFavGroupRename, OpFavGroupDelete, OpFavGroupMove, OpFavPlace, OpGoal, OpConversationRetitle, OpDraftSet, OpQueueMove, OpTerminalStop, OpRewind, OpRewindUndo, OpConversationFork, OpConversationHandoff, OpConversationMerge, OpLimit}
+var Ops = []Op{OpSend, OpCancel, OpRetry, OpPromote, OpAnswer, OpDecide, OpInterrupt, OpQueueResume, OpSeen, OpConversationCreate, OpConversationRename, OpConversationPin, OpConversationMove, OpConversationDelete, OpConversationRestore, OpConversationResume, OpModel, OpBgStop, OpProjectCreate, OpProjectUpdate, OpFavGroupCreate, OpFavGroupRename, OpFavGroupDelete, OpFavGroupMove, OpFavPlace, OpGoal, OpConversationRetitle, OpDraftSet, OpQueueMove, OpTerminalStop, OpRewind, OpRewindUndo, OpConversationFork, OpConversationHandoff, OpConversationMerge, OpLimit}
 
 // PromoteTo is where promote moves a queued message.
 type PromoteTo string

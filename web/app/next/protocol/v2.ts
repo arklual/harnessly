@@ -316,6 +316,7 @@ export const OPS = [
   'model',
   'bg.stop',
   'project.create',
+  'project.update',
   'favorites.group.create',
   'favorites.group.rename',
   'favorites.group.delete',
@@ -1791,6 +1792,8 @@ export interface CommandBodies {
   model: OpBody & { id: ConvId; model: string; effort: Effort | null; ultracode?: boolean };
   'bg.stop': OpBody & { conversationId: ConvId; taskId: string };
   'project.create': OpBody & { path?: string; name?: string };
+  // path: the folder the project's next chats start in; name: what it is called. Absent keeps it; one is needed.
+  'project.update': OpBody & { id: string; path?: string; name?: string };
   'favorites.group.create': OpBody & { name: string };
   'favorites.group.rename': OpBody & { id: string; name: string };
   'favorites.group.delete': OpBody & { id: string };
@@ -3082,6 +3085,7 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   ),
   'bg.stop': object({ ...scoped, taskId: id }),
   'project.create': object({ opId: id }, { path: id, name: id }),
+  'project.update': object({ opId: id, id }, { path: id, name: id }),
   'favorites.group.create': object({ opId: id, name: favName }),
   'favorites.group.rename': object({ opId: id, id: favGroupId, name: favName }),
   'favorites.group.delete': object({ opId: id, id: favGroupId }),
