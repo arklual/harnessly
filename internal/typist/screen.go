@@ -111,6 +111,11 @@ func menuOf(st screen.State) (MenuKind, []string) {
 	if plan := screen.ParsePlanOptions(st.Plain); len(plan) > 0 && planPrompt(st.Plain) {
 		return MenuPlan, plan
 	}
+	if screen.IsLaunchConfirm(st.Plain) {
+		// «Switch model?» and «Change effort level?» are answered by the typist that typed the command: they are
+		// numbered Yes/No like a permission prompt, but no tool asked, and a gate made of one never closes.
+		return MenuOther, st.Menu.Options
+	}
 	if perm := screen.ParsePermissionOptions(st.Plain); len(perm.Options) > 0 {
 		return MenuPermission, perm.Options
 	}

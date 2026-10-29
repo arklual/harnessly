@@ -1,7 +1,8 @@
 #!/bin/bash
 # A stand-in for Claude Code's terminal: an input box on a tmux pane, a transcript on disk, the hooks it was given in
 # its --settings file. A message typed into the box runs a turn of about a second and a half; "perm" in it makes the
-# turn ask permission for `rm -rf build` first, and "ask" makes it end with a reply that names the pending menu's choice.
+# turn ask permission for `rm -rf build` first (drawn as Claude 2.1.311 does: the command in a gutter box), and "ask" makes
+# it end with a reply that names the pending menu's choice.
 # "bg" in a message makes its turn start a background shell (a `sleep` writing to $HOME/bgtasks/<id>.output, as Claude's
 # run_in_background does), and when that process ends the transcript gets the task notification.
 # $HOME/fake-claude-boot-ms (a number; the pane shell keeps no other variables of the runtime): a TUI that draws its box at once but takes no keys for n ms, as a real one does while it starts: what is
@@ -83,7 +84,7 @@ draw() {
     return
   fi
   if [ $menu = 1 ]; then
-    printf '%s\n Bash command\n\n   rm -rf build\n   Remove the build output\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. Yes, and don'"'"'t ask again for rm commands in %s\n   3. No, and tell Claude what to do differently (esc)\n' "$rule" "$cwd"
+    printf '%s\n Bash command\n Remove the build output\n ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌\n │ rm -rf build\n ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. Yes, and don'"'"'t ask again for rm commands in %s\n   3. No, and tell Claude what to do differently (esc)\n' "$rule" "$cwd"
     return
   fi
   [ $busy = 1 ] && printf '\n✻ Working… (esc to interrupt)\n'

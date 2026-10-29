@@ -114,11 +114,11 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 			break
 		}
 	}
-	flat := strings.ReplaceAll(screen, "\n", "") // the pane wraps at 80 columns
+	flat := paneText(screen)
 	// The line is typed as `sh -c '…'`, so each quote of the sh line shows as '\''.
-	if !strings.Contains(flat, `exec env DISABLE_AUTOUPDATER=1 '\''`+agentBin+`'\'' --settings `+filepath.Join(dir, "hooks.json")) ||
-		!strings.Contains(flat, "fake agent started:") || !strings.Contains(flat, `-- "$(printf %b '\''hello there'\'')"`) ||
-		!strings.Contains(flat, "key=[it's secret]") {
+	if !strings.Contains(flat, paneText(`exec env DISABLE_AUTOUPDATER=1 '\''`+agentBin+`'\'' --settings `+filepath.Join(dir, "hooks.json"))) ||
+		!strings.Contains(flat, paneText("fake agent started:")) || !strings.Contains(flat, paneText(`-- "$(printf %b '\''hello there'\'')"`)) ||
+		!strings.Contains(flat, paneText("key=[it's secret]")) {
 		t.Fatalf("the launch line was not typed and run:\n%s", screen)
 	}
 	tab := func() *jsvalue.Object {
@@ -148,14 +148,14 @@ func TestLaunchSliceStartsAConversation(t *testing.T) {
 	}
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		screen, _ = tm.Capture(info.TmuxSession)
-		if strings.Contains(strings.ReplaceAll(screen, "\n", ""), "fake agent started: --resume "+sid) {
+		if strings.Contains(paneText(screen), paneText("fake agent started: --resume "+sid)) {
 			break
 		}
 	}
 	time.Sleep(300 * time.Millisecond)
 	screen, _ = tm.Capture(info.TmuxSession)
-	if flat := strings.ReplaceAll(screen, "\n", ""); !strings.Contains(flat, `exec env DISABLE_AUTOUPDATER=1 '\''`+agentBin+`'\'' --resume `+sid+" --settings") ||
-		!strings.Contains(flat, "fake agent started: --resume "+sid) || !strings.Contains(flat, "key=[it's secret]") {
+	if flat := paneText(screen); !strings.Contains(flat, paneText(`exec env DISABLE_AUTOUPDATER=1 '\''`+agentBin+`'\'' --resume `+sid+" --settings")) ||
+		!strings.Contains(flat, paneText("fake agent started: --resume "+sid)) || !strings.Contains(flat, paneText("key=[it's secret]")) {
 		t.Fatalf("the reset did not resume the agent:\n%s", screen)
 	}
 
@@ -183,4 +183,10 @@ func TestMachineAgentRequest(t *testing.T) {
 	if ok(req("127.0.0.1:5000", "user")) || ok(req("10.0.0.2:5000", "machine-agent")) || ok(httptest.NewRequest("POST", "/", nil)) {
 		t.Fatal("a page session, a remote caller or no session passes")
 	}
+}
+
+// paneText drops every space and line break. The pane wraps at 80 columns and its capture trims a line's trailing
+// space, so a space that lands on the wrap is lost: where it lands depends on the prompt, the runner's host name.
+func paneText(s string) string {
+	return strings.Join(strings.Fields(s), "")
 }

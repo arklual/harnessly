@@ -3,6 +3,7 @@ package main
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/tmux"
@@ -48,7 +49,10 @@ func TestProbeSharesOneSnapshot(t *testing.T) {
 	if got := m.Probe("tk-a"); got != (convo.Probe{Session: true, Foreground: true}) {
 		t.Fatalf("agent %+v", got)
 	}
-	m.Probe("tk-b")
+	if got := m.Probe("tk-b"); got != (convo.Probe{Session: true, Foreground: true}) {
+		t.Fatalf("a shell seen once %+v", got)
+	}
+	m.expire()
 	if got := m.Probe("tk-b"); got != (convo.Probe{Session: true, Shell: true}) {
 		t.Fatalf("shell %+v", got)
 	}
@@ -67,5 +71,35 @@ func TestProbeOnASilentTmux(t *testing.T) {
 	m.Probe("tk-a")
 	if got := m.Probe("tk-a"); got != (convo.Probe{Session: true, Foreground: true}) || len(f.hasAsked) != 0 {
 		t.Fatalf("%+v %v", got, f.hasAsked)
+	}
+}
+
+// expire makes the next look read tmux again.
+func (m *v2Tmux) expire() {
+	m.snapMu.Lock()
+	m.snap.at = time.Time{}
+	m.snapMu.Unlock()
+}
+
+// A shell is believed on the second snapshot that shows it, not on the second look of one: a pane that ran its shell
+// when the snapshot was taken, with the agent up and its first hook in before the next snapshot, is not an agent that
+// exited.
+func TestProbeShellNeedsTwoSnapshots(t *testing.T) {
+	f := &probeFake{ok: true, panes: map[string]tmux.PaneInfo{"tk-a": {Command: "bash"}}}
+	m := &v2Tmux{probe: f}
+	for i := 0; i < 5; i++ {
+		if got := m.Probe("tk-a"); got != (convo.Probe{Session: true, Foreground: true}) {
+			t.Fatalf("look %d of one snapshot: %+v", i, got)
+		}
+	}
+	f.mu.Lock()
+	f.panes = map[string]tmux.PaneInfo{"tk-a": {Command: "claude"}}
+	f.mu.Unlock()
+	m.expire()
+	if got := m.Probe("tk-a"); got != (convo.Probe{Session: true, Foreground: true}) {
+		t.Fatalf("agent up: %+v", got)
+	}
+	if f.reads != 2 {
+		t.Fatalf("%d reads", f.reads)
 	}
 }

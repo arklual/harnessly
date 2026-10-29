@@ -55,7 +55,11 @@ type v2Tmux struct {
 	snap   paneSnap
 }
 
-type doubt struct{ noSession, shell bool }
+// doubt is what the last look of a session saw; gen is the snapshot a shell was seen in.
+type doubt struct {
+	noSession, shell bool
+	gen              uint64
+}
 
 // probeTmux is what a look asks tmux.
 type probeTmux interface {
@@ -64,6 +68,7 @@ type probeTmux interface {
 }
 
 type paneSnap struct {
+	gen   uint64 // counts the reads: two looks of one gen saw the same moment, not two
 	at    time.Time
 	panes map[string]tmux.PaneInfo
 	ok    bool
@@ -81,14 +86,14 @@ func (m *v2Tmux) prober() probeTmux {
 
 // panes is the shared snapshot, read again when older than snapEvery; the looks that ask while it is read wait for it
 // instead of starting their own.
-func (m *v2Tmux) panes() (map[string]tmux.PaneInfo, bool) {
+func (m *v2Tmux) panes() (map[string]tmux.PaneInfo, bool, uint64) {
 	m.snapMu.Lock()
 	defer m.snapMu.Unlock()
 	if m.snap.at.IsZero() || time.Since(m.snap.at) >= snapEvery {
 		panes, ok := m.prober().ReadAllPanes()
-		m.snap = paneSnap{at: time.Now(), panes: panes, ok: ok}
+		m.snap = paneSnap{gen: m.snap.gen + 1, at: time.Now(), panes: panes, ok: ok}
 	}
-	return m.snap.panes, m.snap.ok
+	return m.snap.panes, m.snap.ok, m.snap.gen
 }
 
 func (m *v2Tmux) Pane(session string) typist.Pane {
@@ -101,7 +106,9 @@ func (m *v2Tmux) Pane(session string) typist.Pane {
 }
 
 // Probe: what runs in the session. A look that says "no session" or "a shell" is reported only when the previous look
-// said so too; the first is reported as the agent still running.
+// said so too; the first is reported as the agent still running. Looks that read one snapshot are one look: a pane that
+// was a shell a moment ago (the launch line is not typed yet) must not be read twice from the same snapshot and taken
+// for an agent that exited, as it was when the agent's first hook came before the next snapshot.
 //
 // The look reads the shared snapshot; only a session that was there and is missing from it is asked about on its own
 // (a pane between two programs may list without a command), so a conversation without a session costs nothing.
@@ -113,7 +120,8 @@ func (m *v2Tmux) Probe(session string) convo.Probe {
 	prev := m.doubt[session]
 	m.mu.Unlock()
 	cmd, has := "", true // tmux that did not answer (a loaded machine) said nothing: not gone, not a shell
-	if panes, ok := m.panes(); ok {
+	panes, ok, gen := m.panes()
+	if ok {
 		p, found := panes[session]
 		cmd, has = p.Command, found
 		if !found && !prev.noSession {
@@ -121,8 +129,12 @@ func (m *v2Tmux) Probe(session string) convo.Probe {
 		}
 	}
 	shell := tmux.SafeShells[cmd]
+	if shell && prev.shell && prev.gen == gen {
+		// The same snapshot again is the same look: the first sight of the shell is not confirmed by it.
+		return convo.Probe{Session: true, Foreground: true}
+	}
 	m.mu.Lock()
-	m.doubt[session] = doubt{noSession: !has, shell: shell}
+	m.doubt[session] = doubt{noSession: !has, shell: shell, gen: gen}
 	m.mu.Unlock()
 	switch {
 	case !has && !prev.noSession:
