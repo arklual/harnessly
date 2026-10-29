@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { t } from '@/next/i18n';
 import Modal from '@/next/features/shell/modal';
+import Icon from '@/next/ui/icon';
 import { GIVE_UP_MS, SLOW_MS } from '@/next/ui/use-pending-list';
 
 export interface IProjectSettings {
@@ -9,9 +10,18 @@ export interface IProjectSettings {
   path: string;
 }
 
+/** A folder the machine offers: one level below its default folder, and the git folders below those. */
+export interface IProjectFolder {
+  path: string;
+  git: boolean;
+  branch: string | null;
+}
+
 export interface IProjectSettingsDialogProps {
   /** The project as it is now; null: the dialog is closed. */
   project: IProjectSettings | null;
+  /** The folders offered under the field; null while they load (or when the machine did not give them). */
+  folders: readonly IProjectFolder[] | null;
   onClose: () => void;
   /** Resolves once the server has the change; a rejection is said under the fields. Only what changed is passed. */
   onSave: (change: Partial<IProjectSettings>) => Promise<void>;
@@ -21,7 +31,9 @@ const STATE = { idle: 'idle', busy: 'busy', slow: 'slow' } as const;
 type TState = (typeof STATE)[keyof typeof STATE];
 
 /** «Настройки проекта»: its name and the folder its new chats start in. The chats it has stay where they started. */
-const ProjectSettingsDialog = ({ project, onClose, onSave }: IProjectSettingsDialogProps) => {
+const FOLDERS_SHOWN = 6;
+
+const ProjectSettingsDialog = ({ project, folders, onClose, onSave }: IProjectSettingsDialogProps) => {
   const pathRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
@@ -82,6 +94,15 @@ const ProjectSettingsDialog = ({ project, onClose, onSave }: IProjectSettingsDia
   };
 
   const busy = state !== STATE.idle;
+  // the folders that have what is typed in their path; the current one is not offered again
+  const typed = path.trim().toLowerCase();
+  const offered = (folders ?? [])
+    .filter((folder) => folder.path !== path.trim())
+    .filter(
+      (folder) =>
+        !typed || typed === project?.path.toLowerCase() || folder.path.toLowerCase().includes(typed),
+    )
+    .slice(0, FOLDERS_SHOWN);
   return (
     <Modal
       open={project !== null}
@@ -108,7 +129,7 @@ const ProjectSettingsDialog = ({ project, onClose, onSave }: IProjectSettingsDia
             <span className="hx-create__l">{t('next.projectSettings.path')}</span>
             <input
               ref={pathRef}
-              className="hx-create__in hx-mono"
+              className="hx-create__in hx-create__in--path"
               type="text"
               autoComplete="off"
               spellCheck={false}
@@ -118,6 +139,28 @@ const ProjectSettingsDialog = ({ project, onClose, onSave }: IProjectSettingsDia
               onChange={(event) => setPath(event.target.value)}
             />
           </label>
+          {offered.length > 0 && (
+            <div className="hx-folders" role="list" aria-label={t('next.projectSettings.folders')}>
+              {offered.map((folder) => (
+                <button
+                  key={folder.path}
+                  type="button"
+                  role="listitem"
+                  className="hx-folders__item"
+                  disabled={busy}
+                  title={folder.path}
+                  onClick={() => {
+                    setPath(folder.path);
+                    setError(null);
+                  }}
+                >
+                  <Icon name="folder" size="sm" />
+                  <span className="hx-folders__path">{folder.path}</span>
+                  {folder.branch && <span className="hx-folders__branch">{folder.branch}</span>}
+                </button>
+              ))}
+            </div>
+          )}
           {error && (
             <p className="hx-create__err" role="alert">
               {error}

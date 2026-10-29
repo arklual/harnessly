@@ -4,9 +4,9 @@
 import { useMemo, useState } from 'react';
 import { failureText, settled, pageText } from '@/next/bindings/outcome';
 import { createProject, resumeSession, updateProject } from '@/next/commands';
-import { loadSessions } from '@/next/commands/pages';
+import { loadDirs, loadSessions } from '@/next/commands/pages';
 import NewProjectDialog from '@/next/features/sidebar/new-project-dialog';
-import ProjectSettingsDialog from '@/next/features/sidebar/project-settings-dialog';
+import ProjectSettingsDialog, { type IProjectFolder } from '@/next/features/sidebar/project-settings-dialog';
 import { useProjects } from '@/next/stores/projects';
 import { newProfileProjectId, withProject } from '@/next/features/sidebar/profile-layout';
 import { editProfileSidebar } from '@/next/stores/profile-sidebar';
@@ -64,11 +64,24 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
     [name, path],
   );
 
-  const show = person || !machine ? undefined : (id: string) => setOpenId(id);
+  const [folders, setFolders] = useState<IProjectFolder[] | null>(null);
+
+  // the machine's folders are asked each time it opens: a folder made since is offered too
+  const show =
+    person || !machine
+      ? undefined
+      : (id: string) => {
+          setOpenId(id);
+          setFolders(null);
+          void loadDirs(machine).then((res) => {
+            if ('ok' in res) setFolders(res.value.map(({ path, git, branch }) => ({ path, git, branch })));
+          });
+        };
 
   const dialog = machine && !person && (
     <ProjectSettingsDialog
       project={current}
+      folders={folders}
       onClose={() => setOpenId(null)}
       onSave={async (change) => {
         if (!project) return;

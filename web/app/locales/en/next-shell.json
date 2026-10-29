@@ -222,6 +222,7 @@
   "next.projectSettings.pathAbsolute": "The folder is a full path, from /",
   "next.projectSettings.pathMissing": "There is no such folder on the machine",
   "next.projectSettings.save": "Save",
+  "next.projectSettings.folders": "Folders on the machine",
   "next.projectSettings.failed": "Could not save the project",
   "next.resume.title": "Continue a session",
   "next.resume.lead": "Agents started in a terminal on your machines. The whole history comes along.",

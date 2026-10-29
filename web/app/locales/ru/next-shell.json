@@ -234,6 +234,7 @@
   "next.projectSettings.pathAbsolute": "Папка задаётся полным путём, от /",
   "next.projectSettings.pathMissing": "Такой папки на машине нет",
   "next.projectSettings.save": "Сохранить",
+  "next.projectSettings.folders": "Папки на машине",
   "next.projectSettings.failed": "Не удалось сохранить проект",
   "next.resume.title": "Продолжить сессию",
   "next.resume.lead": "Агенты, запущенные в терминале на ваших машинах. История подхватится целиком.",
