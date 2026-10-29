@@ -57,6 +57,10 @@ type Config struct {
 	// FFmpeg is ffmpeg's absolute path; when empty the usual places are looked in (Candidates).
 	FFmpeg     string
 	Candidates []string
+	// Lang is the language every dictation is recognized in ("ru", "en" or "auto"), whatever the page asks for: the
+	// page asks in the language of its interface, so an English page would have Russian speech written in English.
+	// Empty: the page's.
+	Lang string
 	// ReadyTimeout is how long the service may take to load its model (30 s).
 	ReadyTimeout time.Duration
 	Log          func(level, msg string, kv ...any)
@@ -274,6 +278,8 @@ func (ss *session) finish(f *failure) {
 	}
 }
 
+func knownLang(l string) bool { return l == "ru" || l == "en" || l == "auto" }
+
 func (ss *session) start(lang any) {
 	if ss.started || ss.ended {
 		return
@@ -285,8 +291,11 @@ func (ss *session) start(lang any) {
 		return
 	}
 	resolved := "ru"
-	if l, ok := lang.(string); ok && (l == "ru" || l == "en" || l == "auto") {
+	if l, ok := lang.(string); ok && knownLang(l) {
 		resolved = l
+	}
+	if knownLang(ss.s.cfg.Lang) {
+		resolved = ss.s.cfg.Lang
 	}
 	ss.openedAt = time.Now()
 	ss.asr = ss.dialASR(resolved)
