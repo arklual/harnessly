@@ -337,8 +337,10 @@ func (e *Engine) startServer(ctx context.Context) (*server, error) {
 	if err != nil {
 		return nil, err
 	}
+	// No -nc: whisper-server v1.9.5 has no such flag (it stops at "unknown argument: -nc") and keeps no context anyway,
+	// its no_context is always true.
 	args := []string{"-m", model, "--host", "127.0.0.1", "--port", strconv.Itoa(port), "-t", strconv.Itoa(e.cfg.Threads),
-		"-nt", "-sns", "-nc", "-nf", "-bo", "1"}
+		"-nt", "-sns", "-nf", "-bo", "1"}
 	var stderr tail
 	cmd := exec.Command(bin, args...)
 	cmd.Stderr = &stderr
@@ -432,6 +434,29 @@ func (e *Engine) Close() {
 // Infer recognizes PCM16 mono 16 kHz audio; lang is "ru", "en" or "auto". The server is started when it is not
 // running and stopped after Idle without a request. Cancelling ctx stops the pass.
 func (e *Engine) Infer(ctx context.Context, pcm []byte, lang string) (string, error) {
+	return e.infer(ctx, pcm, lang, 0)
+}
+
+// InferQuick is Infer for a partial while the person speaks: the encoder gets only the recording and a second more
+// (audio_ctx) instead of whisper's whole 30-second window, which on a processor makes a pass of a few seconds of speech
+// several times faster (6 s → 1.4 s for 5 s of audio with the small model on 4 threads) at some cost in accuracy. The
+// final pass keeps the whole window.
+func (e *Engine) InferQuick(ctx context.Context, pcm []byte, lang string) (string, error) {
+	return e.infer(ctx, pcm, lang, quickAudioCtx(len(padPCM(pcm))))
+}
+
+// quickAudioCtx is the encoder context for n bytes of PCM and one second more (a position is 20 ms); 0, the whole
+// window, when that is not shorter.
+func quickAudioCtx(n int) int {
+	const perSecond, window = 50, 1500
+	positions := (n/2*perSecond+sampleRate-1)/sampleRate + perSecond
+	if positions >= window {
+		return 0
+	}
+	return positions
+}
+
+func (e *Engine) infer(ctx context.Context, pcm []byte, lang string, audioCtx int) (string, error) {
 	if !e.Ready() {
 		return "", errors.New("speech engine is not ready")
 	}
@@ -473,6 +498,9 @@ func (e *Engine) Infer(ctx context.Context, pcm []byte, lang string) (string, er
 	_, _ = part.Write(wav(padPCM(pcm)))
 	for k, v := range map[string]string{"response_format": "json", "temperature": "0.0", "no_timestamps": "true", "language": lang} {
 		_ = w.WriteField(k, v)
+	}
+	if audioCtx > 0 {
+		_ = w.WriteField("audio_ctx", strconv.Itoa(audioCtx))
 	}
 	_ = w.Close()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, e.proc.base+"/inference", &body)
