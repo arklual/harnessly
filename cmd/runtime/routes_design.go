@@ -75,7 +75,7 @@ func designConfig(d deps) design.Config {
 		Texts: design.Texts{
 			CLI:          env("RUNTIME_CLI_NAME", "harnessly"),
 			Host:         env("RUNTIME_PLATFORM_HOST", "localhost"),
-			AppName:      env("RUNTIME_APP_NAME", "klodik"),
+			AppName:      env("RUNTIME_APP_NAME", "klodik.tech"),
 			Tag:          env("RUNTIME_DESIGN_TAG", "harnessly-design"),
 			HistoryEmail: env("RUNTIME_DESIGN_HISTORY_EMAIL", "design@localhost"),
 			SharedDir:    env("RUNTIME_DESIGN_SHARED_DIR", "/srv/design"),

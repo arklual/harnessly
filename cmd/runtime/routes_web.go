@@ -167,9 +167,9 @@ func (c *webConfig) page() ([]byte, error) {
 	}
 	if c.name != "" {
 		name := html.EscapeString(c.name)
-		raw = bytes.Replace(raw, []byte(`<meta name="apple-mobile-web-app-title" content="klodik" />`),
+		raw = bytes.Replace(raw, []byte(`<meta name="apple-mobile-web-app-title" content="klodik.tech" />`),
 			[]byte(`<meta name="apple-mobile-web-app-title" content="`+name+`" />`), 1)
-		raw = bytes.Replace(raw, []byte(`<title>klodik</title>`), []byte(`<title>`+name+`</title>`), 1)
+		raw = bytes.Replace(raw, []byte(`<title>klodik.tech</title>`), []byte(`<title>`+name+`</title>`), 1)
 	}
 	return raw, nil
 }

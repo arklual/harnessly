@@ -8,6 +8,9 @@
   («agent launch did not come up»).
 - `fix(voice)`: `RUNTIME_VOICE_LANG` важнее языка, который присылает страница (иначе русская речь переводится на
   английский), и быстрые промежуточные проходы с `audio_ctx`.
+- `feat(brand)`: название klodik.tech (по умолчанию `RUNTIME_APP_NAME`, заголовок, manifest, вход, боковая панель) и
+  значок Claude (оранжевая «искра» на тёмной плитке) вместо «h.». Команда `harnessly`, пути `~/.harnessly` и API
+  не переименованы.
 - `feat(brand)`: название klodik (по умолчанию `RUNTIME_APP_NAME`, заголовок, manifest) и значок Claude (оранжевая
   «искра» на тёмной плитке) вместо «h.». Команда `harnessly`, пути `~/.harnessly` и API не переименованы.
 
@@ -21,6 +24,7 @@ whisper-server (v0.16.16).
     # web/dist не собираем, вынимаем из релизного бинаря:
     gh release download vX.Y.Z -R ly-solutions/harnessly -p 'harnessly_X.Y.Z_linux_amd64.tar.gz' -p checksums.txt
     python3 -I ~/.local/share/harnessly-hotfix/extract_embed.py <релиз>/runtime dist web/dist
+    python3 -I scripts/klodik-dist.py web/dist    # наше название и значок в собранную страницу
     python3 -I scripts/klodik-dist.py web/dist    # наше название и значок в собранную страницу
     systemd-run --user --scope -p MemoryMax=1800M -- \
       env CGO_ENABLED=0 go build -p 2 -trimpath -tags webui \

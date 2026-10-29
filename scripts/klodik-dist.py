@@ -13,7 +13,7 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NAME = "klodik"
+NAME = "klodik.tech"
 # The spark's path (24×24) and how it sits on the 1024 tile; the colour is Claude's terracotta.
 LOGO_SVG = open(os.path.join(ROOT, "web/public/logo.svg")).read()
 SPARK = re.search(r'd="([^"]+)"', LOGO_SVG.split("<path", 1)[1]).group(1)

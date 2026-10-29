@@ -75,7 +75,7 @@ const DEFAULTS: IAppConfig = {
   trackerHosts: [],
   taskKeyPattern: '[A-Z][A-Z0-9]{1,9}-\\d{1,6}',
   gitlabHosts: ['gitlab.com'],
-  productName: 'klodik',
+  productName: 'klodik.tech',
   designName: 'Designly',
   markUrl: null,
   speedPosthogHost: null,
