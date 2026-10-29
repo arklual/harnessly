@@ -76,7 +76,10 @@ func (t *Tmux) shellEnv() [][2]string {
 // ShellLaunchCommand is the command a new session runs: the login shell under `env -i` with the allow-listed
 // environment, so neither the tmux server's cached environment nor the runtime's own variables reach the pane. TMUX and
 // TMUX_PANE, set by tmux for the pane, are expanded by the shell tmux runs the command with and so survive `env -i`.
-// With a niceness configured the shell runs under `nice`, so the panes yield the CPU and the server does not.
+// With a niceness configured the shell runs under `nice`, so the panes yield the CPU and the server does not. tmux runs
+// the command with its default-shell, which is the person's SHELL: bash and zsh exec a last simple command by
+// themselves, fish does not, so `exec` makes the login shell the pane's own process (the agent CLIs are found among
+// its children) whatever that shell is.
 // Every way of starting a pane shell must go through it.
 func (t *Tmux) ShellLaunchCommand() string { return t.shellLaunchCommand(nil) }
 
@@ -84,6 +87,7 @@ func (t *Tmux) ShellLaunchCommand() string { return t.shellLaunchCommand(nil) }
 // is not a valid variable name is dropped.
 func (t *Tmux) shellLaunchCommand(extra []string) string {
 	var b strings.Builder
+	b.WriteString("exec ")
 	if t.cfg.Nice > 0 {
 		b.WriteString("nice -n " + strconv.Itoa(t.cfg.Nice) + " ")
 	}
