@@ -71,7 +71,9 @@ const ProjectSettingsDialog = ({ project, onClose, onSave }: IProjectSettingsDia
       ]);
       onClose();
     } catch (failure) {
-      setError(failure instanceof Error && failure.message ? failure.message : t('next.projectSettings.failed'));
+      setError(
+        failure instanceof Error && failure.message ? failure.message : t('next.projectSettings.failed'),
+      );
       setState(STATE.idle);
     } finally {
       clearTimeout(slow);
