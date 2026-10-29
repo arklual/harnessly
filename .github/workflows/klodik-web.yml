@@ -35,4 +35,5 @@ jobs:
         with:
           name: web-dist
           path: web/dist
+          include-hidden-files: true # .vite/manifest.json: the guest page of the designs reads it
           retention-days: 30
