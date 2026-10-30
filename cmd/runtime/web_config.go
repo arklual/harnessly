@@ -105,7 +105,7 @@ func pageConfigFromEnv() pageConfig {
 		docsOrigin = "https://" + host
 	}
 	c := pageConfig{
-		ProductName: env("RUNTIME_APP_NAME", "harnessly"),
+		ProductName: env("RUNTIME_APP_NAME", "klodik.tech"),
 		DesignName:  env("RUNTIME_DESIGN_NAME", "Sinopia Design"),
 		MarkURL:     optional(os.Getenv("RUNTIME_APP_MARK_URL")),
 		// Empty while RUNTIME_LOCALE is not set: the page then speaks the person's browser language.
