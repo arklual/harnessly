@@ -202,7 +202,7 @@ func TestWebPageOnlyWhereAsked(t *testing.T) {
 
 func TestWebPageNameAndMark(t *testing.T) {
 	const head = `<link rel="icon" href="./logo.svg" type="image/svg+xml" />` +
-		`<meta name="apple-mobile-web-app-title" content="harnessly" /><title>harnessly</title>`
+		`<meta name="apple-mobile-web-app-title" content="klodik.tech" /><title>klodik.tech</title>`
 	files := fstest.MapFS{"index.html": {Data: []byte(`<!doctype html><html><head>` + head + `</head></html>`)}}
 
 	t.Run("left as built without settings", func(t *testing.T) {
@@ -223,7 +223,7 @@ func TestWebPageNameAndMark(t *testing.T) {
 				t.Fatalf("no %s in %s (%v)", want, page, err)
 			}
 		}
-		if strings.Contains(page, "logo.svg") || strings.Contains(page, ">harnessly<") {
+		if strings.Contains(page, "logo.svg") || strings.Contains(page, ">klodik.tech<") {
 			t.Fatalf("built tags left: %s", page)
 		}
 	})
