@@ -106,6 +106,9 @@ export function applyConvsEvent(machine: MachineId, e: ConvsEvent): void {
     case 'project_upsert':
       projectsStore.set(projectKey(machine, e.project.id), { ...e.project, machineId: machine });
       return;
+    case 'project_removed':
+      projectsStore.delete(projectKey(machine, e.id));
+      return;
     case 'favorites_upsert':
       favoritesStore.set(machine, e.favorites);
       return;
