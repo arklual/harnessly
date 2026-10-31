@@ -224,6 +224,25 @@
   "next.projectSettings.save": "Save",
   "next.projectSettings.folders": "Folders on the machine",
   "next.projectSettings.failed": "Could not save the project",
+  "next.projectSettings.delete": "Delete project",
+  "next.projectDelete.title": "Delete “{project}”?",
+  "next.projectDelete.lead": "The project leaves the sidebar. Its folder on the machine and the agents' sessions stay.",
+  "next.projectDelete.leadEmpty": "The project has no chats. Its folder on the machine stays.",
+  "next.projectDelete.chats": {
+    "one": "The project has {n} chat. What becomes of it?",
+    "other": "The project has {n} chats. What becomes of them?"
+  },
+  "next.projectDelete.keep": "Move the chats to the common list",
+  "next.projectDelete.keepNote": "The chats stay as they are, only out of the project.",
+  "next.projectDelete.drop": "Delete with its chats",
+  "next.projectDelete.dropNote": "The conversations and their attachments go; working agents stop.",
+  "next.projectDelete.dropWorking": {
+    "one": "The conversations and their attachments go; {n} agent is working now and will stop.",
+    "other": "The conversations and their attachments go; {n} agents are working now and will stop."
+  },
+  "next.projectDelete.yes": "Delete",
+  "next.projectDelete.back": "Back",
+  "next.projectDelete.failed": "Could not delete the project",
   "next.resume.title": "Continue a session",
   "next.resume.lead": "Agents started in a terminal on your machines. The whole history comes along.",
   "next.resume.placeholder": "Task, folder or branch",

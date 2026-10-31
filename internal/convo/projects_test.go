@@ -245,3 +245,68 @@ func TestAProjectMovesToAnotherFolder(t *testing.T) {
 		t.Fatalf("launched: %+v", r.launcher.launched)
 	}
 }
+
+// A deleted project goes as project_removed after its chats: kept, they are in the common list; deleted with it, they
+// are removed, and a restore brings them back out of any project. After a restart the project is not there.
+func TestAProjectIsDeletedWithOrWithoutItsChats(t *testing.T) {
+	for _, chats := range wire.ProjectChatsAll {
+		t.Run(string(chats), func(t *testing.T) {
+			r := newRig(t)
+			r.rt = NewInline(Deps{MachineID: "m1", Publisher: r.pub, Machine: r.machine, Launcher: r.launcher, Clock: r.clock,
+				Store: NewStore(filepath.Join(r.dir, "v2")), Limits: wire.DefaultLimits, DefaultCwd: r.dir})
+			if err := r.rt.Start(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			made := r.do(wire.ProjectCreateCmd{OpID: "p1", Name: "Витрина"})
+			other := r.do(wire.ProjectCreateCmd{OpID: "p2", Name: "Другое"})
+			id := *made.ID
+			in := r.do(wire.ConversationCreateCmd{OpID: "c1", ProjectID: id, Provider: wire.ProviderClaude})
+			out := r.do(wire.ConversationCreateCmd{OpID: "c2", ProjectID: *other.ID, Provider: wire.ProviderClaude})
+			if in.ID == nil || out.ID == nil {
+				t.Fatalf("conversation.create: %+v %+v", in, out)
+			}
+
+			if res := r.do(wire.ProjectDeleteCmd{OpID: "d-none", ID: "prj-absent", Chats: chats}); res.R != wire.ResultRefused || res.Code != wire.RefuseNotFound {
+				t.Fatalf("no such project: %+v", res)
+			}
+			res := r.do(wire.ProjectDeleteCmd{OpID: "d1", ID: id, Chats: chats})
+			if res.R != wire.ResultAccepted {
+				t.Fatalf("project.delete: %+v", res)
+			}
+			last := r.pub.all[len(r.pub.all)-1]
+			if ev, ok := last.e.(wire.ProjectRemovedEv); !ok || ev.ID != id || last.seq != res.Seq {
+				t.Fatalf("last published %+v at %d, answer %+v", last.e, last.seq, res)
+			}
+
+			snap, _ := r.rt.Conversations(context.Background())
+			if len(snap.Projects) != 1 || snap.Projects[0].ID != *other.ID {
+				t.Fatalf("projects: %+v", snap.Projects)
+			}
+			listed := map[string]*string{}
+			for _, c := range snap.Conversations {
+				listed[c.ID] = c.ProjectID
+			}
+			if p, ok := listed[*out.ID]; !ok || p == nil || *p != *other.ID {
+				t.Fatalf("the other project's chat: %v", listed)
+			}
+			p, kept := listed[*in.ID]
+			if chats == wire.ProjectChatsKeep && (!kept || p != nil) || chats == wire.ProjectChatsDelete && kept {
+				t.Fatalf("%s: the project's chat: %v", chats, listed)
+			}
+			if chats == wire.ProjectChatsDelete {
+				if res := r.do(wire.ConversationRestoreCmd{OpID: "r1", ID: *in.ID}); res.R != wire.ResultAccepted {
+					t.Fatalf("restore: %+v", res)
+				}
+				if rec := r.rt.actor(*in.ID).c.rec; rec.ProjectID != nil {
+					t.Fatalf("restored into %v", *rec.ProjectID)
+				}
+			}
+
+			r.restart()
+			snap, _ = r.rt.Conversations(context.Background())
+			if len(snap.Projects) != 1 || snap.Projects[0].ID != *other.ID {
+				t.Fatalf("after the restart: %+v", snap.Projects)
+			}
+		})
+	}
+}

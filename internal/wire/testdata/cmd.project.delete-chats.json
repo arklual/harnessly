@@ -1,0 +1,5 @@
+{
+  "op": "project.delete",
+  "body": {"opId": "op-pr4", "id": "prj-3f2a9c1e7b04", "chats": "delete"},
+  "result": {"r": "accepted", "ch": "convs", "seq": 1871}
+}

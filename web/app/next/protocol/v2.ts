@@ -266,6 +266,7 @@ export const CONVS_EVENT_TYPES = [
   'conversation_seen',
   'conversation_removed',
   'project_upsert',
+  'project_removed',
   'favorites_upsert',
   'draft_upsert',
 ] as const;
@@ -317,6 +318,7 @@ export const OPS = [
   'bg.stop',
   'project.create',
   'project.update',
+  'project.delete',
   'favorites.group.create',
   'favorites.group.rename',
   'favorites.group.delete',
@@ -337,6 +339,9 @@ export const OPS = [
 export type Op = (typeof OPS)[number];
 export const PROMOTE_TOS = ['now', 'steer'] as const;
 export type PromoteTo = (typeof PROMOTE_TOS)[number];
+/** What a project's deletion does to its chats: keep moves them out to the common list, delete deletes them too. */
+export const PROJECT_CHATS = ['keep', 'delete'] as const;
+export type ProjectChats = (typeof PROJECT_CHATS)[number];
 export const RESULT_KINDS = ['accepted', 'queued', 'refused'] as const;
 export type ResultKind = (typeof RESULT_KINDS)[number];
 export const REFUSE_CODES = [
@@ -1689,6 +1694,7 @@ export type ConvsEvent =
   | { type: 'conversation_seen'; id: ConvId; seenAt: Ms; rev: number }
   | { type: 'conversation_removed'; id: ConvId }
   | { type: 'project_upsert'; project: Project }
+  | { type: 'project_removed'; id: string } // after its chats' own upserts or removals
   | { type: 'favorites_upsert'; favorites: Favorites }
   | { type: 'draft_upsert'; draft: Draft };
 export type ConvEvent =
@@ -1794,6 +1800,7 @@ export interface CommandBodies {
   'project.create': OpBody & { path?: string; name?: string };
   // path: the folder the project's next chats start in; name: what it is called. Absent keeps it; one is needed.
   'project.update': OpBody & { id: string; path?: string; name?: string };
+  'project.delete': OpBody & { id: string; chats: ProjectChats };
   'favorites.group.create': OpBody & { name: string };
   'favorites.group.rename': OpBody & { id: string; name: string };
   'favorites.group.delete': OpBody & { id: string };
@@ -2931,6 +2938,7 @@ const convsEventKinds = {
   conversation_seen: { id: convId, seenAt: ms, rev: seq },
   conversation_removed: { id: convId },
   project_upsert: { project },
+  project_removed: { id },
   favorites_upsert: { favorites },
   draft_upsert: { draft },
 } satisfies Record<ConvsEventType, Shape>;
@@ -3086,6 +3094,7 @@ const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   'bg.stop': object({ ...scoped, taskId: id }),
   'project.create': object({ opId: id }, { path: id, name: id }),
   'project.update': object({ opId: id, id }, { path: id, name: id }),
+  'project.delete': object({ opId: id, id, chats: oneOf(PROJECT_CHATS) }),
   'favorites.group.create': object({ opId: id, name: favName }),
   'favorites.group.rename': object({ opId: id, id: favGroupId, name: favName }),
   'favorites.group.delete': object({ opId: id, id: favGroupId }),

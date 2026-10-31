@@ -115,6 +115,7 @@ describe('v2 closed lists', () => {
     CompactionPhase: v2.COMPACTION_PHASES,
     Op: v2.OPS,
     PromoteTo: v2.PROMOTE_TOS,
+    ProjectChats: v2.PROJECT_CHATS,
     ResultKind: v2.RESULT_KINDS,
     RefuseCode: v2.REFUSE_CODES,
     RetryableRefuseCode: v2.RETRYABLE_REFUSE_CODES,

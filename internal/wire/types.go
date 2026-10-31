@@ -1429,6 +1429,11 @@ type ProjectUpsertEv struct {
 	Project Project `json:"project"`
 }
 
+// ProjectRemovedEv: the project is deleted; its chats came before it as their own upserts or removals.
+type ProjectRemovedEv struct {
+	ID string `json:"id"`
+}
+
 // FavoritesUpsertEv is the favorites' whole layout, after any change of it.
 type FavoritesUpsertEv struct {
 	Favorites Favorites `json:"favorites"`
@@ -1538,6 +1543,7 @@ func (ConversationStateEv) EventType() EventType   { return EvConversationState 
 func (ConversationSeenEv) EventType() EventType    { return EvConversationSeen }
 func (ConversationRemovedEv) EventType() EventType { return EvConversationRemoved }
 func (ProjectUpsertEv) EventType() EventType       { return EvProjectUpsert }
+func (ProjectRemovedEv) EventType() EventType      { return EvProjectRemoved }
 func (FavoritesUpsertEv) EventType() EventType     { return EvFavoritesUpsert }
 func (DraftUpsertEv) EventType() EventType         { return EvDraftUpsert }
 func (TurnStartedEv) EventType() EventType         { return EvTurnStarted }
@@ -1909,6 +1915,25 @@ type ProjectUpdateCmd struct {
 	Name string `json:"name,omitempty"`
 }
 
+// ProjectDeleteCmd removes a project. Chats says what becomes of its chats: keep moves them out to the common list,
+// delete deletes them with it (each restorable for its 7 days, then out of any project).
+type ProjectDeleteCmd struct {
+	OpID  string       `json:"opId"`
+	ID    string       `json:"id"`
+	Chats ProjectChats `json:"chats"`
+}
+
+// ProjectChats is what a project's deletion does to its chats.
+type ProjectChats string
+
+const (
+	ProjectChatsKeep   ProjectChats = "keep"
+	ProjectChatsDelete ProjectChats = "delete"
+)
+
+// ProjectChatsAll is every ProjectChats, in the schema's order.
+var ProjectChatsAll = []ProjectChats{ProjectChatsKeep, ProjectChatsDelete}
+
 // FavGroupCreateCmd makes an empty group in the favorites; the accepted result's ID is the new group's id.
 type FavGroupCreateCmd struct {
 	OpID string `json:"opId"`
@@ -1974,6 +1999,7 @@ func (ConversationMergeCmd) Op() Op   { return OpConversationMerge }
 func (BgStopCmd) Op() Op              { return OpBgStop }
 func (ProjectCreateCmd) Op() Op       { return OpProjectCreate }
 func (ProjectUpdateCmd) Op() Op       { return OpProjectUpdate }
+func (ProjectDeleteCmd) Op() Op       { return OpProjectDelete }
 func (FavGroupCreateCmd) Op() Op      { return OpFavGroupCreate }
 func (FavGroupRenameCmd) Op() Op      { return OpFavGroupRename }
 func (FavGroupDeleteCmd) Op() Op      { return OpFavGroupDelete }
@@ -2011,6 +2037,7 @@ func (c ConversationMergeCmd) OpKey() string   { return c.OpID }
 func (c BgStopCmd) OpKey() string              { return c.OpID }
 func (c ProjectCreateCmd) OpKey() string       { return c.OpID }
 func (c ProjectUpdateCmd) OpKey() string       { return c.OpID }
+func (c ProjectDeleteCmd) OpKey() string       { return c.OpID }
 func (c FavGroupCreateCmd) OpKey() string      { return c.OpID }
 func (c FavGroupRenameCmd) OpKey() string      { return c.OpID }
 func (c FavGroupDeleteCmd) OpKey() string      { return c.OpID }
@@ -2651,12 +2678,13 @@ const (
 	EvConversationSeen    EventType = "conversation_seen"
 	EvConversationRemoved EventType = "conversation_removed"
 	EvProjectUpsert       EventType = "project_upsert"
+	EvProjectRemoved      EventType = "project_removed"
 	EvFavoritesUpsert     EventType = "favorites_upsert"
 	EvDraftUpsert         EventType = "draft_upsert"
 )
 
 // ConvsEventTypes is every ConvsEventType, in the schema's order.
-var ConvsEventTypes = []EventType{EvConversationUpsert, EvConversationState, EvConversationSeen, EvConversationRemoved, EvProjectUpsert, EvFavoritesUpsert, EvDraftUpsert}
+var ConvsEventTypes = []EventType{EvConversationUpsert, EvConversationState, EvConversationSeen, EvConversationRemoved, EvProjectUpsert, EvProjectRemoved, EvFavoritesUpsert, EvDraftUpsert}
 
 const (
 	EvTurnStarted         EventType = "turn_started"
@@ -2721,6 +2749,7 @@ const (
 	OpBgStop              Op = "bg.stop"
 	OpProjectCreate       Op = "project.create"
 	OpProjectUpdate       Op = "project.update"
+	OpProjectDelete       Op = "project.delete"
 	OpFavGroupCreate      Op = "favorites.group.create"
 	OpFavGroupRename      Op = "favorites.group.rename"
 	OpFavGroupDelete      Op = "favorites.group.delete"
@@ -2739,7 +2768,7 @@ const (
 )
 
 // Ops is every Op, in the schema's order.
-var Ops = []Op{OpSend, OpCancel, OpRetry, OpPromote, OpAnswer, OpDecide, OpInterrupt, OpQueueResume, OpSeen, OpConversationCreate, OpConversationRename, OpConversationPin, OpConversationMove, OpConversationDelete, OpConversationRestore, OpConversationResume, OpModel, OpBgStop, OpProjectCreate, OpProjectUpdate, OpFavGroupCreate, OpFavGroupRename, OpFavGroupDelete, OpFavGroupMove, OpFavPlace, OpGoal, OpConversationRetitle, OpDraftSet, OpQueueMove, OpTerminalStop, OpRewind, OpRewindUndo, OpConversationFork, OpConversationHandoff, OpConversationMerge, OpLimit}
+var Ops = []Op{OpSend, OpCancel, OpRetry, OpPromote, OpAnswer, OpDecide, OpInterrupt, OpQueueResume, OpSeen, OpConversationCreate, OpConversationRename, OpConversationPin, OpConversationMove, OpConversationDelete, OpConversationRestore, OpConversationResume, OpModel, OpBgStop, OpProjectCreate, OpProjectUpdate, OpProjectDelete, OpFavGroupCreate, OpFavGroupRename, OpFavGroupDelete, OpFavGroupMove, OpFavPlace, OpGoal, OpConversationRetitle, OpDraftSet, OpQueueMove, OpTerminalStop, OpRewind, OpRewindUndo, OpConversationFork, OpConversationHandoff, OpConversationMerge, OpLimit}
 
 // PromoteTo is where promote moves a queued message.
 type PromoteTo string

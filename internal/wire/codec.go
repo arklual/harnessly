@@ -378,6 +378,7 @@ var events = map[EventType]func([]byte) (Event, error){
 	EvConversationSeen:    as[ConversationSeenEv, Event],
 	EvConversationRemoved: as[ConversationRemovedEv, Event],
 	EvProjectUpsert:       as[ProjectUpsertEv, Event],
+	EvProjectRemoved:      as[ProjectRemovedEv, Event],
 	EvFavoritesUpsert:     as[FavoritesUpsertEv, Event],
 	EvDraftUpsert:         as[DraftUpsertEv, Event],
 	EvTurnStarted:         as[TurnStartedEv, Event],
@@ -493,6 +494,11 @@ func (e ConversationRemovedEv) MarshalJSON() ([]byte, error) {
 
 func (e ProjectUpsertEv) MarshalJSON() ([]byte, error) {
 	type plain ProjectUpsertEv
+	return eventJSON(e, plain(e))
+}
+
+func (e ProjectRemovedEv) MarshalJSON() ([]byte, error) {
+	type plain ProjectRemovedEv
 	return eventJSON(e, plain(e))
 }
 
@@ -633,6 +639,7 @@ var commands = map[Op]func([]byte) (Command, error){
 	OpBgStop:              as[BgStopCmd, Command],
 	OpProjectCreate:       as[ProjectCreateCmd, Command],
 	OpProjectUpdate:       as[ProjectUpdateCmd, Command],
+	OpProjectDelete:       as[ProjectDeleteCmd, Command],
 	OpFavGroupCreate:      as[FavGroupCreateCmd, Command],
 	OpFavGroupRename:      as[FavGroupRenameCmd, Command],
 	OpFavGroupDelete:      as[FavGroupDeleteCmd, Command],

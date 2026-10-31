@@ -1023,6 +1023,28 @@ func (s *Service) Do(ctx context.Context, device string, cmd wire.Command) wire.
 		}
 		s.projects[p.ID] = p
 		return wire.Accepted(wire.ChannelConvs, s.pub(wire.ChannelConvs, wire.ProjectUpsertEv{Project: p}))
+	case wire.ProjectDeleteCmd:
+		if _, ok := s.projects[c.ID]; !ok {
+			return wire.Refused(wire.RefuseNotFound)
+		}
+		for _, cv := range s.convs {
+			if ptrStr(cv.rec.ProjectID) != c.ID {
+				continue
+			}
+			cv.rec.ProjectID = nil
+			if cv.deleted {
+				continue
+			}
+			if c.Chats == wire.ProjectChatsDelete {
+				cv.deleted = true
+				s.pub(wire.ChannelConvs, wire.ConversationRemovedEv{ID: cv.rec.ID})
+			} else {
+				s.upsert(cv)
+			}
+		}
+		delete(s.projects, c.ID)
+		s.order = slices.DeleteFunc(s.order, func(id string) bool { return id == c.ID })
+		return wire.Accepted(wire.ChannelConvs, s.pub(wire.ChannelConvs, wire.ProjectRemovedEv{ID: c.ID}))
 	}
 	return wire.Refused(wire.RefuseUnsupported)
 }

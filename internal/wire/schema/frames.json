@@ -272,7 +272,7 @@
     "ClientFrameKind": {"enum": ["hello", "sub", "unsub", "ping"]},
     "ServerFrameKind": {"enum": ["welcome", "snapshot", "ev", "pong", "error"]},
     "MachineEventType": {"enum": ["machine_status", "machine_load"]},
-    "ConvsEventType": {"enum": ["conversation_upsert", "conversation_state", "conversation_seen", "conversation_removed", "project_upsert", "favorites_upsert", "draft_upsert"]},
+    "ConvsEventType": {"enum": ["conversation_upsert", "conversation_state", "conversation_seen", "conversation_removed", "project_upsert", "project_removed", "favorites_upsert", "draft_upsert"]},
     "ConvEventType": {
       "enum": [
         "turn_started", "step", "entry_update", "entry_replace", "now", "question_asked",
@@ -287,13 +287,14 @@
         "send", "cancel", "retry", "promote", "answer", "decide", "interrupt", "queue.resume", "seen",
         "conversation.create", "conversation.rename", "conversation.pin", "conversation.move",
         "conversation.delete", "conversation.restore", "conversation.resume", "model", "bg.stop",
-        "project.create", "project.update", "favorites.group.create", "favorites.group.rename", "favorites.group.delete",
+        "project.create", "project.update", "project.delete", "favorites.group.create", "favorites.group.rename", "favorites.group.delete",
         "favorites.group.move", "favorites.place", "goal", "conversation.retitle", "draft.set", "queue.move", "terminal.stop", "rewind", "rewind.undo",
         "conversation.fork", "conversation.handoff", "conversation.merge",
         "limit"
       ]
     },
     "PromoteTo": {"enum": ["now", "steer"]},
+    "ProjectChats": {"enum": ["keep", "delete"]},
     "ResultKind": {"enum": ["accepted", "queued", "refused"]},
     "RefuseCode": {
       "enum": [
@@ -2163,6 +2164,12 @@
         },
         {
           "type": "object",
+          "required": ["type", "id"],
+          "additionalProperties": false,
+          "properties": {"type": {"const": "project_removed"}, "id": {"type": "string", "minLength": 1}}
+        },
+        {
+          "type": "object",
           "required": ["type", "favorites"],
           "additionalProperties": false,
           "properties": {"type": {"const": "favorites_upsert"}, "favorites": {"$ref": "#/$defs/Favorites"}}
@@ -2900,6 +2907,16 @@
         "name": {"type": "string", "minLength": 1, "maxLength": 120}
       }
     },
+    "Cmd_project_delete": {
+      "type": "object",
+      "required": ["opId", "id", "chats"],
+      "additionalProperties": false,
+      "properties": {
+        "opId": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "minLength": 1},
+        "chats": {"$ref": "#/$defs/ProjectChats"}
+      }
+    },
     "Cmd_favorites_group_create": {
       "type": "object",
       "required": ["opId", "name"],
@@ -3095,6 +3112,12 @@
           "required": ["op", "body"],
           "additionalProperties": false,
           "properties": {"op": {"const": "project.update"}, "body": {"$ref": "#/$defs/Cmd_project_update"}}
+        },
+        {
+          "type": "object",
+          "required": ["op", "body"],
+          "additionalProperties": false,
+          "properties": {"op": {"const": "project.delete"}, "body": {"$ref": "#/$defs/Cmd_project_delete"}}
         },
         {
           "type": "object",
@@ -3415,6 +3438,16 @@
           "properties": {
             "op": {"const": "project.update"},
             "body": {"$ref": "#/$defs/Cmd_project_update"},
+            "result": {"$ref": "#/$defs/CmdResult"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["op", "body", "result"],
+          "additionalProperties": false,
+          "properties": {
+            "op": {"const": "project.delete"},
+            "body": {"$ref": "#/$defs/Cmd_project_delete"},
             "result": {"$ref": "#/$defs/CmdResult"}
           }
         },

@@ -815,6 +815,8 @@ func (e ConversationSeenEv) Validate() error {
 
 func (e ProjectUpsertEv) Validate() error { return under("project", e.Project.Validate()) }
 
+func (e ProjectRemovedEv) Validate() error { return need("id", e.ID) }
+
 func (e ConversationRemovedEv) Validate() error { return convID("id", e.ID) }
 func (e TurnStartedEv) Validate() error         { return under("turn", e.Turn.Validate()) }
 func (e StepEv) Validate() error                { return under("entry", e.Entry.Validate()) }
@@ -1190,6 +1192,10 @@ func (c ProjectUpdateCmd) Validate() error {
 		errs = append(errs, errors.New("name: one line of at most 120 characters"))
 	}
 	return errors.Join(errs...)
+}
+
+func (c ProjectDeleteCmd) Validate() error {
+	return errors.Join(need("opId", c.OpID), need("id", c.ID), in("chats", c.Chats, ProjectChatsAll))
 }
 
 func (r CmdResult) Validate() error {

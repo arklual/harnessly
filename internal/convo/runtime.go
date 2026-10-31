@@ -956,6 +956,9 @@ func (r *Runtime) route(device string, cmd wire.Command, finish func(wire.CmdRes
 	case wire.ProjectUpdateCmd:
 		finish(r.updateProject(m))
 		return nil
+	case wire.ProjectDeleteCmd:
+		finish(r.deleteProject(device, m))
+		return nil
 	case wire.FavGroupCreateCmd, wire.FavGroupRenameCmd, wire.FavGroupDeleteCmd, wire.FavGroupMoveCmd:
 		finish(r.favGroup(cmd))
 		return nil
@@ -1185,6 +1188,45 @@ func (r *Runtime) updateProject(m wire.ProjectUpdateCmd) wire.CmdResult {
 	saved := slices.Clone(r.projects)
 	r.mu.Unlock()
 	seq := r.d.Publisher.Publish(wire.ChannelConvs, wire.ProjectUpsertEv{Project: p})
+	if r.d.Store != nil {
+		if err := r.d.Store.saveProjects(saved); err != nil {
+			r.d.Log.Warn("projects not saved", "err", err)
+		}
+	}
+	return wire.Accepted(wire.ChannelConvs, seq)
+}
+
+// deleteProject removes a project. Its chats go first, each as its own upsert (keep: out to the common list) or
+// removal (delete: forced, a working agent stopped too); then project_removed, the seq the page waits for. A chat
+// deleted with it, or before, is out of any project too, so a restore brings it back to the common list.
+func (r *Runtime) deleteProject(device string, m wire.ProjectDeleteCmd) wire.CmdResult {
+	if !r.hasProject(m.ID) {
+		return wire.Refused(wire.RefuseNotFound)
+	}
+	force := true
+	for _, a := range r.all() {
+		// A conversation removed since all() has no project left to leave.
+		_ = r.call(context.Background(), a.c.rec.ID, func(c *conv, now time.Time) {
+			if c.rec.ProjectID == nil || *c.rec.ProjectID != m.ID {
+				return
+			}
+			c.rec.ProjectID = nil
+			switch {
+			case c.deletedAt != 0:
+				c.touch()
+			case m.Chats == wire.ProjectChatsDelete:
+				c.touch()
+				c.do(device, wire.ConversationDeleteCmd{OpID: m.OpID + "-" + c.rec.ID, ID: c.rec.ID, Force: &force}, now)
+			default:
+				c.recResult(now)
+			}
+		})
+	}
+	r.mu.Lock()
+	r.projects = slices.DeleteFunc(r.projects, func(p wire.Project) bool { return p.ID == m.ID })
+	saved := slices.Clone(r.projects)
+	r.mu.Unlock()
+	seq := r.d.Publisher.Publish(wire.ChannelConvs, wire.ProjectRemovedEv{ID: m.ID})
 	if r.d.Store != nil {
 		if err := r.d.Store.saveProjects(saved); err != nil {
 			r.d.Log.Warn("projects not saved", "err", err)

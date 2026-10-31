@@ -1788,3 +1788,85 @@ html:has(.hx-app) body {
   padding: 40px 16px 48px;
   font-size: var(--hx-text-md);
 }
+
+/* «Удалить проект»: the way in sits apart at the left of the foot, quiet until pointed at; the two fates of its chats are radio cards. */
+.hx-pdel__start {
+  margin-right: auto;
+  gap: 6px;
+}
+.hx-btn.hx-pdel__start:hover {
+  background: color-mix(in srgb, var(--hx-danger) 8%, transparent);
+  color: var(--hx-danger);
+}
+.hx-pdel {
+  display: grid;
+  gap: 8px;
+}
+.hx-pdel__ask {
+  margin: 0 0 2px;
+  color: var(--hx-fg-2);
+  font-size: 13.5px;
+}
+.hx-pdel__opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+.hx-pdel__opt:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-pdel__opt:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-accent) 16%, transparent);
+}
+.hx-pdel__opt[aria-checked='true'] {
+  border-color: var(--hx-accent);
+  background: color-mix(in srgb, var(--hx-accent) 6%, transparent);
+}
+.hx-pdel__opt[data-tone='danger'][aria-checked='true'] {
+  border-color: var(--hx-danger);
+  background: color-mix(in srgb, var(--hx-danger) 6%, transparent);
+}
+.hx-pdel__dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 1.5px solid var(--hx-border-strong);
+  border-radius: 50%;
+  transition:
+    border-color 160ms ease,
+    border-width 160ms ease;
+}
+.hx-pdel__opt[aria-checked='true'] .hx-pdel__dot {
+  border-width: 5px;
+  border-color: var(--hx-accent);
+}
+.hx-pdel__opt[data-tone='danger'][aria-checked='true'] .hx-pdel__dot {
+  border-color: var(--hx-danger);
+}
+.hx-pdel__text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.hx-pdel__label {
+  font-size: 14px;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-pdel__note {
+  color: var(--hx-fg-3);
+  font-size: 12.5px;
+  line-height: 1.4;
+}

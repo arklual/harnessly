@@ -19,6 +19,7 @@ import type {
   MachineId,
   Model,
   ProfileId,
+  ProjectChats,
   Ms,
   Provider,
   TurnId,
@@ -137,6 +138,9 @@ export const createProject = (m: MachineId, name: string) => runCommand(m, 'proj
 /** The folder a project's next chats start in (the chats it has stay where they are), and its name. */
 export const updateProject = (m: MachineId, id: string, change: { path?: string; name?: string }) =>
   runCommand(m, 'project.update', { id, ...change });
+/** The project goes; its chats move out to the common list (keep) or are deleted with it (delete). */
+export const deleteProject = (m: MachineId, id: string, chats: ProjectChats) =>
+  runCommand(m, 'project.delete', { id, chats });
 
 /** A group in the favorites; resolves with its id once the runtime answers. */
 export const createFavGroup = (m: MachineId, name: string) =>

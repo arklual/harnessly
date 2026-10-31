@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { t } from '@/next/i18n';
+import { plural, t } from '@/next/i18n';
+import type { ProjectChats } from '@/next/protocol/v2';
 import Modal from '@/next/features/shell/modal';
 import Icon from '@/next/ui/icon';
 import { GIVE_UP_MS, SLOW_MS } from '@/next/ui/use-pending-list';
@@ -22,23 +23,69 @@ export interface IProjectSettingsDialogProps {
   project: IProjectSettings | null;
   /** The folders offered under the field; null while they load (or when the machine did not give them). */
   folders: readonly IProjectFolder[] | null;
+  /** The project's chats now: how many, and how many of them have an agent at work. */
+  chats: { count: number; working: number };
   onClose: () => void;
   /** Resolves once the server has the change; a rejection is said under the fields. Only what changed is passed. */
   onSave: (change: Partial<IProjectSettings>) => Promise<void>;
+  /** Resolves once the project is gone, its chats moved out (keep) or deleted with it; absent: no «Удалить проект». */
+  onDelete?: (chats: ProjectChats) => Promise<void>;
 }
 
 const STATE = { idle: 'idle', busy: 'busy', slow: 'slow' } as const;
 type TState = (typeof STATE)[keyof typeof STATE];
 
+/** The dialog's two faces: the fields, and the deletion asked of the project with what becomes of its chats. */
+const STEP = { edit: 'edit', delete: 'delete' } as const;
+type TStep = (typeof STEP)[keyof typeof STEP];
+
+/** Runs work with the dialog's busy, slow and give-up; resolves true once it is done, false when it was said why not. */
+const useWork =
+  (setState: (s: TState) => void, setError: (e: string | null) => void) =>
+  async (work: () => Promise<void>, failed: string): Promise<boolean> => {
+    setError(null);
+    setState(STATE.busy);
+    const slow = setTimeout(() => setState(STATE.slow), SLOW_MS);
+    let giveUp: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        work(),
+        new Promise((_, reject) => {
+          giveUp = setTimeout(() => reject(new Error(t('next.pending.noAnswer'))), GIVE_UP_MS);
+        }),
+      ]);
+      return true;
+    } catch (failure) {
+      setError(failure instanceof Error && failure.message ? failure.message : failed);
+      setState(STATE.idle);
+      return false;
+    } finally {
+      clearTimeout(slow);
+      clearTimeout(giveUp);
+    }
+  };
+
 /** «Настройки проекта»: its name and the folder its new chats start in. The chats it has stay where they started. */
 const FOLDERS_SHOWN = 6;
 
-const ProjectSettingsDialog = ({ project, folders, onClose, onSave }: IProjectSettingsDialogProps) => {
+const ProjectSettingsDialog = ({
+  project,
+  folders,
+  chats,
+  onClose,
+  onSave,
+  onDelete,
+}: IProjectSettingsDialogProps) => {
   const pathRef = useRef<HTMLInputElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
   const [state, setState] = useState<TState>(STATE.idle);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<TStep>(STEP.edit);
+  // the chats move out unless the person picks to delete them: the choice that loses nothing comes first
+  const [fate, setFate] = useState<ProjectChats>('keep');
+  const work = useWork(setState, setError);
 
   // a project opened (or changed on the machine) gives the fields their values again
   const [shown, setShown] = useState<IProjectSettings | null>(null);
@@ -48,6 +95,10 @@ const ProjectSettingsDialog = ({ project, folders, onClose, onSave }: IProjectSe
     setPath(project?.path ?? '');
     setError(null);
     setState(STATE.idle);
+    if (project === null) {
+      setStep(STEP.edit);
+      setFate('keep');
+    }
   }
 
   const submit = async (event: FormEvent) => {
@@ -70,27 +121,20 @@ const ProjectSettingsDialog = ({ project, folders, onClose, onSave }: IProjectSe
       onClose();
       return;
     }
+    if (await work(() => onSave(change), t('next.projectSettings.failed'))) onClose();
+  };
+
+  const remove = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!project || !onDelete) return;
+    // a project with no chats has nothing to keep: it goes as «keep», which moves nothing
+    const chosen = chats.count === 0 ? 'keep' : fate;
+    if (await work(() => onDelete(chosen), t('next.projectDelete.failed'))) onClose();
+  };
+
+  const toStep = (next: TStep) => {
+    setStep(next);
     setError(null);
-    setState(STATE.busy);
-    const slow = setTimeout(() => setState(STATE.slow), SLOW_MS);
-    let giveUp: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        onSave(change),
-        new Promise((_, reject) => {
-          giveUp = setTimeout(() => reject(new Error(t('next.pending.noAnswer'))), GIVE_UP_MS);
-        }),
-      ]);
-      onClose();
-    } catch (failure) {
-      setError(
-        failure instanceof Error && failure.message ? failure.message : t('next.projectSettings.failed'),
-      );
-      setState(STATE.idle);
-    } finally {
-      clearTimeout(slow);
-      clearTimeout(giveUp);
-    }
   };
 
   const busy = state !== STATE.idle;
@@ -103,6 +147,90 @@ const ProjectSettingsDialog = ({ project, folders, onClose, onSave }: IProjectSe
         !typed || typed === project?.path.toLowerCase() || folder.path.toLowerCase().includes(typed),
     )
     .slice(0, FOLDERS_SHOWN);
+  const spin = <span className="hx-gate__spin" aria-hidden="true" />;
+  const errorLine = error && (
+    <p className="hx-create__err" role="alert">
+      {error}
+    </p>
+  );
+  const slowLine = state === STATE.slow && <p className="hx-create__slow">{t('next.chatRow.slow')}</p>;
+
+  if (step === STEP.delete) {
+    const choices: { value: ProjectChats; label: string; note: string }[] = [
+      { value: 'keep', label: t('next.projectDelete.keep'), note: t('next.projectDelete.keepNote') },
+      {
+        value: 'delete',
+        label: t('next.projectDelete.drop'),
+        note:
+          chats.working > 0
+            ? plural(chats.working, 'next.projectDelete.dropWorking')
+            : t('next.projectDelete.dropNote'),
+      },
+    ];
+    const dropping = chats.count > 0 && fate === 'delete';
+    return (
+      <Modal
+        open={project !== null}
+        onClose={onClose}
+        title={t('next.projectDelete.title', { project: project?.name ?? '' })}
+        lead={chats.count === 0 ? t('next.projectDelete.leadEmpty') : t('next.projectDelete.lead')}
+        boxClass="hx-create"
+        initialFocus={keepRef}
+      >
+        <form onSubmit={(event) => void remove(event)}>
+          <div className="hx-modal__body">
+            {chats.count > 0 && (
+              <div
+                className="hx-pdel"
+                role="radiogroup"
+                aria-label={plural(chats.count, 'next.projectDelete.chats')}
+              >
+                <p className="hx-pdel__ask">{plural(chats.count, 'next.projectDelete.chats')}</p>
+                {choices.map((choice) => (
+                  <button
+                    key={choice.value}
+                    ref={choice.value === 'keep' ? keepRef : undefined}
+                    type="button"
+                    role="radio"
+                    className="hx-pdel__opt"
+                    data-tone={choice.value === 'delete' ? 'danger' : undefined}
+                    aria-checked={fate === choice.value}
+                    disabled={busy}
+                    onClick={() => setFate(choice.value)}
+                  >
+                    <span className="hx-pdel__dot" aria-hidden="true" />
+                    <span className="hx-pdel__text">
+                      <span className="hx-pdel__label">
+                        {choice.value === 'delete' ? `${choice.label} (${chats.count})` : choice.label}
+                      </span>
+                      <span className="hx-pdel__note">{choice.note}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {errorLine}
+            {slowLine}
+          </div>
+          <div className="hx-modal__foot">
+            <button
+              type="button"
+              className="hx-btn"
+              data-variant="ghost"
+              disabled={busy}
+              onClick={() => toStep(STEP.edit)}
+            >
+              {t('next.projectDelete.back')}
+            </button>
+            <button type="submit" className="hx-btn hx-create__ok" data-variant="danger" data-busy={busy}>
+              <span>{dropping ? t('next.projectDelete.drop') : t('next.projectDelete.yes')}</span>
+              {spin}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    );
+  }
   return (
     <Modal
       open={project !== null}
@@ -161,20 +289,28 @@ const ProjectSettingsDialog = ({ project, folders, onClose, onSave }: IProjectSe
               ))}
             </div>
           )}
-          {error && (
-            <p className="hx-create__err" role="alert">
-              {error}
-            </p>
-          )}
-          {state === STATE.slow && <p className="hx-create__slow">{t('next.chatRow.slow')}</p>}
+          {errorLine}
+          {slowLine}
         </div>
         <div className="hx-modal__foot">
+          {onDelete && (
+            <button
+              type="button"
+              className="hx-btn hx-pdel__start"
+              data-variant="ghost"
+              disabled={busy}
+              onClick={() => toStep(STEP.delete)}
+            >
+              <Icon name="trash-2" size="sm" />
+              <span>{t('next.projectSettings.delete')}</span>
+            </button>
+          )}
           <button type="button" className="hx-btn" data-variant="ghost" onClick={onClose}>
             {t('next.rowMenu.cancel')}
           </button>
           <button type="submit" className="hx-btn hx-create__ok" data-variant="primary" data-busy={busy}>
             <span>{t('next.projectSettings.save')}</span>
-            <span className="hx-gate__spin" aria-hidden="true" />
+            {spin}
           </button>
         </div>
       </form>
