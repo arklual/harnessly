@@ -118,6 +118,7 @@ export type IPaneRequest = { reload: boolean } & (
   | { k: 'design'; target: string | null }
   | { k: 'files'; target: string | null }
   | { k: 'plan' }
+  | { k: 'chrome' }
   | { k: 'subagent' }
   | { k: 'terminal' }
   | { k: 'side' }
@@ -143,6 +144,8 @@ export const requestOf = (command: TIntentCommand): IPaneRequest | null => {
       return { k: 'files', target, reload };
     case 'plan':
       return { k: 'plan', reload };
+    case 'chrome':
+      return { k: 'chrome', reload };
     case 'subagents':
       return { k: 'subagent', reload };
     case 'terminal':
