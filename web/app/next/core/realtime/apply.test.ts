@@ -182,7 +182,7 @@ describe('a conversation belongs to the machine of its channel', () => {
 });
 
 describe('projects come with the convs channel', () => {
-  it('the snapshot lists them with the default folder, project_upsert adds one, a later snapshot drops the gone', () => {
+  it('the snapshot lists them with the default folder, project_upsert adds one, project_removed and a later snapshot drop the gone', () => {
     const M = 'm-projects' as never;
     const p = (id: string, name: string) => ({
       id,
@@ -200,6 +200,9 @@ describe('projects come with the convs channel', () => {
     expect(defaultCwdStore.get(M)).toBe('/w');
     storeSink.event(M, { ch: 'convs', e: { type: 'project_upsert', project: p('p3', 'c') } } as never);
     expect(projectsStore.get(projectKey(M, 'p3'))?.name).toBe('c');
+    storeSink.event(M, { ch: 'convs', e: { type: 'project_removed', id: 'p2' } } as never);
+    expect(projectsStore.get(projectKey(M, 'p2'))).toBeUndefined();
+    expect(projectsStore.get(projectKey(M, 'p1'))).toBeDefined();
     storeSink.snapshot(M, {
       ch: 'convs',
       data: { conversations: [], projects: [p('p3', 'c')], defaultCwd: '/w' },
