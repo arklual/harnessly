@@ -22,7 +22,7 @@ const (
 
 // TabKinds are the kinds of tab the right pane can hold.
 var TabKinds = []string{"overview", "tools", "browser", "terminal", "files", "disk", "changes", "artifacts", "gitlab",
-	"subagents", "economics", "plan", "peers", "design", "side-chat", "gallery", "task"}
+	"subagents", "economics", "plan", "peers", "design", "side-chat", "gallery", "task", "chrome"}
 
 // IsTabKind says whether v names a kind of TabKinds.
 func IsTabKind(v any) bool {

@@ -40,6 +40,16 @@ describe('placeRequest: a request becomes the pane’s state', () => {
     expect(other.next.active).toBe('t1');
   });
 
+  it('the agent’s Chrome is one tab: asked again, it comes forward; a reload asks nothing', () => {
+    const placed = place(empty, { kind: 'open', tab: 'chrome', auto: true });
+    expect(placed.next).toEqual({ tabs: [{ id: 't1', kind: 'chrome' }], active: 't1', unread: [] });
+    expect(placed.show).toBe(true);
+    const again = place({ ...placed.next, active: '' }, { kind: 'open', tab: 'chrome' });
+    expect(again.next.tabs).toHaveLength(1);
+    expect(again.next.active).toBe('t1');
+    expect(place(empty, { kind: 'open', tab: 'chrome', reload: true }).next).toEqual(empty);
+  });
+
   it('a browser asked for with no page comes to the new tab that is there, not a second blank one', () => {
     const blank: IPaneTabs = {
       tabs: [{ id: 'b1', kind: 'browser', hist: [], hi: -1 }],

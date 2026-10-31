@@ -15,7 +15,7 @@
       "enum": [
         "queue", "steer", "questions", "permissions", "background", "model", "voice", "files", "checkpoints",
         "designly", "search", "vault", "push", "terminal", "machine", "apps", "settings", "drafts", "queue-move", "apps-hub", "terminal-stop", "rewind", "fork", "handoff",
-        "auto-continue"
+        "auto-continue", "chrome"
       ]
     },
     "Reach": {"enum": ["online", "unreachable", "unknown"]},

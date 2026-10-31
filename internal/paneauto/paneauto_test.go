@@ -178,3 +178,26 @@ func TestAHandedOverFileOpensOnce(t *testing.T) {
 		t.Fatalf("%d intents", len(list))
 	}
 }
+
+func TestAChromeMcpOpensTheChromeTabOnce(t *testing.T) {
+	r := newRig(t)
+	r.w.Entry("c1", r.tool("mcp__chrome__navigate_page", "chrome · navigate_page", "", &yes))
+	if got := r.commands(); len(got) != 0 {
+		t.Fatal("opened on a machine without a Chrome to show:", got)
+	}
+	r.w.env.Chrome = true
+	r.w.Entry("c1", r.tool("mcp__chrome__take_snapshot", "chrome · take_snapshot", "", &no))
+	r.w.Entry("c1", r.tool("mcp__github__search", "github · search", "", &yes))
+	r.w.Entry("c1", r.tool("mcp__chrome-devtools__click", "click", "", &yes))
+	r.w.Entry("c1", r.tool("mcp__chrome__fill", "fill", "", &yes))
+	got := r.commands()
+	if len(got) != 1 || got[0] != `{"kind":"open","tab":"chrome","auto":true}` {
+		t.Fatal(got)
+	}
+	for tool, want := range map[string]bool{"mcp__chrome__click": true, "mcp__Chrome-DevTools__x": true, "mcp__chrome": false,
+		"chrome__click": false, "mcp__github__chrome": false} {
+		if IsChromeTool(tool) != want {
+			t.Error(tool)
+		}
+	}
+}

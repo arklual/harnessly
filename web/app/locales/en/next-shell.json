@@ -903,5 +903,14 @@
   "next.delivered.zipEmpty": "The archive is empty",
   "next.delivered.saveOnly": "This file opens in its own program: download it.",
   "next.rowMenu.onVm": "On {machine}",
-  "next.rowMenu.moveVm": "Continue on another machine"
+  "next.rowMenu.moveVm": "Continue on another machine",
+  "next.chrome.name": "Agent's Chrome",
+  "next.chrome.hint": "The browser the agent drives, live",
+  "next.chrome.tabs": "Chrome tabs",
+  "next.chrome.screen": "Chrome's screen: clicks and keys go to it",
+  "next.chrome.waiting": "Connecting to Chrome…",
+  "next.chrome.down": "Chrome does not answer. It has to run with --remote-debugging-port (RUNTIME_CHROME_CDP sets the address).",
+  "next.chrome.state.connecting": "Connecting",
+  "next.chrome.state.up": "Connected",
+  "next.chrome.state.down": "No connection to Chrome"
 }

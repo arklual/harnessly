@@ -363,6 +363,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(hubRoutes(d)...)
 	f.Add(f.AsRoutes(machineSliceRoutes(d, cfg.Listen, cfg.Upstream, pusher, hooks)...)...)
 	f.Add(voiceRoutes(d)...)
+	f.Add(chromeRoutes(d)...)
 	for _, group := range routeGroups {
 		f.Add(f.AsRoutes(group(d)...)...)
 	}

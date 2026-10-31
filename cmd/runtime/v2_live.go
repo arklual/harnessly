@@ -89,6 +89,10 @@ func newV2Live(d deps, c *core) *v2Live {
 	}
 	// The Machine tool reads what the machine slice looks at the machine with; it is up a moment after the start.
 	features = append(features, wire.FeatureMachine)
+	// The Chrome the agents drive, live in the pane (/api/chrome).
+	if machineChrome().On() {
+		features = append(features, wire.FeatureChrome)
+	}
 	// The Apps screen says for each app whether this machine reads it, so it is always offered.
 	features = append(features, wire.FeatureApps, wire.FeatureAppsHub)
 	// The Settings screen reads the agent CLIs' files of this machine, which are there to read or to make.

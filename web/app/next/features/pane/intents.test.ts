@@ -125,6 +125,7 @@ describe('requestOf', () => {
     expect(requestOf(open('design'))).toEqual({ k: 'design', target: null, reload: false });
     expect(requestOf(open('files', '/w/a.md'))).toEqual({ k: 'files', target: '/w/a.md', reload: false });
     expect(requestOf(open('plan'))).toEqual({ k: 'plan', reload: false });
+    expect(requestOf(open('chrome'))).toEqual({ k: 'chrome', reload: false });
     expect(requestOf(open('subagents'))).toEqual({ k: 'subagent', reload: false });
     expect(requestOf(open('terminal'))).toEqual({ k: 'terminal', reload: false });
     expect(requestOf(open('side-chat'))).toEqual({ k: 'side', reload: false });

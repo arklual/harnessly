@@ -959,5 +959,14 @@
   "next.delivered.zipEmpty": "Архив пуст",
   "next.delivered.saveOnly": "Этот файл открывается своей программой: скачайте его.",
   "next.rowMenu.onVm": "На ВМ {machine}",
-  "next.rowMenu.moveVm": "Продолжить на другой ВМ"
+  "next.rowMenu.moveVm": "Продолжить на другой ВМ",
+  "next.chrome.name": "Chrome агента",
+  "next.chrome.hint": "Браузер, которым управляет агент, вживую",
+  "next.chrome.tabs": "Вкладки Chrome",
+  "next.chrome.screen": "Экран Chrome: клики и клавиши уходят в него",
+  "next.chrome.waiting": "Подключаюсь к Chrome…",
+  "next.chrome.down": "Chrome не отвечает. Он должен быть запущен с --remote-debugging-port (адрес задаёт RUNTIME_CHROME_CDP).",
+  "next.chrome.state.connecting": "Подключаюсь",
+  "next.chrome.state.up": "Подключено",
+  "next.chrome.state.down": "Нет связи с Chrome"
 }

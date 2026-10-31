@@ -2120,10 +2120,12 @@ const (
 	// moves or cancels that, and a turn a restart cut short goes on by itself (runtime settings limitContinue,
 	// restartContinue).
 	FeatureAutoContinue Feature = "auto-continue"
+	// FeatureChrome: the machine shows the Chrome its agents drive (a chrome MCP) live in the pane, over /api/chrome.
+	FeatureChrome Feature = "chrome"
 )
 
 // Features is every Feature, in the schema's order.
-var Features = []Feature{FeatureQueue, FeatureSteer, FeatureQuestions, FeaturePermissions, FeatureBackground, FeatureModel, FeatureVoice, FeatureFiles, FeatureCheckpoints, FeatureDesignly, FeatureSearch, FeatureVault, FeaturePush, FeatureTerminal, FeatureMachine, FeatureApps, FeatureSettings, FeatureDrafts, FeatureQueueMove, FeatureAppsHub, FeatureTerminalStop, FeatureRewind, FeatureFork, FeatureHandoff, FeatureAutoContinue}
+var Features = []Feature{FeatureQueue, FeatureSteer, FeatureQuestions, FeaturePermissions, FeatureBackground, FeatureModel, FeatureVoice, FeatureFiles, FeatureCheckpoints, FeatureDesignly, FeatureSearch, FeatureVault, FeaturePush, FeatureTerminal, FeatureMachine, FeatureApps, FeatureSettings, FeatureDrafts, FeatureQueueMove, FeatureAppsHub, FeatureTerminalStop, FeatureRewind, FeatureFork, FeatureHandoff, FeatureAutoContinue, FeatureChrome}
 
 // Reach is whether the cluster hears a machine; standalone it is always online.
 type Reach string
