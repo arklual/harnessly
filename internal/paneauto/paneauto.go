@@ -1,5 +1,6 @@
 // Package paneauto opens in the right pane what the agent of a conversation works on, without being asked: a design of
-// the machine's library whose files it writes, a document it publishes or a board it draws on the workspace's portal.
+// the machine's library whose files it writes, a document it publishes, a board it draws on the workspace's portal or
+// the machine's Chrome it drives through a chrome MCP.
 // It reads the conversation's finished tool calls and keeps a pane intent for the thing (the same intents `open`
 // keeps), once per conversation: the next edit of a design changes nothing (its board updates by itself), the next
 // publication of a document asks a tab that shows it to reload. Conservative on purpose: only the pane's own apps, only
@@ -39,6 +40,8 @@ type Env struct {
 	// Changed is told of a tab whose intents changed (the sync socket's "pane-intents").
 	Changed func(tabID string)
 	Now     func() time.Time
+	// Chrome: the machine shows its Chrome in the pane; a call of a chrome MCP opens it.
+	Chrome bool
 }
 
 // Found is a thing of the pane a call worked on.
@@ -57,12 +60,24 @@ var (
 	boardEditRe = regexp.MustCompile(`(?:^|[\s;&|(/])[\w-]*board\s+(?:create|edit|bind)\b`)
 )
 
+// IsChromeTool says whether a tool is one of a chrome MCP (mcp__chrome__click, mcp__chrome-devtools__navigate_page).
+func IsChromeTool(tool string) bool {
+	rest, ok := strings.CutPrefix(tool, "mcp__")
+	if !ok {
+		return false
+	}
+	server, _, ok := strings.Cut(rest, "__")
+	return ok && strings.Contains(strings.ToLower(server), "chrome")
+}
+
 // Detect is what a finished, successful tool call worked on; nothing for any other entry.
 func Detect(e wire.Entry, env Env) []Found {
 	if e.T != wire.EntryTool || e.OK == nil || !*e.OK {
 		return nil
 	}
 	switch {
+	case env.Chrome && IsChromeTool(e.Tool):
+		return []Found{{Tab: "chrome"}}
 	case editTools[e.Tool]:
 		if env.DesignOf == nil {
 			return nil

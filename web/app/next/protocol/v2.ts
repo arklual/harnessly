@@ -35,6 +35,7 @@ export const FEATURES = [
   'handoff',
   'auto-continue',
   'made',
+  'chrome',
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 export const REACHES = ['online', 'unreachable', 'unknown'] as const;
