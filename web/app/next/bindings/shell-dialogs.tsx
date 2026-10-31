@@ -5,15 +5,17 @@ import { ProjectSafeAccess } from '@/next/bindings/project-safe-access';
 import { useProjectBrowserSettings } from '@/next/features/browser/project-browser-settings';
 import { useMemo, useState } from 'react';
 import { failureText, settled, pageText } from '@/next/bindings/outcome';
-import { createProject, resumeSession, updateProject } from '@/next/commands';
+import { createProject, deleteProject, resumeSession, updateProject } from '@/next/commands';
 import { loadDirs, loadSessions } from '@/next/commands/pages';
 import NewProjectDialog from '@/next/features/sidebar/new-project-dialog';
 import ProjectSettingsDialog, { type IProjectFolder } from '@/next/features/sidebar/project-settings-dialog';
-import { useProjects } from '@/next/stores/projects';
+import { projectKey, useProjects } from '@/next/stores/projects';
+import { conversationsStore } from '@/next/stores/conversations';
+import { useAll, type KeyedStore } from '@/next/core/store';
 import { newProfileProjectId, withProject } from '@/next/features/sidebar/profile-layout';
 import { editProfileSidebar } from '@/next/stores/profile-sidebar';
 import ResumeDialog, { type IResumeSession } from '@/next/features/shell/resume-dialog';
-import type { AgentSession, ConvId, MachineId } from '@/next/protocol/v2';
+import type { AgentSession, ConvId, Conversation, MachineId } from '@/next/protocol/v2';
 import { plural, t } from '@/next/i18n';
 
 const sessionOf = (session: AgentSession, machine: string): IResumeSession => ({
@@ -27,6 +29,23 @@ const sessionOf = (session: AgentSession, machine: string): IResumeSession => ({
   at: session.updatedAt,
   off: false,
 });
+
+type TChatCount = { count: number; working: number };
+
+const chatsOfProjects = (s: KeyedStore<ConvId, Conversation>) => {
+  const out = new Map<string, TChatCount>();
+  for (const c of s.values()) {
+    if (c.projectId === null) continue;
+    const key = projectKey(c.machineId, c.projectId);
+    const n = out.get(key) ?? { count: 0, working: 0 };
+    out.set(key, { count: n.count + 1, working: n.working + (c.state.k === 'working' ? 1 : 0) });
+  }
+  return out;
+};
+
+const sameCounts = (a: Map<string, TChatCount>, b: Map<string, TChatCount>) =>
+  a.size === b.size &&
+  [...a].every(([k, n]) => b.get(k)?.count === n.count && b.get(k)?.working === n.working);
 
 /** «Новый проект»: on the machine, or the person's, whose folders come on a machine as its chats do. */
 export const useProjectDialog = (machine: MachineId | null, person: boolean) => {
@@ -68,6 +87,13 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
   );
 
   const [folders, setFolders] = useState<IProjectFolder[] | null>(null);
+  // the chats of every project as the sidebar has them, what «Удалить проект» asks about; counted for all projects, as
+  // the store's selection is kept by its version alone and must not depend on which one is open
+  const counts = useAll(conversationsStore, chatsOfProjects, sameCounts);
+  const counted = machine && openId !== null ? counts.get(projectKey(machine, openId)) : undefined;
+  const all = counted?.count ?? 0;
+  const working = counted?.working ?? 0;
+  const chats = useMemo(() => ({ count: all, working }), [all, working]);
 
   // the machine's folders are asked each time it opens: a folder made since is offered too
   const show =
@@ -90,6 +116,7 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
         project && <ProjectSafeAccess machine={machine} project={project.id} onEdit={() => setOpenId(null)} />
       }
       folders={folders}
+      chats={chats}
       onClose={() => setOpenId(null)}
       onSave={async (change) => {
         if (!project) return;
@@ -98,6 +125,11 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
         if (change.path && st.failure.r === 'refused' && st.failure.code === 'not-found')
           throw new Error(t('next.projectSettings.pathMissing'));
         throw new Error(failureText(st.failure));
+      }}
+      onDelete={async (fate) => {
+        if (!project) return;
+        const st = await deleteProject(machine, project.id, fate).done;
+        if (st.k === 'failed') throw new Error(failureText(st.failure));
       }}
     />
   );
