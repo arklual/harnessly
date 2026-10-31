@@ -149,7 +149,8 @@ type Proc struct {
 
 // Uploads finds the files the page uploaded before it sent.
 type Uploads interface {
-	// Resolve is the attachments of ids and the paths of their pictures; a refuse code when one is missing or wrong.
+	// Resolve is the attachments of ids and their paths on the machine, one per attachment; a refuse code when one is
+	// missing or wrong.
 	Resolve(ids []string) ([]wire.AttachmentRef, []string, wire.RefuseCode)
 }
 

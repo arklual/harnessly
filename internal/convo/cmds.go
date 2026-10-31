@@ -220,22 +220,32 @@ func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
 		return wire.Refused(wire.RefuseForbidden)
 	}
 	d := outbox.Draft{ClientID: m.ClientID, Text: m.Text, Mode: m.Mode, Kind: m.Kind, Attachments: []wire.AttachmentRef{}}
+	var files []attach.Item
 	if len(m.AttachmentIDs) > 0 {
 		if c.d.Uploads == nil {
 			return wire.Refused(wire.RefuseAttachmentMissing)
 		}
-		refs, images, code := c.d.Uploads.Resolve(m.AttachmentIDs)
+		refs, paths, code := c.d.Uploads.Resolve(m.AttachmentIDs)
 		if code != "" {
 			return wire.Refused(code)
 		}
-		d.Attachments, d.Images = refs, images
+		d.Attachments, d.Images = refs, []string{}
+		for i, ref := range refs {
+			if ref.Kind == wire.AttachmentImage {
+				d.Images = append(d.Images, paths[i])
+				continue
+			}
+			// A file that is not a picture cannot be pasted: the agent reads its path in the block under the words.
+			files = append(files, attach.Item{Ref: wire.MessageRef{Kind: wire.RefFile, ID: paths[i], Title: ref.Name},
+				Line: attach.FileLine(ref.Name, paths[i])})
+		}
 	}
-	if len(m.Refs) > 0 {
-		block, code := c.refsBlock(m.Refs)
+	if len(m.Refs) > 0 || len(files) > 0 {
+		items, code := c.refItems(m.Refs)
 		if code != "" {
 			return wire.Refused(code)
 		}
-		d.Text, d.Refs = attach.With(m.Text, block), slices.Clone(m.Refs)
+		d.Text, d.Refs = attach.With(m.Text, attach.Block(append(files, items...))), slices.Clone(m.Refs)
 	}
 	ch, code := c.box.Send(d, c.rec.State, now)
 	r := c.result(ch, code, wire.ResultQueued, now)
@@ -258,30 +268,30 @@ func (c *conv) send(m wire.SendCmd, now time.Time) wire.CmdResult {
 	return r
 }
 
-// refsBlock is the block of the places a message points at, as the agent reads it under the person's words. A design is
+// refItems are the lines of the places a message points at, as the agent reads them under the person's words. A design is
 // named by the machine's library (Deps.Refs), which also notes this conversation among the design's chats.
-func (c *conv) refsBlock(refs []wire.MessageRef) (string, wire.RefuseCode) {
+func (c *conv) refItems(refs []wire.MessageRef) ([]attach.Item, wire.RefuseCode) {
 	items := make([]attach.Item, 0, len(refs))
 	for _, r := range refs {
 		line, body := attach.LineOf(r), ""
 		if r.Kind == wire.RefChat {
 			var code wire.RefuseCode
 			if line, body, code = c.chatRef(r); code != "" {
-				return "", code
+				return nil, code
 			}
 		}
 		if r.Kind == wire.RefDesign {
 			if c.d.Refs == nil {
-				return "", wire.RefuseUnsupported
+				return nil, wire.RefuseUnsupported
 			}
 			var code wire.RefuseCode
 			if line, code = c.d.Refs.Line(c.rec.ID, r); code != "" {
-				return "", code
+				return nil, code
 			}
 		}
 		items = append(items, attach.Item{Ref: r, Line: line, Body: body})
 	}
-	return attach.Block(items), ""
+	return items, ""
 }
 
 // ChatRefBudget is how many characters of another chat a message carries under its words (about 6 000 tokens).

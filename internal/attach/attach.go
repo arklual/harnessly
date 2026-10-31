@@ -125,6 +125,12 @@ func LineOf(r wire.MessageRef) string {
 	return quoted(r.Title) + " — " + target
 }
 
+// FileLine is the line of a file the person attached to the message: its name and where it lies on the machine.
+func FileLine(name, path string) string {
+	return locale.Pick("Attached file ", "Приложенный файл ") + quoted(name) + " — " + OneLine(path) +
+		locale.Pick(" (read it before you answer).", " (прочитай его, прежде чем отвечать).")
+}
+
 // blockAtEnd is the block as With leaves it: at the very end of the text, after a blank line or alone.
 var blockAtEnd = regexp.MustCompile(`(?:^|\n\n)<attached>\n(?s:.*?)\n</attached>\s*$`)
 

@@ -222,3 +222,43 @@ func TestTheIndexLeavesOutTheAttachedBlock(t *testing.T) {
 		t.Fatalf("%+v %v", d, ok)
 	}
 }
+
+type fakeUploads map[string]wire.AttachmentRef
+
+func (u fakeUploads) Resolve(ids []string) ([]wire.AttachmentRef, []string, wire.RefuseCode) {
+	var refs []wire.AttachmentRef
+	var paths []string
+	for _, id := range ids {
+		ref, ok := u[id]
+		if !ok {
+			return nil, nil, wire.RefuseAttachmentMissing
+		}
+		refs, paths = append(refs, ref), append(paths, "/up/"+id)
+	}
+	return refs, paths, ""
+}
+
+// A file that is not a picture reaches the agent as its path in the block; a message of only such a file is not empty.
+func TestSendCarriesThePathOfAnAttachedFile(t *testing.T) {
+	r := newRig(t)
+	r.rt = NewInline(Deps{MachineID: "m1", Publisher: r.pub, Machine: r.machine, Launcher: r.launcher, Clock: r.clock,
+		Store: NewStore(filepath.Join(r.dir, "v2")), Limits: wire.DefaultLimits,
+		Uploads: fakeUploads{
+			"up_PDF": {ID: "up_PDF", Name: "hw.pdf", Kind: wire.AttachmentFile, Mime: "application/pdf"},
+			"up_PIC": {ID: "up_PIC", Name: "a.png", Kind: wire.AttachmentImage, Mime: "image/png"},
+		}})
+	r.open()
+	res := r.do(wire.SendCmd{OpID: "m1", ClientID: "m1", ConversationID: r.id, Text: "", Mode: wire.ModeQueue,
+		Kind: wire.KindPrompt, AttachmentIDs: []string{"up_PDF", "up_PIC"}})
+	if res.R != wire.ResultQueued && res.R != wire.ResultAccepted {
+		t.Fatalf("send: %+v", res)
+	}
+	text := r.message("m1").Text
+	if !strings.HasPrefix(text, "<attached>\n") || !strings.Contains(text, `<ref kind="file" id="/up/up_PDF" title="hw.pdf"/> `) ||
+		strings.Contains(text, "up_PIC") {
+		t.Errorf("the file's path is not in the words:\n%s", text)
+	}
+	if got := attach.Strip(text); got != "" {
+		t.Errorf("the words without the block: %q", got)
+	}
+}
