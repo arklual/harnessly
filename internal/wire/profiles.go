@@ -9,14 +9,15 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
-// Backend profiles: another vendor's models (Kimi, GLM, Grok, ChatGPT) behind one of the agent CLIs the machine has. A
-// profile is no Provider: a Kimi, GLM or ChatGPT chat is `provider: claude` and a Grok chat `provider: codex`, and
-// `profile` names the vendor setup it runs on. Everything here is optional and goes only to a page that names the `profiles` cap.
+// Backend profiles: another vendor's models (Kimi, GLM, Grok) behind one of the agent CLIs the machine has. A profile is
+// no Provider: a Kimi or GLM chat is `provider: claude` and a Grok chat `provider: codex`, and `profile` names the
+// vendor setup it runs on. Everything here is optional and goes only to a page that names the `profiles` cap.
 //
 // The key of a profile stays on the machine. The wire and the page see a masked tail («…3456») and whether a key is
 // saved, never the key: it travels once, in the body of PUT .../key, and is not echoed.
@@ -35,12 +36,11 @@ const (
 	VendorKimi ProfileVendor = "kimi"
 	VendorGLM  ProfileVendor = "glm"
 	VendorGrok ProfileVendor = "grok"
-	// VendorChatGPT: the models of a ChatGPT subscription, through a proxy on the machine that holds its sign-in.
-	VendorChatGPT ProfileVendor = "chatgpt"
+	VendorGPT  ProfileVendor = "gpt"
 )
 
 // ProfileVendors is every ProfileVendor, in the schema's order.
-var ProfileVendors = []ProfileVendor{VendorKimi, VendorGLM, VendorGrok, VendorChatGPT}
+var ProfileVendors = []ProfileVendor{VendorKimi, VendorGLM, VendorGrok, VendorGPT}
 
 // ProfileOffer is a profile a machine can start a conversation on, as MachineAgent.Profiles lists it under the agent
 // CLI the profile runs through. Models are the profile's own (ids of the vendor), and a conversation of the profile
@@ -103,19 +103,84 @@ type ProfileInfo struct {
 	Hint   string        `json:"hint"`
 	Key    ProfileKey    `json:"key"`
 	Models []AgentModel  `json:"models"`
-	// Login is the vendor CLI's own sign-in the profile runs on while no key is saved (the Grok CLI's for xai); absent
-	// while the CLI is not signed in, and from a runtime that does not read it.
+	// Login is the vendor CLI's own sign-in the profile runs on while no key is saved (the Grok CLI's for xai, the Codex
+	// CLI's for gpt); absent while the CLI is not signed in, and from a runtime that does not read it.
 	Login *ProfileLogin `json:"login,omitempty"`
-	// Proxy is the program on the machine the profile reaches the vendor through (claude-code-proxy for ChatGPT); absent
-	// for a profile that goes to the vendor itself.
-	Proxy *ProfileProxy `json:"proxy,omitempty"`
+	// Switch is present on a profile that takes no key but is turned on and off (gpt: a local proxy over the Codex
+	// CLI's ChatGPT sign-in); absent on the others.
+	Switch *ProfileSwitch `json:"switch,omitempty"`
 }
 
-// ProfileProxy is the local program a profile runs through: whether it is installed. The profile takes no key; its
-// sign-in is the program's own (POST .../<id>/login).
-type ProfileProxy struct {
-	Installed bool `json:"installed"`
+// ProfileSwitch is whether the person turned a switched profile on. On says nothing of whether it can run now: the
+// offer's `configured` does (on, the CLI signed in, the proxy up).
+type ProfileSwitch struct {
+	On bool `json:"on"`
 }
+
+// ProfileSwitchEdit is the body of PUT /api/v2/providers/<id>/switch; `on` is required.
+type ProfileSwitchEdit struct {
+	On *bool `json:"on"`
+}
+
+// MaxProfileSwitchBody is the largest PUT .../switch body.
+const MaxProfileSwitchBody = 256
+
+func (e ProfileSwitchEdit) Validate() error {
+	if e.On == nil {
+		return errors.New("on: missing")
+	}
+	return nil
+}
+
+// ProfileSwitchReason is why a switch could not be turned on.
+type ProfileSwitchReason string
+
+const (
+	// SwitchNoLogin: the vendor CLI is not signed in by a subscription (gpt: no ChatGPT sign-in of Codex).
+	SwitchNoLogin ProfileSwitchReason = "no-login"
+	// SwitchDownload: the proxy could not be downloaded or did not match its pinned digest.
+	SwitchDownload ProfileSwitchReason = "download"
+	// SwitchStart: the proxy did not start or did not answer in time.
+	SwitchStart ProfileSwitchReason = "start"
+)
+
+// ProfileSwitchReasons is every ProfileSwitchReason, in the schema's order.
+var ProfileSwitchReasons = []ProfileSwitchReason{SwitchNoLogin, SwitchDownload, SwitchStart}
+
+// ProfileSwitchError is what a ProfileSwitcher refuses to turn a switch on with; the switch stays off.
+type ProfileSwitchError struct {
+	Reason  ProfileSwitchReason
+	Message string
+}
+
+func (e *ProfileSwitchError) Error() string { return e.Message }
+
+// switchRefusal is the code a reason is refused with.
+var switchRefusal = map[ProfileSwitchReason]RefuseCode{SwitchNoLogin: RefuseConflict, SwitchDownload: RefuseInternal, SwitchStart: RefuseInternal}
+
+// ProfileSwitchRefusal is the answer of a switch that did not go on: the code of the protocol, why, and a message in
+// the runtime's words (English, for the log; the page words the reason itself).
+type ProfileSwitchRefusal struct {
+	R       ResultKind          `json:"r"`
+	Code    RefuseCode          `json:"code"`
+	Reason  ProfileSwitchReason `json:"reason"`
+	Message string              `json:"message"`
+}
+
+func (m ProfileSwitchRefusal) Validate() error {
+	return errors.Join(in("r", m.R, []ResultKind{ResultRefused}), in("code", m.Code, RefuseCodes),
+		in("reason", m.Reason, ProfileSwitchReasons), need("message", m.Message))
+}
+
+// ProfileSwitcher is a ProfilesSource whose switched profiles can be turned on and off. SwitchProfile answers the
+// profile as GET lists it once the switch took: turned on, it waits for the proxy to answer (the first time also for
+// its download), so the caller gives it SwitchTimeout. It refuses with a *ProfileSwitchError.
+type ProfileSwitcher interface {
+	SwitchProfile(ctx context.Context, id string, on bool) (ProfileInfo, error)
+}
+
+// SwitchTimeout bounds a PUT .../switch: the first one downloads the proxy.
+const SwitchTimeout = 3 * time.Minute
 
 // ProfileLogin is a sign-in of the vendor's CLI on the machine: whom it is of (an email; "" when the CLI does not say).
 // The credential stays with the CLI.
@@ -126,6 +191,9 @@ type ProfileLogin struct {
 func (p ProfileInfo) Validate() error {
 	errs := []error{profileIDErr(p.ID), need("label", p.Label), in("vendor", p.Vendor, ProfileVendors), in("via", p.Via, Providers),
 		need("host", p.Host), under("key", p.Key.Validate())}
+	if p.Switch != nil && p.Key.Configured {
+		errs = append(errs, errors.New("switch: a switched profile takes no key"))
+	}
 	for i, m := range p.Models {
 		errs = append(errs, under("models["+strconv.Itoa(i)+"]", m.Validate()))
 	}
@@ -227,12 +295,8 @@ func (t ProfileTest) Validate() error {
 	return errors.Join(errs...)
 }
 
-var (
-	// ErrProfileUnknown: the runtime has no profile of that id.
-	ErrProfileUnknown = errors.New("wire: no such profile")
-	// ErrProfileNoKey: the profile takes no key (it runs on a sign-in of its proxy), or no sign-in from the page.
-	ErrProfileNoKey = errors.New("wire: the profile takes no key")
-)
+// ErrProfileUnknown: the runtime has no profile of that id.
+var ErrProfileUnknown = errors.New("wire: no such profile")
 
 // ProfilesSource keeps the profiles of this machine and their keys.
 type ProfilesSource interface {
@@ -245,20 +309,8 @@ type ProfilesSource interface {
 	TestProfile(ctx context.Context, id string) (ProfileTest, error)
 }
 
-// ProfileLoginSource signs in and out the proxy a profile runs through (ProfileInfo.Proxy), with the same flows as an
-// agent CLI's sign-in: the flow carries the profile's id and its `via`, and is a device flow.
-type ProfileLoginSource interface {
-	// ProfileLogin is the last flow of the profile (or the one on).
-	ProfileLogin(ctx context.Context, id string) (LoginStatus, error)
-	StartProfileLogin(ctx context.Context, id string) (LoginStatus, error)
-	CancelProfileLogin(ctx context.Context, id string) (LoginStatus, error)
-	// ProfileLogout signs the proxy out.
-	ProfileLogout(ctx context.Context, id string) error
-}
-
 // profiles serves /api/v2/providers: GET lists the profiles, PUT and DELETE .../<id>/key save and remove a key, POST
-// .../<id>/test tries the connection; GET, POST and DELETE .../<id>/login and POST .../<id>/logout sign a profile's
-// proxy in and out (ProfileLoginSource). Saving a key changes a file of the person's, so every write is refused to other
+// .../<id>/test tries the connection. Saving a key changes a file of the person's, so every write is refused to other
 // origins (origin.go). The body of a PUT is not logged and the key is not echoed.
 func (s *Server) profiles(w http.ResponseWriter, r *http.Request, rest string) {
 	if s.Profiles == nil {
@@ -279,15 +331,11 @@ func (s *Server) profiles(w http.ResponseWriter, r *http.Request, rest string) {
 		return
 	}
 	parts := strings.Split(rest, "/")
-	if len(parts) != 2 || !ValidProfileID(parts[0]) || !slices.Contains([]string{"key", "test", "login", "logout"}, parts[1]) {
+	if len(parts) != 2 || !ValidProfileID(parts[0]) || (parts[1] != "key" && parts[1] != "test" && parts[1] != "switch") {
 		refuse(w, RefuseNotFound)
 		return
 	}
 	id := parts[0]
-	if parts[1] == "login" || parts[1] == "logout" {
-		s.profileLogins(w, r, id, parts[1])
-		return
-	}
 	switch {
 	case parts[1] == "key" && r.Method == http.MethodPut:
 		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxProfileKeyBody))
@@ -310,44 +358,36 @@ func (s *Server) profiles(w http.ResponseWriter, r *http.Request, rest string) {
 	case parts[1] == "test" && r.Method == http.MethodPost:
 		got, err := s.Profiles.TestProfile(r.Context(), id)
 		s.profileAnswer(w, r, got, err)
+	case parts[1] == "switch" && r.Method == http.MethodPut:
+		sw, ok := s.Profiles.(ProfileSwitcher)
+		if !ok {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxProfileSwitchBody))
+		var edit ProfileSwitchEdit
+		if err == nil {
+			err = decodeStrict(raw, &edit)
+		}
+		if err == nil {
+			err = edit.Validate()
+		}
+		if err != nil {
+			refuse(w, RefuseBadRequest)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), SwitchTimeout)
+		defer cancel()
+		got, err := sw.SwitchProfile(ctx, id, *edit.On)
+		var se *ProfileSwitchError
+		if errors.As(err, &se) {
+			code := switchRefusal[se.Reason]
+			writeJSON(w, refusalStatus[code], ProfileSwitchRefusal{R: ResultRefused, Code: code, Reason: se.Reason, Message: se.Message})
+			return
+		}
+		s.profileAnswer(w, r, got, err)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
-}
-
-// profileLogins serves .../<id>/login and .../<id>/logout.
-func (s *Server) profileLogins(w http.ResponseWriter, r *http.Request, id, route string) {
-	if s.ProfileLogins == nil {
-		refuse(w, RefuseNotFound)
-		return
-	}
-	var status LoginStatus
-	var err error
-	switch {
-	case route == "login" && r.Method == http.MethodGet:
-		status, err = s.ProfileLogins.ProfileLogin(r.Context(), id)
-	case route == "login" && r.Method == http.MethodPost:
-		status, err = s.ProfileLogins.StartProfileLogin(r.Context(), id)
-	case route == "login" && r.Method == http.MethodDelete:
-		status, err = s.ProfileLogins.CancelProfileLogin(r.Context(), id)
-	case route == "logout" && r.Method == http.MethodPost:
-		s.profileLoginAnswer(w, r, LoginOK{OK: true}, s.ProfileLogins.ProfileLogout(r.Context(), id))
-		return
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	s.profileLoginAnswer(w, r, status, err)
-}
-
-func (s *Server) profileLoginAnswer(w http.ResponseWriter, r *http.Request, v interface{ Validate() error }, err error) {
-	switch {
-	case errors.Is(err, ErrProfileUnknown):
-		refuse(w, RefuseNotFound)
-	case errors.Is(err, ErrProfileNoKey):
-		refuse(w, RefuseUnsupported)
-	default:
-		s.loginAnswer(w, r, v, err)
 	}
 }
 
@@ -363,8 +403,6 @@ func (s *Server) profilesFailed(w http.ResponseWriter, r *http.Request, err erro
 	switch {
 	case errors.Is(err, ErrProfileUnknown):
 		refuse(w, RefuseNotFound)
-	case errors.Is(err, ErrProfileNoKey):
-		refuse(w, RefuseUnsupported)
 	case r.Context().Err() != nil || errors.Is(err, context.DeadlineExceeded):
 		refuse(w, RefuseTimeout)
 	default:

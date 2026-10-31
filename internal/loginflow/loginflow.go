@@ -1,6 +1,6 @@
-// Package loginflow signs the machine's agent CLIs, and the proxies of the backend profiles that run through one, in and
-// out for the page. The program does the signing in; the service drives it through a terminal of its own and lets the
-// page see only what the person needs: the vendor's link, the one-time code of a device flow, and where the flow is.
+// Package loginflow signs the machine's agent CLIs in and out for the page. The CLI does the signing in; the service
+// drives it through a terminal of its own and lets the page see only what the person needs: the vendor's link, the
+// one-time code of a device flow, and where the flow is.
 //
 // What it keeps from the CLI's output is the link and that code, taken before anything is typed; after that the output
 // is read and thrown away. A code the person pastes back goes to the terminal's input and is dropped; an API key goes
@@ -57,59 +57,30 @@ type Config struct {
 	Env func() []string
 	// OnChange is told when an account changed: a flow ended in a sign-in, a key was saved, the CLI signed out.
 	OnChange func(p wire.Provider)
-	// ProfileBin finds the proxy of a profile (profileFlows); an error means it is not installed. nil: no profile signs in.
-	ProfileBin func(id string) (string, error)
-	// OnProfileChange is told when a profile's proxy signed in or out.
-	OnProfileChange func(id string)
 	// Now is the clock; nil is the system's.
 	Now func() time.Time
 }
 
-// Service is the wire's LoginSource over the CLIs, and its ProfileLoginSource over the profiles' proxies.
+// Service is the wire's LoginSource over the CLIs.
 type Service struct {
 	cfg Config
 
 	mu    sync.Mutex
-	flows map[who]*flow
-	log   map[who][]time.Time
+	flows map[wire.Provider]*flow
+	log   map[wire.Provider][]time.Time
 }
 
-var (
-	_ wire.LoginSource        = (*Service)(nil)
-	_ wire.ProfileLoginSource = (*Service)(nil)
-)
+var _ wire.LoginSource = (*Service)(nil)
 
 // New is a service over cfg.
 func New(cfg Config) *Service {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &Service{cfg: cfg, flows: map[who]*flow{}, log: map[who][]time.Time{}}
-}
-
-// who is whose sign-in a flow is: an agent CLI's, or (profile set) the proxy's of a profile that runs through it.
-type who struct {
-	provider wire.Provider
-	profile  string
-}
-
-// profileFlow is how the proxy of a profile signs in: the CLI it runs through, the arguments that sign it in and out
-// (always with a device code), and how its link and its code read.
-type profileFlow struct {
-	via            wire.Provider
-	login, logout  []string
-	link, codeLine *regexp.Regexp
-}
-
-// profileFlows are the profiles whose proxy signs in from the page. Fixed here: nothing of the page goes into them.
-var profileFlows = map[string]profileFlow{
-	// claude-code-proxy prints «Visit: https://auth.openai.com/codex/device» and «Enter code: XXXX-XXXXX».
-	"chatgpt": {via: wire.ProviderClaude, login: []string{"codex", "auth", "device"}, logout: []string{"codex", "auth", "logout"},
-		link: codexRE, codeLine: proxyCodeRE},
+	return &Service{cfg: cfg, flows: map[wire.Provider]*flow{}, log: map[wire.Provider][]time.Time{}}
 }
 
 type flow struct {
-	who  who
 	view wire.LoginFlow
 	// in is the terminal's input: set while the flow can take a code.
 	term   *os.File
@@ -140,17 +111,13 @@ func newID() string {
 func (s *Service) ms() wire.Ms { return wire.Ms(s.cfg.Now().UnixMilli()) }
 
 func (s *Service) Login(_ context.Context, p wire.Provider) (wire.LoginStatus, error) {
-	return s.status(who{provider: p}), nil
-}
-
-func (s *Service) status(w who) wire.LoginStatus {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.statusLocked(w)
+	return s.statusLocked(p), nil
 }
 
-func (s *Service) statusLocked(w who) wire.LoginStatus {
-	f, ok := s.flows[w]
+func (s *Service) statusLocked(p wire.Provider) wire.LoginStatus {
+	f, ok := s.flows[p]
 	if !ok {
 		return wire.LoginStatus{}
 	}
@@ -172,50 +139,28 @@ func (s *Service) StartLogin(ctx context.Context, p wire.Provider, mode wire.Log
 	if !ok {
 		return wire.LoginStatus{}, wire.ErrLoginUnsupported
 	}
-	return s.start(ctx, who{provider: p}, mode, args)
-}
-
-// bin finds the program of a sign-in; ErrLoginNotInstalled when it is not on the machine.
-func (s *Service) bin(w who) (string, error) {
-	var bin string
-	var err error
-	switch {
-	case w.profile == "":
-		bin, err = s.cfg.Bin(w.provider)
-	case s.cfg.ProfileBin == nil:
-		return "", wire.ErrLoginUnsupported
-	default:
-		bin, err = s.cfg.ProfileBin(w.profile)
-	}
+	bin, err := s.cfg.Bin(p)
 	if err != nil {
-		return "", wire.ErrLoginNotInstalled
-	}
-	return bin, nil
-}
-
-func (s *Service) start(ctx context.Context, w who, mode wire.LoginMode, args []string) (wire.LoginStatus, error) {
-	bin, err := s.bin(w)
-	if err != nil {
-		return wire.LoginStatus{}, err
+		return wire.LoginStatus{}, wire.ErrLoginNotInstalled
 	}
 	s.mu.Lock()
-	if f, ok := s.flows[w]; ok && f.live() {
+	if f, ok := s.flows[p]; ok && f.live() {
 		s.mu.Unlock()
 		return wire.LoginStatus{}, wire.ErrLoginBusy
 	}
 	now := s.cfg.Now()
-	recent := s.log[w][:0:0]
-	for _, t := range s.log[w] {
+	recent := s.log[p][:0:0]
+	for _, t := range s.log[p] {
 		if now.Sub(t) < StartWindow {
 			recent = append(recent, t)
 		}
 	}
 	if len(recent) >= StartsPer {
-		s.log[w] = recent
+		s.log[p] = recent
 		s.mu.Unlock()
 		return wire.LoginStatus{}, wire.ErrLoginRate
 	}
-	s.log[w] = append(recent, now)
+	s.log[p] = append(recent, now)
 
 	fctx, cancel := context.WithTimeout(context.Background(), FlowTimeout)
 	cmd := exec.CommandContext(fctx, bin, args...)
@@ -229,10 +174,10 @@ func (s *Service) start(ctx context.Context, w who, mode wire.LoginMode, args []
 		return wire.LoginStatus{}, err
 	}
 	started := s.ms()
-	f := &flow{who: w, cancel: cancel, term: term, done: make(chan struct{}),
-		view: wire.LoginFlow{ID: newID(), Provider: w.provider, Profile: w.profile, Mode: mode, State: wire.LoginStarting,
-			Input: inputOf(mode), StartedAt: started, ExpiresAt: started + wire.Ms(FlowTimeout.Milliseconds())}}
-	s.flows[w] = f
+	f := &flow{cancel: cancel, term: term, done: make(chan struct{}),
+		view: wire.LoginFlow{ID: newID(), Provider: p, Mode: mode, State: wire.LoginStarting, Input: inputOf(mode),
+			StartedAt: started, ExpiresAt: started + wire.Ms(FlowTimeout.Milliseconds())}}
+	s.flows[p] = f
 	s.mu.Unlock()
 
 	linked := make(chan struct{})
@@ -247,7 +192,9 @@ func (s *Service) start(ctx context.Context, w who, mode wire.LoginMode, args []
 		s.finish(f, wire.LoginCancelled, "")
 		f.cancel()
 	}
-	return s.status(w), nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.statusLocked(p), nil
 }
 
 func inputOf(m wire.LoginMode) wire.LoginInput {
@@ -292,8 +239,8 @@ func (s *Service) run(ctx context.Context, f *flow, cmd *exec.Cmd, linked chan s
 	default:
 		f.view.State, f.view.Reason = wire.LoginFailed, ptr(wire.LoginStartFailed)
 	}
-	if f.view.State == wire.LoginDone {
-		go s.changed(f.who)
+	if f.view.State == wire.LoginDone && s.cfg.OnChange != nil {
+		go s.cfg.OnChange(f.view.Provider)
 	}
 }
 
@@ -313,7 +260,7 @@ func (s *Service) grab(f *flow, linked func()) {
 			if len(buf) > grabMax {
 				buf = buf[len(buf)-grabMax:]
 			}
-			if url, code, ok := s.scan(f, buf); ok {
+			if url, code, ok := Scan(f.view.Provider, f.view.Mode, buf); ok {
 				found = true
 				buf = nil
 				s.mu.Lock()
@@ -338,8 +285,6 @@ var (
 	claudeRE = regexp.MustCompile(`https://(?:claude\.com|claude\.ai|platform\.claude\.com|console\.anthropic\.com)/[^\s\x07\x1b"'<>]+`)
 	codexRE  = regexp.MustCompile(`https://auth\.openai\.com/[^\s\x07\x1b"'<>]+`)
 	codeRE   = regexp.MustCompile(`(?m)^\s*([A-Z0-9]{4}-[A-Z0-9]{4,6})\s*$`)
-	// proxyCodeRE is the code as claude-code-proxy prints it, after a label on its line.
-	proxyCodeRE = regexp.MustCompile(`(?m)^\s*Enter code:\s*([A-Z0-9]{4}-[A-Z0-9]{4,6})\s*$`)
 )
 
 // MaxLinkLen bounds a link: the longest the vendors print is under 1 KB.
@@ -348,32 +293,15 @@ const MaxLinkLen = 2048
 // Scan looks through the terminal output for the link of a flow and, for a device flow, its one-time code; ok is false
 // until all the flow needs is in the output.
 func Scan(p wire.Provider, mode wire.LoginMode, out []byte) (url string, code *string, ok bool) {
+	var linkRE *regexp.Regexp
 	switch p {
 	case wire.ProviderClaude:
-		return scanWith(claudeRE, codeRE, mode == wire.LoginDevice, out)
+		linkRE = claudeRE
 	case wire.ProviderCodex:
-		return scanWith(codexRE, codeRE, mode == wire.LoginDevice, out)
-	}
-	return "", nil, false
-}
-
-// ScanProfile is Scan for the device flow of a profile's proxy.
-func ScanProfile(id string, out []byte) (url string, code *string, ok bool) {
-	pf, found := profileFlows[id]
-	if !found {
+		linkRE = codexRE
+	default:
 		return "", nil, false
 	}
-	return scanWith(pf.link, pf.codeLine, true, out)
-}
-
-func (s *Service) scan(f *flow, out []byte) (string, *string, bool) {
-	if f.who.profile != "" {
-		return ScanProfile(f.who.profile, out)
-	}
-	return Scan(f.who.provider, f.view.Mode, out)
-}
-
-func scanWith(linkRE, codeRE *regexp.Regexp, device bool, out []byte) (url string, code *string, ok bool) {
 	for _, m := range osc8RE.FindAllSubmatch(out, -1) {
 		if linkRE.Match(m[1]) && linkRE.FindString(string(m[1])) == string(m[1]) {
 			url = string(m[1])
@@ -387,7 +315,7 @@ func scanWith(linkRE, codeRE *regexp.Regexp, device bool, out []byte) (url strin
 	if url == "" || len(url) > MaxLinkLen {
 		return "", nil, false
 	}
-	if device {
+	if mode == wire.LoginDevice {
 		after := plain[strings.Index(string(plain), url)+len(url):]
 		m := codeRE.FindSubmatch(after)
 		if m == nil {
@@ -407,8 +335,7 @@ func (s *Service) SubmitLoginCode(_ context.Context, p wire.Provider, id, code s
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	w := who{provider: p}
-	f, ok := s.flows[w]
+	f, ok := s.flows[p]
 	if !ok || f.view.ID != id || f.view.State != wire.LoginAwaiting || f.view.Input != wire.LoginInputCode || f.term == nil {
 		return wire.LoginStatus{}, wire.ErrLoginStale
 	}
@@ -418,7 +345,7 @@ func (s *Service) SubmitLoginCode(_ context.Context, p wire.Provider, id, code s
 	}
 	f.view.State = wire.LoginChecking
 	go s.watchCheck(f)
-	return s.statusLocked(w), nil
+	return s.statusLocked(p), nil
 }
 
 // watchCheck gives up on a CLI that does not answer a code.
@@ -437,12 +364,8 @@ func (s *Service) watchCheck(f *flow) {
 
 // CancelLogin ends the flow of a CLI that is on.
 func (s *Service) CancelLogin(_ context.Context, p wire.Provider) (wire.LoginStatus, error) {
-	return s.cancel(who{provider: p}), nil
-}
-
-func (s *Service) cancel(w who) wire.LoginStatus {
 	s.mu.Lock()
-	f, ok := s.flows[w]
+	f, ok := s.flows[p]
 	if ok && f.live() {
 		f.view.State = wire.LoginCancelled
 		f.view.URL, f.view.UserCode = nil, nil
@@ -455,7 +378,7 @@ func (s *Service) cancel(w who) wire.LoginStatus {
 		case <-time.After(3 * time.Second):
 		}
 	}
-	return s.status(w)
+	return s.Login(context.Background(), p)
 }
 
 // finish ends a flow that is on with a state.
@@ -491,20 +414,19 @@ func (s *Service) SaveAPIKey(ctx context.Context, p wire.Provider, key string) e
 	if err := (wire.ProfileKeyEdit{Key: key}).Validate(); err != nil {
 		return wire.ErrLoginInput
 	}
-	w := who{provider: p}
 	s.mu.Lock()
-	if f, ok := s.flows[w]; ok && f.live() {
+	if f, ok := s.flows[p]; ok && f.live() {
 		s.mu.Unlock()
 		return wire.ErrLoginBusy
 	}
 	s.mu.Unlock()
-	if err := s.once(ctx, w, []string{"login", "--with-api-key"}, strings.NewReader(key+"\n")); err != nil {
+	if err := s.once(ctx, p, []string{"login", "--with-api-key"}, strings.NewReader(key+"\n")); err != nil {
 		if errors.Is(err, wire.ErrLoginNotInstalled) {
 			return err
 		}
 		return wire.ErrLoginInput
 	}
-	s.changed(w)
+	s.changed(p)
 	return nil
 }
 
@@ -519,76 +441,28 @@ func (s *Service) Logout(ctx context.Context, p wire.Provider) error {
 	default:
 		return wire.ErrLoginUnsupported
 	}
-	return s.logout(ctx, who{provider: p}, args)
-}
-
-func (s *Service) logout(ctx context.Context, w who, args []string) error {
-	s.cancel(w)
-	if err := s.once(ctx, w, args, nil); err != nil {
+	if _, err := s.CancelLogin(ctx, p); err != nil {
 		return err
 	}
-	s.changed(w)
+	if err := s.once(ctx, p, args, nil); err != nil {
+		return err
+	}
+	s.changed(p)
 	return nil
 }
 
-func (s *Service) changed(w who) {
-	switch {
-	case w.profile != "" && s.cfg.OnProfileChange != nil:
-		s.cfg.OnProfileChange(w.profile)
-	case w.profile == "" && s.cfg.OnChange != nil:
-		s.cfg.OnChange(w.provider)
+func (s *Service) changed(p wire.Provider) {
+	if s.cfg.OnChange != nil {
+		s.cfg.OnChange(p)
 	}
-}
-
-// profileOf is the sign-in of a profile's proxy; ErrProfileNoKey for a profile with no proxy that signs in here.
-func (s *Service) profileOf(id string) (who, profileFlow, error) {
-	pf, ok := profileFlows[id]
-	if !ok || s.cfg.ProfileBin == nil {
-		return who{}, profileFlow{}, wire.ErrProfileNoKey
-	}
-	return who{provider: pf.via, profile: id}, pf, nil
-}
-
-func (s *Service) ProfileLogin(_ context.Context, id string) (wire.LoginStatus, error) {
-	w, _, err := s.profileOf(id)
-	if err != nil {
-		return wire.LoginStatus{}, err
-	}
-	return s.status(w), nil
-}
-
-// StartProfileLogin starts the device flow of a profile's proxy, as StartLogin does a CLI's.
-func (s *Service) StartProfileLogin(ctx context.Context, id string) (wire.LoginStatus, error) {
-	w, pf, err := s.profileOf(id)
-	if err != nil {
-		return wire.LoginStatus{}, err
-	}
-	return s.start(ctx, w, wire.LoginDevice, pf.login)
-}
-
-func (s *Service) CancelProfileLogin(_ context.Context, id string) (wire.LoginStatus, error) {
-	w, _, err := s.profileOf(id)
-	if err != nil {
-		return wire.LoginStatus{}, err
-	}
-	return s.cancel(w), nil
-}
-
-// ProfileLogout signs a profile's proxy out; a flow that is on ends first.
-func (s *Service) ProfileLogout(ctx context.Context, id string) error {
-	w, pf, err := s.profileOf(id)
-	if err != nil {
-		return err
-	}
-	return s.logout(ctx, w, pf.logout)
 }
 
 // once runs a CLI to its end with fixed arguments, its input from in and its output thrown away: the exit status is
 // all that is read.
-func (s *Service) once(ctx context.Context, w who, args []string, in io.Reader) error {
-	bin, err := s.bin(w)
+func (s *Service) once(ctx context.Context, p wire.Provider, args []string, in io.Reader) error {
+	bin, err := s.cfg.Bin(p)
 	if err != nil {
-		return err
+		return wire.ErrLoginNotInstalled
 	}
 	ctx, cancel := context.WithTimeout(ctx, KeyTimeout)
 	defer cancel()

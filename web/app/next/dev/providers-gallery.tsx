@@ -146,15 +146,16 @@ const PRESETS: readonly IPresetState[] = [
     models: [model('grok-build-0.1', 'Grok Build')],
   },
   {
-    id: 'chatgpt',
-    label: 'ChatGPT (подписка)',
-    vendor: 'chatgpt',
+    id: 'gpt',
+    label: 'GPT · подписка ChatGPT',
+    vendor: 'gpt',
     via: 'claude',
     host: 'chatgpt.com',
-    hint: 'Подписка ChatGPT Plus или Pro. Неофициальный клиент: OpenAI может ограничить аккаунт',
+    hint: '',
     key: { configured: false, tail: null },
-    models: [model('gpt-6-sol', 'GPT-6 Sol'), model('gpt-6-luna', 'GPT-6 Luna')],
-    proxy: { installed: true },
+    models: [model('gpt-6.1-sol', 'GPT-6.1 Sol'), model('gpt-6-luna', 'GPT-6 Luna')],
+    login: { account: 'sergey@example.test' },
+    switch: { on: false },
   },
 ];
 
@@ -197,7 +198,6 @@ const SettingsScene = ({ state, check, login }: { state?: string; check?: string
   const [open, setOpen] = useState<string | null>(state === 'empty' ? 'claude' : 'kimi');
   const [loginState, setLoginState] = useState<LoginState>(LOGINS[login ?? 'idle'] ?? LOGINS.idle);
   const [codexKey, setCodexKey] = useState({ configured: login === 'key', tail: null });
-  const [proxyLogin, setProxyLogin] = useState<LoginState>(LOGINS.idle);
   const change = (id: PresetId, patch: Partial<IPresetState>) =>
     setStates((have) => have.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const result = (): TestState => {
@@ -235,7 +235,7 @@ const SettingsScene = ({ state, check, login }: { state?: string; check?: string
         <AccountsSection
           cards={[
             { provider: 'claude', k: 'ready', settings: settingsOf('claude', login === 'connected') },
-            { provider: 'codex', k: 'ready', settings: settingsOf('codex', false) },
+            { provider: 'codex', k: 'ready', settings: settingsOf('codex', login === 'connected') },
           ]}
           credentials={{
             claude: credentials({ configured: false, tail: null }),
@@ -255,17 +255,12 @@ const SettingsScene = ({ state, check, login }: { state?: string; check?: string
               return null;
             },
             onTest: async () => later(result(), 900),
-            proxyLogins: { chatgpt: proxyLogin },
-            onProxyLogin: async () => {
-              setProxyLogin({ k: 'starting' });
-              await later(null, 900);
-              setProxyLogin(LOGINS.device);
-              return null;
-            },
-            onProxyCancel: async () => setProxyLogin(LOGINS.idle),
-            onProxyLogout: async () => {
-              await later(null, 400);
-              change('chatgpt', { login: undefined });
+            // ?gpt=fail: the proxy does not start.
+            onSwitch: async (id, on) => {
+              await later(null, 1400);
+              if (on && new URLSearchParams(window.location.search).get('gpt') === 'fail')
+                return 'Прокси не запустился';
+              change(id, { switch: { on } });
               return null;
             },
           }}

@@ -43,23 +43,6 @@ func (f *fakeLogins) Logout(_ context.Context, p wire.Provider) error {
 	return f.err
 }
 
-func (f *fakeLogins) ProfileLogin(_ context.Context, id string) (wire.LoginStatus, error) {
-	f.calls = append(f.calls, "login "+id)
-	return f.status()
-}
-func (f *fakeLogins) StartProfileLogin(_ context.Context, id string) (wire.LoginStatus, error) {
-	f.calls = append(f.calls, "start "+id)
-	return f.status()
-}
-func (f *fakeLogins) CancelProfileLogin(_ context.Context, id string) (wire.LoginStatus, error) {
-	f.calls = append(f.calls, "cancel "+id)
-	return f.status()
-}
-func (f *fakeLogins) ProfileLogout(_ context.Context, id string) error {
-	f.calls = append(f.calls, "logout "+id)
-	return f.err
-}
-
 func jsonBody(v any) []byte { b, _ := json.Marshal(v); return b }
 
 // The sign-in routes pass the person's choice to the source, answer what it answers and never echo a code or a key.
@@ -145,55 +128,6 @@ func TestLoginPages(t *testing.T) {
 	}
 }
 
-// A profile's proxy signs in on routes of the profile, with the flows of the CLIs' sign-ins.
-func TestProfileLoginPages(t *testing.T) {
-	g := newRig(t, time.Hour)
-	g.srv.Profiles = &fakeProfiles{}
-	if code := g.do("GET", "/api/v2/providers/chatgpt/login", nil, nil); code != http.StatusNotFound {
-		t.Fatalf("a machine without profile sign-ins answers %d", code)
-	}
-	url := "https://auth.openai.com/codex/device"
-	userCode := "ABCD-EFGH1"
-	f := &fakeLogins{flow: &wire.LoginFlow{ID: strings.Repeat("b2", 16), Provider: wire.ProviderClaude, Profile: "chatgpt",
-		Mode: wire.LoginDevice, State: wire.LoginAwaiting, Input: wire.LoginInputNone, URL: &url, UserCode: &userCode, StartedAt: 1, ExpiresAt: 2}}
-	g.srv.ProfileLogins = f
-	var st wire.LoginStatus
-	if code := g.do("POST", "/api/v2/providers/chatgpt/login", nil, &st); code != 200 || st.Validate() != nil || st.Flow == nil || st.Flow.Profile != "chatgpt" {
-		t.Fatalf("start: %d %+v", code, st)
-	}
-	if code := g.do("GET", "/api/v2/providers/chatgpt/login", nil, &st); code != 200 {
-		t.Fatalf("get: %d", code)
-	}
-	if code := g.do("DELETE", "/api/v2/providers/chatgpt/login", nil, &st); code != 200 {
-		t.Fatalf("cancel: %d", code)
-	}
-	var ok wire.LoginOK
-	if code := g.do("POST", "/api/v2/providers/chatgpt/logout", nil, &ok); code != 200 || !ok.OK {
-		t.Fatalf("logout: %d", code)
-	}
-	if got, want := strings.Join(f.calls, "|"), "start chatgpt|login chatgpt|cancel chatgpt|logout chatgpt"; got != want {
-		t.Fatalf("calls %q", got)
-	}
-	if code := g.do("PATCH", "/api/v2/providers/chatgpt/login", nil, nil); code != http.StatusMethodNotAllowed {
-		t.Errorf("wrong method: %d", code)
-	}
-	for name, c := range map[string]struct {
-		err  error
-		want int
-	}{
-		"unknown":       {wire.ErrProfileUnknown, http.StatusNotFound},
-		"no proxy":      {wire.ErrProfileNoKey, 0},
-		"not installed": {wire.ErrLoginNotInstalled, 0},
-		"busy":          {wire.ErrLoginBusy, http.StatusConflict},
-	} {
-		f.err = c.err
-		code := g.do("POST", "/api/v2/providers/chatgpt/logout", nil, nil)
-		if (c.want != 0 && code != c.want) || code == 200 {
-			t.Errorf("%s: %d", name, code)
-		}
-	}
-}
-
 func TestLoginFlowShape(t *testing.T) {
 	url := "https://auth.openai.com/codex/device"
 	code := "ABCD-EFGH1"
@@ -210,13 +144,6 @@ func TestLoginFlowShape(t *testing.T) {
 		"reason not failed":   func(f *wire.LoginFlow) { r := wire.LoginTimeout; f.Reason = &r },
 		"user code in claude": func(f *wire.LoginFlow) { f.Provider, f.Mode = wire.ProviderClaude, wire.LoginSubscription },
 		"bad id":              func(f *wire.LoginFlow) { f.ID = "x" },
-		"bad profile":         func(f *wire.LoginFlow) { f.Profile = "Not One" },
-		"profile not device":  func(f *wire.LoginFlow) { f.Profile, f.Mode, f.UserCode = "chatgpt", wire.LoginSubscription, nil },
-	}
-	profile := ok
-	profile.Provider, profile.Profile = wire.ProviderClaude, "chatgpt"
-	if err := profile.Validate(); err != nil {
-		t.Fatalf("a profile's device flow through claude: %v", err)
 	}
 	for name, mutate := range bad {
 		f := ok

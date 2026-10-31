@@ -23,8 +23,9 @@ type Store struct {
 	// Logins are the vendor CLIs' own sign-ins a profile runs on when no key is saved for it, by profile id (the Grok
 	// CLI's for xai); nil for none.
 	Logins map[string]Login
-	// Proxy is the local proxy the Proxied presets run through; nil when the machine has none to start.
-	Proxy *Proxy
+	// Switches are the switched profiles' switches, by profile id (GPTProxy for gpt); nil for none, and a switched
+	// profile without one is never ready.
+	Switches map[string]Switch
 
 	mu sync.Mutex
 	// masks are the keys the feed hides, each with the form it has in a JSON string; read on every frame, so kept here
@@ -37,18 +38,37 @@ type mask struct{ key, escaped, bullets []byte }
 // ErrNoKey: no key is saved for the profile.
 var ErrNoKey = errors.New("providers: no key saved")
 
+// Switch is a profile that runs on a local proxy the runtime keeps instead of a key (Preset.Switched): the person turns
+// it on and off, and while it is on Claude Code is pointed at the proxy.
+type Switch interface {
+	// On is the person's choice, kept across restarts.
+	On() bool
+	// SetOn turns the switch: on waits until the proxy answers (a *wire.ProfileSwitchError when it can not, and the
+	// switch stays off), off stops it.
+	SetOn(ctx context.Context, on bool) error
+	// Ready: on, the vendor CLI signed in, and the proxy answers or can be started again.
+	Ready() bool
+	// Endpoint is where Claude Code sends its requests and the file of the key it sends; ok is false while the switch
+	// is off or the proxy has never had an address.
+	Endpoint() (baseURL, keyFile string, ok bool)
+}
+
+// SwitchOf is the switch of a switched profile; nil for another profile, or when the runtime keeps none.
+func (s *Store) SwitchOf(id string) Switch {
+	if p, ok := Find(id); !ok || !p.Switched {
+		return nil
+	}
+	return s.Switches[id]
+}
+
 // KeyFile is the file the key of a profile is kept in (it may not exist).
 func (s *Store) KeyFile(id string) string { return filepath.Join(s.Dir, id+".key") }
 
 // Set saves the key of a profile, replacing a saved one, and answers what the page may know of it.
 func (s *Store) Set(id, key string) (wire.ProfileKey, error) {
-	p, ok := Find(id)
-	if !ok {
+	// A switched profile takes no key: it has none to save.
+	if p, ok := Find(id); !ok || p.Switched {
 		return wire.ProfileKey{}, wire.ErrProfileUnknown
-	}
-	if p.Proxied {
-		// Its proxy holds the sign-in: a key here would be read by nothing.
-		return wire.ProfileKey{}, wire.ErrProfileNoKey
 	}
 	if err := (wire.ProfileKeyEdit{Key: key}).Validate(); err != nil {
 		return wire.ProfileKey{}, err
@@ -141,8 +161,13 @@ func (s *Store) LoginOf(id string) (account string, ok bool) {
 	return l.Account()
 }
 
-// Ready says whether a conversation can run on the profile: a key is saved, or the vendor CLI is signed in.
+// Ready says whether a conversation can run on the profile: a key is saved, or the vendor CLI is signed in; for a
+// switched profile, its switch says.
 func (s *Store) Ready(id string) bool {
+	if p, ok := Find(id); ok && p.Switched {
+		sw := s.SwitchOf(id)
+		return sw != nil && sw.Ready()
+	}
 	if s.Configured(id) {
 		return true
 	}
@@ -153,6 +178,9 @@ func (s *Store) Ready(id string) bool {
 // Credential is what a request of the profile is authorised with: the saved key, else the token of the vendor CLI's
 // sign-in. A saved key is the person's choice on the Settings screen and goes first.
 func (s *Store) Credential(ctx context.Context, id string) (string, error) {
+	if p, ok := Find(id); ok && p.Switched {
+		return s.switchKey(id)
+	}
 	key, err := s.Key(id)
 	if err == nil || !errors.Is(err, ErrNoKey) {
 		return key, err
@@ -163,6 +191,23 @@ func (s *Store) Credential(ctx context.Context, id string) (string, error) {
 		}
 	}
 	return "", ErrNoKey
+}
+
+// switchKey is the key of a switched profile's proxy, the one Claude Code sends it.
+func (s *Store) switchKey(id string) (string, error) {
+	sw := s.SwitchOf(id)
+	if sw == nil {
+		return "", ErrNoKey
+	}
+	_, file, ok := sw.Endpoint()
+	if !ok {
+		return "", ErrNoKey
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil || strings.TrimSpace(string(raw)) == "" {
+		return "", ErrNoKey
+	}
+	return strings.TrimSpace(string(raw)), nil
 }
 
 // tailOf is «…» and the last four characters of key.

@@ -21,7 +21,7 @@ func TestLoginEnvironment(t *testing.T) {
 	t.Setenv("RT_CLI_TOKEN", "runtime-secret-0000")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-test-0000")
 	t.Setenv("HTTPS_PROXY", "http://proxy.example:3128")
-	svc := v2Logins(dir, func() string { return dir + ":/usr/bin:/bin" }, func(wire.Provider) {}, func(string) {})
+	svc := v2Logins(dir, func() string { return dir + ":/usr/bin:/bin" }, func(wire.Provider) {})
 	st, err := svc.StartLogin(context.Background(), wire.ProviderClaude, wire.LoginSubscription)
 	if err != nil || st.Flow == nil || st.Flow.State != wire.LoginAwaiting {
 		t.Fatalf("%v %+v", err, st.Flow)

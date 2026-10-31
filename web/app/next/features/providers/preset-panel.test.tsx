@@ -25,24 +25,10 @@ const setup = (state: IPresetState, over: Partial<Parameters<typeof PresetPanel>
   const onSave = vi.fn(() => Promise.resolve(null as string | null));
   const onRemove = vi.fn(() => Promise.resolve(null as string | null));
   const onTest = vi.fn(() => Promise.resolve({ k: 'ok' } as TestState));
-  const onProxyLogin = vi.fn(() => Promise.resolve(null as string | null));
-  const onProxyCancel = vi.fn(() => Promise.resolve());
-  const onProxyLogout = vi.fn(() => Promise.resolve(null as string | null));
   const view = render(
-    <PresetPanel
-      state={state}
-      vendor="Kimi"
-      onSave={onSave}
-      onRemove={onRemove}
-      onTest={onTest}
-      proxyLogins={{}}
-      onProxyLogin={onProxyLogin}
-      onProxyCancel={onProxyCancel}
-      onProxyLogout={onProxyLogout}
-      {...over}
-    />,
+    <PresetPanel state={state} vendor="Kimi" onSave={onSave} onRemove={onRemove} onTest={onTest} {...over} />,
   );
-  return { view, onSave, onRemove, onTest, onProxyLogin, onProxyLogout };
+  return { view, onSave, onRemove, onTest };
 };
 
 const field = () => screen.getByLabelText<HTMLInputElement>('Kimi API key');
@@ -98,26 +84,26 @@ describe('a saved key', () => {
     expect(screen.getByText('A key from platform.kimi.ai')).toBeTruthy();
   });
 
-  it('shows only its last digits and never a field holding it', () => {
+  it('never holds the key in a field', () => {
     setup(ON);
-    expect(screen.getByText('Key saved · …3456')).toBeTruthy();
     expect(field().value).toBe('');
+    expect(screen.queryByText(/3456/)).toBeNull();
   });
 
-  it('says plainly what the check found', async () => {
+  it('says what the check found on its button, and a failure’s reason under it', async () => {
     const { onTest } = setup(ON);
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Check connection' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Check' }));
     });
-    expect(screen.getByRole('status').textContent).toBe('The connection works');
+    expect(screen.getByRole('button', { name: 'Works' })).toBeTruthy();
     onTest.mockResolvedValueOnce({ k: 'failed', reason: 'unauthorized' });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Check connection' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Works' }));
     });
     expect(screen.getByRole('status').textContent).toContain('did not accept the key');
     onTest.mockResolvedValueOnce({ k: 'failed', reason: 'rate-limited' });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Check connection' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
     });
     expect(screen.getByRole('status').textContent).toContain('limited the requests');
   });
@@ -159,10 +145,10 @@ describe('a CLI sign-in', () => {
     const { onTest } = setup(SIGNED);
     expect(screen.getByText('Runs on the subscription: CLI sign-in · me@example.com')).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getAllByRole('button', { name: 'Check connection' })[0]);
+      fireEvent.click(screen.getAllByRole('button', { name: 'Check' })[0]);
     });
     expect(onTest).toHaveBeenCalledWith('kimi');
-    expect(screen.getByRole('status').textContent).toBe('The connection works');
+    expect(screen.getAllByRole('button', { name: 'Works' }).length).toBeGreaterThan(0);
     expect(field()).toBeTruthy();
   });
 
@@ -170,61 +156,5 @@ describe('a CLI sign-in', () => {
     setup({ ...ON, login: { account: 'me@example.com' } });
     const line = screen.getByText(/Runs on the subscription/);
     expect(line.closest('.hx-reveal')?.getAttribute('data-open')).toBe('false');
-  });
-});
-
-const CHATGPT: IPresetState = {
-  id: 'chatgpt',
-  label: 'ChatGPT (subscription)',
-  vendor: 'chatgpt',
-  via: 'claude',
-  host: 'chatgpt.com',
-  hint: 'ChatGPT Plus or Pro',
-  key: { configured: false, tail: null },
-  models: [],
-  proxy: { installed: true },
-};
-
-describe('a preset that runs through a program on the machine', () => {
-  it('has no key field and signs the program in', () => {
-    const { onProxyLogin } = setup(CHATGPT);
-    expect(screen.queryByLabelText('Kimi API key')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
-    expect(onProxyLogin).toHaveBeenCalledWith('chatgpt');
-  });
-
-  it('shows the device code of the login on', () => {
-    setup(CHATGPT, {
-      proxyLogins: {
-        chatgpt: {
-          k: 'waiting',
-          url: 'https://auth.openai.com/codex/device',
-          userCode: 'AB12-CD345',
-          asksCode: false,
-        },
-      },
-    });
-    expect(screen.getByText('AB12-CD345')).toBeTruthy();
-  });
-
-  it('gives the install line while the program is missing', () => {
-    setup({ ...CHATGPT, proxy: { installed: false } });
-    expect(screen.getByText(/raine\/claude-code-proxy/)).toBeTruthy();
-    const start = screen.getByRole('button', { name: 'Sign in with ChatGPT', hidden: true });
-    expect(start.closest('[inert]')).not.toBeNull();
-  });
-
-  it('says whose sign-in it runs on, is checked, and signs out on the second press', async () => {
-    const { onTest, onProxyLogout } = setup({ ...CHATGPT, login: { account: 'me@example.com' } });
-    expect(screen.getByText(/me@example\.com/)).toBeTruthy();
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Check connection' }));
-    });
-    expect(onTest).toHaveBeenCalledWith('chatgpt');
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Sign out for sure/ }));
-    });
-    expect(onProxyLogout).toHaveBeenCalledWith('chatgpt');
   });
 });

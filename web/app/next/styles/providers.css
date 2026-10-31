@@ -1,4 +1,4 @@
-/* Модели: Kimi, GLM, Grok, ChatGPT. Карточки — из «Моделей и ключей» (.hx-acct), здесь только то, чего там нет. */
+/* Модели: Kimi, GLM, Grok. Карточки — из «Моделей и ключей» (.hx-acct), здесь только то, чего там нет. */
 
 /* Закрывающийся и открывающийся ряд: высота плавно уходит в ноль, а не пропадает. */
 .hx-reveal {
@@ -48,10 +48,6 @@
 }
 
 /* Карточка вендора: имя крупнее всего остального */
-.hx-prov__name {
-  font-size: var(--hx-text-lg);
-  font-weight: var(--hx-weight-semibold);
-}
 .hx-prov__body {
   display: grid;
   gap: 12px;
@@ -66,7 +62,7 @@
 }
 .hx-preset__hint {
   margin: 0 0 10px;
-  color: var(--hx-fg-3);
+  color: var(--hx-fg-2);
   font-size: var(--hx-text-xs);
   line-height: 1.5;
 }
@@ -84,6 +80,24 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+/* «Удалить» stands apart at the row's end; on a phone it takes a row of its own. */
+.hx-preset__row > .hx-set__btn[data-tone='danger'] {
+  margin-left: auto;
+}
+@media (max-width: 600px) {
+  .hx-preset__row > .hx-set__btn[data-tone='danger'] {
+    margin-left: -12px;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}
+/* What the check found takes the place of its button: a quiet pill with a mark. */
+.hx-set__btn[data-tone='ghost'][data-result] .hx-icon {
+  color: var(--hx-success);
+}
+.hx-set__btn[data-tone='ghost'][data-result='failed'] .hx-icon {
+  color: var(--hx-danger);
 }
 .hx-preset__saved {
   display: flex;
@@ -127,7 +141,7 @@
 
 .hx-preset__where {
   margin: 0;
-  color: var(--hx-fg-3);
+  color: var(--hx-fg-2);
   font-size: var(--hx-text-xs);
   line-height: 1.5;
 }
@@ -151,18 +165,6 @@
   font-family: var(--hx-font-mono);
   font-size: var(--hx-text-lg);
   letter-spacing: 0.12em;
-  user-select: all;
-}
-/* The line that installs a preset's program: read whole, copied whole. */
-.hx-preset__cmd {
-  margin: 0 0 10px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: var(--hx-bg-hover);
-  font-family: var(--hx-font-mono);
-  font-size: var(--hx-text-xs);
-  line-height: 1.5;
-  overflow-wrap: anywhere;
   user-select: all;
 }
 .hx-spin-ic {
@@ -216,4 +218,60 @@
 }
 .hx-seen__note {
   color: var(--hx-fg-3);
+}
+
+/* «GPT в Claude Code»: a switch under a rule at the foot of the Codex card */
+.hx-gpt {
+  margin: 4px 16px 18px 64px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hx-border);
+}
+.hx-gpt__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.hx-gpt__name {
+  margin-bottom: 4px;
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-gpt__more {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--hx-border-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.hx-gpt__more:hover {
+  text-decoration-color: var(--hx-fg-2);
+}
+.hx-gpt__note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  line-height: 1.55;
+}
+.hx-gpt__state {
+  margin: 12px 0 0;
+}
+.hx-gpt__sub {
+  margin-left: 24px;
+}
+.hx-gpt__retry {
+  margin-top: 8px;
+}
+@media (max-width: 600px) {
+  .hx-gpt {
+    margin-left: 16px;
+  }
 }

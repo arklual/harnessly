@@ -79,8 +79,7 @@ func ClaudeCost(model string, input, output, cacheWrite5m, cacheWrite1h, cacheRe
 }
 
 // Anthropic says whether a model id is one of Anthropic's: Claude Code's own ids and aliases, and the synthetic model
-// of its notices. Another vendor's model (Kimi, GLM, Grok, ChatGPT) that runs through Claude Code is not, and has no
-// price here.
+// of its notices. Another vendor's model (Kimi, GLM, Grok) that runs through Claude Code is not, and has no price here.
 func Anthropic(model string) bool {
 	lower := strings.ToLower(model)
 	if lower == "" || strings.HasPrefix(lower, "<") {

@@ -13,13 +13,19 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-10-31f',
+    items: [
+      { key: 'gpt', icon: 'sparkles' },
+      { key: 'models', icon: 'key-round' },
+    ],
+  },
+  {
     id: '2026-10-31e',
     items: [{ key: 'questions', icon: 'message-square' }],
   },
   {
     id: '2026-10-31d',
     items: [
-      { key: 'chatgpt', icon: 'key-round' },
       { key: 'looks', icon: 'palette' },
       { key: 'notices', icon: 'bell' },
       { key: 'settings', icon: 'sliders-horizontal' },

@@ -217,3 +217,76 @@ func TestProfilesGoOnlyToAPageThatReadsThem(t *testing.T) {
 		t.Fatal("the ring lost the profile for a page with the cap")
 	}
 }
+
+// fakeSwitched is fakeProfiles with a gpt profile that is switched on and off, and refuses to go on for a reason.
+type fakeSwitched struct {
+	fakeProfiles
+	on     bool
+	refuse wire.ProfileSwitchReason
+}
+
+func (f *fakeSwitched) gpt() wire.ProfileInfo {
+	return wire.ProfileInfo{ID: "gpt", Label: "GPT", Vendor: wire.VendorGPT, Via: wire.ProviderClaude, Host: "chatgpt.com",
+		Models: []wire.AgentModel{{ID: "gpt-m1", Label: "M1", Efforts: []wire.Effort{}}},
+		Login:  &wire.ProfileLogin{Account: "me@example.com"}, Switch: &wire.ProfileSwitch{On: f.on}}
+}
+
+func (f *fakeSwitched) SwitchProfile(_ context.Context, id string, on bool) (wire.ProfileInfo, error) {
+	if id != "gpt" {
+		return wire.ProfileInfo{}, wire.ErrProfileUnknown
+	}
+	if on && f.refuse != "" {
+		return wire.ProfileInfo{}, &wire.ProfileSwitchError{Reason: f.refuse, Message: "it did not go on"}
+	}
+	f.on = on
+	return f.gpt(), nil
+}
+
+// A switch answers the profile once it took, refuses with its reason in a closed list when it did not, and takes only
+// a body with `on`.
+func TestProfileSwitchPage(t *testing.T) {
+	g := newRig(t, time.Hour)
+	g.srv.Profiles = &fakeProfiles{keys: map[string]string{}}
+	if code := g.do("PUT", "/api/v2/providers/gpt/switch", map[string]bool{"on": true}, nil); code != http.StatusNotFound {
+		t.Fatalf("a source without switches answers %d", code)
+	}
+	src := &fakeSwitched{fakeProfiles: fakeProfiles{keys: map[string]string{}}}
+	g.srv.Profiles = src
+
+	var info wire.ProfileInfo
+	if code := g.do("PUT", "/api/v2/providers/gpt/switch", map[string]bool{"on": true}, &info); code != 200 || info.Validate() != nil || info.Switch == nil || !info.Switch.On {
+		t.Fatalf("on: %d %v %+v", code, info.Validate(), info)
+	}
+	if code := g.do("PUT", "/api/v2/providers/gpt/switch", map[string]bool{"on": false}, &info); code != 200 || info.Switch.On {
+		t.Fatalf("off: %d %+v", code, info)
+	}
+	for reason, status := range map[wire.ProfileSwitchReason]int{wire.SwitchNoLogin: http.StatusConflict,
+		wire.SwitchDownload: http.StatusInternalServerError, wire.SwitchStart: http.StatusInternalServerError} {
+		src.refuse = reason
+		var refusal wire.ProfileSwitchRefusal
+		if code := g.do("PUT", "/api/v2/providers/gpt/switch", map[string]bool{"on": true}, &refusal); code != status || refusal.Validate() != nil || refusal.Reason != reason {
+			t.Errorf("%s: %d %v %+v", reason, code, refusal.Validate(), refusal)
+		}
+	}
+	for name, c := range map[string]struct {
+		method, path string
+		body         any
+		want         int
+	}{
+		"no on":          {"PUT", "/api/v2/providers/gpt/switch", map[string]any{}, http.StatusBadRequest},
+		"not a boolean":  {"PUT", "/api/v2/providers/gpt/switch", map[string]any{"on": "yes"}, http.StatusBadRequest},
+		"unknown field":  {"PUT", "/api/v2/providers/gpt/switch", map[string]any{"on": true, "port": 1}, http.StatusBadRequest},
+		"unswitched":     {"PUT", "/api/v2/providers/kimi/switch", map[string]bool{"on": true}, http.StatusNotFound},
+		"GET the switch": {"GET", "/api/v2/providers/gpt/switch", nil, http.StatusMethodNotAllowed},
+	} {
+		if code := g.do(c.method, c.path, c.body, nil); code != c.want {
+			t.Errorf("%s: %d, want %d", name, code, c.want)
+		}
+	}
+	keyed := src.gpt()
+	tail := "…3456"
+	keyed.Key = wire.ProfileKey{Configured: true, Tail: &tail}
+	if keyed.Validate() == nil {
+		t.Error("a switched profile with a key passes")
+	}
+}

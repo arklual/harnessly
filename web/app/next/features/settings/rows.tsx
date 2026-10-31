@@ -235,10 +235,12 @@ export const LinkRow = ({ label, hint, action, onAction }: ILinkRowProps) => (
 );
 
 interface IButtonProps {
-  tone: 'primary' | 'ghost';
+  tone: 'primary' | 'ghost' | 'danger';
   busy?: boolean;
   disabled?: boolean;
   icon?: string;
+  /** What an action found, said on the button that did it (its icon takes the colour). */
+  result?: 'ok' | 'failed';
   onClick: () => void;
   children: ReactNode;
 }
@@ -249,6 +251,7 @@ export const SetButton = ({
   busy = false,
   disabled = false,
   icon,
+  result,
   onClick,
   children,
 }: IButtonProps) => (
@@ -256,6 +259,7 @@ export const SetButton = ({
     type="button"
     className="hx-set__btn"
     data-tone={tone}
+    data-result={result}
     data-busy={busy || undefined}
     aria-busy={busy || undefined}
     disabled={disabled}

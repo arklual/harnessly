@@ -165,8 +165,15 @@ const cardOf = (provider: Provider, state: Loaded<AgentSettings>): AccountCard =
 const readyOf = (state: Loaded<AgentSettings>): AgentSettings | null =>
   state.k === 'ready' ? state.value : null;
 
-const vendorsOf = ({ state, retry, ...actions }: ReturnType<typeof useProviders>): VendorCards => {
-  if (state.k === 'ready') return { k: 'ready', presets: state.presets, ...actions };
+const vendorsOf = ({
+  state,
+  onSave,
+  onRemove,
+  onTest,
+  onSwitch,
+  retry,
+}: ReturnType<typeof useProviders>): VendorCards => {
+  if (state.k === 'ready') return { k: 'ready', presets: state.presets, onSave, onRemove, onTest, onSwitch };
   if (state.k === 'failed') return { k: 'failed', text: state.text, onRetry: retry };
   return { k: 'loading' };
 };

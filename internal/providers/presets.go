@@ -1,8 +1,8 @@
-// Package providers holds the backend profiles: another vendor's models (Kimi, GLM, Grok, ChatGPT) behind an agent CLI
-// the machine already runs. A profile is no Provider: Kimi and GLM run through Claude Code on a settings file of their
-// own, Grok through Codex with an `xai` provider, ChatGPT through Claude Code and claude-code-proxy on this machine. The
-// presets here are data; the person picks one and gives a key (or signs the proxy in), and never types an address, so a
-// key cannot be pointed at a host the runtime does not know.
+// Package providers holds the backend profiles: another vendor's models (Kimi, GLM, Grok, GPT) behind an agent CLI the
+// machine already runs. A profile is no Provider: Kimi and GLM run through Claude Code on a settings file of their own,
+// Grok through Codex with an `xai` provider, GPT through Claude Code on a local CLIProxyAPI that turns its requests into
+// the ChatGPT backend's (GPTProxy). The presets here are data; the person picks one and gives a key, and never
+// types an address, so a key cannot be pointed at a host the runtime does not know.
 package providers
 
 import "github.com/ly-solutions/harnessly/internal/wire"
@@ -47,20 +47,17 @@ type Preset struct {
 	// Relayed: Codex reaches the vendor through the runtime's Relay, which holds the credential and turns Codex's
 	// requests into what the vendor takes. Without a relay on the launcher it goes straight to BaseURL with the key.
 	Relayed bool
-	// Proxied: Claude Code reaches the vendor through the runtime's own proxy on this machine (Store.Proxy), which holds
-	// the person's sign-in of the vendor. BaseURL is empty: the address is the proxy's, known once it runs. The preset
-	// takes no key; Host is where the proxy sends the requests.
-	Proxied bool
+	// Switched: the profile takes no key. The person turns it on (Store.Switches), and Claude Code is pointed at the
+	// local proxy the switch keeps; BaseURL is where the proxy's requests end up.
+	Switched bool
 }
 
 const million = 1 << 20
 
-// chatgptWindow is the context of a ChatGPT subscription's models, whatever the model's own: OpenAI caps it at 272K.
-const chatgptWindow = 272_000
-
 var (
 	lowHighMax  = []wire.Effort{wire.EffortLow, wire.EffortHigh, wire.EffortMax}
 	grokEfforts = []wire.Effort{wire.EffortLow, wire.EffortMedium, wire.EffortHigh, wire.EffortXHigh}
+	gptEfforts  = []wire.Effort{wire.EffortLow, wire.EffortMedium, wire.EffortHigh, wire.EffortXHigh, wire.EffortMax}
 )
 
 var presets = []Preset{
@@ -119,25 +116,18 @@ var presets = []Preset{
 		KeyEnv: "XAI_API_KEY", Relayed: true,
 	},
 	{
-		ID: "chatgpt", Label: "ChatGPT (подписка)", Vendor: wire.VendorChatGPT, Via: wire.ProviderClaude,
-		Host: "chatgpt.com",
-		Hint: "Подписка ChatGPT Plus или Pro. Неофициальный клиент: OpenAI может ограничить аккаунт",
+		// The models of a ChatGPT subscription as `codex debug models` lists them (10.2026). The windows are the 95% of
+		// the context Codex itself fills; the default efforts are the backend's own.
+		ID: "gpt", Label: "GPT · подписка ChatGPT", Vendor: wire.VendorGPT, Via: wire.ProviderClaude,
+		BaseURL: "https://chatgpt.com/backend-api/codex", Host: "chatgpt.com", Hint: "Через Claude Code: вход Codex CLI по подписке ChatGPT",
 		Models: []Model{
-			{ID: "gpt-6-sol", Label: "GPT-6 Sol", Window: chatgptWindow},
-			{ID: "gpt-6.1-sol", Label: "GPT-6.1 Sol", Window: chatgptWindow},
-			{ID: "gpt-6-astra", Label: "GPT-6 Astra", Window: chatgptWindow},
-			{ID: "gpt-6-luna", Label: "GPT-6 Luna", Hint: "Быстрая и экономная", Window: chatgptWindow},
-			{ID: "gpt-5.5", Label: "GPT-5.5", Window: chatgptWindow},
+			{ID: "gpt-6.1-sol", Label: "GPT-6.1 Sol", Hint: "Основная модель для кода", Window: 475_000, Efforts: gptEfforts, DefaultEffort: wire.EffortLow},
+			{ID: "gpt-6-astra", Label: "GPT-6 Astra", Hint: "Для самых сложных задач", Window: 258_400, Efforts: gptEfforts, DefaultEffort: wire.EffortMedium},
+			{ID: "gpt-6.1-terra", Label: "GPT-6.1 Terra", Window: 475_000, Efforts: gptEfforts, DefaultEffort: wire.EffortLow},
+			{ID: "gpt-6-luna", Label: "GPT-6 Luna", Hint: "Быстрая и дешёвая", Window: 258_400, Efforts: gptEfforts, DefaultEffort: wire.EffortMedium},
 		},
 		Small: "gpt-6-luna", Test: "gpt-6-luna",
-		// What the proxy's author sets for Claude Code: the small model under its old name too, compaction before
-		// OpenAI's limit, and no retry of a broken stream as a whole request (it would run its tools twice).
-		Env: map[string]string{
-			"ANTHROPIC_SMALL_FAST_MODEL":                "gpt-6-luna",
-			"CLAUDE_CODE_AUTO_COMPACT_WINDOW":           "272000",
-			"CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK": "1",
-		},
-		Proxied: true,
+		Switched: true,
 	},
 }
 

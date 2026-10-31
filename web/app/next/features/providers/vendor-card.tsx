@@ -25,8 +25,6 @@ export const vendorStatus = (vendor: Vendor, states: readonly IPresetState[]): s
     const signed = own.find((s) => s.login !== undefined);
     if (!signed?.login) return t('next.providers.off');
     const account = signed.login.account;
-    // The sign-in of a proxy may not say whose it is.
-    if (own.length === 1 && account === '') return t('next.providers.onLoginPlain');
     if (own.length === 1) return t('next.providers.onLogin', { account });
     return t('next.providers.onLoginPreset', { preset: presetName(signed), account });
   }
@@ -48,13 +46,17 @@ const VendorCard = ({ vendor, states, open, onToggle, ...actions }: IVendorCardP
   const current = presets.find((p) => p.id === picked) ?? presets[0];
   const name = t(`next.providers.vendor.${vendor}`);
   return (
-    <div className="hx-acct hx-prov" data-open={open}>
+    <div
+      className="hx-acct hx-prov"
+      data-open={open}
+      data-on={presets.some((p) => p.key.configured || p.login !== undefined)}
+    >
       <button type="button" className="hx-acct__head" aria-expanded={open} onClick={() => onToggle(vendor)}>
         <span className="hx-acct__logo">
           <i className="hx-agent" data-agent={vendor} aria-hidden="true" />
         </span>
         <span className="hx-acct__text">
-          <span className="hx-acct__name hx-prov__name">{name}</span>
+          <span className="hx-acct__name">{name}</span>
           <span className="hx-acct__status">{vendorStatus(vendor, states)}</span>
         </span>
         <Icon name="chevron-down" size="sm" className="hx-acct__chev" />

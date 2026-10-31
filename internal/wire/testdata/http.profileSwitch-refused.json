@@ -1,0 +1,4 @@
+{
+  "http": "profileSwitch",
+  "response": {"r": "refused", "code": "conflict", "reason": "no-login", "message": "Codex is not signed in with a ChatGPT subscription"}
+}

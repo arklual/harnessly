@@ -1,11 +1,9 @@
-// The extra model vendors (Kimi, GLM, Grok, ChatGPT) as the Settings page and the first-run step draw them. The runtime
-// lists the presets (GET /api/v2/providers): each has an address and models of its own, fixed there; the person picks a
-// preset and gives its key, or signs in the program on the machine the preset runs through (ChatGPT). The key is never
-// read back: a saved one shows as its last digits.
-import type { LoginState } from '@/next/features/accounts/model';
+// The extra model vendors (Kimi, GLM, Grok) as the Settings page and the first-run step draw them. The runtime lists
+// the presets (GET /api/v2/providers): each has an address and models of its own, fixed there; the person picks a
+// preset and gives its key. The key is never read back: a saved one shows as its last digits.
 import type { ProfileInfo, ProfileTestReason, ProfileVendor } from '@/next/protocol/v2';
 
-export const VENDORS = ['kimi', 'glm', 'grok', 'chatgpt'] as const satisfies readonly ProfileVendor[];
+export const VENDORS = ['kimi', 'glm', 'grok'] as const satisfies readonly ProfileVendor[];
 export type Vendor = ProfileVendor;
 export type IPresetState = ProfileInfo;
 export type PresetId = ProfileInfo['id'];
@@ -21,16 +19,7 @@ export interface IPresetActions {
   onSave: (preset: PresetId, key: string) => Promise<string | null>;
   onRemove: (preset: PresetId) => Promise<string | null>;
   onTest: (preset: PresetId) => Promise<TestState>;
-  /** The sign-in of a preset that runs through a program on the machine (`proxy`): the login on, by preset. */
-  proxyLogins: Readonly<Partial<Record<PresetId, LoginState>>>;
-  onProxyLogin: (preset: PresetId) => Promise<string | null>;
-  onProxyCancel: (preset: PresetId) => Promise<void>;
-  onProxyLogout: (preset: PresetId) => Promise<string | null>;
 }
-
-/** The line that installs claude-code-proxy, the program the ChatGPT preset runs through. */
-export const PROXY_INSTALL =
-  'curl -fsSL https://raw.githubusercontent.com/raine/claude-code-proxy/main/scripts/install.sh | bash';
 
 /** The presets of a vendor in the order the runtime lists them. */
 export const presetsOfVendor = (vendor: Vendor, presets: readonly IPresetState[]): IPresetState[] =>

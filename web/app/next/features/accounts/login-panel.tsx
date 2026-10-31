@@ -19,20 +19,9 @@ interface ILoginPanelProps {
   onSubmitCode: (code: string) => Promise<string | null>;
   onCancel: () => Promise<void>;
   onLogout: () => Promise<string | null>;
-  /** What the start button says where the subscription has a name of its own («Войти через ChatGPT»). */
-  startLabel?: string;
 }
 
-const LoginPanel = ({
-  via,
-  account,
-  login,
-  onLogin,
-  onSubmitCode,
-  onCancel,
-  onLogout,
-  startLabel,
-}: ILoginPanelProps) => {
+const LoginPanel = ({ via, account, login, onLogin, onSubmitCode, onCancel, onLogout }: ILoginPanelProps) => {
   const [code, setCode] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,15 +82,7 @@ const LoginPanel = ({
     <div className="hx-preset">
       <div className="hx-reveal" data-open={shown === 'connected'}>
         <div className="hx-reveal__in" inert={shown !== 'connected' || undefined}>
-          <div className="hx-preset__saved">
-            <Icon name="circle-check" size="sm" />
-            <span>
-              {t(via === 'console' ? 'next.login.connectedConsole' : 'next.login.connected', {
-                plan: account.plan ?? '',
-              }).trim()}
-              {account.who ? ` · ${account.who}` : ''}
-            </span>
-          </div>
+          {/* Whom it is signed in as is on the card's line; here is only the way out. */}
           <div className="hx-preset__row">
             <SetButton tone="ghost" busy={leaving} onClick={() => void leave()}>
               {sure ? t('next.login.leaveSure') : t('next.login.leave')}
@@ -118,7 +99,7 @@ const LoginPanel = ({
             <SetButton tone="primary" onClick={() => void start()}>
               {shown === 'failed'
                 ? t('next.login.again')
-                : (startLabel ?? t(via === 'console' ? 'next.login.startConsole' : 'next.login.start'))}
+                : t(via === 'console' ? 'next.login.startConsole' : 'next.login.start')}
             </SetButton>
           </div>
         </div>

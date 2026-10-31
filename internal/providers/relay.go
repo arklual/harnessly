@@ -34,6 +34,15 @@ type Relay struct {
 	// Client sends the requests up; nil is one without a total timeout (a turn streams for minutes) that follows no
 	// redirect.
 	Client *http.Client
+	// Plain: the body goes up as it came, without the rewrite for xAI (the GPT relay: CLIProxyAPI already sends what
+	// the ChatGPT backend takes).
+	Plain bool
+	// Forward are the headers of the request that go up with it; nil is the ones Codex sends xAI.
+	Forward []string
+	// Extra are headers of the credential's own put on each request (the ChatGPT account); nil puts none.
+	Extra func(ctx context.Context) http.Header
+	// Allow says whether a request may use the relay; nil lets every one through, the route in front having checked it.
+	Allow func(*http.Request) bool
 }
 
 // RelayBodyMax bounds a request Codex sends: a long chat with every tool runs to a few megabytes.
@@ -61,6 +70,10 @@ func (rl *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if rl.Allow != nil && !rl.Allow(r) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
 	var body []byte
 	var names map[string]flatTool
 	if r.Method == http.MethodPost {
@@ -70,7 +83,7 @@ func (rl *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		body = raw
-		if strings.HasSuffix(rest, "/responses") {
+		if !rl.Plain && strings.HasSuffix(rest, "/responses") {
 			if out, n, err := RewriteRequest(raw); err == nil {
 				body, names = out, n
 			}
@@ -94,9 +107,18 @@ func (rl *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		relayError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	for _, h := range forwarded {
+	fwd := rl.Forward
+	if fwd == nil {
+		fwd = forwarded
+	}
+	for _, h := range fwd {
 		if v := r.Header.Get(h); v != "" {
 			req.Header.Set(h, v)
+		}
+	}
+	if rl.Extra != nil {
+		for k, vs := range rl.Extra(r.Context()) {
+			req.Header[http.CanonicalHeaderKey(k)] = vs
 		}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)

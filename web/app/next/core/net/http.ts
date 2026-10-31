@@ -71,9 +71,9 @@ export async function postCommand(url: string, body: unknown, timeoutMs: number)
   }
 }
 
-export type PageOutcome<T> =
+export type PageOutcome<T, R extends { r: 'refused' } = Refusal> =
   | { ok: true; value: T }
-  | Refusal
+  | R
   | { r: 'failed'; code: 'timeout' | 'network'; status: null }
   | { r: 'failed'; code: 'http'; status: number };
 
@@ -112,16 +112,20 @@ export async function sendJson<T>(
   return answerPage(res, read);
 }
 
-/** A runtime resource's POST or PUT with a JSON body (outside v2's commands): the answer through the strict reader. */
-export async function sendBody<T>(
+/**
+ * A runtime resource's POST or PUT with a JSON body (outside v2's commands): the answer through the strict reader. A
+ * resource whose refusal says more than its code (a switch says why) gives the reader of its refusal.
+ */
+export async function sendBody<T, R extends { r: 'refused' } = Refusal>(
   method: 'POST' | 'PUT',
   url: string,
   body: unknown,
   read: (v: unknown) => T,
   timeoutMs: number,
-): Promise<PageOutcome<T>> {
+  readRefusal?: (v: unknown) => R,
+): Promise<PageOutcome<T, R>> {
   const res = await timed(url, { method, headers: headers(true), body: JSON.stringify(body) }, timeoutMs);
-  return answerPage(res, read);
+  return answerPage(res, read, readRefusal);
 }
 
 /** A resource's PUT of raw bytes (a recording), typed as the blob is: the answer through the strict reader. */
@@ -143,10 +147,11 @@ export async function sendBlob<T>(
   return answerPage(res, read);
 }
 
-async function answerPage<T>(
+async function answerPage<T, R extends { r: 'refused' } = Refusal>(
   res: Response | 'timeout' | 'network',
   read: (v: unknown) => T,
-): Promise<PageOutcome<T>> {
+  readRefusal?: (v: unknown) => R,
+): Promise<PageOutcome<T, R>> {
   if (res === 'timeout' || res === 'network') return { r: 'failed', code: res, status: null };
   if (res.status === 204) return { ok: true, value: read(null) };
   let doc: unknown;
@@ -158,7 +163,8 @@ async function answerPage<T>(
   try {
     // `r` is a refusal's mark; a change that was taken (`accepted`) carries its result beside it.
     const refused = typeof doc === 'object' && doc !== null && 'r' in doc && doc.r !== 'accepted';
-    if (refused) return parseRefusal(doc);
+    // Without a reader of its own the refusal is the plain one, which is R's default.
+    if (refused) return (readRefusal ?? parseRefusal)(doc) as R;
     return { ok: true, value: read(doc) };
   } catch {
     return { r: 'failed', code: 'http', status: res.status };

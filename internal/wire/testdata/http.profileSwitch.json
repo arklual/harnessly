@@ -1,0 +1,12 @@
+{
+  "http": "profileSwitch",
+  "response": {
+    "id": "gpt", "label": "GPT · подписка ChatGPT", "vendor": "gpt", "via": "claude", "host": "chatgpt.com",
+    "hint": "Через Claude Code: вход Codex CLI по подписке ChatGPT", "key": {"configured": false, "tail": null},
+    "models": [
+      {"id": "gpt-6.1-sol", "label": "GPT-6.1 Sol", "hint": "", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": "low"}
+    ],
+    "login": {"account": "me@example.com"},
+    "switch": {"on": true}
+  }
+}

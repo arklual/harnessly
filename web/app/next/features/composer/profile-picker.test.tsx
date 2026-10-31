@@ -34,13 +34,6 @@ const claude = {
       models: [model('kimi-k3.1-pro', 'K3.1 Pro')],
     },
     { id: 'glm', label: 'GLM', vendor: 'glm', configured: false, models: [model('glm-5.3')] },
-    {
-      id: 'chatgpt',
-      label: 'ChatGPT (подписка)',
-      vendor: 'chatgpt',
-      configured: true,
-      models: [model('gpt-6-sol', 'GPT-6 Sol')],
-    },
   ],
 } as unknown as MachineAgent;
 const codex = {
@@ -63,7 +56,7 @@ const codex = {
 describe('profile groups', () => {
   it('lists Claude and Codex first, then a group per connected profile; a profile without a key is not listed', () => {
     const keys = pickerAgents([claude, codex]).map((a) => a.profile ?? a.provider);
-    expect(keys).toEqual(['claude', 'codex', 'kimi', 'chatgpt', 'xai']);
+    expect(keys).toEqual(['claude', 'codex', 'kimi', 'xai']);
   });
 
   it('adds nothing for a machine that reports no profiles', () => {
@@ -137,7 +130,7 @@ describe('the picker with profile groups', () => {
     const { view } = open();
     act(() => view.container.querySelector<HTMLButtonElement>('.hx-picker__center')?.click());
     const segs = [...view.container.querySelectorAll('.hx-seg__item')].map((el) => el.textContent);
-    expect(segs).toEqual(['Claude', 'Codex', 'Kimi', 'ChatGPT (подписка)', 'Grok']);
+    expect(segs).toEqual(['Claude', 'Codex', 'Kimi', 'Grok']);
     const kimi = view.container.querySelectorAll<HTMLButtonElement>('.hx-seg__item')[2];
     act(() => kimi.click());
     const rows = view.container.querySelectorAll<HTMLElement>('.hx-options[data-active="true"] .hx-option');

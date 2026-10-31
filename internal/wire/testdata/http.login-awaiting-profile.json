@@ -1,4 +1,0 @@
-{
-  "http": "login",
-  "response": {"flow": {"id": "0123456789abcdef0123456789abcdef", "provider": "claude", "profile": "chatgpt", "mode": "device", "state": "awaiting", "input": "none", "url": "https://auth.openai.com/codex/device", "userCode": "ABCD-EFGH1", "startedAt": 1800000000000, "expiresAt": 1800000900000, "reason": null}}
-}

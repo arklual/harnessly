@@ -35,13 +35,7 @@ func TestPresetsAreWithinTheContract(t *testing.T) {
 		}
 		seen[p.ID] = true
 		u, err := url.Parse(p.BaseURL)
-		switch {
-		case p.Proxied:
-			// No address of its own: the runtime's proxy's. Host is where the proxy sends the requests.
-			if p.BaseURL != "" || p.Via != wire.ProviderClaude || p.Host == "" {
-				t.Errorf("%s: address %q host %q", p.ID, p.BaseURL, p.Host)
-			}
-		case err != nil || u.Scheme != "https" || u.Host != p.Host:
+		if err != nil || u.Scheme != "https" || u.Host != p.Host {
 			t.Errorf("%s: address %q host %q", p.ID, p.BaseURL, p.Host)
 		}
 		if p.Via == wire.ProviderCodex != (p.KeyEnv != "") {
@@ -70,7 +64,7 @@ func TestPresetsAreWithinTheContract(t *testing.T) {
 			}
 		}
 	}
-	for _, id := range []string{"kimi", "kimi-code", "glm", "glm-cn", "xai", "chatgpt"} {
+	for _, id := range []string{"kimi", "kimi-code", "glm", "glm-cn", "xai"} {
 		if !seen[id] {
 			t.Errorf("no preset %s", id)
 		}
@@ -98,7 +92,6 @@ func TestPresetModelEfforts(t *testing.T) {
 		{"glm-cn", "glm-5.3", lowHighMax, wire.EffortMax},
 		{"xai", "grok-4.7", []wire.Effort{wire.EffortLow, wire.EffortMedium, wire.EffortHigh, wire.EffortXHigh}, wire.EffortHigh},
 		{"xai", "grok-build-0.1", []wire.Effort{}, ""},
-		{"chatgpt", "gpt-6-sol", []wire.Effort{}, ""},
 	} {
 		p, ok := Find(tc.profile)
 		if !ok {

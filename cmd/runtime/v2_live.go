@@ -119,7 +119,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		dictation = dv
 		features = append(features, wire.FeatureVoice)
 	}
-	v.profiles = profileStore(d.DataDir, d.Home, func() string { return os.Getenv("PATH") })
+	v.profiles = &providers.Store{Dir: filepath.Join(d.DataDir, "providers"), Logins: profileLogins(d.Home)}
 	if c.agents != nil && c.agents.profiles != nil {
 		// One store for the launch lines and the pages: a key saved on a page is the one the next launch reads.
 		v.profiles = c.agents.profiles
@@ -213,18 +213,18 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.OpenAll = open.OpenAll
 	v.srv.AgentSettings = newV2AgentSettings(d)
 	v.srv.Profiles = &providers.Source{Store: v.profiles, OnChange: v.machine.republishProfiles}
+	if c.agents != nil && c.agents.gpt != nil {
+		// The proxy that comes up or goes down by itself changes whether the gpt profile is offered.
+		c.agents.gpt.Notify(v.machine.republishProfiles)
+	}
 	// A key an agent printed (a `cat` of its file, an environment dump) leaves the machine masked.
 	wire.SetRedactor(v.profiles.Redact)
 	if c.agents != nil && c.agents.checker != nil {
-		logins := v2Logins(d.Home, cachedPath(c.agents.checker.ShellPath), func(wire.Provider) {
+		v.srv.Logins = v2Logins(d.Home, cachedPath(c.agents.checker.ShellPath), func(wire.Provider) {
 			// The account changed: the next look at the CLIs is a fresh one, and the page hears it.
 			c.agents.checker.Invalidate()
 			go v.machine.refresh()
-		}, func(string) {
-			// A profile's proxy signed in or out: the profile is offered, or no longer.
-			v.machine.republishProfiles()
 		})
-		v.srv.Logins, v.srv.ProfileLogins = logins, logins
 	}
 	v.srv.Context = v.rt.Context
 	v.srv.MessageStatus = v.rt.MessageStatus

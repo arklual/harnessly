@@ -1,7 +1,8 @@
 // A key of an agent or a vendor's preset, entered here: a write-only field while it has no key (or is being replaced),
-// else the saved key as its last digits with «Проверить подключение» (where the machine can), «Заменить ключ» and «Удалить
-// ключ». The field is never filled from outside and is emptied the moment the key is sent; replacing and deleting wait for
-// a second press. What the check found is said in a plain line under it. The panel never holds a saved key.
+// else «Проверить» (where the machine can), «Заменить» and «Удалить» in red at the row's end; the key's last digits are on
+// the card's line. The field is never filled from outside and is emptied the moment the key is sent; replacing and deleting
+// wait for a second press. What the check found takes the place of its button, a failure's reason a plain line under it.
+// The panel never holds a saved key.
 import { useEffect, useRef, useState } from 'react';
 import { cleanKey, isKeyShape, type TestFailure, type TestState } from '@/next/features/providers/model';
 import { FormError, SetButton } from '@/next/features/settings/rows';
@@ -24,9 +25,28 @@ const TEST_TEXT = {
   page: 'next.providers.test.page',
 } as const satisfies Record<TestFailure, string>;
 
-export const testLine = (test: TestState): string | null => {
-  if (test.k === 'ok') return t('next.providers.testOk');
-  return test.k === 'failed' ? t(TEST_TEXT[test.reason]) : null;
+const testLine = (test: TestState): string | null => (test.k === 'failed' ? t(TEST_TEXT[test.reason]) : null);
+
+/** «Проверить» that becomes what it found: «Работает» with a mark, or «Ещё раз» over the reason said below it. */
+const TestButton = ({ test, onClick }: { test: TestState; onClick: () => void }) => {
+  if (test.k === 'ok' || test.k === 'failed') {
+    const ok = test.k === 'ok';
+    return (
+      <SetButton
+        tone="ghost"
+        icon={ok ? 'check' : 'triangle-alert'}
+        result={ok ? 'ok' : 'failed'}
+        onClick={onClick}
+      >
+        {t(ok ? 'next.providers.testWorks' : 'next.providers.testAgain')}
+      </SetButton>
+    );
+  }
+  return (
+    <SetButton tone="primary" busy={test.k === 'testing'} onClick={onClick}>
+      {test.k === 'testing' ? t('next.providers.testing') : t('next.providers.test')}
+    </SetButton>
+  );
 };
 
 interface IKeyPanelProps {
@@ -138,10 +158,9 @@ const KeyPanel = ({ hint, label, saved, login, onSave, onRemove, onTest, onSaved
 
   const line = testLine(test);
   // The lines stay on screen while their rows close.
-  const [kept, setKept] = useState({ text: '', ok: false });
+  const [kept, setKept] = useState('');
   const [keptError, setKeptError] = useState('');
-  const ok = test.k === 'ok';
-  if (line !== null && (kept.text !== line || kept.ok !== ok)) setKept({ text: line, ok });
+  if (line !== null && kept !== line) setKept(line);
   if (error !== null && keptError !== error) setKeptError(error);
   return (
     <div className="hx-preset">
@@ -156,9 +175,7 @@ const KeyPanel = ({ hint, label, saved, login, onSave, onRemove, onTest, onSaved
             <p className="hx-preset__where">{t('next.providers.loginNote')}</p>
             {onTest && (
               <div className="hx-preset__row">
-                <SetButton tone="primary" busy={test.k === 'testing'} onClick={() => void check()}>
-                  {test.k === 'testing' ? t('next.providers.testing') : t('next.providers.test')}
-                </SetButton>
+                <TestButton test={test} onClick={() => void check()} />
               </div>
             )}
           </div>
@@ -203,24 +220,13 @@ const KeyPanel = ({ hint, label, saved, login, onSave, onRemove, onTest, onSaved
       </div>
       <div className="hx-reveal" data-open={!form}>
         <div className="hx-reveal__in" inert={form || undefined}>
-          <div className="hx-preset__saved">
-            <Icon name="circle-check" size="sm" />
-            <span>
-              {saved.tail
-                ? t('next.providers.keySaved', { tail: saved.tail })
-                : t('next.providers.keySavedPlain')}
-            </span>
-          </div>
+          {/* The key's last digits are on the card's line; the panel holds only what is done with it. */}
           <div className="hx-preset__row">
-            {onTest && (
-              <SetButton tone="primary" busy={test.k === 'testing'} onClick={() => void check()}>
-                {test.k === 'testing' ? t('next.providers.testing') : t('next.providers.test')}
-              </SetButton>
-            )}
+            {onTest && <TestButton test={test} onClick={() => void check()} />}
             <SetButton tone="ghost" onClick={() => setReplacing(true)}>
               {t('next.providers.replace')}
             </SetButton>
-            <SetButton tone="ghost" busy={removing} onClick={() => void remove()}>
+            <SetButton tone="danger" busy={removing} onClick={() => void remove()}>
               {sure ? t('next.providers.removeSure') : t('next.providers.remove')}
             </SetButton>
           </div>
@@ -228,9 +234,9 @@ const KeyPanel = ({ hint, label, saved, login, onSave, onRemove, onTest, onSaved
       </div>
       <div className="hx-reveal" data-open={line !== null && (!form || signed)}>
         <div className="hx-reveal__in">
-          <div className="hx-preset__test" data-ok={kept.ok || undefined} role="status">
-            <Icon name={kept.ok ? 'circle-check' : 'triangle-alert'} size="sm" />
-            <span>{kept.text}</span>
+          <div className="hx-preset__test" role="status">
+            <Icon name="triangle-alert" size="sm" />
+            <span>{kept}</span>
           </div>
         </div>
       </div>

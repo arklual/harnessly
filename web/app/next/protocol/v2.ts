@@ -427,7 +427,7 @@ export interface MachineAgent {
 }
 /** A profile id: lower case, `^[a-z][a-z0-9-]{0,31}$`. The runtime owns the list (`kimi`, `glm`, `xai`…). */
 export type ProfileId = string;
-export const PROFILE_VENDORS = ['kimi', 'glm', 'grok', 'chatgpt'] as const;
+export const PROFILE_VENDORS = ['kimi', 'glm', 'grok', 'gpt'] as const;
 export type ProfileVendor = (typeof PROFILE_VENDORS)[number];
 /** A backend profile a machine can start a conversation on: another vendor's models behind this CLI. */
 export interface ProfileOffer {
@@ -459,17 +459,32 @@ export interface ProfileInfo {
   /** The vendor CLI's own sign-in on the machine (a subscription) the profile runs on when no key is saved; absent
    *  when there is none. */
   login?: ProfileLogin;
-  /** The program on the machine the profile runs through (claude-code-proxy for ChatGPT); absent for one that goes to
-   *  the vendor itself. Such a profile takes no key: it signs the program in (POST /api/v2/providers/{id}/login). */
-  proxy?: ProfileProxy;
+  /** Present on a profile that takes no key but is turned on and off (`gpt`: a local proxy over the Codex CLI's
+   *  ChatGPT sign-in); absent on the others. */
+  switch?: ProfileSwitch;
+}
+/** Whether the person turned a switched profile on. Whether it can run now is the offer's `configured`. */
+export interface ProfileSwitch {
+  on: boolean;
+}
+/** The body of PUT /api/v2/providers/{id}/switch. */
+export interface ProfileSwitchEdit {
+  on: boolean;
+}
+/** Why a switch did not go on: Codex not signed in by a ChatGPT subscription, the proxy not downloaded, not started. */
+export const PROFILE_SWITCH_REASONS = ['no-login', 'download', 'start'] as const;
+export type ProfileSwitchReason = (typeof PROFILE_SWITCH_REASONS)[number];
+/** What PUT .../switch answers when the switch stays off: the protocol's code, why, and the runtime's own words
+ *  (English, for the log). */
+export interface ProfileSwitchRefusal {
+  r: 'refused';
+  code: RefuseCode;
+  reason: ProfileSwitchReason;
+  message: string;
 }
 /** A sign-in of the vendor's CLI: whom it is of (an email). */
 export interface ProfileLogin {
   account: string;
-}
-/** The local program a profile runs through: whether it is installed. */
-export interface ProfileProxy {
-  installed: boolean;
 }
 export interface ProfileList {
   profiles: ProfileInfo[];
@@ -523,8 +538,6 @@ export type LoginReason = (typeof LOGIN_REASONS)[number];
 export interface LoginFlow {
   id: string;
   provider: Provider;
-  /** Set on the sign-in of a profile's proxy: `provider` is then the CLI the profile runs through, the mode `device`. */
-  profile?: ProfileId;
   mode: LoginMode;
   state: LoginState;
   input: LoginInput;
@@ -2193,44 +2206,38 @@ const profileKey: Decoder<ProfileKey> = object({
   configured: bool,
   tail: nullable((v, p) => (PROFILE_TAIL.test(str(v, p)) ? (v as string) : fail(p, 'not a key tail'))),
 });
-const profileList: Decoder<ProfileList> = object({
-  profiles: array(
-    object(
-      {
-        id: profileId,
-        label: id,
-        vendor: profileVendor,
-        via: provider,
-        host: id,
-        hint: str,
-        key: profileKey,
-        models: array(agentModel),
-      },
-      { login: object({ account: str }), proxy: object({ installed: bool }) },
-    ),
-  ),
-});
+const profileInfo: Decoder<ProfileInfo> = object(
+  {
+    id: profileId,
+    label: id,
+    vendor: profileVendor,
+    via: provider,
+    host: id,
+    hint: str,
+    key: profileKey,
+    models: array(agentModel),
+  },
+  { login: object({ account: str }), switch: object({ on: bool }) },
+);
+const profileList: Decoder<ProfileList> = object({ profiles: array(profileInfo) });
 const profileTest: Decoder<ProfileTest> = object({
   ok: bool,
   reason: nullable(oneOf(PROFILE_TEST_REASONS)),
   status: nullable(int),
   ms: int,
 });
-const loginFlow: Decoder<LoginFlow> = object(
-  {
-    id: str,
-    provider,
-    mode: oneOf(LOGIN_MODES),
-    state: oneOf(LOGIN_STATES),
-    input: oneOf(LOGIN_INPUTS),
-    url: nullable(str),
-    userCode: nullable(str),
-    startedAt: ms,
-    expiresAt: ms,
-    reason: nullable(oneOf(LOGIN_REASONS)),
-  },
-  { profile: profileId },
-);
+const loginFlow: Decoder<LoginFlow> = object({
+  id: str,
+  provider,
+  mode: oneOf(LOGIN_MODES),
+  state: oneOf(LOGIN_STATES),
+  input: oneOf(LOGIN_INPUTS),
+  url: nullable(str),
+  userCode: nullable(str),
+  startedAt: ms,
+  expiresAt: ms,
+  reason: nullable(oneOf(LOGIN_REASONS)),
+});
 const loginStatus: Decoder<LoginStatus> = object({ flow: nullable(loginFlow) });
 const loginOK: Decoder<LoginOK> = object({ ok: bool });
 const machineLoad: Decoder<MachineLoad> = object({
@@ -3277,6 +3284,16 @@ export function parseMachineRefusal(v: unknown): MachineRefusal {
   })(v, '$');
 }
 
+/** Reads the refusal of a switch that did not go on. */
+export function parseProfileSwitchRefusal(v: unknown): ProfileSwitchRefusal {
+  return object({
+    r: constant('refused'),
+    code: oneOf(REFUSE_CODES),
+    reason: oneOf(PROFILE_SWITCH_REASONS),
+    message: id,
+  })(v, '$');
+}
+
 /** Reads the refusal of a files page. */
 export function parseFileRefusal(v: unknown): FileRefusal {
   return object({ r: constant('refused'), code: oneOf(REFUSE_CODES), message: id })(v, '$');
@@ -3372,6 +3389,7 @@ export const parsePage = {
   profiles: (v: unknown): ProfileList => profileList(v, '$'),
   profileKey: (v: unknown): ProfileKey => profileKey(v, '$'),
   profileTest: (v: unknown): ProfileTest => profileTest(v, '$'),
+  profileSwitch: (v: unknown): ProfileInfo => profileInfo(v, '$'),
   login: (v: unknown): LoginStatus => loginStatus(v, '$'),
   loginOK: (v: unknown): LoginOK => loginOK(v, '$'),
 };

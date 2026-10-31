@@ -22,10 +22,11 @@
         "login": {"account": "me@example.com"}
       },
       {
-        "id": "chatgpt", "label": "ChatGPT · подписка", "vendor": "chatgpt", "via": "claude", "host": "127.0.0.1:18765",
+        "id": "gpt", "label": "GPT · подписка ChatGPT", "vendor": "gpt", "via": "claude", "host": "chatgpt.com",
         "hint": "", "key": {"configured": false, "tail": null},
-        "models": [{"id": "gpt-6-sol", "label": "GPT-6 Sol", "hint": "", "efforts": [], "defaultEffort": null}],
-        "proxy": {"installed": true}
+        "models": [{"id": "gpt-6-luna", "label": "GPT-6 Luna", "hint": "", "efforts": ["low", "medium"], "defaultEffort": "medium"}],
+        "login": {"account": "me@example.com"},
+        "switch": {"on": false}
       }
     ]
   }

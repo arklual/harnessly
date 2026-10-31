@@ -304,7 +304,7 @@
       ]
     },
     "RetryableRefuseCode": {"enum": ["machine-offline", "rate-limited", "internal", "timeout"]},
-    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "login", "loginOK"]},
+    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
     "Channel": {"type": "string", "pattern": "^(machine|convs|conv:tab-[A-Za-z0-9_-]+)$"},
     "EntryId": {"type": "string", "pattern": "^((c:[0-9a-f-]+|x:[0-9]+)#[0-9]+|live:(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$"},
     "TurnId": {"type": "string", "pattern": "^(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+$"},
@@ -385,8 +385,9 @@
       }
     },
     "ProfileId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$"},
-    "ProfileVendor": {"enum": ["kimi", "glm", "grok", "chatgpt"]},
+    "ProfileVendor": {"enum": ["kimi", "glm", "grok", "gpt"]},
     "ProfileTestReason": {"enum": ["no-key", "unauthorized", "forbidden", "rate-limited", "unreachable", "timeout", "rejected"]},
+    "ProfileSwitchReason": {"enum": ["no-login", "download", "start"]},
     "ProfileOffer": {
       "type": "object",
       "required": ["id", "label", "vendor", "configured", "models"],
@@ -422,7 +423,30 @@
         "key": {"$ref": "#/$defs/ProfileKey"},
         "models": {"type": "array", "items": {"$ref": "#/$defs/AgentModel"}},
         "login": {"$ref": "#/$defs/ProfileLogin"},
-        "proxy": {"$ref": "#/$defs/ProfileProxy"}
+        "switch": {"$ref": "#/$defs/ProfileSwitch"}
+      }
+    },
+    "ProfileSwitch": {
+      "type": "object",
+      "required": ["on"],
+      "additionalProperties": false,
+      "properties": {"on": {"type": "boolean"}}
+    },
+    "ProfileSwitchEdit": {
+      "type": "object",
+      "required": ["on"],
+      "additionalProperties": false,
+      "properties": {"on": {"type": "boolean"}}
+    },
+    "ProfileSwitchRefusal": {
+      "type": "object",
+      "required": ["r", "code", "reason", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "r": {"const": "refused"},
+        "code": {"$ref": "#/$defs/RefuseCode"},
+        "reason": {"$ref": "#/$defs/ProfileSwitchReason"},
+        "message": {"type": "string", "minLength": 1}
       }
     },
     "ProfileLogin": {
@@ -430,12 +454,6 @@
       "required": ["account"],
       "additionalProperties": false,
       "properties": {"account": {"type": "string"}}
-    },
-    "ProfileProxy": {
-      "type": "object",
-      "required": ["installed"],
-      "additionalProperties": false,
-      "properties": {"installed": {"type": "boolean"}}
     },
     "ProfileList": {
       "type": "object",
@@ -460,7 +478,6 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
         "provider": {"$ref": "#/$defs/Provider"},
-        "profile": {"$ref": "#/$defs/ProfileId"},
         "mode": {"$ref": "#/$defs/LoginMode"},
         "state": {"$ref": "#/$defs/LoginState"},
         "input": {"$ref": "#/$defs/LoginInput"},
@@ -4030,6 +4047,15 @@
           "properties": {
             "http": {"const": "profileTest"},
             "response": {"oneOf": [{"$ref": "#/$defs/ProfileTest"}, {"$ref": "#/$defs/Refusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "profileSwitch"},
+            "response": {"oneOf": [{"$ref": "#/$defs/ProfileInfo"}, {"$ref": "#/$defs/ProfileSwitchRefusal"}, {"$ref": "#/$defs/Refusal"}]}
           }
         },
         {

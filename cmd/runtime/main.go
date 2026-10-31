@@ -282,6 +282,14 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			}),
 		},
 	}
+	if ref.c.agents != nil && ref.c.agents.gpt != nil {
+		// The relay the GPT proxy talks to: only that proxy, which holds this runtime's secret of it.
+		gptRelay := ref.c.agents.gpt.Relay()
+		routes = append(routes, gate.Route{
+			Match:   func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, providers.GPTRelayPath+"/") },
+			Handler: gptRelay,
+		})
+	}
 	if ref.c.agents != nil && ref.c.agents.profiles != nil {
 		// The relay a Codex chat on a vendor profile talks to (xAI): only the runtime's own CLIs, which hold its token.
 		relays := providers.Relays(ref.c.agents.profiles, providers.RelayPrefix)
@@ -496,6 +504,11 @@ func run(ctx context.Context, cfg gate.Config) error {
 		go alone.cleanUp(f.home, env("RUNTIME_UPLOADS_DIR", filepath.Join(cfg.DataDir, "uploads")))
 	}
 	f.startUpdateCheck(ctx)
+	// A GPT switch left on brings its proxy up again.
+	if a := f.core.c.agents; a != nil && a.gpt != nil {
+		a.gpt.Resume()
+		defer a.gpt.Close()
+	}
 	terms := f.terms
 	var handler http.Handler = f
 	if cfg.Standalone() {

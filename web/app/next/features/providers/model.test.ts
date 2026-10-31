@@ -24,7 +24,6 @@ const LIST = [
   preset('kimi', 'kimi', 'Kimi · платформа'),
   preset('kimi-code', 'kimi', 'Kimi · Kimi Code', '…3456'),
   preset('xai', 'grok', 'Grok'),
-  preset('chatgpt', 'chatgpt', 'ChatGPT (подписка)'),
 ];
 
 describe('presets', () => {
@@ -33,14 +32,13 @@ describe('presets', () => {
   });
 
   it('lists only the vendors the runtime has presets of, in the page’s order', () => {
-    expect(vendorsOf(LIST)).toEqual(['kimi', 'grok', 'chatgpt']);
+    expect(vendorsOf(LIST)).toEqual(['kimi', 'grok']);
     expect(vendorsOf([])).toEqual([]);
   });
 
   it('opens a card on the preset that has a key, else on the first, else on none', () => {
     expect(defaultPreset('kimi', LIST)).toBe('kimi-code');
     expect(defaultPreset('grok', LIST)).toBe('xai');
-    expect(defaultPreset('chatgpt', LIST)).toBe('chatgpt');
     expect(defaultPreset('glm', LIST)).toBeNull();
   });
 

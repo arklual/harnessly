@@ -110,9 +110,6 @@ type Server struct {
 	// Logins signs the agents in and out: GET/POST/DELETE /api/v2/agents/<provider>/login, POST .../login/code, PUT
 	// .../key, POST .../logout; nil: no such routes.
 	Logins LoginSource
-	// ProfileLogins signs a profile's proxy in and out: GET/POST/DELETE /api/v2/providers/<id>/login, POST .../logout;
-	// nil: those routes are 404s.
-	ProfileLogins ProfileLoginSource
 	// RuntimeSettings are the runtime's own settings: GET and PUT /api/v2/runtime-settings; nil: both are 404s.
 	RuntimeSettings RuntimeSettingsStore
 	// Me is the person of a runtime on its own; nil: /api/v2/me is a 404 (the cluster's gateway answers it itself).

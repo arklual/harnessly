@@ -1,28 +1,17 @@
-// The «Модели» page on a machine: what the runtime has of the vendors' keys, the three things a person does with one
-// (save, delete, check), and the sign-in of a preset that runs through a program on the machine (ChatGPT). The list
-// changes only from the runtime's answers, so a failure leaves it where it was.
+// The «Модели» page on a machine: what the runtime has of the vendors' keys, and the three things a person does with
+// one (save, delete, check). The list changes only from the runtime's answers, so a failure leaves it where it was.
 import { useCallback, useEffect, useState } from 'react';
 import { pageText } from '@/next/bindings/outcome';
-import { loginOf, refusalText } from '@/next/bindings/settings-credentials';
-import type { LoginState } from '@/next/features/accounts/model';
 import {
-  cancelProviderLogin,
   deleteProviderKey,
-  loadProviderLogin,
   loadProviders,
-  logoutProvider,
   putProviderKey,
-  startProviderLogin,
+  putProviderSwitch,
   testProvider,
 } from '@/next/features/providers/api';
 import type { IPresetState, PresetId, TestState } from '@/next/features/providers/model';
 import { t } from '@/next/i18n';
-import type { LoginStatus, MachineId, ProfileKey } from '@/next/protocol/v2';
-
-const POLL_MS = 1500;
-const IDLE: LoginState = { k: 'idle' };
-const isRunning = (login: LoginState | undefined): boolean =>
-  login?.k === 'starting' || login?.k === 'waiting' || login?.k === 'checking';
+import type { MachineId, ProfileKey } from '@/next/protocol/v2';
 
 type TState = { k: 'loading' } | { k: 'failed'; text: string } | { k: 'ready'; presets: IPresetState[] };
 
@@ -30,71 +19,11 @@ type TState = { k: 'loading' } | { k: 'failed'; text: string } | { k: 'ready'; p
 const isMissing = (res: Exclude<Awaited<ReturnType<typeof loadProviders>>, { ok: true }>): boolean =>
   res.r === 'refused' ? res.code === 'not-found' : res.code === 'http' && res.status === 404;
 
-/** The sign-ins of the presets' proxies: the login the machine runs, asked again while it waits for the person. */
-const useProxyLogins = (machine: MachineId, reload: () => void) => {
-  const [proxyLogins, setLogins] = useState<Readonly<Partial<Record<PresetId, LoginState>>>>({});
-  const running = Object.entries(proxyLogins)
-    .filter(([, login]) => isRunning(login))
-    .map(([preset]) => preset);
-  const watched = running.join(' ');
-
-  const take = useCallback(
-    (preset: PresetId, status: LoginStatus) => {
-      setLogins((now) => ({ ...now, [preset]: loginOf(status.flow) }));
-      if (status.flow?.state === 'done') reload();
-    },
-    [reload],
-  );
-
-  useEffect(() => {
-    if (watched === '') return;
-    let live = true;
-    const timer = setInterval(() => {
-      for (const preset of watched.split(' ')) {
-        void loadProviderLogin(machine, preset).then((res) => {
-          if (live && 'ok' in res) take(preset, res.value);
-        });
-      }
-    }, POLL_MS);
-    return () => {
-      live = false;
-      clearInterval(timer);
-    };
-  }, [watched, machine, take]);
-
-  const onProxyLogin = useCallback(
-    async (preset: PresetId): Promise<string | null> => {
-      setLogins((now) => ({ ...now, [preset]: { k: 'starting' } }));
-      const res = await startProviderLogin(machine, preset);
-      if (!('ok' in res)) {
-        setLogins((now) => ({ ...now, [preset]: IDLE }));
-        return refusalText(res, t('next.login.startFailed'));
-      }
-      take(preset, res.value);
-      return null;
-    },
-    [machine, take],
-  );
-  const onProxyCancel = useCallback(
-    async (preset: PresetId) => {
-      await cancelProviderLogin(machine, preset);
-      setLogins((now) => ({ ...now, [preset]: IDLE }));
-    },
-    [machine],
-  );
-  const onProxyLogout = useCallback(
-    async (preset: PresetId): Promise<string | null> => {
-      const res = await logoutProvider(machine, preset);
-      if (!('ok' in res)) return t('next.login.logoutFailed');
-      setLogins((now) => ({ ...now, [preset]: IDLE }));
-      reload();
-      return null;
-    },
-    [machine, reload],
-  );
-
-  return { proxyLogins, onProxyLogin, onProxyCancel, onProxyLogout };
-};
+/** What a refused switch says: the runtime's reason in the person's words, or that the machine did not answer. */
+const switchFailure = (res: Exclude<Awaited<ReturnType<typeof putProviderSwitch>>, { ok: true }>): string =>
+  res.r === 'refused' && 'reason' in res
+    ? t(`next.providers.gpt.failed.${res.reason}`)
+    : t('next.providers.gpt.failed.page');
 
 /** The presets of a machine and the actions on them; the first-run step uses the same hook. */
 export const useProviders = (machine: MachineId, enabled = true) => {
@@ -153,13 +82,24 @@ export const useProviders = (machine: MachineId, enabled = true) => {
     },
     [machine],
   );
+  // The switch of a profile (GPT in Claude Code) answers with the whole profile once the machine has done it.
+  const onSwitch = useCallback(
+    async (preset: PresetId, on: boolean): Promise<string | null> => {
+      const res = await putProviderSwitch(machine, preset, on);
+      if (!('ok' in res)) return switchFailure(res);
+      setState((now) =>
+        now.k !== 'ready'
+          ? now
+          : { k: 'ready', presets: now.presets.map((p) => (p.id === preset ? res.value : p)) },
+      );
+      return null;
+    },
+    [machine],
+  );
   const retry = useCallback(() => {
     setState({ k: 'loading' });
     setAttempt((n) => n + 1);
   }, []);
-  // A sign-in changed what the machine has: the list is read again, the one on screen staying until it comes.
-  const reload = useCallback(() => setAttempt((n) => n + 1), []);
-  const logins = useProxyLogins(machine, reload);
 
-  return { state, onSave, onRemove, onTest, retry, ...logins };
+  return { state, onSave, onRemove, onTest, onSwitch, retry };
 };

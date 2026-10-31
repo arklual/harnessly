@@ -22,7 +22,7 @@ const POLL_MS = 1500;
 const IDLE: LoginState = { k: 'idle' };
 
 /** What a refused request says, in the words of what the person does about it. */
-export const refusalText = (res: { r?: string; code?: string }, fallback: string): string => {
+const refusalText = (res: { r?: string; code?: string }, fallback: string): string => {
   if (res.r !== 'refused') return fallback;
   if (res.code === 'conflict') return t('next.login.busy');
   if (res.code === 'rate-limited') return t('next.login.rateLimited');
@@ -34,7 +34,7 @@ const failureOf = (flow: LoginFlow): string =>
   flow.reason ? t(`next.login.reason.${flow.reason}`) : t('next.login.failed');
 
 /** The state the card shows for a flow; a finished one is `idle` (who is signed in comes from the settings). */
-export const loginOf = (flow: LoginFlow | null): LoginState => {
+const loginOf = (flow: LoginFlow | null): LoginState => {
   if (!flow) return IDLE;
   if (flow.state === 'starting') return { k: 'starting' };
   if (flow.state === 'checking') return { k: 'checking' };
@@ -44,7 +44,7 @@ export const loginOf = (flow: LoginFlow | null): LoginState => {
   if (flow.state === 'expired') return { k: 'failed', reason: t('next.login.expired') };
   return IDLE;
 };
-export const isFinished = (flow: LoginFlow | null): boolean =>
+const isFinished = (flow: LoginFlow | null): boolean =>
   flow === null || ['done', 'failed', 'cancelled', 'expired'].includes(flow.state);
 
 /** What the card of one agent needs; `reload` re-reads the agent's settings once the sign-in changed. */

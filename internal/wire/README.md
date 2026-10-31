@@ -679,8 +679,8 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     a page that names the cap (`/api/v2/socket?caps=delegation`, and `?caps=delegation` on `/api/v2/runtime-settings`):
     any other page gets the record without `parentId` (an event's older form is encoded with the same seq) and the
     settings without `delegation`.
-64. **Backend profiles (Kimi, GLM, Grok, ChatGPT).** A profile is another vendor's models behind one of the agent CLIs,
-    not a new `Provider`: a Kimi, GLM or ChatGPT chat is `provider: claude`, a Grok chat `provider: codex`. A profile id is
+64. **Backend profiles (Kimi, GLM, Grok).** A profile is another vendor's models behind one of the agent CLIs, not a new
+    `Provider`: a Kimi or GLM chat is `provider: claude`, a Grok chat `provider: codex`. A profile id is
     `^[a-z][a-z0-9-]{0,31}$` and the runtime owns the list. `conversation.create` and `conversation.handoff` may carry
     `profile` beside `model` (a model of the profile; `model.profile` in a command is refused), and the record carries
     `model.profile` for as long as it lives; it cannot be changed in a chat (a handoff starts another one).
@@ -690,8 +690,8 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     without `profiles` and the models without `profile` (an event's older form is encoded with the same seq, a
     snapshot is cut the same way).
     The Settings screen reads and writes the keys over HTTP, same origin only for a write: `GET /api/v2/providers` →
-    `{profiles: [{id, label, vendor, via, host, hint, key: {configured, tail}, models, login?: {account},
-    proxy?: {installed}}]}` (every preset of the runtime; `proxy` for one that runs through a program on the machine); `PUT /api/v2/providers/<id>/key` `{key}` → `{configured, tail}` (the key is 8–512 printable characters
+    `{profiles: [{id, label, vendor, via, host, hint, key: {configured, tail}, models}]}` (every preset of the
+    runtime); `PUT /api/v2/providers/<id>/key` `{key}` → `{configured, tail}` (the key is 8–512 printable characters
     without a space); `DELETE /api/v2/providers/<id>/key` → `{configured: false, tail: null}`;
     `POST /api/v2/providers/<id>/test` → `{ok, reason, status, ms}`, one minimal request to the vendor with the saved
     key. An unknown id is `not-found`, a bad key `bad-request`. The key never comes back: `tail` is «…» and its last
@@ -730,11 +730,6 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     reads who is signed in from `GET /api/v2/agent-settings/{provider}` (`account`), as before. Writes are same-origin
     only; no answer carries a code or a key, and the code and the key are not logged. Claude takes no API key this way:
     `console` is its sign-in for API billing.
-    A profile that runs through a program on the machine (`proxy` in its `GET /api/v2/providers` entry, ChatGPT through
-    claude-code-proxy) takes no key (`PUT .../key` is `unsupported`) and signs that program in the same way:
-    `POST /api/v2/providers/<id>/login` (no body) starts a device flow, `GET` and `DELETE` read and cancel it,
-    `POST .../logout` signs it out (`{ok: true}`). Its flow carries `profile` beside `provider` (the CLI the profile
-    runs through) and is always `mode: "device"`. Who is signed in is the profile's `login.account`.
 67. **What the chat made.** `GET /api/v2/conversations/{id}/made` answers `{items, complete}`: the docs, boards and
     designs the chat made, opened or changed, newest first, at most 60. An item is `{kind: doc|board|design, ref,
     title, op: created|changed, at, cover, designKind}`; `ref` is the page's URL for a doc or a board (a board keeps its

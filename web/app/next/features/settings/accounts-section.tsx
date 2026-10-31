@@ -14,7 +14,13 @@ import {
   type LoginState,
 } from '@/next/features/accounts/model';
 import KeyPanel from '@/next/features/providers/key-panel';
-import { vendorsOf, type IPresetActions, type IPresetState } from '@/next/features/providers/model';
+import {
+  vendorsOf,
+  type IPresetActions,
+  type IPresetState,
+  type PresetId,
+} from '@/next/features/providers/model';
+import GptSwitch from '@/next/features/providers/gpt-switch';
 import VendorCard from '@/next/features/providers/vendor-card';
 import { optionValue } from '@/next/features/settings/options';
 import { FormError, Group, SetButton } from '@/next/features/settings/rows';
@@ -57,11 +63,16 @@ export interface IAgentCredentials extends ICredentialActions {
   seen: readonly string[] | undefined;
 }
 
-/** The vendors' cards (Kimi, GLM, Grok, ChatGPT): the presets as the runtime lists them, or why it has none to show. */
+/** The vendors' cards (Kimi, GLM, Grok): the presets as the runtime lists them, or why it has none to show. */
 export type VendorCards =
   | { k: 'loading' }
   | { k: 'failed'; text: string; onRetry: () => void }
-  | ({ k: 'ready'; presets: readonly IPresetState[] } & IPresetActions);
+  | ({
+      k: 'ready';
+      presets: readonly IPresetState[];
+      /** Turns a switchable profile on or off (GPT in Claude Code); resolves null when the machine did it. */
+      onSwitch: (preset: PresetId, on: boolean) => Promise<string | null>;
+    } & IPresetActions);
 
 export interface IAccountsSectionProps {
   cards: readonly AccountCard[];
@@ -80,9 +91,11 @@ export interface IAccountsSectionProps {
 const statusText = (settings: AgentSettings): string => {
   const { account } = settings;
   if (!account.signedIn || !account.method) return t('next.settings.accounts.off');
-  return account.method === 'subscription'
-    ? t('next.settings.accounts.onSubscription', { plan: account.plan ?? '' }).trim()
-    : t('next.settings.accounts.onKey');
+  const how =
+    account.method === 'subscription'
+      ? t('next.settings.accounts.onSubscription', { plan: account.plan ?? '' }).trim()
+      : t('next.settings.accounts.onKey');
+  return account.who ? `${how} · ${account.who}` : how;
 };
 
 const SignIn = ({ settings, credentials }: { settings: AgentSettings; credentials: IAgentCredentials }) => {
@@ -265,13 +278,18 @@ const Card = ({
   open,
   busy,
   credentials,
+  gpt,
   onToggle,
   onBaseUrl,
   onRetry,
-}: { card: AccountCard; open: boolean; busy: boolean; credentials: IAgentCredentials } & Pick<
-  IAccountsSectionProps,
-  'onToggle' | 'onBaseUrl' | 'onRetry'
->) => {
+}: {
+  card: AccountCard;
+  open: boolean;
+  busy: boolean;
+  credentials: IAgentCredentials;
+  /** The Codex card's foot: the `gpt` profile and its switch; null on the other cards. */
+  gpt: { preset: IPresetState | undefined; onSwitch: (on: boolean) => Promise<string | null> } | null;
+} & Pick<IAccountsSectionProps, 'onToggle' | 'onBaseUrl' | 'onRetry'>) => {
   const settings = card.k === 'ready' ? card.settings : null;
   const connected = settings?.account.signedIn ?? false;
   let status = t('next.settings.loading');
@@ -309,12 +327,28 @@ const Card = ({
             <>
               <SignIn settings={settings} credentials={credentials} />
               <Proxy key={settings.provider} settings={settings} busy={busy} onBaseUrl={onBaseUrl} />
+              {gpt && (
+                <GptSwitch
+                  preset={gpt.preset}
+                  ready={settings.account.signedIn && settings.account.method === 'subscription'}
+                  onSwitch={gpt.onSwitch}
+                />
+              )}
             </>
           )}
         </div>
       </div>
     </div>
   );
+};
+
+/** The `gpt` profile of the runtime's list and its switch, for the Codex card. */
+const gptOf = (vendors: Extract<VendorCards, { k: 'ready' }>) => {
+  const preset = vendors.presets.find((p) => p.vendor === 'gpt');
+  return {
+    preset,
+    onSwitch: (on: boolean) => (preset ? vendors.onSwitch(preset.id, on) : Promise.resolve(null)),
+  };
 };
 
 const AccountsSection = ({
@@ -335,6 +369,7 @@ const AccountsSection = ({
         open={open === card.provider}
         busy={busy.has(card.provider)}
         credentials={credentials[card.provider]}
+        gpt={card.provider === 'codex' && vendors.k === 'ready' ? gptOf(vendors) : null}
         onToggle={onToggle}
         onBaseUrl={onBaseUrl}
         onRetry={onRetry}
@@ -351,10 +386,6 @@ const AccountsSection = ({
           onSave={vendors.onSave}
           onRemove={vendors.onRemove}
           onTest={vendors.onTest}
-          proxyLogins={vendors.proxyLogins}
-          onProxyLogin={vendors.onProxyLogin}
-          onProxyCancel={vendors.onProxyCancel}
-          onProxyLogout={vendors.onProxyLogout}
         />
       ))}
     {vendors.k === 'loading' && <Skeleton className="hx-set__sk" />}

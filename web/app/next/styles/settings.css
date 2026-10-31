@@ -449,6 +449,14 @@
 .hx-set__btn[data-tone='ghost']:hover {
   background: var(--hx-bg-active);
 }
+/* Deleting is said in red text, not as a third pill beside the others. */
+.hx-set__btn[data-tone='danger'] {
+  background: none;
+  color: var(--hx-danger);
+}
+.hx-set__btn[data-tone='danger']:hover {
+  background: color-mix(in oklch, var(--hx-danger) 12%, transparent);
+}
 .hx-set__btn-spin {
   display: none;
 }
@@ -548,12 +556,18 @@
   gap: 2px;
 }
 .hx-acct__name {
-  font-size: var(--hx-text-md);
-  font-weight: var(--hx-weight-medium);
+  font-size: var(--hx-text-lg);
+  font-weight: var(--hx-weight-semibold);
 }
 .hx-acct__status {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hx-acct[data-on='false'] .hx-acct__status {
   color: var(--hx-fg-3);
-  font-size: var(--hx-text-xs);
 }
 .hx-acct__chev {
   color: var(--hx-fg-3);
@@ -588,12 +602,12 @@
   align-items: baseline;
   gap: 8px;
   margin-bottom: 6px;
-  color: var(--hx-fg-2);
+  color: var(--hx-fg-1);
   font-size: var(--hx-text-xs);
   font-weight: var(--hx-weight-medium);
 }
 .hx-acct__label-hint {
-  color: var(--hx-fg-3);
+  color: var(--hx-fg-2);
   font-weight: var(--hx-weight-regular);
 }
 .hx-acct__line {

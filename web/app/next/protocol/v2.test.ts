@@ -6,6 +6,7 @@ import {
   parseCommand,
   parseMachineRefusal,
   parsePage,
+  parseProfileSwitchRefusal,
   parseRefusal,
   parseServerFrame,
   ProtocolError,
@@ -46,6 +47,8 @@ function parseFixture(doc: unknown): unknown {
   const http = o.http as keyof typeof parsePage;
   if (!Object.hasOwn(parsePage, http)) throw new Error(`unknown fixture kind ${JSON.stringify(http)}`);
   const response = o.response as Record<string, unknown>;
+  if ('r' in response && http === 'profileSwitch')
+    return { http, response: parseProfileSwitchRefusal(response) };
   return { http, response: 'r' in response ? parseRefusal(response) : parsePage[http](response) };
 }
 
@@ -154,6 +157,7 @@ describe('v2 closed lists', () => {
     LimitAction: v2.LIMIT_ACTIONS,
     ProfileVendor: v2.PROFILE_VENDORS,
     ProfileTestReason: v2.PROFILE_TEST_REASONS,
+    ProfileSwitchReason: v2.PROFILE_SWITCH_REASONS,
     LoginMode: v2.LOGIN_MODES,
     LoginState: v2.LOGIN_STATES,
     LoginInput: v2.LOGIN_INPUTS,

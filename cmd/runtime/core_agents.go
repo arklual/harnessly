@@ -37,6 +37,8 @@ type coreAgents struct {
 	codexArgs      codex.LaunchConfig
 	// profiles keeps the keys of the backend profiles and gives a launch on one what it needs (providers).
 	profiles *providers.Store
+	// gpt is the switch of the gpt profile and the proxy it keeps; nil while the runtime's port is unknown.
+	gpt *providers.GPTProxy
 	// launchOn: the launch slice is on, so conversations start and resume here (set by main); starter and resume are
 	// the core's, set once it exists.
 	launchOn func() bool
@@ -98,8 +100,11 @@ func skipPermissions(configFile string) func() bool {
 }
 
 func newCoreAgents(c coreAgentsConfig) *coreAgents {
-	checker := preflight.New(c.Home)
-	profiles := profileStore(c.DataDir, c.Home, cachedPath(checker.ShellPath))
+	profiles := &providers.Store{Dir: filepath.Join(c.DataDir, "providers"), Logins: profileLogins(c.Home)}
+	gpt := gptProxy(c, profiles)
+	if gpt != nil {
+		profiles.Switches = map[string]providers.Switch{"gpt": gpt}
+	}
 	launcher := providers.Launcher{Store: profiles, Relay: codexRelay(c)}
 	editor := func() (string, error) {
 		script := c.EditorScript
@@ -116,7 +121,8 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	shared := notifySharedFor(c.DataDir)
 	return &coreAgents{
 		profiles: profiles,
-		checker:  checker,
+		gpt:      gpt,
+		checker:  preflight.New(c.Home),
 		envDir:   c.EnvDir,
 		options:  catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey},
 		claude: claude.LaunchConfig{
@@ -172,27 +178,28 @@ func codexMCP(c coreAgentsConfig) codex.MCP {
 	return m
 }
 
-// profileLogins are the vendor CLIs' sign-ins of the person a profile can run on: the Grok CLI's for xai, and
-// claude-code-proxy's of ChatGPT for chatgpt.
+// profileLogins are the vendor CLIs' sign-ins of the person a profile can run on: the Grok CLI's for xai, the Codex
+// CLI's (by a ChatGPT subscription) for gpt.
 func profileLogins(home string) map[string]providers.Login {
 	if home == "" {
 		return nil
 	}
 	return map[string]providers.Login{
-		"xai":     &providers.GrokLogin{Path: filepath.Join(providers.GrokHome(home), "auth.json")},
-		"chatgpt": &providers.ChatGPTLogin{Path: providers.ChatGPTAuthFile(home, os.Getenv)},
+		"xai": &providers.GrokLogin{Path: filepath.Join(providers.GrokHome(home), "auth.json")},
+		"gpt": &providers.CodexLogin{Path: filepath.Join(providers.CodexHome(home), "auth.json")},
 	}
 }
 
-// profileStore is the store of the profiles: their keys in <DataDir>/providers, the vendor CLIs' sign-ins and the
-// proxy the ChatGPT profile runs through. path is the PATH the person's login shell builds.
-func profileStore(dataDir, home string, path func() string) *providers.Store {
-	return &providers.Store{Dir: filepath.Join(dataDir, "providers"), Logins: profileLogins(home), Proxy: &providers.Proxy{
-		Bin:   func() (string, error) { return providers.FindProxy(path(), home) },
-		Env:   func() []string { return personEnv(home, path(), proxyEnvNames) },
-		Log:   filepath.Join(dataDir, "providers", providers.ProxyName+".log"),
-		State: filepath.Join(dataDir, "providers", providers.ProxyName+".json"),
-	}}
+// gptProxy is the switch of the gpt profile over the store's Codex sign-in, its proxy reaching the runtime's GPT relay
+// on the runtime's port; nil while the port or the home is unknown.
+func gptProxy(c coreAgentsConfig, store *providers.Store) *providers.GPTProxy {
+	login, _ := store.Logins["gpt"].(*providers.CodexLogin)
+	relay := codex.MCPURL(c.Port, providers.GPTRelayPath)
+	if login == nil || relay == "" {
+		return nil
+	}
+	return &providers.GPTProxy{Dir: filepath.Join(store.Dir, "gpt-proxy"), OnFile: filepath.Join(store.Dir, "gpt.on"),
+		Login: login, RelayBase: relay}
 }
 
 // codexRelay is the runtime's relay as Codex is told about it: on the runtime's port, behind the CLI token Codex
