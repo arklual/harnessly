@@ -153,18 +153,15 @@ func (m *v2Tmux) Probe(session string) convo.Probe {
 type v2Uploads struct{ up *wire.Uploads }
 
 func (u v2Uploads) Resolve(ids []string) ([]wire.AttachmentRef, []string, wire.RefuseCode) {
-	refs, images := make([]wire.AttachmentRef, 0, len(ids)), []string{}
+	refs, paths := make([]wire.AttachmentRef, 0, len(ids)), make([]string, 0, len(ids))
 	for _, id := range ids {
 		ref, path, ok := u.up.Get(id)
 		if !ok {
 			return nil, nil, wire.RefuseAttachmentMissing
 		}
-		refs = append(refs, ref)
-		if ref.Kind == wire.AttachmentImage {
-			images = append(images, path)
-		}
+		refs, paths = append(refs, ref), append(paths, path)
 	}
-	return refs, images, ""
+	return refs, paths, ""
 }
 
 // v2Log writes the conversations' journal lines.
