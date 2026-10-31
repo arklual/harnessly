@@ -56,6 +56,9 @@
 .hx-icon[data-i='chevron-up'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22m18 15-6-6-6 6%22 /%3E%3C/svg%3E');
 }
+.hx-icon[data-i='chrome'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2210%22 /%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%224%22 /%3E%3Cline x1=%2221.17%22 x2=%2212%22 y1=%228%22 y2=%228%22 /%3E%3Cline x1=%223.95%22 x2=%228.54%22 y1=%226.06%22 y2=%2214%22 /%3E%3Cline x1=%2210.88%22 x2=%2215.46%22 y1=%2221.94%22 y2=%2214%22 /%3E%3C/svg%3E');
+}
 .hx-icon[data-i='circle-alert'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2210%22 /%3E%3Cline x1=%2212%22 x2=%2212%22 y1=%228%22 y2=%2212%22 /%3E%3Cline x1=%2212%22 x2=%2212.01%22 y1=%2216%22 y2=%2216%22 /%3E%3C/svg%3E');
 }

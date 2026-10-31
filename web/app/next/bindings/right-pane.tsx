@@ -42,7 +42,7 @@ import LazyView from '@/next/ui/lazy-view';
 import { CLIENT_ID } from '@/next/bindings/agent-terminal';
 import { pageText } from '@/next/bindings/outcome';
 import { closeTerminal, loadOpenTarget, loadTasks, loadTerminals, openTerminal } from '@/next/commands/pages';
-import { machineApi } from '@/next/core/net/machine';
+import { machineApi, runtimeSocket } from '@/next/core/net/machine';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useBackground } from '@/next/stores/conversation';
 import { hasFeature, useMachines } from '@/next/stores/machines';
@@ -77,6 +77,7 @@ const MachineTab = later(() => import('@/next/bindings/machine-tab'));
 const DesignlyPane = later(() => import('@/next/bindings/designly-pane'));
 const FilesView = later(() => import('@/next/features/pane/files-view'));
 const DeliveredView = later(() => import('@/next/features/pane/delivered-view'));
+const ChromeView = later(() => import('@/next/features/pane/chrome-view'));
 
 /** The launcher's tools in the design's order; one not named keeps its place after them. */
 const TOOL_ORDER = [
@@ -92,6 +93,7 @@ const TOOL_ORDER = [
   'terminal',
   'shell',
   'browser',
+  'chrome',
   'L:disk',
   'machine',
   'L:gitlab',
@@ -154,6 +156,8 @@ const tabInfo = (tab: TTab, machine: string, chat: string): IPaneTab & { sub: st
       name: (tab.file && tab.path.split('/').pop()) || t('next.pane.files'),
       sub: tab.path || t('next.pane.filesRoot'),
     };
+  if (tab.kind === 'chrome')
+    return { id: tab.id, icon: 'chrome', name: t('next.chrome.name'), sub: t('next.chrome.hint') };
   if (tab.kind === 'shell') return { id: tab.id, icon: 'terminal', name: t('next.pane.shell'), sub: machine };
   const at = tab.hist[tab.hi];
   return {
@@ -441,6 +445,17 @@ const PaneBody = (props: IPaneBodyProps) => {
       hint: t('next.pane.browserHint'),
       live: openCount(tabs, 'browser'),
     },
+    ...(hasFeature(conv.machineId, 'chrome')
+      ? [
+          {
+            id: 'chrome',
+            group: 'vm',
+            icon: 'chrome',
+            name: t('next.chrome.name'),
+            hint: t('next.chrome.hint'),
+          },
+        ]
+      : []),
     ...(machineTool
       ? [
           {
@@ -524,7 +539,7 @@ const PaneBody = (props: IPaneBodyProps) => {
       } else add({ id: nextId(), kind: 'subagent', focus: null });
       return;
     }
-    if (id === 'side' || id === 'plan' || id === 'files' || id === 'machine') {
+    if (id === 'side' || id === 'plan' || id === 'files' || id === 'machine' || id === 'chrome') {
       const have = tabs.find((x) => x.kind === id);
       if (have) setActive(have.id);
       else
@@ -655,7 +670,7 @@ const PaneBody = (props: IPaneBodyProps) => {
         ...legacy.tabs,
       ]}
       tab={legacyTab?.id ?? tab?.id ?? TOOLS_TAB}
-      ownBar={tab?.kind === 'browser' || tab?.kind === 'designly'}
+      ownBar={tab?.kind === 'browser' || tab?.kind === 'chrome' || tab?.kind === 'designly'}
       maxed={props.maxed}
       onPick={(id) => {
         if (isLegacyTab(id)) legacy.pick(id);
@@ -741,6 +756,9 @@ const PaneBody = (props: IPaneBodyProps) => {
             `/terminal?conversation=${encodeURIComponent(conv.id)}&terminal=${encodeURIComponent(tab.terminal)}&clientId=${CLIENT_ID}`,
           )}
         />
+      )}
+      {tab?.kind === 'chrome' && (
+        <ChromeView key={tab.id} url={runtimeSocket('/api/chrome', conv.machineId)} />
       )}
       {tab?.kind === 'browser' && (
         <BrowserTab

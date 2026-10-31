@@ -51,6 +51,7 @@ func (v *v2Live) newPaneWatcher() *paneauto.Watcher {
 		Targets:  panelTargets(),
 		DesignOf: designAPI(v.d).L.DesignOfPath,
 		Intents:  c.intents,
+		Chrome:   machineChrome().On(),
 		TabOf: func(conv string) string {
 			if v.rt == nil {
 				return ""

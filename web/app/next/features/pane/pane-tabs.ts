@@ -7,6 +7,8 @@ import type { IPaneRequest, TLegacyKind } from '@/next/features/pane/intents';
 export type TTab =
   | { id: string; kind: 'side' }
   | { id: string; kind: 'plan' }
+  /** The machine's Chrome that the agents' chrome MCP drives, live. */
+  | { id: string; kind: 'chrome' }
   | { id: string; kind: 'machine' }
   | { id: string; kind: 'designly'; design: string | null }
   | { id: string; kind: 'subagent'; focus: string | null }
@@ -129,7 +131,11 @@ const placeFiles = (state: IPaneTabs, target: string | null, ctx: IPlaceContext)
   };
 };
 
-const singleTab = (kind: 'plan' | 'subagent' | 'designly', id: string, design: string | null): TTab => {
+const singleTab = (
+  kind: 'plan' | 'chrome' | 'subagent' | 'designly',
+  id: string,
+  design: string | null,
+): TTab => {
   if (kind === 'designly') return { id, kind, design };
   if (kind === 'subagent') return { id, kind, focus: null };
   return { id, kind };
@@ -137,7 +143,7 @@ const singleTab = (kind: 'plan' | 'subagent' | 'designly', id: string, design: s
 
 const placeSingle = (
   state: IPaneTabs,
-  kind: 'plan' | 'subagent' | 'designly',
+  kind: 'plan' | 'chrome' | 'subagent' | 'designly',
   ctx: IPlaceContext,
   design: string | null,
 ): IPlaced => {
@@ -180,6 +186,7 @@ export const placeRequest = (state: IPaneTabs, request: IPaneRequest, ctx: IPlac
       if (reload) return nothing(state);
       return placeFiles(state, request.target, ctx);
     case 'plan':
+    case 'chrome':
     case 'subagent':
       if (reload) return nothing(state);
       return placeSingle(state, request.k, ctx, null);

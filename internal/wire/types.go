@@ -2135,10 +2135,12 @@ const (
 	FeatureAutoContinue Feature = "auto-continue"
 	// FeatureMade: GET /api/v2/conversations/{id}/made lists what the chat made, opened or changed (docs, boards, designs).
 	FeatureMade Feature = "made"
+	// FeatureChrome: the machine shows the Chrome its agents drive (a chrome MCP) live in the pane, over /api/chrome.
+	FeatureChrome Feature = "chrome"
 )
 
 // Features is every Feature, in the schema's order.
-var Features = []Feature{FeatureQueue, FeatureSteer, FeatureQuestions, FeaturePermissions, FeatureBackground, FeatureModel, FeatureVoice, FeatureFiles, FeatureCheckpoints, FeatureDesignly, FeatureSearch, FeatureVault, FeaturePush, FeatureTerminal, FeatureMachine, FeatureApps, FeatureSettings, FeatureDrafts, FeatureQueueMove, FeatureAppsHub, FeatureTerminalStop, FeatureRewind, FeatureFork, FeatureHandoff, FeatureAutoContinue, FeatureMade}
+var Features = []Feature{FeatureQueue, FeatureSteer, FeatureQuestions, FeaturePermissions, FeatureBackground, FeatureModel, FeatureVoice, FeatureFiles, FeatureCheckpoints, FeatureDesignly, FeatureSearch, FeatureVault, FeaturePush, FeatureTerminal, FeatureMachine, FeatureApps, FeatureSettings, FeatureDrafts, FeatureQueueMove, FeatureAppsHub, FeatureTerminalStop, FeatureRewind, FeatureFork, FeatureHandoff, FeatureAutoContinue, FeatureMade, FeatureChrome}
 
 // Reach is whether the cluster hears a machine; standalone it is always online.
 type Reach string
