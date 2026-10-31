@@ -13,6 +13,10 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-10-31g',
+    items: [{ key: 'quotaRetry', icon: 'rotate-ccw' }],
+  },
+  {
     id: '2026-10-31f',
     items: [
       { key: 'gpt', icon: 'sparkles' },

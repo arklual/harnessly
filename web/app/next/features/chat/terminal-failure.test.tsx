@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, expect, it, vi } from 'vitest';
-import TerminalFailureCard from '@/next/features/chat/terminal-failure';
+import TerminalFailureCard, { retryText } from '@/next/features/chat/terminal-failure';
+import type { FeedItem } from '@/next/features/chat/types';
 import { pinLocale } from '@/next/i18n';
 
 beforeAll(() => pinLocale('en'));
@@ -23,7 +24,7 @@ it('shows the terminal state and only opens target selection after the explicit 
     />,
   );
 
-  expect(screen.getByRole('alert').textContent).toContain('Provider quota exhausted');
+  expect(screen.getByRole('alert').textContent).toContain('Model limit reached');
   expect(screen.getByRole('alert').textContent).toContain('Quota exhausted for this account');
   expect(choose).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Choose another model' }));
@@ -66,4 +67,12 @@ it('keeps the target action visible but unavailable when the existing picker has
     />,
   );
   expect(screen.getByRole('button', { name: 'Choose another model' }).hasAttribute('disabled')).toBe(true);
+});
+
+it('retries the stopped turn with its own message, and leaves a waiting queue to resume', () => {
+  const turn = (text: string) => ({ kind: 'turn', key: text, prompt: { text } }) as unknown as FeedItem;
+  expect(retryText([turn('first'), turn('build it')], 0)).toBe('build it');
+  expect(retryText([turn('build it')], 2)).toBeNull();
+  expect(retryText([], 0)).toBeNull();
+  expect(retryText(null, 0)).toBeNull();
 });

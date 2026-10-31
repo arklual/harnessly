@@ -92,8 +92,32 @@
   overflow-wrap: anywhere;
 }
 .hx-terminalfailure__detail {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--hx-fg-3);
+  font: inherit;
   font-size: var(--hx-text-xs);
+  text-align: left;
+  cursor: pointer;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+.hx-terminalfailure__detail[data-open='true'] {
+  -webkit-line-clamp: unset;
+  cursor: text;
+  user-select: text;
+}
+.hx-terminalfailure__detail:hover {
+  color: var(--hx-fg-2);
+}
+.hx-terminalfailure__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin-top: var(--hx-space-2);
 }
 .hx-autoline {
   display: flex;

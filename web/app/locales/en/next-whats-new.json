@@ -1,4 +1,6 @@
 {
+  "next.whatsNew.2026-10-31g.quotaRetry.title": "«Try again» after a limit",
+  "next.whatsNew.2026-10-31g.quotaRetry.text": "When a model hit its limit, the button runs the stopped turn again, and the card says when the limit resets.",
   "next.whatsNew.2026-10-31e.questions.title": "Agent questions show at once",
   "next.whatsNew.2026-10-31e.questions.text": "When the agent thought for a long while and then asked, the card with the choices now comes up over the field instead of hiding behind «working».",
   "next.whatsNew.2026-10-31d.looks.title": "Colour themes",

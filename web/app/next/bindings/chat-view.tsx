@@ -38,7 +38,7 @@ import { modelName, pickerAgentOf } from '@/next/features/composer/agents';
 import Feed from '@/next/features/chat/feed';
 import FileShare from '@/next/features/filedoc/file-share';
 import LimitCard from '@/next/features/chat/limit-card';
-import TerminalFailureCard from '@/next/features/chat/terminal-failure';
+import TerminalFailureCard, { retryText } from '@/next/features/chat/terminal-failure';
 import ChatLogin, { loginLostTurn } from '@/next/bindings/chat-login';
 import type { FeedItem } from '@/next/features/chat/types';
 import GateCard from '@/next/features/questions/gate-card';
@@ -48,7 +48,7 @@ import type { ConvId, MachineId, TurnOutput } from '@/next/protocol/v2';
 import { useFeedKinds } from '@/next/stores/feed-kinds';
 import { downloadUrl } from '@/next/features/pane/delivered';
 import { linkReason, useConnection, useLinkRestored } from '@/next/stores/connection';
-import { useBackground, useFeed, useGates, usePictures } from '@/next/stores/conversation';
+import { useBackground, useFeed, useGates, usePictures, useQueue } from '@/next/stores/conversation';
 import { runsByCall, WorkflowRuns } from '@/next/features/workflows/run';
 import { machineApi } from '@/next/core/net/machine';
 import { MessagePictures, type IMessagePictures } from '@/next/features/chat/pictures';
@@ -147,6 +147,7 @@ const ChatView = ({
     [read, pendingItems, handoff.origin, handoff.originTurn, hasOlderTurns],
   );
   const waitingAgents = useWaitingAgents(conv);
+  const queue = useQueue(conv);
   // The chat's workflows by the Workflow call that started each: the feed's card of a call draws its run.
   const background = useBackground(conv);
   const workflowRuns = useMemo(() => runsByCall(background), [background]);
@@ -378,7 +379,11 @@ const ChatView = ({
                           <TerminalFailureCard
                             failure={record?.terminalFailure ?? null}
                             onChooseTarget={handoff.handoff ? () => requestContinue(conv) : null}
-                            onRetry={() => settled(resumeQueue(machine, conv))}
+                            onRetry={() => {
+                              const text = retryText(items, queue?.items.length ?? 0);
+                              if (text) sendMessage(machine, { conversationId: conv, text });
+                              return settled(resumeQueue(machine, conv));
+                            }}
                           />
                           {loginLost && provider && (
                             <ChatLogin

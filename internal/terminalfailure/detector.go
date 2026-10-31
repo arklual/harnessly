@@ -59,7 +59,7 @@ var (
 	// These are the user-facing terminal notices emitted by Claude/Codex and compatible backends (including Kimi's
 	// retry loop). Requiring both the usage-limit sentence and its reset sentence keeps ordinary discussion of the
 	// internal quota_exhausted code from becoming a provider failure.
-	usageLimitRE = regexp.MustCompile(`(?i)\byou['’]?ve\s+(?:reached|hit)\s+your\s+(?:(?:\d+[ -]hour|session)\s+)?(?:usage\s+)?limit\b.{0,320}\b(?:your\s+quota\s+will\s+reset|resets?\b)`)
+	usageLimitRE = regexp.MustCompile(`(?i)\byou['’]?ve\s+(?:reached|hit)\s+your\s+(?:(?:\d+[ -]hour|session|weekly|daily|opus|sonnet)\s+)*(?:usage\s+)?limit\b.{0,320}\b(?:your\s+quota\s+will\s+reset|resets?\b(?:\s+(?:at\s+)?(?:[a-z]{3,9}\s+\d{1,2},?\s+)?\d{1,2}(?::\d{2})?\s*(?:[ap]m)?(?:\s+\([^)]{1,40}\))?)?)`)
 )
 
 type Detector struct {

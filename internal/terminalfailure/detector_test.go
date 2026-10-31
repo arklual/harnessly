@@ -104,3 +104,18 @@ func TestTerminalDetectorPromotesKimiUsageLimitRetry(t *testing.T) {
 		t.Fatalf("screenshot quota line: %+v, %v", got, ok)
 	}
 }
+
+// Claude's limit notice says when the limit comes back: the detail keeps it, not a sentence cut at «resets».
+func TestUsageLimitDetailKeepsTheResetTime(t *testing.T) {
+	for _, tc := range []struct{ screen, want string }{
+		{"  ⎿  You've hit your 5-hour limit · resets 3pm (Europe/Moscow)\n     /upgrade to increase your usage limit.\n",
+			"You've hit your 5-hour limit · resets 3pm (Europe/Moscow)"},
+		{"  ⎿  You've hit your weekly limit · resets Nov 3, 10:30am (UTC)\n", "You've hit your weekly limit · resets Nov 3, 10:30am (UTC)"},
+		{"  ⎿  You've hit your session limit · resets\n", "You've hit your session limit · resets"},
+	} {
+		got, ok := detect(tc.screen)
+		if !ok || got.Detail != tc.want {
+			t.Fatalf("%q: %v %q", tc.screen, ok, got.Detail)
+		}
+	}
+}
