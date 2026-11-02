@@ -1,6 +1,9 @@
 package codemode
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // Object is an object literal: its keys in source order and the values the scanner could read (nil for an expression).
 type Object struct {
@@ -14,6 +17,14 @@ func (o *Object) str(key string) string {
 	}
 	s, _ := o.vals[key].(string)
 	return s
+}
+
+func (o *Object) number(key string) (float64, bool) {
+	if o == nil {
+		return 0, false
+	}
+	f, ok := o.vals[key].(float64)
+	return f, ok
 }
 
 // list is the objects in an array literal under key; a single object counts as a list of one.
@@ -161,6 +172,17 @@ func parseValue(s string, i int) (any, int) {
 		return parseObject(s, i)
 	case '[':
 		return parseArray(s, i)
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		// A number literal, read for the arguments that count things (generate_images' count).
+		j := i
+		for j < len(s) && (s[j] >= '0' && s[j] <= '9' || s[j] == '.') {
+			j++
+		}
+		if k := skipSpace(s, j); k >= len(s) || strings.IndexByte(",)]};", s[k]) >= 0 {
+			if f, err := strconv.ParseFloat(s[i:j], 64); err == nil {
+				return f, k
+			}
+		}
 	}
 	return nil, skipExpr(s, i)
 }

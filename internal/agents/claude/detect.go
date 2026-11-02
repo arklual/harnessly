@@ -43,9 +43,26 @@ func exists(p string) bool {
 	return err == nil
 }
 
-// IsRunning: one of the pane shell's own children is Claude.
-func (d *Detector) IsRunning(children []int) bool {
+// SandboxProgram is the wrapper a chat with apps runs Claude under (internal/apps/boundary.go). It forks Claude and
+// stays as its parent, so the detector looks through it: its children count as the pane shell's.
+const SandboxProgram = "bwrap"
+
+// throughSandbox is children with each sandbox among them replaced by its own children.
+func (d *Detector) throughSandbox(children []int) []int {
+	out := make([]int, 0, len(children))
 	for _, pid := range children {
+		if argv, ok := d.Procs.ArgvOf(pid); ok && len(argv) > 0 && filepath.Base(argv[0]) == SandboxProgram {
+			out = append(out, d.Procs.ChildrenOf(pid)...)
+			continue
+		}
+		out = append(out, pid)
+	}
+	return out
+}
+
+// IsRunning: one of the pane shell's own children (through the apps' sandbox) is Claude.
+func (d *Detector) IsRunning(children []int) bool {
+	for _, pid := range d.throughSandbox(children) {
 		if d.Match.Is(d.Procs, pid, Binary) {
 			return true
 		}
@@ -144,7 +161,7 @@ func (d *Detector) Detect(children []int) (agents.SessionInfo, error) {
 	if len(children) == 0 {
 		return agents.Info(agents.NotRunning), nil
 	}
-	all := d.Procs.WithGrandchildren(children)
+	all := d.Procs.WithGrandchildren(d.throughSandbox(children))
 	for _, rec := range d.pidFiles(all) {
 		args, ok := d.Procs.ArgsOf(rec.pid)
 		if !ok || !d.Match.Is(d.Procs, rec.pid, Binary) {
@@ -203,7 +220,7 @@ var settingsArg = regexp.MustCompile(`--settings(?:=|` + jscompat.SpaceClass + `
 // launcher writes settings of its own, and older data folders had another name). found is false when no Claude runs
 // there.
 func (d *Detector) RunsWithHooks(children []int, hooksPath, hookScriptName string) (hooked, found bool) {
-	for _, pid := range d.Procs.WithGrandchildren(children) {
+	for _, pid := range d.Procs.WithGrandchildren(d.throughSandbox(children)) {
 		args, ok := d.Procs.ArgsOf(pid)
 		if !ok || args == "" || !d.Match.Is(d.Procs, pid, Binary) {
 			continue
@@ -224,7 +241,7 @@ func (d *Detector) RunsWithHooks(children []int, hooksPath, hookScriptName strin
 // WithEnv is the Claude among the pane's children and grandchildren whose environment has one of the exact KEY=value
 // entries (the prompt editor's VISUAL), or 0.
 func (d *Detector) WithEnv(children []int, entries ...string) int {
-	for _, pid := range d.Procs.WithGrandchildren(children) {
+	for _, pid := range d.Procs.WithGrandchildren(d.throughSandbox(children)) {
 		if !d.Match.Is(d.Procs, pid, Binary) {
 			continue
 		}

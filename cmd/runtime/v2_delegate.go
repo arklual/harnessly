@@ -14,9 +14,13 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/delivery"
+	"github.com/ly-solutions/harnessly/internal/design"
+	"github.com/ly-solutions/harnessly/internal/fileplace"
+	"github.com/ly-solutions/harnessly/internal/imagegen"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
+	"github.com/ly-solutions/harnessly/internal/panel"
 	"github.com/ly-solutions/harnessly/internal/proc"
 	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/tmux"
@@ -69,14 +73,29 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		id, why := callers.of(r)
 		t := delegation.Tools{S: v.delegation, Caller: id, Why: why}
 		hand := delivery.Tools{Access: access}
+		pics := imagegen.Tools{S: imageJobs(v.d), Caller: id, Why: why, Allowed: func(p string) bool { return saveFolderOK(access, p, v.d.WorkspaceRoot, sharedProjects) }, Readable: pictureReadable(v.d, access)}
 		if id != "" {
 			hand.Handed = func(info delivery.Info) { v.openDelivered(id, info) }
 		}
 		if rec, ok := v.rt.Record(id); ok {
 			t.Provider = rec.Provider
 			hand.Cwd = rec.Cwd
+			pics.Cwd, pics.Codex = rec.Cwd, rec.Provider == wire.ProviderCodex
 		}
-		return toolsets{t, hand}
+		place := fileplace.Tools{Store: v.selections, Access: access, Chat: id, Why: why, Show: v.showFilePlace}
+		if rec, ok := v.rt.Record(id); ok {
+			place.Cwd = rec.Cwd
+		}
+		// The agent of a chat with apps stays in its wall: a chat it started or wrote to would run outside.
+		if _, walled := v.d.CLI.AgentOf(r); walled {
+			return toolsets{hand, pics, place}
+		}
+		// Only a chat that works in a video project carries the video's tools (HRN-580).
+		video := design.VideoTools{L: designAPI(v.d).L}
+		if rec, ok := v.rt.Record(id); ok {
+			video.Project = video.L.VideoProjectOf(rec.Cwd)
+		}
+		return toolsets{t, hand, pics, video, place}
 	}
 	set := previewOf(v.d)
 	set.agentTools.Store(&tools)
@@ -107,6 +126,23 @@ func (v *v2Live) openDelivered(conv string, info delivery.Info) {
 	if paneauto.OpenOnce(c.intents, tab.TabID, "files", info.Path) && c.sync != nil {
 		c.sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tab.TabID))
 	}
+}
+
+// showFilePlace opens a file in the pane of the chat's tab at a place, as the agent asked.
+func (v *v2Live) showFilePlace(conv, path, place string) error {
+	c := v.c
+	if c.cfg.Tmux == nil || c.intents == nil || v.rt == nil {
+		return errNoPane
+	}
+	tab, err := legacyTabOf(v.rt.Record, c.cfg.Tmux.ParseSessionName, conv)
+	if err != nil || tab.TabID == "" {
+		return errNoPane
+	}
+	c.intents.Add(tab.TabID, panel.Command{Kind: "open", Tab: "files", Target: path, Place: place}.JSON())
+	if c.sync != nil {
+		c.sync.Broadcast(jsvalue.NewObject("type", "pane-intents", "tabId", tab.TabID))
+	}
+	return nil
 }
 
 // toolsets are several groups of tools served as one.

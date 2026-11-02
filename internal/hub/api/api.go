@@ -4,6 +4,8 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"github.com/ly-solutions/harnessly/internal/hub/analytics"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -17,16 +19,21 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/dist"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
+	"github.com/ly-solutions/harnessly/internal/hub/ingest"
+	"github.com/ly-solutions/harnessly/internal/hub/limits"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/machines"
 	"github.com/ly-solutions/harnessly/internal/hub/mail"
+	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/proxy"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
+	"github.com/ly-solutions/harnessly/internal/hub/rates"
 	"github.com/ly-solutions/harnessly/internal/hub/relay"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/sshinstall"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
+	"github.com/ly-solutions/harnessly/internal/hub/usage"
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/sites"
 )
@@ -59,9 +66,15 @@ type Options struct {
 type Hub struct {
 	Handler http.Handler
 
-	Auth     *auth.Service
-	Spaces   *spaces.Service
-	Machines *machines.Service
+	Auth      *auth.Service
+	Spaces    *spaces.Service
+	Orgs      *orgs.Service
+	Analytics *analytics.Service
+	Machines  *machines.Service
+	// Ingest pulls the machines' spend facts; nil unless HUB_USAGE_INGEST=on.
+	Ingest *ingest.Service
+	// Limits sends the machines their limit lists; nil while HUB_LIMITS_ENFORCE=off.
+	Limits   *limits.Pusher
 	Relay    *relay.Service
 	Proxy    *proxy.Service
 	Dist     *dist.Handler
@@ -106,10 +119,35 @@ func New(o Options) (*Hub, error) {
 		Config: cfg, DB: db, Auth: h.Auth, Mailer: o.Mailer, Events: h.Events, Limiter: o.Limiter, Log: log, Now: o.Now,
 		OnMemberGone: func(spaceID, userID string) { px.Kick(spaceID, userID) },
 	})
+	var budgetSink machines.BudgetSink
+	limitsChanged := func() {}
+	if cfg.LimitsEnforce != hubproto.EnforceOff {
+		h.Limits = limits.NewPusher(limits.PushDeps{DB: db, Reg: h.Registry, Mode: cfg.LimitsEnforce, Log: log, Now: o.Now})
+		budgetSink, limitsChanged = h.Limits, h.Limits.Kick
+	}
+	rb := &rates.Book{DB: db, URL: cfg.RatesURL, Client: o.HTTPClient, Log: log, Now: o.Now}
+	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb})
+	h.Analytics = analytics.New(analytics.Deps{DB: db, Gate: h.Orgs.Gate, Log: log, Now: o.Now, Rates: rb})
+	var usageSink machines.UsageSink
+	if cfg.UsageIngest {
+		// The price list starts from the runtime's own numbers; a row an administrator corrected is never overwritten.
+		sctx, scancel := context.WithTimeout(context.Background(), 30*time.Second)
+		n, err := usage.Seed(sctx, db.S())
+		scancel()
+		if err != nil {
+			return nil, fmt.Errorf("price list: %w", err)
+		}
+		if n > 0 {
+			log.Info("price list seeded", "rows", n)
+		}
+		h.Ingest = ingest.New(ingest.Deps{DB: db, Reg: h.Registry, Log: log, Now: o.Now})
+		usageSink = h.Ingest
+	}
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
-		OnRevoked: func(machineID string) { px.Forget(machineID) },
+		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink,
 	})
+	h.Analytics.UseMachines(h.Machines)
 	h.Relay = relay.New(relay.Deps{Auth: h.Auth, DB: db, Machines: h.Machines, Reg: h.Registry, Log: log, Now: o.Now, Timeout: o.AgentTimeout})
 	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now})
 	h.Proxy = px
@@ -153,6 +191,8 @@ func New(o Options) (*Hub, error) {
 	mux.Handle("GET /api/config", httpx.Handler(h.config))
 	h.Auth.Mount(mux)
 	h.Spaces.Mount(mux)
+	h.Orgs.Mount(mux)
+	h.Analytics.Mount(mux)
 	h.Machines.Mount(mux)
 	if h.SSH != nil {
 		h.SSH.Mount(h.Spaces.Sub())
@@ -255,6 +295,12 @@ func (h *Hub) Run(ctx context.Context) {
 func (h *Hub) Shutdown() {
 	h.Events.Close()
 	h.Registry.CloseAll()
+	if h.Ingest != nil {
+		h.Ingest.Close()
+	}
+	if h.Limits != nil {
+		h.Limits.Close()
+	}
 	if h.SSH != nil {
 		h.SSH.Close()
 	}

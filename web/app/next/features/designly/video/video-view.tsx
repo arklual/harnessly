@@ -10,6 +10,8 @@ import { t } from '@/next/i18n';
 import { Skeleton } from '@/next/ui/skeleton';
 import { useMedia } from '@/next/ui/use-media';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
+import { VIDEO_FORMAT } from '@/next/features/designly/video/types';
+import { useVideoView } from '@/next/features/designly/video/use-video-view';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { setDeck } from '@/next/stores/deck';
 import { changeVideo, useVideo } from '@/next/stores/video';
@@ -178,6 +180,19 @@ const VideoView = (props: IVideoViewProps) => {
   }
   const [pop, setPop] = useState<TPop | null>(null);
   const shownPop = usePresence(pop, POP_EXIT_MS);
+  const [playing, setPlaying] = useState(false);
+  const view = useVideoView({
+    machine,
+    id,
+    time,
+    playing,
+    format: video ? formatOf(video, chosen) : VIDEO_FORMAT.landscape,
+    onSeek: setTime,
+    onFormat: setChosen,
+    onRange: setRange,
+    onLoop: setLoop,
+  });
+  const shownOffer = usePresence(view.offer, POP_EXIT_MS);
   const themeRef = useThemeVars<HTMLDivElement>(
     video ? deckTheme(video.deck).vars : DECK_THEMES[0].vars,
     video?.deck.font,
@@ -302,6 +317,8 @@ const VideoView = (props: IVideoViewProps) => {
         loop={loop}
         onComment={() => comment(range, null)}
         onPick={(pick) => comment(null, pick)}
+        command={view.command}
+        onPlaying={setPlaying}
       />
     );
   };
@@ -315,6 +332,8 @@ const VideoView = (props: IVideoViewProps) => {
       data-embed={embed ? '1' : '0'}
       data-phone={phone ? '1' : '0'}
       data-path={path ?? undefined}
+      onPointerDownCapture={view.touch}
+      onKeyDownCapture={view.touch}
     >
       <VideoBar
         title={title}
@@ -369,6 +388,30 @@ const VideoView = (props: IVideoViewProps) => {
       )}
 
       <div className="hx-video__main">
+        {shownOffer.value && (
+          <div className="hx-video__offer" data-state={shownOffer.state}>
+            <button
+              type="button"
+              className="hx-btn"
+              data-variant="ghost"
+              data-size="sm"
+              onClick={view.takeOffer}
+            >
+              {t('next.video.shell.offerShow')}
+              {shownOffer.value.t !== undefined ? ` ${clock(shownOffer.value.t)}` : ''}
+            </button>
+            <button
+              type="button"
+              className="hx-btn"
+              data-variant="ghost"
+              data-size="sm"
+              aria-label={t('next.video.shell.offerDrop')}
+              onClick={view.dropOffer}
+            >
+              ×
+            </button>
+          </div>
+        )}
         <div className="hx-video__stage" data-format={format}>
           {stageBody()}
         </div>

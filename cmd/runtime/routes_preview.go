@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
@@ -49,11 +50,14 @@ type previewSet struct {
 	// agentTools are the MCP tools besides the DevTools for the agent that calls (delegation, v2_delegate.go): set once
 	// the conversations run, nil before.
 	agentTools atomic.Pointer[func(*http.Request) mcpserver.Toolset]
-	scanner    *ports.Scanner
-	logs       *devtools.ServerLogs
-	proxy      *preview.Proxy
-	cfg        preview.Config
-	search     ports.Searcher
+	// appTools are the host's tools for the agent of a chat with apps: their own server, harnessly-app, which the launch
+	// adds to such a chat (?server=harnessly-app on this endpoint); nil before the conversations run.
+	appTools atomic.Pointer[func(*http.Request) mcpserver.Toolset]
+	scanner  *ports.Scanner
+	logs     *devtools.ServerLogs
+	proxy    *preview.Proxy
+	cfg      preview.Config
+	search   ports.Searcher
 }
 
 var (
@@ -523,7 +527,14 @@ func (s *previewSet) serveMCP(d deps, r *http.Request) (int, any, http.Header) {
 		return previewBytes(r, 400, mcpserver.ParseError(), previewNoStore())
 	}
 	srv := &mcpserver.Server{Name: s.mcpName, Sets: []mcpserver.Toolset{s.mcp}}
-	if more := s.agentTools.Load(); more != nil {
+	if r.URL.Query().Get("server") == apps.HostServer {
+		srv = &mcpserver.Server{Name: apps.HostServer}
+		if more := s.appTools.Load(); more != nil {
+			if set := (*more)(r); set != nil {
+				srv.Sets = append(srv.Sets, set)
+			}
+		}
+	} else if more := s.agentTools.Load(); more != nil {
 		if set := (*more)(r); set != nil {
 			srv.Sets = append(srv.Sets, set)
 		}

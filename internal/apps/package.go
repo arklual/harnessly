@@ -180,6 +180,39 @@ func (p *Package) checkFiles() Problems {
 		}
 	}
 
+	if sin, err := m.SinopiaOf(); err == nil {
+		if sin.Bindings != nil && sin.Bindings.Schema != "" {
+			p.checkJSON("sinopia.bindings.schema", sin.Bindings.Schema, &ps)
+		}
+		for i, k := range sin.Kinds {
+			path := fmt.Sprintf("sinopia.kinds[%d]", i)
+			if k.Schema != "" {
+				p.checkJSON(path+".schema", k.Schema, &ps)
+			}
+			if k.Icon != "" {
+				_, _ = p.stat(path+".icon", k.Icon, &ps)
+			}
+			for from, file := range k.Migrations {
+				if file == "" {
+					continue
+				}
+				if _, err := p.stat(path+".migrations."+from, file, &ps); err != nil {
+					continue
+				}
+				raw, err := p.read(file)
+				if err != nil {
+					continue
+				}
+				if _, err := ParsePatch(raw); err != nil {
+					add(path+".migrations."+from, "%s: %v", file, err)
+				}
+			}
+		}
+		for i, t := range sin.Templates {
+			_, _ = p.stat(fmt.Sprintf("sinopia.templates[%d]", i), strings.TrimSuffix(t, "/")+"/"+TemplateBoard, &ps)
+		}
+	}
+
 	if raw, err := p.read(".claude-plugin/plugin.json"); err == nil {
 		var pj struct {
 			Name string `json:"name"`

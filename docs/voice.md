@@ -71,4 +71,21 @@ model at all. Downloads: the server from this repository's `whisper-server-*` re
 workflow from the commit pinned in the Dockerfile, checked against the release's `whisper-server.sha256`) and the model
 from `huggingface.co/ggerganov/whisper.cpp`, checked against the SHA-256 in `internal/voice/engine/manifest.go`.
 
+## Cloud models and your own words
+
+Settings → Voice input → _Model_ picks who recognizes: the machine (the default; the recording never leaves it),
+OpenAI `gpt-4o-transcribe` (Realtime API transcription) or Yandex SpeechKit (v3 streaming, gRPC). A cloud model is
+offered once its key is saved in Settings → Models and keys (OpenAI: an API key; Yandex: a service account's API key and,
+if the account needs it, the folder id). The keys sit beside the vendors' keys in `<data folder>/providers` (mode 0600)
+and go only to that provider. The recording is sent to a provider only while its model is the picked one; text arrives
+in the field as you speak, as with the machine's own model.
+
+_My words_ (in the same section, kept with the account) fix what the recognizer gets wrong. A word may have _how it is
+heard_ variants (replaced exactly, ignoring case); without them it is found by how it sounds (a Cyrillic word that is
+a transliteration of a Latin one, conservatively: «синопию» becomes `Sinopia`). The replacement is made by the runtime on
+every partial and final text for any model. OpenAI also gets the words as a prompt; Yandex SpeechKit v3 takes no
+vocabulary, so for it the replacement alone works. A recording sent whole after the stop (a machine without the
+socket) is not corrected.
+
+
 Licences: [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

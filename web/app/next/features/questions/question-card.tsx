@@ -30,6 +30,8 @@ interface IQuestionCardProps {
   onAnswer: (questionId: string, answers: AnswerItem[]) => Promise<unknown>;
   /** The card is folded into its bar, so the person writes in the chat. */
   onFold?: (folded: boolean) => void;
+  /** Gives the parent what the card's button does, so Enter in the field does the same; it answers false with nothing to send. */
+  onSendReady?: (send: (() => boolean) | null) => void;
 }
 
 type TSelection = Readonly<Record<number, readonly number[]>>;
@@ -66,7 +68,7 @@ const morph = (root: HTMLElement | null, apply: () => void) => {
   );
 };
 
-const QuestionCard = ({ question, device, ownAnswer, onAnswer, onFold }: IQuestionCardProps) => {
+const QuestionCard = ({ question, device, ownAnswer, onAnswer, onFold, onSendReady }: IQuestionCardProps) => {
   const open = question !== null && (question.state.k === 'open' || question.state.k === 'answering');
   const { value: shown, state: presence } = usePresence(open ? question : null, ASK_EXIT_MS);
   const [ask, setAsk] = useAskState(shown?.id ?? null);
@@ -130,6 +132,18 @@ const QuestionCard = ({ question, device, ownAnswer, onAnswer, onFold }: IQuesti
     morph(rootRef.current, () => setAsk((state) => ({ ...state, folded })));
     onFold?.(folded);
   };
+
+  const pressButton = () => {
+    if (busy || !answered(ask.step)) return false;
+    if (last && allAnswered) submit();
+    else advance(ask.sel);
+    return true;
+  };
+  useEffect(() => {
+    if (!onSendReady) return undefined;
+    onSendReady(open ? pressButton : null);
+    return () => onSendReady(null);
+  });
 
   useDigitKeys(open && !ask.folded && !busy, current?.options.length ?? 0, (n) => pick(n - 1));
 
@@ -278,7 +292,7 @@ const QuestionCard = ({ question, device, ownAnswer, onAnswer, onFold }: IQuesti
                     variant="primary"
                     busy={busy}
                     disabled={!answered(ask.step)}
-                    onClick={() => (last && allAnswered ? submit() : advance(ask.sel))}
+                    onClick={pressButton}
                   >
                     {nextLabel}
                   </Button>

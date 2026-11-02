@@ -19,8 +19,15 @@
 // A message is taken only from window.parent.
 //
 // Headless (the render and the check, through the DevTools protocol):
-//   window.tkVideo = {v: 1, ready(): Promise, seek(ms): Promise<{same}>, audit(opts?): Promise<issue[]>, moments(),
-//                     scene({transition})}
+//   window.tkVideo = {v: 2, ready(): Promise, seek(ms): Promise<{same}>, audit(opts?): Promise<issue[]>, moments(),
+//                     scene({transition}), problems(): problem[], info(): {engines, motionDur}}
+//
+// The board's motion engines (HRN-576). All of them hang on one time:
+//   tkVideo.motion(build)  build(root) runs once the board is drawn and the fonts and images are in. With GSAP on the page
+//                          every tween and timeline it makes is gathered into one paused timeline and sought with t.
+//   tkVideo.register({name, ready?(), seek(ms)})  any other engine (a canvas, three.js, lottie): ready may return a promise
+//                          and the scene waits for it; seek draws time ms and may return a promise. seek returning false
+//                          says that nothing changed. It must draw from the time alone, not from the previous frame.
 (function () {
   'use strict';
   if (window.tkVideo) return;
@@ -38,6 +45,14 @@
   var realPerf = performance.now.bind(performance);
   var realRaf = window.requestAnimationFrame.bind(window);
   var realCaf = window.cancelAnimationFrame.bind(window);
+
+  // The deck's fonts: nothing is installed on a render machine. A @font-face costs nothing until text uses it.
+  (function () {
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/__lib/motion/fonts.css';
+    (document.head || document.documentElement).appendChild(link);
+  })();
 
   var vt = 0;
   var playing = null; // {t0, r0, rate}
@@ -100,6 +115,121 @@
       try { round[i].cb(ts); } catch (err) { tellError(err); }
     }
     return round.length;
+  }
+
+  // ---- the board's engines ----
+
+  var engines = []; // {name, ready, seek}
+  var builders = [];
+  var problems = []; // what went wrong: the check reports it
+  var settled = false; // the board is drawn and its assets are in: builders run now
+  var gsapMaster = null; // {tl, t0}: the paused timeline holding the board's tweens; t0 is the root's time at the build
+
+  function problem(code, msg) {
+    if (problems.length >= 50) return;
+    problems.push({ code: code, msg: String(msg).slice(0, 400) });
+  }
+
+  function register(engine) {
+    if (!engine || typeof engine.seek !== 'function') {
+      problem('engine', 'tkVideo.register needs {name, seek(ms)}');
+      return;
+    }
+    engines.push({ name: String(engine.name || 'engine'), ready: engine.ready, seek: engine.seek, started: null });
+    dirty = true;
+  }
+
+  function motion(build) {
+    if (typeof build !== 'function') {
+      problem('engine', 'tkVideo.motion needs a function');
+      return;
+    }
+    builders.push(build);
+    if (settled) runBuilders();
+  }
+
+  function runBuilders() {
+    if (!builders.length) return;
+    var list = builders;
+    builders = [];
+    var g = window.gsap;
+    var t0 = 0;
+    if (g) {
+      g.defaults({ lazy: false });
+      g.ticker.lagSmoothing(0);
+      t0 = g.globalTimeline.time();
+    }
+    var root = document.querySelector('main') || document.body;
+    for (var i = 0; i < list.length; i++) {
+      try { list[i](root); } catch (err) { problem('engine', 'tkVideo.motion: ' + (err && err.message || err)); tellError(err); }
+    }
+    if (!g) return;
+    // exportRoot takes in every tween made so far, also those made outside a timeline, so a frame depends on t alone.
+    var tl = g.exportRoot({ paused: true }, true);
+    g.ticker.sleep();
+    if (gsapMaster) {
+      gsapMaster.more.push(tl);
+      return;
+    }
+    gsapMaster = { tl: tl, t0: t0, more: [], last: -1 };
+    engines.push({ name: 'gsap', ready: null, started: null, seek: seekGsap });
+  }
+
+  function seekGsap(ms) {
+    var m = gsapMaster;
+    var at = ms / 1000;
+    var end = motionEnd();
+    var clamped = Math.min(at, end);
+    if (clamped === m.last) return false;
+    m.last = clamped;
+    m.tl.time(m.t0 + clamped, false);
+    for (var i = 0; i < m.more.length; i++) m.more[i].time(m.t0 + clamped, false);
+    window.gsap.ticker.sleep(); // rendering wakes it: its frames are not the scene's
+    return true;
+  }
+
+  // motionEnd: where the board's GSAP ends, in seconds from the scene's start.
+  function motionEnd() {
+    var m = gsapMaster;
+    if (!m) return 0;
+    var end = m.tl.duration() - m.t0;
+    for (var i = 0; i < m.more.length; i++) end = Math.max(end, m.more[i].duration() - m.t0);
+    return Math.max(0, end);
+  }
+
+  // Every engine draws ms; true when one of them says it changed something. Each answer is awaited through waits.
+  function seekEngines(ms, waits) {
+    var changed = false;
+    for (var i = 0; i < engines.length; i++) {
+      try {
+        var r = engines[i].seek(ms);
+        if (r && typeof r.then === 'function') {
+          changed = true;
+          if (waits) waits.push(r.then(null, engineFailed(engines[i])));
+        } else if (r !== false) {
+          changed = true;
+        }
+      } catch (err) { engineFailed(engines[i])(err); }
+    }
+    return changed;
+  }
+
+  function engineFailed(engine) {
+    return function (err) {
+      problem('engine', engine.name + ': ' + (err && err.message || err));
+      tellError(err);
+    };
+  }
+
+  function readyEngines() {
+    var waits = [];
+    for (var i = 0; i < engines.length; i++) {
+      var e = engines[i];
+      if (e.started || typeof e.ready !== 'function') continue;
+      try { e.started = Promise.resolve(e.ready()).then(null, engineFailed(e)); } catch (err) { engineFailed(e)(err); e.started = Promise.resolve(); }
+      waits.push(e.started);
+    }
+    return Promise.all(waits);
   }
 
   // ---- build-ins ----
@@ -314,9 +444,11 @@
     engage();
     vt = Math.max(0, Math.round(t));
     var ran = flushRaf();
-    var changed = apply(vt);
+    var waits = [];
+    var drew = seekEngines(vt, waits);
+    var changed = apply(vt) || drew;
     // What the callbacks and the engine's renders do lands a task later.
-    return yieldTask().then(yieldTask).then(function () {
+    return Promise.all(waits).then(yieldTask).then(yieldTask).then(function () {
       if (apply(vt)) changed = true;
       return { same: !changed && ran === 0 };
     });
@@ -331,10 +463,11 @@
 
   function moments() {
     var out = [];
-    var els = document.querySelectorAll('[data-tk-at]');
+    var els = document.querySelectorAll('[data-tk-at],[data-tk-mark]');
     for (var i = 0; i < els.length && out.length < 200; i++) {
       if (source(els[i])) continue;
       var at = secondsAttr(els[i], 'data-tk-at');
+      if (at === null) at = secondsAttr(els[i], 'data-tk-mark');
       if (at === null) continue;
       out.push({ block: blockOf(els[i]) || '', at: at, out: secondsAttr(els[i], 'data-tk-out') });
     }
@@ -376,12 +509,12 @@
     var minFont = opts && typeof opts.minFont === 'number' ? opts.minFont : 0;
     var out = [];
     var seen = {};
-    function add(code, el, px) {
+    function add(code, el, px, detail) {
       var block = blockOf(el);
-      var key = code + '|' + block;
+      var key = code + '|' + block + '|' + (detail || '');
       if (seen[key] || out.length >= 100) return;
       seen[key] = true;
-      out.push({ code: code, block: block, px: px });
+      out.push({ code: code, block: block, px: px, detail: detail || null });
     }
     var W = window.innerWidth;
     var H = window.innerHeight;
@@ -406,7 +539,49 @@
         if (r.left < -2 || r.top < -2 || r.right > W + 2 || r.bottom > H + 2) add('offscreen', el, null);
       }
     }
+    motionAudit(add, out);
     return out;
+  }
+
+  // motionAudit: two tweens driving one property of one target at once. The later one takes its start value on the first
+  // pass, so a frame reached by seeking differs from the same frame played through.
+  function motionAudit(add, out) {
+    if (!gsapMaster) return;
+    var tl = gsapMaster.tl;
+    var tweens = tl.getChildren(true, true, false);
+    var byKey = new Map();
+    var skip = { ease: 1, duration: 1, delay: 1, stagger: 1, overwrite: 1, repeat: 1, repeatDelay: 1, yoyo: 1, onComplete: 1, onUpdate: 1, onStart: 1, immediateRender: 1, lazy: 1, id: 1, startAt: 1, runBackwards: 1, data: 1, paused: 1, transformOrigin: 1, svgOrigin: 1, callbackScope: 1, onUpdateParams: 1, onCompleteParams: 1, onStartParams: 1, parent: 1 };
+    for (var i = 0; i < tweens.length && out.length < 100; i++) {
+      var tw = tweens[i];
+      if (!tw.targets || !tw.duration() || !tw.vars) continue;
+      var from = absoluteStart(tw);
+      var to = from + tw.totalDuration();
+      var targets = tw.targets();
+      for (var j = 0; j < targets.length; j++) {
+        var el = targets[j];
+        if (!el || el.nodeType !== 1) continue;
+        var seen = byKey.get(el);
+        if (!seen) { seen = {}; byKey.set(el, seen); }
+        for (var prop in tw.vars) {
+          if (skip[prop]) continue;
+          var prior = seen[prop];
+          if (prior && from < prior - 0.001) add('motion-overlap', el, null, nameOf(el) + ' ' + prop + ' at ' + (from - gsapMaster.t0).toFixed(2) + 's');
+          seen[prop] = Math.max(prior || 0, to);
+        }
+      }
+    }
+  }
+
+  function nameOf(el) {
+    var cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
+    if (el.id) return '#' + el.id;
+    return el.tagName.toLowerCase() + (cls ? '.' + cls : '');
+  }
+
+  function absoluteStart(tw) {
+    var at = tw.startTime();
+    for (var p = tw.parent; p && p !== gsapMaster.tl; p = p.parent) at = p.startTime() + at;
+    return at;
   }
 
   // ---- ready ----
@@ -428,8 +603,18 @@
         if (document.readyState !== 'loading' && drawn() || tries > 600) {
           var bar = document.querySelectorAll('[data-tk-library-bar]');
           for (var i = 0; i < bar.length; i++) bar[i].remove();
+          // Layout first: a font starts loading only once text asks for it.
+          void document.documentElement.offsetHeight;
           var fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
-          fonts.then(images).then(function () { engage(); resolve(true); });
+          fonts.then(images).then(function () {
+            settled = true;
+            runBuilders();
+            return readyEngines();
+          }).then(function () {
+            engage();
+            seekEngines(vt, null);
+            resolve(true);
+          });
           return;
         }
         setTimeout(poll, 25);
@@ -454,6 +639,7 @@
     if (!playing) return;
     vt = Math.max(0, Math.round(playing.t0 + (realPerf() - playing.r0) * playing.rate));
     flushRaf();
+    seekEngines(vt, null);
     apply(vt);
     var now = realPerf();
     if (now - lastTime >= TIME_EVERY) {
@@ -528,15 +714,52 @@
     }
   });
 
-  window.addEventListener('error', function (event) { tellError(event.error || event.message); });
+  window.addEventListener('error', function (event) {
+    var t = event.target;
+    if (t && t !== window && t.nodeType === 1) {
+      problem('asset', (t.src || t.href || t.tagName) + ' did not load');
+      return;
+    }
+    problem('script', event.message || event.error);
+    tellError(event.error || event.message);
+  }, true);
+  window.addEventListener('unhandledrejection', function (event) {
+    problem('script', event.reason && event.reason.message || event.reason);
+    tellError(event.reason);
+  });
+
+  // external: what the board fetched from another origin. A video draws from the project and the kit alone.
+  function external() {
+    var out = [];
+    var list = performance.getEntriesByType ? performance.getEntriesByType('resource') : [];
+    for (var i = 0; i < list.length; i++) {
+      var u = list[i].name;
+      if (u.indexOf('data:') === 0 || u.indexOf('blob:') === 0) continue;
+      try { if (new URL(u).origin !== location.origin) out.push(u); } catch (err) { /* not an address */ }
+    }
+    return out;
+  }
+
+  function allProblems() {
+    var out = problems.slice();
+    var ext = external();
+    for (var i = 0; i < ext.length && i < 10; i++) out.push({ code: 'external', msg: ext[i] });
+    return out;
+  }
 
   window.tkVideo = {
-    v: 1,
+    v: 2,
     ready: ready,
     seek: function (ms) { return ready().then(function () { playing = null; return seekTo(ms); }); },
     audit: function (opts) { return ready().then(function () { return audit(opts); }); },
     moments: moments,
     scene: setScene,
+    motion: motion,
+    register: register,
+    problems: allProblems,
+    info: function () {
+      return { engines: engines.map(function (e) { return e.name; }), motionDur: Math.round(motionEnd() * 1000) };
+    },
   };
 
   // Once the board is drawn: hide what waits for its moment, then say the scene is ready.

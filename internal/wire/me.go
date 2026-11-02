@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"unicode/utf8"
 )
@@ -23,6 +24,51 @@ type PersonSettings struct {
 	DefaultMachine *string        `json:"defaultMachine"`
 	Notify         NotifySettings `json:"notify"`
 	QuickPrompts   []string       `json:"quickPrompts"`
+	// Keys are the shortcuts the person changed: an action's id to its shortcuts («Mod+Shift+KeyO»); an empty list
+	// turns the action off.
+	Keys  map[string][]string `json:"keys"`
+	Voice VoiceSettings       `json:"voice"`
+}
+
+// VoiceEngines are the recognition models a person may pick for dictation: the machine's own, OpenAI's, Yandex's.
+const (
+	VoiceEngineLocal  = "local"
+	VoiceEngineOpenAI = "openai"
+	VoiceEngineYandex = "yandex"
+)
+
+// VoiceEngines is every recognition model, in the order Settings lists them.
+var VoiceEngines = []string{VoiceEngineLocal, VoiceEngineOpenAI, VoiceEngineYandex}
+
+// VoiceSettings are the dictation's: which model recognizes and the person's own words.
+type VoiceSettings struct {
+	Engine string      `json:"engine"`
+	Words  []VoiceWord `json:"words"`
+}
+
+// VoiceWord is a word the recognizer gets wrong: how it is written and, optionally, how it is heard.
+type VoiceWord struct {
+	Word  string   `json:"word"`
+	Heard []string `json:"heard"`
+}
+
+// Limits of the dictionary.
+const (
+	MaxVoiceWords    = 200
+	MaxVoiceWordLen  = 64
+	MaxVoiceHeard    = 10
+	maxVoiceHeardLen = 64
+)
+
+func validVoice(v VoiceSettings) bool {
+	ok := slices.Contains(VoiceEngines, v.Engine) && v.Words != nil && len(v.Words) <= MaxVoiceWords
+	for _, w := range v.Words {
+		ok = ok && w.Word != "" && utf8.RuneCountInString(w.Word) <= MaxVoiceWordLen && w.Heard != nil && len(w.Heard) <= MaxVoiceHeard
+		for _, h := range w.Heard {
+			ok = ok && h != "" && utf8.RuneCountInString(h) <= maxVoiceHeardLen
+		}
+	}
+	return ok
 }
 
 // NotifySettings: which events notify, with a sound, and the do-not-disturb switch.
@@ -45,7 +91,7 @@ type Me struct {
 func DefaultSettings() PersonSettings {
 	return PersonSettings{UIVersion: "next", Locale: "ru", Density: "compact", TextSize: "m", EnterSends: true,
 		Notify:       NotifySettings{Types: []string{"turn-finished", "question", "permission"}},
-		QuickPrompts: []string{}}
+		QuickPrompts: []string{}, Keys: map[string][]string{}, Voice: VoiceSettings{Engine: VoiceEngineLocal, Words: []VoiceWord{}}}
 }
 
 // Limits of the settings a page may write.
@@ -53,6 +99,8 @@ const (
 	MaxQuickPrompts   = 50
 	MaxQuickPromptLen = 2000
 	MaxNotifyTypes    = 32
+	MaxKeyActions     = 200
+	MaxKeysPerAction  = 8
 	MaxSettingsBody   = 128 << 10
 )
 
@@ -86,10 +134,18 @@ func (f *FileMe) load() Me {
 			me = saved
 		}
 	}
+	// A record from before the dictation settings has none of them.
+	if me.Settings.Voice.Engine == "" {
+		me.Settings.Voice = DefaultSettings().Voice
+	}
 	// Finished turns fold; «full» was the old default, written with every other setting, and no
 	// page offers the switch yet: a saved «full» is that default. Goes when the settings get the switch.
 	if me.Settings.Density == "full" {
 		me.Settings.Density = "compact"
+	}
+	// A record from before the shortcuts has none of them.
+	if me.Settings.Keys == nil {
+		me.Settings.Keys = map[string][]string{}
 	}
 	me.Email = nil
 	if f.Name != "" {
@@ -185,12 +241,52 @@ func applySettingsPatch(cur PersonSettings, patch json.RawMessage) (PersonSettin
 				ok = ok && p != "" && utf8.RuneCountInString(p) <= MaxQuickPromptLen
 			}
 			next.QuickPrompts = q
+		case "keys":
+			var m map[string][]string
+			ok = one(raw, &m) && m != nil && len(m) <= MaxKeyActions
+			for id, chords := range m {
+				ok = ok && validKeyAction(id) && chords != nil && len(chords) <= MaxKeysPerAction
+				for _, c := range chords {
+					ok = ok && validChord(c)
+				}
+			}
+			next.Keys = m
+		case "voice":
+			var v VoiceSettings
+			ok = one(raw, &v) && validVoice(v)
+			next.Voice = v
 		}
 		if !ok {
 			return cur, ErrMeBadPatch
 		}
 	}
 	return next, nil
+}
+
+// validKeyAction: an action's id is «scope.name», as the page's list has them.
+func validKeyAction(id string) bool {
+	if id == "" || len(id) > 64 {
+		return false
+	}
+	for _, r := range id {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+// validChord: a shortcut is its modifiers (Mod, Ctrl, Alt, Shift) and a key's place, joined by «+».
+func validChord(c string) bool {
+	if c == "" || len(c) > 64 {
+		return false
+	}
+	for _, r := range c {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '+') {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidMachineID: a machine id is a short token, not a path or a sentence.

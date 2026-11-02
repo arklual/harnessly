@@ -533,14 +533,34 @@ func videoCRF(draft bool) int {
 	return VideoFinalCRF
 }
 
-// videoClipArgs reads JPEG frames from stdin and writes one scene's clip: a fixed size, no sound.
+// videoPreset is x264's speed: a final render takes its time, since it is what people see.
+func videoPreset(draft bool) string {
+	if draft {
+		return "veryfast"
+	}
+	return "slow"
+}
+
+// videoColorArgs tags the stream as BT.709: without the tags a player guesses, and greys and accents shift.
+func videoColorArgs() []string {
+	return []string{"-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"}
+}
+
+// videoClipArgs reads frames from stdin (PNG for a final render, JPEG for a draft) and writes one scene's clip: a fixed
+// size, no sound.
 func videoClipArgs(f VideoFormat, draft bool, out string) []string {
 	w, h := f.Size(draft)
-	return []string{"-hide_banner", "-y", "-loglevel", "error",
-		"-f", "image2pipe", "-c:v", "mjpeg", "-framerate", strconv.Itoa(videoFPSNow), "-i", "pipe:0",
-		"-vf", fmt.Sprintf("scale=%d:%d:out_range=tv,setsar=1,format=yuv420p", w, h),
-		"-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", strconv.Itoa(videoCRF(draft)), "-r", strconv.Itoa(videoFPSNow),
-		"-pix_fmt", "yuv420p", "-threads", "2", "-f", "mp4", out}
+	codec := "png"
+	if draft {
+		codec = "mjpeg"
+	}
+	args := []string{"-hide_banner", "-y", "-loglevel", "error",
+		"-f", "image2pipe", "-c:v", codec, "-framerate", strconv.Itoa(videoFPSNow), "-i", "pipe:0",
+		"-vf", fmt.Sprintf("scale=%d:%d:out_color_matrix=bt709:out_range=tv,setsar=1,format=yuv420p", w, h),
+		"-an", "-c:v", "libx264", "-preset", videoPreset(draft), "-crf", strconv.Itoa(videoCRF(draft)), "-r", strconv.Itoa(videoFPSNow),
+		"-pix_fmt", "yuv420p"}
+	args = append(args, videoColorArgs()...)
+	return append(args, "-threads", "2", "-f", "mp4", out)
 }
 
 // videoJoinArgs joins the clips named in list (relative names in the list's folder) without re-encoding.
@@ -551,10 +571,12 @@ func videoJoinArgs(list, out string) []string {
 
 // videoSubsArgs burns subs.ass (in the folder ffmpeg runs in) into in.
 func videoSubsArgs(in, out string, draft bool) []string {
-	return []string{"-hide_banner", "-y", "-loglevel", "error", "-nostdin", "-progress", "pipe:1", "-nostats",
+	args := []string{"-hide_banner", "-y", "-loglevel", "error", "-nostdin", "-progress", "pipe:1", "-nostats",
 		"-protocol_whitelist", "file", "-i", in, "-vf", "subtitles=subs.ass", "-an",
-		"-c:v", "libx264", "-preset", "veryfast", "-crf", strconv.Itoa(videoCRF(draft)), "-r", strconv.Itoa(videoFPSNow),
-		"-pix_fmt", "yuv420p", "-threads", "2", "-movflags", "+faststart", "-f", "mp4", out}
+		"-c:v", "libx264", "-preset", videoPreset(draft), "-crf", strconv.Itoa(videoCRF(draft)), "-r", strconv.Itoa(videoFPSNow),
+		"-pix_fmt", "yuv420p"}
+	args = append(args, videoColorArgs()...)
+	return append(args, "-threads", "2", "-movflags", "+faststart", "-f", "mp4", out)
 }
 
 // videoConcatList is the concat demuxer's list. Only the hex keys of our own clips go in it, never a name from outside.
@@ -632,9 +654,12 @@ func (l *Library) renderClip(ctx context.Context, bin string, tab *deckTab, id s
 	if err := cmd.Start(); err != nil {
 		return err
 	}
+	if tab != nil {
+		tab.lossless = !draft
+	}
 	// The engine's frame loop waits for a busy machine (videoWaitLoad), within a budget per scene.
 	ferr := videoFramesImpl(l, cctx, tab, id, sc, f, draft, videoFrameTimes(sc.Dur), func(s videoShot) error {
-		if _, err := stdin.Write(s.JPEG); err != nil {
+		if _, err := stdin.Write(s.Image); err != nil {
 			return err
 		}
 		frame()

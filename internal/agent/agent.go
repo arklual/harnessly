@@ -37,10 +37,11 @@ type Agent struct {
 	cfg    Config
 	secret []byte
 	// secretMu guards secret for a hub-mode agent, which starts before the runtime has written it.
-	secretMu sync.Mutex
-	roots    Roots
-	hello    Hello
-	client   *http.Client
+	secretMu   sync.Mutex
+	roots      Roots
+	hello      Hello
+	appsGuests *appsGuests
+	client     *http.Client
 
 	tunnels     *tunnels
 	state       *stateFiles
@@ -164,6 +165,8 @@ func (a *Agent) serveLink(conn *websocket.Conn, heard chan<- struct{}, hub bool)
 	a.mu.Unlock()
 	if hub {
 		a.hub.linkUp(l)
+	} else {
+		a.replayAppsGuests(l)
 	}
 	defer func() {
 		a.mu.Lock()
@@ -386,6 +389,20 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 	case "design.notify":
 		res, err := a.callRuntime(route("design/notify"), body(req))
 		return res, nil, err
+	case "apps.team":
+		// The platform's snapshot of the team (role, catalog, installs): the member's registry merges it in.
+		res, err := a.callRuntime(route("apps/team/sync"), body(req))
+		return res, nil, err
+	case "apps.team.snapshot":
+		res, err := a.callRuntime(route("apps/team/snapshot"), body(req))
+		return res, nil, err
+	case "apps.public":
+		// The platform's reviewed list of the public catalog, with the archives.
+		res, err := a.callRuntime(route("apps/public/sync"), body(req))
+		return res, nil, err
+	case "apps.public.snapshot":
+		res, err := a.callRuntime(route("apps/public/snapshot"), body(req))
+		return res, nil, err
 	case "eval.start":
 		res, err := a.callRuntime(route("eval/start"), body(req))
 		return res, nil, err
@@ -593,8 +610,9 @@ func every(ctx context.Context, d time.Duration, now bool, f func()) {
 	}
 }
 
-// runHub is Run for a machine registered with a hub: no transcripts are read and no state is kept in step, only the
-// hub's operations are served, over the signed link the hub-side loop keeps.
+// runHub is Run for a machine registered with a hub: no transcripts are sent and no state is kept in step, only the
+// hub's operations are served, over the signed link the hub-side loop keeps. The one thing read from the transcripts is
+// the numbers of the usage outbox (docs/hub/usage.md), when the binary brings a feed for it.
 func (a *Agent) runHub(ctx context.Context) error {
 	if err := a.hub.start(ctx); err != nil {
 		return err

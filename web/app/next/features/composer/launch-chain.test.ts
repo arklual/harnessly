@@ -99,6 +99,18 @@ describe('the steps of a start', () => {
     expect(chainOver(sent)).toBe(true);
   });
 
+  it('ends once the agent is at work, whatever the person queued for the next turn', () => {
+    const plan = chainPlan(input({ pending: undefined }));
+    const working = input({ agent: 'working', pending: undefined, waiting: 1 });
+    expect(states(plan, working)).toEqual(['launch:done', 'send:done']);
+    expect(chainOver(working)).toBe(true);
+  });
+
+  it('keeps the message step while an idle agent has not taken it', () => {
+    const idle = input({ agent: 'idle', pending: undefined, waiting: 1 });
+    expect(chainOver(idle)).toBe(false);
+  });
+
   it('has only the steps there is something for', () => {
     expect(chainPlan(input({ pending: undefined, waiting: 0 }))).toEqual({
       launch: true,

@@ -400,6 +400,31 @@ func TestDesigns(t *testing.T) {
 	}
 }
 
+func TestApps(t *testing.T) {
+	refused(t, open("app", "acme.demo"))
+	withApps := targets
+	withApps.AppRef = func(text string) string {
+		if text == "acme.demo" || text == "acme.demo/main" {
+			return "acme.demo/main"
+		}
+		return ""
+	}
+	for _, in := range []string{"acme.demo", " acme.demo/main "} {
+		c, err := withApps.Parse(open("app", in))
+		if err != "" || c != (Command{Kind: "open", Tab: "app", Target: "acme.demo/main"}) {
+			t.Errorf("%q → %+v %q", in, c, err)
+		}
+	}
+	for _, in := range []string{"acme.other", "acme.demo/../x", "acme.demo\u001b[201~"} {
+		if c, err := withApps.Parse(open("app", in)); err == "" {
+			t.Errorf("accepted %q → %+v", in, c)
+		}
+	}
+	if c, err := withApps.Parse(open("app", nil)); err != "" || c != (Command{Kind: "open", Tab: "app"}) {
+		t.Errorf("the list: %+v %q", c, err)
+	}
+}
+
 func TestAutoAndReloadTravel(t *testing.T) {
 	got := string(jsvalue.Stringify(Command{Kind: "open", Tab: "artifacts", Target: "/agents/docs/a", Auto: true, Reload: true}.JSON(), ""))
 	if got != `{"kind":"open","tab":"artifacts","target":"/agents/docs/a","auto":true,"reload":true}` {

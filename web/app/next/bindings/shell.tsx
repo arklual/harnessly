@@ -58,10 +58,16 @@ import HomeTools, { type IHomeTool } from '@/next/features/shell/home-tools';
 import { PeopleBlock } from '@/next/bindings/asks';
 import RailChats from '@/next/features/sidebar/rail-chats';
 import { useShellTabs, wantsNewTab } from '@/next/bindings/tabs';
+import { useShellKeys } from '@/next/bindings/shell-keys';
 import { useTopTabs } from '@/next/stores/tabs';
 import { usePhone } from '@/next/ui/use-media';
 import Sidebar from '@/next/features/sidebar/sidebar';
-import LegacyScreen, { LEGACY_SCREEN } from '@/next/legacy/screens';
+import { useSidebarApps } from '@/next/bindings/use-sidebar-apps';
+import AppMainPage from '@/next/bindings/app-main';
+import AppDocPage from '@/next/bindings/app-doc';
+import AppsListPage from '@/next/bindings/apps-list';
+import { AppConfirmHost } from '@/next/features/app-views/confirm';
+import LegacyScreen, { LEGACY_SCREEN, ManageScreen } from '@/next/legacy/screens';
 import {
   SIDEBAR_VIEW,
   type IMoreItem,
@@ -69,6 +75,7 @@ import {
   type ISidebarProject,
 } from '@/next/features/sidebar/types';
 import Icon from '@/next/ui/icon';
+import { hubHref } from '@/next/features/manage/api';
 import LazyView from '@/next/ui/lazy-view';
 import { usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
@@ -192,6 +199,7 @@ const sidebarView = (route: TRoute) => {
     route.kind === ROUTE.designlyNew ||
     route.kind === ROUTE.videoNew ||
     route.kind === ROUTE.site ||
+    route.kind === ROUTE.appDoc ||
     route.kind === ROUTE.invite
   )
     return SIDEBAR_VIEW.designly;
@@ -329,12 +337,15 @@ const Shell = ({ owner }: IShellProps) => {
     return () => clearTimeout(timer);
   }, [currentId, present, listed]);
 
-  // Reading the chat reads it: what the agent finished while it is on screen is seen.
-  const unreadUpTo = record && isUnread(record) ? (record.lastTurn?.endedAt ?? null) : null;
+  // Reading the chat reads it: what the agent finished while it is on screen is seen, beside an app's page too.
+  const besideId = route.kind === ROUTE.app ? (route.chat ?? null) : null;
+  const beside = useConversation(besideId && isConvId(besideId) ? besideId : null);
+  const reading = route.kind === ROUTE.app ? beside : record;
+  const unreadUpTo = reading && isUnread(reading) ? (reading.lastTurn?.endedAt ?? null) : null;
   useEffect(() => {
-    if (!record || unreadUpTo === null || document.visibilityState !== 'visible') return;
-    void markSeen(record.machineId, record.id, unreadUpTo);
-  }, [record, unreadUpTo]);
+    if (!reading || unreadUpTo === null || document.visibilityState !== 'visible') return;
+    void markSeen(reading.machineId, reading.id, unreadUpTo);
+  }, [reading, unreadUpTo]);
 
   // Back on a wide window, the phone drawer's state would leave the window inert: it closes.
   useEffect(() => {
@@ -347,21 +358,28 @@ const Shell = ({ owner }: IShellProps) => {
   }, []);
 
   useEffect(() => {
+    if (!drawerOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      const mod = (event.metaKey || event.ctrlKey) && !event.altKey;
-      if (mod && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setSearchOpen((current) => !current);
-      } else if (mod && event.key.toLowerCase() === 'b') {
-        event.preventDefault();
-        toggleRail();
-      } else if (event.key === 'Escape' && drawerOpen) setDrawerOpen(false);
+      if (event.key === 'Escape') setDrawerOpen(false);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [drawerOpen]);
+  const keysHelp = useShellKeys({
+    chats: model.chats,
+    currentId,
+    navigate,
+    openChat,
+    toggleSearch: () => setSearchOpen((current) => !current),
+    toggleRail,
+  });
 
-  const notices = useNotices({ person: owner || 'local', currentId, onOpenChat: openChat });
+  // The chat in sight, the open one or the one beside an app's page: its replies are no news.
+  const notices = useNotices({
+    person: owner || 'local',
+    currentId: besideId ?? currentId,
+    onOpenChat: openChat,
+  });
   const notify = useNotify();
 
   const chat = useMemo(
@@ -414,26 +432,31 @@ const Shell = ({ owner }: IShellProps) => {
   ];
   const more: readonly IMoreItem[] = [
     {
-      id: 'apps',
-      icon: 'app-window',
-      label: t('next.sidebar.apps'),
-      current: route.kind === ROUTE.apps,
-      onSelect: () => openScreen({ kind: ROUTE.apps }),
+      id: 'tasks',
+      icon: 'list-checks',
+      label: t('next.sidebar.tasks'),
+      current: route.kind === ROUTE.tasks,
+      onSelect: () => openScreen({ kind: ROUTE.tasks }),
     },
     {
-      id: 'efficiency',
-      icon: 'gauge',
-      label: t('next.sidebar.efficiency'),
-      current: route.kind === ROUTE.efficiency,
-      onSelect: () => openScreen({ kind: ROUTE.efficiency }),
+      id: 'manage',
+      icon: 'sliders-horizontal',
+      label: t('next.sidebar.manage'),
+      current: route.kind === ROUTE.manage || route.kind === ROUTE.stats || route.kind === ROUTE.efficiency,
+      onSelect: () => openScreen({ kind: ROUTE.manage }),
     },
-    {
-      id: 'stats',
-      icon: 'chart-column',
-      label: t('next.sidebar.stats'),
-      current: route.kind === ROUTE.stats,
-      onSelect: () => openScreen({ kind: ROUTE.stats }),
-    },
+    ...(hubHref()
+      ? [
+          {
+            id: 'hub',
+            icon: 'layout-dashboard',
+            label: t('next.sidebar.hub'),
+            external: true,
+            current: false,
+            onSelect: () => window.location.assign(hubHref() ?? '/'),
+          } satisfies IMoreItem,
+        ]
+      : []),
   ];
 
   // No machine runs the new runtime: nothing will load, the list is empty rather than a skeleton forever.
@@ -507,6 +530,14 @@ const Shell = ({ owner }: IShellProps) => {
     route.kind === ROUTE.site ? route.id : null,
     route.kind,
   );
+  const openAppScreen = useCallback(
+    (to: TRoute) => {
+      navigate(to);
+      setDrawerOpen(false);
+    },
+    [navigate],
+  );
+  const sidebarApps = useSidebarApps(noV2 ? null : model.active, model.conversations, route, openAppScreen);
   const designMachine = useMemo(
     () =>
       model.active && model.startMachines.length > 1
@@ -597,6 +628,7 @@ const Shell = ({ owner }: IShellProps) => {
       onPickMachine={pickMachine}
       onManageMachines={() => openScreen({ kind: ROUTE.settings, section: 'machines' })}
       people={<PeopleBlock machine={noV2 ? null : model.active} />}
+      apps={sidebarApps}
       designs={
         workingDesigns && {
           rows: workingDesigns,
@@ -632,15 +664,14 @@ const Shell = ({ owner }: IShellProps) => {
   });
   const homeTools: readonly IHomeTool[] = [
     toolOf('designly', 'palette', t('next.sidebar.designly'), { kind: ROUTE.designly }),
-    toolOf('apps', 'app-window', t('next.sidebar.apps'), { kind: ROUTE.apps }),
+    toolOf('tasks', 'list-checks', t('next.sidebar.tasks'), { kind: ROUTE.tasks }),
     {
       id: 'search',
       icon: 'search',
       label: t('next.sidebar.search'),
       onOpen: () => setSearchOpen(true),
     },
-    toolOf('stats', 'chart-column', t('next.sidebar.stats'), { kind: ROUTE.stats }),
-    toolOf('efficiency', 'gauge', t('next.sidebar.efficiency'), { kind: ROUTE.efficiency }),
+    toolOf('manage', 'sliders-horizontal', t('next.sidebar.manage'), { kind: ROUTE.manage }),
     toolOf('settings', 'settings', t('next.shell.settings'), { kind: ROUTE.settings, section: null }),
   ];
 
@@ -648,6 +679,7 @@ const Shell = ({ owner }: IShellProps) => {
     <>
       {projectDialog.dialog}
       {projectSettings.dialog}
+      <AppConfirmHost />
       {resumeDialog.dialog}
       <NotificationCenter
         open={notifications !== null}
@@ -726,6 +758,7 @@ const Shell = ({ owner }: IShellProps) => {
       <UpdateBanner available={update.available} onReload={update.reload} onDismiss={update.dismiss} />
       <ReleaseNotice release={update.available ? null : release.release} onDismiss={release.dismiss} />
       <WhatsNew ready={boot.k === 'ready'} updating={update.available} />
+      {keysHelp}
     </>
   );
 
@@ -761,7 +794,10 @@ const Shell = ({ owner }: IShellProps) => {
       {/* The open design, the Apps screen and Settings have their own strip at the top: no header over them. */}
       {route.kind !== ROUTE.site &&
         route.kind !== ROUTE.invite &&
+        route.kind !== ROUTE.tasks &&
         route.kind !== ROUTE.apps &&
+        route.kind !== ROUTE.app &&
+        route.kind !== ROUTE.appDoc &&
         route.kind !== ROUTE.settings && (
           <ChatHeader
             chat={chat}
@@ -850,8 +886,28 @@ const Shell = ({ owner }: IShellProps) => {
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.videoNew && model.active && (
         <VideoCreateView key={model.active} machine={model.active} machines={designMachine} />
       )}
-      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.apps && model.active && (
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.tasks && model.active && (
         <AppsScreen key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />
+      )}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.apps && model.active && (
+        <AppsListPage key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />
+      )}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
+        <AppMainPage
+          key={`${route.id}/${route.chat ?? ''}/${tabs.activeId}`}
+          machine={model.active}
+          id={route.id}
+          chat={route.chat ?? null}
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
+      )}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.appDoc && model.active && (
+        <AppDocPage
+          key={`${model.active}/${route.id}`}
+          machine={model.active}
+          id={route.id}
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.settings && model.active && (
         <SettingsScreen
@@ -862,8 +918,11 @@ const Shell = ({ owner }: IShellProps) => {
           onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
-      {route.kind === ROUTE.stats && <LegacyScreen screen={LEGACY_SCREEN.stats} />}
-      {route.kind === ROUTE.efficiency && <LegacyScreen screen={LEGACY_SCREEN.efficiency} />}
+      {route.kind === ROUTE.manage && <ManageScreen onOpen={navigate} />}
+      {route.kind === ROUTE.stats && <LegacyScreen screen={LEGACY_SCREEN.stats} onOpen={navigate} />}
+      {route.kind === ROUTE.efficiency && (
+        <LegacyScreen screen={LEGACY_SCREEN.efficiency} onOpen={navigate} />
+      )}
       {route.kind === ROUTE.invite && <InviteAccept key={route.token} token={route.token} />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.site && !model.active && <SiteWait />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.site && model.active && (

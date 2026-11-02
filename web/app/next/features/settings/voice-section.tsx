@@ -12,7 +12,11 @@ import {
   needsNewKey,
   originOf,
 } from '@/next/features/settings/voice-api';
+import DictionaryGroup from '@/next/features/settings/dictionary-group';
+import { engineChoices } from '@/next/features/settings/voice-engines';
+import type { SpeechKeys } from '@/next/features/providers/speech-keys';
 import { t } from '@/next/i18n';
+import type { VoiceEngineId, VoiceSettings, VoiceWord } from '@/next/stores/me';
 import { VOICE_LANGS, type IVoicePrefs, type TVoiceLang } from '@/next/stores/voice';
 
 export interface IMicrophone {
@@ -35,6 +39,14 @@ export interface IVoiceSectionProps {
   microphones: readonly IMicrophone[] | null;
   modelBusy: boolean;
   engineBusy: boolean;
+  /** The person's choice of the recognition model and their words (the account's). */
+  voice: VoiceSettings;
+  /** The cloud models' keys on the machine; null while unread or when the machine cannot say. */
+  speechKeys: SpeechKeys | null;
+  voiceBusy: boolean;
+  onVoiceEngine: (engine: VoiceEngineId) => void;
+  /** Saves the whole dictionary; resolves with the reason in words, null when kept. */
+  onWords: (words: VoiceWord[]) => Promise<string | null>;
   onDevice: (id: string | null) => void;
   onLang: (lang: TVoiceLang) => void;
   onModel: (model: TVoiceModel) => void;
@@ -165,6 +177,11 @@ const VoiceSection = ({
   microphones,
   modelBusy,
   engineBusy,
+  voice,
+  speechKeys,
+  voiceBusy,
+  onVoiceEngine,
+  onWords,
   onDevice,
   onLang,
   onModel,
@@ -191,6 +208,17 @@ const VoiceSection = ({
     });
   return (
     <>
+      <Group title={t('next.settings.voice.recognizer')} foot={t('next.settings.voice.recognizer.foot')}>
+        <MenuRow
+          label={t('next.settings.voice.recognizer.label')}
+          hint={t('next.settings.voice.recognizer.hint')}
+          value={voice.engine}
+          choices={engineChoices(speechKeys)}
+          busy={voiceBusy}
+          onPick={(value) => onVoiceEngine(value as VoiceEngineId)}
+        />
+      </Group>
+      <DictionaryGroup words={voice.words} onSave={onWords} />
       {engine && (
         <Group
           title={t('next.settings.voice.machine')}

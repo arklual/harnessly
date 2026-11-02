@@ -88,6 +88,7 @@
   "pane.paneRegistry.gallery": "Gallery",
   "pane.paneRegistry.task": "Task",
   "pane.paneRegistry.vault": "Vault",
+  "pane.paneRegistry.app": "App",
   "pane.designCheckPanel.desktop": "desktop",
   "pane.designCheckPanel.phone": "phone",
   "pane.designCheckPanel.open": "Open “{title}”",

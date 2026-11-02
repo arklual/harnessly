@@ -19,6 +19,10 @@ import (
 )
 
 const (
+	OrgsOff    = "off"
+	OrgsShadow = "shadow"
+	OrgsOn     = "on"
+
 	EditionSelfHosted = "self-hosted"
 	EditionCloud      = "cloud"
 	SignupOpen        = "open"
@@ -91,9 +95,21 @@ type Config struct {
 	// the data folder.
 	SecretKey       string
 	MinAgentVersion string
-	TermsURL        string
-	WebDir          string
-	LogLevel        string
+	// Orgs (HUB_ORGS) is how far organizations are switched on: OrgsOff (the schema is there, the hub behaves as before),
+	// OrgsShadow (the new endpoints answer instance administrators only: checking and seeding), OrgsOn (everyone).
+	Orgs string
+	// UsageIngest (HUB_USAGE_INGEST=on) lets the hub pull the machines' spend facts (docs/hub/usage.md); off: it never
+	// asks, and the spend tables stay empty.
+	UsageIngest bool
+	// LimitsEnforce (HUB_LIMITS_ENFORCE) is what the machines do with the limits (docs/hub/limits.md): off sends them
+	// nothing (the hub still shows the limits), warn makes a stop only a notice, stop stops new chats.
+	LimitsEnforce string
+	// RatesURL (HUB_RATES_URL) is where the Central Bank's daily rates are read; "" is cbr.ru, "off" never fetches (money
+	// is then shown in dollars).
+	RatesURL string
+	TermsURL string
+	WebDir   string
+	LogLevel string
 }
 
 // SitesS3 is an S3-compatible bucket for the sites' files (MinIO, Selectel). Endpoint empty: a folder.
@@ -303,6 +319,24 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	default:
 		bad("HUB_SSH must be on or off")
 	}
+	switch c.Orgs = strings.ToLower(def("HUB_ORGS", OrgsOff)); c.Orgs {
+	case OrgsOff, OrgsShadow, OrgsOn:
+	default:
+		bad("HUB_ORGS must be off, shadow or on, got %q", c.Orgs)
+	}
+	switch strings.ToLower(def("HUB_USAGE_INGEST", "off")) {
+	case "on", "true", "1", "yes":
+		c.UsageIngest = true
+	case "off", "false", "0", "no":
+	default:
+		bad("HUB_USAGE_INGEST must be on or off")
+	}
+	switch c.LimitsEnforce = strings.ToLower(def("HUB_LIMITS_ENFORCE", "off")); c.LimitsEnforce {
+	case "off", "warn", "stop":
+	default:
+		bad("HUB_LIMITS_ENFORCE must be off, warn or stop, got %q", c.LimitsEnforce)
+	}
+	c.RatesURL = get("HUB_RATES_URL")
 	switch strings.ToLower(def("HUB_SSH_ALLOW_PRIVATE", "off")) {
 	case "on", "true", "1", "yes":
 		c.SSHAllowPrivate = true

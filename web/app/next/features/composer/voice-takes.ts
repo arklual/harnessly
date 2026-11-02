@@ -126,6 +126,11 @@ const sync = async (id: string) => {
   }
 };
 
+/** What could not reach the cluster earlier (the upload failed or the page went) goes now. */
+export const syncTakes = () => {
+  for (const take of takesStore.values()) if (!take.cloud && take.state !== 'live') void sync(take.id);
+};
+
 let loaded: { person: string; done: Promise<void> } | null = null;
 
 /** Reads what the person's earlier pages left: interrupted recordings become failed takes, old recognized ones go. */
@@ -143,8 +148,7 @@ export const loadTakes = (): Promise<void> => {
       else if (take.state === 'live' && now - take.seen > SILENT_MS) write({ ...take, state: 'failed' });
       else takesStore.set(take.id, take);
     }
-    // What an earlier page could not hand over to the cluster goes now.
-    for (const take of takesStore.values()) if (!take.cloud && take.state !== 'live') void sync(take.id);
+    syncTakes();
   })();
   loaded = { person, done };
   return done;

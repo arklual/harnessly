@@ -1,0 +1,73 @@
+{
+  "change": {
+    "id": "c2subagentsaaaaaaaaa",
+    "scope": {
+      "kind": "org",
+      "id": "o2acmeorgaaaaaaaaaaa"
+    },
+    "kind": "manual",
+    "title": "Субагенты на Sonnet",
+    "at": "2026-10-15T09:00:00Z",
+    "author": {
+      "userId": "u2annaaaaaaaaaaaaaaa",
+      "name": "Анна"
+    },
+    "source": "manual",
+    "machines": 0
+  },
+  "before": {
+    "from": "2026-10-08",
+    "to": "2026-10-15",
+    "tz": "Europe/Moscow"
+  },
+  "after": {
+    "from": "2026-10-15",
+    "to": "2026-10-22",
+    "tz": "Europe/Moscow"
+  },
+  "overlaps": [],
+  "effects": [
+    {
+      "kpi": "money_per_mr",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "before": 19.4,
+      "after": 15.2,
+      "delta": -4.2,
+      "noise": 1.6,
+      "nBefore": 131,
+      "nAfter": 140,
+      "verdict": "better"
+    },
+    {
+      "kpi": "tool_errors",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "before": 0.071,
+      "after": 0.068,
+      "delta": -0.003,
+      "noise": 0.008,
+      "nBefore": 131,
+      "nAfter": 140,
+      "verdict": "noise"
+    },
+    {
+      "kpi": "completion",
+      "scope": {
+        "kind": "team",
+        "id": "m2productteamaaaaaaa"
+      },
+      "before": null,
+      "after": 0.4,
+      "delta": null,
+      "noise": null,
+      "nBefore": 3,
+      "nAfter": 12,
+      "verdict": "too_few"
+    }
+  ]
+}

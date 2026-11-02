@@ -97,6 +97,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.logins(w, r, strings.TrimPrefix(p, "agents/"))
 	case strings.HasPrefix(p, "machine/"):
 		s.machineTool(w, r, strings.TrimPrefix(p, "machine/"))
+	case p == "pane-selection":
+		if s.PaneSelection == nil {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.PaneSelection.ServeHTTP(w, r)
+	case p == "file-bytes":
+		if s.FileBytes == nil {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.FileBytes.ServeHTTP(w, r)
 	case strings.HasPrefix(p, "move/"):
 		if s.Move == nil {
 			refuse(w, RefuseNotFound)

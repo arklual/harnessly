@@ -1,0 +1,540 @@
+/* The picture editor (features/image-edit): the full-size viewer (ui.css .hx-imgview) with a stage for the picture, the
+   versions, and a dock of tools under it. One layout for every screen:
+   - wide: the picture, under it the dock; the versions in a column on the left;
+   - a narrow dock (phone): the five tools are a grid with a short label under each icon, the versions a strip above it;
+   - a short wide screen (a phone held sideways): the dock moves beside the picture. */
+
+/* The stage's shape is a number, so a new shape grows instead of jumping. */
+@property --hx-r {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1.5;
+}
+
+.hx-imgview[data-edit] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--hx-space-3);
+  padding: 56px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  cursor: default;
+}
+.hx-imgview[data-edit] .hx-imgview__x {
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+}
+.hx-imgview__dl {
+  right: calc(max(12px, env(safe-area-inset-right)) + 44px) !important;
+  text-decoration: none;
+}
+.hx-imgview__wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding-inline: 72px;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+.hx-imgview__stage {
+  position: relative;
+  aspect-ratio: var(--hx-r);
+  width: min(100cqw, calc(100cqh * var(--hx-r)));
+  overflow: hidden;
+  border-radius: var(--hx-radius-md);
+  box-shadow: var(--hx-shadow-overlay);
+}
+.hx-imgview__stage[data-animate] {
+  transition: --hx-r 240ms var(--hx-ease-out);
+}
+.hx-imgview__stage[data-pending] {
+  opacity: 0;
+}
+/* Zoomed, the picture may grow out of its frame, as in the plain viewer. */
+.hx-imgview[data-zoomed] .hx-imgview__stage {
+  overflow: visible;
+}
+.hx-imgview__stage[data-clear] {
+  background: repeating-conic-gradient(#2c2c30 0 25%, #1c1c20 0 50%) 0 0 / 20px 20px;
+}
+.hx-imgview[data-edit] .hx-imgview__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  box-shadow: none;
+  object-fit: cover;
+  user-select: none;
+  transition:
+    filter 500ms var(--hx-ease-out),
+    transform 500ms var(--hx-ease-out),
+    translate 180ms var(--hx-ease-out),
+    scale 180ms var(--hx-ease-out);
+}
+.hx-imgview[data-edit] .hx-imgview__stage[data-clear] .hx-imgview__img {
+  object-fit: contain;
+}
+.hx-imgview[data-edit] .hx-imgview__stage[data-busy] .hx-imgview__img {
+  filter: blur(22px) saturate(1.1);
+  transform: scale(1.08);
+}
+.hx-imgview[data-edit][data-locked] .hx-imgview__img {
+  cursor: crosshair;
+}
+/* The slow shimmer over a picture being changed. */
+.hx-imgview__stage[data-busy]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.14) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: hx-ie-shimmer 1.6s linear infinite;
+}
+@keyframes hx-ie-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+/* The new version comes in from blur. */
+.hx-imgview__stage[data-fresh] .hx-imgview__img {
+  animation: hx-ie-reveal 800ms var(--hx-ease-out) backwards;
+}
+@keyframes hx-ie-reveal {
+  from {
+    filter: blur(22px) saturate(1.1);
+    transform: scale(1.08);
+  }
+}
+
+/* ── The drawing layer: only there while a drawing tool is on, so only then does a finger draw instead of
+   scrolling or zooming ── */
+.hx-ie__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+/* The strokes are drawn in solid violet and shown translucent, so a stroke over a stroke does not get darker. */
+.hx-ie__canvas[data-kind='erase'] {
+  opacity: 0.55;
+}
+
+/* ── The versions ── */
+.hx-ie__versions {
+  position: absolute;
+  z-index: 3;
+  left: max(16px, env(safe-area-inset-left));
+  top: 64px;
+  max-height: calc(50% - 80px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.hx-ie__thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: repeating-conic-gradient(#2c2c30 0 25%, #1c1c20 0 50%) 0 0 / 10px 10px;
+  opacity: 0.6;
+  cursor: pointer;
+  transition:
+    opacity 160ms var(--hx-ease-out),
+    box-shadow 160ms var(--hx-ease-out);
+}
+.hx-ie__thumb:hover:not(:disabled),
+.hx-ie__thumb[aria-pressed='true'] {
+  opacity: 1;
+}
+.hx-ie__thumb[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--hx-fg-1);
+}
+.hx-ie__thumb:disabled {
+  cursor: default;
+}
+.hx-ie__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hx-ie__thumb[data-clear] img {
+  object-fit: contain;
+}
+
+/* ── The dock: options of the tool, the tools, the field ── */
+.hx-imgview__dock {
+  flex: none;
+  width: 100%;
+  max-width: 720px;
+  container: iedock / inline-size;
+  /* Over the phone's keyboard (composer/use-keyboard-inset.ts sets --hx-kb on this element). */
+  margin-bottom: var(--hx-kb, 0px);
+}
+.hx-ie {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.hx-ie__opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  animation: hx-in-fade 160ms var(--hx-ease-out) backwards;
+}
+.hx-ie__chip {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-ie__chip:hover:not(:disabled) {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-ie__chip[aria-pressed='true'],
+.hx-ie__chip[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--hx-fg-1);
+  border-color: transparent;
+  color: var(--hx-bg-app);
+}
+.hx-ie__chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hx-ie__undo {
+  padding: 0;
+  width: 30px;
+}
+.hx-ie__color {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.hx-ie__color::before {
+  content: '';
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--hx-ie-color);
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 2px oklch(0.1 0 0);
+  transition: border-color 160ms var(--hx-ease-out);
+}
+.hx-ie__color[data-c='#ff3b5c'] {
+  --hx-ie-color: #ff3b5c;
+}
+.hx-ie__color[data-c='#ffd60a'] {
+  --hx-ie-color: #ffd60a;
+}
+.hx-ie__color[data-c='#ffffff'] {
+  --hx-ie-color: #fff;
+}
+.hx-ie__color[aria-pressed='true']::before {
+  border-color: var(--hx-fg-1);
+}
+
+.hx-ie__bar {
+  display: flex;
+  gap: 2px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+}
+.hx-ie__tool {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-ie__tool:hover:not(:disabled) {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-ie__tool[aria-pressed='true'],
+.hx-ie__tool[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-ie__tool:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hx-ie__short {
+  display: none;
+}
+
+.hx-ie__fail {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  max-width: 100%;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.hx-ie__retry {
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.hx-ie__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 8px 8px 18px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-xl);
+  background: var(--hx-bg-bubble);
+}
+.hx-ie__input {
+  flex: 1;
+  min-width: 0;
+  /* One line that grows with a long hint or text where the browser can (field-sizing); else one line. */
+  field-sizing: content;
+  min-height: 32px;
+  max-height: 96px;
+  resize: none;
+  overflow-y: auto;
+  padding: 6px 0;
+  line-height: 20px;
+  box-sizing: border-box;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-md);
+}
+.hx-ie__input::placeholder {
+  color: var(--hx-fg-3);
+}
+.hx-ie__input:disabled {
+  cursor: default;
+}
+.hx-ie__send {
+  flex: none;
+  align-self: flex-end;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hx-fg-1);
+  color: var(--hx-bg-app);
+  cursor: pointer;
+  transition: opacity 160ms var(--hx-ease-out);
+}
+.hx-ie__send:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* A narrow dock (a phone, a phone held sideways, a narrow window): all five tools at once, no scrolling. */
+@container iedock (max-width: 560px) {
+  .hx-ie__bar {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    width: 100%;
+  }
+  .hx-ie__tool {
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    height: 52px;
+    padding: 0 2px;
+    font-size: 11px;
+    letter-spacing: -0.01em;
+  }
+  .hx-ie__long {
+    display: none;
+  }
+  .hx-ie__short {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@container iedock (max-width: 320px) {
+  .hx-ie__tool {
+    font-size: 10px;
+    letter-spacing: -0.03em;
+  }
+}
+
+/* A finger needs 44 px, and a field of 16 px or more or iOS zooms the page when it is focused. */
+@media (pointer: coarse) {
+  .hx-ie__chip {
+    min-width: 44px;
+    height: 44px;
+    padding: 0 16px;
+  }
+  .hx-ie__undo {
+    width: 44px;
+    padding: 0;
+  }
+  .hx-ie__color {
+    width: 44px;
+    height: 44px;
+  }
+  .hx-ie__input {
+    min-height: 44px;
+    padding: 12px 0;
+    font-size: 16px;
+  }
+  .hx-ie__send {
+    width: 44px;
+    height: 44px;
+  }
+  .hx-ie__field {
+    padding: 4px 4px 4px 18px;
+  }
+  .hx-ie__thumb {
+    width: 48px;
+    height: 48px;
+  }
+  .hx-ie__retry {
+    min-height: 44px;
+    padding: 0 8px;
+  }
+  .hx-ie__tool {
+    min-height: 44px;
+  }
+}
+
+/* A phone held upright: the versions become a strip above the dock, the picture takes the whole width. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .hx-imgview[data-edit] {
+    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+  }
+  .hx-imgview__wrap {
+    padding-inline: 0;
+  }
+  .hx-ie__versions {
+    position: static;
+    flex: none;
+    flex-direction: row;
+    max-width: 100%;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px;
+  }
+}
+
+/* A short wide screen (a phone held sideways): the dock goes beside the picture, so the picture stays usable. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .hx-imgview[data-edit] {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 12px;
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .hx-imgview__wrap {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    width: auto;
+    padding-inline: 0;
+  }
+  .hx-imgview[data-versions] .hx-imgview__wrap {
+    padding-left: 60px;
+  }
+  .hx-imgview__dock {
+    flex: none;
+    align-self: center;
+    width: min(340px, 44vw);
+    max-width: none;
+    max-height: 100%;
+    overflow-y: auto;
+    padding-top: 36px;
+  }
+  .hx-ie__versions {
+    top: 12px;
+    max-height: calc(100% - 24px);
+  }
+}
+
+/* The narrowest docks (a 320 px phone): the options still fit one row. */
+@container iedock (max-width: 340px) {
+  .hx-ie__opts {
+    gap: 4px;
+  }
+  .hx-ie__chip {
+    min-width: 40px;
+    padding: 0 10px;
+  }
+}

@@ -80,6 +80,18 @@ func (c *conv) hold(l feed.Limit, now time.Time) {
 	c.change(c.box.Pause(wire.PausedLimited, now), now)
 }
 
+// terminalLimit is the plan's usage limit behind a terminal failure, when its words name the reset: a chat stopped on it
+// has no other model to wait for, it waits for the reset as any chat held on its limit does. A vendor's quota and a
+// failure that names no reset stay with the person's choice.
+func (c *conv) terminalLimit() (feed.Limit, bool) {
+	f, p := c.rec.TerminalFailure, c.box.Paused()
+	if f == nil || p == nil || p.Reason != wire.PausedNeedsTarget || c.rec.Provider != wire.ProviderClaude || c.onProfile() {
+		return feed.Limit{}, false
+	}
+	l, ok := feed.ClaudeLimitText(f.Detail, time.UnixMilli(f.At))
+	return l, ok && l.ResetsAt > 0
+}
+
 // continueAt is when a hold goes on by itself: the reset and a jitter of the conversation's own, so the chats held on
 // one limit do not all start at once; LimitRetryMin from now at the earliest.
 func (c *conv) continueAt(h *wire.LimitHold, now time.Time) *wire.Ms {
@@ -98,6 +110,10 @@ func (c *conv) continueAt(h *wire.LimitHold, now time.Time) *wire.Ms {
 // limitDue goes on with a held chat whose time came: by itself at ContinueAt; at the reset without a word of its own
 // when it is not to go on by itself, so what the person queued meanwhile goes.
 func (c *conv) limitDue(now time.Time) {
+	if l, ok := c.terminalLimit(); ok {
+		c.rec.TerminalFailure = nil
+		c.hold(l, now)
+	}
 	h := c.rec.Limited
 	switch {
 	case h == nil:
@@ -110,6 +126,9 @@ func (c *conv) limitDue(now time.Time) {
 
 // limitWake is when the hold is next due, zero for none.
 func (c *conv) limitWake() time.Time {
+	if _, ok := c.terminalLimit(); ok {
+		return time.UnixMilli(c.rec.TerminalFailure.At)
+	}
 	h := c.rec.Limited
 	switch {
 	case h == nil:

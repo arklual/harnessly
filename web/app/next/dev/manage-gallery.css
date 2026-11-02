@@ -1,0 +1,4 @@
+/* The page of the gallery scrolls as a whole, so a screenshot shows the whole screen. */
+.hx-manage-gallery .hx-lscreen {
+  overflow: visible;
+}

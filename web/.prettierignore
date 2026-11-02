@@ -4,3 +4,4 @@ pnpm-lock.yaml
 test-results
 playwright-report
 dist-hub
+app/next/features/app-views/fixtures/ext-apps

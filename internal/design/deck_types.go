@@ -348,6 +348,8 @@ const (
 	DeckPatchStyle DeckPatchOp = "style"
 	DeckPatchMove  DeckPatchOp = "move"
 	DeckPatchReset DeckPatchOp = "reset"
+	// DeckPatchImage puts a drawn picture into an element (see DeckPatchRequest.Src).
+	DeckPatchImage DeckPatchOp = "image"
 )
 
 // DeckPatchRequest is the body of POST /design/deck/patch. Tpl is the element's data-dc-tpl (preorder index of the
@@ -358,16 +360,28 @@ const (
 // element's fingerprint as the board gave it (`was` of tk:deck-hover, -select, -drag): its source tag, style attribute
 // and words; the edit lands on that element or is refused as changed.
 type DeckPatchRequest struct {
-	Artifact string             `json:"artifact"`
-	Page     string             `json:"page"`
-	Tpl      int                `json:"tpl"`
-	Op       DeckPatchOp        `json:"op"`
-	Was      *string            `json:"was,omitempty"`
-	HTML     *string            `json:"html,omitempty"`
-	Style    map[string]*string `json:"style,omitempty"`
-	X        *float64           `json:"x,omitempty"`
-	Y        *float64           `json:"y,omitempty"`
-	Unit     string             `json:"unit,omitempty"`
+	Artifact string `json:"artifact"`
+	Page     string `json:"page"`
+	// File names a board of the project (at its root) instead of a deck page: a canvas board has no page of its own.
+	File  string             `json:"file,omitempty"`
+	Tpl   int                `json:"tpl"`
+	Op    DeckPatchOp        `json:"op"`
+	Was   *string            `json:"was,omitempty"`
+	HTML  *string            `json:"html,omitempty"`
+	Style map[string]*string `json:"style,omitempty"`
+	X     *float64           `json:"x,omitempty"`
+	Y     *float64           `json:"y,omitempty"`
+	Unit  string             `json:"unit,omitempty"`
+	// image: Src is the picture's path in the project (assets/<name>-<n>.png). An img gets it as its src, any other
+	// element as a covering background-image. Prompt and Job are remembered on the element (data-gen-prompt,
+	// data-gen-job); Was is the element's fingerprint, as for style.
+	Src    string `json:"src,omitempty"`
+	Prompt string `json:"prompt,omitempty"`
+	Job    string `json:"job,omitempty"`
+	// From is the picture the job changed (a change of a picture, not a new one): the element remembers it as
+	// data-gen-from. A Src that is not a job's own picture (the original put back) comes with no Job and no Prompt:
+	// the element then forgets what it was drawn from.
+	From string `json:"from,omitempty"`
 }
 
 // The codes a refused patch answers with: 409 changed (the source is not what the page saw), 422 dynamic (the
@@ -375,6 +389,8 @@ type DeckPatchRequest struct {
 const (
 	DeckPatchChanged = "changed"
 	DeckPatchDynamic = "dynamic"
+	// DeckPatchLocked: an app bound the project's elements and keeps the rest from free edits (403).
+	DeckPatchLocked = "locked"
 )
 
 // DeckPptxStyle is the answer of POST /design/deck/pptx-style: what a company template gives a new deck.

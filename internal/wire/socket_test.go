@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -997,6 +998,25 @@ func TestVoicePage(t *testing.T) {
 	if code := g.do("POST", "/api/v2/voice?lang=auto", audio, &got); code != 200 || lang != "auto" {
 		t.Fatalf("auto: %d lang %q", code, lang)
 	}
+	// The person's own words are put over the text, as in the live dictation.
+	me := &wire.FileMe{Path: filepath.Join(t.TempDir(), "me.json"), Name: "P"}
+	cur, err := me.Me()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := me.Patch(cur.Rev, json.RawMessage(`{"voice":{"engine":"local","words":[{"word":"Sinopia","heard":["синопия"]}]}}`)); err != nil {
+		t.Fatal(err)
+	}
+	g.srv.Me = me
+	orig := g.srv.Voice
+	g.srv.Voice = func(_ context.Context, r io.Reader, _ string) (string, error) {
+		_, _ = io.ReadAll(r)
+		return "открой синопия", nil
+	}
+	if code := g.do("POST", "/api/v2/voice", audio, &got); code != 200 || got.Text != "открой Sinopia" {
+		t.Fatalf("words: %d %q", code, got.Text)
+	}
+	g.srv.Me, g.srv.Voice = nil, orig
 	var refused wire.CmdResult
 	for _, c := range []struct {
 		name, path string

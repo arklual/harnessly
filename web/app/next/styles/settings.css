@@ -377,6 +377,13 @@
 .hx-set-menu__item:hover {
   background: var(--hx-bg-hover);
 }
+.hx-set-menu__item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.hx-set-menu__item:disabled:hover {
+  background: none;
+}
 .hx-set-menu__text {
   flex: 1;
   min-width: 0;
@@ -2101,4 +2108,25 @@
 }
 .hx-place__spot:disabled {
   cursor: default;
+}
+
+/* Голосовой ввод: свои слова */
+.hx-key-form.hx-voice-words {
+  margin-top: 0;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--hx-border);
+  border-radius: 0;
+  background: transparent;
+}
+.hx-key-form.hx-voice-words:first-child {
+  border-top: 0;
+}
+.hx-voice-words__field {
+  display: grid;
+  gap: 4px;
+}
+.hx-voice-words__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }

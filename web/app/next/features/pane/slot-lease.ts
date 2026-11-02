@@ -1,6 +1,7 @@
 // Which preview slot a browser tab uses. A slot is one cookie, so two tabs on one slot take each other's page over.
 // Every tab holds a slot of its own (ports 1–6, sites 7–8); when all are held, the one used least recently is taken
-// from its tab, which asks again when it is looked at.
+// from its tab, which asks again when it is looked at. A page that keeps a fixed slot (a design's board) pins it: the
+// leases go round it, or the next app view or tab would take the board's cookie and the board would turn into a 404.
 
 export type TSlotKind = 'port' | 'site';
 
@@ -13,6 +14,8 @@ interface IHold {
   tab: string;
   kind: TSlotKind;
   at: number;
+  /** Kept by `pin`: never handed to another tab. */
+  pinned: boolean;
 }
 
 export interface ISlotLeases {
@@ -22,6 +25,8 @@ export interface ISlotLeases {
   slotOf: (tab: string) => number | null;
   /** Lets go of the tab's slot (a closed tab). */
   release: (tab: string) => void;
+  /** Keeps this slot for the page whatever leases come; whoever held it is told it was taken. Returns the unpin. */
+  pin: (slot: number, page: string) => () => void;
   /** Called with the tab that lost its slot to another. Returns the unsubscribe. */
   onTaken: (listener: (tab: string) => void) => () => void;
 }
@@ -34,7 +39,10 @@ export const createSlotLeases = (clock: () => number = Date.now): ISlotLeases =>
   const stamp = () => clock() * 1000 + (tick = (tick + 1) % 1000);
 
   const heldBy = (tab: string): [number, IHold] | undefined =>
-    [...holds.entries()].find(([, hold]) => hold.tab === tab);
+    [...holds.entries()].find(([, hold]) => hold.tab === tab && !hold.pinned);
+  const tell = (tab: string) => {
+    for (const listener of [...listeners]) listener(tab);
+  };
 
   const lease: ISlotLeases['lease'] = (kind, tab) => {
     const mine = heldBy(tab);
@@ -47,15 +55,17 @@ export const createSlotLeases = (clock: () => number = Date.now): ISlotLeases =>
     const pool = SLOTS[kind];
     const free = pool.find((slot) => !holds.has(slot));
     if (free !== undefined) {
-      holds.set(free, { tab, kind, at: stamp() });
+      holds.set(free, { tab, kind, at: stamp(), pinned: false });
       return free;
     }
-    const oldest = pool
+    // Every slot of the pool pinned is no case of this window (a design pins two of six); the oldest of all then.
+    const open = pool.filter((slot) => !holds.get(slot)?.pinned);
+    const oldest = (open.length > 0 ? open : pool)
       .map((slot) => [slot, holds.get(slot)] as const)
       .reduce((best, now) => (now[1] && best[1] && now[1].at < best[1].at ? now : best));
     const [slot, taken] = oldest;
-    holds.set(slot, { tab, kind, at: stamp() });
-    if (taken) for (const listener of [...listeners]) listener(taken.tab);
+    holds.set(slot, { tab, kind, at: stamp(), pinned: false });
+    if (taken) tell(taken.tab);
     return slot;
   };
 
@@ -65,6 +75,16 @@ export const createSlotLeases = (clock: () => number = Date.now): ISlotLeases =>
     release: (tab) => {
       const mine = heldBy(tab);
       if (mine) holds.delete(mine[0]);
+    },
+    pin: (slot, page) => {
+      const held = holds.get(slot);
+      if (held && held.tab !== page) tell(held.tab);
+      const kind: TSlotKind = SLOTS.site.includes(slot) ? 'site' : 'port';
+      holds.set(slot, { tab: page, kind, at: stamp(), pinned: true });
+      return () => {
+        const now = holds.get(slot);
+        if (now?.tab === page && now.pinned) holds.delete(slot);
+      };
     },
     onTaken: (listener) => {
       listeners.add(listener);

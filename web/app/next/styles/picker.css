@@ -279,34 +279,43 @@
   font-weight: var(--hx-weight-semibold);
 }
 
-/* Agent segments: the backing slides under the chosen one */
+/* Agent segments: any number of agents in one strip that scrolls sideways; the backing slides under the chosen one */
 .hx-seg {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(var(--n), 1fr);
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
   padding: 2px;
   border-radius: var(--hx-radius-sm);
   background: var(--hx-bg-active);
+}
+.hx-seg::-webkit-scrollbar {
+  display: none;
 }
 .hx-seg__glider {
   position: absolute;
   top: 2px;
   bottom: 2px;
-  left: calc(2px + var(--a) * (100% - 4px) / var(--n));
-  width: calc((100% - 4px) / var(--n));
+  left: var(--gx, 2px);
+  width: var(--gw, 0);
   border-radius: 6px;
   background: var(--hx-bg-raised);
   box-shadow: var(--hx-shadow-sm);
-  transition: left 420ms var(--hx-ease-out);
+  transition:
+    left 420ms var(--hx-ease-out),
+    width 420ms var(--hx-ease-out);
 }
 .hx-seg__item {
   position: relative;
+  flex: 1 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   height: 28px;
-  padding: 0;
+  padding: 0 10px;
   border: 0;
   background: transparent;
   font: inherit;
@@ -320,6 +329,7 @@
   color: var(--hx-fg-1);
 }
 .hx-seg__item .hx-agent {
+  flex: 0 0 auto;
   width: 12px;
   height: 12px;
   opacity: 0.55;
@@ -366,69 +376,47 @@
 .hx-options[data-active='false'] {
   opacity: 0.25;
 }
-.hx-seg[data-n='1'],
 .hx-carousel__track[data-n='1'] {
   --n: 1;
 }
-.hx-seg[data-n='2'],
 .hx-carousel__track[data-n='2'] {
   --n: 2;
 }
-.hx-seg[data-n='3'],
 .hx-carousel__track[data-n='3'] {
   --n: 3;
 }
-.hx-seg[data-n='4'],
 .hx-carousel__track[data-n='4'] {
   --n: 4;
 }
-.hx-seg[data-n='5'],
 .hx-carousel__track[data-n='5'] {
   --n: 5;
 }
-.hx-seg[data-n='6'],
 .hx-carousel__track[data-n='6'] {
   --n: 6;
 }
-.hx-seg[data-n='7'],
 .hx-carousel__track[data-n='7'] {
   --n: 7;
 }
-.hx-seg[data-a='0'],
 .hx-carousel__track[data-a='0'] {
   --a: 0;
 }
-.hx-seg[data-a='1'],
 .hx-carousel__track[data-a='1'] {
   --a: 1;
 }
-.hx-seg[data-a='2'],
 .hx-carousel__track[data-a='2'] {
   --a: 2;
 }
-.hx-seg[data-a='3'],
 .hx-carousel__track[data-a='3'] {
   --a: 3;
 }
-.hx-seg[data-a='4'],
 .hx-carousel__track[data-a='4'] {
   --a: 4;
 }
-.hx-seg[data-a='5'],
 .hx-carousel__track[data-a='5'] {
   --a: 5;
 }
-.hx-seg[data-a='6'],
 .hx-carousel__track[data-a='6'] {
   --a: 6;
-}
-
-/* With vendors' groups beside Claude and Codex the segments are many: the marks give way to the names. */
-.hx-seg:is([data-n='5'], [data-n='6'], [data-n='7']) .hx-seg__item {
-  font-size: 10.5px;
-}
-.hx-seg:is([data-n='5'], [data-n='6'], [data-n='7']) .hx-seg__item .hx-agent {
-  display: none;
 }
 
 /* Rows of the choice */

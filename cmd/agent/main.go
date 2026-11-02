@@ -22,6 +22,7 @@ func main() {
 		agent.Log("error", "agent failed to start", agent.F{K: "error", V: err.Error()})
 		os.Exit(1)
 	}
+	cfg.UsageFeed = usageFeed
 	a, err := agent.New(cfg)
 	if err != nil {
 		agent.Log("error", "agent failed to start", agent.F{K: "error", V: err.Error()})

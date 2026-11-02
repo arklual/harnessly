@@ -552,3 +552,15 @@
 .hx-icon[data-i='arrow-left-right'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M8 3 4 7l4 4%22 /%3E%3Cpath d=%22M4 7h16%22 /%3E%3Cpath d=%22m16 21 4-4-4-4%22 /%3E%3Cpath d=%22M20 17H4%22 /%3E%3C/svg%3E');
 }
+.hx-icon[data-i='volume-2'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z%22/%3E%3Cpath d=%22M16 9a5 5 0 0 1 0 6%22/%3E%3Cpath d=%22M19.364 18.364a9 9 0 0 0 0-12.728%22/%3E%3C/svg%3E');
+}
+.hx-icon[data-i='volume-x'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z%22/%3E%3Cline x1=%2222%22 x2=%2216%22 y1=%229%22 y2=%2215%22/%3E%3Cline x1=%2216%22 x2=%2222%22 y1=%229%22 y2=%2215%22/%3E%3C/svg%3E');
+}
+.hx-icon[data-i='music'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M9 18V5l12-2v13%22/%3E%3Ccircle cx=%226%22 cy=%2218%22 r=%223%22/%3E%3Ccircle cx=%2218%22 cy=%2216%22 r=%223%22/%3E%3C/svg%3E');
+}
+.hx-icon[data-i='film'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Crect width=%2218%22 height=%2218%22 x=%223%22 y=%223%22 rx=%222%22/%3E%3Cpath d=%22M7 3v18%22/%3E%3Cpath d=%22M3 7.5h4%22/%3E%3Cpath d=%22M3 12h18%22/%3E%3Cpath d=%22M3 16.5h4%22/%3E%3Cpath d=%22M17 3v18%22/%3E%3Cpath d=%22M17 7.5h4%22/%3E%3Cpath d=%22M17 16.5h4%22/%3E%3C/svg%3E');
+}

@@ -28,6 +28,7 @@ func designVideoRoutes(d deps) []gate.JSONRoute {
 	return []gate.JSONRoute{
 		designRoute(videoPath(""), a.Video),
 		designRoute(videoPath("/settings"), a.VideoSettings),
+		designRoute(videoPath("/view"), a.VideoView),
 		designRoute(videoPath("/scene"), a.VideoScene),
 		designRoute(videoPath("/comments"), a.VideoComments),
 		designRoute(videoPath("/render"), a.VideoRender),

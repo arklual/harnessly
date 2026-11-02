@@ -618,11 +618,25 @@ export const detectFramework = (win: any, doc: any): { framework: TFramework; ng
   return { framework: 'unknown' };
 };
 
+/** The `data-hl-*` bindings of an element (the apps' fields of a Sinopia board): name without the prefix, up to 12, clipped. */
+export const hlBindings = (el: any): Record<string, string> | null => {
+  const out: Record<string, string> = {};
+  let n = 0;
+  for (const attribute of Array.from(el.attributes ?? []) as { name: string; value: string }[]) {
+    if (n >= 12) break;
+    if (!attribute.name.startsWith('data-hl-')) continue;
+    out[attribute.name.slice(8)] = String(attribute.value).slice(0, 200);
+    n += 1;
+  }
+  return n > 0 ? out : null;
+};
+
 export const pickedMessage = (el: any, win: any, doc: any, core: any) => {
   const box = el.getBoundingClientRect();
   const found = core.findComponent(el, win);
   return {
     type: 'tk:picked',
+    hl: hlBindings(el),
     selector: core.cssSelector(el, doc),
     tag: String(el.tagName).toLowerCase(),
     text: core.clip(
@@ -763,7 +777,13 @@ export const captureNatives = (win: any) => {
     stopImmediately: win.Event?.prototype?.stopImmediatePropagation,
   };
   // Outside a secure context there is no ServiceWorkerContainer, and then no service worker can control the document.
-  const workers = win.navigator?.serviceWorker ?? null;
+  // A sandboxed document without allow-same-origin (an app's view) throws on reading it: none controls it either.
+  let workers: any = null;
+  try {
+    workers = win.navigator?.serviceWorker ?? null;
+  } catch {
+    workers = null;
+  }
   const controller = get(win.ServiceWorkerContainer?.prototype, 'controller');
   return {
     ...natives,
@@ -1554,6 +1574,8 @@ export const resourceTypeOfInitiator = (initiator: string, url: string): string 
 export const installDevtools = (win: any, doc: any, core: any, initial: string | null): void => {
   const origin = win.location.origin;
   if (typeof origin !== 'string' || !/^https?:\/\//.test(origin)) return;
+  // An opaque-origin document (an app's view in its sandbox) may not reach the slot: no reports, no polling.
+  if (win.origin === 'null') return;
   const Url = win.URL;
   const parse = win.JSON.parse;
   const stringify = win.JSON.stringify;

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка презентации</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<main class="dl">
+  <p class="dl__lead">Блок не длиннее <b id="limit"></b> слов. Самые длинные тексты:</p>
+  <ol class="dl__list" id="list"></ol>
+  <p class="dl__note" id="note" role="status"></p>
+</main>
+<!-- Classic scripts only: the view runs in an opaque-origin frame (see docs/apps.md). -->
+<script src="/__hl/app-sdk.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { Dialog } from '@base-ui/react/dialog';
+import { useKeyHint } from '@/next/features/keys/keys-help';
 import { useRef, useState, type KeyboardEvent } from 'react';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
@@ -89,6 +90,7 @@ const SearchDialog = ({
   failed = null,
   indexing = false,
 }: ISearchDialogProps) => {
+  const searchKey = useKeyHint('global.search');
   const container = usePortalContainer();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -276,9 +278,11 @@ const SearchDialog = ({
                 </span>
               )}
               <span className="hx-spacer" />
-              <span>
-                <kbd>⌘K</kbd>
-              </span>
+              {searchKey && (
+                <span>
+                  <kbd>{searchKey}</kbd>
+                </span>
+              )}
             </div>
           </Dialog.Popup>
         </div>

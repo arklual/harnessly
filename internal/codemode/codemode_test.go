@@ -54,3 +54,22 @@ func TestDescribe(t *testing.T) {
 		})
 	}
 }
+
+func TestDescribeFindsThePicturesAScriptDraws(t *testing.T) {
+	cases := []struct {
+		name, js string
+		want     *ImageCall
+	}{
+		{"codex tool, two calls", `await Promise.all([tools.image_gen__imagegen({prompt:"red"}), tools.image_gen__imagegen({prompt:"blue"})]);`,
+			&ImageCall{Count: 2, Prompt: "red"}},
+		{"harnessly tool with count", `await tools.mcp__harnessly__generate_images({prompt:"fox", count: 4, shape:"portrait"});`,
+			&ImageCall{Count: 4, Prompt: "fox", Shape: "portrait"}},
+		{"no pictures", `await tools.exec_command({cmd:"ls"});`, nil},
+	}
+	for _, c := range cases {
+		got := Describe(c.js).Images
+		if (got == nil) != (c.want == nil) || got != nil && *got != *c.want {
+			t.Errorf("%s: got %+v, want %+v", c.name, got, c.want)
+		}
+	}
+}

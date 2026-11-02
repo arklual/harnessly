@@ -35,6 +35,7 @@ export const KNOWN_CHECKS = [
   'voice_engine',
   'voice_download',
   'disk',
+  'apps_boundary',
   'https',
   'mic',
 ] as const;

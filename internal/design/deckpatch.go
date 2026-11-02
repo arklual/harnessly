@@ -602,6 +602,8 @@ func applyDeckPatch(src string, req DeckPatchRequest, w int) (string, error) {
 		set["translate"] = deckTranslate(*req.X, *req.Y, w)
 	case DeckPatchReset:
 		set["translate"] = nil
+	case DeckPatchImage:
+		return b.patchImage(e, req)
 	default:
 		return "", patchBad(locale.Pick("Unknown edit", "Неизвестная правка"))
 	}
@@ -776,6 +778,32 @@ func (b *dcBoard) patchStyle(e *dcElem, set map[string]*string) (string, error) 
 	if strings.Contains(current, "{{") {
 		return "", patchDynamic()
 	}
+	text := mergeStyle(current, set)
+	var next string
+	switch {
+	case style == nil && text == "":
+		return b.src, nil
+	case style == nil:
+		end := len(raw) - 1
+		if strings.HasSuffix(raw, "/>") {
+			end = len(raw) - 2
+		}
+		pre := strings.TrimRight(raw[:end], " \t\n\r\f")
+		next = pre + ` style="` + attrEscape(text) + `"` + raw[len(pre):]
+	case text == "":
+		from := style.start
+		for from > 0 && strings.ContainsRune(" \t\n\r\f", rune(raw[from-1])) {
+			from--
+		}
+		next = raw[:from] + raw[style.end:]
+	default:
+		next = raw[:style.start] + `style="` + attrEscape(text) + `"` + raw[style.end:]
+	}
+	return b.src[:b.abs(tok.start)] + next + b.src[b.abs(tok.end):], nil
+}
+
+// mergeStyle is a style attribute's text with the declarations in set put in (a nil value takes the property out).
+func mergeStyle(current string, set map[string]*string) string {
 	decls := parseStyle(current)
 	keys := make([]string, 0, len(set))
 	for p := range set {
@@ -802,35 +830,14 @@ func (b *dcBoard) patchStyle(e *dcElem, set map[string]*string) (string, error) 
 		}
 		decls = kept
 	}
-	text := styleText(decls)
-	var next string
-	switch {
-	case style == nil && text == "":
-		return b.src, nil
-	case style == nil:
-		end := len(raw) - 1
-		if strings.HasSuffix(raw, "/>") {
-			end = len(raw) - 2
-		}
-		pre := strings.TrimRight(raw[:end], " \t\n\r\f")
-		next = pre + ` style="` + attrEscape(text) + `"` + raw[len(pre):]
-	case text == "":
-		from := style.start
-		for from > 0 && strings.ContainsRune(" \t\n\r\f", rune(raw[from-1])) {
-			from--
-		}
-		next = raw[:from] + raw[style.end:]
-	default:
-		next = raw[:style.start] + `style="` + attrEscape(text) + `"` + raw[style.end:]
-	}
-	return b.src[:b.abs(tok.start)] + next + b.src[b.abs(tok.end):], nil
+	return styleText(decls)
 }
 
 func attrEscape(s string) string {
 	return strings.NewReplacer("&", "&amp;", `"`, "&quot;").Replace(s)
 }
 
-// DeckPatch is POST DeckPatchRequest (edit): 200 {rev}; 409 {code: DeckPatchChanged}; 422 {code: DeckPatchDynamic}.
+// DeckPatch is POST DeckPatchRequest (edit): 200 {rev} ({rev, was} for an image: the element's new fingerprint); 409 {code: DeckPatchChanged}; 422 {code: DeckPatchDynamic}.
 func (a *API) DeckPatch(r *http.Request) Answer {
 	body, refused := a.Guard(r, http.MethodPost)
 	if refused != nil {
@@ -842,14 +849,14 @@ func (a *API) DeckPatch(r *http.Request) Answer {
 	if err == nil {
 		err = json.Unmarshal(raw, &req)
 	}
-	if err != nil || !IsLibraryID(req.Artifact) || !IsPageID(req.Page) || req.Tpl < 0 {
+	if err != nil || !IsLibraryID(req.Artifact) || (!IsPageID(req.Page) && !(req.Page == "" && IsBoardFile(req.File))) || req.Tpl < 0 {
 		return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("Unknown slide", "Неизвестный слайд")), h)
 	}
 	if no := a.gate(r, req.Artifact, RoleEdit); no != nil {
 		return *no
 	}
 	a.startBackground()
-	rev, err := a.L.patchDeckBoard(req, time.Now())
+	rev, board, err := a.L.patchDeckBoard(req, time.Now())
 	if err != nil {
 		var pe *deckPatchErr
 		if errors.As(err, &pe) {
@@ -861,31 +868,51 @@ func (a *API) DeckPatch(r *http.Request) Answer {
 		a.warn("design deck patch failed", err)
 		return JSON(r, http.StatusInternalServerError, errorBody(locale.Pick("Could not save the edit", "Не удалось сохранить правку")), h)
 	}
+	if req.Op == DeckPatchImage {
+		// The element's fingerprint now: the next edit of it (drawn again) is made against this one.
+		if b, ok := parseDcBoard(board); ok {
+			if e := b.elem(req.Tpl); e != nil {
+				return JSON(r, http.StatusOK, jsvalue.NewObject("rev", float64(rev), "was", deckFingerprint(e.node)), h)
+			}
+		}
+	}
 	return JSON(r, http.StatusOK, jsvalue.NewObject("rev", float64(rev)), h)
 }
 
 // patchDeckBoard writes a hand edit into a slide's board, between two snapshots of the history that name the person:
 // what was there before is kept, and the edit is a version of its own. rev is the board's time after the edit.
-func (l *Library) patchDeckBoard(req DeckPatchRequest, now time.Time) (int64, error) {
-	page, ok := l.ReadModel(req.Artifact).Page(req.Page)
+func (l *Library) patchDeckBoard(req DeckPatchRequest, now time.Time) (int64, string, error) {
+	var page Page
+	var ok bool
+	if req.Page == "" {
+		// A board named by its file (the canvas): it must be a root board file of the project, not a path.
+		page, ok = Page{File: req.File}, !strings.ContainsAny(req.File, "\\\x00") && req.File != "." && req.File != ".."
+	} else {
+		page, ok = l.ReadModel(req.Artifact).Page(req.Page)
+	}
 	file := pageFileOf(page.File)
 	if !ok || !IsBoardFile(file) {
-		return 0, &deckPatchErr{http.StatusNotFound, "", locale.Pick("No such slide", "Нет такого слайда")}
+		return 0, "", &deckPatchErr{http.StatusNotFound, "", locale.Pick("No such slide", "Нет такого слайда")}
 	}
 	path := filepath.Join(l.ProjectDir(req.Artifact), file)
 	l.hist.chain.Lock()
 	defer l.hist.chain.Unlock()
 	before, err := readFileLimited(path, deckBoardMax)
 	if err != nil {
-		return 0, &deckPatchErr{http.StatusNotFound, "", locale.Pick("No such slide", "Нет такого слайда")}
+		return 0, "", &deckPatchErr{http.StatusNotFound, "", locale.Pick("No such slide", "Нет такого слайда")}
 	}
 	w := 0
 	if page.W != nil {
 		w = *page.W
 	}
+	if lock := l.LockUnbound; lock != nil && lock(req.Artifact) {
+		if b, ok := parseDcBoard(string(before)); !ok || !b.bound(req.Tpl) {
+			return 0, "", &deckPatchErr{http.StatusForbidden, DeckPatchLocked, locale.Pick("An app bound this slide's data: only the bound elements change by hand", "Приложение привязало данные этого слайда: вручную меняются только привязанные элементы")}
+		}
+	}
 	next, err := applyDeckPatch(string(before), req, w)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	board := BoardTitleOf(file)
 	if page.Title != "" {
@@ -903,18 +930,34 @@ func (l *Library) patchDeckBoard(req DeckPatchRequest, now time.Time) (int64, er
 		l.deckSnapshot(runtime, editors, locale.Pick("Before a manual edit of \""+board+"\"", "Перед правкой вручную «"+board+"»"), now)
 		// The agent may have written the board meanwhile: the edit goes over what it was made against only.
 		if again, err := readFileLimited(path, deckBoardMax); err != nil || string(again) != string(before) {
-			return 0, patchChanged()
+			return 0, "", patchChanged()
 		}
 		if _, err := writeIfChanged(path, []byte(next)); err != nil {
-			return 0, err
+			return 0, "", err
 		}
 		l.deckSnapshot(runtime, editors, locale.Pick("Manual edit: \""+board+"\"", "Правка вручную: «"+board+"»"), now)
 	}
 	st, err := os.Stat(path)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
-	return st.ModTime().UnixMilli(), nil
+	return st.ModTime().UnixMilli(), next, nil
+}
+
+// bound says whether the element numbered tpl, or one around it, is bound to a field of an app (data-hl-field).
+func (b *dcBoard) bound(tpl int) bool {
+	e := b.elem(tpl)
+	if e == nil {
+		return false
+	}
+	for n := e.node; n != nil; n = n.Parent {
+		if n.Type == html.ElementNode {
+			if _, ok := attrOf(n, "data-hl-field"); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // deckSnapshot saves the history around a hand edit; a busy or failing history does not lose the edit (the next

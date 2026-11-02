@@ -18,7 +18,13 @@ import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
 import { PRESENCE, type TPresenceState, usePresence } from '@/next/ui/presence';
 import { useVoice } from '@/next/bindings/use-voice';
-import { DeckTextTools, type IDeckTextToolsProps } from '@/next/features/designly/deck/deck-toolbar';
+import {
+  DeckTextTools,
+  isVisualSelection,
+  type IDeckImageHost,
+  type IDeckTextToolsProps,
+} from '@/next/features/designly/deck/deck-toolbar';
+import ImageGenPanel, { imageTargetOf } from '@/next/features/designly/image-gen/gen-panel';
 import { toast } from '@/next/ui/toast';
 
 /** The sheet's exit, ms (the board's 240 ms slide down). */
@@ -31,9 +37,11 @@ export interface IEditSheetProps extends IDeckTextToolsProps {
   onDone: () => void;
   /** Sends the words to the agent about the block; absent where the agent cannot be asked. */
   onAsk?: (text: string) => void;
+  /** A selected picture or block gets the picture generator in place of the text's tools. */
+  image?: IDeckImageHost;
 }
 
-export const EditSheet = ({ state, machine, n, onDone, onAsk, ...tools }: IEditSheetProps) => {
+export const EditSheet = ({ state, machine, n, onDone, onAsk, image, ...tools }: IEditSheetProps) => {
   const [text, setText] = useState('');
   const voice = useVoice(machine, text, setText);
   const send = () => {
@@ -57,9 +65,19 @@ export const EditSheet = ({ state, machine, n, onDone, onAsk, ...tools }: IEditS
           <span className="hx-btn__text">{t('next.deck.sheets.done')}</span>
         </button>
       </div>
-      <div className="hx-deck-es__row">
-        <DeckTextTools {...tools} sheet />
-      </div>
+      {image && isVisualSelection(tools.sel) ? (
+        <ImageGenPanel
+          key={`${tools.sel.tpl}:${tools.sel.gen?.job ?? ''}`}
+          machine={machine}
+          target={imageTargetOf(image.artifact, image.board, tools.sel)}
+          apply={image.apply}
+          embedded
+        />
+      ) : (
+        <div className="hx-deck-es__row">
+          <DeckTextTools {...tools} sheet />
+        </div>
+      )}
       <form
         className="hx-deck-es__ask"
         onSubmit={(event) => {

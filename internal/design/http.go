@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/imagegen"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
@@ -39,6 +40,8 @@ type API struct {
 	// OneShot is one tool-less, session-less call of the agent's model (a deck's dictation tidied into notes); nil
 	// while none is wired, and the tidy route then answers 503.
 	OneShot func(ctx context.Context, prompt string) (string, error)
+	// Images draws pictures for a design (nil while none is wired: the image route then answers 503).
+	Images *imagegen.Service
 	// PublicToken checks the tokens of the public read (design-public).
 	PublicToken PublicConfig
 	// GuestApp is the built web page (web/dist): the guest page of a link without sign-in is served from it.
@@ -79,17 +82,20 @@ const bodyLimit = 1 << 20
 
 // ReadBody parses a request body as the dispatcher did: JSON (an empty body is {}), a form as an object, anything
 // else as text; refused is the dispatcher's plain-text answer to a body too large or not JSON.
-func ReadBody(r *http.Request) (body any, refused *Answer) {
-	if r.ContentLength > bodyLimit {
+func ReadBody(r *http.Request) (body any, refused *Answer) { return readBody(r, bodyLimit) }
+
+// readBody is ReadBody with the route's own limit (the dispatcher's is 1mb).
+func readBody(r *http.Request, limit int64) (body any, refused *Answer) {
+	if r.ContentLength > limit {
 		a := text(http.StatusRequestEntityTooLarge, "Body exceeded 1mb limit")
 		return nil, &a
 	}
-	raw, err := io.ReadAll(io.LimitReader(r.Body, bodyLimit+1))
+	raw, err := io.ReadAll(io.LimitReader(r.Body, limit+1))
 	if err != nil {
 		a := text(http.StatusBadRequest, "Invalid body")
 		return nil, &a
 	}
-	if len(raw) > bodyLimit {
+	if int64(len(raw)) > limit {
 		a := text(http.StatusRequestEntityTooLarge, "Body exceeded 1mb limit")
 		return nil, &a
 	}
@@ -160,11 +166,21 @@ func QueryString(r *http.Request, k string) string {
 // Guard is the design routes' check: the dispatcher's session-or-token, then a page session, the allowed methods and a
 // JSON body for anything but GET. The body is read in between, as the dispatcher read it before the handler ran.
 func (a *API) Guard(r *http.Request, methods ...string) (body *jsvalue.Object, refused *Answer) {
+	return a.guardLimit(r, bodyLimit, methods...)
+}
+
+// guardLimit is Guard for a route that takes a body larger than the dispatcher's 1mb; a body over the limit is refused with
+// words (a JSON error the page shows), not the dispatcher's plain text.
+func (a *API) guardLimit(r *http.Request, limit int64, methods ...string) (body *jsvalue.Object, refused *Answer) {
 	if status, v, h, no := a.APIRefusal(r); no {
 		return nil, &Answer{status, v, h}
 	}
-	raw, bad := ReadBody(r)
+	raw, bad := readBody(r, limit)
 	if bad != nil {
+		if limit != bodyLimit {
+			ans := JSON(r, http.StatusRequestEntityTooLarge, errorBody(locale.Pick("The marks are too large to send: erase some and try again", "Пометки слишком большие, чтобы их отправить: сотрите часть и попробуйте снова")), noStore())
+			return nil, &ans
+		}
 		return nil, bad
 	}
 	h := noStore()

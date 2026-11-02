@@ -143,6 +143,8 @@ export interface IChoice {
   label: string;
   /** A short line under the label in a menu. */
   sub: string | null;
+  /** Shown but not to be picked (the model has no key yet); `sub` says why. */
+  disabled?: boolean;
 }
 
 /** A text of the dictionary when it has one for the key. */

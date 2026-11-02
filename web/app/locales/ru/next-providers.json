@@ -101,5 +101,15 @@
   "next.providers.gpt.failed.no-login": "Codex не вошёл по подписке: войдите и включите снова",
   "next.providers.gpt.failed.download": "Не удалось скачать прокси: проверьте интернет на машине",
   "next.providers.gpt.failed.start": "Прокси не запустился",
-  "next.providers.gpt.failed.page": "Машина не ответила"
+  "next.providers.gpt.failed.page": "Машина не ответила",
+  "next.speech.openai": "OpenAI · распознавание речи",
+  "next.speech.yandex": "Yandex SpeechKit",
+  "next.speech.hint.openai": "Ключ API OpenAI для модели gpt-4o-transcribe. Запись уходит в OpenAI, только если вы выбрали эту модель в «Голосовом вводе»",
+  "next.speech.hint.yandex": "API-ключ сервисного аккаунта Yandex Cloud с ролью ai.speechkit-stt.user. Запись уходит в Yandex, только если вы выбрали эту модель в «Голосовом вводе»",
+  "next.speech.hint.yandex-folder": "Идентификатор каталога — нужен не каждому аккаунту, можно оставить пустым",
+  "next.speech.aria.openai": "Ключ API OpenAI",
+  "next.speech.aria.yandex": "API-ключ Yandex Cloud",
+  "next.speech.aria.yandex-folder": "Идентификатор каталога Yandex Cloud",
+  "next.speech.unsupported": "Эта машина ещё не умеет подключать облачное распознавание: обновите её рантайм.",
+  "next.speech.loadFailed": "Не удалось узнать, что подключено для голоса"
 }

@@ -117,6 +117,9 @@ type Library struct {
 	centerOnce sync.Once
 	centerV    *centerLeases
 	leaseMem   leaseMemory
+	// LockUnbound says whether a project's hand edits are limited to the elements an app binds (data-hl-field): set by
+	// the runtime from the apps on in the project; nil when no app locks anything.
+	LockUnbound func(project string) bool
 }
 
 func New(cfg Config) *Library {

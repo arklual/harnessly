@@ -1,0 +1,160 @@
+{
+  "scope": "me",
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "cmpPeriod": {
+    "from": "2026-09-01",
+    "to": "2026-10-01",
+    "tz": "Europe/Moscow"
+  },
+  "kpis": [
+    {
+      "kpi": "money_per_mr",
+      "unit": "usd",
+      "betterWhen": "down",
+      "value": 15.9,
+      "n": 71,
+      "cmpValue": 18.2,
+      "cmpN": 66,
+      "delta": -2.3,
+      "noise": 1.4,
+      "verdict": "better"
+    },
+    {
+      "kpi": "completion",
+      "unit": "share",
+      "betterWhen": "up",
+      "value": 0.42,
+      "n": 71,
+      "cmpValue": 0.38,
+      "cmpN": 66,
+      "delta": 0.04,
+      "noise": 0.03,
+      "verdict": "better"
+    },
+    {
+      "kpi": "time_to_mr",
+      "unit": "ms",
+      "betterWhen": "down",
+      "value": 2940000,
+      "n": 71,
+      "cmpValue": 3300000,
+      "cmpN": 66,
+      "delta": -360000,
+      "noise": 400000,
+      "verdict": "noise"
+    },
+    {
+      "kpi": "mrs_per_person",
+      "unit": "count",
+      "betterWhen": "up",
+      "value": 5.1,
+      "n": 71,
+      "cmpValue": 4.4,
+      "cmpN": 66,
+      "delta": 0.7,
+      "noise": 0.8,
+      "verdict": "noise"
+    },
+    {
+      "kpi": "autonomy",
+      "unit": "share",
+      "betterWhen": "up",
+      "value": 0.71,
+      "n": 71,
+      "cmpValue": 0.69,
+      "cmpN": 66,
+      "delta": 0.02,
+      "noise": 0.03,
+      "verdict": "noise"
+    },
+    {
+      "kpi": "waiting_human",
+      "unit": "ms",
+      "betterWhen": "down",
+      "value": 412000,
+      "n": 71,
+      "cmpValue": 388000,
+      "cmpN": 66,
+      "delta": 24000,
+      "noise": 60000,
+      "verdict": "noise"
+    },
+    {
+      "kpi": "parallelism",
+      "unit": "count",
+      "betterWhen": "up",
+      "value": 2.3,
+      "n": 71,
+      "cmpValue": 2.1,
+      "cmpN": 66,
+      "delta": 0.2,
+      "noise": 0.3,
+      "verdict": "noise"
+    },
+    {
+      "kpi": "tool_errors",
+      "unit": "share",
+      "betterWhen": "down",
+      "value": 0.061,
+      "n": 71,
+      "cmpValue": 0.074,
+      "cmpN": 66,
+      "delta": -0.013,
+      "noise": 0.008,
+      "verdict": "better"
+    },
+    {
+      "kpi": "reread_context",
+      "unit": "share",
+      "betterWhen": "down",
+      "value": 0.18,
+      "n": 71,
+      "cmpValue": 0.21,
+      "cmpN": 66,
+      "delta": -0.03,
+      "noise": 0.02,
+      "verdict": "better"
+    },
+    {
+      "kpi": "session_start_ctx",
+      "unit": "tokens",
+      "betterWhen": "down",
+      "value": 31000,
+      "n": 71,
+      "cmpValue": 29500,
+      "cmpN": 66,
+      "delta": 1500,
+      "noise": 3000,
+      "verdict": "noise"
+    },
+    {
+      "kpi": "cache_hit",
+      "unit": "share",
+      "betterWhen": "up",
+      "value": 0.93,
+      "n": 71,
+      "cmpValue": 0.92,
+      "cmpN": 66,
+      "delta": 0.01,
+      "noise": 0.01,
+      "verdict": "noise"
+    },
+    {
+      "kpi": "skills_in_use",
+      "unit": "share",
+      "betterWhen": "up",
+      "value": 0.34,
+      "n": 71,
+      "cmpValue": 0.31,
+      "cmpN": 66,
+      "delta": 0.03,
+      "noise": 0.05,
+      "verdict": "noise"
+    }
+  ],
+  "series": null
+}

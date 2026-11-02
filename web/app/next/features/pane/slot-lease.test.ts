@@ -59,4 +59,21 @@ describe('slot leases', () => {
     leases.lease('site', 'd');
     expect(heard).toEqual([]);
   });
+
+  it('goes round a pinned slot: the board of a design keeps its cookie while app views lease', () => {
+    let now = 0;
+    const leases = createSlotLeases(() => ++now);
+    const heard: string[] = [];
+    leases.onTaken((tab) => heard.push(tab));
+    expect(leases.lease('port', 'app:a')).toBe(1);
+    const unpin = leases.pin(1, 'design:1');
+    leases.pin(2, 'design:2');
+    // The view that held 1 was told, and asks again: it gets a slot the board does not use.
+    expect(heard).toEqual(['app:a']);
+    expect(leases.lease('port', 'app:a')).toBe(3);
+    for (const tab of ['b', 'c', 'd', 'e']) leases.lease('port', tab);
+    expect([1, 2]).not.toContain(leases.slotOf('e'));
+    unpin();
+    expect(leases.lease('port', 'f')).toBe(1);
+  });
 });

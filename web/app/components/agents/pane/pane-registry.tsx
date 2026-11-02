@@ -51,6 +51,7 @@ export const PANE_KINDS: Record<TPaneTabKind, IPaneKindSpec> = {
   gallery: { title: t('pane.paneRegistry.gallery'), icon: Images, agentOnly: false },
   task: { title: t('pane.paneRegistry.task'), icon: ClipboardList, agentOnly: false },
   vault: { title: t('pane.paneRegistry.vault'), icon: KeyRound, agentOnly: false },
+  app: { title: t('pane.paneRegistry.app'), icon: AppWindow, agentOnly: false },
 };
 
 /** The «Tools» page in this order: Codex's own tools first, then ours. */

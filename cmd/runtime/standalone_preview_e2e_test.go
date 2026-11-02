@@ -172,9 +172,11 @@ func TestStandalonePreviewEndToEnd(t *testing.T) {
 	}
 	var slotCookie string
 	for _, c := range (&http.Response{Header: enter.header}).Cookies() {
-		if strings.HasPrefix(c.Name, "hl_preview_") {
+		// A loopback slot's cookie is a secure, unpartitioned SameSite=None one: an app's view frame has an opaque
+		// origin, so every load from it is cross-site (browsers keep Secure cookies on loopback http).
+		if strings.HasPrefix(c.Name, "__Host-hl_preview_") {
 			slotCookie = c.Name + "=" + c.Value
-			if !c.HttpOnly || c.SameSite != http.SameSiteLaxMode {
+			if !c.HttpOnly || !c.Secure || c.SameSite != http.SameSiteNoneMode || c.Partitioned {
 				t.Fatalf("slot cookie flags: %+v", c)
 			}
 		}

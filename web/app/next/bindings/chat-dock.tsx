@@ -12,7 +12,7 @@ import {
 import { useContextWindow } from '@/next/bindings/use-context-window';
 import { useAgentLimits } from '@/next/bindings/use-limits';
 import { limitsProviderOf } from '@/next/features/limits/model';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   answerQuestion,
   cancelMessage,
@@ -58,6 +58,13 @@ import {
 } from '@/next/stores/carried-notes';
 import { noteQuote } from '@/next/features/designly/site-notes';
 import { clearDesignNotes, patchDesignNotes, useDesignNotes } from '@/next/stores/design-notes';
+import { putFileSelectionChip, useFileSelectionChip } from '@/next/stores/file-selection';
+import {
+  FILE_SELECTION_ID,
+  fileSelectionQuote,
+  formatFileSelection,
+} from '@/next/features/pane/file-selection';
+import { dismissFileSelection } from '@/next/features/pane/report-selection';
 import DockBar from '@/next/features/composer/dock-bar';
 import { refusalReason } from '@/next/features/chat/model-switch';
 import GoalBar from '@/next/features/composer/goal-bar';
@@ -75,6 +82,10 @@ import { addDraftRef, clearDraft, draftsStore, removeDraftRef, setDraft } from '
 import { attachedOf, refKey } from '@/next/features/chat/attached';
 import { designThumb } from '@/next/features/composer/attach-sources';
 import type { IPlusAttach } from '@/next/features/composer/plus-menu';
+import type { IPlusApps } from '@/next/features/composer/apps-pane';
+import ChatAppsRow from '@/next/features/app-main/chat-apps-row';
+import { useInstalledApps } from '@/next/features/app-views/api';
+import { useChatApps } from '@/next/bindings/use-chat-apps';
 import { openAttached } from '@/next/features/pane/open-attached';
 import { REFS_MAX, type MessageRef } from '@/next/protocol/v2';
 import { limitPlaceholder } from '@/next/features/chat/limit';
@@ -154,6 +165,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const quotes = useQuotes(conv);
   // The notes made on a design in the pane beside this chat ride in its field like quotes and go with the message.
   const designNotes = useDesignNotes(conv);
+  const fileChip = useFileSelectionChip(conv);
   // The notes of a queued message taken back into the field: chips before the new ones, numbered first.
   const carried = useCarriedNotes(conv);
   const open = useMemo(() => openGates(gates), [gates]);
@@ -251,10 +263,11 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     onChat,
   });
 
+  const cardSend = useRef<(() => boolean) | null>(null);
   const onSubmit = useCallback(
     (sendMode: TSendMode) => {
       if (question) {
-        toast(t('next.ask.useCard'), { tone: 'info' });
+        if (!cardSend.current?.()) toast(t('next.ask.useCard'), { tone: 'info' });
         return;
       }
       if (uploads.uploading) {
@@ -275,6 +288,15 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
               port: note.port,
             }),
           ),
+          ...(fileChip
+            ? [
+                formatFileSelection(
+                  carried.length + designNotes.length + 1,
+                  fileChip.path,
+                  fileChip.selection,
+                ),
+              ]
+            : []),
         ]),
         attachments: uploads.ready,
         refs,
@@ -288,9 +310,10 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
       clearQuotes(conv);
       clearDesignNotes(conv);
       clearCarriedNotes(conv);
+      putFileSelectionChip(conv, null);
       uploads.reset();
     },
-    [machine, conv, text, refs, quotes, designNotes, carried, uploads, question, working, extra],
+    [machine, conv, text, refs, quotes, designNotes, carried, fileChip, uploads, question, working, extra],
   );
 
   // «Изменить»: the runtime lets the message go (pessimistic), and only then its text is back in the field.
@@ -341,6 +364,27 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         : null,
     [record, machine, cwd, attachedKeys, conv],
   );
+  // The apps on in this chat: a quiet row over the field, and «+» → «Приложение» to turn one on. The installed list is
+  // read only once the chat has an app (the «+» pane reads it when it opens).
+  const chatApps = useChatApps(machine, conv);
+  const installedApps = useInstalledApps(machine, 0, chatApps.on.length > 0).list;
+  const appChips = useMemo(
+    () => chatApps.on.map((id) => ({ id, name: installedApps?.apps.find((a) => a.id === id)?.name ?? id })),
+    [chatApps.on, installedApps],
+  );
+  const plusApps = useMemo<IPlusApps | null>(
+    () =>
+      // Apps run in Claude Code chats for now.
+      record && provider === 'claude'
+        ? {
+            machine,
+            on: chatApps.on,
+            onPick: (id) => void chatApps.turn(id, true),
+            onAll: () => goTo({ kind: ROUTE.apps }),
+          }
+        : null,
+    [record, provider, machine, chatApps],
+  );
   const refChips = useMemo(
     () => refs.map((r) => ({ ...r, thumb: r.kind === 'design' ? designThumb(machine, r.id) : null })),
     [refs, machine],
@@ -387,6 +431,9 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         question={question}
         device={deviceId()}
         ownAnswer={question ? text : ''}
+        onSendReady={(send) => {
+          cardSend.current = send;
+        }}
         onAnswer={async (id, answers) => {
           await settled(answerQuestion(machine, conv, id, answers));
           clearDraft(conv);
@@ -410,6 +457,12 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onMove={canMove ? (id, before) => settled(moveQueued(machine, conv, id, before)) : undefined}
         onResume={() => settled(resumeQueue(machine, conv))}
         onRetry={(id) => settled(retryMessage(id))}
+      />
+      <ChatAppsRow
+        apps={appChips}
+        busy={chatApps.busy}
+        onOpen={(id) => goTo({ kind: ROUTE.app, id, chat: conv })}
+        onOff={(id) => void chatApps.turn(id, false)}
       />
       <Composer
         enterSends={enterSends}
@@ -452,6 +505,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         attach={attach}
         stash={stash}
         takes={voice.onMic ? takes : null}
+        apps={plusApps}
         acceptsChats
         quotes={[
           ...quotes.map((q) => ({
@@ -468,10 +522,13 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
             icon: 'map-pin',
           })),
           ...designNotes.map((note, i) => noteQuote(note, carried.length + i + 1)),
+          ...(fileChip ? [fileSelectionQuote(fileChip.path, fileChip.selection)] : []),
           ...(extra?.quotes ?? []),
         ]}
         onRemoveQuote={(id) => {
-          if (id.startsWith(CARRIED_PREFIX)) dropCarriedNote(conv, Number(id.slice(CARRIED_PREFIX.length)));
+          if (id === FILE_SELECTION_ID) dismissFileSelection(machine, conv);
+          else if (id.startsWith(CARRIED_PREFIX))
+            dropCarriedNote(conv, Number(id.slice(CARRIED_PREFIX.length)));
           else if (extra?.quotes.some((q) => q.id === id)) extra.onRemoveQuote(id);
           else if (designNotes.some((n) => n.id === id)) {
             patchDesignNotes(conv, (have) => have.filter((n) => n.id !== id));

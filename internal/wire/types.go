@@ -760,7 +760,23 @@ type Entry struct {
 	Level        NoticeLevel     `json:"level"`
 	Code         string          `json:"code"`
 	Detail       *string         `json:"detail"`
-	Peers        []PeerNote      `json:"peers"` // peer: what other agents' sessions wrote to this one
+	Peers        []PeerNote      `json:"peers"`  // peer: what other agents' sessions wrote to this one
+	Images       *ImageGen       `json:"images"` // tool: the picture card of a picture-drawing call; left out for any other
+}
+
+// ImageGenStates are the states of a picture call.
+var ImageGenStates = []string{"drawing", "done", "failed"}
+
+// ImageGen is the picture card of a tool call that draws pictures (Codex's image_gen, harnessly's generate_images).
+// Done are the files so far, as absolute paths on the machine; Count is how many the call asked for.
+type ImageGen struct {
+	Count  int      `json:"count"`
+	Prompt string   `json:"prompt"`
+	Shape  string   `json:"shape"` // square | landscape | portrait, "" when not told
+	JobID  string   `json:"jobId"` // harnessly's job, "" for Codex's own tool
+	State  string   `json:"state"` // drawing | done | failed
+	Done   []string `json:"done"`
+	Failed *string  `json:"failed"`
 }
 
 // QuestionID is the id of the question asked by a tool use.

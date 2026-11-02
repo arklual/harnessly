@@ -78,9 +78,19 @@ export const chainPlan = ({ agent, pending, waiting }: IChainInput): IChainPlan 
   return null;
 };
 
+/**
+ * The agent at work has taken the message the chain was for: what still waits then is what the person queued for the
+ * next turn, not this start's message.
+ */
+const messageTaken = (agent: AgentStateKind | undefined, waiting: number): boolean =>
+  waiting === 0 || (agent !== undefined && AT_WORK.has(agent));
+
 /** The chain is over: the agent is up, nothing waits to be applied and the message has been taken. */
-export const chainOver = ({ agent, pending, waiting }: IChainInput): boolean =>
-  agent !== 'starting' && !pending && waiting === 0;
+export const chainOver = ({ agent, pending, waiting }: IChainInput): boolean => {
+  if (agent === 'starting') return false;
+  if (agent !== undefined && AT_WORK.has(agent)) return !pending?.applying;
+  return !pending && waiting === 0;
+};
 
 /** The steps of a plan, each as the stores say it stands now. */
 export const chainSteps = (plan: IChainPlan, input: IChainInput): ILaunchStep[] => {
@@ -97,7 +107,7 @@ export const chainSteps = (plan: IChainPlan, input: IChainInput): ILaunchStep[] 
   if (plan.send) {
     let state: TStepState = STEP_STATE.done;
     if (starting || modelWaits) state = STEP_STATE.todo;
-    else if (input.waiting > 0) state = STEP_STATE.active;
+    else if (!messageTaken(input.agent, input.waiting)) state = STEP_STATE.active;
     steps.push({ id: STEP.send, state });
   }
   return steps;

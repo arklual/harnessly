@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/voice/engine"
 )
@@ -191,5 +192,44 @@ func TestMachineCheckRoutes(t *testing.T) {
 	}
 	if w := call(http.MethodGet, "/machine/checks", "", true); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"id":"tmux"`) {
 		t.Fatalf("checks: %d %s", w.Code, w.Body)
+	}
+}
+
+// The wall around the agents of chats with apps: no check on a machine without apps, the package or the kernel's
+// setting as the fix where bwrap cannot make it.
+func TestMachineCheckAppsBoundary(t *testing.T) {
+	p, _ := fakeProbe(t)
+	sysctls := map[string]string{}
+	p.ReadFile = func(name string) ([]byte, error) {
+		if v, ok := sysctls[name]; ok {
+			return []byte(v + "\n"), nil
+		}
+		return nil, os.ErrNotExist
+	}
+	var applies bool
+	var wallErr error
+	p.AppsBoundary = func() (bool, error) { return applies, wallErr }
+	if _, ok := checksByID(p.run(context.Background()))["apps_boundary"]; ok {
+		t.Fatal("no apps, no check")
+	}
+	applies = true
+	if c := checksByID(p.run(context.Background()))["apps_boundary"]; !c.OK || c.FixCommand != "" {
+		t.Fatalf("%+v", c)
+	}
+	for _, tc := range []struct {
+		err    error
+		sysctl map[string]string
+		want   string
+	}{
+		{apps.ErrNoBwrap, nil, "sudo apt-get install -y bubblewrap"},
+		{errors.New("bwrap: setting up uid map: Permission denied"), map[string]string{"/proc/sys/kernel/apparmor_restrict_unprivileged_userns": "1"}, "sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict"},
+		{errors.New("bwrap: No permissions to create new namespace"), map[string]string{"/proc/sys/user/max_user_namespaces": "0"}, "echo user.max_user_namespaces=15000 | sudo tee /etc/sysctl.d/60-harnessly-userns.conf && sudo sysctl --system"},
+		{errors.New("bwrap: something else"), nil, ""},
+	} {
+		wallErr, sysctls = tc.err, tc.sysctl
+		c := checksByID(p.run(context.Background()))["apps_boundary"]
+		if c.OK || c.Detail != tc.err.Error() || c.FixCommand != tc.want {
+			t.Fatalf("%v: %+v", tc.err, c)
+		}
 	}
 }

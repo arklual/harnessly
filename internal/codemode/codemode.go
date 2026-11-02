@@ -30,6 +30,42 @@ type Call struct {
 type Description struct {
 	Tool    string
 	Summary string
+	// Images is set when the script draws pictures.
+	Images *ImageCall
+}
+
+// ImageCall is the picture drawing a script asks for: Count pictures, the first brief as Prompt.
+type ImageCall struct {
+	Count  int
+	Prompt string
+	Shape  string
+}
+
+// imageCalls finds the calls that draw pictures: Codex's own image_gen__imagegen (one picture per call) and harnessly's
+// generate_images (count pictures per call).
+func imageCalls(calls []Call) *ImageCall {
+	var out *ImageCall
+	for _, c := range calls {
+		obj, _ := c.Arg.(*Object)
+		n := 0
+		switch {
+		case c.Name == "image_gen__imagegen":
+			n = 1
+		case c.Name == "generate_images" || strings.HasSuffix(c.Name, "__generate_images"):
+			if f, ok := obj.number("count"); ok && f >= 1 {
+				n = int(f)
+			} else {
+				n = 1
+			}
+		default:
+			continue
+		}
+		if out == nil {
+			out = &ImageCall{Prompt: obj.str("prompt"), Shape: obj.str("shape")}
+		}
+		out.Count += n
+	}
+	return out
 }
 
 // Describe summarizes a code-mode script.
@@ -45,13 +81,14 @@ func Describe(js string) Description {
 		tools[i], texts[i] = describeCall(c)
 		same = same && tools[i] == tools[0]
 	}
+	images := imageCalls(calls)
 	if len(calls) == 1 {
-		return Description{Tool: tools[0], Summary: texts[0]}
+		return Description{Tool: tools[0], Summary: texts[0], Images: images}
 	}
 	if !same {
-		return Description{Tool: "exec", Summary: join(texts, false)}
+		return Description{Tool: "exec", Summary: join(texts, false), Images: images}
 	}
-	return Description{Tool: tools[0], Summary: join(texts, tools[0] == "exec_command")}
+	return Description{Tool: tools[0], Summary: join(texts, tools[0] == "exec_command"), Images: images}
 }
 
 // join puts the first parts that fit side by side; shell parts drop the repeated "$ ".
@@ -176,6 +213,9 @@ func describeCall(c Call) (tool, text string) {
 		return "view_image", p
 	case "web__run":
 		return "web_search", webSummary(obj)
+	}
+	if strings.HasPrefix(c.Name, "mcp__") {
+		return c.Name, shorten(obj.firstString(), partMax)
 	}
 	if strings.Contains(c.Name, "__") {
 		return "mcp__" + c.Name, shorten(obj.firstString(), partMax)

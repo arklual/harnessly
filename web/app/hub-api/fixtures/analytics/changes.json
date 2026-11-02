@@ -1,0 +1,33 @@
+{
+  "changes": [
+    {
+      "id": "c2claudeversionaaaaa",
+      "scope": {
+        "kind": "tenant",
+        "id": "t2acmetenantaaaaaaaa"
+      },
+      "kind": "claude_version",
+      "title": "Claude Code 2.4.1 → 2.5.0",
+      "at": "2026-10-22T03:10:00Z",
+      "author": null,
+      "source": "detected",
+      "machines": 3
+    },
+    {
+      "id": "c2subagentsaaaaaaaaa",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "kind": "manual",
+      "title": "Субагенты на Sonnet",
+      "at": "2026-10-15T09:00:00Z",
+      "author": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "source": "manual",
+      "machines": 0
+    }
+  ]
+}

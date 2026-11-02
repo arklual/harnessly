@@ -161,6 +161,19 @@ export const ENTRY_KINDS = [
   'peer',
 ] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
+export const IMAGE_GEN_STATES = ['drawing', 'done', 'failed'] as const;
+export type ImageGenState = (typeof IMAGE_GEN_STATES)[number];
+/** The picture card of a tool call that draws pictures: how many it asked for, the files so far (absolute paths on the machine). */
+export interface ImageGen {
+  count: number;
+  prompt: string;
+  shape: string; // square | landscape | portrait; '' when not told
+  jobId: string; // harnessly's job; '' for Codex's own tool
+  state: ImageGenState;
+  done: string[];
+  failed: string | null;
+}
+
 export const SUBAGENT_STATUSES = ['running', 'done', 'failed'] as const;
 export type SubagentStatus = (typeof SUBAGENT_STATUSES)[number];
 export const NOTICE_LEVELS = ['info', 'warn', 'error'] as const;
@@ -1458,6 +1471,7 @@ export type Entry = EntryBase &
         summary: string;
         ok: boolean | null;
         output: ToolOutput | null;
+        images?: ImageGen; // a call that draws pictures
       }
     | {
         t: 'subagent';
@@ -2803,6 +2817,15 @@ const toolOutput: Decoder<ToolOutput> = object({
   text: str,
   truncated: nullable(object({ shown: int, total: int })),
 });
+const imageGen: Decoder<ImageGen> = object({
+  count: int,
+  prompt: str,
+  shape: str,
+  jobId: str,
+  state: oneOf(IMAGE_GEN_STATES),
+  done: array(str),
+  failed: nullable(str),
+});
 const entryKinds = {
   user: { text: str, attachments: array(attachmentRef), clientId: nullable(id) },
   say: { md: str },
@@ -2838,12 +2861,17 @@ const entryKinds = {
     ),
   },
 } satisfies Record<EntryKind, Shape>;
-const entry: Decoder<Entry> = variants('t', entryKinds, {
-  id: entryId,
-  turnId: nullable(turnId),
-  at: ms,
-  rev: seq,
-});
+const entry: Decoder<Entry> = variants(
+  't',
+  entryKinds,
+  {
+    id: entryId,
+    turnId: nullable(turnId),
+    at: ms,
+    rev: seq,
+  },
+  { tool: { images: imageGen } },
+);
 
 const messageStateKinds = {
   queued: { position: seq, reason: oneOf(QUEUE_REASONS), wait: nullable(waitD) },

@@ -1,0 +1,200 @@
+/* The picture card of a call that draws pictures (features/chat/image-card.tsx): a tile per picture in the frame the
+   call asked for, a soft blurred gradient with a slow shimmer while it is drawn, the picture coming in from blur to
+   sharp when it is ready. One picture is one big tile, two stand side by side, four make 2x2, more go in threes. */
+.hx-imgs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  max-width: 560px;
+  margin: var(--hx-space-2) 0;
+  container-type: inline-size;
+  --hx-img-cap: 420px;
+}
+@media (max-width: 600px) {
+  .hx-imgs {
+    --hx-img-cap: 60vh;
+  }
+}
+.hx-imgs[data-cols='1'] {
+  max-width: 480px;
+}
+.hx-imgs[data-count='3'] {
+  max-width: 720px;
+}
+.hx-imgs__grid {
+  display: grid;
+  gap: var(--hx-space-2);
+  grid-template-columns: minmax(0, 1fr);
+}
+.hx-imgs[data-cols='2'] .hx-imgs__grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@container (min-width: 600px) {
+  .hx-imgs[data-count='3'] .hx-imgs__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.hx-imgs[data-cols='3'] .hx-imgs__grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hx-img {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-active);
+  --hx-ar: 1;
+  aspect-ratio: var(--hx-ar);
+  cursor: default;
+  transition: transform 240ms var(--hx-ease-out);
+}
+.hx-img:not(:disabled) {
+  cursor: zoom-in;
+}
+.hx-img:not(:disabled):active {
+  transform: scale(0.985);
+}
+.hx-img:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+.hx-img[data-shape='landscape'] {
+  --hx-ar: 1.5;
+}
+.hx-img[data-shape='portrait'] {
+  --hx-ar: 0.6667;
+}
+/* A lone picture is capped in height; its width shrinks with it, the frame stays */
+.hx-imgs[data-cols='1'] .hx-img {
+  width: min(100%, calc(var(--hx-img-cap) * var(--hx-ar)));
+}
+
+/* The placeholder: blurred colour that drifts slowly, and a shimmer across it */
+.hx-img__ph {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(60% 60% at 25% 30%, var(--hx-ph-a) 0%, transparent 70%),
+    radial-gradient(55% 55% at 78% 70%, var(--hx-ph-b) 0%, transparent 70%), var(--hx-bg-active);
+  filter: blur(28px);
+  animation: hx-img-drift 9s ease-in-out infinite alternate;
+  transition: opacity 520ms var(--hx-ease-out);
+}
+.hx-img__ph[data-tone='0'] {
+  --hx-ph-a: color-mix(in srgb, var(--hx-p-violet-400) 55%, transparent);
+  --hx-ph-b: color-mix(in srgb, var(--hx-p-blue-400) 45%, transparent);
+}
+.hx-img__ph[data-tone='1'] {
+  --hx-ph-a: color-mix(in srgb, var(--hx-p-blue-400) 55%, transparent);
+  --hx-ph-b: color-mix(in srgb, var(--hx-p-green-500) 35%, transparent);
+}
+.hx-img__ph[data-tone='2'] {
+  --hx-ph-a: color-mix(in srgb, var(--hx-p-amber-500) 40%, transparent);
+  --hx-ph-b: color-mix(in srgb, var(--hx-p-violet-400) 45%, transparent);
+}
+.hx-img__ph[data-tone='3'] {
+  --hx-ph-a: color-mix(in srgb, var(--hx-p-green-500) 40%, transparent);
+  --hx-ph-b: color-mix(in srgb, var(--hx-p-blue-400) 50%, transparent);
+}
+.hx-img::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 260%;
+  background: linear-gradient(
+    100deg,
+    transparent 38%,
+    color-mix(in srgb, var(--hx-bg-raised) 38%, transparent) 50%,
+    transparent 62%
+  );
+  transform: translateX(-80%);
+  animation: hx-sk-sweep 2.8s linear infinite;
+  pointer-events: none;
+  transition: opacity 400ms var(--hx-ease-out);
+}
+.hx-img[data-ready='true']::after,
+.hx-img[data-broken]::after {
+  opacity: 0;
+  animation: none;
+}
+.hx-img[data-ready='true'] .hx-img__ph {
+  opacity: 0;
+}
+
+/* The picture: blurred and a little large until it has loaded, then sharp */
+.hx-img__pic {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  filter: blur(24px);
+  transform: scale(1.06);
+  transition:
+    opacity 600ms var(--hx-ease-out),
+    filter 800ms var(--hx-ease-out),
+    transform 800ms var(--hx-ease-out);
+}
+.hx-img[data-ready='true'] .hx-img__pic {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+.hx-imgs__err {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-imgs__cap {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hx-imgs__cap:hover {
+  color: var(--hx-fg-1);
+}
+.hx-imgs__cap[data-wide] {
+  white-space: normal;
+}
+.hx-imgs__cap:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+
+@keyframes hx-img-drift {
+  from {
+    transform: translate(-3%, -2%) scale(1);
+  }
+  to {
+    transform: translate(3%, 2%) scale(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-img,
+  .hx-img__pic,
+  .hx-img__ph,
+  .hx-img::after {
+    transition: none;
+    animation: none;
+  }
+  .hx-img__pic {
+    filter: none;
+    transform: none;
+  }
+}

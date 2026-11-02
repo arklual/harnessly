@@ -1,6 +1,7 @@
 // The open chat's right pane over the machine: the header's button, the tabs and what each shows. A tab is the
 // launcher, the side chat (questions about this chat, the agent is not disturbed), an own terminal of the chat (a shell
 // the machine keeps until the tab closes it) or a browser tab with its own history. Only tools the machine really has are offered; the rest of the design's list waits for its API.
+import { requestFilePlace } from '@/next/features/pane/file-place';
 import {
   useEffect,
   useEffectEvent,
@@ -23,10 +24,14 @@ import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
 import SideChat from '@/next/features/pane/side-chat';
 import { SideFloat } from '@/next/features/pane/side-float';
 import { onOpenSubagent, openSubagent } from '@/next/features/subagents/open';
+import AppTab from '@/next/features/app-views/app-tab';
+import { useInstalledApps } from '@/next/features/app-views/api';
+import { onOpenAppTab } from '@/next/features/app-views/open';
 import { workflowsOf } from '@/next/features/workflows/run';
 import { onOpenNotePage } from '@/next/features/designly/open-note';
 import { onOpenAttached } from '@/next/features/pane/open-attached';
 import type { MadeItem, MessageRef } from '@/next/protocol/v2';
+import { loadKindDocs } from '@/next/features/app-catalog/api';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { useSubagents } from '@/next/bindings/subagents';
 import { setPaneOpen } from '@/next/bindings/pane-open';
@@ -48,6 +53,7 @@ import { useBackground } from '@/next/stores/conversation';
 import { hasFeature, useMachines } from '@/next/stores/machines';
 import type {
   ConvId,
+  MachineId,
   Conversation,
   DirListing,
   FileContent,
@@ -63,6 +69,9 @@ import { browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/featu
 import { requestOf, type IPaneIntent, type IPaneRequest } from '@/next/features/pane/intents';
 import { usePaneIntents } from '@/next/bindings/pane-intents';
 import { usePhone } from '@/next/ui/use-media';
+import { KEY_SCOPE } from '@/next/features/keys/commands';
+import { useKeys } from '@/next/features/keys/use-keys';
+import { useKeyHint } from '@/next/features/keys/keys-help';
 import { chatPaneOf, chatPanes, markUsed, useChatPane, type IChatPane } from '@/next/stores/pane-state';
 import { conversationsStore, convsLoadedStore } from '@/next/stores/conversations';
 
@@ -75,6 +84,16 @@ const PlanView = later(() => import('@/next/features/pane/plan-view'));
 const SubagentView = later(() => import('@/next/features/pane/subagent-view'));
 const MachineTab = later(() => import('@/next/bindings/machine-tab'));
 const DesignlyPane = later(() => import('@/next/bindings/designly-pane'));
+
+/** A design opened beside the chat, full screen: Sinopia Design with this chat; a document of an app's type, its own page. */
+const openDesignFull = async (machine: MachineId, design: string, chat: ConvId) => {
+  const docs = await loadKindDocs(machine).catch(() => []);
+  goTo(
+    docs.some((d) => d.document === design)
+      ? { kind: ROUTE.appDoc, id: design }
+      : { kind: ROUTE.site, id: design, chat },
+  );
+};
 const FilesView = later(() => import('@/next/features/pane/files-view'));
 const DeliveredView = later(() => import('@/next/features/pane/delivered-view'));
 
@@ -131,7 +150,19 @@ const openCount = (tabs: readonly TTab[], kind: TTab['kind']): string | undefine
   return n > 0 ? t('next.pane.liveOpen', { n }) : undefined;
 };
 
-const tabInfo = (tab: TTab, machine: string, chat: string): IPaneTab & { sub: string } => {
+const tabInfo = (
+  tab: TTab,
+  machine: string,
+  chat: string,
+  appName: (id: string) => string | null,
+): IPaneTab & { sub: string } => {
+  if (tab.kind === 'app')
+    return {
+      id: tab.id,
+      icon: 'app-window',
+      name: appName(tab.app) ?? tab.app,
+      sub: t('next.appview.tabHint'),
+    };
   if (tab.kind === 'side')
     return {
       id: tab.id,
@@ -309,6 +340,7 @@ const FilesTab = ({
   if (delivered)
     return (
       <DeliveredView
+        conv={conv.id}
         machine={conv.machineId}
         path={tab.path.startsWith('/') ? tab.path : `${conv.cwd.replace(/\/+$/, '')}/${tab.path}`}
         view={delivered}
@@ -364,6 +396,7 @@ interface IPaneBodyProps {
 }
 
 const PaneBody = (props: IPaneBodyProps) => {
+  const sideKey = useKeyHint('global.sideChat');
   const { conv, machineName, setTabs, active, setActive, edits, guard } = props;
   const tabs = props.besideDesign ? props.tabs.filter((x) => x.kind !== 'designly') : props.tabs;
   const [opening, setOpening] = useState(false);
@@ -374,6 +407,7 @@ const PaneBody = (props: IPaneBodyProps) => {
   const shells = hasFeature(conv.machineId, 'terminal');
   const machineTool = hasFeature(conv.machineId, 'machine');
   const { legacy } = props;
+  const installed = useInstalledApps(conv.machineId);
   const legacyTab = isLegacyTab(active) ? legacy.tabs.find((x) => x.id === active) : undefined;
   // Neither is open: the tools, the permanent first tab (it is not among the pane's own).
   const tab = legacyTab ? undefined : tabs.find((x) => x.id === active);
@@ -397,7 +431,7 @@ const PaneBody = (props: IPaneBodyProps) => {
             icon: 'message-square-text',
             name: t('next.pane.side'),
             hint: t('next.pane.sideHint'),
-            kbd: '⌥⌘S',
+            kbd: sideKey ?? undefined,
           },
         ]
       : []),
@@ -590,6 +624,8 @@ const PaneBody = (props: IPaneBodyProps) => {
   };
 
   const { side } = props;
+  // The tabs of dev apps whose inspector is open (a section under the view, not a tab of its own).
+  const [inspecting, setInspecting] = useState<ReadonlySet<string>>(new Set());
   const saveButton = tab?.kind === 'files' && edits.live?.tab === tab.id;
   const paneActions = () => {
     if (tab?.kind === 'side')
@@ -621,6 +657,29 @@ const PaneBody = (props: IPaneBodyProps) => {
           </button>
         </>
       );
+    if (tab?.kind === 'app' && installed.list?.apps.find((a) => a.id === tab.app)?.dev) {
+      const on = inspecting.has(tab.id);
+      return (
+        <button
+          type="button"
+          className="hx-head-btn hx-tipped"
+          aria-label={t('next.appmain.debug')}
+          aria-pressed={on}
+          onClick={() =>
+            setInspecting((now) => {
+              const next = new Set(now);
+              if (!next.delete(tab.id)) next.add(tab.id);
+              return next;
+            })
+          }
+        >
+          <Icon name="bug" size="sm" />
+          <span className="hx-tip" data-pos="below" data-align="end">
+            {t('next.appmain.debug')}
+          </span>
+        </button>
+      );
+    }
     if (!tab || tab.kind !== 'files') return null;
     // «Поделиться» of a file that can be a document, next to «Сохранить».
     const share = tab.file && isShareable(tab.path) && (
@@ -648,7 +707,12 @@ const PaneBody = (props: IPaneBodyProps) => {
     <ToolPane
       tabs={[
         ...tabs.map((x) => ({
-          ...tabInfo(x, machineName, conv.title),
+          ...tabInfo(
+            x,
+            machineName,
+            conv.title,
+            (id) => installed.list?.apps.find((a) => a.id === id)?.name ?? null,
+          ),
           dirty: edits.unsaved.has(x.id),
           unread: props.unread.includes(x.id),
         })),
@@ -665,7 +729,9 @@ const PaneBody = (props: IPaneBodyProps) => {
       onToggleMax={() => {
         // A design opened beside the chat goes full screen as Sinopia Design, with this chat as its chat.
         if (tab?.kind === 'designly' && tab.design !== null && !props.maxed)
-          goTo({ kind: ROUTE.site, id: tab.design, chat: conv.id });
+          void openDesignFull(conv.machineId, tab.design, conv.id);
+        // An app goes full screen as the app's own page, with this chat beside it.
+        else if (tab?.kind === 'app' && !props.maxed) goTo({ kind: ROUTE.app, id: tab.app, chat: conv.id });
         else props.onToggleMax();
       }}
       onClose={() =>
@@ -722,6 +788,16 @@ const PaneBody = (props: IPaneBodyProps) => {
           conv={conv.id}
           design={tab.design}
           onOpen={(design) => setTabs((list) => list.map((x) => (x.id === tab.id ? { ...tab, design } : x)))}
+        />
+      )}
+      {tab?.kind === 'app' && (
+        <AppTab
+          key={tab.id}
+          machine={conv.machineId}
+          conversation={conv.id}
+          app={tab.app}
+          view={tab.view}
+          inspect={inspecting.has(tab.id)}
         />
       )}
       {tab?.kind === 'files' && (
@@ -950,24 +1026,22 @@ export const useRightPane = (
   };
 
   // ⌥⌘S: the side chat where it lives, docked or over the window; again, the window goes.
-  const onSideKey = useEffectEvent(() => {
+  const onSideKey = () => {
     if (docked) dockSide();
     else if (float === 'open') {
       side.stop();
       leaveFloat();
     } else openFloat();
-  });
-  const sideKeyOn = conv?.provider === 'claude';
-  useEffect(() => {
-    if (!sideKeyOn) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (!(event.altKey && (event.metaKey || event.ctrlKey) && event.code === 'KeyS')) return;
-      event.preventDefault();
-      onSideKey();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [sideKeyOn]);
+  };
+  // The pane's shortcuts (features/keys): the pane itself, and the side chat of a Claude chat.
+  useKeys(
+    KEY_SCOPE.global,
+    {
+      'global.pane': () => (open ? closePane() : show()),
+      'global.sideChat': conv?.provider === 'claude' ? onSideKey : undefined,
+    },
+    conv !== null,
+  );
 
   // What Legacy's pane got for the tools this pane has of its own comes here: an address to a browser tab, the plan
   // and the side chat to theirs.
@@ -1042,8 +1116,12 @@ export const useRightPane = (
     if (show && !phone) setOpen(true);
   };
   // A plain function: the hook below calls the newest one from its own effect event.
-  const applyIntents = (intents: IPaneIntent[]) =>
+  const applyIntents = (intents: IPaneIntent[]) => {
+    for (const { command } of intents)
+      if (command.kind === 'open' && command.target && command.place)
+        requestFilePlace(command.target, command.place);
     applyRequests(intents.flatMap((intent) => requestOf(intent.command) ?? []));
+  };
   usePaneIntents(conv?.machineId ?? null, legacy.tabId, applyIntents);
   // What was asked for this chat while the person was in another one is placed now that they are back; a tab of
   // Legacy's pane waits for it to come.
@@ -1075,6 +1153,10 @@ export const useRightPane = (
     });
   });
   useEffect(() => onOpenSubagent(showSubagent), []);
+
+  // A view's hl.pane.open and a card's «Открыть в панели» ask for an app's tab like the agent's `open app` does.
+  const showApp = useEffectEvent((target: string) => applyRequests([{ k: 'app', target, reload: false }]));
+  useEffect(() => onOpenAppTab(showApp), []);
 
   // A sent note's chip opens its design in the pane's Designly tab; the viewer turns to the note's page itself.
   const showNotePage = useEffectEvent((design: string) => {

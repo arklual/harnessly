@@ -1,0 +1,313 @@
+/* «Сгенерировать картинку»: the panel under the deck's toolbar, in the canvas's card and in the phone's edit sheet. */
+
+/* Under the toolbar, as its menus are; leaves the way it came. */
+.hx-deck-tb__pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 296px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    var(--hx-shadow-overlay),
+    0 0 0 1px var(--hx-border);
+  white-space: normal;
+  animation: hx-imagegen-in 200ms var(--hx-ease-out);
+  z-index: 5;
+}
+.hx-deck-tb__pop[data-closing='1'] {
+  animation: hx-imagegen-out 160ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+.hx-deck-tb__ai[data-busy='true'] .hx-icon {
+  animation: hx-imagegen-pulse 1.2s ease-in-out infinite;
+}
+
+.hx-imagegen {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.hx-imagegen[data-embedded='1'] {
+  padding: 4px 2px 8px;
+}
+.hx-imagegen__field {
+  width: 100%;
+  min-height: 56px;
+  max-height: 140px;
+  resize: none;
+  padding: 8px 10px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 10px;
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 1.4;
+}
+.hx-imagegen__field:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -1px;
+}
+.hx-imagegen__row,
+.hx-imagegen__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hx-imagegen__acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hx-imagegen__btn {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 140ms var(--hx-ease-out);
+}
+.hx-imagegen__btn:hover:not(:disabled) {
+  background: var(--hx-bg-hover);
+}
+.hx-imagegen__btn[data-primary='1'] {
+  color: var(--hx-accent);
+}
+.hx-imagegen__btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hx-imagegen__btn[data-busy='true'] {
+  opacity: 0.6;
+}
+.hx-imagegen__x {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+.hx-imagegen__x:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-imagegen__run {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: hx-imagegen-in 200ms var(--hx-ease-out);
+}
+.hx-imagegen__said {
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+/* A picture is being drawn: the line breathes. */
+.hx-imagegen__said[data-live='1'] {
+  animation: hx-imagegen-pulse 1.6s ease-in-out infinite;
+}
+.hx-imagegen__strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.hx-imagegen__tile {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--hx-bg-hover);
+  box-shadow: 0 0 0 1px var(--hx-border);
+  cursor: pointer;
+  animation: hx-imagegen-in 240ms var(--hx-ease-out);
+  transition:
+    box-shadow 140ms var(--hx-ease-out),
+    transform 140ms var(--hx-ease-out);
+}
+.hx-imagegen__tile:hover:not(:disabled) {
+  box-shadow: 0 0 0 2px var(--hx-accent);
+}
+.hx-imagegen__tile:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.hx-imagegen__tile:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hx-imagegen__tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hx-imagegen__tile[data-wait='1'] {
+  cursor: default;
+  background: linear-gradient(
+    110deg,
+    var(--hx-bg-hover) 30%,
+    var(--hx-bg-active) 50%,
+    var(--hx-bg-hover) 70%
+  );
+  background-size: 220% 100%;
+  animation: hx-imagegen-sweep 1.6s linear infinite;
+}
+
+/* In the canvas's card: a quiet row that opens the panel under it. */
+.hx-ann__gen {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 8px;
+}
+.hx-ann__gen-btn {
+  align-self: flex-start;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.hx-ann__gen-btn:hover,
+.hx-ann__gen-btn[aria-expanded='true'] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-ann__gen-btn[data-busy='true'] .hx-icon {
+  animation: hx-imagegen-pulse 1.2s ease-in-out infinite;
+}
+.hx-ann__gen-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: hx-imagegen-in 200ms var(--hx-ease-out);
+}
+.hx-ann__gen-panel[data-closing='1'] {
+  animation: hx-imagegen-out 160ms var(--hx-ease-out) forwards;
+  pointer-events: none;
+}
+
+@keyframes hx-imagegen-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes hx-imagegen-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes hx-imagegen-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes hx-imagegen-sweep {
+  to {
+    background-position: -220% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-imagegen__said[data-live='1'],
+  .hx-imagegen__tile[data-wait='1'],
+  .hx-deck-tb__ai[data-busy='true'] .hx-icon,
+  .hx-ann__gen-btn[data-busy='true'] .hx-icon {
+    animation: none;
+  }
+}
+
+/* The generator opened from a button on a picture of the page: a card by the block, a sheet from the bottom on a phone. */
+.hx-imgact {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+.hx-imgact__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+.hx-imgact__panel {
+  position: absolute;
+  left: var(--ix, 8px);
+  top: var(--iy, 8px);
+  width: var(--iw, 296px);
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow:
+    var(--hx-shadow-overlay),
+    0 0 0 1px var(--hx-border);
+  animation: hx-imagegen-in 200ms var(--hx-ease-out);
+}
+.hx-imgact[data-closing='1'] .hx-imgact__panel {
+  animation: hx-imagegen-out 160ms var(--hx-ease-out) forwards;
+}
+.hx-imgact[data-closing='1'] .hx-imgact__scrim {
+  pointer-events: none;
+}
+@media (max-width: 560px) {
+  .hx-imgact__panel {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    max-height: 70dvh;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    border-radius: 16px 16px 0 0;
+    animation-name: hx-imgact-sheet-in;
+  }
+  .hx-imgact[data-closing='1'] .hx-imgact__panel {
+    animation-name: hx-imgact-sheet-out;
+  }
+}
+@keyframes hx-imgact-sheet-in {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+@keyframes hx-imgact-sheet-out {
+  to {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-imgact__panel {
+    animation: none;
+  }
+}
+
+/* A phone's field is 16 px: the page does not zoom in on it. */
+@media (max-width: 560px) {
+  .hx-imagegen__field {
+    font-size: 16px;
+  }
+}

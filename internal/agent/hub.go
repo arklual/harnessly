@@ -50,6 +50,7 @@ type hub struct {
 	audit   *Audit
 	env     *agentnet.EnvDir
 	proxies *agentnet.Proxies
+	budget  *budgetKeeper
 	check   *agentnet.Checker
 	shell   *preflight.Checker
 	filter  *routeFilter
@@ -60,6 +61,8 @@ type hub struct {
 	ctx      context.Context
 	installs *install.Manager
 	logins   *agentlogin.Manager
+	// usage is nil when the outbox could not be opened.
+	usage *usage
 
 	mu      sync.Mutex
 	checks  map[string]hubproto.ProviderCheck // the last provider check of each agent, for its status
@@ -92,6 +95,7 @@ func newHub(a *Agent) *hub {
 		policy:        NewPolicyStore(cfg.PolicyFile, cfg.Home, cfg.DataDir),
 		audit:         NewAudit(filepath.Join(cfg.DataDir, "agent-audit.log")),
 		env:           agentnet.NewEnvDir(cfg.EnvDir),
+		budget:        newBudgetKeeper(cfg.DataDir),
 		check:         &agentnet.Checker{},
 		shell:         &preflight.Checker{Home: cfg.Home, Env: os.Environ()},
 		checks:        map[string]hubproto.ProviderCheck{},
@@ -162,12 +166,14 @@ func (h *hub) start(ctx context.Context) error {
 	h.goBG(func() { every(ctx, linkStateEvery, false, h.heartbeat) })
 	h.goBG(func() { every(ctx, agentsEvery, false, func() { h.refreshAgents(false) }) })
 	h.goBG(func() { every(ctx, preflightEvery, false, h.sendPreflight) })
+	h.startUsage()
 	return nil
 }
 
 // stop runs after the link's context is done: the loops have returned or are about to.
 func (h *hub) stop() {
 	h.bg.Wait()
+	h.stopUsage()
 	_ = os.Remove(LinkStatePath(h.a.cfg.DataDir))
 	if h.filter != nil {
 		h.filter.Close()
@@ -245,6 +251,7 @@ func (h *hub) linkUp(l *link) {
 	Log("info", "linked to the hub", F{"machine", h.machine.MachineID})
 	h.goBG(h.sendPreflight)
 	h.goBG(func() { h.refreshAgents(true) })
+	h.usageAnnounce()
 }
 
 func (h *hub) linkDown(l *link) {
@@ -332,10 +339,14 @@ func (h *hub) hello() hubproto.Hello {
 		features = append(features, "tunnel")
 	}
 	features = append(features, hubproto.FeaturesV2...)
+	if h.usage != nil {
+		features = append(features, hubproto.FeatureUsage)
+	}
+	features = append(features, hubproto.FeatureBudget)
 	return hubproto.Hello{
 		Protocol: hubproto.Version, AgentVersion: a.hello.AgentVersion, User: a.hello.User, Home: a.hello.Home,
 		Hostname: a.hello.Hostname, Features: features, MachineID: h.machine.MachineID, OS: runtime.GOOS, Arch: runtime.GOARCH,
-		Profile: h.machine.Profile, Policy: h.policy.Current(),
+		Profile: h.machine.Profile, Policy: h.policy.Current(), BudgetVersion: h.budget.Version(),
 	}
 }
 

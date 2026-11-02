@@ -17,6 +17,8 @@
 # E2E_DATABASE_URL=postgres://user@host:port/emptydb?sslmode=disable runs the hub on that (empty) Postgres database
 # instead of SQLite; pg_dump (on PATH or in /usr/lib/postgresql/*/bin) then also searches the database for the secrets.
 #
+# E2E_HUB_ORGS sets HUB_ORGS (shadow by default: the instance admin moves the space into an organization midway).
+#
 # Needs: go, curl, jq, tmux. For the UI: web/dist-hub (pnpm build:hub; this script runs it when pnpm exists and the folder
 # is missing) and, for the machine's page, web/dist (pnpm build) so the runtime is built with the page in it.
 # No call leaves this machine: the provider check goes through a proxy that does not exist. E2E_REAL_PROVIDER=1 lets it
@@ -187,6 +189,7 @@ mkdir -p "$T/hub"
 (
 	export HUB_LISTEN="127.0.0.1:$HUB_PORT" HUB_PUBLIC_URL="$HUB" HUB_DATA_DIR="$T/hub" HUB_DIST_DIR="$T/dist"
 	export HUB_LOCAL_CODE_FILE="$T/hub/local-code" HUB_LOG_LEVEL=info HUB_EDITION=self-hosted HUB_SIGNUP=open
+	export HUB_ORGS="${E2E_HUB_ORGS:-shadow}"
 	if [ -n "$DB_URL" ]; then export HUB_DATABASE_URL="$DB_URL"; fi
 	if [ -n "$WEB_DIR" ]; then export HUB_WEB_DIR="$WEB_DIR"; fi
 	exec "$T/bin/hub" serve
@@ -436,6 +439,17 @@ if [ "$HAVE_PAGE" = 1 ]; then
 fi
 SET_COOKIES=$(curl -sS -o /dev/null -D - -b "$OWNER" "$HUB$BASE/api/auth/setup" | grep -ci '^set-cookie:' || true)
 expect "no cookie of the runtime reaches the browser" "$SET_COOKIES" 0
+
+# --- organizations: a space moves into one (HUB_ORGS=shadow, docs/hub/orgs.md) ------------------------------------
+
+step "The space moves into an organization: its machine stays online, the open runtime keeps its session"
+call "$OWNER" POST /api/orgs "{\"name\":\"Тестовая организация\",\"spaceIds\":[\"$SID\"]}"
+expect "the instance admin makes an organization of the space" "$CODE" 201
+expect "…the space is its tenant" "$(j '.tenants[0].id')" "$SID"
+call "$OWNER" GET "/api/machines/$MID"
+expect "the machine is still online" "$(j .machine.status)" online
+call "$OWNER" GET "$BASE/api/auth/setup"
+expect "the open runtime answers in the same session" "$CODE" 200
 
 # --- 11. policy and the kill switch -------------------------------------------------------------------------------
 

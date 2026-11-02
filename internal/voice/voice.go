@@ -31,6 +31,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/sameorigin"
+	"github.com/ly-solutions/harnessly/internal/voice/cloud"
+	"github.com/ly-solutions/harnessly/internal/voice/dict"
 )
 
 const (
@@ -60,6 +62,11 @@ type Config struct {
 	// ReadyTimeout is how long the service may take to load its model (30 s).
 	ReadyTimeout time.Duration
 	Log          func(level, msg string, kv ...any)
+	// Credentials gives the saved key (and Yandex's folder id) of a cloud engine ("openai", "yandex"); an error says
+	// there is none. nil: no cloud engine is offered.
+	Credentials func(engine string) (key, folder string, err error)
+	// Cloud replaces the cloud recognizers (tests); nil is the real ones.
+	Cloud map[string]cloud.Func
 }
 
 // Server serves dictation sockets; the request is already authenticated.
@@ -131,6 +138,8 @@ type session struct {
 
 	asr *asrConn
 	dec *decoder
+	// dict is the person's words, applied to every text the page gets.
+	dict []dict.Entry
 }
 
 // ServeHTTP upgrades the request and serves one dictation until either side closes.
@@ -228,7 +237,9 @@ func (ss *session) onClient(raw []byte) {
 	switch typ, _ := msg.Get("type"); typ {
 	case "start":
 		lang, _ := msg.Get("lang")
-		ss.start(lang)
+		eng, _ := msg.Get("engine")
+		words, _ := msg.Get("dict")
+		ss.start(lang, eng, words)
 	case "stop":
 		if !ss.started || ss.ended || ss.stopping {
 			return
@@ -274,7 +285,7 @@ func (ss *session) finish(f *failure) {
 	}
 }
 
-func (ss *session) start(lang any) {
+func (ss *session) start(lang, eng, words any) {
 	if ss.started || ss.ended {
 		return
 	}
@@ -288,8 +299,18 @@ func (ss *session) start(lang any) {
 	if l, ok := lang.(string); ok && (l == "ru" || l == "en" || l == "auto") {
 		resolved = l
 	}
+	ss.dict = parseDict(words)
+	engine, _ := eng.(string)
+	var dial dialFunc
+	if engine != "" && engine != "local" {
+		var f *failure
+		if dial, f = ss.s.cloudDial(engine, ss.dict, resolved); f != nil {
+			ss.finish(f)
+			return
+		}
+	}
 	ss.openedAt = time.Now()
-	ss.asr = ss.dialASR(resolved)
+	ss.asr = ss.dialASR(resolved, dial)
 	ss.dec = ss.startDecoder(bin)
 }
 
@@ -325,7 +346,10 @@ type asrConn struct {
 	cancel      context.CancelFunc
 }
 
-func (ss *session) dialASR(lang string) *asrConn {
+// dialFunc opens the connection to a recognition service; nil is the machine's own, on its Unix socket.
+type dialFunc func(ctx context.Context) (net.Conn, error)
+
+func (ss *session) dialASR(lang string, dial dialFunc) *asrConn {
 	a := &asrConn{lang: lang, out: make(chan []byte, 1024)}
 	ctx, cancel := context.WithCancel(ss.ctx)
 	a.cancel = cancel
@@ -333,8 +357,14 @@ func (ss *session) dialASR(lang string) *asrConn {
 	a.out <- jsonLine(jsvalue.NewObject("cmd", "start", "lang", lang))
 	out := a.out
 	go func() {
-		var d net.Dialer
-		conn, err := d.DialContext(ctx, "unix", ss.s.cfg.Socket)
+		var conn net.Conn
+		var err error
+		if dial != nil {
+			conn, err = dial(ctx)
+		} else {
+			var d net.Dialer
+			conn, err = d.DialContext(ctx, "unix", ss.s.cfg.Socket)
+		}
 		if err != nil {
 			ss.deliver(ctx, event{kind: "asrError", err: dialError(err, ss.s.cfg.Socket)})
 			ss.deliver(ctx, event{kind: "asrClosed"})
@@ -499,7 +529,11 @@ func (a *asrConn) handle(ss *session, ev event) {
 		withText := func(kind string) *jsvalue.Object {
 			o := jsvalue.NewObject("type", kind)
 			if hasText {
-				o.Set("text", rawValue(text))
+				v := rawValue(text)
+				if str, ok := v.(string); ok && len(ss.dict) > 0 {
+					v = dict.Apply(str, ss.dict)
+				}
+				o.Set("text", v)
 			}
 			return o
 		}

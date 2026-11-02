@@ -1,0 +1,8 @@
+{
+  "next.appteam.title": "Каталог команды",
+  "next.appteam.none": "Пока пусто. Опубликуйте приложение для команды: harnessly app publish --team",
+  "next.appteam.install": "Установить для команды",
+  "next.appteam.uninstall": "Убрать у команды",
+  "next.appteam.mute": "Выключить у меня",
+  "next.appteam.unmute": "Включить у меня"
+}

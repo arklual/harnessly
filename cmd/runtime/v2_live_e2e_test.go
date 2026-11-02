@@ -49,6 +49,15 @@ func TestV2LiveRuntimeEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Registered at once, before anything can fail: the tmux server of the test's private socket goes with the dir,
+	// whatever way the test ends (the stand-in panes it holds must not outlive it).
+	rootSocket := "hs-test-live-" + strconv.Itoa(os.Getpid())
+	t.Cleanup(func() {
+		c := exec.Command(tmuxBin, "-L", rootSocket, "kill-server")
+		c.Env = append(os.Environ(), "TMUX_TMPDIR="+filepath.Join(root, "t"))
+		_ = c.Run()
+		_ = os.RemoveAll(root)
+	})
 	bin := filepath.Join(root, "runtime")
 	if out, err := exec.Command(goBin, "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
@@ -130,13 +139,15 @@ func TestV2LiveRuntimeEndToEnd(t *testing.T) {
 		c := exec.Command(bin)
 		c.Env = env
 		c.Stdout, c.Stderr = logFile, logFile
-		c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		// Own process group, and killed with the test binary: nothing the runtime started outlives the test.
+		c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL}
 		if err := c.Start(); err != nil {
 			t.Fatal(err)
 		}
 		runtime = c
 	}
 	stop := func() {
+		pgid := runtime.Process.Pid
 		_ = runtime.Process.Signal(syscall.SIGTERM)
 		done := make(chan struct{})
 		go func() { _ = runtime.Wait(); close(done) }()
@@ -146,6 +157,8 @@ func TestV2LiveRuntimeEndToEnd(t *testing.T) {
 			_ = runtime.Process.Kill()
 			<-done
 		}
+		// Whatever the runtime left in its group (ffmpeg, tmux clients) goes too.
+		_ = syscall.Kill(-pgid, syscall.SIGKILL)
 	}
 	start()
 	t.Cleanup(func() {

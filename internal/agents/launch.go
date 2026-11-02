@@ -50,6 +50,17 @@ type ClaudeApps struct {
 	PluginDirs []string
 	// PromptFile is the apps' instructions joined, appended to the system prompt; "" for none.
 	PromptFile string
+	// MCPConfig is a second --mcp-config file: the host's app tools as the server harnessly-app; "" for none.
+	MCPConfig string
+	// RuntimeMCPConfig replaces the runtime's own --mcp-config: the same server with the launch's token in place of
+	// the person's; "" keeps the runtime's.
+	RuntimeMCPConfig string
+	// Wrap are shell words the CLI runs under (the operating system's wall around the apps, internal/apps/boundary.go),
+	// put between the launch's environment and the CLI; "" runs it as it is.
+	Wrap string
+	// Env are `VAR='value'` shell words the CLI gets after the launch's own environment (the agent's token file,
+	// HARNESSLY_CLI_TOKEN_FILE); "" for none.
+	Env string
 }
 
 // ErrNoApps: a launch names apps and this machine has none.

@@ -1,29 +1,7 @@
 /** Tabs of the right panel of a conversation, as in Codex desktop: pure transitions and their storage. */
+import { PANE_TAB_KINDS, SINGLE_PANE_KINDS, type TPaneTabKind } from '@/lib/pane-kinds';
 
-export const PANE_TAB_KINDS = [
-  'overview',
-  'tools',
-  'browser',
-  'terminal',
-  'files',
-  'disk',
-  'changes',
-  'artifacts',
-  'gitlab',
-  'subagents',
-  'economics',
-  'plan',
-  'peers',
-  'design',
-  'side-chat',
-  'gallery',
-  'task',
-  'vault',
-] as const;
-export type TPaneTabKind = (typeof PANE_TAB_KINDS)[number];
-
-/** One of these per conversation: the target of a browser is where it goes, not which browser it is. */
-const SINGLE_KINDS: readonly TPaneTabKind[] = ['overview', 'tools', 'browser', 'terminal', 'vault'];
+export { PANE_TAB_KINDS, type TPaneTabKind } from '@/lib/pane-kinds';
 
 /** The islands of the conversation: the first tab of every panel, it cannot be closed. */
 export const OVERVIEW_TAB_ID = 'overview' as const;
@@ -71,7 +49,7 @@ export const isPaneTabRequest = (value: unknown): value is IPaneTabRequest => {
 };
 
 export const paneTabId = (kind: TPaneTabKind, target: string | null): string =>
-  SINGLE_KINDS.includes(kind) || target === null ? kind : `${kind}:${target}`;
+  SINGLE_PANE_KINDS.includes(kind) || target === null ? kind : `${kind}:${target}`;
 
 const overviewTab = (): IPaneTab => ({ id: OVERVIEW_TAB_ID, kind: 'overview', target: null, title: null });
 

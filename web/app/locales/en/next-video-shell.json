@@ -38,5 +38,7 @@
   "next.video.shell.shareFormat": "Opens in",
   "next.video.shell.shareNoMp4": "No MP4 is rendered yet: until there is one, guests see a placeholder",
   "next.video.shell.source": "Source",
-  "next.video.shell.style": "Style"
+  "next.video.shell.style": "Style",
+  "offerShow": "Show",
+  "offerDrop": "Not now"
 }

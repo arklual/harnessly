@@ -2,7 +2,7 @@
   "id": "harnessly.mr-review",
   "name": "Ревью MR",
   "description": "Ревью мерж-реквеста в чате: читает дифф, ничего не правит и не пушит",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "harnessly": ">=0.16.36",
   "trust": "declarative",
   "targets": ["chat"],

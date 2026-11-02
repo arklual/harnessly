@@ -151,6 +151,8 @@ func TestOpenSendsTheDetectedTabFromTheOwnSession(t *testing.T) {
 		{"https://github.com/ly-solutions/harnessly/issues/7", "gitlab", "https://github.com/ly-solutions/harnessly/issues/7"},
 		{"https://github.com/ly-solutions/harnessly", "browser", "https://github.com/ly-solutions/harnessly"},
 		{"PROJ-123", "task", "PROJ-123"},
+		{"app:acme.cashback", "app", "acme.cashback"},
+		{"app:acme.cashback/main", "app", "acme.cashback/main"},
 		{"/home/a/work/report.md", "files", "/home/a/work/report.md"},
 		{"notes/todo.md", "files", "/home/a/work/notes/todo.md"},
 	}
@@ -461,5 +463,32 @@ func TestDeliverSendsTheAbsolutePathAndTheTitle(t *testing.T) {
 	}
 	if r := f.run(t, "", "deliver", "x.zip"); r.code == 0 {
 		t.Fatal("outside a pane there is nobody to hand a file to")
+	}
+}
+
+// The agent of a chat with apps reads the token of its launch from HARNESSLY_CLI_TOKEN_FILE, before the person's
+// cli-token in the data folder; a named file without a token is an error, not the person's token.
+func TestEndpointAgentTokenFile(t *testing.T) {
+	home := t.TempDir()
+	data := filepath.Join(home, ".harnessly")
+	if err := os.MkdirAll(data, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(data, "port"), []byte("4100"), 0o600)
+	_ = os.WriteFile(filepath.Join(data, "cli-token"), []byte("person\n"), 0o600)
+	agentFile := filepath.Join(t.TempDir(), "agent-token-1")
+	_ = os.WriteFile(agentFile, []byte("agent.1.2.mac\n"), 0o600)
+	vars := map[string]string{}
+	c := &cli{env: Env{Getenv: func(k string) string { return vars[k] }, Home: home}}
+	if _, token, err := c.endpoint(); err != nil || token != "person" {
+		t.Fatalf("the person's: %q %v", token, err)
+	}
+	vars["HARNESSLY_CLI_TOKEN_FILE"] = agentFile
+	if _, token, err := c.endpoint(); err != nil || token != "agent.1.2.mac" {
+		t.Fatalf("the agent's: %q %v", token, err)
+	}
+	vars["HARNESSLY_CLI_TOKEN_FILE"] = filepath.Join(t.TempDir(), "missing")
+	if _, token, err := c.endpoint(); err == nil {
+		t.Fatalf("a missing token file gave %q", token)
 	}
 }

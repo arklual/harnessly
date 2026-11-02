@@ -198,7 +198,7 @@ var entryFields = func() map[string]fieldSet {
 		EntryUser:       {"text", "attachments", "clientId"},
 		EntrySay:        {"md"},
 		EntryThink:      {"text"},
-		EntryTool:       {"toolUseId", "tool", "summary", "ok", "output"},
+		EntryTool:       {"toolUseId", "tool", "summary", "ok", "output", "images?"},
 		EntrySubagent:   {"agentId", "agentType", "description", "status", "model", "durationMs", "output"},
 		EntryAnswers:    {"questionId", "pairs"},
 		EntryGate:       {"permissionId"},

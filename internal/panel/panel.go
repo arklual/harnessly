@@ -20,18 +20,14 @@ const (
 	MaxMessage = 400
 )
 
-// TabKinds are the kinds of tab the right pane can hold.
-var TabKinds = []string{"overview", "tools", "browser", "terminal", "files", "disk", "changes", "artifacts", "gitlab",
-	"subagents", "economics", "plan", "peers", "design", "side-chat", "gallery", "task"}
-
-// IsTabKind says whether v names a kind of TabKinds.
+// IsTabKind says whether v names a kind of the registry.
 func IsTabKind(v any) bool {
 	s, ok := v.(string)
 	if !ok {
 		return false
 	}
-	for _, k := range TabKinds {
-		if k == s {
+	for _, k := range registry {
+		if k.name == s {
 			return true
 		}
 	}
@@ -61,6 +57,9 @@ type Targets struct {
 	// DesignRef is the id of the machine's design that a text names (its id, its folder or a file in it, its title),
 	// "" for none; nil: the machine has no design library and "open design" takes no target.
 	DesignRef func(text string) string
+	// AppRef is the canonical "<app id>[/<view>]" of an installed app's pane view that a text names, "" for none; nil:
+	// the machine has no apps and "open app" takes no target.
+	AppRef func(text string) string
 }
 
 func (t Targets) readerPath() string {
@@ -71,6 +70,9 @@ func (t Targets) readerPath() string {
 }
 
 // Command is a command the pane knows.
+// maxPlace bounds a place in a file: it names a range, a time or a page, nothing long.
+const maxPlace = 200
+
 type Command struct {
 	Kind   string // open, show, hide, status
 	Tab    string
@@ -79,6 +81,8 @@ type Command struct {
 	Auto bool
 	// Reload: the thing changed, a tab that shows it reloads; nothing opens for it.
 	Reload bool
+	// Place: where in the file to show (a range of cells, a time, a page); "" for none.
+	Place string
 }
 
 // JSON is the command as the sync socket carries it.
@@ -95,6 +99,9 @@ func (c Command) JSON() *jsvalue.Object {
 		if c.Reload {
 			o.Set("reload", true)
 		}
+		if c.Place != "" {
+			o.Set("place", c.Place)
+		}
 	}
 	return o
 }
@@ -109,9 +116,8 @@ const (
 	gitlab
 	task
 	designRef
+	appRef
 )
-
-var targetOf = map[string]targetKind{"browser": port, "files": path, "changes": path, "artifacts": doc, "gitlab": gitlab, "task": task, "design": designRef}
 
 func clean(s string) bool { return tmux.StripControlChars(s) == s }
 
@@ -417,19 +423,25 @@ func (t Targets) hint(tab string, k targetKind) string {
 		}
 		return locale.Pick("open design: no such design; give its id, its folder or a file in it, or its exact title",
 			"open design: такого дизайна нет; нужен его id, его папка или файл в ней, или точное название")
+	case appRef:
+		if t.AppRef == nil {
+			return locale.Pick("open app: this machine has no apps", "open app: на этой машине нет приложений")
+		}
+		return locale.Pick("open app: no such app with a pane view; give its id, <id>/<view> to pick a view (harnessly app list)",
+			"open app: такого приложения с видом для панели нет; нужен его id или <id>/<вид> (harnessly app list)")
 	}
 	return locale.Pick("open "+tab+": a path without \"..\" and control characters is required", "open "+tab+": нужен путь без «..» и управляющих символов")
 }
 
 func (t Targets) parseOpen(tab, target any) (Command, string) {
 	if !IsTabKind(tab) {
-		return Command{}, locale.Pick("open: unknown tab, available: ", "open: неизвестная вкладка, доступны ") + strings.Join(TabKinds, ", ")
+		return Command{}, locale.Pick("open: unknown tab, available: ", "open: неизвестная вкладка, доступны ") + strings.Join(Kinds(), ", ")
 	}
 	name := tab.(string)
 	if s, isStr := target.(string); target == nil || (isStr && jsvalue.TrimJS(s) == "") {
 		return Command{Kind: "open", Tab: name}, ""
 	}
-	k := targetOf[name]
+	k := targetOfKind(name)
 	if k == none {
 		return Command{}, locale.Pick("open "+name+": this tab needs no target", "open "+name+": этой вкладке цель не нужна")
 	}
@@ -453,6 +465,10 @@ func (t Targets) parseOpen(tab, target any) (Command, string) {
 		if t.DesignRef != nil && clean(text) {
 			c = t.DesignRef(jsvalue.TrimJS(text))
 		}
+	case appRef:
+		if t.AppRef != nil && clean(text) {
+			c = t.AppRef(jsvalue.TrimJS(text))
+		}
 	}
 	if c == "" {
 		return Command{}, t.hint(name, k)
@@ -472,7 +488,13 @@ func (t Targets) Parse(input any) (Command, string) {
 	case "open":
 		tab, _ := o.Get("tab")
 		target, _ := o.Get("target")
-		return t.parseOpen(tab, target)
+		command, refusal := t.parseOpen(tab, target)
+		if place, _ := o.Get("place"); refusal == "" {
+			if text, isText := place.(string); isText && len(text) <= maxPlace {
+				command.Place = text
+			}
+		}
+		return command, refusal
 	case "show", "hide", "status":
 		return Command{Kind: kind.(string)}, ""
 	}

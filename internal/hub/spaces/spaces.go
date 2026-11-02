@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
+	"github.com/ly-solutions/harnessly/internal/hub/authz"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
@@ -132,26 +133,44 @@ func (s *Service) route(w http.ResponseWriter, r *http.Request) {
 // Events is the broker the service publishes to; the machine side shares it.
 func (s *Service) Events() *events.Broker { return s.events }
 
+// Authz is the rights module over the database: grants and organizations count only while HUB_ORGS is not off.
+func (s *Service) Authz() authz.Authz {
+	return authz.Authz{S: s.db.S(), MembershipOnly: s.cfg == nil || s.cfg.Orgs == config.OrgsOff}
+}
+
 // Access is the person's role in the space. A person who is not in it, and an id that is not a space at all, both get
-// the same forbidden: ids are not a way to learn which spaces exist.
+// the same forbidden: ids are not a way to learn which spaces exist. Someone who manages the space from above (an admin
+// of its organization) has the owner's rights in it without being a member.
 func (s *Service) Access(ctx context.Context, userID, spaceID string) (string, error) {
 	role, err := s.db.S().Role(ctx, spaceID, userID)
 	if err != nil {
 		return "", err
 	}
-	if role == "" {
-		return "", httpx.ErrForbidden
+	if role != "" {
+		return role, nil
 	}
-	return role, nil
+	if s.cfg != nil && s.cfg.Orgs != config.OrgsOff {
+		ok, err := s.Authz().Allowed(ctx, authz.Principal{UserID: userID}, authz.Check{Action: authz.Manage, Scope: authz.Scope{Kind: store.ScopeTenant, ID: spaceID}})
+		if err != nil && !errors.Is(err, httpx.ErrNotFound) {
+			return "", err
+		}
+		if ok {
+			return store.RoleOwner, nil
+		}
+	}
+	return "", httpx.ErrForbidden
 }
 
-// Owner is Access for an operation only owners may do.
+// Owner is Access for an operation only owners may do: authz.Manage on the space as a tenant.
 func (s *Service) Owner(ctx context.Context, userID, spaceID string) error {
-	role, err := s.Access(ctx, userID, spaceID)
+	if _, err := s.Access(ctx, userID, spaceID); err != nil {
+		return err
+	}
+	ok, err := s.Authz().Allowed(ctx, authz.Principal{UserID: userID}, authz.Check{Action: authz.Manage, Scope: authz.Scope{Kind: store.ScopeTenant, ID: spaceID}})
 	if err != nil {
 		return err
 	}
-	if role != store.RoleOwner {
+	if !ok {
 		return httpx.New(http.StatusForbidden, "forbidden", "Это может только владелец пространства")
 	}
 	return nil

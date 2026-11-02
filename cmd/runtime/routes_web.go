@@ -130,7 +130,8 @@ func (c *webConfig) handler() http.HandlerFunc {
 			if c.serveStatic(w, r, name) {
 				return
 			}
-			if path.Ext(name) != "" {
+			// An app's page carries its id, and ids are dotted (harnessly.cashback): not a file.
+			if path.Ext(name) != "" && !strings.HasPrefix(name, "apps/") {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write([]byte(`{"error":"Not found"}`))

@@ -1,0 +1,21 @@
+:root {
+  --bg: var(--t-bg, #ffffff);
+  --surface: var(--t-surface, #f6f6f8);
+  --text: var(--t-text, #16161d);
+  --muted: var(--t-text-muted, #6b6b78);
+  --border: var(--t-border, #dcdce3);
+  --accent: var(--t-accent, #5b5bd6);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+.mb { padding: 16px; }
+.mb__add { display: flex; gap: 8px; margin-bottom: 16px; }
+.mb__input { flex: 1; min-width: 0; padding: 8px 10px; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font: inherit; }
+.mb__button, .mb__remove { padding: 8px 12px; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font: inherit; cursor: pointer; }
+.mb__button:hover, .mb__remove:hover { border-color: var(--accent); }
+.mb__input:focus-visible, .mb__button:focus-visible, .mb__remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mb__cards { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.mb__card { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.mb__text { margin: 0; overflow-wrap: anywhere; }
+.mb__remove { align-self: flex-end; padding: 4px 8px; color: var(--muted); }
+.mb__note { margin: 12px 0 0; color: var(--muted); }

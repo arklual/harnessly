@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/ly-solutions/harnessly/internal/imagecard"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/outputs"
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -92,6 +93,7 @@ type builder struct {
 	offsets []int64
 	byID    map[string]int
 	tools   map[string]string // tool use id → entry id
+	jobs    map[string]string // harnessly picture job id → the entry of the call that started it
 	gates   map[string]string // tool use id → gate id of a question, a plan or an approval
 	turns   []*turn
 	byTurn  map[string]int
@@ -113,7 +115,7 @@ type builder struct {
 
 func newBuilder(conv string, provider wire.Provider) *builder {
 	return &builder{conv: conv, provider: provider, byID: map[string]int{}, tools: map[string]string{},
-		gates: map[string]string{}, byTurn: map[string]int{}, outputs: map[string]string{}, calls: map[string]call{},
+		jobs: map[string]string{}, gates: map[string]string{}, byTurn: map[string]int{}, outputs: map[string]string{}, calls: map[string]call{},
 		teammates: map[string]string{}, limits: map[string]Limit{}}
 }
 
@@ -173,6 +175,9 @@ func (b *builder) add(o *jsvalue.Object, offset int64) step {
 		return s
 	case "task-progress":
 		b.tasks.progress(o)
+		return s
+	case "image-result":
+		b.imageResult(&s, o)
 		return s
 	case "user-message":
 		if truthy(o, "pending") {
@@ -485,6 +490,13 @@ func (b *builder) tool(s *step, o *jsvalue.Object, typ, id string, at wire.Ms, o
 	if out := str(o, "stdout"); out != "" {
 		e.Output = b.output(id, out)
 	}
+	if g, ok := o.Get("imageGen"); ok && typ == "tool-call" {
+		if call, isObj := g.(*jsvalue.Object); isObj {
+			count, _ := num(call, "count")
+			e.Images = &wire.ImageGen{Count: int(count), Prompt: str(call, "prompt"), Shape: str(call, "shape"),
+				State: imagecard.Drawing, Done: []string{}}
+		}
+	}
 	b.tools[use] = id
 	b.push(s, e, offset)
 	if typ == "tool-call" {
@@ -655,6 +667,9 @@ func (b *builder) result(s *step, o *jsvalue.Object, id string, at wire.Ms, offs
 			changed = true
 		}
 		e.OK = &ok2
+		if b.imagesResult(s, &e, o, ok2) {
+			changed = true
+		}
 	}
 	if changed {
 		e.Rev++
@@ -680,6 +695,86 @@ func (b *builder) result(s *step, o *jsvalue.Object, id string, at wire.Ms, offs
 		}
 	}
 	s.signals = append(s.signals, Signal{K: SignalGateResolved, EntryID: id, GateID: gate, Offset: offset, At: at})
+}
+
+// imagesResult settles the picture card of a finished call and reports whether e changed. A harnessly answer names its
+// job and the files (a wait_images answer is the earlier card's, found by the job); Codex's script just ends.
+func (b *builder) imagesResult(s *step, e *wire.Entry, o *jsvalue.Object, ok bool) bool {
+	rv, has := o.Get("images")
+	rep, isObj := rv.(*jsvalue.Object)
+	if !has || !isObj {
+		if e.Images == nil || e.Images.State != imagecard.Drawing {
+			return false
+		}
+		img := *e.Images
+		switch {
+		case !ok:
+			img.State = imagecard.Failed
+			img.Failed = sptr(str(o, "summary"))
+		case len(img.Done) == 0 && img.Failed != nil:
+			img.State = imagecard.Failed
+		default:
+			img.State = imagecard.Done
+		}
+		e.Images = &img
+		return true
+	}
+	card, own := e, e.Images != nil
+	idx := -1
+	if !own {
+		var found bool
+		if idx, found = b.byID[b.jobs[str(rep, "jobId")]]; !found {
+			return false
+		}
+		held := b.entries[idx]
+		card = &held
+		if card.Images == nil {
+			return false
+		}
+	}
+	img := *card.Images
+	img.JobID, img.State = str(rep, "jobId"), str(rep, "state")
+	img.Done = []string{}
+	if list, isList := rep.Get("paths"); isList {
+		img.Done = append(img.Done, jsvalue.Strings(list.([]any))...)
+	}
+	img.Failed = nil
+	if msg := str(rep, "error"); msg != "" {
+		img.Failed = sptr(msg)
+	}
+	img.Count = max(img.Count, len(img.Done))
+	card.Images = &img
+	if own {
+		b.jobs[img.JobID] = e.ID
+		return true
+	}
+	card.Rev++
+	b.entries[idx] = *card
+	s.updated = append(s.updated, idx)
+	return false
+}
+
+// imageResult adds one picture Codex finished to the step of the script that drew it.
+func (b *builder) imageResult(s *step, o *jsvalue.Object) {
+	i, ok := b.byID[b.tools[str(o, "toolUseId")]]
+	if !ok || b.entries[i].Images == nil {
+		return
+	}
+	e := b.entries[i]
+	img := *e.Images
+	img.Done = slices.Clone(img.Done)
+	if failure := str(o, "failure"); failure != "" {
+		img.Failed = sptr(failure)
+	} else if p := str(o, "path"); p != "" && !slices.Contains(img.Done, p) {
+		img.Done = append(img.Done, p)
+	}
+	img.Count = max(img.Count, len(img.Done))
+	if img.Prompt == "" {
+		img.Prompt = str(o, "prompt")
+	}
+	e.Images, e.Rev = &img, e.Rev+1
+	b.entries[i] = e
+	s.updated = append(s.updated, i)
 }
 
 // cur is the turn a new entry belongs to: the open one, else the one the runtime ended ahead of the transcript.

@@ -1,0 +1,28 @@
+{
+  "id": "acme.moodboard",
+  "name": "Мудборд",
+  "description": "Новый тип документа Sinopia: доска с карточками-идеями, весь формат собран из SDK приложения",
+  "version": "0.1.0",
+  "harnessly": ">=0.17.0",
+  "trust": "sandboxed",
+  "targets": ["sinopia.acme.moodboard"],
+  "activation": { "on": ["document"] },
+  "permissions": ["sinopia.kind", "sinopia.read", "storage"],
+  "views": [
+    { "id": "editor", "title": "Мудборд", "entry": "ui/editor.html", "targets": ["sinopia.acme.moodboard"] }
+  ],
+  "sinopia": {
+    "kinds": [
+      {
+        "id": "acme.moodboard",
+        "title": "Мудборд",
+        "icon": "ui/moodboard.svg",
+        "editor": "editor",
+        "schema": "schema/moodboard.json",
+        "schemaVersion": 2,
+        "dataKey": "board",
+        "migrations": { "1": "migrations/1-to-2.json" }
+      }
+    ]
+  }
+}

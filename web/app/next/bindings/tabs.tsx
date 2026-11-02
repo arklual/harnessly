@@ -34,14 +34,19 @@ const paceOf = (status: string): TPace | null => {
   return null;
 };
 
-const FIXED: Record<Exclude<TRoute['kind'], 'chat' | 'site'>, { icon: string; title: () => string }> = {
+const FIXED: Record<
+  Exclude<TRoute['kind'], 'chat' | 'site' | 'app' | 'appDoc'>,
+  { icon: string; title: () => string }
+> = {
   [ROUTE.home]: { icon: 'house', title: () => t('next.tabs.home') },
   [ROUTE.designly]: { icon: 'palette', title: () => t('next.tabs.designly') },
   [ROUTE.designlyNew]: { icon: 'presentation', title: () => t('next.deck.create.title') },
   [ROUTE.videoNew]: { icon: 'clapperboard', title: () => t('next.video.create.title') },
   [ROUTE.invite]: { icon: 'palette', title: () => t('next.tabs.designly') },
-  [ROUTE.apps]: { icon: 'app-window', title: () => t('next.sidebar.apps') },
+  [ROUTE.tasks]: { icon: 'list-checks', title: () => t('next.sidebar.tasks') },
+  [ROUTE.apps]: { icon: 'layout-grid', title: () => t('next.sidebar.apps') },
   [ROUTE.settings]: { icon: 'settings', title: () => t('next.shell.settings') },
+  [ROUTE.manage]: { icon: 'sliders-horizontal', title: () => t('next.sidebar.manage') },
   [ROUTE.stats]: { icon: 'chart-column', title: () => t('next.sidebar.stats') },
   [ROUTE.efficiency]: { icon: 'gauge', title: () => t('next.sidebar.efficiency') },
 };
@@ -62,6 +67,10 @@ export const stripTabOf = (tab: ITab, chats: ReadonlyMap<string, ITabChat>): ISt
       attention: WAITING.has(status),
     };
   }
+  if (route.kind === ROUTE.app)
+    return { id: tab.id, title: tab.title ?? route.id, icon: 'layout-grid', busy: null, attention: false };
+  if (route.kind === ROUTE.appDoc)
+    return { id: tab.id, title: tab.title ?? route.id, icon: 'blocks', busy: null, attention: false };
   if (route.kind === ROUTE.site)
     return { id: tab.id, title: tab.title ?? route.id, icon: 'pen-tool', busy: null, attention: false };
   const fixed = FIXED[route.kind];

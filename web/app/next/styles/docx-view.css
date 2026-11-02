@@ -1,0 +1,141 @@
+/* A Word file in the pane: the paper keeps the file's own colours in either theme, as the words on it are written for paper. */
+.hx-deliv[data-view='docx'] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.hx-docx {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  --hx-docx-font: Calibri, Carlito, 'Segoe UI', system-ui, sans-serif;
+}
+.hx-docx__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 30px;
+  padding-bottom: 8px;
+}
+.hx-docx__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-hover);
+  padding: 16px;
+}
+.hx-docx__wait {
+  display: block;
+  width: min(100%, 794px);
+  height: 100%;
+  margin: 0 auto;
+  border-radius: var(--hx-radius-sm);
+}
+.hx-docx__page {
+  display: none;
+  box-sizing: border-box;
+  width: min(100%, var(--hx-docx-page, 794px));
+  min-height: 100%;
+  margin: 0 auto;
+  padding: clamp(20px, 7%, 72px);
+  border-radius: var(--hx-radius-sm);
+  background: #fff;
+  color: #111;
+  color-scheme: light;
+  font-family: var(--hx-docx-font);
+  font-size: 11pt;
+  line-height: 1.35;
+  caret-color: #111;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+.hx-docx__page[data-ready='true'] {
+  display: block;
+}
+.hx-docx__p {
+  position: relative;
+  margin-block: var(--hx-docx-before, 0) var(--hx-docx-after, 0);
+  padding-inline-start: var(--hx-docx-indent, 0);
+  min-height: 1lh;
+  /* Skipping what is out of view clips a paragraph to its box: the list's marker stands inside it, in the indent. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1.5em;
+}
+.hx-docx__p[data-marker] {
+  padding-inline-start: max(var(--hx-docx-indent, 0px), 1.6em);
+}
+.hx-docx__p[data-marker]::before {
+  content: attr(data-marker);
+  position: absolute;
+  inset-inline-end: calc(100% - max(var(--hx-docx-indent, 0px), 1.6em));
+  margin-inline-end: 0.5em;
+  white-space: nowrap;
+  user-select: none;
+}
+.hx-docx__p[data-align='center'] {
+  text-align: center;
+}
+.hx-docx__p[data-align='right'] {
+  text-align: right;
+}
+.hx-docx__p[data-align='justify'] {
+  text-align: justify;
+}
+.hx-docx__p[data-flash='true'] {
+  animation: hx-docx-flash 1.4s var(--hx-ease-out);
+}
+@keyframes hx-docx-flash {
+  from {
+    background: color-mix(in srgb, #f5c518 45%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+.hx-docx__page a {
+  color: #0b57d0;
+  text-decoration: underline;
+}
+.hx-docx__tab {
+  display: inline-block;
+  width: 3em;
+}
+.hx-docx__image {
+  display: inline-block;
+  width: var(--hx-docx-w, auto);
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: var(--hx-docx-ratio, auto);
+  vertical-align: bottom;
+}
+.hx-docx__no-image {
+  display: inline-block;
+  width: 96px;
+  height: 64px;
+  border-radius: 4px;
+  background: #eee;
+}
+.hx-docx__table {
+  width: 100%;
+  margin-block: 8px;
+  border-collapse: collapse;
+}
+.hx-docx__table td {
+  padding: 4px 8px;
+  border: 1px solid #c8c8c8;
+  background: var(--hx-docx-fill, transparent);
+  vertical-align: top;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-docx__page,
+  .hx-docx__p[data-flash='true'] {
+    animation: none;
+  }
+}

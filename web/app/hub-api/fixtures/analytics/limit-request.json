@@ -1,0 +1,12 @@
+{
+  "request": {
+    "id": "r2requestaaaaaaaaaaa",
+    "status": "sent",
+    "to": [
+      {
+        "userId": "u2borisaaaaaaaaaaaaa",
+        "name": "Борис"
+      }
+    ]
+  }
+}

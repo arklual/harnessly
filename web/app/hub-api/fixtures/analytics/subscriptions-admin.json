@@ -1,0 +1,118 @@
+{
+  "scope": {
+    "kind": "org",
+    "id": "o2acmeorgaaaaaaaaaaa"
+  },
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "subscriptions": [
+    {
+      "accountId": "a2claudemaxaaaaaaaaa",
+      "label": "Claude Max №1",
+      "provider": "anthropic",
+      "plan": "max-20x",
+      "monthlyFee": {
+        "usd": 200,
+        "shown": 16300.0
+      },
+      "preliminary": true,
+      "shares": [
+        {
+          "person": {
+            "userId": "u2annaaaaaaaaaaaaaaa",
+            "name": "Анна"
+          },
+          "share": 0.55,
+          "amount": {
+            "usd": 110,
+            "shown": 8965.0
+          },
+          "windowPct": 21.0
+        },
+        {
+          "person": {
+            "userId": "u2borisaaaaaaaaaaaaa",
+            "name": "Борис"
+          },
+          "share": 0.45,
+          "amount": {
+            "usd": 90,
+            "shown": 7335.0
+          },
+          "windowPct": 17.0
+        }
+      ],
+      "windows": [
+        {
+          "name": "five_hour",
+          "scope": "all",
+          "lengthSec": 18000,
+          "usedPct": 38.0,
+          "resetsAt": "2026-10-30T20:00:00Z",
+          "measuredAt": "2026-10-30T17:55:00Z",
+          "confidence": "undocumented",
+          "waiting": false,
+          "forecastFullAt": null
+        },
+        {
+          "name": "seven_day",
+          "scope": "all",
+          "lengthSec": 604800,
+          "usedPct": 71.0,
+          "resetsAt": "2026-11-02T09:00:00Z",
+          "measuredAt": "2026-10-30T17:55:00Z",
+          "confidence": "undocumented",
+          "waiting": false,
+          "forecastFullAt": null
+        }
+      ]
+    },
+    {
+      "accountId": "a2claudemaxbbbbbbbbb",
+      "label": "Claude Max №2",
+      "provider": "anthropic",
+      "plan": "max-20x",
+      "monthlyFee": {
+        "usd": 200,
+        "shown": 16300.0
+      },
+      "preliminary": true,
+      "shares": [
+        {
+          "person": {
+            "userId": "u2veraaaaaaaaaaaaaaa",
+            "name": "Вера"
+          },
+          "share": 1.0,
+          "amount": {
+            "usd": 200,
+            "shown": 16300.0
+          },
+          "windowPct": null
+        }
+      ],
+      "windows": [
+        {
+          "name": "five_hour",
+          "scope": "all",
+          "lengthSec": 18000,
+          "usedPct": null,
+          "resetsAt": "2026-10-30T16:00:00Z",
+          "measuredAt": "2026-10-30T17:55:00Z",
+          "confidence": "undocumented",
+          "waiting": true,
+          "forecastFullAt": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "members": [
+    {
+      "userId": "u2annaaaaaaaaaaaaaaa",
+      "email": "anna@example.com",
+      "name": "Анна",
+      "joinedAt": "2026-10-01T09:00:00Z",
+      "lastActiveAt": "2026-10-30T18:12:00Z",
+      "invited": false,
+      "grants": [
+        {
+          "userId": "u2annaaaaaaaaaaaaaaa",
+          "scope": {
+            "kind": "org",
+            "id": "o2acmeorgaaaaaaaaaaa"
+          },
+          "role": "admin",
+          "grantedBy": null,
+          "grantedAt": "2026-10-01T09:00:00Z"
+        }
+      ],
+      "teams": [
+        {
+          "teamId": "m2platformteamaaaaaa",
+          "isPrimary": true
+        }
+      ],
+      "tenantRole": "owner"
+    },
+    {
+      "userId": "u2borisaaaaaaaaaaaaa",
+      "email": "boris@example.com",
+      "name": "Борис",
+      "joinedAt": "2026-10-01T09:00:00Z",
+      "lastActiveAt": "2026-10-30T18:12:00Z",
+      "invited": false,
+      "grants": [
+        {
+          "userId": "u2borisaaaaaaaaaaaaa",
+          "scope": {
+            "kind": "team",
+            "id": "m2platformteamaaaaaa"
+          },
+          "role": "lead",
+          "grantedBy": "u2annaaaaaaaaaaaaaaa",
+          "grantedAt": "2026-10-01T09:00:00Z"
+        }
+      ],
+      "teams": [
+        {
+          "teamId": "m2platformteamaaaaaa",
+          "isPrimary": true
+        },
+        {
+          "teamId": "m2productteamaaaaaaa",
+          "isPrimary": false
+        }
+      ],
+      "tenantRole": "member"
+    },
+    {
+      "userId": "u2veraaaaaaaaaaaaaaa",
+      "email": "vera@example.com",
+      "name": "Вера",
+      "joinedAt": "2026-10-01T09:00:00Z",
+      "lastActiveAt": "2026-10-30T18:12:00Z",
+      "invited": false,
+      "grants": [],
+      "teams": [
+        {
+          "teamId": "m2platformteamaaaaaa",
+          "isPrimary": true
+        }
+      ],
+      "tenantRole": "member"
+    },
+    {
+      "userId": "u2glebaaaaaaaaaaaaaa",
+      "email": "gleb@example.com",
+      "name": "",
+      "joinedAt": "2026-10-01T09:00:00Z",
+      "lastActiveAt": null,
+      "invited": true,
+      "grants": [],
+      "teams": [
+        {
+          "teamId": "m2productteamaaaaaaa",
+          "isPrimary": true
+        }
+      ],
+      "tenantRole": "member"
+    }
+  ]
+}

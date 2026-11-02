@@ -2,6 +2,7 @@
 // work on) puts it among them. Pure: the binding (right-pane.tsx) keeps the state and runs the effects.
 import { parseAddress, type IAddress } from '@/next/features/pane/address';
 import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
+import { parseAppTarget } from '@/next/features/app-views/target';
 import type { IPaneRequest, TLegacyKind } from '@/next/features/pane/intents';
 
 export type TTab =
@@ -12,6 +13,8 @@ export type TTab =
   | { id: string; kind: 'subagent'; focus: string | null }
   | { id: string; kind: 'files'; path: string; file: boolean }
   | { id: string; kind: 'shell'; terminal: string }
+  /** An installed app's view; `view` null: the app's first view for the pane. */
+  | { id: string; kind: 'app'; app: string; view: string | null }
   /** `reload` counts the reloads asked from outside the tab (a page the agent published again). */
   | { id: string; kind: 'browser'; hist: IAddress[]; hi: number; reload?: number };
 
@@ -129,6 +132,21 @@ const placeFiles = (state: IPaneTabs, target: string | null, ctx: IPlaceContext)
   };
 };
 
+const placeApp = (state: IPaneTabs, target: string | null, ctx: IPlaceContext): IPlaced => {
+  const named = parseAppTarget(target);
+  // «open app» with no app, or with a name that is not one, only brings the pane out.
+  if (named === null) return { next: state, effect: null, show: true };
+  const have = state.tabs.find(
+    (x) => x.kind === 'app' && x.app === named.app && (named.view === null || x.view === named.view),
+  );
+  if (have) return { next: front(state, have.id, ctx.busy), effect: null, show: true };
+  return {
+    next: added(state, { id: ctx.nextId(), kind: 'app', app: named.app, view: named.view }, ctx.busy),
+    effect: null,
+    show: true,
+  };
+};
+
 const singleTab = (kind: 'plan' | 'subagent' | 'designly', id: string, design: string | null): TTab => {
   if (kind === 'designly') return { id, kind, design };
   if (kind === 'subagent') return { id, kind, focus: null };
@@ -179,6 +197,9 @@ export const placeRequest = (state: IPaneTabs, request: IPaneRequest, ctx: IPlac
     case 'files':
       if (reload) return nothing(state);
       return placeFiles(state, request.target, ctx);
+    case 'app':
+      if (reload) return nothing(state);
+      return placeApp(state, request.target, ctx);
     case 'plan':
     case 'subagent':
       if (reload) return nothing(state);

@@ -6,7 +6,10 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePresence, PRESENCE } from '@/next/ui/presence';
-import type { TDeckRect } from '@/next/features/designly/deck/bridge';
+import type { IDeckGen, TDeckRect, TDeckSelectKind } from '@/next/features/designly/deck/bridge';
+import ImageGenPanel, { imageTargetOf } from '@/next/features/designly/image-gen/gen-panel';
+import { useGenRun, type TGenApply } from '@/next/features/designly/image-gen/gen-store';
+import type { MachineId } from '@/next/protocol/v2';
 import { DECK_FONT, DECK_FONT_CSS, type TDeckFont } from '@/next/features/designly/deck/types';
 
 /** The toolbar stands this far above the block, px. */
@@ -41,12 +44,31 @@ export const nearestSize = (size: number): number =>
 export interface IDeckSelection {
   tpl: number;
   label: string;
-  kind: 'title' | 'text';
+  kind: TDeckSelectKind;
   /** Its font size, board px; 0 when unknown. */
   size: number;
   rect: TDeckRect;
   /** The board's fingerprint of the element: a style patch carries it. */
   was: string;
+  /** A picture or an empty block: its width over its height (0 when unknown) and what it was drawn from. */
+  ratio: number;
+  gen: IDeckGen | null;
+  /** The block's words, for an app's selection item. */
+  text?: string;
+  tag?: string;
+}
+
+/** Whether the selection is a picture or a block (not a text): the picture tools are for it. */
+export const isVisualSelection = (sel: Pick<IDeckSelection, 'kind'>): boolean =>
+  sel.kind === 'image' || sel.kind === 'block';
+
+/** What the picture tools need of the host: the machine, the deck, the slide on screen and how a picture gets written. */
+export interface IDeckImageHost {
+  machine: MachineId;
+  artifact: string;
+  /** The slide's id: a run belongs to the element on that slide. */
+  board: string;
+  apply: TGenApply;
 }
 
 /** What the person set on a block in this session: Ж and К switch back off. */
@@ -208,7 +230,46 @@ export const DeckTextTools = ({
   );
 };
 
+/** The picture tools of a selected picture or block: one button that opens the generator under the toolbar. */
+const ImageTools = ({ sel, host }: { sel: IDeckSelection; host: IDeckImageHost }) => {
+  const [open, setOpen] = useState(false);
+  const shown = usePresence(open ? sel : null, MENU_EXIT_MS);
+  const target = imageTargetOf(host.artifact, host.board, sel);
+  const run = useGenRun(target.key);
+  return (
+    <>
+      <button
+        type="button"
+        className="hx-deck-tb__ai"
+        aria-expanded={open}
+        data-busy={run !== null ? 'true' : undefined}
+        onClick={() => setOpen(!open)}
+      >
+        <Icon name="sparkles" size="sm" />
+        {sel.gen ? t('next.imagegen.regenerate') : t('next.imagegen.generate')}
+      </button>
+      {shown.value !== null && (
+        <div
+          className="hx-deck-tb__pop"
+          data-closing={shown.state === PRESENCE.closing ? '1' : undefined}
+          role="group"
+          aria-label={t('next.imagegen.generate')}
+        >
+          <ImageGenPanel
+            key={`${sel.tpl}:${sel.gen?.job ?? ''}`}
+            machine={host.machine}
+            target={imageTargetOf(host.artifact, host.board, shown.value)}
+            apply={host.apply}
+          />
+        </div>
+      )}
+    </>
+  );
+};
+
 export interface IDeckToolbarProps extends IDeckTextToolsProps {
+  /** The picture tools in place of the text's, for a selected picture or block. */
+  image?: IDeckImageHost;
   /** The ask's button: «Попросить…», or «В чат» in the chat's sidebar. */
   askLabel: string;
   onAsk: () => void;
@@ -217,7 +278,7 @@ export interface IDeckToolbarProps extends IDeckTextToolsProps {
 }
 
 /** Above the block on a wide window; kept inside the slot's width. */
-const DeckToolbar = ({ askLabel, onAsk, onHold, ...tools }: IDeckToolbarProps) => {
+const DeckToolbar = ({ askLabel, onAsk, onHold, image, ...tools }: IDeckToolbarProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [x, y] = tools.sel.rect;
   // The block's corner in board px and the toolbar's own width: the stylesheet scales the one by the slot's
@@ -238,7 +299,11 @@ const DeckToolbar = ({ askLabel, onAsk, onHold, ...tools }: IDeckToolbarProps) =
       aria-label={t('next.deck.toolbar.label')}
       onPointerDown={onHold}
     >
-      <DeckTextTools {...tools} />
+      {image && isVisualSelection(tools.sel) ? (
+        <ImageTools sel={tools.sel} host={image} />
+      ) : (
+        <DeckTextTools {...tools} />
+      )}
       <button type="button" className="hx-deck-tb__ai" onClick={onAsk}>
         {askLabel}
       </button>

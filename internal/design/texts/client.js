@@ -1526,13 +1526,16 @@
     // point: where the block was clicked or held, in the board's pixels.
     var tellPicked = function (el, x, y) {
       var box = el.getBoundingClientRect();
-      tellHostDom({
+      var message = {
         type: 'tk:picked', pick: rememberPicked(el), look: readLook(el), selector: pickSelector(el), tag: String(el.tagName).toLowerCase(),
+        hl: hlOf(el), tpl: hlTpl(el), fp: hlPrint(el),
         text: String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
         rect: { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) },
         outerHTML: String(el.outerHTML || '').slice(0, 2048), component: null, url: location.href, viewport: { w: innerWidth, h: innerHeight },
         point: [Math.round(x + scrollX), Math.round(y + scrollY)]
-      });
+      };
+      genTell(message, el);
+      tellHostDom(message);
     };
     var swallowPick = function (event) {
       if (!picking) return;
@@ -1654,6 +1657,109 @@
       }
     });
   }
+  // The apps on in the document (internal/apps) mark elements of a board with data-hl-* attributes: data-hl-field binds
+  // one to a field of an app. The host turns this on (`tk:hl {on}`) when an app is on in the document. A click on a bound
+  // element is then the app's: it answers `tk:hl-click` with the element and its bindings instead of acting, and the host
+  // opens the app's inspector on that field. The host also sends the marks of the checks and of the apps (`tk:hl-marks
+  // {items: [{tpl, level, note}]}`, by the numbers of the engine); the board outlines the elements, whether or not an
+  // app binds fields here. A picked block says
+  // its bindings (`hl`), its number (`tpl`) and the board's fingerprint of it (`fp`) in `tk:picked`.
+  var HL_COLORS = { error: '#dc2626', warning: '#d97706', info: '#2563eb', comment: '#7c3aed' };
+  var HL_MAX = 12;
+  var hlOn = false;
+  var hlMarks = [];
+  var hlLayer = null;
+  function hlOf(el) {
+    var out = null;
+    var n = 0;
+    for (var i = 0; el && el.attributes && i < el.attributes.length && n < HL_MAX; i += 1) {
+      var attribute = el.attributes[i];
+      if (attribute.name.indexOf('data-hl-') !== 0) continue;
+      if (!out) out = {};
+      out[attribute.name.slice(8)] = String(attribute.value).slice(0, 200);
+      n += 1;
+    }
+    return out;
+  }
+  function hlTpl(el) {
+    var n = el && el.getAttribute ? Number(el.getAttribute('data-dc-tpl')) : NaN;
+    return isFinite(n) && n >= 0 && n % 1 === 0 && el.getAttribute('data-dc-tpl') !== '' ? n : null;
+  }
+  function hlPrint(el) {
+    return typeof deckFingerprint === 'function' && hlTpl(el) !== null ? deckFingerprint(el) : '';
+  }
+  function hlDraw() {
+    if (hlLayer) { hlLayer.remove(); hlLayer = null; }
+    if (!hlMarks.length) return;
+    hlLayer = document.createElement('div');
+    hlLayer.setAttribute('data-tk-library-mark', '');
+    hlLayer.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:2147483646';
+    hlMarks.forEach(function (mark) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-dc-tpl="' + mark.tpl + '"]'), function (el) {
+        var box = el.getBoundingClientRect();
+        if (!box.width && !box.height) return;
+        var color = HL_COLORS[mark.level] || HL_COLORS.info;
+        var frame = document.createElement('div');
+        frame.style.cssText = 'position:absolute;box-sizing:border-box;pointer-events:none;border:2px solid ' + color + ';border-radius:3px;background:' + color + '1a;' +
+          'left:' + (box.left + scrollX) + 'px;top:' + (box.top + scrollY) + 'px;width:' + box.width + 'px;height:' + box.height + 'px';
+        var badge = document.createElement('div');
+        badge.textContent = mark.level === 'comment' ? '✉' : '!';
+        badge.title = mark.note;
+        badge.style.cssText = 'position:absolute;right:-2px;top:-2px;transform:translateY(-100%);pointer-events:auto;cursor:default;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;' +
+          'font:700 12px/18px system-ui,sans-serif;text-align:center;color:#fff;background:' + color + ';border-radius:9px';
+        frame.appendChild(badge);
+        hlLayer.appendChild(frame);
+      });
+    });
+    document.documentElement.appendChild(hlLayer);
+  }
+  function hlReadMarks(raw) {
+    if (!Array.isArray(raw) || raw.length > 400) return null;
+    var out = [];
+    for (var i = 0; i < raw.length; i += 1) {
+      var item = raw[i];
+      if (!item || typeof item !== 'object' || typeof item.tpl !== 'number' || item.tpl % 1 !== 0 || item.tpl < 0 || typeof item.note !== 'string') return null;
+      out.push({ tpl: item.tpl, level: typeof item.level === 'string' && HL_COLORS[item.level] ? item.level : 'info', note: item.note.slice(0, 300) });
+    }
+    return out;
+  }
+  // Through a preview slot too: the slot's bridge picks and follows blocks, but knows nothing of the apps' marks and
+  // bound elements.
+  if (parentWin) {
+    window.addEventListener('click', function (event) {
+      if (!hlOn || picking || event.button !== 0) return;
+      var target = pickTarget(event);
+      var el = target && target.closest ? target.closest('[data-hl-field]') : null;
+      if (!el) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+      var box = el.getBoundingClientRect();
+      tellHostDom({
+        type: 'tk:hl-click', field: String(el.getAttribute('data-hl-field')).slice(0, 80), hl: hlOf(el), tpl: hlTpl(el), fp: hlPrint(el),
+        selector: pickSelector(el), tag: String(el.tagName).toLowerCase(),
+        text: String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+        rect: { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) },
+        url: location.href
+      });
+    }, true);
+    window.addEventListener('message', function (event) {
+      var data = event.data;
+      if (event.source !== parentWin || event.origin !== hostOrigin || !data || typeof data !== 'object') return;
+      if (data.type === 'tk:hl' && typeof data.on === 'boolean') {
+        hlOn = data.on;
+        document.documentElement.toggleAttribute('data-tk-hl', hlOn);
+        hlDraw();
+      }
+      if (data.type === 'tk:hl-marks') {
+        var marks = hlReadMarks(data.items);
+        if (marks) { hlMarks = marks; hlDraw(); }
+      }
+    });
+    window.addEventListener('resize', function () { if (hlLayer) hlDraw(); });
+    // The host learns of the board and which one it is; it answers with `tk:hl` and the marks.
+    tellHostDom({ type: 'tk:hl-hello', url: location.href });
+  }
   // A presentation's slide (the deck): the host that frames it turns the deck on (`tk:deck {on, mode}`) and the board
   // then tells what is under the pointer (`tk:deck-hover`: the block, its box, whether it was moved and may be), lets
   // the person edit a text in place where the template's text is plain (`tk:deck-select`, `tk:deck-text` on leaving it,
@@ -1689,6 +1795,8 @@
   var deckTimer = 0;
   var deckReady = '';
   var deckPointerAt = 0;
+  // The picture or empty block selected for drawing into (`tk:deck-select` of kind image or block).
+  var deckVisual = null;
   function tellDeck(message) { tellHostDom(message); }
   function deckRound(v) { return Math.round(v * 10) / 10; }
   function deckRect(el) {
@@ -1866,10 +1974,12 @@
     deckApplySteps();
     deckMark();
     deckTellReady();
+    deckVisualSync();
   }
   function deckSoon() { if (!deckTimer) deckTimer = setTimeout(deckRefresh, 120); }
   function deckStyle() {
     var css = 'html[data-tk-deck="edit"] [data-tk-deck-text]{cursor:text}'
+      + '[data-tk-deck-pick]{outline:2px solid rgba(123,97,255,.9) !important;outline-offset:-2px}'
       + 'html[data-tk-deck="edit"] [data-free],html[data-tk-deck="edit"] [data-block-free]{cursor:grab}'
       + 'html[data-tk-deck-drag] *{cursor:grabbing !important;user-select:none !important}'
       + '[data-tk-deck-text][contenteditable="true"]{outline:none;-webkit-user-modify:read-write}'
@@ -1888,6 +1998,7 @@
       deckLeave(true);
       deckEnd(null, true);
       deckPressEnd();
+      deckVisualEnd(false);
       deckOn = false;
       deckStep = null;
       deckPointer = false;
@@ -1918,6 +2029,7 @@
   function deckEdit(el, x, y) {
     if (deckEditing && deckEditing.el === el) return;
     deckLeave(false);
+    deckVisualEnd(false);
     var n = deckNumber(el);
     el.setAttribute('data-tk-deck-text', '');
     el.setAttribute('contenteditable', 'true');
@@ -1941,7 +2053,7 @@
     var block = deckBlockAt(el);
     var label = block && block.getAttribute('data-block') ? deckName(block) : deckName(el);
     tellDeck({ type: 'tk:deck-select', tpl: deckEditing.tpl, label: label, kind: title ? 'title' : 'text', size: deckRound(size), rect: deckRect(el),
-      was: deckFingerprint(el) });
+      was: deckFingerprint(el), tag: String(el.localName).slice(0, 32), text: String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400) });
   }
   function deckCommit() {
     if (!deckEditing || deckEditing.cancel) return;
@@ -2060,13 +2172,16 @@
   }
   function deckPick(el, x, y) {
     var box = el.getBoundingClientRect();
-    tellDeck({
+    var message = {
       type: 'tk:picked', pick: rememberPicked(el), look: readLook(el), selector: pickSelector(el), tag: String(el.tagName).toLowerCase(),
+      hl: hlOf(el), tpl: hlTpl(el), fp: hlPrint(el),
       text: String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
       rect: { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) },
       outerHTML: String(el.outerHTML || '').slice(0, 2048), component: null, url: location.href, viewport: { w: innerWidth, h: innerHeight },
       point: [deckRound(x + scrollX), deckRound(y + scrollY)]
-    });
+    };
+    genTell(message, el);
+    tellDeck(message);
   }
   window.addEventListener('pointerdown', function (event) {
     if (!deckOn || picking || !event.isPrimary) return;
@@ -2147,6 +2262,9 @@
       return;
     }
     deckLeave(false);
+    var visual = deckVisualAt(target);
+    if (visual) { deckVisualSelect(visual); return; }
+    deckVisualEnd(true);
     var el = target && target.closest ? target.closest('[data-dc-tpl]') : null;
     var source = el && deckOwnWords(el) ? deckSourceOf(el) : null;
     if (source && String(source.textContent).indexOf('{{') >= 0) tellDeck({ type: 'tk:deck-dynamic', tpl: deckNumber(el) });
@@ -2196,6 +2314,495 @@
     if (data.type === 'tk:deck-pointer' && typeof data.on === 'boolean') deckPointer = data.on;
     if (data.type === 'tk:deck-done') deckLeave(false);
   });
+  // Drawing a picture into an element (Sinopia's picture generation). A pick tells what the host needs to write
+  // one into the board's source: the element's template number and fingerprint (null when the source does not name it),
+  // its shape, whether it is an <img>, and what it was drawn from (data-gen-prompt, data-gen-job).
+  function genInfo(el) {
+    var n = deckNumber(el);
+    var source = n === null ? null : deckSourceOf(el);
+    if (!source) return { tpl: null, was: '', ratio: 0, image: false, gen: null };
+    var box = el.getBoundingClientRect();
+    var prompt = el.getAttribute('data-gen-prompt');
+    var job = el.getAttribute('data-gen-job');
+    return {
+      tpl: n, was: deckFingerprint(el), ratio: box.height > 0 ? Math.round(box.width / box.height * 100) / 100 : 0,
+      image: el.localName === 'img' || deckBackdrop(el),
+      gen: prompt && job ? { prompt: prompt.slice(0, 1000), job: job.slice(0, 40) } : null
+    };
+  }
+  function genTell(message, el) {
+    var g = genInfo(el);
+    message.tpl = g.tpl;
+    message.was = g.was;
+    message.ratio = g.ratio;
+    message.gen = g.gen;
+  }
+  function deckBackdrop(el) {
+    var image = getComputedStyle(el).backgroundImage;
+    return !!image && image !== 'none';
+  }
+  // The picture, or the empty block, under a click that is not a text.
+  function deckVisualAt(node) {
+    var slide = deckSlide();
+    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
+    el = el && el.closest ? el.closest('[data-dc-tpl]') : null;
+    var found = null;
+    for (var up = el; up && up !== slide && up !== document.body && !domOurs(up); up = up.parentElement) {
+      if (deckNumber(up) === null) break;
+      if (up.localName === 'img' || deckBackdrop(up)) { found = up; break; }
+    }
+    found = found || deckBlockAt(node);
+    return found && genInfo(found).tpl !== null ? found : null;
+  }
+  function deckVisualTell(force) {
+    var el = deckVisual.el;
+    var g = genInfo(el);
+    var message = {
+      type: 'tk:deck-select', tpl: g.tpl, label: deckName(el), kind: g.image ? 'image' : 'block', size: 0, rect: deckRect(el),
+      was: g.was, ratio: g.ratio, gen: g.gen
+    };
+    var signature = JSON.stringify(message);
+    if (!force && deckVisual.sig === signature) return;
+    deckVisual.sig = signature;
+    tellDeck(message);
+  }
+  function deckVisualSelect(el) {
+    if (deckVisual && deckVisual.el === el) { deckVisualTell(true); return; }
+    deckVisualEnd(false);
+    el.setAttribute('data-tk-deck-pick', '');
+    deckVisual = { el: el, tpl: deckNumber(el), sig: '' };
+    deckVisualTell(true);
+  }
+  function deckVisualEnd(tell) {
+    if (!deckVisual) return;
+    deckVisual.el.removeAttribute('data-tk-deck-pick');
+    deckVisual = null;
+    if (tell) tellDeck({ type: 'tk:deck-deselect' });
+  }
+  // The engine draws again on a change of the board (a picture written into it): the selection follows its element and
+  // tells the host the new fingerprint and what the element was drawn from.
+  function deckVisualSync() {
+    if (!deckVisual) return;
+    var el = deckSame(deckVisual.tpl)[0];
+    if (!el) { deckVisualEnd(true); return; }
+    if (el !== deckVisual.el) {
+      deckVisual.el.removeAttribute('data-tk-deck-pick');
+      deckVisual.el = el;
+    }
+    if (!el.hasAttribute('data-tk-deck-pick')) el.setAttribute('data-tk-deck-pick', '');
+    deckVisualTell(false);
+  }
+  // While a picture is being drawn the element shows a soft, blurred, moving veil (`tk:gen {tpl, on}` from the host).
+  var genVeils = {};
+  var genCss = null;
+  var genFrame = 0;
+  function genStyle() {
+    if (genCss) return;
+    genCss = document.createElement('style');
+    genCss.setAttribute('data-tk-library-mark', '');
+    genCss.textContent = '[data-tk-gen-veil]{position:fixed;z-index:2147483000;pointer-events:none;overflow:hidden;opacity:0;transition:opacity 320ms cubic-bezier(.22,1,.36,1);'
+      + 'backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);background:rgba(255,255,255,.28)}'
+      + '[data-tk-gen-veil][data-on]{opacity:1}'
+      + '[data-tk-gen-veil]::after{content:"";position:absolute;inset:-40%;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%);'
+      + 'animation:tk-gen-sweep 1.8s cubic-bezier(.45,0,.2,1) infinite}'
+      + '@keyframes tk-gen-sweep{from{transform:translateX(-60%)}to{transform:translateX(60%)}}'
+      + '@media (prefers-reduced-motion:reduce){[data-tk-gen-veil]::after{animation:none}}';
+    document.documentElement.appendChild(genCss);
+  }
+  function genPlace() {
+    genFrame = 0;
+    var keys = Object.keys(genVeils);
+    keys.forEach(function (key) {
+      var veil = genVeils[key];
+      var el = deckSame(Number(key))[0];
+      if (!el) { veil.setAttribute('hidden', ''); return; }
+      veil.removeAttribute('hidden');
+      var r = el.getBoundingClientRect();
+      var radius = getComputedStyle(el).borderRadius;
+      veil.style.cssText = 'left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px;border-radius:' + radius;
+    });
+    if (keys.length) genFrame = requestAnimationFrame(genPlace);
+  }
+  function genVeil(tpl, on) {
+    var veil = genVeils[tpl];
+    if (on && !veil) {
+      genStyle();
+      veil = document.createElement('div');
+      veil.setAttribute('data-tk-gen-veil', '');
+      document.documentElement.appendChild(veil);
+      genVeils[tpl] = veil;
+      if (!genFrame) genFrame = requestAnimationFrame(genPlace);
+      genPlace();
+      requestAnimationFrame(function () { veil.setAttribute('data-on', ''); });
+    }
+    if (!on && veil) {
+      delete genVeils[tpl];
+      veil.removeAttribute('data-on');
+      setTimeout(function () { veil.remove(); }, 340);
+    }
+  }
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!parentWin || event.source !== parentWin || event.origin !== hostOrigin || !data || typeof data !== 'object') return;
+    if (data.type === 'tk:gen' && typeof data.tpl === 'number' && data.tpl >= 0 && data.tpl % 1 === 0 && typeof data.on === 'boolean') genVeil(data.tpl, data.on);
+  });
+  // Pictures on the page, where the host says the person may change them (`tk:images {on}`; a guest's or a shared link's
+  // page is never told). A picture under the pointer (an <img>, or a block with a background image the board's source
+  // names) shows a small button inside it, «Edit»; a touch on one shows it too (there is no hover). An empty place for a
+  // picture (a block with data-image-slot, or an <img> with no real src) shows «Generate» inside it, always. A press
+  // tells the host (`tk:image-act`) which block, what it holds and where it is; the host opens the editor or the generator.
+  // A picture whose source is filled in by {{ }} says nothing: a write into it would be refused. A remote picture
+  // (another site's) offers only «Generate», which replaces it. The button keeps inside the block and off its text.
+  var IMG_TEXT = { edit: 'Edit', gen: 'Generate' };
+  var IMG_PATHS = {
+    edit: 'M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 8.5l3 3',
+    gen: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z'
+  };
+  var IMG_MIN = 40;
+  var IMG_ROOM = 8;
+  var IMG_WIDE = 150;
+  var IMG_TALL = 64;
+  var IMG_PICTURE_EXT = /\.(png|jpe?g|webp)$/i;
+  var imgOn = false;
+  // The scale the host shows this page at (a deck's slide is the page shrunk to the stage): the buttons are drawn at 1 / it, so
+  // they are the same size on the screen at any scale.
+  var imgScale = 1;
+  var imgCss = null;
+  var imgHover = null;
+  var imgSlots = {};
+  var imgFrame = 0;
+  var imgPointer = null;
+  var imgTap = null;
+  var imgObserver = null;
+  var imgPinned = false;
+  function imgStyle() {
+    if (imgCss) return;
+    imgCss = document.createElement('style');
+    imgCss.setAttribute('data-tk-library-mark', '');
+    imgCss.textContent = '[data-tk-img-grp]{position:fixed;z-index:2147482900;display:flex;gap:calc(4px*var(--k,1));opacity:0;transform:scale(.94);pointer-events:none;'
+      + 'transition:opacity 150ms cubic-bezier(.22,1,.36,1),transform 150ms cubic-bezier(.22,1,.36,1)}'
+      + '[data-tk-img-grp][data-on]{opacity:1;transform:none}[data-tk-img-grp][data-on] [data-tk-img-btn]{pointer-events:auto}'
+      + '[data-tk-img-btn]{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:calc(6px*var(--k,1));height:calc(28px*var(--k,1));padding:0 calc(11px*var(--k,1)) 0 calc(9px*var(--k,1));'
+      + 'margin:0;border:0;border-radius:calc(14px*var(--k,1));background:rgba(18,18,20,.76);color:#fff;font:500 calc(12px*var(--k,1))/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:0;cursor:pointer;'
+      + 'white-space:nowrap;-webkit-backdrop-filter:blur(calc(8px*var(--k,1)));backdrop-filter:blur(calc(8px*var(--k,1)));box-shadow:0 calc(1px*var(--k,1)) calc(5px*var(--k,1)) rgba(0,0,0,.28);pointer-events:none;'
+      + 'transition:background-color 120ms;-webkit-tap-highlight-color:transparent;touch-action:manipulation}'
+      + '[data-tk-img-btn]:hover{background:rgba(18,18,20,.92)}'
+      + '[data-tk-img-btn]:focus-visible{outline:calc(2px*var(--k,1)) solid #fff;outline-offset:calc(1px*var(--k,1))}'
+      + '[data-tk-img-btn] svg{width:calc(15px*var(--k,1));height:calc(15px*var(--k,1));flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}'
+      + '[data-tk-img-btn][data-more],[data-tk-img-grp][data-icon] [data-tk-img-btn]{width:calc(28px*var(--k,1));padding:0}[data-tk-img-btn][data-more] span,[data-tk-img-grp][data-icon] [data-tk-img-btn] span{display:none}'
+      + '@media (pointer:coarse){[data-tk-img-btn]{height:calc(36px*var(--k,1));border-radius:calc(18px*var(--k,1));font-size:calc(13px*var(--k,1))}[data-tk-img-btn][data-more],[data-tk-img-grp][data-icon] [data-tk-img-btn]{width:calc(36px*var(--k,1))}}'
+      + '@media (prefers-reduced-motion:reduce){[data-tk-img-grp],[data-tk-img-btn]{transition:none}}';
+    document.documentElement.appendChild(imgCss);
+  }
+  function imgPill(act, more) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('data-tk-img-btn', act);
+    btn.setAttribute('data-tk-library-mark', '');
+    if (more) btn.setAttribute('data-more', '');
+    btn.setAttribute('aria-label', IMG_TEXT[act]);
+    btn.title = IMG_TEXT[act];
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', IMG_PATHS[act]);
+    svg.appendChild(path);
+    var label = document.createElement('span');
+    label.textContent = IMG_TEXT[act];
+    btn.appendChild(svg);
+    btn.appendChild(label);
+    return btn;
+  }
+  // A group of buttons over a picture: «Edit» for a picture of the project, «Generate» for an empty place or a remote
+  // picture; a picture drawn from a brief also keeps a small «Generate» beside «Edit» (it can be drawn again).
+  // `press(act)` is told which one was pressed.
+  function imgButton(acts, press) {
+    imgStyle();
+    var grp = document.createElement('div');
+    grp.setAttribute('data-tk-img-grp', '');
+    grp.setAttribute('data-tk-library-mark', '');
+    acts.forEach(function (act, at) {
+      var pill = imgPill(act, at > 0);
+      pill.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        press(act);
+      });
+      grp.appendChild(pill);
+    });
+    document.documentElement.appendChild(grp);
+    return grp;
+  }
+  function imgDrop(btn) {
+    if (!btn) return;
+    btn.removeAttribute('data-on');
+    setTimeout(function () { btn.remove(); }, 180);
+  }
+  // What the board's source says the picture of an element is; null when a write into it would be refused or there is
+  // nothing to offer. kind: 'slot' (empty place), 'own' (a picture of the project: «Edit»), 'remote' (only «Generate»).
+  function imgSrcPath(value) {
+    var v = String(value || '').trim();
+    if (!v) return { empty: true, path: '' };
+    // A heavy file of the project is served by its content (/__h/<hash>/<name>): it is the project's own, its path is in the board's file.
+    if (/^\/__h\/[0-9a-f]{32}\//.test(v)) return { empty: false, path: '', hashed: true };
+    if (/^[a-z][a-z0-9+.-]*:/i.test(v) || v.charAt(0) === '/' || v.indexOf('//') === 0) return { empty: false, path: '' };
+    v = v.replace(/^\.\//, '').replace(/[?#].*$/, '');
+    try { v = decodeURIComponent(v); } catch (e) { return { empty: false, path: '' }; }
+    if (!IMG_PICTURE_EXT.test(v) || v.split('/').some(function (part) { return part === '' || part === '.' || part === '..'; })) return { empty: false, path: '' };
+    return { empty: false, path: v };
+  }
+  function imgInfo(el) {
+    if (!el || el.nodeType !== 1 || domOurs(el)) return null;
+    var g = genInfo(el);
+    if (g.tpl === null) return null;
+    // Only a board at the root of the project can be written (a wrapper's page, a file in a folder, cannot).
+    if (!/^[^\/\\]+\.dc\.html$/.test(projectPath(location.href) || '')) return null;
+    var source = deckSourceOf(el);
+    if (!source) return null;
+    var slotMark = el.hasAttribute('data-image-slot');
+    var prompt = String(el.getAttribute('data-image-prompt') || '').trim().slice(0, 1000);
+    var kind;
+    var src = '';
+    if (el.localName === 'img') {
+      var raw = source.getAttribute('src');
+      if (raw !== null && String(raw).indexOf('{{') >= 0) return null;
+      if (source.hasAttribute('srcset') && String(source.getAttribute('srcset')).indexOf('{{') >= 0) return null;
+      var parsed = imgSrcPath(raw);
+      if (parsed.empty || /placeholder/i.test(String(raw))) kind = 'slot';
+      else if (parsed.path || parsed.hashed) { kind = 'own'; src = parsed.path; }
+      else kind = 'remote';
+    } else {
+      var style = String(source.getAttribute('style') || '');
+      if (style.indexOf('{{') >= 0) return null;
+      var url = /background(?:-image)?\s*:[^;]*url\(\s*(["']?)([^"')]+)\1\s*\)/i.exec(style);
+      var computed = getComputedStyle(el).backgroundImage;
+      var painted = !!computed && computed.indexOf('url(') >= 0;
+      if (url && painted) {
+        var own = imgSrcPath(url[2]);
+        if (own.path || own.hashed) { kind = 'own'; src = own.path; } else kind = 'remote';
+      } else if (painted) kind = 'remote';
+      else if (slotMark) kind = 'slot';
+      else return null;
+    }
+    if (slotMark && kind !== 'slot') slotMark = false;
+    var trail = String(el.getAttribute('data-gen-from') || '').split(/\s+/).map(function (part) { return imgSrcPath(part).path; }).filter(Boolean);
+    return { el: el, kind: kind, src: src, slot: kind === 'slot', brief: prompt, tpl: g.tpl, was: g.was, ratio: g.ratio, gen: g.gen, from: trail.slice(-12).join(' ') };
+  }
+  function imgIsPicture(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.localName === 'img') return true;
+    if (el.hasAttribute('data-image-slot')) return true;
+    var image = getComputedStyle(el).backgroundImage;
+    return !!image && image.indexOf('url(') >= 0;
+  }
+  function imgVisible(el) {
+    var r = el.getBoundingClientRect();
+    var left = Math.max(0, r.left);
+    var top = Math.max(0, r.top);
+    var right = Math.min(innerWidth, r.right);
+    var bottom = Math.min(innerHeight, r.bottom);
+    return (right - left) * imgScale >= IMG_MIN && (bottom - top) * imgScale >= IMG_MIN ? { left: left, top: top, width: right - left, height: bottom - top } : null;
+  }
+  // The button's room is free when what is on top of its corners and middle is the picture itself or something with no
+  // words and nothing to press.
+  function imgFree(el, left, top, w, h, btn) {
+    var e = 2 / imgScale;
+    var points = [[left + e, top + e], [left + w - e, top + e], [left + e, top + h - e], [left + w - e, top + h - e], [left + w / 2, top + h / 2]];
+    for (var i = 0; i < points.length; i += 1) {
+      var stack = document.elementsFromPoint(points[i][0], points[i][1]);
+      var top1 = null;
+      for (var j = 0; j < stack.length; j += 1) if (stack[j] !== btn && !domOurs(stack[j])) { top1 = stack[j]; break; }
+      if (!top1 || top1 === el) continue;
+      if (/^(A|BUTTON|INPUT|TEXTAREA|SELECT|LABEL)$/.test(top1.tagName)) return false;
+      for (var c = top1.firstChild; c; c = c.nextSibling) if (c.nodeType === 3 && String(c.nodeValue).trim()) return false;
+    }
+    return true;
+  }
+  function imgPlaceButton(btn, el, slot) {
+    var vis = imgVisible(el);
+    if (!vis) { btn.removeAttribute('data-on'); return false; }
+    var small = vis.width * imgScale < IMG_WIDE || vis.height * imgScale < IMG_TALL;
+    btn.style.setProperty('--k', String(1 / imgScale));
+    var room = IMG_ROOM / imgScale;
+    if (small) btn.setAttribute('data-icon', ''); else btn.removeAttribute('data-icon');
+    var w = btn.offsetWidth || 90 / imgScale;
+    var h = btn.offsetHeight || 28 / imgScale;
+    var left;
+    var top;
+    if (slot) {
+      left = vis.left + (vis.width - w) / 2;
+      top = vis.top + (vis.height - h) / 2;
+    } else {
+      var corners = [[vis.left + vis.width - w - room, vis.top + room], [vis.left + room, vis.top + room],
+        [vis.left + vis.width - w - room, vis.top + vis.height - h - room], [vis.left + room, vis.top + vis.height - h - room]];
+      var chosen = corners[0];
+      for (var i = 0; i < corners.length; i += 1) {
+        if (imgFree(el, corners[i][0], corners[i][1], w, h, btn)) { chosen = corners[i]; break; }
+      }
+      left = chosen[0];
+      top = chosen[1];
+    }
+    btn.style.left = Math.round(left) + 'px';
+    btn.style.top = Math.round(top) + 'px';
+    return true;
+  }
+  function imgTell(act, info) {
+    var r = info.el.getBoundingClientRect();
+    tellDeck({
+      type: 'tk:image-act', act: act, tpl: info.tpl, was: info.was, ratio: info.ratio, gen: info.gen, from: info.from, src: info.src, slot: info.slot,
+      brief: info.brief, label: deckName(info.el), file: projectPath(location.href) || '', rect: [deckRound(r.left), deckRound(r.top), deckRound(r.width), deckRound(r.height)], vw: innerWidth, vh: innerHeight
+    });
+  }
+  function imgActsOf(info) {
+    // A remote picture and an empty place can only be drawn; a picture of the project is changed.
+    if (info.kind !== 'own') return ['gen'];
+    return info.gen ? ['edit', 'gen'] : ['edit'];
+  }
+  function imgShowHover(info) {
+    if (imgHover && imgHover.info.el === info.el && imgHover.info.tpl === info.tpl) {
+      imgHover.info = info;
+      imgPlaceButton(imgHover.btn, info.el, false);
+      return;
+    }
+    imgHideHover();
+    var btn = imgButton(imgActsOf(info), function (act) {
+      var now = imgHover && imgHover.btn === btn ? imgHover.info : info;
+      imgTell(act, imgInfo(now.el) || now);
+    });
+    imgHover = { btn: btn, info: info };
+    if (imgPlaceButton(btn, info.el, false)) requestAnimationFrame(function () { btn.setAttribute('data-on', ''); });
+  }
+  function imgHideHover() {
+    if (!imgHover) return;
+    imgDrop(imgHover.btn);
+    imgHover = null;
+    imgPinned = false;
+  }
+  // The topmost picture at a point of the page, with what is known of it; the button itself counts as "stay".
+  function imgAt(x, y) {
+    var stack = document.elementsFromPoint(x, y);
+    for (var i = 0; i < stack.length; i += 1) {
+      var el = stack[i];
+      if (el.hasAttribute && (el.hasAttribute('data-tk-img-btn') || el.hasAttribute('data-tk-img-grp'))) return 'keep';
+      if (domOurs(el)) continue;
+      if (el === document.documentElement || el === document.body) continue;
+      if (!imgIsPicture(el)) continue;
+      var info = imgInfo(el);
+      if (info && !info.slot && imgVisible(el)) return info;
+      if (info && info.slot) return null;
+    }
+    return null;
+  }
+  function imgBusy() {
+    return picking || deckDrag || deckEditing || document.documentElement.hasAttribute('data-tk-deck-drag') || (deckOn && deckMode !== 'edit');
+  }
+  function imgMove() {
+    imgFrame = 0;
+    if (!imgOn || !imgPointer || imgBusy()) { if (imgHover && !imgPinned) imgHideHover(); return; }
+    if (imgPointer.touch) return;
+    var found = imgAt(imgPointer.x, imgPointer.y);
+    if (found === 'keep') return;
+    if (found) imgShowHover(found); else if (!imgPinned) imgHideHover();
+  }
+  function imgSlotInfos() {
+    var found = [];
+    Array.prototype.forEach.call(document.querySelectorAll('[data-image-slot], img'), function (el) {
+      var info = imgInfo(el);
+      if (info && info.slot) found.push(info);
+    });
+    return found;
+  }
+  function imgSyncSlots() {
+    var want = {};
+    if (imgOn && !imgBusy()) imgSlotInfos().forEach(function (info) { if (!genVeils[info.tpl]) want[info.tpl] = info; });
+    Object.keys(imgSlots).forEach(function (key) {
+      if (!want[key]) { imgDrop(imgSlots[key].btn); delete imgSlots[key]; }
+    });
+    Object.keys(want).forEach(function (key) {
+      var info = want[key];
+      var held = imgSlots[key];
+      if (!held || held.info.el !== info.el) {
+        if (held) imgDrop(held.btn);
+        var btn = imgButton(['gen'], function (act) {
+          var cur = imgSlots[key];
+          imgTell(act, cur ? imgInfo(cur.info.el) || cur.info : info);
+        });
+        held = imgSlots[key] = { btn: btn, info: info };
+      }
+      held.info = info;
+      if (imgPlaceButton(held.btn, info.el, true)) {
+        if (!held.btn.hasAttribute('data-on')) requestAnimationFrame(function () { held.btn.setAttribute('data-on', ''); });
+      }
+    });
+  }
+  function imgPlaceAll() {
+    imgFrame = 0;
+    if (!imgOn) return;
+    imgSyncSlots();
+    if (imgHover) {
+      if (!document.contains(imgHover.info.el) || !imgPlaceButton(imgHover.btn, imgHover.info.el, false)) imgHideHover();
+    }
+  }
+  function imgSchedule() { if (!imgFrame) imgFrame = requestAnimationFrame(imgPlaceAll); }
+  function imgSet(on) {
+    if (on === imgOn) { if (on) imgSchedule(); return; }
+    imgOn = on;
+    if (!on) {
+      imgHideHover();
+      Object.keys(imgSlots).forEach(function (key) { imgDrop(imgSlots[key].btn); });
+      imgSlots = {};
+      if (imgObserver) { imgObserver.disconnect(); imgObserver = null; }
+      return;
+    }
+    imgObserver = new MutationObserver(function (records) {
+      for (var i = 0; i < records.length; i += 1) if (!domOurs(records[i].target)) { imgSchedule(); return; }
+    });
+    imgObserver.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'style', 'class', 'data-image-slot'] });
+    imgSchedule();
+  }
+  window.addEventListener('pointermove', function (event) {
+    if (!imgOn || event.pointerType === 'touch') return;
+    imgPointer = { x: event.clientX, y: event.clientY, touch: false };
+    if (!imgFrame) imgFrame = requestAnimationFrame(imgMove);
+  }, true);
+  window.addEventListener('mouseout', function (event) {
+    if (!event.relatedTarget && imgHover && !imgPinned) imgHideHover();
+  });
+  window.addEventListener('scroll', function () { if (imgOn) { if (imgHover && !imgPinned) imgHideHover(); imgSchedule(); } }, true);
+  window.addEventListener('resize', function () { if (imgOn) imgSchedule(); });
+  window.addEventListener('load', function () { if (imgOn) imgSchedule(); });
+  // A touch has no hover: a tap on a picture shows the button on it (and stays), a tap elsewhere takes it away.
+  window.addEventListener('pointerdown', function (event) {
+    if (!imgOn || event.pointerType !== 'touch') return;
+    imgTap = { x: event.clientX, y: event.clientY, at: Date.now(), id: event.pointerId };
+  }, true);
+  window.addEventListener('pointerup', function (event) {
+    var tap = imgTap;
+    imgTap = null;
+    if (!imgOn || event.pointerType !== 'touch' || !tap || tap.id !== event.pointerId) return;
+    if (Math.abs(event.clientX - tap.x) + Math.abs(event.clientY - tap.y) > 10 || Date.now() - tap.at > 500 || imgBusy()) return;
+    var found = imgAt(event.clientX, event.clientY);
+    if (found === 'keep') return;
+    imgPointer = { x: event.clientX, y: event.clientY, touch: true };
+    if (found) { imgShowHover(found); imgPinned = true; }
+    else { imgPinned = false; imgHideHover(); }
+  }, true);
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!parentWin || event.source !== parentWin || event.origin !== hostOrigin || !data || typeof data !== 'object') return;
+    if (data.type === 'tk:images' && typeof data.on === 'boolean') {
+      var k = Number(data.scale);
+      var next = isFinite(k) && k >= 0.05 && k <= 8 ? k : 1;
+      var moved = next !== imgScale;
+      imgScale = next;
+      imgSet(data.on);
+      if (moved && imgOn) imgSchedule();
+    }
+    // The veil over a place being drawn takes its «Generate» away; when it is gone the place is looked at again.
+    if (data.type === 'tk:gen') setTimeout(imgSchedule, 0);
+  });
+  if (parentWin) { try { parentWin.postMessage({ type: 'tk:images-hello' }, hostOrigin); } catch (e) {} }
   function showTweaks(open) {
     if (hosted) { try { parentWin.postMessage({ type: 'tk:tweaks-panel', open: open }, hostOrigin); } catch (e) {} return; }
     tweaksOpen = open;

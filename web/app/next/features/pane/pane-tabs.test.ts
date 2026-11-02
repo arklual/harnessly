@@ -15,6 +15,32 @@ const place = (state: IPaneTabs, command: TIntentCommand, busy = false, nextId =
   return placeRequest(state, request, { busy, cwd: '/home/me/work/', nextId });
 };
 
+describe('placeRequest: an installed app’s tab', () => {
+  it('opens the app’s view once; asking again brings it forward', () => {
+    const first = place(empty, { kind: 'open', tab: 'app', target: 'acme.demo/main' });
+    expect(first.next.tabs).toEqual([{ id: 't1', kind: 'app', app: 'acme.demo', view: 'main' }]);
+    expect(first.show).toBe(true);
+    const again = place(first.next, { kind: 'open', tab: 'app', target: 'acme.demo/main' });
+    expect(again.next.tabs).toHaveLength(1);
+    const other = place(first.next, { kind: 'open', tab: 'app', target: 'acme.demo/side' });
+    expect(other.next.tabs).toHaveLength(2);
+  });
+
+  it('an app named without a view comes to the app’s tab that is open', () => {
+    const first = place(empty, { kind: 'open', tab: 'app', target: 'acme.demo/main' });
+    const again = place(first.next, { kind: 'open', tab: 'app', target: 'acme.demo' });
+    expect(again.next.tabs).toHaveLength(1);
+  });
+
+  it('a target that is no app only brings the pane out', () => {
+    for (const target of ['../x', 'Acme.Demo', 'acme']) {
+      const placed = place(empty, { kind: 'open', tab: 'app', target });
+      expect(placed.next.tabs).toEqual([]);
+      expect(placed.show).toBe(true);
+    }
+  });
+});
+
 describe('placeRequest: a request becomes the pane’s state', () => {
   it('a design opens in the tab of designs, which comes forward; the pane comes out', () => {
     const placed = place(empty, { kind: 'open', tab: 'design', target: 'landing' });

@@ -145,21 +145,36 @@ export const readPptxStyle = async (m: MachineId, file: Blob): Promise<IDeckPptx
 
 // ---- hand edits (WP2's route)
 
-export type TDeckPatchResult = { ok: true; rev: number } | { ok: false; code: TDeckPatchRefusal };
+/** `was` is the element's fingerprint after a picture was written into it (the next edit of it is made against that). */
+export type TDeckPatchResult =
+  { ok: true; rev: number; was: string | null } | { ok: false; code: TDeckPatchRefusal };
+
+/** The board a patch lands on: a deck's page, or (the canvas) a board of the project by its file. */
+export type TPatchBoard = string | { file: string };
 
 export const patchDeck = async (
   m: MachineId,
   artifact: string,
-  page: string,
+  board: TPatchBoard,
   patch: TDeckPatch,
 ): Promise<TDeckPatchResult> => {
   const res = await fetch(runtimePath(deck('/patch'), m), {
     credentials: 'same-origin',
-    ...postJson({ artifact, page, ...patch }),
+    ...postJson({
+      artifact,
+      ...(typeof board === 'string' ? { page: board } : { file: board.file }),
+      ...patch,
+    }),
   });
   const body: unknown = await res.json().catch(() => null);
   const r = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
-  if (res.ok) return { ok: true, rev: typeof r.rev === 'number' ? r.rev : 0 };
+  if (res.ok) {
+    return {
+      ok: true,
+      rev: typeof r.rev === 'number' ? r.rev : 0,
+      was: typeof r.was === 'string' ? r.was : null,
+    };
+  }
   if ((res.status === 409 && r.code === 'changed') || (res.status === 422 && r.code === 'dynamic')) {
     return { ok: false, code: r.code as TDeckPatchRefusal };
   }

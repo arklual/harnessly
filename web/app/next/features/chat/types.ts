@@ -1,9 +1,16 @@
 // What the conversation view draws, as plain props. The wire types are a copy of the shapes in protocol/v2.ts (the v2
 // contract, internal/wire on the Go side) that this view reads; once protocol/v2.ts is on this branch they become
 // re-exports from it and nothing here changes shape. The view types below them are what the stores hand the feed.
-import type { AutoContinueWhy, Effort, MessageRef, TerminalAside, TurnOutput } from '@/next/protocol/v2';
+import type {
+  AutoContinueWhy,
+  Effort,
+  ImageGen,
+  MessageRef,
+  TerminalAside,
+  TurnOutput,
+} from '@/next/protocol/v2';
 
-export type { OutputKind, TurnOutput } from '@/next/protocol/v2';
+export type { ImageGen, OutputKind, TurnOutput } from '@/next/protocol/v2';
 
 export type Ms = number;
 export type EntryId = string;
@@ -72,6 +79,8 @@ export type ToolEntry = EntryBase & {
   summary: string;
   ok: boolean | null; // null: still running
   output: ToolOutput | null;
+  /** A call that draws pictures: the card shows them. */
+  images?: ImageGen;
 };
 export type SubagentEntry = EntryBase & {
   t: 'subagent';

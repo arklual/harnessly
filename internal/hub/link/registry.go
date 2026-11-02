@@ -63,6 +63,18 @@ func (r *Registry) Revoke(machineID string) {
 	}
 }
 
+// Disable closes the machine's link with 4003 (the pair is switched off): the agent waits a minute and dials again,
+// which the dialer refuses while the machine is disabled; its key stays good, so it links again once it is enabled.
+func (r *Registry) Disable(machineID string) {
+	r.mu.Lock()
+	l := r.links[machineID]
+	delete(r.links, machineID)
+	r.mu.Unlock()
+	if l != nil {
+		l.Close(websocket.StatusCode(hubproto.CloseSwitchedOff), "machine disabled")
+	}
+}
+
 // Online lists the machines with a live link, sorted.
 func (r *Registry) Online() []string {
 	r.mu.Lock()

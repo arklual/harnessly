@@ -1,0 +1,50 @@
+:root {
+  --bg: var(--t-bg, #ffffff);
+  --surface: var(--t-surface, #f6f6f8);
+  --surface-hover: var(--t-surface-hover, #ececf0);
+  --text: var(--t-text, #16161d);
+  --muted: var(--t-text-muted, #6b6b78);
+  --border: var(--t-border, #dcdce3);
+  --accent: var(--t-accent, #5b5bd6);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+.cb { max-width: 640px; margin: 0 auto; padding: 16px; }
+.cb__title { margin: 0; font-size: 22px; font-weight: 650; }
+.cb__sub { margin: 4px 0 16px; color: var(--muted); }
+.cb__list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.cb__item {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; text-align: left; color: inherit;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; font: inherit; cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.cb__item:hover { background: var(--surface-hover); }
+.cb__item[aria-pressed='true'] { border-color: var(--accent); }
+.cb__item:disabled { opacity: 0.5; cursor: default; }
+.cb__item:focus-visible, .cb__send:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cb__name { flex: 1; min-width: 0; }
+.cb__name b { display: block; font-weight: 600; }
+.cb__name span { color: var(--muted); font-size: 13px; }
+.cb__pct { font-weight: 650; font-variant-numeric: tabular-nums; }
+.cb__mark {
+  width: 20px; height: 20px; flex: none; border: 1.5px solid var(--border); border-radius: 50%;
+  display: grid; place-items: center; font-size: 12px; color: transparent;
+}
+.cb__item[aria-pressed='true'] .cb__mark { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.cb__foot { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.cb__send {
+  padding: 9px 16px; border: 0; border-radius: 999px; background: var(--accent); color: var(--bg);
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+.cb__send:disabled { opacity: 0.4; cursor: default; }
+.cb__note { margin: 0; color: var(--muted); }
+@media (max-width: 420px) {
+  .cb { padding: 12px; }
+  .cb__item { padding: 10px; gap: 10px; }
+}
+.cb__form { display: flex; gap: 8px; margin-top: 8px; }
+.cb__input {
+  flex: 1; min-width: 0; padding: 9px 12px; color: inherit; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; font: inherit;
+}
+.cb__input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -34,7 +34,7 @@ const (
 // videoPoll is the pause between two looks at a running render; tests shorten it.
 var videoPoll = 2 * time.Second
 
-const videoUsage = "design video needs a subcommand: get, scene, frame, check, render, comments"
+const videoUsage = "design video needs a subcommand: guide, get, scene, frame, check, render, comments"
 
 func (c *cli) designVideo(args []string) error {
 	if len(args) == 0 {
@@ -45,6 +45,8 @@ func (c *cli) designVideo(args []string) error {
 	case "--help", "-h", "help":
 		c.out("%s", videoHelp)
 		return nil
+	case "guide":
+		return c.videoGuide(rest)
 	case "get", "show":
 		return c.videoGet(rest)
 	case "scene", "scenes":
@@ -59,6 +61,23 @@ func (c *cli) designVideo(args []string) error {
 		return c.videoComments(rest)
 	}
 	return usageErr("unknown design video command %q (%s)", sub, videoUsage)
+}
+
+// videoGuide prints a topic of the video's rules (no topic: the basics).
+func (c *cli) videoGuide(args []string) error {
+	topic := "basics"
+	if len(args) > 1 {
+		return usageErr("design video guide [%s]", strings.Join(design.VideoGuideTopics[:], "|"))
+	}
+	if len(args) == 1 {
+		topic = args[0]
+	}
+	text, ok := design.VideoGuide(topic, "harnessly")
+	if !ok {
+		return usageErr("no guide topic %q (%s)", topic, strings.Join(design.VideoGuideTopics[:], ", "))
+	}
+	c.out("%s", text)
+	return nil
 }
 
 // ---- time and argument parsing --------------------------------------------------------------------------------------
@@ -349,12 +368,12 @@ func (c *cli) videoSceneCall(body map[string]any, verb string) error {
 // ---- frame ----------------------------------------------------------------------------------------------------------
 
 func (c *cli) videoFrame(args []string) error {
-	args, on := switches(args, "draft")
+	args, on := switches(args, "draft", "sheet")
 	f, err := parseFlags(args, map[string]string{"at": "at", "format": "format", "strip": "strip"})
 	if err != nil {
 		return err
 	}
-	const usage = "design video frame <project> <scene> (--at 2.4s | --strip FROM:TO:STEP) [--format 9:16] [--draft]"
+	const usage = "design video frame <project> <scene> (--at 2.4s | --strip FROM:TO:STEP | --sheet) [--format 9:16] [--draft]"
 	if len(f.pos) != 2 {
 		return usageErr("%s", usage)
 	}
@@ -362,6 +381,8 @@ func (c *cli) videoFrame(args []string) error {
 	strip, hasStrip := f.values["strip"]
 	at, hasAt := f.values["at"]
 	switch {
+	case on["sheet"]:
+		q.Set("sheet", "1")
 	case hasStrip:
 		norm, _, err := parseVideoStrip(strip)
 		if err != nil {
@@ -630,11 +651,13 @@ func (c *cli) videoComments(args []string) error {
 	return nil
 }
 
-const videoHelp = `harnessly design video get|scene|frame|check|render|comments
+const videoHelp = `harnessly design video guide|get|scene|frame|check|render|comments
 
 A video project is a deck whose boards are scenes. Lengths are set only with these commands; never edit meta/ by hand.
 Times: 8s, 1.5s, 1500ms, 0:06 (m:ss) or plain seconds. Add --json for the runtime's answer.
 
+  harnessly design video guide [basics|director|motion|engines|check]
+      the rules of video work, read when needed: the basics, how to run the work, animation, other engines, what to verify
   harnessly design video get <project>
       scenes with start, length (set or auto), transition, moments, words, open comments; the renders' freshness
   harnessly design video scene add <project> --title TITLE [--dur 6s|auto]
@@ -644,8 +667,11 @@ Times: 8s, 1.5s, 1500ms, 0:06 (m:ss) or plain seconds. Add --json for the runtim
   harnessly design video frame <project> <scene> --at 2.4s [--format 9:16] [--draft]
   harnessly design video frame <project> <scene> --strip 0:6:1s [--format 9:16] [--draft]
       jpg files of the scene at a time (or FROM:TO:STEP, at most 60 frames); open them with Read
+  harnessly design video frame <project> <scene> --sheet [--format 9:16]
+      one picture of the whole scene: a frame per half second with the time on each; open it with Read
   harnessly design video check <project> [--scene S] [--format 16:9|9:16]
-      timers, Math.random, Date, things past the scene's end, overflow, tiny text; exit 1 on errors
+      timers, frame loops, outside addresses, tweens that overlap, engine and script errors, things past the scene's end,
+      overflow and blocks off screen along the scene's time, tiny text, frames that depend on the way there; exit 1 on errors
   harnessly design video render <project> [--format 16:9|9:16] [--scene S] [--draft] [--wait]
       render the mp4 (--scene: only that scene's clip, --draft: half size, never published); --wait shows progress
   harnessly design video comments <project> [--open]

@@ -3,6 +3,7 @@
 // keeps the record (the slot's proxy and the bridge in the page write it; the pane and the agents read it), the panel
 // polls it while it is open, filters it by type and by words, and sends any line to the chat. The throttling and the cache
 // are the slot's own settings, changed through the runtime.
+import { useKeyHint } from '@/next/features/keys/keys-help';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   fetchDevtools,
@@ -180,6 +181,7 @@ const SiteDevtools = ({
   onClose,
   onGrab,
 }: ISiteDevtoolsProps) => {
+  const inspectKey = useKeyHint('site.inspect');
   const { log, error, saving, change, retry } = useDevtools(machine, slot, open);
   const record = useServerSources(machine, artifact, open);
   const server = allServerRows(
@@ -238,7 +240,7 @@ const SiteDevtools = ({
           <Icon name="square-mouse-pointer" size="sm" />
           <span className="hx-tip" data-pos="below" data-align="start">
             {t('next.site.dev.inspectTip')}
-            <kbd>⇧⌘C</kbd>
+            {inspectKey && <kbd>{inspectKey}</kbd>}
           </span>
         </button>
         <span className="hx-devtools__sep" />

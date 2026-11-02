@@ -166,6 +166,10 @@ func ParseVideoBoard(src string) VideoBoard {
 			out.Transition = boardTransition(v)
 		}
 		atRaw, hasAt := t.attrs["data-tk-at"]
+		if !hasAt {
+			// A mark is a moment on the time line that moves nothing (GSAP moves the block).
+			atRaw, hasAt = t.attrs["data-tk-mark"]
+		}
 		outRaw, hasOut := t.attrs["data-tk-out"]
 		stepRaw, hasStep := t.attrs["data-step"]
 		buildRaw, hasBuild := t.attrs["data-build-in"]

@@ -53,7 +53,7 @@ func (a *API) VideoFrame(w http.ResponseWriter, r *http.Request) {
 	image(w, r, data, "private, no-cache")
 }
 
-// CLIVideoFrame is GET ?project&page&at[&format&strip=a:b:step&draft] (view): {frames: [{t, path}]}, absolute paths of
+// CLIVideoFrame is GET ?project&page&at[&format&strip=a:b:step&draft&sheet=1] (view): {frames: [{t, path}]}, absolute paths of
 // the cached JPEGs for the agent to open. format is the video's first format when not given; strip is a stretch in ms
 // (from a to b, every step), instead of at.
 func (a *API) CLIVideoFrame(r *http.Request) Answer {
@@ -73,7 +73,11 @@ func (a *API) CLIVideoFrame(r *http.Request) Answer {
 		return a.deckFail(r, err, "read the video")
 	}
 	page := QueryString(r, "page")
+	sheet := QueryString(r, "sheet") == "1"
 	times, err := videoStripTimes(QueryString(r, "at"), QueryString(r, "strip"))
+	if sheet {
+		times, err = []int64{0}, nil
+	}
 	if err != nil || page == "" {
 		return JSON(r, http.StatusBadRequest, errorBody(locale.Pick("page and at (or strip=a:b:step, ms) are expected",
 			"Нужны page и at (или strip=a:b:step, мс)")), h)
@@ -94,7 +98,14 @@ func (a *API) CLIVideoFrame(r *http.Request) Answer {
 		T    int64  `json:"t"`
 		Path string `json:"path"`
 	}
-	files, err := a.L.VideoFrameFiles(r.Context(), project, page, f, draft, times)
+	var files []string
+	if sheet {
+		var file string
+		file, err = a.L.VideoSheetFile(r.Context(), project, page, f)
+		files = []string{file}
+	} else {
+		files, err = a.L.VideoFrameFiles(r.Context(), project, page, f, draft, times)
+	}
 	if err != nil {
 		return a.deckFail(r, err, "draw the frame")
 	}

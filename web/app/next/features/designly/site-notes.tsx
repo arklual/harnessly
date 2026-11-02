@@ -22,6 +22,8 @@ import { DRAFT_ANCHOR, useNoteAnchor } from '@/next/features/designly/note-ancho
 import { dragNote, keepNotePos, readNotePos } from '@/next/features/designly/note-drag';
 import type { IPoint } from '@/next/features/designly/site-drag';
 import { plural, t } from '@/next/i18n';
+import type { MachineId } from '@/next/protocol/v2';
+import { CardImageGen } from '@/next/features/designly/image-gen/canvas';
 import { PRESENCE, useLeavingList, usePresence, usePresentFlag } from '@/next/ui/presence';
 import '@/next/styles/notes.css';
 
@@ -104,6 +106,8 @@ export interface INotePopoverProps {
   /** Another page is on screen: the card steps away (it comes back with its page). */
   hidden?: boolean;
   guest?: INoteGuest;
+  /** Where a picture can be drawn into the picked block: the machine, the design and the board file picked on. */
+  image?: { machine: MachineId; artifact: string; file: string };
 }
 
 /** The colour of a swatch reaches the CSS through a custom property of its own, not through a style attribute. */
@@ -290,6 +294,7 @@ export const NotePopover = ({
   gone,
   hidden = false,
   guest,
+  image,
 }: INotePopoverProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
@@ -414,6 +419,14 @@ export const NotePopover = ({
         />
       </div>
       {look && <NoteProps look={look} edit={draft.style} onEdit={onStyle} open={tune} gone={gone} />}
+      {image && !guest && draft.picked.draw && (
+        <CardImageGen
+          machine={image.machine}
+          artifact={image.artifact}
+          file={image.file}
+          draw={draft.picked.draw}
+        />
+      )}
       <div className="hx-ann__foot">
         <button type="button" className="hx-ann__cancel" onClick={() => leave(onCancel)}>
           {t('next.notes.revert')}

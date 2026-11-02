@@ -76,7 +76,12 @@ func TestRenderMakesAnMP4WithFFmpeg(t *testing.T) {
 			}
 			jpegs := map[[2]int][]byte{}
 			for _, size := range [][2]int{{1920, 1080}, {1080, 1920}, {960, 540}, {540, 960}} {
-				file := filepath.Join(t.TempDir(), "f.jpg")
+				// A final render takes PNG frames, a draft JPEG ones.
+				name := "f.png"
+				if size[0] < 1000 && size[1] < 1000 {
+					name = "f.jpg"
+				}
+				file := filepath.Join(t.TempDir(), name)
 				out, err := exec.Command(ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
 					"testsrc=size="+strconv.Itoa(size[0])+"x"+strconv.Itoa(size[1])+":rate=1", "-frames:v", "1", file).CombinedOutput()
 				if err != nil {
@@ -92,7 +97,7 @@ func TestRenderMakesAnMP4WithFFmpeg(t *testing.T) {
 				g.drawn[sc.ID] += len(times)
 				g.mu.Unlock()
 				for i, at := range times {
-					if err := each(videoShot{I: i, T: at, JPEG: jpegs[[2]int{w, h}], Same: i > 0}); err != nil {
+					if err := each(videoShot{I: i, T: at, Image: jpegs[[2]int{w, h}], Same: i > 0}); err != nil {
 						return err
 					}
 				}

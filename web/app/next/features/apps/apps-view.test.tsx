@@ -189,7 +189,7 @@ const props = (patch: Partial<IAppsViewProps> = {}): IAppsViewProps => ({
 describe('AppsView: the left list', () => {
   it('lists the connected apps on the left with the host, and marks the open one', () => {
     render(<AppsView {...props()} />);
-    const nav = screen.getByRole('navigation', { name: 'Apps' });
+    const nav = screen.getByRole('navigation', { name: 'Tasks and MRs' });
     const items = within(nav).getAllByRole('button', { name: /Tracker|GitLab/ });
     expect(items.map((item) => item.textContent)).toEqual([
       'Trackertracker.example.com',
@@ -221,8 +221,8 @@ describe('AppsView: the left list', () => {
     const onBack = vi.fn();
     render(<AppsView {...props({ onOpenDrawer, onSettings, onBack })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Connected apps' }));
-    fireEvent.click(screen.getByRole('button', { name: 'All apps' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Connections' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All lists' }));
     expect(onOpenDrawer).toHaveBeenCalled();
     expect(onSettings).toHaveBeenCalled();
     expect(onBack).toHaveBeenCalled();

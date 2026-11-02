@@ -1595,6 +1595,20 @@
         "truncated": {"oneOf": [{"$ref": "#/$defs/ToolOutputTruncated"}, {"type": "null"}]}
       }
     },
+    "ImageGen": {
+      "type": "object",
+      "required": ["count", "prompt", "shape", "jobId", "state", "done", "failed"],
+      "additionalProperties": false,
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "prompt": {"type": "string"},
+        "shape": {"type": "string"},
+        "jobId": {"type": "string"},
+        "state": {"enum": ["drawing", "done", "failed"]},
+        "done": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "failed": {"oneOf": [{"type": "string"}, {"type": "null"}]}
+      }
+    },
     "AnswerPair": {
       "type": "object",
       "required": ["q", "a"],
@@ -1674,7 +1688,8 @@
             "tool": {"type": "string"},
             "summary": {"type": "string"},
             "ok": {"oneOf": [{"type": "boolean"}, {"type": "null"}]},
-            "output": {"oneOf": [{"$ref": "#/$defs/ToolOutput"}, {"type": "null"}]}
+            "output": {"oneOf": [{"$ref": "#/$defs/ToolOutput"}, {"type": "null"}]},
+            "images": {"$ref": "#/$defs/ImageGen"}
           }
         },
         {

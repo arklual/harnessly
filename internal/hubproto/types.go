@@ -72,6 +72,9 @@ const (
 	OpGitkeyEnsure  = "gitkey.ensure"
 	OpRuntimeSess   = "runtime.session"
 	OpTunnelOpen    = "tunnel.open"
+	// OpRuntimeRestart restarts the agent's runtime: {jobId, when}, answered at once, the outcome a job event. An agent
+	// that does not know it answers `unsupported`.
+	OpRuntimeRestart = "runtime.restart"
 )
 
 // Events the agent sends (the `event` of a frame).
@@ -154,6 +157,8 @@ type Hello struct {
 	Arch         string   `json:"arch"`
 	Profile      Profile  `json:"profile"`
 	Policy       Policy   `json:"policy"`
+	// BudgetVersion is the version of the last budget.set the agent holds (0: none); only with the "budget" feature.
+	BudgetVersion int64 `json:"budgetVersion,omitempty"`
 }
 
 // Policy is what the machine's own policy file allows. The hub reads it and cannot change it.

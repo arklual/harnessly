@@ -9,7 +9,7 @@ import SiteView, {
   type ISiteTab,
 } from '@/next/features/designly/site-view';
 import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
-import { claimOwnership, fetchAccess } from '@/next/features/designly/access/api';
+import { ROLE, claimOwnership, fetchAccess } from '@/next/features/designly/access/api';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
 import PublishDialog from '@/next/features/designly/publish/publish-dialog';
 import NoAccess from '@/next/features/designly/access/no-access';
@@ -23,6 +23,7 @@ import {
   type IDesignLibrary,
 } from '@/next/features/designly/api';
 import { openPreview, slotNonce } from '@/next/core/net/preview';
+import { slotLeases } from '@/next/features/pane/slot-lease';
 import type { IStageOptions } from '@/next/bindings/site-stage';
 import { usePaneChatStage, useSiteOnlyStage, type IStageWithChat } from '@/next/bindings/pane-stage';
 import { useTabState, useTabTitle } from '@/next/stores/tabs';
@@ -35,6 +36,8 @@ import { t } from '@/next/i18n';
 import { onOpenNotePage, takeNoteBoard } from '@/next/features/designly/open-note';
 import DesignlyDeck from '@/next/bindings/designly-deck';
 import DesignlyVideo from '@/next/bindings/designly-video';
+import SinopiaStage from '@/next/features/app-views/sinopia/sinopia-stage';
+import { useSinopia } from '@/next/features/app-views/sinopia/use-sinopia';
 
 /** The slot the open design's page lives in; «open outside» takes the next one so the two do not fight. */
 const PAGE_SLOT = 1;
@@ -175,6 +178,15 @@ const DesignlySiteBody = ({
   useTabTitle(routePath({ kind: ROUTE.site, id }), pane ? null : (project?.design.title ?? null));
   const pageSlot = pane ? PANE_PAGE_SLOT : PAGE_SLOT;
   const outsideSlot = pane ? PANE_OUTSIDE_SLOT : OUTSIDE_SLOT;
+  // The board's slots are this page's: an app view or a browser tab leasing one would take the board's cookie over.
+  useEffect(() => {
+    const unpinPage = slotLeases.pin(pageSlot, `design:${pageSlot}`);
+    const unpinOutside = slotLeases.pin(outsideSlot, `design:${outsideSlot}`);
+    return () => {
+      unpinPage();
+      unpinOutside();
+    };
+  }, [pageSlot, outsideSlot]);
   // What a share and the phone's code give: the design's own page, not the chat the pane is in.
   const shareUrl = pane ? designAddress(id) : window.location.href;
 
@@ -286,6 +298,18 @@ const DesignlySiteBody = ({
   const src = mayShow ? (onFirstPage ? opened.enterUrl : plainSrc) : null;
   const slotOrigin = opened?.origin ?? null;
   const slotError = opened?.error ?? null;
+  // The apps on in this document (their panels, selection menu, marks on the boards, the gate before a share). The
+  // chat they send tasks to is the one the pane sits beside, or the one the person came from.
+  // The design's own chat, when it has no pane or chat it was opened from, is the column's.
+  const appsChat =
+    paneConv ?? (chat !== null && chat.startsWith('tab-') ? (chat as ConvId) : null) ?? stage?.conv ?? null;
+  const sinopia = useSinopia({
+    machine,
+    id,
+    kind: project?.design.kind ?? null,
+    conversation: appsChat,
+    slotOrigin,
+  });
 
   // The slot opens for the page on screen at the time; the pages after it reuse it (see the effect on the path).
   const pathRef = useRef(path);
@@ -390,11 +414,20 @@ const DesignlySiteBody = ({
   const shareButton = ((): ISiteAccess | undefined => {
     if (gated === null) return undefined;
     if (gated.canManage)
-      return { label: t('next.pane.designShare'), onOpen: () => setShareOpen(true), manage: true };
+      return {
+        label: t('next.pane.designShare'),
+        onOpen: () => sinopia.gate(() => setShareOpen(true)),
+        manage: true,
+      };
     if (gated.role === 'view' || gated.role === 'comment')
       return { label: t('next.access.askEdit'), onOpen: () => setShareOpen(true) };
-    return { label: t('next.pane.designShare'), onOpen: () => setShareOpen(true) };
+    return { label: t('next.pane.designShare'), onOpen: () => sinopia.gate(() => setShareOpen(true)) };
   })();
+
+  // Who may change pictures: where there is no gateway the design is as it was (its person edits); otherwise the owner and editors.
+  const mayEdit =
+    gate.state.k === ACCESS.absent ||
+    (gated !== null && (gated.role === ROLE.owner || gated.role === ROLE.manage || gated.role === ROLE.edit));
 
   const back = pane ? pane.onBack : () => goTo({ kind: ROUTE.designly });
   if (gated !== null && gated.role === null) {
@@ -493,8 +526,9 @@ const DesignlySiteBody = ({
       pane={pane && { onShare: copyLink, chat: paneChat }}
       toolPane={toolPane}
       access={shareButton}
-      publish={gated?.canManage ? { onOpen: () => setPublishOpen(true) } : undefined}
+      publish={gated?.canManage ? { onOpen: () => sinopia.gate(() => setPublishOpen(true)) } : undefined}
       devtools={{ machine, slot: slotOrigin, artifact: id }}
+      images={mayEdit && project ? { machine, artifact: id } : undefined}
       memoryKey={id}
     />
   );
@@ -518,6 +552,7 @@ const DesignlySiteBody = ({
       stage,
       pane: pane && { onBack: pane.onBack },
       access: shareButton,
+      mayEdit,
       maxed,
       onToggleMax,
       onOpenDrawer,
@@ -525,13 +560,21 @@ const DesignlySiteBody = ({
     };
     if (project.design.kind === 'video') return <DesignlyVideo {...host} />;
     if (project.design.kind === 'slides')
-      return <DesignlyDeck {...host} onStale={() => setAttempt((n) => n + 1)} />;
+      return <DesignlyDeck {...host} onPick={sinopia.pickBlock} onStale={() => setAttempt((n) => n + 1)} />;
     return site;
   };
 
   return (
     <>
-      {kindView()}
+      <SinopiaStage
+        machine={machine}
+        kind={project?.design.kind ?? null}
+        id={id}
+        conversation={appsChat}
+        sinopia={sinopia}
+      >
+        {kindView()}
+      </SinopiaStage>
       {gated?.canManage && project && project.design.kind !== 'slides' && (
         <PublishDialog
           open={publishOpen}

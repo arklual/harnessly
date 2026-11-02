@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кешбэки</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="cb">
+  <header class="cb__head">
+    <h1 class="cb__title">Кешбэки</h1>
+    <p class="cb__sub" id="sub"></p>
+  </header>
+  <ul class="cb__list" id="list"></ul>
+  <footer class="cb__foot">
+    <button type="button" class="cb__send" id="send" disabled>Отправить выбор в чат</button>
+    <p class="cb__note" id="note" role="status"></p>
+  </footer>
+</main>
+<!-- Classic scripts only: the view runs in an opaque-origin frame, which sends the slot's cookie with classic scripts,
+     stylesheets and images but not with module scripts or CORS loads, so those would come back 401. -->
+<script src="/__hl/app-sdk.js"></script>
+<script src="cashback-data.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

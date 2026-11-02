@@ -1,0 +1,58 @@
+{
+  "id": "harnessly.deck-lint",
+  "name": "Валидатор презентаций",
+  "description": "Находит слайды, где слишком много текста или мелкий шрифт, отмечает их на доске и не даёт поделиться, пока есть ошибки",
+  "version": "0.1.0",
+  "harnessly": ">=0.17.0",
+  "trust": "sandboxed",
+  "targets": ["sinopia.slides"],
+  "activation": { "on": ["document"] },
+  "permissions": ["sinopia.read", "sinopia.write"],
+  "agent": {
+    "instructions": "instructions.md",
+    "skills": ["deck-fixes"],
+    "tools": {
+      "allow": ["app.*"]
+    }
+  },
+  "views": [
+    { "id": "panel", "title": "Проверка презентации", "entry": "ui/panel.html", "targets": ["sinopia.slides"] }
+  ],
+  "sinopia": {
+    "panels": [{ "id": "lint", "view": "panel", "title": "Проверка", "kinds": ["slides"] }],
+    "checks": [
+      {
+        "id": "deck",
+        "title": "Текст на слайдах",
+        "on": ["save", "share"],
+        "blockShare": "error",
+        "kinds": ["slides"],
+        "rules": [
+          {
+            "id": "wordy",
+            "select": "h1, h2, h3, p, li",
+            "maxWords": 40,
+            "level": "error",
+            "message": "Слишком много слов: {n} из {limit}"
+          },
+          {
+            "id": "tiny",
+            "select": "p, li",
+            "minFontPx": 18,
+            "level": "warning",
+            "message": "Мелкий шрифт: {n}px, не меньше {limit}px",
+            "fix": { "font-size": "24px" }
+          }
+        ]
+      }
+    ],
+    "selection": [
+      {
+        "id": "shorten",
+        "title": "Сократить",
+        "agent": "Сократи выбранный текст до сути: вдвое меньше слов, смысл тот же. Правь через app_sinopia_patch.",
+        "kinds": ["slides"]
+      }
+    ]
+  }
+}

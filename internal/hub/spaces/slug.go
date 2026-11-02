@@ -75,3 +75,7 @@ func slugCandidate(base string, n int) string {
 	}
 	return base + suffix
 }
+
+// Slug is the n-th slug to try for a name (n from 1), by the rules of the spaces' slugs; organizations and teams take
+// theirs the same way.
+func Slug(name string, n int) string { return slugCandidate(slugBase(name), n) }

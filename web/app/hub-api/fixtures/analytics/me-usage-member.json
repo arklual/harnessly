@@ -1,0 +1,402 @@
+{
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "accountedUntil": "2026-10-30T17:58:00Z",
+  "total": {
+    "list": {
+      "usd": 261.4,
+      "shown": 21304.1
+    },
+    "paid": {
+      "usd": 230,
+      "shown": 18745.0
+    }
+  },
+  "byDay": [
+    {
+      "day": "2026-10-01",
+      "list": {
+        "usd": 8,
+        "shown": 652.0
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-02",
+      "list": {
+        "usd": 9,
+        "shown": 733.5
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-03",
+      "list": {
+        "usd": 10,
+        "shown": 815.0
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-04",
+      "list": {
+        "usd": 11,
+        "shown": 896.5
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-05",
+      "list": {
+        "usd": 8,
+        "shown": 652.0
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-06",
+      "list": {
+        "usd": 9,
+        "shown": 733.5
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-07",
+      "list": {
+        "usd": 10,
+        "shown": 815.0
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-08",
+      "list": {
+        "usd": 11,
+        "shown": 896.5
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-09",
+      "list": {
+        "usd": 8,
+        "shown": 652.0
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-10",
+      "list": {
+        "usd": 9,
+        "shown": 733.5
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-11",
+      "list": {
+        "usd": 10,
+        "shown": 815.0
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-12",
+      "list": {
+        "usd": 11,
+        "shown": 896.5
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-13",
+      "list": {
+        "usd": 8,
+        "shown": 652.0
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-14",
+      "list": {
+        "usd": 9,
+        "shown": 733.5
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-15",
+      "list": {
+        "usd": 10,
+        "shown": 815.0
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-16",
+      "list": {
+        "usd": 11,
+        "shown": 896.5
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-17",
+      "list": {
+        "usd": 8,
+        "shown": 652.0
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-18",
+      "list": {
+        "usd": 9,
+        "shown": 733.5
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-19",
+      "list": {
+        "usd": 10,
+        "shown": 815.0
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-20",
+      "list": {
+        "usd": 11,
+        "shown": 896.5
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-21",
+      "list": {
+        "usd": 8,
+        "shown": 652.0
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-22",
+      "list": {
+        "usd": 9,
+        "shown": 733.5
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-23",
+      "list": {
+        "usd": 10,
+        "shown": 815.0
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-24",
+      "list": {
+        "usd": 11,
+        "shown": 896.5
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-25",
+      "list": {
+        "usd": 8,
+        "shown": 652.0
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-26",
+      "list": {
+        "usd": 9,
+        "shown": 733.5
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-27",
+      "list": {
+        "usd": 10,
+        "shown": 815.0
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    },
+    {
+      "day": "2026-10-28",
+      "list": {
+        "usd": 11,
+        "shown": 896.5
+      },
+      "paid": {
+        "usd": 7,
+        "shown": 570.5
+      }
+    },
+    {
+      "day": "2026-10-29",
+      "list": {
+        "usd": 8,
+        "shown": 652.0
+      },
+      "paid": {
+        "usd": 8,
+        "shown": 652.0
+      }
+    },
+    {
+      "day": "2026-10-30",
+      "list": {
+        "usd": 9,
+        "shown": 733.5
+      },
+      "paid": {
+        "usd": 9,
+        "shown": 733.5
+      }
+    }
+  ],
+  "byModel": [
+    {
+      "model": "claude-opus-4-6",
+      "list": {
+        "usd": 201.4,
+        "shown": 16414.1
+      },
+      "calls": 2210
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "list": {
+        "usd": 60,
+        "shown": 4890.0
+      },
+      "calls": 930
+    }
+  ],
+  "byAccount": [
+    {
+      "accountId": "a2claudemaxbbbbbbbbb",
+      "label": "Claude Max №2",
+      "funding": "org",
+      "list": {
+        "usd": 240,
+        "shown": 19560.0
+      },
+      "paid": {
+        "usd": 200,
+        "shown": 16300.0
+      }
+    },
+    {
+      "accountId": "a2verapersonalaaaaaa",
+      "label": "Личный ключ Anthropic",
+      "funding": "personal",
+      "list": {
+        "usd": 21.4,
+        "shown": 1744.1
+      },
+      "paid": {
+        "usd": 30,
+        "shown": 2445.0
+      }
+    }
+  ]
+}

@@ -2,6 +2,8 @@
 // there while the person reads the bottom, even as a turn grows or the dock above the field does (the design's
 // --dock-pad); scrolled away it shows «To new». Older turns load when the top comes near, and the turn the person
 // looks at stays where it was. Long feeds draw only the turns around the viewport (feed-window.ts).
+import { KEY_SCOPE } from '@/next/features/keys/commands';
+import { useKeys } from '@/next/features/keys/use-keys';
 import {
   memo,
   startTransition,
@@ -50,6 +52,7 @@ import Icon from '@/next/ui/icon';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import { CatchingUp, FeedLoading, FeedStart, OlderLoading } from '@/next/features/chat/feed-status';
 import { t } from '@/next/i18n';
+import { toast } from '@/next/ui/toast';
 import useFeedAnchor from '@/next/features/chat/use-feed-anchor';
 import '@/next/styles/ui.css';
 import '@/next/styles/chat.css';
@@ -291,6 +294,19 @@ const Feed = (props: IFeedProps) => {
     goalReached = null,
     modelLabel = shortModelName,
   } = props;
+  // ⌘⇧C (features/keys): the latest answer of the chat on screen, as its «Копировать» copies it.
+  const lastTurn = (items ?? []).findLast((item) => item.kind === 'turn' && item.answer !== null);
+  const lastAnswer = lastTurn?.kind === 'turn' ? (lastTurn.answer?.md ?? null) : null;
+  useKeys(KEY_SCOPE.global, {
+    'global.copyAnswer':
+      lastAnswer === null
+        ? undefined
+        : () =>
+            void navigator.clipboard.writeText(lastAnswer).then(
+              () => toast(t('next.keys.copied')),
+              () => toast(t('next.shellData.noClipboard'), { tone: 'error' }),
+            ),
+  });
   const scrollerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);

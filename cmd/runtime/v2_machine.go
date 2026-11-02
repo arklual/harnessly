@@ -36,6 +36,14 @@ func (p v2Pane) TypeLine(text string) error    { return p.tm.SendLiteralThenEnte
 func (p v2Pane) TypeOnly(text string) error    { return p.tm.SendLiteral(p.session, text) }
 func (p v2Pane) Keys(keys ...string) error     { return p.tm.SendKeySequence(p.session, keys...) }
 
+// A permission dialog that does not fit its window gets this much: at 197 columns of command, about 50 lines of it.
+const (
+	dialogCols = 200
+	dialogRows = 60
+)
+
+func (p v2Pane) GrowForDialog() bool { return p.tm.GrowDetached(p.session, dialogCols, dialogRows) }
+
 // v2Tmux is convo.Machine over tmux. A pane that looks gone, or an agent that looks exited, is believed only when
 // the look before agreed: one call that failed on a loaded machine must not stop a working agent.
 type v2Tmux struct {

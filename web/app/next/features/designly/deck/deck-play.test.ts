@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextMove, playKey, prevMove } from './deck-play';
+import { nextMove, prevMove } from './deck-play';
 
 describe('nextMove', () => {
   it('shows the steps of a slide before the next slide', () => {
@@ -20,21 +20,5 @@ describe('prevMove', () => {
   });
   it('stops at the start', () => {
     expect(prevMove(0, 0)).toBeNull();
-  });
-});
-
-describe('playKey', () => {
-  it('maps the keys of the board', () => {
-    expect(playKey({ key: 'ArrowRight' })).toBe('next');
-    expect(playKey({ key: ' ' })).toBe('next');
-    expect(playKey({ key: 'PageDown' })).toBe('next');
-    expect(playKey({ key: 'ArrowUp' })).toBe('prev');
-    expect(playKey({ key: 'Escape' })).toBe('exit');
-    expect(playKey({ key: 'к' })).toBe('record');
-    expect(playKey({ key: 'x' })).toBeNull();
-  });
-  it('leaves chords to the browser', () => {
-    expect(playKey({ key: 'ArrowRight', metaKey: true })).toBeNull();
-    expect(playKey({ key: 'r', ctrlKey: true })).toBeNull();
   });
 });

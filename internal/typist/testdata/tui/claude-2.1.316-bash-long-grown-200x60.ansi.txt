@@ -1,0 +1,60 @@
+
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.316[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mHaiku 5.5 · Claude Max[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m/work/proj[39m
+
+
+[38;5;246m[48;5;237m❯ [38;5;231mCall the Bash tool exactly once with the exact command stored between the markers, verbatim, on one line. Do not read anything first, do not explain.[39m
+  [38;5;231mBEGIN[39m
+  [38;5;231mfalse && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/hrn-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add "$@"; [39m
+  [38;5;231m}; union web/app/hub/org/api/live.ts web/app/hub/org/mock/index.ts; GIT_EDITOR=true git cherry-pick --continue >/dev/null 2>&1 && echo ok 96bb8995; for c in 6399604c c5cb8f03 242c1747 c59e5b6b [39m
+  [38;5;231mba3cde0d; do if git cherry-pick $c >/dev/null 2>&1; then echo "ok $c"; continue; fi; U=$(git diff --name-only --diff-filter=U); echo "CONFLICT $c: $U" | tr '\n' ' '; echo; bad=""; for f in ${(f)U};[39m
+  [38;5;231mdo case $f in web/app/hub/org/api/live.ts|web/app/hub/org/mock/index.ts|web/app/hub/org/org.css|web/app/hub/org/api/index.ts|web/app/hub/org/api/types.ts) ;; *) bad="$bad $f";; esac; done; if [ -n[39m
+  [38;5;231m"$bad" ]; then echo "STOP on:$bad"; for f in ${=bad}; do /usr/bin/awk '/^<<<<<<< /{p=1} p{print FILENAME":"NR": "$0} /^>>>>>>> /{p=0}' "$f" | cut -c1-130 | head -50; done; break; fi; for f in [39m
+  [38;5;231m${(f)U}; do /usr/bin/awk '/^<<<<<<< /{p=1} p{print NR": "$0} /^>>>>>>> /{p=0}' "$f" | cut -c1-110 | head -24; done; union ${(f)U}; GIT_EDITOR=true git cherry-pick --continue >/dev/null 2>&1 && echo[39m
+  [38;5;231m"ok-union $c"; done; git status -sb | head -1 | cut -c1-70; git log --oneline origin/main..HEAD | wc -l; /usr/bin/grep -rln '^<<<<<<< \|^>>>>>>> ' web/app/hub | head; }[39m
+  [38;5;231mEND[39m
+
+[38;5;246m[49m●[39m Running guarded cherry-pick script (short-circuited by false)
+[38;5;246m  ⎿  $ false && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/hrn-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add [39m
+     [38;5;246m"$@"; }; union web/app/hub/org/api/live.ts web/app/hub/org/mock/index.ts; GIT_EDITOR=true git cherry-pick …[39m
+
+[38;5;153m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;153mBash command[0m
+ [38;5;246mRun guarded cherry-pick script (short-circuited by false)[39m
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m [2m│[0m false && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/hrn-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add "$@";
+ [2m│[0m }; union web/app/hub/org/api/live.ts web/app/hub/org/mock/index.ts; GIT_EDITOR=true git cherry-pick --continue >/dev/null 2>&1 && echo ok 96bb8995; for c in 6399604c c5cb8f03 242c1747 c59e5b6b
+ [2m│[0m ba3cde0d; do if git cherry-pick $c >/dev/null 2>&1; then echo "ok $c"; continue; fi; U=$(git diff --name-only --diff-filter=U); echo "CONFLICT $c: $U" | tr '\n' ' '; echo; bad=""; for f in
+ [2m│[0m ${(f)U}; do case $f in web/app/hub/org/api/live.ts|web/app/hub/org/mock/index.ts|web/app/hub/org/org.css|web/app/hub/org/api/index.ts|web/app/hub/org/api/types.ts) ;; *) bad="$bad $f";; esac;
+ [2m│[0m done; if [ -n "$bad" ]; then echo "STOP on:$bad"; for f in ${=bad}; do /usr/bin/awk '/^<<<<<<< /{p=1} p{print FILENAME":"NR": "$0} /^>>>>>>> /{p=0}' "$f" | cut -c1-130 | head -50; done; break; fi;
+ [2m│[0m for f in ${(f)U}; do /usr/bin/awk '/^<<<<<<< /{p=1} p{print NR": "$0} /^>>>>>>> /{p=0}' "$f" | cut -c1-110 | head -24; done; union ${(f)U}; GIT_EDITOR=true git cherry-pick --continue >/dev/null
+ [2m│[0m 2>&1 && echo "ok-union $c"; done; git status -sb | head -1 | cut -c1-70; git log --oneline origin/main..HEAD | wc -l; /usr/bin/grep -rln '^<<<<<<< \|^>>>>>>> ' web/app/hub | head; }
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m [2m│[0m Dangerous rm operation not ruled out — the shell may read this command differently than it was parsed
+
+ Do you want to proceed?
+ [38;5;153m❯[39m [38;5;246m1. [38;5;153mYes[39m
+   [38;5;246m2. [39mNo
+
+ [38;5;246mEsc to cancel · Tab to amend[39m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,73 @@
+{
+  "events": [
+    {
+      "id": "e2aaaaaaaaaaaaaaaaa3",
+      "at": "2026-10-30T10:00:00Z",
+      "actor": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "scope": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa"
+      },
+      "action": "grant.add",
+      "target": {
+        "kind": "user",
+        "id": "u2borisaaaaaaaaaaaaa",
+        "label": "Борис"
+      },
+      "before": null,
+      "after": {
+        "role": "lead"
+      },
+      "self": false
+    },
+    {
+      "id": "e2aaaaaaaaaaaaaaaaa2",
+      "at": "2026-10-29T12:30:00Z",
+      "actor": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "action": "limit.set",
+      "target": {
+        "kind": "limit",
+        "id": "l2aaaaaaaaaaaaaaaaa1",
+        "label": "Организация, месяц"
+      },
+      "before": {
+        "amountUsd": 2000
+      },
+      "after": {
+        "amountUsd": 2500
+      },
+      "self": true
+    },
+    {
+      "id": "e2aaaaaaaaaaaaaaaaa1",
+      "at": "2026-10-01T09:00:00Z",
+      "actor": null,
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "action": "org.create",
+      "target": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa",
+        "label": "Acme"
+      },
+      "before": null,
+      "after": {
+        "name": "Acme"
+      },
+      "self": false
+    }
+  ],
+  "next": null
+}

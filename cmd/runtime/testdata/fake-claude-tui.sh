@@ -111,7 +111,11 @@ while :; do
     last="$prompt"; prompt=""; shown=""; entry user "$last"; fire prompt-submit ""
     busy=1; until=$(( $(now) + 1500 )); draw
   fi
+  # The stand-in must not outlive its pane: it ends when the terminal is gone (EOF, or its tmux server is no longer its parent)
+  # and, whatever happens, after ten minutes.
+  [ "$SECONDS" -lt 600 ] && kill -0 "$PPID" 2>/dev/null || exit 0
   IFS= read -rsn1 -t 0.2 ch; rc=$?
+  if [ $rc -ne 0 ] && [ $rc -le 128 ]; then exit 0; fi
   # a timeout in the middle of a multi-byte character hands over the bytes read so far
   if [ $rc -gt 128 ] && [ -z "$ch" ]; then
     bgwatch

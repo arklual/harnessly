@@ -25,7 +25,7 @@ var (
 	closedClusterOps = map[string]bool{
 		"transcripts.list": true, "transcripts.read": true, "state.list": true, "state.put": true, "state.mode": true,
 		"state.result": true, "conversations.start": true, "docs.deliver": true, "docs.notify": true, "design.access": true,
-		"design.notify": true, "eval.start": true, "eval.poll": true, "eval.stop": true, "status.send": true,
+		"design.notify": true, "apps.team": true, "apps.team.snapshot": true, "apps.public": true, "apps.public.snapshot": true, "eval.start": true, "eval.poll": true, "eval.stop": true, "status.send": true,
 	}
 
 	// keyVars are the variables the agents take their API key from.
@@ -117,8 +117,12 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 		return map[string]string{"publicKey": pub}, nil, nil
 	case hubproto.OpRuntimeSess:
 		return h.opSession(req, pol)
+	case hubproto.OpUsageRead, hubproto.OpUsageAck:
+		return h.opUsage(op, req)
 	case hubproto.OpTunnelOpen:
 		return h.opTunnel(l, req, pol)
+	case hubproto.OpBudgetSet:
+		return h.opBudget(req)
 	}
 	if closedClusterOps[op] {
 		return nil, nil, hubproto.Errf(hubproto.CodePolicyDenied, "%s is not served on a hub link", op)

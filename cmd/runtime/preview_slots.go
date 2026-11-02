@@ -525,8 +525,11 @@ func isSlotCookieLine(line string) bool {
 	return strings.HasPrefix(line, previewCookieName) || strings.HasPrefix(line, "__Host-"+previewCookieName)
 }
 
-// session is the slot's cookie when it is valid and names this slot.
+// session is the slot's newest valid cookie that names this slot. A browser may hold several: a plain and a secure
+// one, or one per partition after the cookie's kind changed, and the older ones show a target the pane left.
 func (s *previewSlots) session(r *http.Request, slot int, secret []byte) *previewSession {
+	var best *previewSession
+	var bestAt float64
 	for _, secure := range []bool{false, true} {
 		name := s.slotCookie(slot, secure)
 		for _, c := range r.Cookies() {
@@ -537,12 +540,13 @@ func (s *previewSlots) session(r *http.Request, slot int, secret []byte) *previe
 			if !ok {
 				continue
 			}
-			if sess, ok := previewSessionOf(p); ok && sess.slot == slot {
-				return sess
+			at, _ := p["iat"].(float64)
+			if sess, ok := previewSessionOf(p); ok && sess.slot == slot && (best == nil || at > bestAt) {
+				best, bestAt = sess, at
 			}
 		}
 	}
-	return nil
+	return best
 }
 
 func previewDeny(w http.ResponseWriter, status int, text string) {
@@ -586,6 +590,15 @@ func (s *previewSlots) slotHandler(slot int) http.Handler {
 		sess := s.session(r, slot, secret)
 		if sess == nil {
 			previewDeny(w, 401, previewExpiredText())
+			return
+		}
+		// A loopback slot's cookie is unpartitioned SameSite=None (see enter), so any site open in the browser could
+		// send it with a plain <img> or <script> load, which carries no Origin and, from a sandbox, no Referer either.
+		// Only an app's view needs cross-site loads (its opaque-origin frame makes every load one), and the view server
+		// answers nothing without the session's token in the path but the SDK's own code: a person's dev server never
+		// gets a cross-site request through a loopback slot.
+		if s.public == nil && loopbackOrigin(own) && r.Header.Get("Sec-Fetch-Site") == "cross-site" && !sess.showsAppViews() {
+			previewDeny(w, 403, locale.Pick("A request from another address", "Запрос с чужого адреса"))
 			return
 		}
 		// Only the slot itself and the app drive a slot: a sibling slot is another target, maybe an external site.
@@ -634,11 +647,16 @@ func (s *previewSlots) enter(w http.ResponseWriter, r *http.Request, slot int, s
 			}
 		}
 	}
-	secure := strings.HasPrefix(ticket.origin, "https:")
+	// A loopback slot counts as secure too: browsers keep Secure cookies on http://127.0.0.1 and localhost, and an
+	// app's view frame has an opaque origin, so every load from it is cross-site and a Lax cookie never comes along.
+	// Not partitioned there: the page and a loopback slot are one site, so the enter navigation lands in the
+	// same-site partition while the frame's loads ask for the cross-site one and would find no cookie.
+	loopback := loopbackOrigin(ticket.origin)
+	secure := strings.HasPrefix(ticket.origin, "https:") || loopback
 	cookie := &http.Cookie{Name: s.slotCookie(slot, secure), Value: agent.SignPayload(secret, previewSlotAudience, ticket.fields(), previewSlotTTL),
 		Path: "/", HttpOnly: true, MaxAge: int(previewSlotTTL / time.Second), SameSite: http.SameSiteLaxMode}
 	if secure {
-		cookie.Secure, cookie.SameSite, cookie.Partitioned = true, http.SameSiteNoneMode, true
+		cookie.Secure, cookie.SameSite, cookie.Partitioned = true, http.SameSiteNoneMode, !loopback
 	}
 	http.SetCookie(w, cookie)
 	h.Set("Location", path)
@@ -790,4 +808,27 @@ func previewBridgeFromWeb() func() ([]byte, bool) {
 		return nil
 	}
 	return func() ([]byte, bool) { return script, true }
+}
+
+// loopbackOrigin: http://127.0.0.1:<port>, http://[::1]:<port> or http://localhost:<port>.
+func loopbackOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	if err != nil || u.Scheme != "http" {
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// appViewPort is the loopback port of the apps' view server once it is up (routes_apps.go), 0 before.
+var appViewPort atomic.Int64
+
+// showsAppViews says whether the slot shows the apps' view server.
+func (s *previewSession) showsAppViews() bool {
+	port := appViewPort.Load()
+	return port != 0 && s.target.Kind == "port" && int64(s.target.Port) == port
 }

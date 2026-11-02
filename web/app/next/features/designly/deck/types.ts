@@ -239,7 +239,13 @@ export interface IDeckTidied {
   voice: boolean;
 }
 
-export const DECK_PATCH_OP = { text: 'text', style: 'style', move: 'move', reset: 'reset' } as const;
+export const DECK_PATCH_OP = {
+  text: 'text',
+  style: 'style',
+  move: 'move',
+  reset: 'reset',
+  image: 'image',
+} as const;
 export type TDeckPatchOp = (typeof DECK_PATCH_OP)[keyof typeof DECK_PATCH_OP];
 
 /**
@@ -253,7 +259,23 @@ export type TDeckPatch =
   | { op: 'style'; tpl: number; was: string; style: Record<string, string | null> }
   /** Board pixels, written as `translate` in cqw; in px when the board says the block sits in a container (`px`). */
   | { op: 'move'; tpl: number; was: string; x: number; y: number; unit?: 'px' }
-  | { op: 'reset'; tpl: number; was: string };
+  | { op: 'reset'; tpl: number; was: string }
+  /**
+   * A drawn picture put into the element: `src` is its place in the project (`assets/<job>-<n>.png`), `job` the name of
+   * the job's files, `prompt` the brief the element remembers. An img takes it as its src, any other element as a
+   * covering background.
+   */
+  | {
+      op: 'image';
+      tpl: number;
+      was: string;
+      src: string;
+      /** Absent when the original is put back: the element forgets what it was drawn from. */
+      job?: string;
+      prompt?: string;
+      /** The pictures this one was changed from (paths of the project, space apart), oldest first. */
+      from?: string;
+    };
 
 /** What a refused patch says: the source changed under the page, or the element is interpolated. */
 export const DECK_PATCH_REFUSAL = { changed: 'changed', dynamic: 'dynamic' } as const;

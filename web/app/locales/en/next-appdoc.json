@@ -1,0 +1,15 @@
+{
+  "next.appdoc.needsApp": "The app \"{app}\" is needed",
+  "next.appdoc.needsAppText": "The document stays where it is. Install the app and it can be edited again.",
+  "next.appdoc.toApps": "Go to apps",
+  "next.appdoc.readOnly": "The document is open for reading only",
+  "next.appdoc.code.newer": "It was made by a newer version of the app than the one installed here. Update the app.",
+  "next.appdoc.code.failed": "The app could not bring it up to its own version. The document is untouched.",
+  "next.appdoc.code.no-room": "There was no room to keep the old copy next to the new one. The document is untouched.",
+  "next.appdoc.code.unreadable": "The version or the content of the document could not be read. It is untouched.",
+  "next.appdoc.code.no-package": "The app's package cannot be read, so the document cannot be brought up to date. It is untouched.",
+  "next.appdoc.code.view-only": "You can view this document but not change it.",
+  "next.appdoc.details": "Details: {reason}",
+  "next.appdoc.failed": "The document could not be opened",
+  "next.appdoc.noView": "The app has no view that edits this document"
+}

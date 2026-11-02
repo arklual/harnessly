@@ -2032,13 +2032,13 @@ test('11. «Apps» is the first of «More»: the tracker’s epics and stale tas
     await kids.first().click();
   };
   await openApps();
-  await expect(kids).toHaveText(['Apps', 'Efficiency', 'Statistics']);
-  await expect(page).toHaveURL(/\/apps$/);
+  await expect(kids).toHaveText(['Tasks and MRs', 'Efficiency', 'Statistics']);
+  await expect(page).toHaveURL(/\/tasks$/);
   const apps = page.locator('.hx-feedapp');
   await expect(apps).toBeVisible();
   // The screen has its own strip: no chat header over it.
   await expect(page.locator('.hx-header')).toHaveCount(0);
-  await expect(apps.getByRole('heading', { name: 'Apps' })).toBeVisible();
+  await expect(apps.getByRole('heading', { name: 'Tasks and MRs' })).toBeVisible();
   await expect(apps.getByRole('tab')).toHaveText(['Tracker', 'GitLab']);
   await expect(apps.getByRole('tab', { name: 'Tracker' })).toHaveAttribute('aria-selected', 'true');
 
@@ -2251,14 +2251,14 @@ test('12. Settings opens from the profile menu, the Apps screen and the machine 
   await expect(page.locator('.hx-hello')).toBeVisible();
 
   // 5. From the Apps screen: the button next to its title.
-  await page.goto(at('/apps'));
-  await page.getByRole('button', { name: 'Connected apps' }).click();
+  await page.goto(at('/tasks'));
+  await page.getByRole('button', { name: 'Connections' }).click();
   await expect(page).toHaveURL(/\/settings\/apps$/);
   await expect(set.getByRole('heading', { name: 'Apps' })).toBeVisible();
   await expect(set.locator('.hx-app-card')).toHaveCount(2);
   await expect(set.locator('.hx-app-card').first()).toContainText('Connected');
   await set.locator('.hx-app-card').first().getByRole('button', { name: 'Open' }).click();
-  await expect(page).toHaveURL(/\/apps$/);
+  await expect(page).toHaveURL(/\/tasks$/);
 
   // 6. From the machine card: «Set up machines».
   await page.locator('.hx-machine__chip').click();

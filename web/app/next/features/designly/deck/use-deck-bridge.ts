@@ -8,6 +8,8 @@ import {
   type TDeckBoardMessage,
   type TDeckHostMessage,
 } from '@/next/features/designly/deck/bridge';
+import type { IImageAct } from '@/next/features/designly/image-gen/image-act';
+import { readBridgeMessage } from '@/next/features/designly/page-bridge';
 
 /** The keys the board hands to the deck, as `KeyboardEvent.key`. */
 const BOARD_KEYS: Record<string, string> = {
@@ -44,8 +46,11 @@ export const useDeckBridge = (
   src: string | null,
   onMessage: (message: TDeckBoardMessage) => void,
   onKey: (key: string) => void,
+  /** The board's buttons on its pictures: the board is up (`hello`), or a button was pressed. */
+  onImage?: (message: 'hello' | IImageAct) => void,
 ): IDeckBridge => {
   const take = useEffectEvent(onMessage);
+  const image = useEffectEvent((message: 'hello' | IImageAct) => onImage?.(message));
   const key = useEffectEvent(onKey);
   const srcRef = useRef(src);
   useEffect(() => {
@@ -61,7 +66,13 @@ export const useDeckBridge = (
         return;
       }
       const pressed = readBoardKey(event.data);
-      if (pressed !== null) key(pressed);
+      if (pressed !== null) {
+        key(pressed);
+        return;
+      }
+      const said = readBridgeMessage(event.data);
+      if (said?.k === 'images-hello') image('hello');
+      if (said?.k === 'image-act') image(said.act);
     };
     window.addEventListener('message', listen);
     return () => window.removeEventListener('message', listen);

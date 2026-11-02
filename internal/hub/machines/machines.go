@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
@@ -24,6 +23,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // Deps are what the service is built from.
@@ -40,6 +40,22 @@ type Deps struct {
 	Now func() time.Time
 	// OnRevoked runs after a machine was revoked: whatever is held for it must go.
 	OnRevoked func(machineID string)
+	// Usage pulls the machines' spend facts (HUB_USAGE_INGEST); nil: the hub neither subscribes to usage.available nor
+	// reads any outbox.
+	Usage UsageSink
+	// Budget sends the machines their limit lists (HUB_LIMITS_ENFORCE); nil: off.
+	Budget BudgetSink
+}
+
+// BudgetSink is what keeps a machine's limit list current (internal/hub/limits).
+type BudgetSink interface {
+	Connected(machineID string, hello hubproto.Hello)
+}
+
+// UsageSink is what reads a machine's spend outbox (internal/hub/ingest).
+type UsageSink interface {
+	Connected(machineID string, features []string)
+	Trigger(machineID string)
 }
 
 // Service is the machine side of the hub.
@@ -55,6 +71,8 @@ type Service struct {
 	log     *slog.Logger
 	now     func() time.Time
 	revoked func(machineID string)
+	usage   UsageSink
+	budget  BudgetSink
 
 	// infoMu serialises the read-modify-write of a machine's info document: the connect routine and the agent's events
 	// all update it.
@@ -65,7 +83,7 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -93,6 +111,8 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/machines/{machineId}", s.auth.Require(s.remove))
 	mux.Handle("GET /api/machines/{machineId}/open", s.auth.Require(s.open))
 	mux.Handle("POST /api/machines/{machineId}/preflight", s.auth.Require(s.rerunPreflight))
+
+	s.mountOrg(mux)
 
 	mux.Handle("POST /agent/register", httpx.Handler(s.register))
 }
@@ -311,18 +331,21 @@ func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal)
 }
 
 func (s *Service) rename(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	var req struct{ Name string }
+	var req patchRequest
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
 	}
-	name := strings.Join(strings.Fields(req.Name), " ")
-	if n := len([]rune(name)); n == 0 || n > 60 {
-		return httpx.Invalid("name", "Название — от 1 до 60 символов")
+	// The team and the access list are the organization's (patchOrg); a name alone is what it always was.
+	if req.TeamID != nil || req.Access != nil {
+		return s.patchOrg(w, r, p, req)
 	}
-	for _, c := range name {
-		if unicode.IsControl(c) {
-			return httpx.Invalid("name", "В названии есть недопустимые символы")
-		}
+	var raw string
+	if req.Name != nil {
+		raw = *req.Name
+	}
+	name, err := cleanMachineName(raw)
+	if err != nil {
+		return err
 	}
 	ctx := r.Context()
 	m, err := s.Authorize(ctx, p.User.ID, r.PathValue("machineId"), true)
@@ -404,6 +427,9 @@ func (s *Service) open(w http.ResponseWriter, r *http.Request, p *auth.Principal
 	}
 	if ok, retry := s.lim.Allow("open:"+p.User.ID, 120, time.Minute); !ok {
 		return httpx.RateLimited(ratelimit.RetrySeconds(retry))
+	}
+	if m.DisabledAt != nil {
+		return errDisabledMachine
 	}
 	// Without HUB_RUNTIME_DOMAIN the page would run on the hub's origin: only a machine an administrator connected may.
 	if err := s.auth.RequireTrustedMachine(ctx, m.CreatedBy); err != nil {

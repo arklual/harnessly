@@ -1,6 +1,8 @@
 package convo
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -14,6 +16,10 @@ import (
 // transcript gained when it grew.
 const metaEvery = 3 * time.Second
 
+// metaRestEvery: a conversation at rest whose files did not change is still read whole this often, so what the record
+// changed meanwhile meets the transcript's word again.
+const metaRestEvery = time.Minute
+
 // watchMeta reads, off the actor and now and then, the effort the agent really runs on its /goal and its recap, and gives them
 // back on the actor. The transcript is the only place that says them: the box shows them, the hooks do not.
 func (c *conv) watchMeta(now time.Time) {
@@ -25,8 +31,17 @@ func (c *conv) watchMeta(now time.Time) {
 	}
 	c.metaReading, c.metaAt = true, now
 	meta, pics, path := c.d.Meta, c.d.Shots, c.rec.TranscriptPath
+	// A conversation at rest whose transcript and subagents folder did not change has nothing new to say. Every
+	// conversation of the runtime — stopped and gone ones too, 260 on one machine — came here every 3 s, and the reads
+	// (the transcript, the subagents folder, each subagent's file) were ~80 opens a second for nothing. A
+	// working one is read whatever the stamp: a subagent's file grows without touching the folder.
+	resting, last := c.metaResting() && now.Sub(c.metaFullAt) < metaRestEvery, c.metaStamp
 	c.spawn(func() any {
-		var out metaRead
+		out := metaRead{stamp: stampOf(path)}
+		if resting && out.stamp.ok && out.stamp == last {
+			out.same = true
+			return out
+		}
 		if meta != nil {
 			out.info = meta.Read(path)
 		}
@@ -37,6 +52,11 @@ func (c *conv) watchMeta(now time.Time) {
 	}, func(r any) {
 		c.metaReading = false
 		got, _ := r.(metaRead)
+		c.metaStamp = got.stamp
+		if got.same {
+			return
+		}
+		c.metaFullAt = now
 		now := c.d.Clock.Now()
 		if c.d.Meta != nil {
 			c.metaApply(got.info, now)
@@ -60,10 +80,40 @@ func servable(list []shots.Shot) []shots.Shot {
 	return out
 }
 
-// metaRead is what one look at the transcripts found.
+// metaRead is what one look at the transcripts found; same: nothing changed since the last, nothing was read.
 type metaRead struct {
 	info  sessionmeta.Info
 	shots []shots.Shot
+	stamp metaStamp
+	same  bool
+}
+
+// metaStamp is a transcript and its subagents folder as a stat sees them; ok is false when the transcript is not there.
+type metaStamp struct {
+	ok            bool
+	size, modNano int64
+	subsNano      int64
+}
+
+func stampOf(transcript string) metaStamp {
+	st, err := os.Stat(transcript)
+	if err != nil {
+		return metaStamp{}
+	}
+	s := metaStamp{ok: true, size: st.Size(), modNano: st.ModTime().UnixNano()}
+	if sub, err := os.Stat(filepath.Join(strings.TrimSuffix(transcript, ".jsonl"), "subagents")); err == nil {
+		s.subsNano = sub.ModTime().UnixNano()
+	}
+	return s
+}
+
+// metaResting: the agent is not at work, so its transcript is all there is to watch.
+func (c *conv) metaResting() bool {
+	switch c.rec.State.K {
+	case wire.StateIdle, wire.StateReady, wire.StateStopped, wire.StateGone, wire.StateLaunchFailed:
+		return true
+	}
+	return false
 }
 
 // shotsApply makes the list of pictures the transcripts' latest: a change goes out whole. Where the files are stays

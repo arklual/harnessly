@@ -15,6 +15,8 @@ interface IDeliveryCardProps {
 const iconOf = (mime: string | undefined): string => {
   if (!mime) return 'file-text';
   if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'film';
+  if (mime.startsWith('audio/')) return 'music';
   if (mime === 'application/zip' || mime === 'application/gzip' || mime === 'application/x-tar')
     return 'files';
   if (mime.includes('spreadsheet') || mime === 'text/csv' || mime === 'application/vnd.ms-excel')

@@ -1,16 +1,15 @@
 package main
 
 import (
-	"crypto/subtle"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/coreapi/layoutapi"
 	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -24,17 +23,21 @@ import (
 // side effects also under "core-shadow"). They use the core's one store, sync socket and pane intents.
 
 // cliTokenFirst checks the cli-token the way the previous runtime's handlers did: the first token header present
-// decides, whatever the others carry.
+// decides, whatever the others carry. An agent token of a chat with apps holds here as the cli-token does: these are
+// the tabs and panes the agent's CLI opens.
 func cliTokenFirst(dataDir string, headers []string) func(*http.Request) bool {
+	tokens := &gate.CLIToken{DataDir: dataDir}
 	return func(r *http.Request) bool {
-		raw, _ := os.ReadFile(filepath.Join(dataDir, "cli-token"))
-		token := strings.TrimSpace(string(raw))
 		for _, h := range headers {
 			vs, present := r.Header[http.CanonicalHeaderKey(strings.TrimSpace(h))]
 			if !present {
 				continue
 			}
-			return token != "" && len(vs) > 0 && subtle.ConstantTimeCompare([]byte(vs[0]), []byte(token)) == 1
+			if len(vs) == 0 {
+				return false
+			}
+			_, ok := tokens.Accepts(vs[0])
+			return ok
 		}
 		return false
 	}
@@ -165,6 +168,8 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 	}
 	// "open design <id|path|title>" names a design of this machine's library.
 	deps.Targets.DesignRef = designAPI(d).L.RefOf
+	// "open app <id>[/<view>]" names a pane view of an installed app.
+	deps.Targets.AppRef = apps.Open(d.DataDir).PaneRef
 	main, shadow := layoutapi.Routes(deps)
 	routes := []gate.Route{{Slice: "core", Match: main.Match, Handler: main.Handler}}
 	return append(routes, f.AsBodyRoutes(gate.BodyRoute{Slice: "core", Match: shadow.Match, Serve: shadow.Handler.ServeHTTP})...)

@@ -19,7 +19,12 @@ import { isStashKey, KEY_ACTION, keyAction } from '@/next/features/composer/keys
 import LimitsChip from '@/next/features/limits/limits-chip';
 import type { LimitsView } from '@/next/features/limits/model';
 import ModelPicker, { type IModelPickerProps } from '@/next/features/composer/model-picker';
-import PlusMenu, { type IPlusAttach, type IPlusTakes } from '@/next/features/composer/plus-menu';
+import type { IPlusApps } from '@/next/features/composer/apps-pane';
+import PlusMenu, {
+  type IPlusAttach,
+  type IPlusMenuHandle,
+  type IPlusTakes,
+} from '@/next/features/composer/plus-menu';
 import type { IStash } from '@/next/features/composer/stash-list';
 import { RefChips, type IRefChip } from '@/next/features/chat/ref-chips';
 import { usePromptHistory } from '@/next/features/composer/prompt-history';
@@ -40,6 +45,11 @@ import usePending, { isBusy, PENDING } from '@/next/ui/use-pending';
 import { t } from '@/next/i18n';
 import { usePresence } from '@/next/ui/presence';
 import { DictationMirror, RecordingTime, RecordingWave } from '@/next/features/composer/recording';
+import { chordOf } from '@/next/features/keys/chord';
+import { KEY_SCOPE } from '@/next/features/keys/commands';
+import { useKeyHint } from '@/next/features/keys/keys-help';
+import { commandsOfChord } from '@/next/features/keys/keymap';
+import { keyOverrides, useKeys } from '@/next/features/keys/use-keys';
 import '@/next/styles/ui.css';
 import '@/next/styles/composer.css';
 
@@ -108,6 +118,8 @@ export interface IComposerProps {
   stash?: IStash | null;
   /** The person's recordings in «+»; without it there is no «Записи». */
   takes?: IPlusTakes | null;
+  /** The installed apps «+» can turn on in this chat; without it there is no «Приложение». */
+  apps?: IPlusApps | null;
   recording: Recording | null;
   /** Voice input; without it the microphone is not offered. `at`: the caret in the field, where the words go. */
   onMic?: (at?: number) => void;
@@ -192,6 +204,15 @@ const Composer = (props: IComposerProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement | null>(null);
+  // ⇧Esc (features/keys): the cursor to the end of the latest field on screen.
+  useKeys(KEY_SCOPE.global, {
+    'global.focusField': () => {
+      const field = fieldRef.current;
+      if (!field) return;
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+    },
+  });
   const mirrorRef = useRef<HTMLDivElement | null>(null);
   /** What was sent from the field a moment ago: the text and where it stood, until the field shows it is empty. */
   const sentRef = useRef<{ text: string; at: number } | null>(null);
@@ -435,6 +456,38 @@ const Composer = (props: IComposerProps) => {
     props.onFinishRecording();
   };
 
+  // The field's shortcuts (features/keys). A field out of sight takes none; of several on a screen the latest does.
+  const onScreen = () => {
+    const root = rootRef.current;
+    return root !== null && root.isConnected && (root.checkVisibility?.() ?? true);
+  };
+  const plusRef = useRef<IPlusMenuHandle>(null);
+  useKeys(KEY_SCOPE.composer, {
+    'composer.dictate': () => {
+      if (!onScreen() || !props.onMic) return false;
+      if (!recording) onMicClick();
+      else if (!recording.busy) props.onFinishRecording();
+    },
+    'composer.cancelDictation': () => {
+      if (!onScreen() || !recording || recording.busy) return false;
+      setSendAfter(false);
+      props.onCancelRecording();
+    },
+    'composer.stopAgent': () => {
+      // Nothing to stop, or text selected (⌃C may be the copy): the press is not ours.
+      const selected = (window.getSelection()?.toString() ?? '') !== '';
+      if (!onScreen() || !working || selected || isBusy(stop.phase)) return false;
+      void stop.run('stop', props.onStop);
+    },
+    'composer.attach': () => {
+      if (!onScreen() || props.quiet || recording) return false;
+      plusRef.current?.openFiles();
+    },
+  });
+  const dictateHint = useKeyHint('composer.dictate');
+  const cancelHint = useKeyHint('composer.cancelDictation');
+  const stopHint = useKeyHint('composer.stopAgent');
+
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (props.stash && isStashKey(event.nativeEvent)) {
       event.preventDefault();
@@ -442,7 +495,15 @@ const Composer = (props: IComposerProps) => {
       return;
     }
     if (palette.onKeyDown(event) || history.onKeyDown(event)) return;
-    const action = keyAction(event.nativeEvent, touch, props.enterSends ?? true);
+    let action = keyAction(event.nativeEvent, touch, props.enterSends ?? true);
+    // «Send now» is the action of the shortcuts list: whatever it is bound to sends, and ⌃↵ no longer does once it is not.
+    const chord = chordOf(event.nativeEvent);
+    const sendNow =
+      chord !== null &&
+      !event.nativeEvent.isComposing &&
+      commandsOfChord(chord, keyOverrides()).some((c) => c.id === 'composer.send');
+    if (action === KEY_ACTION.sendNow && !sendNow) action = null;
+    else if (sendNow && action !== KEY_ACTION.send) action = KEY_ACTION.sendNow;
     if (action === KEY_ACTION.send) {
       event.preventDefault();
       if (!recording) submit('queue');
@@ -632,6 +693,7 @@ const Composer = (props: IComposerProps) => {
             <RoundButton
               icon="x"
               label={t('next.composer.cancelRecording')}
+              keys={cancelHint ? [cancelHint] : undefined}
               variant="ghost"
               size="sm"
               onClick={() => {
@@ -671,6 +733,7 @@ const Composer = (props: IComposerProps) => {
         ) : (
           <div className="hx-composer__bar" data-back={recorded || undefined}>
             <PlusMenu
+              ref={plusRef}
               contexts={props.contexts ?? []}
               onFiles={props.onFiles}
               onContext={(id) => props.onContext?.(id)}
@@ -678,13 +741,21 @@ const Composer = (props: IComposerProps) => {
               attach={props.attach}
               stash={props.stash}
               takes={props.takes}
+              apps={props.apps}
             />
             {picker && <ModelPicker {...picker} />}
             {props.limits && <LimitsChip view={props.limits} />}
             <span className="hx-spacer" />
             {props.contextRing && <ContextRing {...props.contextRing} />}
             {props.tools}
-            {props.onMic && <RoundButton icon="mic" label={t('next.composer.voice')} onClick={onMicClick} />}
+            {props.onMic && (
+              <RoundButton
+                icon="mic"
+                label={t('next.composer.voice')}
+                keys={dictateHint ? [dictateHint] : undefined}
+                onClick={onMicClick}
+              />
+            )}
             {/* While the agent works the field shows one button: stop with an empty field, the arrow with a message
                 (↵ into the queue, ⌃↵ straight into its turn). */}
             {working && !hasContent && (
@@ -693,7 +764,7 @@ const Composer = (props: IComposerProps) => {
                 iconSize="sm"
                 variant="accent"
                 label={props.waiting ? t('next.composer.stopWaiting') : t('next.composer.stop')}
-                keys={['⌃', 'C']}
+                keys={stopHint ? [stopHint] : undefined}
                 busy={isBusy(stop.phase)}
                 onClick={() => stop.run('stop', props.onStop)}
               />

@@ -24,6 +24,9 @@ var (
 	errBadDial     = httpx.New(http.StatusUnauthorized, "unauthenticated", "Подпись не принята")
 	errRevoked     = httpx.New(http.StatusForbidden, "forbidden", "Машина отозвана").With("reason", "revoked")
 	errDialFlooded = httpx.RateLimited(60)
+	// errDisabled is a dial of a machine an administrator switched off: not a 403, which would make the agent stop
+	// dialing until it is restarted; it keeps trying and gets in once the machine is switched on.
+	errDisabled = httpx.New(http.StatusLocked, "machine_disabled", "Машина выключена администратором")
 )
 
 const (
@@ -226,6 +229,9 @@ func (d *Dialer) admit(r *http.Request, verify func(ed25519.PublicKey, hubproto.
 	// The signature is good: from here on it is the machine's owner talking, and what is said may be honest.
 	if m.RevokedAt != nil {
 		return store.Machine{}, errRevoked
+	}
+	if m.DisabledAt != nil && checkVersion {
+		return store.Machine{}, errDisabled
 	}
 	if !d.remember(m.ID, a.Nonce, now) {
 		return bad("replayed nonce", m.ID)

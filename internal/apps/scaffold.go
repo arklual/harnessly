@@ -71,7 +71,12 @@ func Scaffold(dir, id, name, template string) error {
 		m.Views = []View{{ID: "main", Title: name, Entry: "ui/index.html", Targets: []string{TargetPane, TargetApp}}}
 		files["ui/index.html"] = "<!doctype html>\n<html lang=\"ru\">\n<head>\n<meta charset=\"utf-8\">\n" +
 			"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>" + name + "</title>\n</head>\n" +
-			"<body>\n<main>\n<h1>" + name + "</h1>\n</main>\n</body>\n</html>\n"
+			"<body>\n<main>\n<h1>" + name + "</h1>\n</main>\n" +
+			"<!-- Classic scripts only: the view runs in an opaque-origin frame, which sends the slot's cookie with classic\n" +
+			"     scripts, stylesheets and images but not with module scripts or CORS loads (fetch, fonts): those come back 401. -->\n" +
+			"<script src=\"/__hl/app-sdk.js\"></script>\n<script src=\"main.js\"></script>\n</body>\n</html>\n"
+		files["ui/main.js"] = "// window.harnessly is the app SDK (docs/apps.md); connect() rejects with host_unavailable outside Harnessly.\n" +
+			"window.harnessly.connect().then(function (hl) {\n  console.log('" + name + "', hl.context.target);\n}).catch(function () {});\n"
 	}
 	raw, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {

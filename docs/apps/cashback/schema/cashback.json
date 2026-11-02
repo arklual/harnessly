@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "maxLength": 40, "description": "Название категории" },
+    "percent": { "type": "integer", "minimum": 0, "maximum": 30, "description": "Процент кешбэка" },
+    "limit": { "type": "integer", "minimum": 0, "maximum": 100000, "description": "Лимит в месяц, ₽" },
+    "note": { "type": "string", "maxLength": 120, "description": "Пояснение под названием" },
+    "link": { "type": "string", "pattern": "^https://", "maxLength": 300, "description": "Адрес страницы условий" }
+  }
+}

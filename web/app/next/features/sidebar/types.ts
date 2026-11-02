@@ -165,6 +165,8 @@ export interface IMoreItem {
   icon: string;
   label: string;
   current: boolean;
+  /** Leads out of the app (an arrow follows the name). */
+  external?: boolean;
   onSelect: () => void;
 }
 

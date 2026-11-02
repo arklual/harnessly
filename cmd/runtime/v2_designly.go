@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/design"
 	"github.com/ly-solutions/harnessly/internal/designkit"
 	"github.com/ly-solutions/harnessly/internal/locale"
@@ -29,6 +30,8 @@ type v2Designly struct {
 	v    *v2Live
 	api  *design.API
 	file string
+	// apps say which projects are documents of the types apps add; the library's list leaves them out. nil where there are none.
+	apps *apps.Registry
 	// links are the designs each conversation's transcript worked on, whatever its folder.
 	links *design.ChatLinks
 
@@ -263,13 +266,16 @@ func kindLine(k wire.DesignKind) string {
 			"font, never edit it) and from var(--deck-font): use the variables, no hard-coded colours or fonts, so a theme change "+
 			"restyles every slide. Name the blocks of a slide with data-block=\"<Name>\" (Title, Body, Diagram: the person points "+
 			"at them) and mark what appears on a click with data-step=\"1\", \"2\" and so on. A block the person has moved or "+
-			"retyped by hand (a translate: in its style, or a \"Manual edit\" entry in the history) is changed only when asked.",
+			"retyped by hand (a translate: in its style, or a \"Manual edit\" entry in the history) is changed only when asked. "+
+			"Leave a picture you have no image for as an empty place: a block with data-image-slot and data-image-prompt=\"<what to draw>\", "+
+			"which the person draws on the slide.",
 			"Проект — презентация: каждая доска — один слайд 16:9. Цвета и шрифт берутся из CSS-переменных --deck-* файла "+
 				"project/deck-theme.css (подключи его в head каждой доски; рантайм пишет его из темы и шрифта презентации, руками "+
 				"не правь) и из var(--deck-font): используй переменные, не вписывай цвета и шрифты, чтобы смена темы перекрашивала "+
 				"все слайды. Блоки слайда называй data-block=\"<Имя>\" (Заголовок, Текст, Схема: человек указывает на них), а то, что "+
 				"появляется по клику, помечай data-step=\"1\", \"2\" и так далее. Блок, который человек подвинул или переписал "+
-				"руками (translate: в его style или «Правка вручную» в истории), меняй только по просьбе.")
+				"руками (translate: в его style или «Правка вручную» в истории), меняй только по просьбе. Картинку, которой у тебя "+
+				"нет, оставь пустым местом: блок с data-image-slot и data-image-prompt=\"<что нарисовать>\", человек нарисует его на слайде.")
 	case wire.DesignVideo:
 		return videoKindLine()
 	case wire.DesignDS:
@@ -441,7 +447,15 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 	// Without an identity nobody is "me": the owners still show.
 	me, _ := lib.Identity()
 	now := time.Now()
+	// A document of a type an app adds is opened in the app's editor, not listed as a site, a deck or a video.
+	var appDocs map[string]string
+	if d.apps != nil {
+		appDocs = d.apps.DocKinds()
+	}
 	for _, a := range arts {
+		if _, ok := appDocs[a.ID]; ok {
+			continue
+		}
 		dir := lib.ArtifactDir(a.ID)
 		item := wire.DesignArtifact{ID: a.ID, Title: a.Title, UpdatedAt: wire.Ms(a.UpdatedAt), Kind: kindOf(st, lib, a.ID), Pinned: st.Pinned[a.ID],
 			ProjectPath: a.ProjectPath, Boards: []wire.DesignBoard{}, Convs: []string{}, Role: wire.DesignRole(lib.RoleOf(a.ID, me, now))}

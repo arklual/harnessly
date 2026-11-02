@@ -74,6 +74,55 @@ describe('Composer dictation', () => {
   });
 });
 
+describe('Composer shortcuts (features/keys)', () => {
+  const press = (init: KeyboardEventInit) => fireEvent.keyDown(window, init);
+
+  it('the dictation shortcut starts a dictation and, while recording, finishes it', () => {
+    const onMic = vi.fn();
+    const onFinishRecording = vi.fn();
+    const { rerender } = render(<Composer {...props({ onMic, onFinishRecording })} />);
+    press({ key: ' ', code: 'Space', ctrlKey: true, shiftKey: true });
+    expect(onMic).toHaveBeenCalledTimes(1);
+    rerender(
+      <Composer
+        {...props({ onMic, onFinishRecording, recording: { startedAt: 1, busy: false, level: null } })}
+      />,
+    );
+    press({ key: ' ', code: 'Space', ctrlKey: true, shiftKey: true });
+    expect(onFinishRecording).toHaveBeenCalledTimes(1);
+    expect(onMic).toHaveBeenCalledTimes(1);
+  });
+
+  it('Esc does not cancel a dictation: cancelling has no key until one is given', () => {
+    const onCancelRecording = vi.fn();
+    render(
+      <Composer {...props({ onCancelRecording, recording: { startedAt: 1, busy: false, level: null } })} />,
+    );
+    press({ key: 'Escape', code: 'Escape' });
+    expect(onCancelRecording).not.toHaveBeenCalled();
+  });
+
+  it('the stop shortcut stops a working agent, and leaves a press with text selected to the copy', () => {
+    const onStop = vi.fn(() => Promise.resolve());
+    render(<Composer {...props({ onStop, value: '' })} />);
+    const select = vi.spyOn(window, 'getSelection');
+    select.mockReturnValue({ toString: () => 'some text' } as Selection);
+    press({ key: '.', code: 'Period', ctrlKey: true });
+    expect(onStop).not.toHaveBeenCalled();
+    select.mockReturnValue({ toString: () => '' } as Selection);
+    press({ key: '.', code: 'Period', ctrlKey: true });
+    expect(onStop).toHaveBeenCalledTimes(1);
+    select.mockRestore();
+  });
+
+  it('the stop shortcut does nothing while the agent is idle', () => {
+    const onStop = vi.fn(() => Promise.resolve());
+    render(<Composer {...props({ onStop, mode: 'idle' })} />);
+    press({ key: '.', code: 'Period', ctrlKey: true });
+    expect(onStop).not.toHaveBeenCalled();
+  });
+});
+
 describe('Queue rows', () => {
   const row: QueueRow = {
     clientId: 'c1',

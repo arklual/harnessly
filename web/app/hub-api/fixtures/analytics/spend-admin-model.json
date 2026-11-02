@@ -1,0 +1,140 @@
+{
+  "scope": {
+    "kind": "org",
+    "id": "o2acmeorgaaaaaaaaaaa"
+  },
+  "by": "model",
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "total": {
+    "list": {
+      "usd": 1610,
+      "shown": 131215.0
+    },
+    "paid": {
+      "usd": 1380,
+      "shown": 112470.0
+    },
+    "limit": {
+      "ruleId": "l2orgaaaaaaaaaaaaaa",
+      "amount": {
+        "usd": 2500,
+        "shown": 203750.0
+      },
+      "pct": 0.552,
+      "status": "ok",
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      }
+    },
+    "forecast": {
+      "usd": 2140,
+      "shown": 174410.0
+    }
+  },
+  "rows": [
+    {
+      "key": "claude-opus-4-6",
+      "label": "claude-opus-4-6",
+      "list": {
+        "usd": 1120,
+        "shown": 91280.0
+      },
+      "paid": {
+        "usd": 950,
+        "shown": 77425.0
+      },
+      "calls": 1200,
+      "unpricedCalls": 0,
+      "tokens": {
+        "input": 2240000,
+        "output": 10080000,
+        "cacheRead": 448000000,
+        "cacheWrite": 22400000
+      },
+      "limit": null,
+      "forecast": null,
+      "guessedShare": 0.0
+    },
+    {
+      "key": "claude-sonnet-4-6",
+      "label": "claude-sonnet-4-6",
+      "list": {
+        "usd": 390,
+        "shown": 31785.0
+      },
+      "paid": {
+        "usd": 340,
+        "shown": 27710.0
+      },
+      "calls": 1200,
+      "unpricedCalls": 0,
+      "tokens": {
+        "input": 780000,
+        "output": 3510000,
+        "cacheRead": 156000000,
+        "cacheWrite": 7800000
+      },
+      "limit": null,
+      "forecast": null,
+      "guessedShare": 0.0
+    },
+    {
+      "key": "gpt-5.4",
+      "label": "gpt-5.4",
+      "list": {
+        "usd": 100,
+        "shown": 8150.0
+      },
+      "paid": {
+        "usd": 90,
+        "shown": 7335.0
+      },
+      "calls": 1200,
+      "unpricedCalls": 0,
+      "tokens": {
+        "input": 200000,
+        "output": 900000,
+        "cacheRead": 40000000,
+        "cacheWrite": 2000000
+      },
+      "limit": null,
+      "forecast": null,
+      "guessedShare": 0.0
+    },
+    {
+      "key": "k3.1-pro",
+      "label": "k3.1-pro",
+      "list": {
+        "usd": 0,
+        "shown": 0.0
+      },
+      "paid": {
+        "usd": 0,
+        "shown": 0.0
+      },
+      "calls": 1970,
+      "unpricedCalls": 1970,
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "limit": null,
+      "forecast": null,
+      "guessedShare": 0.0
+    }
+  ],
+  "accountedUntil": "2026-10-30T17:58:00Z"
+}

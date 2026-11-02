@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/imagecard"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/terminalfailure"
@@ -308,6 +309,23 @@ func summarizeToolResult(content any, isError any) string {
 				return firstLineSummary(jsString(coalesce(get(o, "text"), "")))
 			}
 		}
+	}
+	return ""
+}
+
+// contentText is the text of a tool result: the string, or its text items one under another.
+func contentText(content any) string {
+	switch c := content.(type) {
+	case string:
+		return c
+	case []any:
+		var parts []string
+		for _, item := range c {
+			if o, ok := item.(*jsvalue.Object); ok && isStr(get(o, "type"), "text") {
+				parts = append(parts, jsString(coalesce(get(o, "text"), "")))
+			}
+		}
+		return strings.Join(parts, "\n")
 	}
 	return ""
 }
@@ -727,6 +745,14 @@ func toolUseEntry(c *jsvalue.Object, b *claudeBase, ts float64) *jsvalue.Object 
 			e.Set("publish", pub)
 		}
 	}
+	if name, _ := toolName.(string); imagecard.IsGenerate(name) {
+		count := 1
+		if f, ok := get(input, "count").(float64); ok && f >= 1 {
+			count = int(f)
+		}
+		e.Set("imageGen", obj("count", float64(count), "prompt", jsString(coalesce(get(input, "prompt"), "")),
+			"shape", jsString(coalesce(get(input, "shape"), ""))))
+	}
 	e.Set("status", "pending")
 	if isStr(toolName, "Agent") || isStr(toolName, "Task") {
 		e.Set("agent", subagentCall(input))
@@ -825,6 +851,13 @@ func (p *claudeParse) user(raw any, ts float64) []*jsvalue.Object {
 			"isError", coalesce(get(item, "is_error"), false), "summary", summary)
 		if answers != nil {
 			e.Set("answers", answers)
+		}
+		if rep, ok := imagecard.ParseReport(contentText(get(item, "content"))); ok {
+			paths := make([]any, len(rep.Paths))
+			for i, p := range rep.Paths {
+				paths[i] = p
+			}
+			e.Set("images", obj("jobId", rep.JobID, "state", rep.State, "paths", paths, "error", rep.Error))
 		}
 		if links := resultLinks(get(item, "content"), coalesce(get(item, "is_error"), false)); len(links) > 0 {
 			e.Set("links", links)

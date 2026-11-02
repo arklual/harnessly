@@ -13,8 +13,122 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-02n',
+    items: [{ key: 'limitReset', icon: 'clock' }],
+  },
+  {
+    id: '2026-11-02m',
+    items: [
+      { key: 'player', icon: 'play' },
+      { key: 'language', icon: 'languages' },
+      { key: 'longCommand', icon: 'shield-question' },
+    ],
+  },
+  {
+    id: '2026-11-02l',
+    items: [
+      { key: 'office', icon: 'file-text' },
+      { key: 'history', icon: 'history' },
+    ],
+  },
+  {
+    id: '2026-11-02k',
+    items: [
+      { key: 'selection', icon: 'locate' },
+      { key: 'sheet', icon: 'file-spreadsheet' },
+    ],
+  },
+  {
+    id: '2026-11-02j',
+    items: [
+      { key: 'hubMoney', icon: 'chart-line' },
+      { key: 'hubMachines', icon: 'server' },
+    ],
+  },
+  {
+    id: '2026-11-02i',
+    items: [{ key: 'deckApps', icon: 'presentation' }],
+  },
+  {
+    id: '2026-11-02h',
+    items: [
+      { key: 'player', icon: 'play' },
+      { key: 'pdf', icon: 'file-text' },
+    ],
+  },
+  {
+    id: '2026-11-02g',
+    items: [
+      { key: 'appDocs', icon: 'library' },
+      { key: 'appsWall', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-02f',
+    items: [{ key: 'language', icon: 'languages' }],
+  },
+  {
+    id: '2026-11-02e',
+    items: [
+      { key: 'longCommand', icon: 'shield-question' },
+      { key: 'enterAnswers', icon: 'keyboard' },
+    ],
+  },
+  {
+    id: '2026-11-02d',
+    items: [
+      { key: 'longVoice', icon: 'mic' },
+      { key: 'sinopiaSize', icon: 'presentation' },
+      { key: 'pictureList', icon: 'image' },
+    ],
+  },
+  {
+    id: '2026-11-02c',
+    items: [
+      { key: 'motion', icon: 'play' },
+      { key: 'show', icon: 'eye' },
+    ],
+  },
+  {
+    id: '2026-11-02b',
+    items: [
+      { key: 'pictureEdit', icon: 'pencil' },
+      { key: 'sinopiaHover', icon: 'presentation' },
+    ],
+  },
+  {
+    id: '2026-11-02',
+    items: [{ key: 'manage', icon: 'sliders-horizontal' }],
+  },
+  {
+    id: '2026-10-31k',
+    items: [{ key: 'appsMain', icon: 'layout-grid' }],
+  },
+  {
+    id: '2026-10-31j',
+    items: [{ key: 'keys', icon: 'keyboard' }],
+  },
+  {
+    id: '2026-10-31i',
+    items: [
+      { key: 'words', icon: 'book-open' },
+      { key: 'models', icon: 'mic' },
+    ],
+  },
+  {
+    id: '2026-10-31h',
+    items: [
+      { key: 'images', icon: 'image' },
+      { key: 'sinopiaImages', icon: 'presentation' },
+    ],
+  },
+  {
     id: '2026-10-31g',
-    items: [{ key: 'quotaRetry', icon: 'rotate-ccw' }],
+    items: [
+      { key: 'quotaRetry', icon: 'rotate-ccw' },
+      { key: 'keys', icon: 'keyboard' },
+      { key: 'step', icon: 'arrow-right-left' },
+    ],
   },
   {
     id: '2026-10-31f',

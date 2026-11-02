@@ -57,3 +57,48 @@ describe('«+» pickers', () => {
     expect(onFiles).not.toHaveBeenCalled();
   });
 });
+
+describe('«+» → «Приложение»', () => {
+  const installed = {
+    apps: [
+      { id: 'a.one', name: 'Кешбэки', description: 'Банк', targets: ['chat'], views: [] },
+      { id: 'b.two', name: 'Ревью', description: '', targets: ['chat'], views: [] },
+      { id: 'c.pane', name: 'Только панель', description: '', targets: ['pane'], views: [] },
+    ],
+    viewPort: 1,
+  };
+
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('is not offered without the apps of the chat', () => {
+    render(<PlusMenu contexts={[]} onFiles={vi.fn()} onContext={vi.fn()} onPrompts={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.queryByRole('menuitem', { name: /Приложение|App/ })).toBeNull();
+  });
+
+  it('lists the apps that work in a chat and are not on, and a pick turns that one on', async () => {
+    vi.doMock('@/next/features/app-views/api', () => ({
+      useInstalledApps: () => ({ list: installed, error: null }),
+    }));
+    const { default: Menu } = await import('@/next/features/composer/plus-menu');
+    const onPick = vi.fn();
+    render(
+      <Menu
+        contexts={[]}
+        onFiles={vi.fn()}
+        onContext={vi.fn()}
+        onPrompts={vi.fn()}
+        apps={{ machine: 'm1' as never, on: ['a.one'], onPick, onAll: vi.fn() }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /App/ }));
+    // Turned on already (a.one) and not for a chat (c.pane) stay out.
+    expect(screen.queryByText('Кешбэки')).toBeNull();
+    expect(screen.queryByText('Только панель')).toBeNull();
+    fireEvent.click(screen.getByRole('option', { name: /Ревью/ }));
+    expect(onPick).toHaveBeenCalledWith('b.two');
+  });
+});

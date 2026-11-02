@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/gate"
+	"github.com/ly-solutions/harnessly/internal/hooksetup"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -137,13 +139,15 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			EditorScript:    editor,
 			HumanEditorVar:  c.HumanEditorVar,
 			Profiles:        launcher,
-			Apps:            &apps.Launcher{Registry: apps.Open(c.DataDir), GuardCommand: appGuardCommand()},
+			Apps: &apps.Launcher{Registry: apps.Open(c.DataDir), GuardCommand: appGuardCommand(), MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
+				Boundary: appBoundary(), AgentToken: (&gate.CLIToken{DataDir: c.DataDir}).IssueAgent},
 		},
 		codexLauncher:  filepath.Join(c.DataDir, "codex-launcher.js"),
 		launcherScript: launcherScriptConfig(c),
 		codexArgs: codex.LaunchConfig{
-			Hooks: &codex.HookConfig{Script: filepath.Join(c.DataDir, "codex-hook.sh"), UserConfig: filepath.Join(c.Home, ".codex", "config.toml")},
-			MCP:   codexMCP(c),
+			Hooks: &codex.HookConfig{Script: filepath.Join(c.DataDir, "codex-hook.sh"), UserConfig: filepath.Join(c.Home, ".codex", "config.toml"),
+				BudgetScript: budgetScript(c.DataDir)},
+			MCP: codexMCP(c),
 			WorkspacePrompt: withNotifyBots(bots, shared, promptDir,
 				withSafe(c.SafePrompt, promptDir, func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "codex-prompt.md") })),
 			SkipPermissions:  skipPermissions(c.ConfigFile),
@@ -533,4 +537,12 @@ func withAgentEnv(base []string, dir, provider string) []string {
 		out = append(out, name+"="+merged[name])
 	}
 	return out
+}
+
+// budgetScript is the hub's limit hook for Codex: the script's path under a hub, "" otherwise (hooksetup.Config.Budget).
+func budgetScript(dataDir string) string {
+	if !hubMode() {
+		return ""
+	}
+	return filepath.Join(dataDir, hooksetup.BudgetHookFile)
 }

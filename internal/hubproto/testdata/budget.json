@@ -1,0 +1,85 @@
+{
+  "hello with budget": {
+    "protocol": 2,
+    "agentVersion": "0.17.0",
+    "user": "",
+    "home": "",
+    "hostname": "",
+    "features": [
+      "usage",
+      "budget"
+    ],
+    "machineId": "h2runneraaaaaaaaaaaa",
+    "os": "",
+    "arch": "",
+    "profile": "",
+    "policy": {
+      "terminal": false,
+      "agentLogin": false,
+      "keys": false,
+      "env": false,
+      "install": false,
+      "runtimeSession": false,
+      "denyRoutes": null,
+      "source": ""
+    },
+    "budgetVersion": 17
+  },
+  "request budget.set": {
+    "entries": [
+      {
+        "account": "claude:7d0c6f0e-0000-4000-8000-00000000000b",
+        "forbid": false,
+        "modelPattern": "",
+        "pct": 1.02,
+        "reason": "Окно Claude Max №2 — 92%, сброс в 20:00",
+        "resetsAt": 1793466000000,
+        "ruleId": "l2windowmax2aaaaaaa",
+        "status": "stop",
+        "user": "vera@example.com"
+      },
+      {
+        "account": "",
+        "forbid": false,
+        "modelPattern": "",
+        "pct": 0.84,
+        "reason": "Личный лимит — 84% за октябрь",
+        "resetsAt": 1793480400000,
+        "ruleId": "l2veraaaaaaaaaaaaaa",
+        "status": "warn",
+        "user": "vera@example.com"
+      },
+      {
+        "account": "",
+        "forbid": true,
+        "modelPattern": "opus-4-1",
+        "pct": 0,
+        "reason": "Модель opus-4-1 в организации запрещена",
+        "resetsAt": 0,
+        "ruleId": "l2forbidopusaaaaaaa",
+        "status": "stop",
+        "user": "vera@example.com"
+      }
+    ],
+    "id": 21,
+    "issuedAt": 1793455200000,
+    "mode": "warn",
+    "op": "budget.set",
+    "version": 17
+  },
+  "request budget.set empty": {
+    "entries": [],
+    "id": 22,
+    "issuedAt": 1793455260000,
+    "mode": "stop",
+    "op": "budget.set",
+    "version": 18
+  },
+  "result budget.set": {
+    "id": 21,
+    "ok": true,
+    "result": {
+      "version": 17
+    }
+  }
+}

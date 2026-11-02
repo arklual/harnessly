@@ -18,7 +18,8 @@ export const LEGACY_KINDS = [
 export type TLegacyKind = (typeof LEGACY_KINDS)[number];
 
 export type TIntentCommand =
-  { kind: 'open'; tab: string; target?: string; auto?: boolean; reload?: boolean } | { kind: 'show' };
+  | { kind: 'open'; tab: string; target?: string; auto?: boolean; reload?: boolean; place?: string }
+  | { kind: 'show' };
 
 export interface IPaneIntent {
   id: string;
@@ -49,7 +50,8 @@ const isCommand = (v: unknown): v is TIntentCommand => {
     typeof v.tab === 'string' &&
     (v.target === undefined || typeof v.target === 'string') &&
     optionalBool(v.auto) &&
-    optionalBool(v.reload)
+    optionalBool(v.reload) &&
+    (v.place === undefined || typeof v.place === 'string')
   );
 };
 
@@ -117,6 +119,7 @@ export type IPaneRequest = { reload: boolean } & (
   | { k: 'browser'; target: string | null }
   | { k: 'design'; target: string | null }
   | { k: 'files'; target: string | null }
+  | { k: 'app'; target: string | null }
   | { k: 'plan' }
   | { k: 'subagent' }
   | { k: 'terminal' }
@@ -141,6 +144,8 @@ export const requestOf = (command: TIntentCommand): IPaneRequest | null => {
       return { k: 'design', target, reload };
     case 'files':
       return { k: 'files', target, reload };
+    case 'app':
+      return { k: 'app', target, reload };
     case 'plan':
       return { k: 'plan', reload };
     case 'subagents':

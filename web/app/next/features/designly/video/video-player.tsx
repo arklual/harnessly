@@ -41,6 +41,7 @@ import {
   type TVideoSource,
 } from '@/next/features/designly/video/types';
 import type { MachineId } from '@/next/protocol/v2';
+import type { IPlayerCommand } from '@/next/features/designly/video/use-video-view';
 
 export interface IVideoPlayerProps {
   machine: MachineId;
@@ -68,6 +69,10 @@ export interface IVideoPlayerProps {
   onComment: () => void;
   /** A block picked in the scene for a comment (`tk:video-hit`). */
   onPick: (pick: IVideoPick) => void;
+  /** What the agent asked the player to do; a new `seq` acts once. */
+  command?: IPlayerCommand | null;
+  /** Says whether it is playing, for what the agent is told. */
+  onPlaying?: (playing: boolean) => void;
 }
 
 /** A playhead this far from where the player is (while it plays) is a seek of the view's, ms. */
@@ -97,6 +102,8 @@ const VideoPlayer = ({
   loop,
   onComment,
   onPick,
+  command = null,
+  onPlaying,
 }: IVideoPlayerProps) => {
   const total = video.durMs;
   const scenes = video.scenes;
@@ -324,6 +331,23 @@ const VideoPlayer = ({
     return () => cancelAnimationFrame(frame);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, playing, range, loop]);
+
+  // What the agent asked: acts once per command, after the seek of the same command has landed.
+  const commandSeq = command?.seq ?? 0;
+  useEffect(() => {
+    if (command === null) return;
+    const timer = setTimeout(() => {
+      if (command.kind === 'play') playNow();
+      else pauseNow();
+    }, 0);
+    return () => clearTimeout(timer);
+    // one command, one action
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commandSeq]);
+
+  useEffect(() => {
+    onPlaying?.(playing);
+  }, [playing, onPlaying]);
 
   // The playhead moved by the view (the timeline, a comment): seek there. While playing, the player's own reports come
   // back through `time` a render late, so only a jump counts.

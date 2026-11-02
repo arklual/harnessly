@@ -67,7 +67,7 @@ func (s *Store) KeyFile(id string) string { return filepath.Join(s.Dir, id+".key
 // Set saves the key of a profile, replacing a saved one, and answers what the page may know of it.
 func (s *Store) Set(id, key string) (wire.ProfileKey, error) {
 	// A switched profile takes no key: it has none to save.
-	if p, ok := Find(id); !ok || p.Switched {
+	if p, ok := Find(id); !IsSpeechKey(id) && (!ok || p.Switched) {
 		return wire.ProfileKey{}, wire.ErrProfileUnknown
 	}
 	if err := (wire.ProfileKeyEdit{Key: key}).Validate(); err != nil {
@@ -108,7 +108,7 @@ func (s *Store) Set(id, key string) (wire.ProfileKey, error) {
 
 // Remove deletes the saved key; a profile with none stays as it is.
 func (s *Store) Remove(id string) (wire.ProfileKey, error) {
-	if _, ok := Find(id); !ok {
+	if _, ok := Find(id); !ok && !IsSpeechKey(id) {
 		return wire.ProfileKey{}, wire.ErrProfileUnknown
 	}
 	s.mu.Lock()
@@ -123,7 +123,7 @@ func (s *Store) Remove(id string) (wire.ProfileKey, error) {
 // Key is the saved key of a profile; ErrNoKey when there is none. Callers use it for the request of a test and never
 // keep it.
 func (s *Store) Key(id string) (string, error) {
-	if _, ok := Find(id); !ok {
+	if _, ok := Find(id); !ok && !IsSpeechKey(id) {
 		return "", wire.ErrProfileUnknown
 	}
 	raw, err := os.ReadFile(s.KeyFile(id))
@@ -226,8 +226,12 @@ func Mask(key string) string {
 // rebuildLocked reads every saved key again into the masks.
 func (s *Store) rebuildLocked() {
 	masks := []mask{}
+	ids := SpeechKeys
 	for _, p := range presets {
-		raw, err := os.ReadFile(s.KeyFile(p.ID))
+		ids = append(ids[:len(ids):len(ids)], p.ID)
+	}
+	for _, id := range ids {
+		raw, err := os.ReadFile(s.KeyFile(id))
 		key := strings.TrimSpace(string(raw))
 		// A key shorter than the least a page may save cannot be one of ours, and would mask words.
 		if err != nil || len(key) < wire.ProfileKeyMin {

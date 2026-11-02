@@ -24,7 +24,7 @@ vi.mock('@/lib/app-path', () => ({
   scopedAppPath: (p: string) => p,
   currentMachineId: () => undefined,
 }));
-vi.mock('@/next/stores/connection', () => ({ useLinkRestored: () => 0 }));
+vi.mock('@/next/stores/connection', () => ({ useLinkRestored: () => 0, onReconnectNow: () => undefined }));
 vi.mock('@/next/stores/tabs', () => ({
   useTabState: <T,>(_key: string, initial: T) => useState<T>(initial),
   useTabTitle: () => undefined,

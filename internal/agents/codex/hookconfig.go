@@ -23,6 +23,9 @@ type HookConfig struct {
 	Script string
 	// UserConfig is the person's ~/.codex/config.toml.
 	UserConfig string
+	// BudgetScript is the hub's limit script (hooksetup); "" adds nothing. It runs after Script on UserPromptSubmit
+	// and PreToolUse, where it can stop the chat.
+	BudgetScript string
 
 	mu    sync.Mutex
 	cache *userHooks
@@ -199,11 +202,15 @@ func (h *HookConfig) Flags() (args []string, parseError bool, err error) {
 	if err != nil {
 		return nil, false, err
 	}
-	ours := tomlTable{keys: []string{"matcher", "hooks"}, m: map[string]any{
-		"matcher": ".*",
-		"hooks":   []any{tomlTable{keys: []string{"type", "command"}, m: map[string]any{"type": "command", "command": h.Script}}},
-	}}
+	command := func(cmd string) any {
+		return tomlTable{keys: []string{"type", "command"}, m: map[string]any{"type": "command", "command": cmd}}
+	}
 	for _, ev := range HookEvents {
+		cmds := []any{command(h.Script)}
+		if h.BudgetScript != "" && (ev == "UserPromptSubmit" || ev == "PreToolUse") {
+			cmds = append(cmds, command(`sh "`+h.BudgetScript+`" codex `+ev))
+		}
+		ours := tomlTable{keys: []string{"matcher", "hooks"}, m: map[string]any{"matcher": ".*", "hooks": cmds}}
 		entries := append([]any{ours}, u.byEvent[ev]...)
 		args = append(args, "-c", "hooks."+ev+"="+tomlInline(entries))
 	}

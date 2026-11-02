@@ -487,3 +487,14 @@ func TestServeUploadAndPreviewBodies(t *testing.T) {
 		t.Fatal(w.Code)
 	}
 }
+
+func TestPreviewPlaysSoundAndVideoInRanges(t *testing.T) {
+	for _, ext := range []string{"mp4", "webm", "mkv", "mp3", "wav", "m4a", "ogg", "opus", "flac"} {
+		if contentType, ranged := PreviewType(ext); contentType == "" || !ranged {
+			t.Errorf("PreviewType(%q) = %q, %v: a player seeks in ranges", ext, contentType, ranged)
+		}
+	}
+	if _, ranged := PreviewType("png"); ranged {
+		t.Error("a picture is not read in ranges")
+	}
+}

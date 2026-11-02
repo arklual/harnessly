@@ -2,6 +2,7 @@ package tmux
 
 import (
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,31 @@ func (t *Tmux) capture(name string, flags ...string) (string, bool) {
 		return "", false
 	}
 	return r.stdout, true
+}
+
+// GrowDetached makes the window of a session no client is attached to at least cols×rows and gives the program time to
+// redraw; true when it grew. An attached terminal keeps the size it set. resize-window turns the window's window-size to
+// manual, so that option is unset again: a terminal attached later sets the size as before.
+func (t *Tmux) GrowDetached(name string, cols, rows int) bool {
+	r := t.on(name, "display-message", "-p", "-t", name, "#{session_attached} #{window_width} #{window_height}")
+	if r.err != nil {
+		return false
+	}
+	fields := strings.Fields(r.stdout)
+	if len(fields) != 3 || fields[0] != "0" {
+		return false
+	}
+	curCols, errCols := strconv.Atoi(fields[1])
+	curRows, errRows := strconv.Atoi(fields[2])
+	if errCols != nil || errRows != nil || curCols >= cols && curRows >= rows {
+		return false
+	}
+	if t.on(name, "resize-window", "-t", name, "-x", strconv.Itoa(max(curCols, cols)), "-y", strconv.Itoa(max(curRows, rows))).err != nil {
+		return false
+	}
+	_ = t.on(name, "set-window-option", "-t", name, "-u", "window-size")
+	t.sleep(resizeSettle)
+	return true
 }
 
 // Terminal is the page's terminal attached to a session (internal/terminal's Server is one).

@@ -1,0 +1,10 @@
+{
+  "next.apppublic.title": "Public catalog",
+  "next.apppublic.search": "Find an app",
+  "next.apppublic.none": "Nothing found.",
+  "next.apppublic.install": "Install",
+  "next.apppublic.confirm": "Install with these rights",
+  "next.apppublic.cancel": "Cancel",
+  "next.apppublic.rights": "Asks for: {rights}",
+  "next.apppublic.norights": "Asks for no special rights."
+}

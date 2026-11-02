@@ -4,6 +4,8 @@
 // screen, the panel's mode and tab, the selected and hovered block, the open popover or sheet — and talks to the board
 // on screen through the deck bridge: it turns the board's deck mode on, writes hand edits (text, style, move) into the
 // board's source through the patch route, and shows the frame, grip and guides of the blocks.
+import { placeOf } from '@/next/features/keys/chord';
+import { runChord } from '@/next/features/keys/use-keys';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { ISiteAccess, ISiteStage } from '@/next/features/designly/site-view';
 import type { MachineId } from '@/next/protocol/v2';
@@ -20,6 +22,7 @@ import {
   postDeck,
   type TDeckBoardMessage,
   type TDeckHostMessage,
+  type TDeckRect,
   type TDeckMode,
 } from '@/next/features/designly/deck/bridge';
 import {
@@ -39,22 +42,31 @@ import {
   type TDeckTab,
 } from '@/next/features/designly/deck/types';
 import { DECK_BOARD_H, DECK_BOARD_W, deckIndexOf, deckStep } from '@/next/features/designly/deck/layout';
-import {
-  DECK_KEY,
-  deckKeyAction,
-  useDeckKeys,
-  type TDeckKey,
-} from '@/next/features/designly/deck/use-deck-keys';
+import { DECK_KEY, useDeckKeys, type TDeckKey } from '@/next/features/designly/deck/use-deck-keys';
 import { useDeckBridge } from '@/next/features/designly/deck/use-deck-bridge';
+import ImageActions, { type IImageOpen } from '@/next/features/designly/image-gen/image-actions';
+import { frameScale, screenBoxOf, type IImageAct } from '@/next/features/designly/image-gen/image-act';
 import DeckBar from '@/next/features/designly/deck/deck-bar';
 import DeckStrip, { DECK_PENDING_THUMBS } from '@/next/features/designly/deck/deck-strip';
 import DeckStage from '@/next/features/designly/deck/deck-stage';
 import { deckHold, deckPlayBlock, slideOfBoard } from '@/next/features/designly/deck/deck-making';
 import DeckOverlay, { type IDeckDrag, type IDeckHover } from '@/next/features/designly/deck/deck-overlay';
 import DeckToolbar, {
+  isVisualSelection,
+  type IDeckImageHost,
   type IDeckSelection,
   type IDeckTextLook,
 } from '@/next/features/designly/deck/deck-toolbar';
+import {
+  genKey,
+  latestGenWas,
+  noteGenWas,
+  reloadIfOnScreen,
+  showBoardOnScreen,
+  useGenRuns,
+  type IGenApplied,
+  type TGenApply,
+} from '@/next/features/designly/image-gen/gen-store';
 import { DeckNotesLine, DeckPager, type IDeckSubsDictation } from '@/next/features/designly/deck/deck-subs';
 import DeckStyle, { DECK_THEMES, deckTheme, useThemeVars } from '@/next/features/designly/deck/deck-style';
 import DeckMenu, { exportDeck, lastRecording } from '@/next/features/designly/deck/deck-menu';
@@ -87,6 +99,16 @@ export interface IDeckBoard {
   title: string;
 }
 
+/** A block selected on a slide, as an app's selection item takes it: the board's file, its number, its fingerprint. */
+export interface IDeckPicked {
+  path: string;
+  tpl: number;
+  was: string;
+  text: string;
+  tag: string;
+  rect: TDeckRect;
+}
+
 export interface IDeckViewProps {
   machine: MachineId;
   /** The project's id: the deck routes' `artifact`. */
@@ -111,6 +133,8 @@ export interface IDeckViewProps {
   /** Set in the right pane beside a chat: the compact column (`data-embed`), its chat is the host's. */
   pane?: { onBack: () => void };
   access?: ISiteAccess;
+  /** The person may change the deck: its pictures get «Изменить» / «Сгенерировать» on them. */
+  mayEdit?: boolean;
   maxed: boolean;
   onToggleMax: () => void;
   onOpenDrawer: () => void;
@@ -118,6 +142,8 @@ export interface IDeckViewProps {
   fallback: ReactNode;
   /** The deck's state could not be read: why (the shell still shows the boards). */
   deckError?: string | null;
+  /** The block selected on the slide (null once none is): the apps' selection bar works on it. */
+  onPick?: (picked: IDeckPicked | null) => void;
 }
 
 /** The board's breakpoints (not the app's): ≤560 is a phone. */
@@ -166,7 +192,20 @@ const focusComposer = (scope: ParentNode | null) =>
   );
 
 const DeckView = (props: IDeckViewProps) => {
-  const { machine, id, title, boards, path, onGo, src, stage, pane, access, deckError = null } = props;
+  const {
+    machine,
+    id,
+    title,
+    boards,
+    path,
+    onGo,
+    src,
+    stage,
+    pane,
+    access,
+    mayEdit = false,
+    deckError = null,
+  } = props;
   const deck = useDeck(id) ?? null;
   const phone = useMedia(DECK_PHONE_QUERY);
   const embed = pane !== undefined;
@@ -192,6 +231,8 @@ const DeckView = (props: IDeckViewProps) => {
   const comments = useDeckComments(machine, id);
   const dict = useDeckDictation(machine, id);
   const [sel, setSel] = useState<IDeckSelection | null>(null);
+  /** A button on a picture of the board was pressed: the editor or the generator is open for it. */
+  const [imageOpen, setImageOpen] = useState<IImageOpen | null>(null);
   const [hover, setHover] = useState<IDeckHover | null>(null);
   const [drag, setDrag] = useState<IDeckDrag | null>(null);
   const [grip, setGrip] = useState(false);
@@ -237,6 +278,24 @@ const DeckView = (props: IDeckViewProps) => {
   const w = board?.w ?? slide?.w ?? DECK_BOARD_W;
   const h = board?.h ?? slide?.h ?? DECK_BOARD_H;
   const edit = screen === DECK_SCREEN.edit;
+  // The apps' selection bar works on the block selected on the slide on screen.
+  const onPick = props.onPick;
+  const pickedPath = current?.path ?? null;
+  useEffect(() => {
+    if (!onPick) return;
+    onPick(
+      sel !== null && pickedPath !== null && edit
+        ? {
+            path: pickedPath,
+            tpl: sel.tpl,
+            was: sel.was,
+            text: sel.text ?? '',
+            tag: sel.tag ?? '',
+            rect: sel.rect,
+          }
+        : null,
+    );
+  }, [onPick, sel, pickedPath, edit]);
   const ctx: IDeckContext | null = drawn ? { slide: n, label: sel?.label ?? null } : null;
   const ctxLabel = sel
     ? `${t('next.deck.stage.slide', { n })} · ${sel.label}`
@@ -251,6 +310,7 @@ const DeckView = (props: IDeckViewProps) => {
   if (shownPath !== path) {
     setShownPath(path);
     setSel(null);
+    setImageOpen(null);
     setHover(null);
     setDrag(null);
     setSteps(0);
@@ -262,6 +322,7 @@ const DeckView = (props: IDeckViewProps) => {
   if (shownScreen !== screen) {
     setShownScreen(screen);
     setSel(null);
+    setImageOpen(null);
     setHover(null);
     setPop(null);
     setSheet(null);
@@ -377,25 +438,89 @@ const DeckView = (props: IDeckViewProps) => {
    * Writes a hand edit into the board on screen; the board redraws itself on success. A refusal or a failure is said
    * and the board is read anew, so the live preview of the text, style or move does not stay as if it were written.
    */
-  const patch = (change: TDeckPatch) => {
-    if (!slide) return;
-    patchDeck(machine, id, slide.id, change).then(
+  // A picture is written long after the render that started it: what it needs of the screen is read when it lands.
+  useEffect(() => {
+    showBoardOnScreen(slide?.id ?? null, reloadBoard);
+  });
+  const write = (change: TDeckPatch, slideId: string): Promise<IGenApplied | null> => {
+    const reload = () => {
+      reloadIfOnScreen(slideId);
+    };
+    return patchDeck(machine, id, slideId, change).then(
       (result) => {
         if (result.ok) {
           setEdits((v) => v + 1);
-          return;
+          return { was: result.was };
         }
-        reloadBoard();
+        reload();
         toast(t(result.code === 'dynamic' ? 'next.deck.edit.dynamic' : 'next.deck.edit.changed'), {
           tone: 'warning',
         });
+        return null;
       },
       (failure: Error) => {
-        reloadBoard();
+        reload();
         toast(t('next.deck.edit.failed'), { tone: 'error', description: failure.message });
+        return null;
       },
     );
   };
+  const patch = (change: TDeckPatch) => {
+    if (!slide) return;
+    void write(change, slide.id);
+  };
+
+  /** Writes a drawn picture into the element a run was started on; true once the machine confirmed it. */
+  const imageApply =
+    (slideId: string, tpl: number, started: string): TGenApply =>
+    (pic, drawn) =>
+      write(
+        {
+          op: 'image',
+          tpl,
+          // The latest fingerprint the board gave the element: the first picture changes its style, and with it this.
+          was: latestGenWas(genKey(id, slideId, tpl)) ?? started,
+          src: pic.src,
+          job: drawn.job,
+          prompt: drawn.prompt,
+        },
+        slideId,
+      );
+  const imageHost: IDeckImageHost | undefined =
+    slide && sel && isVisualSelection(sel)
+      ? {
+          machine,
+          artifact: id,
+          board: slide.id,
+          apply: imageApply(slide.id, sel.tpl, sel.was),
+        }
+      : undefined;
+
+  // The veil over each element a picture is being drawn into: told to the board on screen, and again when it reloads.
+  const runs = useGenRuns();
+  const veiled = useRef(new Set<number>());
+  const veilFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!slide) return;
+    // Another slide, or a board that loaded anew, has no veils yet: they are all told again.
+    const board = `${slide.id}:${painted}`;
+    if (veilFor.current !== board) {
+      veilFor.current = board;
+      veiled.current.clear();
+    }
+    const want = new Set(
+      runs.filter((run) => run.key === genKey(id, slide.id, run.tpl)).map((run) => run.tpl),
+    );
+    for (const tpl of want) {
+      if (!veiled.current.has(tpl)) post({ type: 'tk:gen', tpl, on: true });
+    }
+    for (const tpl of veiled.current) {
+      if (!want.has(tpl)) post({ type: 'tk:gen', tpl, on: false });
+    }
+    veiled.current = want;
+    // post reads the frame on screen through a ref; the runs and the slide say when to tell the board.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runs, slide?.id, id, painted]);
 
   /** A block's move as written: board px, in px where the block sits in a container of its own. */
   const movePatch = (d: IDeckDrag): TDeckPatch =>
@@ -438,6 +563,7 @@ const DeckView = (props: IDeckViewProps) => {
           return;
         }
         lostHover.current = false;
+        if (slide) noteGenWas(genKey(id, slide.id, message.tpl), message.was);
         setHover({
           tpl: message.tpl,
           name: message.name,
@@ -452,6 +578,7 @@ const DeckView = (props: IDeckViewProps) => {
         return;
       case 'select':
         if (!edit || picking) return;
+        if (slide) noteGenWas(genKey(id, slide.id, message.tpl), message.was);
         setSel({
           tpl: message.tpl,
           label: message.label,
@@ -459,6 +586,10 @@ const DeckView = (props: IDeckViewProps) => {
           size: message.size,
           rect: message.rect,
           was: message.was,
+          ratio: message.ratio,
+          gen: message.gen,
+          text: message.text,
+          tag: message.tag,
         });
         if (phone) setSheet(DECK_SHEET.edit);
         return;
@@ -523,6 +654,12 @@ const DeckView = (props: IDeckViewProps) => {
       case DECK_KEY.prev:
         step(-1);
         return;
+      case DECK_KEY.first:
+        go(0);
+        return;
+      case DECK_KEY.last:
+        go(total - 1);
+        return;
       case DECK_KEY.comment:
         startPick();
         return;
@@ -561,14 +698,19 @@ const DeckView = (props: IDeckViewProps) => {
 
   // The show and the recording take their keys themselves (on the window): a key pressed over the board goes there too.
   const playing = screen === DECK_SCREEN.show || screen === DECK_SCREEN.rec;
-  useDeckBridge(frameRef, src, onBoard, (key) => {
-    if (playing) {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+  // A key pressed over the board is the deck's (or the show's) as if pressed on the page.
+  /** The board's pictures wear their buttons only in the editor, for a person who may change the deck. */
+  const imagesOn = mayEdit && edit;
+  const onImage = (said: 'hello' | IImageAct) => {
+    if (said === 'hello') {
+      post({ type: 'tk:images', on: imagesOn, scale: frameScale(frameRef.current) });
       return;
     }
-    const action = deckKeyAction(key, screen);
-    if (action !== null) onKey(action);
-  });
+    const at = frameRef.current?.getBoundingClientRect();
+    if (!imagesOn || !at || !slide) return;
+    setImageOpen({ act: said, box: screenBoxOf(at, said) });
+  };
+  useDeckBridge(frameRef, src, onBoard, (key) => runChord(placeOf(key, ''), false), onImage);
   useDeckKeys(!playing, screen, onKey);
 
   // The board on screen is in the deck's mode of the screen; a board loaded later is told when it loads.
@@ -576,9 +718,30 @@ const DeckView = (props: IDeckViewProps) => {
   // The show and the recording uncover a slide's steps one by one; the editor shows them all.
   const tellMode = () => {
     post({ type: 'tk:tweaks-host', on: true, open: false });
+    post({ type: 'tk:images', on: imagesOn, scale: frameScale(frameRef.current) });
     if (mode !== null) post({ type: 'tk:deck', on: true, mode });
     if (playing) post({ type: 'tk:deck-step', n: playStep });
   };
+  // The board is the stage's width shrunk to the stage: its buttons are told the scale again whenever the stage is resized.
+  useEffect(() => {
+    const frame = frameRef.current;
+    const tell = () => post({ type: 'tk:images', on: imagesOn, scale: frameScale(frameRef.current) });
+    tell();
+    const stage = frame?.parentElement;
+    if (!stage) return;
+    let raf = 0;
+    const watch = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(tell);
+    });
+    watch.observe(stage);
+    return () => {
+      cancelAnimationFrame(raf);
+      watch.disconnect();
+    };
+    // post reads the frame on screen through a ref; the right to change pictures and the slide on show say when to tell it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesOn, src]);
   useEffect(() => {
     if (mode !== null) post({ type: 'tk:deck', on: true, mode });
     if (playing) post({ type: 'tk:deck-step', n: 0 });
@@ -786,6 +949,7 @@ const DeckView = (props: IDeckViewProps) => {
             )}
             {edit && sel && !picking && drag === null && !phone && (
               <DeckToolbar
+                image={imageHost}
                 sel={sel}
                 look={look}
                 onStyle={styleBlock}
@@ -941,6 +1105,7 @@ const DeckView = (props: IDeckViewProps) => {
 
       {phone && edit && shownSheet.value === DECK_SHEET.edit && sel && (
         <EditSheet
+          image={imageHost}
           state={shownSheet.state}
           machine={machine}
           n={n}
@@ -973,6 +1138,17 @@ const DeckView = (props: IDeckViewProps) => {
         dict={dict}
         ask={stage?.ask}
       />
+
+      {slide && (
+        <ImageActions
+          machine={machine}
+          artifact={id}
+          address={slide.id}
+          open={imageOpen}
+          write={(change) => write(change, slide.id)}
+          onClose={() => setImageOpen(null)}
+        />
+      )}
 
       <DeckToast />
     </div>

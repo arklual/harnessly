@@ -22,6 +22,7 @@ import {
   initialOf,
   type TDesignScope,
 } from '@/next/features/designly/owners';
+import type { IAppKind } from '@/next/features/app-catalog/api';
 import type { DesignOwner } from '@/next/protocol/v2';
 import { plural, t } from '@/next/i18n';
 import { formatAgoFull } from '@/next/i18n/format';
@@ -53,6 +54,8 @@ export interface IDesignCard {
   owner: DesignOwner | null;
   /** The person may edit it, so may delete it. */
   canDelete?: boolean;
+  /** For a document of a type an installed app adds: the type's name, shown where a design shows its kind. */
+  appKind?: string;
 }
 
 /** The start of a project: the brief's field, the kinds, the model and the design system. */
@@ -72,6 +75,10 @@ export interface IDesignlyCompose {
   onDeck?: () => void;
   /** The Video tile: a video is made on its own create screen, with the brief typed so far. */
   onVideo?: () => void;
+  /** The document types installed apps add; a tile each. null while they load or when the machine lists none. */
+  appKinds?: readonly IAppKind[] | null;
+  /** A new document of an app's type, named by the brief typed so far; resolves once it is made, rejects (the caller says why). */
+  onAppKind?: (kind: IAppKind, brief: string) => Promise<void>;
 }
 
 export interface IDesignlyHomeProps {
@@ -233,9 +240,13 @@ const Hero = ({
   voice,
   onDeck,
   onVideo,
+  appKinds = null,
+  onAppKind,
   inputRef,
 }: IHeroProps) => {
   const [kind, setKind] = useState<TDesignKind>(DESIGN_KIND.site);
+  // The app type being made: one at a time, the tile waits for the machine's answer.
+  const [making, setMaking] = useState<string | null>(null);
   const [ds, setDs] = useState<string | null>(null);
   const { value: bar, state: barState } = usePresence(voice.recording, REC_EXIT_MS);
   const [sending, setSending] = useState(false);
@@ -388,10 +399,45 @@ const Hero = ({
               </span>
             </button>
           ))}
+          {onAppKind &&
+            appKinds?.map((k) => (
+              <button
+                key={k.id}
+                type="button"
+                className="hx-dl-start"
+                aria-busy={making === k.id || undefined}
+                disabled={making !== null}
+                onClick={() => {
+                  setMaking(k.id);
+                  void onAppKind(k, brief.trim())
+                    .then(
+                      () => onBrief(''),
+                      () => undefined,
+                    )
+                    .finally(() => setMaking(null));
+                }}
+              >
+                <span className="hx-dl-start__ic">
+                  <Icon name={making === k.id ? 'loader-circle' : 'blocks'} />
+                </span>
+                <span className="hx-dl-start__text">
+                  <span className="hx-dl-start__name">{k.title}</span>
+                  <span className="hx-dl-start__desc">{k.appName}</span>
+                </span>
+              </button>
+            ))}
         </div>
       </div>
     </div>
   );
+};
+
+/** The line under a card's title: the type and the date for an app's document, else the boards, or that it is drawn. */
+const cardSub = (card: IDesignCard, now: number): string => {
+  const ago = formatAgoFull(card.updatedAt, now);
+  if (card.appKind) return `${card.appKind} · ${ago}`;
+  if (card.drawing) return t('next.designly.drawingShort');
+  return `${plural(card.boards, `next.designly.units.${card.kind}`)} · ${ago}`;
 };
 
 const DesignlyHome = ({
@@ -595,23 +641,25 @@ const DesignlyHome = ({
                     <div className="hx-dl-card__shot">
                       <CardShot image={card.image} />
                       <span className="hx-dl-card__alt" />
-                      <button
-                        type="button"
-                        className="hx-dl-card__pin hx-tipped"
-                        aria-pressed={card.pinned}
-                        aria-busy={pinning === card.id || undefined}
-                        aria-label={card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
-                        disabled={pinning === card.id}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          pin(card);
-                        }}
-                      >
-                        <Icon name="pin" size="sm" />
-                        <span className="hx-tip" data-pos="below" data-align="end">
-                          {card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
-                        </span>
-                      </button>
+                      {!card.appKind && (
+                        <button
+                          type="button"
+                          className="hx-dl-card__pin hx-tipped"
+                          aria-pressed={card.pinned}
+                          aria-busy={pinning === card.id || undefined}
+                          aria-label={card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
+                          disabled={pinning === card.id}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            pin(card);
+                          }}
+                        >
+                          <Icon name="pin" size="sm" />
+                          <span className="hx-tip" data-pos="below" data-align="end">
+                            {card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
+                          </span>
+                        </button>
+                      )}
                       {onDelete && card.canDelete && (
                         <button
                           type="button"
@@ -637,10 +685,8 @@ const DesignlyHome = ({
                       <span className="hx-dl-card__text">
                         <span className="hx-dl-card__title">{card.title}</span>
                         <span className="hx-dl-card__sub">
-                          <Icon name={KIND_ICON[card.kind]} size="sm" />
-                          {card.drawing
-                            ? t('next.designly.drawingShort')
-                            : `${plural(card.boards, `next.designly.units.${card.kind}`)} · ${formatAgoFull(card.updatedAt, now)}`}
+                          <Icon name={card.appKind ? 'blocks' : KIND_ICON[card.kind]} size="sm" />
+                          {cardSub(card, now)}
                         </span>
                       </span>
                       {card.owner && (

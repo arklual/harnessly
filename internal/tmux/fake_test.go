@@ -24,6 +24,7 @@ type fakeTmux struct {
 	broken  map[string]bool // sockets whose tmux fails with some other error
 	calls   []call
 	sleeps  []time.Duration
+	display string // what display-message prints; empty: the pane's name
 }
 
 type call struct {
@@ -103,6 +104,10 @@ func (f *fakeTmux) run(dir, program string, args ...string) result {
 			out.WriteString(p[0] + "\tclaude\t/home\t" + p[1][1:] + "\t0\n")
 		}
 	case "display-message":
+		if f.display != "" {
+			out.WriteString(f.display)
+			break
+		}
 		out.WriteString(pane[0] + "\n")
 	case "kill-server":
 		delete(f.servers, socket)
@@ -786,5 +791,35 @@ func TestTabOf(t *testing.T) {
 		if got := tm.TabOf(session); got != want {
 			t.Errorf("TabOf(%q) = %q, want %q", session, got, want)
 		}
+	}
+}
+
+func TestGrowDetached(t *testing.T) {
+	f, tm := sendRig(t)
+	f.display = "0 80 24\n"
+	if !tm.GrowDetached("nw-s", 200, 60) {
+		t.Fatal("a small detached window did not grow")
+	}
+	if !slices.ContainsFunc(f.calls, func(c call) bool {
+		return slices.Equal(c.args[3:], []string{"resize-window", "-t", "nw-s", "-x", "200", "-y", "60"})
+	}) || !reflect.DeepEqual(f.last()[3:], []string{"set-window-option", "-t", "nw-s", "-u", "window-size"}) {
+		t.Fatalf("calls: %+v", f.calls)
+	}
+	if !reflect.DeepEqual(f.sleeps, []time.Duration{resizeSettle}) {
+		t.Fatalf("sleeps: %v", f.sleeps)
+	}
+
+	for name, display := range map[string]string{"attached": "1 80 24\n", "big enough": "0 200 60\n", "unreadable": "what\n"} {
+		f.reset()
+		f.display = display
+		if tm.GrowDetached("nw-s", 200, 60) || len(f.calls) != 1 {
+			t.Fatalf("%s: %+v", name, f.calls)
+		}
+	}
+
+	f.reset()
+	f.display = "0 240 24\n"
+	if !tm.GrowDetached("nw-s", 200, 60) || !slices.Contains(f.calls[1].args, "240") {
+		t.Fatalf("a wide window keeps its width: %+v", f.calls)
 	}
 }

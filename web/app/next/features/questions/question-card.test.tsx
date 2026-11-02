@@ -80,3 +80,52 @@ describe('QuestionCard', () => {
     expect(document.querySelector('.hx-ask')).toBeNull();
   });
 });
+
+// HRN-600: the card folded for an answer in the chat. Enter in the field does what the card's button does.
+describe('Enter in the field', () => {
+  const one: Question = { ...question, items: [question.items[0]] };
+
+  it('sends the own answer of the last step', () => {
+    const onAnswer = vi.fn(() => Promise.resolve());
+    let send: (() => boolean) | null = null;
+    render(
+      <QuestionCard
+        question={one}
+        device="d1"
+        ownAnswer="My own words"
+        onAnswer={onAnswer}
+        onSendReady={(next) => {
+          send = next;
+        }}
+      />,
+    );
+    let sent = false;
+    act(() => {
+      sent = send?.() ?? false;
+    });
+    expect(sent).toBe(true);
+    expect(onAnswer).toHaveBeenCalledWith('q1', [{ i: 0, choices: [], text: 'My own words' }]);
+  });
+
+  it('sends nothing without an answer', () => {
+    const onAnswer = vi.fn(() => Promise.resolve());
+    let send: (() => boolean) | null = null;
+    render(
+      <QuestionCard
+        question={one}
+        device="d1"
+        ownAnswer=""
+        onAnswer={onAnswer}
+        onSendReady={(next) => {
+          send = next;
+        }}
+      />,
+    );
+    let sent = true;
+    act(() => {
+      sent = send?.() ?? false;
+    });
+    expect(sent).toBe(false);
+    expect(onAnswer).not.toHaveBeenCalled();
+  });
+});

@@ -24,7 +24,11 @@ func designDeckRoutes(d deps) []gate.JSONRoute {
 	if a.OneShot == nil {
 		a.OneShot = deckOneShot(d)
 	}
+	if a.Images == nil {
+		a.Images = imageJobs(d)
+	}
 	return []gate.JSONRoute{
+		designRoute(platformAPI+"/design/image", a.DesignImage),
 		designRoute(deckPath(""), a.Deck),
 		designRoute(deckPath("/settings"), a.DeckSettings),
 		designRoute(deckPath("/notes"), a.DeckNotes),
@@ -46,6 +50,7 @@ func designDeckBodyRoutes(d deps) []gate.BodyRoute {
 		return func(r *http.Request) bool { return files.RouteIs(r, deckPath(p)) }
 	}
 	return []gate.BodyRoute{
+		{Slice: "design", Match: func(r *http.Request) bool { return files.RouteIs(r, platformAPI+"/design/image/file") }, Serve: a.DesignImageFile},
 		{Slice: "design", Match: at("/pptx-style"), Serve: a.DeckPptxStyle},
 		{Slice: "design", Match: at("/rec/chunk"), Serve: a.DeckRecChunk},
 		{Slice: "design", Match: at("/rec/media"), Serve: a.DeckRecMedia},

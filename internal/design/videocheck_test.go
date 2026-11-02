@@ -138,7 +138,7 @@ func TestVideoFrameFilesCache(t *testing.T) {
 	videoFramesImpl = func(_ *Library, _ context.Context, _ *deckTab, _ string, _ VideoScene, _ VideoFormat, _ bool, times []int64, each func(videoShot) error) error {
 		for i, ts := range times {
 			drawn++
-			if err := each(videoShot{I: i, T: ts, JPEG: []byte("jpeg@" + strconv.FormatInt(ts, 10))}); err != nil {
+			if err := each(videoShot{I: i, T: ts, Image: []byte("jpeg@" + strconv.FormatInt(ts, 10))}); err != nil {
 				return err
 			}
 		}

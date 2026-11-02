@@ -159,8 +159,11 @@ type conv struct {
 
 	// metaReading is a read of the transcript's word on the effort and the goal off the actor, metaAt when the last
 	// began; launchUltracode: the tab was started on ultracode (a Legacy tab's launch), which the transcript never says.
-	metaReading     bool
-	metaAt          time.Time
+	metaReading bool
+	metaAt      time.Time
+	// metaStamp is what the transcript and its subagents folder were at the last read that ran (see watchMeta).
+	metaStamp       metaStamp
+	metaFullAt      time.Time
 	launchUltracode bool
 	// shots are the pictures the agent looked at, newest first, and shotPaths the files they are, by id.
 	shots     []wire.Shot

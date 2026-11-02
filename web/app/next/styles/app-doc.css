@@ -1,0 +1,37 @@
+/* The notice in the place of an app's editor (features/app-doc). */
+.hx-appdoc__note {
+  display: grid;
+  gap: var(--hx-space-3);
+  justify-items: start;
+  max-width: 520px;
+  margin: var(--hx-space-8) auto;
+  padding: 0 var(--hx-space-4);
+  color: var(--hx-fg-1);
+}
+.hx-appdoc__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.hx-appdoc__text {
+  margin: 0;
+  color: var(--hx-fg-2);
+}
+.hx-appdoc__detail {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.hx-appdoc__strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-1) var(--hx-space-3);
+  margin: 0;
+  padding: var(--hx-space-2) var(--hx-space-4);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-appdoc__why {
+  color: var(--hx-fg-3);
+}

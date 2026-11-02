@@ -1,0 +1,179 @@
+{
+  "mode": "warn",
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "rules": [
+    {
+      "id": "l2windowmax2aaaaaaa",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "userId": null,
+      "accountId": "a2claudemaxbbbbbbbbb",
+      "modelPattern": null,
+      "forbid": false,
+      "period": "five_hour",
+      "unit": "window_pct",
+      "amount": 90,
+      "warnPct": 0.8,
+      "used": 92,
+      "pct": 1.022,
+      "status": "stop",
+      "resetsAt": "2026-10-31T17:00:00Z",
+      "estimated": true,
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "setAt": "2026-10-01T07:00:00Z"
+    },
+    {
+      "id": "l2veraaaaaaaaaaaaaa",
+      "scope": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa"
+      },
+      "userId": "u2veraaaaaaaaaaaaaaa",
+      "accountId": null,
+      "modelPattern": null,
+      "forbid": false,
+      "period": "month",
+      "unit": "money",
+      "amount": 100,
+      "warnPct": 0.8,
+      "used": 84,
+      "pct": 0.84,
+      "status": "warn",
+      "resetsAt": "2026-10-31T21:00:00Z",
+      "estimated": false,
+      "setBy": {
+        "userId": "u2borisaaaaaaaaaaaaa",
+        "name": "Борис"
+      },
+      "setAt": "2026-10-01T07:00:00Z"
+    },
+    {
+      "id": "l2teamplatformaaaaa",
+      "scope": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa"
+      },
+      "userId": null,
+      "accountId": null,
+      "modelPattern": null,
+      "forbid": false,
+      "period": "month",
+      "unit": "money",
+      "amount": 1500,
+      "warnPct": 0.8,
+      "used": 1190,
+      "pct": 0.793,
+      "status": "ok",
+      "resetsAt": "2026-10-31T21:00:00Z",
+      "estimated": false,
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "setAt": "2026-10-01T07:00:00Z"
+    },
+    {
+      "id": "l2veraceilingaaaaaa",
+      "scope": {
+        "kind": "tenant",
+        "id": "t2acmetenantaaaaaaaa"
+      },
+      "userId": "u2veraaaaaaaaaaaaaaa",
+      "accountId": null,
+      "modelPattern": null,
+      "forbid": false,
+      "period": "month",
+      "unit": "money",
+      "amount": 150,
+      "warnPct": 0.8,
+      "used": 84,
+      "pct": 0.56,
+      "status": "ok",
+      "resetsAt": "2026-10-31T21:00:00Z",
+      "estimated": false,
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "setAt": "2026-10-01T07:00:00Z"
+    },
+    {
+      "id": "l2forbidopusaaaaaaa",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "userId": null,
+      "accountId": null,
+      "modelPattern": "opus-4-1",
+      "forbid": true,
+      "period": "month",
+      "unit": "money",
+      "amount": 0,
+      "warnPct": 0.8,
+      "used": 0,
+      "pct": 1,
+      "status": "stop",
+      "resetsAt": null,
+      "estimated": false,
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "setAt": "2026-10-01T07:00:00Z"
+    }
+  ],
+  "effective": [
+    {
+      "account": {
+        "id": "a2claudemaxbbbbbbbbb",
+        "label": "Claude Max №2"
+      },
+      "modelPattern": "",
+      "status": "stop",
+      "pct": 1.022,
+      "bindingRuleId": "l2windowmax2aaaaaaa",
+      "ruleIds": ["l2windowmax2aaaaaaa", "l2veraaaaaaaaaaaaaa", "l2teamplatformaaaaa", "l2veraceilingaaaaaa"],
+      "reason": "Окно Claude Max №2 — 92%, сброс в 20:00",
+      "resetsAt": "2026-10-31T17:00:00Z"
+    },
+    {
+      "account": null,
+      "modelPattern": "",
+      "status": "warn",
+      "pct": 0.84,
+      "bindingRuleId": "l2veraaaaaaaaaaaaaa",
+      "ruleIds": ["l2veraaaaaaaaaaaaaa", "l2teamplatformaaaaa", "l2veraceilingaaaaaa"],
+      "reason": "Личный лимит — 84% за октябрь",
+      "resetsAt": "2026-10-31T21:00:00Z"
+    },
+    {
+      "account": null,
+      "modelPattern": "opus-4-1",
+      "status": "stop",
+      "pct": 1,
+      "bindingRuleId": "l2forbidopusaaaaaaa",
+      "ruleIds": ["l2forbidopusaaaaaaa"],
+      "reason": "Модель opus-4-1 в организации запрещена",
+      "resetsAt": null
+    }
+  ],
+  "machines": [
+    {
+      "machineId": "h2runneraaaaaaaaaaaa",
+      "name": "runner-a",
+      "version": 17,
+      "syncedAt": "2026-10-31T13:20:05Z"
+    }
+  ]
+}

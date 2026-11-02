@@ -60,6 +60,9 @@ type codexState struct {
 	staleWarnings map[string]bool
 	suppressed    map[string]bool
 	pending       *codexMessage
+	// imageCall is the call id of the latest code-mode script that draws pictures and has not ended: the pictures Codex
+	// reports as done (it writes no start event) belong to it.
+	imageCall string
 
 	// line is where the transcript line being read starts, and synthetic how many call ids it has made up so far.
 	line      int64
@@ -472,6 +475,9 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 			delete(s.suppressed, callID)
 			return nil
 		}
+		if callID == s.imageCall {
+			s.imageCall = ""
+		}
 		return []*jsvalue.Object{codexEntry("tool-result", ts, "toolUseId", callID, "isError", false,
 			"summary", summarizeCodexOutput(safeString(prop(p, "output"))))}
 	case "custom_tool_call":
@@ -491,13 +497,19 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 			status = "success"
 		}
 		summary := summarizeCodexCall(name, prop(p, "input"))
+		var images *codemode.ImageCall
 		if input, ok := prop(p, "input").(string); ok && name == "exec" {
 			// Code mode: the script calls the real tools, so the entry says which ones.
 			d := codemode.Describe(input)
-			name, summary = d.Tool, d.Summary
+			name, summary, images = d.Tool, d.Summary, d.Images
 		}
-		return []*jsvalue.Object{codexEntry("tool-call", ts, "toolUseId", callID, "toolName", name,
-			"summary", summary, "status", status)}
+		call := codexEntry("tool-call", ts, "toolUseId", callID, "toolName", name,
+			"summary", summary, "status", status)
+		if images != nil {
+			call.Set("imageGen", jsvalue.NewObject("count", float64(images.Count), "prompt", images.Prompt, "shape", images.Shape))
+			s.imageCall = callID // Codex logs the call «completed» while it still runs; its output line ends it
+		}
+		return []*jsvalue.Object{call}
 	case "web_search_call":
 		callID := safeString(prop(p, "call_id"))
 		if callID == "" {
@@ -509,6 +521,30 @@ func (s *codexState) responseItem(p *jsvalue.Object, ts float64) []*jsvalue.Obje
 		return []*jsvalue.Object{e}
 	}
 	return nil
+}
+
+// imageDone is one picture a code-mode script drew (or failed to): an "image-result" for the script's step. The file
+// is named by its saved path, never by the picture itself (item.result is the whole PNG in base64).
+func (s *codexState) imageDone(item any, ts float64) []*jsvalue.Object {
+	if s.imageCall == "" {
+		return nil
+	}
+	failure := ""
+	if f := prop(item, "failure"); !codexNullish(f) {
+		failure = safeString(f)
+		if failure == "" {
+			failure = safeString(codexCoalesce(prop(f, "message"), prop(f, "error")))
+		}
+		if failure == "" {
+			failure = "the picture could not be drawn"
+		}
+	}
+	path := safeString(prop(item, "savedPath"))
+	if failure == "" && path == "" {
+		return nil
+	}
+	return []*jsvalue.Object{codexEntry("image-result", ts, "toolUseId", s.imageCall, "path", path, "failure", failure,
+		"prompt", safeString(prop(item, "revisedPrompt")))}
 }
 
 func readCommand(p *jsvalue.Object) string {
@@ -685,7 +721,11 @@ func (s *codexState) eventMsg(p *jsvalue.Object, ts float64) []*jsvalue.Object {
 		e.Set("status", "pending")
 		return one(e)
 	case "item_completed":
-		if prop(prop(p, "item"), "type") != "ContextCompaction" {
+		item := prop(p, "item")
+		if prop(item, "type") == "Extension" && prop(item, "kind") == "image_gen.generation" {
+			return s.imageDone(item, ts)
+		}
+		if prop(item, "type") != "ContextCompaction" {
 			return nil
 		}
 		return one(codexEntry("context-compacted", ts))

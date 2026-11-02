@@ -10,6 +10,8 @@ import {
 } from '@/next/bindings/settings-data';
 import { useAgentCredentials } from '@/next/bindings/settings-credentials';
 import { useProviders } from '@/next/bindings/settings-providers';
+import { useSpeechKeys } from '@/next/bindings/settings-speech';
+import type { SpeechCards } from '@/next/features/providers/speech-cards';
 import AccountsSection, {
   type AccountCard,
   type VendorCards,
@@ -178,6 +180,12 @@ const vendorsOf = ({
   return { k: 'loading' };
 };
 
+const speechOf = ({ state, onSave, onRemove, retry }: ReturnType<typeof useSpeechKeys>): SpeechCards => {
+  if (state.k === 'ready') return { k: 'ready', keys: state.keys, onSave, onRemove };
+  if (state.k === 'failed') return { k: 'failed', text: state.text, onRetry: retry };
+  return { k: 'loading' };
+};
+
 export const AccountsPage = ({ machine, pages, pending }: IAccountsPageProps) => {
   const [open, setOpen] = useState<string | null>('claude');
   const providers = useProviders(machine);
@@ -186,6 +194,7 @@ export const AccountsPage = ({ machine, pages, pending }: IAccountsPageProps) =>
     codex: useAgentCredentials(machine, 'codex', readyOf(pages.codex.state), pages.codex.retry),
   };
   const vendors = vendorsOf(providers);
+  const speech = speechOf(useSpeechKeys(machine));
   const { run, pending: waiting } = pending;
   const cards = PROVIDER_LIST.map((provider) => cardOf(provider, pages[provider].state));
   const busy = new Set(PROVIDER_LIST.filter((provider) => waiting.has(`${provider}/baseUrl`)));
@@ -194,6 +203,7 @@ export const AccountsPage = ({ machine, pages, pending }: IAccountsPageProps) =>
       cards={cards}
       credentials={credentials}
       vendors={vendors}
+      speech={speech}
       open={open}
       busy={busy}
       onToggle={(provider) => setOpen((now) => (now === provider ? null : provider))}

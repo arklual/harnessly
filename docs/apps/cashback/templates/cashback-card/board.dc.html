@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+html,body{margin:0}
+.cb-card{box-sizing:border-box;max-width:420px;margin:48px auto;padding:24px;border:1px solid #dcdce3;border-radius:20px;background:#fff;color:#16161d;font:16px/1.4 system-ui,sans-serif}
+.cb-card__top{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+.cb-card__title{margin:0;font-size:24px;font-weight:650}
+.cb-card__pct{font-size:40px;font-weight:700;color:#5b5bd6}
+.cb-card__note{margin:8px 0 0;color:#6b6b78}
+.cb-card__limit{margin:16px 0 0;font-size:14px;color:#6b6b78}
+.cb-card__more{display:inline-block;margin-top:16px;color:#5b5bd6}
+</style>
+</helmet>
+<main class="cb-card">
+  <!-- data-hl-field binds an element to a field of the Cashback app (schema/cashback.json): a click on it opens the
+       app's inspector on that field, and the app's values are written back into the element. data-hl-attr names the
+       attribute the field sets; without it the field is the element's words. -->
+  <div class="cb-card__top">
+    <h2 class="cb-card__title" data-hl-field="title">Кафе и рестораны</h2>
+    <div class="cb-card__pct"><span data-hl-field="percent">7</span>%</div>
+  </div>
+  <p class="cb-card__note" data-hl-field="note">Оплата картой, не доставка</p>
+  <p class="cb-card__limit">До <span data-hl-field="limit">2000</span> ₽ в месяц</p>
+  <a class="cb-card__more" data-hl-field="link" data-hl-attr="href" href="https://example.org/cashback">Условия</a>
+  <!-- Not bound: with lockUnbound the app keeps free hand edits off this line. -->
+  <p class="cb-card__limit">Данные демонстрационные.</p>
+</main>
+</x-dc>
+</body>
+</html>

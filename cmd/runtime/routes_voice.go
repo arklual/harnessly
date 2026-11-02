@@ -38,7 +38,7 @@ func voiceAssetSegments(r *http.Request) ([]string, bool) {
 // newVoice is the machine's dictation: ffmpeg and the recognition service it is set up with, or, when it names none, the
 // engine the runtime brings itself (voice_engine.go).
 func newVoice(dataDir string) *voice.Server {
-	srv := voice.New(voice.Config{Socket: voiceSocket(dataDir), FFmpeg: os.Getenv("RUNTIME_VOICE_FFMPEG_BIN"), Log: voiceLog})
+	srv := voice.New(voice.Config{Socket: voiceSocket(dataDir), FFmpeg: os.Getenv("RUNTIME_VOICE_FFMPEG_BIN"), Log: voiceLog, Credentials: voiceCredentials(dataDir)})
 	noteVoiceDecoder(srv)
 	return srv
 }
@@ -71,5 +71,5 @@ func voiceRoutes(d deps) []gate.Route {
 				assets.Serve(w, r, segments)
 			}),
 		},
-	}, voiceEngineRoutes(d, dictation)...)
+	}, append(voiceEngineRoutes(d, dictation), voiceKeysRoutes(d, dictation)...)...)
 }

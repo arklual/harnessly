@@ -2,6 +2,7 @@ package typist
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/jscompat"
@@ -88,13 +89,35 @@ func Read(styled string, provider wire.Provider) Screen {
 	return s
 }
 
-// Look reads the pane; a pane that cannot be read is a Screen that is not Readable.
+// Look reads the pane; a pane that cannot be read is a Screen that is not Readable. A permission dialog too tall for
+// the window has its top off the screen and out of the scrollback (Claude draws it on the alternate screen), so the
+// call in it cannot be read whole: the pane grows when it can, and the look reads the dialog as redrawn.
 func Look(p Pane, provider wire.Provider) Screen {
 	styled, ok := p.CaptureStyled()
 	if !ok {
 		return Screen{}
 	}
+	s := Read(styled, provider)
+	if !s.dialogCut(provider) {
+		return s
+	}
+	g, ok := p.(DialogGrower)
+	if !ok || !g.GrowForDialog() {
+		return s
+	}
+	styled, ok = p.CaptureStyled()
+	if !ok {
+		return Screen{}
+	}
 	return Read(styled, provider)
+}
+
+// dialogCut: Claude's permission dialog is up without the solid rule it always opens with, so its top is off the screen.
+func (s Screen) dialogCut(provider wire.Provider) bool {
+	if provider == wire.ProviderCodex || s.Menu != MenuPermission {
+		return false
+	}
+	return !slices.ContainsFunc(strings.Split(s.Plain, "\n"), solidRuleRE.MatchString)
 }
 
 func menuOf(st screen.State) (MenuKind, []string) {

@@ -348,3 +348,33 @@ func TestContainerSandboxArgs(t *testing.T) {
 		t.Fatalf("--yolo is enough: %q", args)
 	}
 }
+
+func TestHookFlagsWithTheBudgetScript(t *testing.T) {
+	h := &HookConfig{Script: "/d/codex-hook.sh", UserConfig: filepath.Join(t.TempDir(), "none.toml"), BudgetScript: "/d/budget-hook.sh"}
+	args, _, err := h.Flags()
+	if err != nil {
+		t.Fatal(err)
+	}
+	byEvent := map[string]string{}
+	for i := 1; i < len(args); i += 2 {
+		k, v, _ := strings.Cut(args[i], "=")
+		byEvent[k] = v
+	}
+	ours := `{type="command",command="/d/codex-hook.sh"}`
+	budget := func(ev string) string { return `{type="command",command="sh \"/d/budget-hook.sh\" codex ` + ev + `"}` }
+	for ev, want := range map[string]string{
+		"hooks.UserPromptSubmit": `[{matcher=".*",hooks=[` + ours + `,` + budget("UserPromptSubmit") + `]}]`,
+		"hooks.PreToolUse":       `[{matcher=".*",hooks=[` + ours + `,` + budget("PreToolUse") + `]}]`,
+		"hooks.Stop":             `[{matcher=".*",hooks=[` + ours + `]}]`,
+	} {
+		if byEvent[ev] != want {
+			t.Errorf("%s: %s\nwant %s", ev, byEvent[ev], want)
+		}
+	}
+	for k, v := range byEvent {
+		var parsed map[string]any
+		if _, err := toml.Decode(k+"="+v, &parsed); err != nil {
+			t.Errorf("%s does not parse: %v", k, err)
+		}
+	}
+}

@@ -30,6 +30,13 @@ import { useVoice } from '@/next/bindings/use-voice';
 import { DECK_NEW_DRAFT } from '@/next/features/designly/deck/deck-create';
 import { VIDEO_NEW_DRAFT } from '@/next/features/designly/video/video-create';
 import { setDraftText } from '@/next/stores/drafts';
+import {
+  createKindDocument,
+  loadKindDocs,
+  loadKinds,
+  type IAppKind,
+  type IKindDoc,
+} from '@/next/features/app-catalog/api';
 import { t } from '@/next/i18n';
 
 /** How often the library is asked again while an agent draws. */
@@ -64,6 +71,21 @@ const cardOf = (m: MachineId, design: IDesign, working: ReadonlySet<string>): ID
   };
 };
 
+/** A document of an app's type as a card: no picture, no boards; the type's name stands where a design shows its kind. */
+const appDocCard = (doc: IKindDoc): IDesignCard => ({
+  id: doc.document,
+  title: doc.title,
+  boards: 0,
+  updatedAt: doc.updatedAt,
+  image: null,
+  kind: 'site',
+  pinned: false,
+  drawing: false,
+  owner: null,
+  canDelete: false,
+  appKind: doc.kindTitle,
+});
+
 const useNow = (ms: number) => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -74,8 +96,10 @@ const useNow = (ms: number) => {
 };
 
 /** The machine's library as the cards show it: read on open and again when the link returns, kept while an agent draws. */
-const useDesignLibrary = (machine: MachineId) => {
+const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
   const [designs, setDesigns] = useState<IDesign[] | null>(null);
+  // The documents of the types apps add; an older runtime, or none, lists none (they are an addition, not the library).
+  const [appDocs, setAppDocs] = useState<IKindDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
   const convs = useConversationList(machine);
   const [attempt, setAttempt] = useState(0);
@@ -87,7 +111,8 @@ const useDesignLibrary = (machine: MachineId) => {
   const load = useCallback(
     (signal?: AbortSignal) =>
       fetchLibrary(machine, signal).then(
-        (library) => {
+        async (library) => {
+          if (withAppDocs) setAppDocs(await loadKindDocs(machine).catch(() => []));
           loaded.current = true;
           setDesigns(library.designs);
           setError(null);
@@ -98,7 +123,7 @@ const useDesignLibrary = (machine: MachineId) => {
           if (!loaded.current) setError(failure.message);
         },
       ),
-    [machine],
+    [machine, withAppDocs],
   );
 
   useEffect(() => {
@@ -116,10 +141,11 @@ const useDesignLibrary = (machine: MachineId) => {
     return () => clearInterval(timer);
   }, [drawing, load]);
 
-  const cards = useMemo(
-    () => designs?.map((design) => cardOf(machine, design, working)) ?? null,
-    [designs, machine, working],
-  );
+  const cards = useMemo(() => {
+    if (designs === null) return null;
+    return [...designs.map((design) => cardOf(machine, design, working)), ...appDocs.map(appDocCard)];
+  }, [designs, appDocs, machine, working]);
+  const appDocIds = useMemo(() => new Set(appDocs.map((d) => d.document)), [appDocs]);
 
   const onPin = async (id: string, pinned: boolean) => {
     try {
@@ -148,7 +174,7 @@ const useDesignLibrary = (machine: MachineId) => {
     setAttempt((n) => n + 1);
   };
 
-  return { cards, error, now, load, onPin, onDelete, onRetry };
+  return { cards, error, now, load, onPin, onDelete, onRetry, appDocIds };
 };
 
 /** The machine's engine, browser and ffmpeg; null until (or unless) the machine answered. */
@@ -189,7 +215,8 @@ interface IDesignlyLibraryProps {
 
 /** The library alone, for the right pane: its chat is the field that starts a design, so there is none here. */
 export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
-  const { cards, error, now, onPin, onDelete, onRetry } = useDesignLibrary(machine);
+  // The documents of the types apps add are listed here as in the whole library; opening one is the pane's to tell.
+  const { cards, error, now, onPin, onDelete, onRetry } = useDesignLibrary(machine, true);
   const notice = noticeOf(useDesignEngine(machine));
   return (
     <DesignlyHome
@@ -213,7 +240,7 @@ interface IDesignlyViewProps {
 }
 
 const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
-  const { cards, error, now, load, onPin, onDelete, onRetry } = useDesignLibrary(machine);
+  const { cards, error, now, load, onPin, onDelete, onRetry, appDocIds } = useDesignLibrary(machine, true);
   const notice = noticeOf(useDesignEngine(machine));
   const [systems, setSystems] = useState<IDesignSystem[] | null>(null);
   const restored = useLinkRestored(machine);
@@ -234,6 +261,32 @@ const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
 
   const [brief, setBrief] = useState('');
   const voice = useVoice(machine, brief, setBrief);
+
+  // The document types installed apps add are only an offer: an older runtime, or none installed, shows no tile.
+  const [appKinds, setAppKinds] = useState<IAppKind[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadKinds(machine).then(
+      (kinds) => live && setAppKinds(kinds),
+      () => live && setAppKinds(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [machine, restored]);
+
+  const onAppKind = async (kind: IAppKind, name: string) => {
+    const title = name ? titleOf(name) : kind.title;
+    let created: { document: string };
+    try {
+      created = await createKindDocument(machine, kind.id, title);
+    } catch (failure) {
+      toast(t('next.designly.createFailed'), { tone: 'error', description: (failure as Error).message });
+      throw failure;
+    }
+    // The new document opens at once, in the app's editor.
+    goTo({ kind: ROUTE.appDoc, id: created.document });
+  };
 
   const onCreate = async (brief: string, kind: TDesignKind, designSystem: string | null) => {
     const title = titleOf(brief);
@@ -266,7 +319,7 @@ const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
       now={now}
       onPin={onPin}
       onDelete={onDelete}
-      onOpen={(id) => goTo({ kind: ROUTE.site, id })}
+      onOpen={(id) => goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id })}
       onRetry={onRetry}
       compose={{
         systems,
@@ -281,6 +334,8 @@ const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
           onChange: onPick,
           machine: machines,
         },
+        appKinds,
+        onAppKind,
         onDeck: () => {
           // The brief typed so far goes with the person to the deck's create screen.
           if (brief.trim()) setDraftText(DECK_NEW_DRAFT, brief);

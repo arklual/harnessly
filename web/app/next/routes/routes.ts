@@ -9,10 +9,14 @@ export const ROUTE = {
   designlyNew: 'designlyNew',
   videoNew: 'videoNew',
   site: 'site',
+  appDoc: 'appDoc',
   invite: 'invite',
+  manage: 'manage',
   stats: 'stats',
   efficiency: 'efficiency',
+  tasks: 'tasks',
   apps: 'apps',
+  app: 'app',
   settings: 'settings',
 } as const;
 
@@ -20,6 +24,7 @@ export const ROUTE = {
 export const SETTINGS_SECTIONS = [
   'general',
   'appearance',
+  'keys',
   'notifications',
   'voice',
   'takes',
@@ -48,12 +53,19 @@ export type TRoute =
   | { kind: typeof ROUTE.videoNew }
   /** A design of the library opened: `/designly/:id`, `?chat=` the chat it was opened from (its column shows it). */
   | { kind: typeof ROUTE.site; id: string; chat?: string; access?: TAccessFocus }
+  /** A document of a type an installed app adds, opened in the app's editor: `/designly/doc/:id`. */
+  | { kind: typeof ROUTE.appDoc; id: string }
   /** A link-invitation to a design, `/designly/invite/:token` (a push or a letter says `/design/invite/:token`). */
   | { kind: typeof ROUTE.invite; token: string }
-  /** The screens of «More»: `/stats`, `/efficiency`, `/apps`. */
+  /** The screens of «More»: `/manage` (personal history, with Statistics and Efficiency as its tabs), `/apps`. */
+  | { kind: typeof ROUTE.manage }
   | { kind: typeof ROUTE.stats }
   | { kind: typeof ROUTE.efficiency }
+  | { kind: typeof ROUTE.tasks }
+  /** The installed apps: `/apps`. */
   | { kind: typeof ROUTE.apps }
+  /** An app opened as the main thing: `/apps/:id`, `?chat=` the chat it works in (its column shows it). */
+  | { kind: typeof ROUTE.app; id: string; chat?: string }
   /** Settings: `/settings` (the list of sections; on a wide window the first one is open) and `/settings/:section`. */
   | { kind: typeof ROUTE.settings; section: SettingsSection | null };
 
@@ -64,10 +76,14 @@ const DESIGNLY_RE = /^\/designly\/?$/;
 const DESIGNLY_NEW_RE = /^\/designly\/new\/slides\/?$/;
 const VIDEO_NEW_RE = /^\/designly\/new\/video\/?$/;
 const SITE_RE = /^\/design(?:ly)?\/([a-z0-9][a-z0-9-]{0,62})\/?$/;
+const APP_DOC_RE = /^\/designly\/doc\/([a-z0-9][a-z0-9-]{0,62})\/?$/;
 const INVITE_RE = /^\/design(?:ly)?\/invite\/([A-Za-z0-9_-]{8,200})\/?$/;
+const MANAGE_RE = /^\/manage\/?$/;
 const STATS_RE = /^\/stats\/?$/;
 const EFFICIENCY_RE = /^\/efficiency\/?$/;
+const TASKS_RE = /^\/tasks\/?$/;
 const APPS_RE = /^\/apps\/?$/;
+const APP_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/?$/;
 const SETTINGS_RE = /^\/settings(?:\/([a-z]+))?\/?$/;
 
 /** One parameter of an address's query, when it names one. */
@@ -87,9 +103,16 @@ export const parseRoute = (path: string): TRoute => {
   if (DESIGNLY_RE.test(pathname)) return { kind: ROUTE.designly };
   if (DESIGNLY_NEW_RE.test(pathname)) return { kind: ROUTE.designlyNew };
   if (VIDEO_NEW_RE.test(pathname)) return { kind: ROUTE.videoNew };
+  if (MANAGE_RE.test(pathname)) return { kind: ROUTE.manage };
   if (STATS_RE.test(pathname)) return { kind: ROUTE.stats };
   if (EFFICIENCY_RE.test(pathname)) return { kind: ROUTE.efficiency };
+  if (TASKS_RE.test(pathname)) return { kind: ROUTE.tasks };
   if (APPS_RE.test(pathname)) return { kind: ROUTE.apps };
+  const app = APP_RE.exec(pathname);
+  if (app?.[1]) {
+    const chat = queryParam(path, 'chat');
+    return { kind: ROUTE.app, id: app[1], ...(chat ? { chat } : {}) };
+  }
   const settings = SETTINGS_RE.exec(pathname);
   if (settings) {
     // «Models» was a section of its own: its address leads to the page it moved to.
@@ -99,6 +122,8 @@ export const parseRoute = (path: string): TRoute => {
     if (!settings[1]) return { kind: ROUTE.settings, section: null };
     return section ? { kind: ROUTE.settings, section } : HOME;
   }
+  const appDoc = APP_DOC_RE.exec(pathname);
+  if (appDoc?.[1]) return { kind: ROUTE.appDoc, id: appDoc[1] };
   const invite = INVITE_RE.exec(pathname);
   if (invite?.[1]) return { kind: ROUTE.invite, token: invite[1] };
   const site = SITE_RE.exec(pathname);
@@ -138,14 +163,24 @@ export const routePath = (route: TRoute): string => {
       if (route.access) query.set('access', route.access);
       return query.size > 0 ? `/designly/${route.id}?${query}` : `/designly/${route.id}`;
     }
+    case ROUTE.appDoc:
+      return `/designly/doc/${route.id}`;
     case ROUTE.invite:
       return `/designly/invite/${route.token}`;
+    case ROUTE.manage:
+      return '/manage';
     case ROUTE.stats:
       return '/stats';
     case ROUTE.efficiency:
       return '/efficiency';
+    case ROUTE.tasks:
+      return '/tasks';
     case ROUTE.apps:
       return '/apps';
+    case ROUTE.app:
+      return route.chat
+        ? `/apps/${route.id}?${new URLSearchParams({ chat: route.chat })}`.replace(/%3A/gi, ':')
+        : `/apps/${route.id}`;
     case ROUTE.settings:
       return route.section ? `/settings/${route.section}` : '/settings';
     default:
@@ -168,7 +203,7 @@ const plainPathname = (path: string): string => {
 /**
  * The place an address is, as one key: two addresses with the same key show the same thing, so a tab
  * strip keeps one tab for them. A chat is `chat:<id>`; a design `design:<id>`, with `+chat:<id>` when it was opened
- * with a chat; Designly's library `designly`; every section of Settings `settings`; the start page `home`. Query
+ * with a chat; an app `app:<id>`; Designly's library `designly`; every section of Settings `settings`; the start page `home`. Query
  * (page, board, panes, view), hash, a trailing slash, escapes and the `/design/` spelling do not make a place; an
  * address that is none of ours is its plain pathname.
  */
@@ -179,8 +214,12 @@ export const placeKeyOf = (path: string): string => {
       return `chat:${route.id}`;
     case ROUTE.site:
       return route.chat ? `design:${route.id}+chat:${route.chat}` : `design:${route.id}`;
+    case ROUTE.appDoc:
+      return `appdoc:${route.id}`;
     case ROUTE.invite:
       return `invite:${route.token}`;
+    case ROUTE.app:
+      return `app:${route.id}`;
     case ROUTE.home: {
       const pathname = plainPathname(path);
       return pathname === '/' ? 'home' : pathname;

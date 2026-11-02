@@ -1,6 +1,6 @@
 // The agent's work inside a turn, compact (not a log): a thought, one line per tool with its output
 // on a click, a run of tools folded into «K actions», subagents, dynamic workflows, a compaction divider and notices.
-import { memo, useState, type ReactNode } from 'react';
+import { memo, useContext, useState, type ReactNode } from 'react';
 import Md from '@/next/features/chat/md';
 import type {
   AnswersEntry,
@@ -11,6 +11,7 @@ import type {
   ThinkEntry,
   ToolEntry,
 } from '@/next/features/chat/types';
+import { ImageCard, ImageHost, imageEntryOf } from '@/next/features/chat/image-card';
 import SubsBlock from '@/next/features/subagents/subs-block';
 import WorkflowCard from '@/next/features/workflows/workflow-card';
 import PeerNotes from '@/next/features/chat/peer-note';
@@ -19,6 +20,8 @@ import { parsePeerOut } from '@/next/features/chat/peer';
 import { PeerOutStep } from '@/next/features/chat/peer-card';
 import { parseAskCall } from '@/next/features/asks/parse';
 import { AskStep } from '@/next/features/asks/ask-step';
+import AppCard from '@/next/features/app-views/app-card';
+import { parseAppCard } from '@/next/features/app-views/card';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { useSeen } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
@@ -250,6 +253,9 @@ export const isWorkflowCall = (entry: Entry): entry is ToolEntry & { tool: 'Work
 const peerOutOf = (entry: ToolEntry) =>
   parsePeerOut(entry.tool, entry.summary, entry.ok, entry.output?.text ?? null);
 
+/** An app's card (MCP Apps) that a tool of the app's own server returned: drawn under its step, never folded away. */
+const appCardOf = (entry: ToolEntry) => parseAppCard(entry.tool, entry.output?.text ?? null);
+
 /** A question of the agent to a person (`harnessly ask`): its card, not a line among the tools. */
 const askCallOf = (entry: ToolEntry) => parseAskCall(entry.tool, entry.summary, entry.output?.text ?? null);
 
@@ -277,6 +283,7 @@ export const dedupeTools = (steps: Entry[]): Entry[] => {
       ok: entry.ok ?? kept.ok,
       output: entry.output ?? kept.output,
       summary: kept.summary || entry.summary,
+      images: entry.images ?? kept.images,
     };
   }
   return out;
@@ -298,7 +305,14 @@ export const groupSteps = (rawSteps: Entry[], live: boolean): TStepNode[] => {
       return;
     }
     // A message to another agent stays in view: it is not folded into «K actions».
-    if (entry.t === 'tool' && !peerOutOf(entry) && !askCallOf(entry)) {
+    // A picture card stays in view too: the pictures are the content.
+    if (
+      entry.t === 'tool' &&
+      !peerOutOf(entry) &&
+      !askCallOf(entry) &&
+      !imageEntryOf(entry) &&
+      !appCardOf(entry)
+    ) {
       run.push(entry);
       return;
     }
@@ -322,6 +336,14 @@ interface IStepsProps {
   renderGate?: (permissionId: string) => ReactNode;
 }
 
+/** A call that draws pictures is a card where the chat knows its machine, else a plain step. */
+const ToolOrImages = ({ entry }: { entry: ToolEntry }) => {
+  const host = useContext(ImageHost);
+  const images = imageEntryOf(entry);
+  if (host !== null && images !== null) return <ImageCard entry={images} />;
+  return <ToolStep entry={entry} />;
+};
+
 /** One step of the work, by kind; answers and the messages steered into the turn are drawn by the turn (see splitAtMessages). */
 const Step = ({ entry, renderGate }: { entry: Entry; renderGate?: (permissionId: string) => ReactNode }) => {
   switch (entry.t) {
@@ -333,7 +355,16 @@ const Step = ({ entry, renderGate }: { entry: Entry; renderGate?: (permissionId:
       const out = peerOutOf(entry);
       if (out) return <PeerOutStep out={out} />;
       const ask = askCallOf(entry);
-      return ask ? <AskStep call={ask} ran={entry.ok !== false} /> : <ToolStep entry={entry} />;
+      if (ask) return <AskStep call={ask} ran={entry.ok !== false} />;
+      const card = appCardOf(entry);
+      return card ? (
+        <>
+          <ToolOrImages entry={entry} />
+          <AppCard card={card} />
+        </>
+      ) : (
+        <ToolOrImages entry={entry} />
+      );
     }
     case 'compaction':
       return <Compaction entry={entry} />;

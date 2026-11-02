@@ -56,6 +56,8 @@ export interface IAppConfig {
   /** The hub this machine is connected to (RUNTIME_HUB_URL), no trailing slash: the page links back to it and signing out
    *  goes through it. null: the runtime is reached directly. */
   hubUrl: string | null;
+  /** Where the «Хаб» link leads (RUNTIME_HUB_LINK, else hubUrl), no trailing slash. It says nothing of who signs in. */
+  hubLink: string | null;
 }
 
 const DEFAULTS: IAppConfig = {
@@ -86,6 +88,7 @@ const DEFAULTS: IAppConfig = {
   layoutKey: 'layout',
   launchDefaultsKey: 'launchDefaults',
   hubUrl: null,
+  hubLink: null,
 };
 
 let cached: IAppConfig | null = null;
@@ -121,11 +124,14 @@ export const appConfig = (): IAppConfig => {
     ...DEFAULTS,
     ...read,
     features: { ...DEFAULTS.features, ...(read.features ?? {}) },
-    locale: read.locale === 'ru' ? 'ru' : 'en',
+    // The person's own choice (Settings → General) wins over the installation's language.
+    locale:
+      (typeof document !== 'undefined' ? savedLanguage() : null) ?? (read.locale === 'ru' ? 'ru' : 'en'),
     copy: read.copy ?? {},
     basePath: (read.basePath ?? baseHref ?? DEFAULTS.basePath).replace(/\/+$/, ''),
     platformApi: (read.platformApi ?? platformMeta ?? DEFAULTS.platformApi).replace(/\/+$/, ''),
     hubUrl: typeof read.hubUrl === 'string' && read.hubUrl ? read.hubUrl.replace(/\/+$/, '') : null,
+    hubLink: typeof read.hubLink === 'string' && read.hubLink ? read.hubLink.replace(/\/+$/, '') : null,
   };
   return cached;
 };
@@ -136,3 +142,29 @@ export const platformApi = (): string => appConfig().platformApi;
 /** The page layout saved in the runtime's config under its configured key. */
 export const savedLayoutOf = <T>(config: Record<string, unknown> | null | undefined): T | undefined =>
   (config?.[appConfig().layoutKey] as T | undefined) ?? undefined;
+
+// The language the person chose for the interface in Settings → General: this browser's, as the theme is. Until one is
+// chosen the installation's language (RUNTIME_LOCALE) holds.
+export type TLanguage = 'ru' | 'en';
+
+const KEY = 'hl:language';
+
+/** The language chosen in this browser, or null while none is (or the storage cannot be read). */
+export const savedLanguage = (): TLanguage | null => {
+  try {
+    const value = window.localStorage.getItem(KEY);
+    return value === 'ru' || value === 'en' ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Keeps the choice; false when the browser would not store it, so the choice must not be shown as made. */
+export const saveLanguage = (lang: TLanguage): boolean => {
+  try {
+    window.localStorage.setItem(KEY, lang);
+    return window.localStorage.getItem(KEY) === lang;
+  } catch {
+    return false;
+  }
+};

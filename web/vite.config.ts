@@ -68,6 +68,25 @@ const preloadDictionary = (): Plugin => ({
   },
 });
 
+// What pdf.js reads at run time by address and not by import: the character maps, the standard fonts and its decoders. Put
+// beside the chunks, where the PDF view's engine asks for them (next/features/pane/pdf/pdf-engine.ts); nothing comes from outside.
+const pdfAssets = (): Plugin => ({
+  name: 'harnessly-pdf-assets',
+  apply: 'build',
+  generateBundle() {
+    const root = fileURLToPath(new URL('./node_modules/pdfjs-dist/', import.meta.url));
+    for (const folder of ['cmaps', 'standard_fonts', 'wasm', 'iccs']) {
+      for (const file of readdirSync(root + folder)) {
+        this.emitFile({
+          type: 'asset',
+          fileName: `assets/pdfjs/${folder}/${file}`,
+          source: readFileSync(`${root}${folder}/${file}`),
+        });
+      }
+    }
+  },
+});
+
 // The modules the interface (next/entry) needs at once, sorted by who else needs them: read from the module graph after
 // the build has walked it, before the chunks are cut. What the page's start (main.tsx) also needs is «start», what the
 // guest page (guest/main.tsx, a design opened by link) also needs is «shared», the rest is «shell»: a guest then loads
@@ -201,7 +220,15 @@ const CODE_SPLITTING = {
 
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), dictionaries(), preloadDictionary(), collectShell(), orderShellStyles()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    dictionaries(),
+    preloadDictionary(),
+    collectShell(),
+    orderShellStyles(),
+    pdfAssets(),
+  ],
   resolve: {
     alias: {
       '@kit': fileURLToPath(new URL('./kit', import.meta.url)),

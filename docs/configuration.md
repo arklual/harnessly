@@ -277,6 +277,7 @@ can serve the same build while the machine behind it is down.
 | `RUNTIME_PEOPLE` | `login=Name` pairs, comma separated: display names of the people of this installation (greeting, statistics, mentions) |
 | `RUNTIME_PANE_HOSTS` | extra hosts whose pages the side pane's browser tab may open |
 | `RUNTIME_DEFAULT_PINS` | pages every person finds pinned in the browser tab until they change their pins: comma separated `address` or `address=Name` (none by default) |
+| `RUNTIME_HUB_LINK` | where the page's «Хаб» link leads, for a machine no hub carries (default: `RUNTIME_HUB_URL`). Only a link: unlike `RUNTIME_HUB_URL` it changes neither the sign-in nor the chat's terminal |
 | `RUNTIME_HUB_URL` | the public address of the [hub](hub/machine.md) that carries this runtime (the installer sets it); the page gets it as `hubUrl`. It also closes the first-run password setup (the hub signs people in) and lets the machine agent open a login console at `<base>/console/<id>` |
 | `RUNTIME_SPEED_POSTHOG_HOST`, `RUNTIME_SPEED_POSTHOG_KEY` | a PostHog project the page reports its own speed to (load, long tasks); unset: nothing is sent |
 

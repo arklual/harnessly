@@ -28,7 +28,7 @@ import {
 } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { bootNext, shutdownNext } from '@/next/boot';
-import { appConfig } from '@/platform/config';
+import { appConfig, saveLanguage, type TLanguage } from '@/platform/config';
 import { hasFeature, useMachines } from '@/next/stores/machines';
 import { useDeadline } from '@/next/ui/use-deadline';
 import {
@@ -48,6 +48,13 @@ import { useTheme } from '@/platform/theme';
 /** The words for a change of the person's settings that did not go through. */
 const patchError = (res: Exclude<PatchResult, { r: 'accepted' }>): string =>
   res.r === 'refused' ? t(`next.refuse.${res.code}`) : t('next.failure.network');
+
+/** The language is read while the texts are drawn, so a new one is taken by a reload, once the browser has kept it. */
+const changeLanguage = (language: TLanguage): void => {
+  if (language === locale()) return;
+  if (saveLanguage(language)) window.location.reload();
+  else toast(t('next.settings.failed'), { tone: 'error' });
+};
 
 /** A change of the person's settings: resolves when the server took it, rejects with the reason when it did not. */
 const savePerson = async (patch: Partial<PersonSettings>): Promise<void> => {
@@ -211,6 +218,7 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
       paneAuto={paneAuto}
       feedKinds={feedKinds}
       language={locale()}
+      onLanguage={changeLanguage}
       account={{ name, hint, canSignOut: password || hubUrl !== null }}
       idleStop={runtime.value?.idleStop ?? null}
       limitContinue={runtime.value?.limitContinue ?? null}
@@ -300,7 +308,7 @@ export const AppsPage = ({ machine }: { machine: MachineId }) => {
     <AppsSection
       feed={feed.state.k === 'ready' ? feed.state.value : null}
       error={error}
-      onOpen={() => goTo({ kind: ROUTE.apps })}
+      onOpen={() => goTo({ kind: ROUTE.tasks })}
       onRetry={feed.retry}
     />
   );

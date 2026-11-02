@@ -51,10 +51,13 @@ import { linkReason, useConnection, useLinkRestored } from '@/next/stores/connec
 import { useBackground, useFeed, useGates, usePictures, useQueue } from '@/next/stores/conversation';
 import { runsByCall, WorkflowRuns } from '@/next/features/workflows/run';
 import { machineApi } from '@/next/core/net/machine';
+import { ImageHost, type IImageHost } from '@/next/features/chat/image-card';
 import { MessagePictures, type IMessagePictures } from '@/next/features/chat/pictures';
 import { conversationsStore, useConversation, useConversationList } from '@/next/stores/conversations';
 import { convOfRef, parsePeer, PeerActions, type IPeerActions } from '@/next/features/chat/peer';
 import { AskSource, type IAskSource } from '@/next/features/asks/parse';
+import { AppViewHost, type IAppViewHost } from '@/next/features/app-views/host';
+import PostedCards from '@/next/features/app-views/posted';
 import { RewindActions, type IRewindActions } from '@/next/features/chat/rewind';
 import { DelegatedChats } from '@/next/features/chat/delegation';
 import { sendPeer } from '@/next/features/peers/api';
@@ -259,6 +262,8 @@ const ChatView = ({
     [listedPictures, machine, conv],
   );
 
+  const imageHost = useMemo<IImageHost>(() => ({ machine, conv }), [machine, conv]);
+
   // A model as the machine's agent names it («Sonnet 5.5»), for the lines of changed models in the feed.
   const agents = machineView?.machine.agents;
   const provider = record?.provider;
@@ -325,6 +330,8 @@ const ChatView = ({
 
   // The agent's questions to people (`harnessly ask`) read from this machine's list of asks.
   const askSource = useMemo<IAskSource>(() => ({ machine, conversation: conv }), [machine, conv]);
+  // The apps' cards in this feed work beside this chat.
+  const appViewHost = useMemo<IAppViewHost>(() => ({ machine, conversation: conv }), [machine, conv]);
 
   const metGoal = record?.goal?.status === 'met' ? record.goal : null;
   const goalReached =
@@ -339,110 +346,119 @@ const ChatView = ({
     <AttachmentSrc.Provider value={srcOf}>
       <ChatLinks.Provider value={handoff.links}>
         <MessagePictures.Provider value={pictures}>
-          <PeerActions.Provider value={peerActions}>
-            <AskSource.Provider value={askSource}>
-              <RewindActions value={rewindActions}>
-                <DelegatedChats.Provider value={delegated}>
-                  <WorkflowRuns value={workflowRuns}>
-                    <Feed
-                      items={items}
-                      failed={notFound || wait.expired}
-                      failedReason={notFound ? null : failedReason}
-                      onRetryLoad={() => {
-                        onRetryLoad();
-                        wait.restart();
-                      }}
-                      olderFailed={olderFailed}
-                      hasOlder={before !== null}
-                      loadingOlder={loadingOlder}
-                      catchingUp={catchingUp}
-                      onLoadOlder={onLoadOlder}
-                      reveal={reveal}
-                      onRevealed={doneReveal}
-                      density={density}
-                      offline={connection !== undefined && connection.k !== 'live'}
-                      enterAfter={feed?.subscribedAt ?? openedAt}
-                      machineName={machineView?.machine.name ?? machine}
-                      workingSince={workingSince}
-                      terminalStop={terminalStop}
-                      goalReached={goalReached}
-                      limit={
-                        <LimitCard
-                          limited={limited}
-                          clock={machineClock}
-                          controls={machineView?.features.includes('auto-continue') ?? false}
-                          onDecide={(action) => settled(decideLimit(machine, conv, action))}
-                        />
-                      }
-                      terminalFailure={
-                        <>
-                          <TerminalFailureCard
-                            failure={record?.terminalFailure ?? null}
-                            onChooseTarget={handoff.handoff ? () => requestContinue(conv) : null}
-                            onRetry={() => {
-                              const text = retryText(items, queue?.items.length ?? 0);
-                              if (text) sendMessage(machine, { conversationId: conv, text });
-                              return settled(resumeQueue(machine, conv));
-                            }}
-                          />
-                          {loginLost && provider && (
-                            <ChatLogin
-                              key={loginLost.key}
-                              machine={machine}
-                              provider={provider}
-                              onRetry={loginLost.prompt ? () => resend(loginLost.prompt?.text ?? '') : null}
+          <ImageHost.Provider value={imageHost}>
+            <PeerActions.Provider value={peerActions}>
+              <AskSource.Provider value={askSource}>
+                <AppViewHost value={appViewHost}>
+                  <RewindActions value={rewindActions}>
+                    <DelegatedChats.Provider value={delegated}>
+                      <WorkflowRuns value={workflowRuns}>
+                        <Feed
+                          items={items}
+                          failed={notFound || wait.expired}
+                          failedReason={notFound ? null : failedReason}
+                          onRetryLoad={() => {
+                            onRetryLoad();
+                            wait.restart();
+                          }}
+                          olderFailed={olderFailed}
+                          hasOlder={before !== null}
+                          loadingOlder={loadingOlder}
+                          catchingUp={catchingUp}
+                          onLoadOlder={onLoadOlder}
+                          reveal={reveal}
+                          onRevealed={doneReveal}
+                          density={density}
+                          offline={connection !== undefined && connection.k !== 'live'}
+                          enterAfter={feed?.subscribedAt ?? openedAt}
+                          machineName={machineView?.machine.name ?? machine}
+                          workingSince={workingSince}
+                          terminalStop={terminalStop}
+                          goalReached={goalReached}
+                          limit={
+                            <LimitCard
+                              limited={limited}
+                              clock={machineClock}
+                              controls={machineView?.features.includes('auto-continue') ?? false}
+                              onDecide={(action) => settled(decideLimit(machine, conv, action))}
                             />
-                          )}
-                        </>
-                      }
-                      waiting={
-                        waitingAgents.length > 0 ? { agents: waitingAgents, onOpen: onShowBackground } : null
-                      }
-                      modelLabel={modelLabel}
-                      onOpenFile={onOpenFile}
-                      onOpenOutput={onOpenOutput}
-                      onShareFile={(path) => setSharing({ path, open: true })}
-                      shown={shown}
-                      downloadUrl={(path) => downloadUrl(machine, path)}
-                      onOpenRef={(kind, label, href) => {
-                        if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
-                        else onOpenRef?.(href ?? label);
-                      }}
-                      onLoadSteps={onLoadSteps}
-                      onContinueTurn={() => resend(t('next.turnEnd.continueText'))}
-                      onRetryTurn={(turnId) =>
-                        resend(turnPrompt.get(turnId) ?? t('next.turnEnd.continueText'))
-                      }
-                      onRetryMessage={(clientId) => settled(retryMessage(clientId))}
-                      onResendMessage={(clientId) => {
-                        resendRefused(clientId);
-                        return Promise.resolve();
-                      }}
-                      onDeleteMessage={(clientId) => {
-                        const m = messagesStore.get(clientId);
-                        if (!m) return Promise.resolve();
-                        return settled(cancelMessage(clientId));
-                      }}
-                      renderGate={renderGate}
-                      onForkTurn={handoff.onForkTurn}
-                      dock={
-                        move.moved ? (
-                          <MovedNote moved={move.moved} onOpen={move.openMoved} />
-                        ) : (
-                          <ChatDock
-                            conv={conv}
-                            machine={machine}
-                            extra={dockExtra}
-                            handoff={handoff.handoff}
-                          />
-                        )
-                      }
-                    />
-                  </WorkflowRuns>
-                </DelegatedChats.Provider>
-              </RewindActions>
-            </AskSource.Provider>
-          </PeerActions.Provider>
+                          }
+                          terminalFailure={
+                            <>
+                              <PostedCards />
+                              <TerminalFailureCard
+                                failure={record?.terminalFailure ?? null}
+                                onChooseTarget={handoff.handoff ? () => requestContinue(conv) : null}
+                                onRetry={() => {
+                                  const text = retryText(items, queue?.items.length ?? 0);
+                                  if (text) sendMessage(machine, { conversationId: conv, text });
+                                  return settled(resumeQueue(machine, conv));
+                                }}
+                              />
+                              {loginLost && provider && (
+                                <ChatLogin
+                                  key={loginLost.key}
+                                  machine={machine}
+                                  provider={provider}
+                                  onRetry={
+                                    loginLost.prompt ? () => resend(loginLost.prompt?.text ?? '') : null
+                                  }
+                                />
+                              )}
+                            </>
+                          }
+                          waiting={
+                            waitingAgents.length > 0
+                              ? { agents: waitingAgents, onOpen: onShowBackground }
+                              : null
+                          }
+                          modelLabel={modelLabel}
+                          onOpenFile={onOpenFile}
+                          onOpenOutput={onOpenOutput}
+                          onShareFile={(path) => setSharing({ path, open: true })}
+                          shown={shown}
+                          downloadUrl={(path) => downloadUrl(machine, path)}
+                          onOpenRef={(kind, label, href) => {
+                            if (kind === 'file' && !href) onOpenFile?.(label.replace(/:\d+$/, ''));
+                            else onOpenRef?.(href ?? label);
+                          }}
+                          onLoadSteps={onLoadSteps}
+                          onContinueTurn={() => resend(t('next.turnEnd.continueText'))}
+                          onRetryTurn={(turnId) =>
+                            resend(turnPrompt.get(turnId) ?? t('next.turnEnd.continueText'))
+                          }
+                          onRetryMessage={(clientId) => settled(retryMessage(clientId))}
+                          onResendMessage={(clientId) => {
+                            resendRefused(clientId);
+                            return Promise.resolve();
+                          }}
+                          onDeleteMessage={(clientId) => {
+                            const m = messagesStore.get(clientId);
+                            if (!m) return Promise.resolve();
+                            return settled(cancelMessage(clientId));
+                          }}
+                          renderGate={renderGate}
+                          onForkTurn={handoff.onForkTurn}
+                          dock={
+                            move.moved ? (
+                              <MovedNote moved={move.moved} onOpen={move.openMoved} />
+                            ) : (
+                              <ChatDock
+                                conv={conv}
+                                machine={machine}
+                                extra={dockExtra}
+                                handoff={handoff.handoff}
+                              />
+                            )
+                          }
+                        />
+                      </WorkflowRuns>
+                    </DelegatedChats.Provider>
+                  </RewindActions>
+                </AppViewHost>
+              </AskSource.Provider>
+            </PeerActions.Provider>
+          </ImageHost.Provider>
         </MessagePictures.Provider>
       </ChatLinks.Provider>
       {handoff.sheets}

@@ -8,6 +8,24 @@ import { clusterApi } from '@/next/core/net/machine';
 import { getPage, sendJson } from '@/next/core/net/http';
 import type { MachineId } from '@/next/protocol/v2';
 
+/** The recognition models of dictation: the machine's own, OpenAI's, Yandex's. */
+export const VOICE_ENGINE_IDS = ['local', 'openai', 'yandex'] as const;
+export type VoiceEngineId = (typeof VOICE_ENGINE_IDS)[number];
+
+/** A word dictation gets wrong: how it is written and, optionally, how it is heard. */
+export interface VoiceWord {
+  word: string;
+  heard: string[];
+}
+
+/** The dictionary's limits, as the runtime keeps them (internal/wire/me.go). */
+export const VOICE_LIMITS = { words: 200, wordLen: 64, heard: 10 } as const;
+
+export interface VoiceSettings {
+  engine: VoiceEngineId;
+  words: VoiceWord[];
+}
+
 export interface PersonSettings {
   uiVersion: 'legacy' | 'next';
   locale: 'ru' | 'en';
@@ -17,6 +35,9 @@ export interface PersonSettings {
   defaultMachine: MachineId | null;
   notify: { types: string[]; sound: boolean; dnd: boolean };
   quickPrompts: string[];
+  /** The shortcuts the person changed: an action's id to its shortcuts (features/keys); an empty list turns it off. */
+  keys: Record<string, string[]>;
+  voice: VoiceSettings;
 }
 
 export interface Me {
@@ -44,6 +65,8 @@ export const DEFAULT_SETTINGS: PersonSettings = {
   defaultMachine: null,
   notify: { types: ['turn-finished', 'question', 'permission'], sound: false, dnd: false },
   quickPrompts: [],
+  keys: {},
+  voice: { engine: 'local', words: [] },
 };
 
 export type PatchResult =
@@ -109,6 +132,18 @@ export const useMe = (): MeState => useStore(meStore);
 export const useEnterSends = (): boolean => {
   const me = useMe();
   return me.k === 'ready' ? me.me.settings.enterSends : true;
+};
+
+/** The dictation's settings: the model and the person's words; until the settings are known, the machine's own model. */
+export const useVoiceSettings = (): VoiceSettings => {
+  const me = useMe();
+  return me.k === 'ready' ? me.me.settings.voice : DEFAULT_SETTINGS.voice;
+};
+
+/** The same, read once (a dictation that begins). */
+export const voiceSettings = (): VoiceSettings => {
+  const st = meStore.get();
+  return st.k === 'ready' ? st.me.settings.voice : DEFAULT_SETTINGS.voice;
 };
 
 let source: MeSource = localMeSource();

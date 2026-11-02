@@ -2,10 +2,11 @@
 // (visualViewport) goes to --hx-kb on the dock, which lifts it by that much. Desktop never sees a change.
 import { useEffect, type RefObject } from 'react';
 
-const useKeyboardInset = (ref: RefObject<HTMLElement | null>) => {
+/** `holder` is the element that gets lifted: the closest ancestor of `ref` (or itself) matching it. */
+const useKeyboardInset = (ref: RefObject<HTMLElement | null>, holder = '.hx-dock') => {
   useEffect(() => {
     const viewport = window.visualViewport;
-    const element = ref.current?.closest<HTMLElement>('.hx-dock') ?? null;
+    const element = ref.current?.closest<HTMLElement>(holder) ?? null;
     if (!viewport || !element) return;
     let frame = 0;
     const update = () => {
@@ -25,7 +26,7 @@ const useKeyboardInset = (ref: RefObject<HTMLElement | null>) => {
       viewport.removeEventListener('scroll', update);
       element.style.removeProperty('--hx-kb');
     };
-  }, [ref]);
+  }, [ref, holder]);
 };
 
 export default useKeyboardInset;

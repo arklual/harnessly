@@ -17,6 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/background"
+	"github.com/ly-solutions/harnessly/internal/budget"
 	"github.com/ly-solutions/harnessly/internal/coreapi"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/history"
@@ -104,6 +105,9 @@ type core struct {
 	// launcher starts and resumes conversations, inbox delivers document comments (slice "launch").
 	launcher *launch.Starter
 	inbox    *launch.Inbox
+	// budget is the hub's limits gate (budget_gate.go), made on first use.
+	budget     *budget.Gate
+	budgetOnce sync.Once
 	// api answers the hook and agent routes; push sends the web push notifications (nil when off).
 	api  *coreapi.Config
 	push *push.Sender

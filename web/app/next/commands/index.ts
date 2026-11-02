@@ -107,6 +107,9 @@ export const renameConversation = (m: MachineId, id: ConvId, title: string) =>
   runCommand(m, 'conversation.rename', { id, title });
 export const pinConversation = (m: MachineId, id: ConvId, pinned: boolean) =>
   runCommand(m, 'conversation.pin', { id, pinned });
+/** The installed apps turned on in a chat, the whole list: the runtime keeps exactly these (and stops a resting agent). */
+export const setConversationApps = (m: MachineId, id: ConvId, apps: string[]) =>
+  runCommand(m, 'conversation.apps', { id, apps });
 export const moveConversation = (m: MachineId, id: ConvId, projectId: string | null) =>
   runCommand(m, 'conversation.move', { id, projectId });
 export const deleteConversation = (m: MachineId, id: ConvId, force = false) =>

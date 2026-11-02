@@ -1,0 +1,381 @@
+{
+  "scope": {
+    "kind": "org",
+    "id": "o2acmeorgaaaaaaaaaaa"
+  },
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "spend": {
+    "list": {
+      "usd": 1610,
+      "shown": 131215.0
+    },
+    "paid": {
+      "usd": 1380,
+      "shown": 112470.0
+    },
+    "limit": {
+      "ruleId": "l2orgaaaaaaaaaaaaaa",
+      "amount": {
+        "usd": 2500,
+        "shown": 203750.0
+      },
+      "pct": 0.552,
+      "status": "ok",
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      }
+    },
+    "forecast": {
+      "usd": 2140,
+      "shown": 174410.0
+    }
+  },
+  "tiles": {
+    "activePeople": {
+      "value": 4,
+      "cmpValue": 3,
+      "unit": "people"
+    },
+    "sessions": {
+      "value": 612,
+      "cmpValue": 540,
+      "unit": "count"
+    },
+    "mrs": {
+      "value": 87,
+      "cmpValue": 71,
+      "unit": "count"
+    },
+    "moneyPerMr": {
+      "value": 15.9,
+      "cmpValue": 18.2,
+      "unit": "usd"
+    }
+  },
+  "attention": [
+    {
+      "id": "g2windowaaaaaaaaaaaa",
+      "rule": "window_90",
+      "severity": "critical",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "account",
+        "id": "a2claudemaxaaaaaaaaa",
+        "label": "Claude Max №1"
+      },
+      "title": "Окно Claude Max №1 — 92%",
+      "detail": "Сброс через 2 ч 10 мин",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "move_account",
+        "label": "Перекинуть на №2",
+        "fromAccountId": "a2claudemaxaaaaaaaaa",
+        "toAccountId": "a2claudemaxbbbbbbbbb"
+      }
+    },
+    {
+      "id": "g2budgetaaaaaaaaaaaa",
+      "rule": "budget_runs_out",
+      "severity": "warn",
+      "scope": {
+        "kind": "tenant",
+        "id": "t2acmetenantaaaaaaaa"
+      },
+      "subject": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa",
+        "label": "Платформа"
+      },
+      "title": "Бюджет «Платформы» кончится 26 ноября",
+      "detail": "Темп за 7 дней — $41 в день, осталось $310 до конца месяца",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "raise_limit",
+        "label": "Поднять лимит",
+        "scope": {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa"
+        },
+        "userId": null
+      }
+    },
+    {
+      "id": "g2unknownaaaaaaaaaaa",
+      "rule": "unknown_account",
+      "severity": "info",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "account",
+        "id": "a2unknownaaaaaaaaaaa",
+        "label": "Неизвестный ключ Anthropic"
+      },
+      "title": "На машине организации — незнакомый ключ",
+      "detail": "Расход по нему считается личным, пока ключ не зарегистрирован",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "register_account",
+        "label": "Зарегистрировать",
+        "accountId": "a2unknownaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2nopriceaaaaaaaaaaa",
+      "rule": "model_no_price",
+      "severity": "info",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeorgaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "model",
+        "id": "k3.1-pro",
+        "label": "k3.1-pro"
+      },
+      "title": "У модели k3.1-pro нет цены",
+      "detail": "1970 вызовов за 30 дней не попали в деньги",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "open_prices",
+        "label": "Указать цену",
+        "model": "k3.1-pro"
+      }
+    },
+    {
+      "id": "g2machineaaaaaaaaaaa",
+      "rule": "machine_offline",
+      "severity": "info",
+      "scope": {
+        "kind": "tenant",
+        "id": "t2acmetenantaaaaaaaa"
+      },
+      "subject": {
+        "kind": "machine",
+        "id": "h2buildboxaaaaaaaaaa",
+        "label": "build-box"
+      },
+      "title": "build-box не на связи 2 дня",
+      "detail": "Последний раз — 28 октября в 14:02",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": true,
+      "action": {
+        "kind": "open_machine",
+        "label": "Открыть машину",
+        "machineId": "h2buildboxaaaaaaaaaa"
+      }
+    }
+  ],
+  "spendBy": {
+    "by": "team",
+    "rows": [
+      {
+        "key": "m2platformteamaaaaaa",
+        "label": "Платформа",
+        "list": {
+          "usd": 1190,
+          "shown": 96985.0
+        },
+        "paid": {
+          "usd": 980,
+          "shown": 79870.0
+        },
+        "calls": 1200,
+        "unpricedCalls": 0,
+        "tokens": {
+          "input": 2380000,
+          "output": 10710000,
+          "cacheRead": 476000000,
+          "cacheWrite": 23800000
+        },
+        "limit": {
+          "ruleId": "l2teamplatformaaaaa",
+          "amount": {
+            "usd": 1500,
+            "shown": 122250.0
+          },
+          "pct": 0.793,
+          "status": "ok",
+          "setBy": {
+            "userId": "u2annaaaaaaaaaaaaaaa",
+            "name": "Анна"
+          }
+        },
+        "forecast": {
+          "usd": 1580,
+          "shown": 128770.0
+        },
+        "guessedShare": 0.04
+      },
+      {
+        "key": "m2productteamaaaaaaa",
+        "label": "Продукт",
+        "list": {
+          "usd": 420,
+          "shown": 34230.0
+        },
+        "paid": {
+          "usd": 400,
+          "shown": 32600.0
+        },
+        "calls": 1200,
+        "unpricedCalls": 0,
+        "tokens": {
+          "input": 840000,
+          "output": 3780000,
+          "cacheRead": 168000000,
+          "cacheWrite": 8400000
+        },
+        "limit": {
+          "ruleId": "l2teamproductaaaaaa",
+          "amount": {
+            "usd": 600,
+            "shown": 48900.0
+          },
+          "pct": 0.7,
+          "status": "ok",
+          "setBy": {
+            "userId": "u2annaaaaaaaaaaaaaaa",
+            "name": "Анна"
+          }
+        },
+        "forecast": {
+          "usd": 560,
+          "shown": 45640.0
+        },
+        "guessedShare": 0.0
+      }
+    ]
+  },
+  "subscriptions": [
+    {
+      "accountId": "a2claudemaxaaaaaaaaa",
+      "label": "Claude Max №1",
+      "provider": "anthropic",
+      "plan": "max-20x",
+      "monthlyFee": {
+        "usd": 200,
+        "shown": 16300.0
+      },
+      "preliminary": true,
+      "shares": [
+        {
+          "person": {
+            "userId": "u2annaaaaaaaaaaaaaaa",
+            "name": "Анна"
+          },
+          "share": 0.55,
+          "amount": {
+            "usd": 110,
+            "shown": 8965.0
+          },
+          "windowPct": 21.0
+        },
+        {
+          "person": {
+            "userId": "u2borisaaaaaaaaaaaaa",
+            "name": "Борис"
+          },
+          "share": 0.45,
+          "amount": {
+            "usd": 90,
+            "shown": 7335.0
+          },
+          "windowPct": 17.0
+        }
+      ],
+      "windows": [
+        {
+          "name": "five_hour",
+          "scope": "all",
+          "lengthSec": 18000,
+          "usedPct": 38.0,
+          "resetsAt": "2026-10-30T20:00:00Z",
+          "measuredAt": "2026-10-30T17:55:00Z",
+          "confidence": "undocumented",
+          "waiting": false,
+          "forecastFullAt": null
+        },
+        {
+          "name": "seven_day",
+          "scope": "all",
+          "lengthSec": 604800,
+          "usedPct": 71.0,
+          "resetsAt": "2026-11-02T09:00:00Z",
+          "measuredAt": "2026-10-30T17:55:00Z",
+          "confidence": "undocumented",
+          "waiting": false,
+          "forecastFullAt": null
+        }
+      ]
+    },
+    {
+      "accountId": "a2claudemaxbbbbbbbbb",
+      "label": "Claude Max №2",
+      "provider": "anthropic",
+      "plan": "max-20x",
+      "monthlyFee": {
+        "usd": 200,
+        "shown": 16300.0
+      },
+      "preliminary": true,
+      "shares": [
+        {
+          "person": {
+            "userId": "u2veraaaaaaaaaaaaaaa",
+            "name": "Вера"
+          },
+          "share": 1.0,
+          "amount": {
+            "usd": 200,
+            "shown": 16300.0
+          },
+          "windowPct": null
+        }
+      ],
+      "windows": [
+        {
+          "name": "five_hour",
+          "scope": "all",
+          "lengthSec": 18000,
+          "usedPct": null,
+          "resetsAt": "2026-10-30T16:00:00Z",
+          "measuredAt": "2026-10-30T17:55:00Z",
+          "confidence": "undocumented",
+          "waiting": true,
+          "forecastFullAt": null
+        }
+      ]
+    }
+  ],
+  "accountedUntil": "2026-10-30T17:58:00Z"
+}

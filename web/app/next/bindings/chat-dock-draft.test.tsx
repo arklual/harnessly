@@ -7,7 +7,7 @@ vi.mock('@/next/bindings/use-limits', () => ({ useAgentLimits: () => null }));
 vi.mock('@/next/bindings/use-context-window', () => ({ useContextWindow: () => null }));
 const dictations: IDictationEvents[] = [];
 vi.mock('@/next/features/composer/voice-socket', () => ({
-  openDictation: (_m: string, _lang: string, on: IDictationEvents) => {
+  openDictation: (_m: string, _lang: string, _voice: unknown, on: IDictationEvents) => {
     dictations.push(on);
     let ready = false;
     return {

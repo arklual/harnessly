@@ -39,6 +39,9 @@ type pageConfig struct {
 	// HubURL is the public address of the hub this machine is connected to (RUNTIME_HUB_URL), without a trailing slash;
 	// null for a runtime no hub carries. The page links back to the hub and signs out there.
 	HubURL *string `json:"hubUrl"`
+	// HubLink is where the page's «Хаб» link leads: RUNTIME_HUB_LINK, else the hub carrying this runtime. A machine no hub
+	// carries can link to one without RUNTIME_HUB_URL, which would close the first-run setup and the chat's terminal.
+	HubLink *string `json:"hubLink"`
 }
 
 // pagePin is a page every person finds pinned in the browser tab until they change their pins.
@@ -115,6 +118,10 @@ func pageConfigFromEnv() pageConfig {
 	}
 	c.GithubHost = githubFromEnv().Web
 	c.HubURL = optional(strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_HUB_URL")), "/"))
+	c.HubLink = c.HubURL
+	if link := strings.TrimRight(strings.TrimSpace(os.Getenv("RUNTIME_HUB_LINK")), "/"); link != "" {
+		c.HubLink = &link
+	}
 	if prefixes := splitList(env("RUNTIME_UPLOAD_HEADER_PREFIXES", "x-harnessly-")); len(prefixes) > 0 {
 		c.UploadHeaderPrefix = prefixes[0]
 	}

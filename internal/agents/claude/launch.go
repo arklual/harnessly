@@ -63,6 +63,15 @@ func LauncherCommand(launcher string) (string, error) {
 	return LaunchEnv + " " + agents.ShellQuote(launcher), nil
 }
 
+// wrappedLauncher is LauncherCommand with the CLI under wrap (shell words), after the environment: `VAR=1 <wrap> claude`.
+func wrappedLauncher(launcher, wrap string) (string, error) {
+	command, err := LauncherCommand(launcher)
+	if err != nil || wrap == "" {
+		return command, err
+	}
+	return strings.Replace(command, LaunchEnv+" ", LaunchEnv+" "+wrap+" ", 1), nil
+}
+
 // LaunchFlags are `--model '<m>'` and `--effort <e>` of a choice, checked again first.
 func LaunchFlags(l *agents.Launch) ([]string, error) {
 	if l == nil {
@@ -174,6 +183,13 @@ func (c LaunchConfig) promptFileFlags(workspaceID string, extra []string) ([]str
 // Flags are the launch flags in order: settings, MCP config, skills plugin, system-prompt files, permissions, model and
 // effort.
 func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFiles []string) (string, error) {
+	flags, _, err := c.flagsAndWrap(workspaceID, launch, promptFiles)
+	return flags, err
+}
+
+// flagsAndWrap are Flags and the words the CLI runs under: the apps' environment and wall (agents.ClaudeApps Env and
+// Wrap), in that order.
+func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, promptFiles []string) (string, string, error) {
 	settings := c.HooksPath
 	// settingsFile is the same file unquoted, for the apps' file to extend.
 	settingsFile := c.HooksPath
@@ -182,27 +198,27 @@ func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFil
 		// reads one --settings (the last one given), so it replaces the hooks file here, and the model goes in the file's
 		// environment as well as in --model.
 		if c.Profiles == nil {
-			return "", ErrNoProfiles
+			return "", "", ErrNoProfiles
 		}
 		if err := agents.CheckLaunch(launch); err != nil {
-			return "", err
+			return "", "", err
 		}
 		if launch.Effort != nil {
 			m, ok := c.Profiles.Model(launch.Profile, *launch.Model)
 			if !ok || !slices.Contains(m.Efforts, wire.Effort(*launch.Effort)) {
-				return "", agents.ErrLaunchEffort
+				return "", "", agents.ErrLaunchEffort
 			}
 		}
 		path, err := c.Profiles.ClaudeSettings(launch.Profile, *launch.Model, c.HooksPath)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		settings, settingsFile = agents.ShellQuote(path), path
 	} else if launch != nil && launch.Ultracode {
 		// Claude Code reads one --settings (the last one given): the mode goes into a copy of the hooks settings.
 		path, err := UltracodeSettings(c.HooksPath)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		settings, settingsFile = path, path
 	}
@@ -210,18 +226,22 @@ func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFil
 	if launch != nil && len(launch.Apps) > 0 {
 		// The apps' settings file is the one chosen above plus the app-guard hook: Claude reads one --settings.
 		if c.Apps == nil {
-			return "", agents.ErrNoApps
+			return "", "", agents.ErrNoApps
 		}
 		if err := agents.CheckLaunch(launch); err != nil {
-			return "", err
+			return "", "", err
 		}
 		var err error
 		if apps, err = c.Apps.Claude(launch.Apps, settingsFile); err != nil {
-			return "", err
+			return "", "", err
 		}
 		settings = agents.ShellQuote(apps.Settings)
 	}
-	parts := []string{"--settings " + settings, "--mcp-config " + c.MCPConfigPath}
+	mcp := c.MCPConfigPath
+	if apps.RuntimeMCPConfig != "" {
+		mcp = agents.ShellQuote(apps.RuntimeMCPConfig)
+	}
+	parts := []string{"--settings " + settings, "--mcp-config " + mcp}
 	if c.PluginDir != nil {
 		if dir := c.PluginDir(); dir != "" {
 			parts = append(parts, "--plugin-dir "+agents.ShellQuote(dir))
@@ -230,12 +250,15 @@ func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFil
 	for _, dir := range apps.PluginDirs {
 		parts = append(parts, "--plugin-dir "+agents.ShellQuote(dir))
 	}
+	if apps.MCPConfig != "" {
+		parts = append(parts, "--mcp-config "+agents.ShellQuote(apps.MCPConfig))
+	}
 	if apps.PromptFile != "" {
 		promptFiles = append(slices.Clone(promptFiles), apps.PromptFile)
 	}
 	prompts, err := c.promptFileFlags(workspaceID, promptFiles)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	parts = append(parts, prompts...)
 	if c.SkipPermissions != nil && c.SkipPermissions() {
@@ -243,10 +266,10 @@ func (c LaunchConfig) Flags(workspaceID string, launch *agents.Launch, promptFil
 	}
 	flags, err := LaunchFlags(launch)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	parts = append(parts, flags...)
-	return strings.Join(parts, " "), nil
+	return strings.Join(parts, " "), strings.TrimSpace(apps.Env + " " + apps.Wrap), nil
 }
 
 func (c LaunchConfig) withEditor(command string) string {
@@ -263,11 +286,11 @@ func (c LaunchConfig) withEditor(command string) string {
 // LaunchCommand is the line that starts a new conversation (an initial prompt goes after it, see
 // agents.WithInitialPrompt).
 func (c LaunchConfig) LaunchCommand(workspaceID string, launch *agents.Launch, promptFiles []string) (string, error) {
-	flags, err := c.Flags(workspaceID, launch, promptFiles)
+	flags, wrap, err := c.flagsAndWrap(workspaceID, launch, promptFiles)
 	if err != nil {
 		return "", err
 	}
-	launcher, err := LauncherCommand(c.Launcher)
+	launcher, err := wrappedLauncher(c.Launcher, wrap)
 	if err != nil {
 		return "", err
 	}
@@ -279,11 +302,11 @@ func (c LaunchConfig) ResumeCommand(sessionID, workspaceID string, launch *agent
 	if !agents.IsUUID(sessionID) {
 		return "", errors.New("Invalid session ID format: " + sessionID)
 	}
-	flags, err := c.Flags(workspaceID, launch, nil)
+	flags, wrap, err := c.flagsAndWrap(workspaceID, launch, nil)
 	if err != nil {
 		return "", err
 	}
-	launcher, err := LauncherCommand(c.Launcher)
+	launcher, err := wrappedLauncher(c.Launcher, wrap)
 	if err != nil {
 		return "", err
 	}

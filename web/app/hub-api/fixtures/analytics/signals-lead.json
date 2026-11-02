@@ -1,0 +1,91 @@
+{
+  "signals": [
+    {
+      "id": "g2overaaaaaaaaaaaaaa",
+      "rule": "over_80",
+      "severity": "warn",
+      "scope": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa"
+      },
+      "subject": {
+        "kind": "user",
+        "id": "u2veraaaaaaaaaaaaaaa",
+        "label": "Вера"
+      },
+      "title": "Вера потратила 84% личного лимита",
+      "detail": "$84 из $100 за октябрь",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "raise_limit",
+        "label": "Поднять лимит",
+        "scope": {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa"
+        },
+        "userId": "u2veraaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2requestaaaaaaaaaaa",
+      "rule": "limit_request",
+      "severity": "info",
+      "scope": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa"
+      },
+      "subject": {
+        "kind": "user",
+        "id": "u2veraaaaaaaaaaaaaaa",
+        "label": "Вера"
+      },
+      "title": "Вера просит +$50 на октябрь",
+      "detail": "«Доделать миграцию до релиза»",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "raise_limit",
+        "label": "Поднять лимит",
+        "scope": {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa"
+        },
+        "userId": "u2veraaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2budgetaaaaaaaaaaaa",
+      "rule": "budget_runs_out",
+      "severity": "warn",
+      "scope": {
+        "kind": "tenant",
+        "id": "t2acmetenantaaaaaaaa"
+      },
+      "subject": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa",
+        "label": "Платформа"
+      },
+      "title": "Бюджет «Платформы» кончится 26 ноября",
+      "detail": "Темп за 7 дней — $41 в день, осталось $310 до конца месяца",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "raise_limit",
+        "label": "Поднять лимит",
+        "scope": {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa"
+        },
+        "userId": null
+      }
+    }
+  ]
+}

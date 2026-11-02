@@ -21,6 +21,7 @@ import {
   type PresetId,
 } from '@/next/features/providers/model';
 import GptSwitch from '@/next/features/providers/gpt-switch';
+import SpeechKeyCards, { type SpeechCards } from '@/next/features/providers/speech-cards';
 import VendorCard from '@/next/features/providers/vendor-card';
 import { optionValue } from '@/next/features/settings/options';
 import { FormError, Group, SetButton } from '@/next/features/settings/rows';
@@ -78,6 +79,8 @@ export interface IAccountsSectionProps {
   cards: readonly AccountCard[];
   credentials: Readonly<Record<Provider, IAgentCredentials>>;
   vendors: VendorCards;
+  /** The keys of the cloud recognition models, under the vendors'. */
+  speech: SpeechCards;
   /** The open card: an agent or a vendor. */
   open: string | null;
   /** The providers whose address is being written. */
@@ -355,6 +358,7 @@ const AccountsSection = ({
   cards,
   credentials,
   vendors,
+  speech,
   open,
   busy,
   onToggle,
@@ -399,6 +403,7 @@ const AccountsSection = ({
         />
       </div>
     )}
+    <SpeechKeyCards cards={speech} />
   </Group>
 );
 

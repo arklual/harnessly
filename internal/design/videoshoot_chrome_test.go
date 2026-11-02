@@ -56,6 +56,9 @@ p{position:absolute;left:10cqw;top:40cqh;font-size:4cqh;margin:0}
 		`<main class="board">`, `<main class="board" data-transition="fade">`, 1)},
 }
 
+// videoExtraScenes are scenes a test file adds to the fixture.
+var videoExtraScenes []struct{ Title, Board string }
+
 type shootRig struct {
 	l      *Library
 	id     string
@@ -82,7 +85,7 @@ func newShootRig(t *testing.T) *shootRig {
 	writeFile(t, filepath.Join(root, id, ProjectDirname, "deck-theme.css"), `:root{--deck-bg:#ffffff}`)
 	writeFile(t, filepath.Join(root, id, VideoSettingsFile), `{"v":1,"formats":["16:9","9:16"],"fps":30,"seconds":null,"voice":"none","subs":true}`)
 	g := &shootRig{l: l, id: id}
-	for i, s := range videoScenesFixture {
+	for i, s := range append(append([]struct{ Title, Board string }{}, videoScenesFixture...), videoExtraScenes...) {
 		pid := ULID(1_700_000_000_000+int64(i), [10]byte{byte(i + 1)})
 		file := s.Title + ".dc.html"
 		writeFile(t, filepath.Join(root, id, MetaDirname, MetaPagesDirname, pid+".json"),
@@ -106,6 +109,9 @@ func videoStandIn(l *Library) http.Handler {
 		switch {
 		case strings.HasPrefix(r.URL.Path, vendorPrefix):
 			l.serveVendor(w, r, r.URL.Path, false)
+			return
+		case strings.HasPrefix(r.URL.Path, motionKitPrefix):
+			l.serveMotionKit(w, r, r.URL.Path, false)
 			return
 		case r.URL.Path == scriptPath:
 			w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
@@ -153,7 +159,7 @@ func (g *shootRig) shoot(t *testing.T, s *deckShooter, sc VideoScene, f VideoFor
 		if v.I == 0 {
 			start = time.Now()
 		}
-		sum := sha256.Sum256(v.JPEG)
+		sum := sha256.Sum256(v.Image)
 		hashes = append(hashes, hex.EncodeToString(sum[:8]))
 		same = append(same, v.Same)
 		return nil

@@ -89,6 +89,7 @@ const ToolsLauncher = ({ tools, groups, onOpen, onAddress, head, ready = true }:
         className="hx-tl__tile"
         data-live={x.live ? 'true' : undefined}
         data-quiet={quiet ? 'true' : undefined}
+        data-used={!quiet && quietIds.size > 0 ? 'true' : undefined}
         aria-selected={current === x}
         onClick={() => onOpen(x.id)}
       >
@@ -169,8 +170,10 @@ const ToolsLauncher = ({ tools, groups, onOpen, onAddress, head, ready = true }:
         {shown.map((g) => (
           <section key={g.id} className="hx-tl__group">
             <div className="hx-tl__label">{g.label}</div>
-            <div className="hx-tl__grid">{g.items.map((x) => tile(x, false))}</div>
-            {g.quiet.length > 0 && <div className="hx-tl__quiet">{g.quiet.map((x) => tile(x, true))}</div>}
+            <div className="hx-tl__grid">
+              {g.items.map((x) => tile(x, false))}
+              {g.quiet.map((x) => tile(x, true))}
+            </div>
           </section>
         ))}
       </div>

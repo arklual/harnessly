@@ -1,6 +1,10 @@
 package apps
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestDecide(t *testing.T) {
 	cashback := &Manifest{ID: "acme.cashback", Agent: &Agent{Tools: &ToolPolicy{
@@ -25,6 +29,7 @@ func TestDecide(t *testing.T) {
 		{"exact confirm beats the mask", []*Manifest{cashback}, Call{Tool: "mcp__plugin_acme-cashback_bank-cashback__create"}, DecideConfirm, "acme.cashback"},
 		{"other MCP denied", []*Manifest{cashback}, Call{Tool: "mcp__github__create_issue"}, DecideDeny, "acme.cashback"},
 		{"host tools", []*Manifest{cashback}, Call{Tool: "mcp__harnessly-app__flow_go"}, DecideAllow, "acme.cashback"},
+		{"host tool by its dotted rule", []*Manifest{{ID: "x.y", Agent: &Agent{Tools: &ToolPolicy{Confirm: []string{"app.data.set"}}}}}, Call{Tool: "mcp__harnessly-app__data_set"}, DecideConfirm, "x.y"},
 		{"built-in denied", []*Manifest{cashback}, bash("ls"), DecideDeny, "acme.cashback"},
 		{"built-in allowed", []*Manifest{cashback}, Call{Tool: "Read"}, DecideAllow, "acme.cashback"},
 		{"no rule", []*Manifest{review}, Call{Tool: "Read"}, DecideNone, ""},
@@ -92,12 +97,79 @@ func TestSnapshotKeepsTheAppsOn(t *testing.T) {
 		{Call{Tool: "Bash", Input: map[string]any{"command": "echo x > /data/apps/packages/a.b/harnessly/app.json"}}, DecideDeny},
 		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly --json app rm a.b"}}, DecideDeny},
 		{Call{Tool: "Bash", Input: map[string]any{"command": "/usr/local/bin/harnessly app uninstall a.b"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel beta"}}, DecideNone},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel dev ."}}, DecideNone},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app eval ."}}, DecideNone},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel stable"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel=stable"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel beta --team"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --team=x"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --space=x"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --space x"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel stable"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel=prod"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel \"stable\""}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --channel beta --channel stable"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app update --yes"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app update"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app promote 1.3.0 --channel stable"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app rollback --channel stable"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app team install acme.demo"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app share acme.demo --ttl 7d"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app public install --yes acme.demo"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app public publish acme.demo 1.0.0"}}, DecideDeny},
+		{Call{Tool: "Bash", Input: map[string]any{"command": "harnessly app publish --public"}}, DecideDeny},
 		{Call{Tool: "Edit", Input: map[string]any{"file_path": "/home/me/dev-app/harnessly/app.json"}}, DecideDeny},
 		{Call{Tool: "Edit", Input: map[string]any{"file_path": "/home/me/dev-app/../dev-app/x"}}, DecideDeny},
 		{Call{Tool: "Edit", Input: map[string]any{"file_path": "/home/me/dev-application/x"}}, DecideNone},
 	} {
 		if v, _ := s.Decide(c.call); v.Decision != c.want {
 			t.Errorf("%+v: %s", c.call, v.Decision)
+		}
+	}
+}
+
+// The agent's file tools and its shell reach the registry by the way it really leads, not by how it is written.
+func TestSnapshotProtectsByRealPath(t *testing.T) {
+	base := t.TempDir()
+	data := filepath.Join(base, "data")
+	registry := filepath.Join(data, "apps")
+	if err := os.MkdirAll(filepath.Join(registry, "packages", "a.b"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	work := filepath.Join(base, "work")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The chat's own folder holds a link into the registry, and the data folder is also reached through a link.
+	if err := os.Symlink(registry, filepath.Join(work, "reg")); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(base, "alias")
+	if err := os.Symlink(data, alias); err != nil {
+		t.Fatal(err)
+	}
+	s := Snapshot{Protected: []string{alias + "/apps"}}
+	edit := func(tool, path string) Call { return Call{Tool: tool, Input: map[string]any{"file_path": path}} }
+	for _, c := range []struct {
+		name string
+		call Call
+		want Decision
+	}{
+		{"edit through a link in the work folder", edit("Edit", filepath.Join(work, "reg", "installed.json")), DecideDeny},
+		{"write a new file through the link", edit("Write", filepath.Join(work, "reg", "packages", "a.b", "new.json")), DecideDeny},
+		{"edit by the real path", edit("Edit", filepath.Join(registry, "installed.json")), DecideDeny},
+		{"edit by the path the launch named", edit("MultiEdit", alias+"/apps/installed.json"), DecideDeny},
+		{"edit with .. back into it", edit("Write", filepath.Join(work, "..", "data", "apps", "x")), DecideDeny},
+		{"the notebook tool", Call{Tool: "NotebookEdit", Input: map[string]any{"notebook_path": filepath.Join(registry, "n.ipynb")}}, DecideDeny},
+		{"edit in the work folder", edit("Edit", filepath.Join(work, "main.go")), DecideNone},
+		{"edit the data folder's other files", edit("Edit", filepath.Join(data, "cli-token")), DecideNone},
+		{"edit a sibling that shares the prefix", edit("Edit", filepath.Join(data, "apps-notes.md")), DecideNone},
+		{"bash by the real path", Call{Tool: "Bash", Input: map[string]any{"command": "echo x > " + registry + "/installed.json"}}, DecideDeny},
+		{"bash by the launch's path", Call{Tool: "Bash", Input: map[string]any{"command": "rm -rf " + alias + "/apps/packages"}}, DecideDeny},
+	} {
+		if v, _ := s.Decide(c.call); v.Decision != c.want {
+			t.Errorf("%s: %s, want %s", c.name, v.Decision, c.want)
 		}
 	}
 }

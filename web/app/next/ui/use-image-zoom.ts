@@ -12,6 +12,8 @@ const DOUBLE_TAP_PX = 32;
 /** A double click / tap on a fitted picture goes to its real size, but at least this much. */
 const DOUBLE_ZOOM_MIN = 2;
 const EASE_ATTR = 'ease';
+/** The viewer's own controls (the picture editor's dock, versions and drawing layer): not the picture. */
+const KEEP = '.hx-imgview__keep';
 
 interface IView {
   scale: number;
@@ -50,6 +52,7 @@ const useImageZoom = (
   useEffect(() => {
     const root = stage.current;
     if (!active || !root) return;
+    const bound = image.current;
     let view: IView = { scale: ZOOM_MIN, x: 0, y: 0 };
     const pointers = new Map<number, IPoint>();
     let pinch: { distance: number; mid: IPoint; view: IView } | null = null;
@@ -124,7 +127,10 @@ const useImageZoom = (
       };
     };
 
+    /** The editor's own controls (dock, versions) are not the picture. */
+    const onKept = (target: EventTarget | null) => target instanceof Element && target.closest(KEEP) !== null;
     const onWheel = (event: WheelEvent) => {
+      if (onKept(event.target)) return;
       event.preventDefault();
       ease(false);
       const lines = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
@@ -133,7 +139,12 @@ const useImageZoom = (
       zoom(view.scale * Math.exp(-event.deltaY * lines * rate), at, at, view);
     };
     const onDown = (event: PointerEvent) => {
-      if (event.button !== 0 || (event.target instanceof Element && event.target.closest('button'))) return;
+      if (
+        event.button !== 0 ||
+        onKept(event.target) ||
+        (event.target instanceof Element && event.target.closest('button'))
+      )
+        return;
       ease(false);
       lastType = event.pointerType;
       flags.current.dragged = false;
@@ -193,7 +204,12 @@ const useImageZoom = (
     };
     // A touch screen's double tap is read in onUp; this is the mouse's.
     const onDouble = (event: MouseEvent) => {
-      if (lastType === 'touch' || (event.target instanceof Element && event.target.closest('button'))) return;
+      if (
+        lastType === 'touch' ||
+        onKept(event.target) ||
+        (event.target instanceof Element && event.target.closest('button'))
+      )
+        return;
       toggle({ x: event.clientX, y: event.clientY });
     };
     const onEnd = () => ease(false);
@@ -214,6 +230,9 @@ const useImageZoom = (
       root.removeEventListener('dblclick', onDouble);
       root.removeEventListener('transitionend', onEnd);
       delete root.dataset.zoomed;
+      // Turned off while zoomed (a drawing tool was chosen): the picture goes back to fitted.
+      bound?.style.removeProperty('translate');
+      bound?.style.removeProperty('scale');
     };
     // A new picture (the key) rebinds with a fitted view.
   }, [stage, image, active, resetKey]);

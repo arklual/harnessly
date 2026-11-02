@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мудборд</title>
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<main class="mb">
+  <form class="mb__add" id="add">
+    <input class="mb__input" id="text" type="text" maxlength="500" placeholder="Новая идея" autocomplete="off" aria-label="Новая идея">
+    <button class="mb__button" type="submit">Добавить</button>
+  </form>
+  <ul class="mb__cards" id="cards"></ul>
+  <p class="mb__note" id="note" role="status"></p>
+</main>
+<!-- Classic scripts only: the view runs in an opaque-origin frame (see docs/apps.md). -->
+<script src="/__hl/app-sdk.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

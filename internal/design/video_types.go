@@ -25,13 +25,13 @@ const (
 	VideoRendersDir      = ".media/video/renders"
 	VideoChaptersFile    = DeckPublishedDir + "/chapters.json"
 	VideoPublishedFile   = DeckPublishedDir + "/video.json"
-	VideoRuntimeVersion  = 1
+	VideoRuntimeVersion  = 2
 	VideoRendersKept     = 3
 	VideoCacheMaxBytes   = 2 << 30
 	VideoRenderTabs      = 2
 	VideoRenderTimeout   = 40 * time.Minute
 	VideoDraftCRF        = 28
-	VideoFinalCRF        = 18
+	VideoFinalCRF        = 16
 	VideoFrameJPEGQ      = 92
 	VideoLoadPerCPUPause = 1.5
 )
@@ -259,16 +259,24 @@ const (
 // The codes of a check's findings.
 const (
 	// Static lint of the board's scripts.
-	VideoCheckTimer  = "timer"  // setTimeout, setInterval
-	VideoCheckRandom = "random" // Math.random
-	VideoCheckClock  = "clock"  // Date.now, new Date(
+	VideoCheckTimer   = "timer"          // setTimeout, setInterval
+	VideoCheckRaf     = "raf"            // the board's own requestAnimationFrame loop
+	VideoCheckUnbound = "motion-unbound" // GSAP on the board outside tkVideo.motion
+	VideoCheckRandom  = "random"         // Math.random
+	VideoCheckClock   = "clock"          // Date.now, new Date(
 	// Times.
 	VideoCheckPastEnd = "past-end" // a data-tk-at past the scene's duration
 	// In Chrome, at the scene's end, per enabled format.
-	VideoCheckOverflow  = "overflow"   // text overflows its box
-	VideoCheckOffscreen = "offscreen"  // a block outside the viewport
-	VideoCheckSmallText = "small-text" // a font under 28 px at 1080 width (9:16)
-	VideoCheckUnstable  = "unstable"   // the same t captured twice gives different frames
+	VideoCheckOverflow  = "overflow"        // text overflows its box
+	VideoCheckOffscreen = "offscreen"       // a block outside the viewport
+	VideoCheckSmallText = "small-text"      // a font under 28 px at 1080 width (9:16)
+	VideoCheckUnstable  = "unstable"        // the same t captured twice gives different frames
+	VideoCheckOverlap   = "motion-overlap"  // two tweens on one property of one target at one time
+	VideoCheckMotionEnd = "motion-past-end" // the motion runs past the scene's end
+	VideoCheckExternal  = "external"        // the board reaches outside the project and the kit
+	VideoCheckAsset     = "asset"           // a file of the board did not load
+	VideoCheckScript    = "script"          // a script of the board threw
+	VideoCheckEngine    = "engine"          // an engine of the board failed
 )
 
 // VideoCheckIssue is one finding of POST /api/cli/design/video/check. Format nil: the finding holds for every format
@@ -307,10 +315,10 @@ const DeckCommentVideo = "video"
 // bytes. Same: nothing changed since the previous frame (JPEG is then the previous frame's bytes, so the render can pipe
 // it again without encoding a new one).
 type videoShot struct {
-	I    int
-	T    int64
-	JPEG []byte
-	Same bool
+	I     int
+	T     int64
+	Image []byte // a JPEG, or a PNG when the tab is lossless
+	Same  bool
 }
 
 // videoFramesImpl is the engine the render and the frame route call (WP2a builds Library.videoFrames in videoshoot.go):

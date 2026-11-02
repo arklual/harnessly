@@ -1,4 +1,4 @@
-// Dictation over the machine's socket (/api/voice, internal/voice): the page sends {type: 'start', lang}, then the
+// Dictation over the machine's socket (/api/voice, internal/voice): the page sends {type: 'start', lang, engine, dict}, then the
 // recorder's chunks as they come, then {type: 'stop' | 'abort'}; it gets ready, partial (the whole text so far),
 // final and error back. An error with code `unavailable` (or a socket that never opened) means this machine cannot
 // recognize on the fly — the caller falls back to sending the whole recording. While the machine gets its speech
@@ -6,6 +6,7 @@
 // and how far it is; the recording waits for ready and goes on as soon as it comes.
 import { runtimeSocket } from '@/next/core/net/machine';
 import type { MachineId } from '@/next/protocol/v2';
+import type { VoiceSettings } from '@/next/stores/me';
 import type { TDictationLang } from '@/next/stores/voice';
 
 /** The model may be loading on the machine; the recording waits for it, so this is generous. */
@@ -61,7 +62,16 @@ const parse = (data: unknown): IServerMessage | null => {
   }
 };
 
-export const openDictation = (m: MachineId, lang: TDictationLang, events: IDictationEvents): IDictation => {
+/** What the machine is told to recognize with: the model the person picked and their words. */
+export const startMessage = (lang: TDictationLang, voice: VoiceSettings) =>
+  JSON.stringify({ type: 'start', lang, engine: voice.engine, dict: voice.words });
+
+export const openDictation = (
+  m: MachineId,
+  lang: TDictationLang,
+  voice: VoiceSettings,
+  events: IDictationEvents,
+): IDictation => {
   let socket: WebSocket | null = null;
   let ready = false;
   let over = false;
@@ -90,7 +100,7 @@ export const openDictation = (m: MachineId, lang: TDictationLang, events: IDicta
   }
   const ws = socket;
   timer = setTimeout(() => fail({ message: '', unavailable: true }), CONNECT_MS);
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'start', lang }));
+  ws.onopen = () => ws.send(startMessage(lang, voice));
   ws.onmessage = (event) => {
     const msg = parse(event.data);
     if (!msg || over) return;

@@ -28,6 +28,7 @@ const (
 	StatusHookFile = "status-hook.sh"
 	StatuslineFile = "statusline.sh"
 	CodexHookFile  = "codex-hook.sh"
+	BudgetHookFile = "budget-hook.sh"
 	HooksFile      = "hooks.json"
 	MCPConfigFile  = "preview-mcp.json"
 	LauncherFile   = "codex-launcher.js"
@@ -61,6 +62,11 @@ type Config struct {
 	LegacyTmuxSocket string
 	// Codex is what the Codex launcher script needs; nil writes none.
 	Codex *codex.LauncherScriptConfig
+	// Budget writes the script that applies the hub's limits (internal/budget) and puts it in the Claude hook
+	// settings. Off, the files are as they were; it is on where a hub carries the runtime.
+	Budget bool
+	// BudgetFile is the limits file as the script spells it (`$HOME/.<name>/budget.json`); "" is the data folder's.
+	BudgetFile string
 }
 
 // Writer writes the files of one data folder.
@@ -86,6 +92,7 @@ func (w *Writer) TokenPath() string      { return w.path(TokenFile) }
 func (w *Writer) StatusHookPath() string { return w.path(StatusHookFile) }
 func (w *Writer) StatuslinePath() string { return w.path(StatuslineFile) }
 func (w *Writer) CodexHookPath() string  { return w.path(CodexHookFile) }
+func (w *Writer) BudgetHookPath() string { return w.path(BudgetHookFile) }
 func (w *Writer) HooksPath() string      { return w.path(HooksFile) }
 func (w *Writer) MCPConfigPath() string  { return w.path(MCPConfigFile) }
 func (w *Writer) LauncherPath() string   { return w.path(LauncherFile) }
@@ -123,7 +130,7 @@ func dq(s string) string { return `"` + s + `"` }
 
 func (c Config) preamble() string {
 	return `PORT_FILE="` + c.ScriptDataDir + `/` + PortFile + `"
-TOKEN_FILE="` + c.ScriptDataDir + `/` + TokenFile + `"
+TOKEN_FILE="${HARNESSLY_CLI_TOKEN_FILE:-` + c.ScriptDataDir + `/` + TokenFile + `}"
 [ -f "$PORT_FILE" ] || exit 0
 [ -f "$TOKEN_FILE" ] || exit 0
 PORT=$(cat "$PORT_FILE")
@@ -148,7 +155,7 @@ if [ "$EVENT" = "notification" ]; then
 fi
 
 (
-  SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null) || SESSION=""
+  SESSION="${HARNESSLY_SESSION:-$(tmux display-message -p '#{session_name}' 2>/dev/null)}"
   PAYLOAD="{\"event\":\"${EVENT}\",\"session\":\"${SESSION}\""
   if [ -n "$NOTIFICATION_TYPE" ]; then
     PAYLOAD="${PAYLOAD},\"notificationType\":\"${NOTIFICATION_TYPE}\""
@@ -178,13 +185,37 @@ func (c Config) StatuslineScript() []byte {
 func (c Config) CodexHookScript() []byte {
 	return []byte(`#!/usr/bin/env bash
 set -u
-` + c.preamble() + `SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null) || SESSION=""
+` + c.preamble() + `SESSION="${HARNESSLY_SESSION:-$(tmux display-message -p '#{session_name}' 2>/dev/null)}"
 
 curl -sS -X POST -o /dev/null \
 ` + c.headerLines() + ` \
   -H "Content-Type: application/json" \
   --data-binary @- \
   "http://localhost:${PORT}/api/status/hook?provider=codex&tmuxSession=${SESSION}" 2>/dev/null || true
+exit 0
+`)
+}
+
+// BudgetHookScript is what Claude and Codex run on a prompt and before a tool (`sh <script> <provider> <event>`): it
+// asks the runtime whether the hub's limit lets the chat go on and prints the answer, which the CLI reads as the hook's
+// output (a notice, or a stop). It is silent, and quick, while no list is held or the list's mode is off. The runtime
+// being away never stops a chat.
+func (c Config) BudgetHookScript() []byte {
+	file := c.BudgetFile
+	if file == "" {
+		file = c.ScriptDataDir + "/budget.json"
+	}
+	return []byte(`#!/bin/sh
+PROVIDER="${1:-claude}"
+EVENT="${2:-UserPromptSubmit}"
+LIMITS="` + file + `"
+[ -f "$LIMITS" ] || exit 0
+grep -Eq '"mode" *: *"(warn|stop)"' "$LIMITS" 2>/dev/null || exit 0
+` + c.preamble() + `cat >/dev/null
+SESSION="${HARNESSLY_SESSION:-$(tmux display-message -p '#{session_name}' 2>/dev/null)}"
+curl -sf --max-time 2 -X POST \
+` + c.headerLines() + ` \
+  "http://localhost:${PORT}/api/budget/hook?provider=${PROVIDER}&event=${EVENT}&session=${SESSION}" 2>/dev/null
 exit 0
 `)
 }
@@ -239,7 +270,11 @@ func (c Config) MCPConfig(port int, token string) []byte {
 
 // HookSettings is the `--settings` file Claude is launched with.
 func (w *Writer) HookSettings() []byte {
-	return claude.HookSettings(claude.HookSettingsConfig{StatusHook: w.StatusHookPath(), Statusline: w.StatuslinePath(), Allow: w.cfg.Allow})
+	c := claude.HookSettingsConfig{StatusHook: w.StatusHookPath(), Statusline: w.StatuslinePath(), Allow: w.cfg.Allow}
+	if w.cfg.Budget {
+		c.BudgetHook = w.BudgetHookPath()
+	}
+	return claude.HookSettings(c)
 }
 
 // writeAtomic replaces path with content through a temporary file in the same folder, then gives it mode: a script an
@@ -297,6 +332,11 @@ func (w *Writer) Ensure(port int, token string) (Result, error) {
 	}
 	if err := writeManaged(w.CodexHookPath(), w.cfg.CodexHookScript(), 0o700); err != nil {
 		res.CodexHookFailed = true
+	}
+	if w.cfg.Budget {
+		if err := writeManaged(w.BudgetHookPath(), w.cfg.BudgetHookScript(), 0o755); err != nil {
+			return res, err
+		}
 	}
 	if err := writePrivate(w.MCPConfigPath(), w.cfg.MCPConfig(port, token)); err != nil {
 		return res, err

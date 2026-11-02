@@ -71,6 +71,20 @@ APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skil
   harnessly app list | remove ID    the installed apps; uninstall one
   harnessly app enable|disable ID
                                     turn an app on or off in this chat (the agent gets it when it starts next)
+  harnessly app publish [DIR] --channel dev|beta|stable [--team]
+                                    publish a new, immutable version on a channel (--team: also to the team's catalog)
+  harnessly app promote VERSION --channel beta|stable | rollback --channel C | channels [ID]
+                                    move a channel up (stable asks the evals), back, or look at where they point
+  harnessly app install --channel C ID | update [--yes] [ID]
+                                    follow a channel; bring installs to what their channel points at
+  harnessly app install --team ID [--channel stable] | team [list|publish|uninstall]
+                                    an owner installs the catalog's app for the whole team
+  harnessly app public [list [QUERY]] | publish ID VERSION | install ID [--yes]
+                                    the public catalog: browse, put a version on stable in it, install for yourself (rights are shown first)
+  harnessly app share ID [--view main] [--ttl 7d] [--write] | shares | unshare LINK
+                                    a standalone app (target app) by link: no account, no chat, no agent
+  harnessly app eval [DIR] [--runs N] [--case NAME] [--threshold 0.8] [--no-baseline] [--no-judge]
+                                    run evals/*.json on a real agent; exits 1 under the threshold
 
 SECRETS (the safe of this machine: tokens and keys the person put in, outside the chat)
   harnessly secret list             the names in the safe and when each was put and last used (never a value)
@@ -184,6 +198,15 @@ and what the agent of a chat gets while it is on (agent: instructions, skills, m
   harnessly app install ./cashback      # a copy: later edits do not reach it
   harnessly app enable acme.cashback    # in the chat this tab runs
   harnessly app list --json
+
+Versions are immutable and live on channels. An eval scenario is a file evals/<name>.json:
+  {"prompt": "…", "runs": 3, "baseline": true,
+   "mocks": {"mcp": {"<server of .mcp.json>": "fixtures/<file>.json"}},
+   "expect": {"tool_used": ["server.tool"], "tool_not_used": ["server.tool"], "final_text": ["regexp"]},
+   "graders": [{"llm": "a criterion in words"}]}
+  harnessly app eval ./cashback            # needs a Claude Code login; the report is left in .harnessly/eval.json
+  harnessly app publish ./cashback --channel beta
+  harnessly app promote 1.3.0 --channel stable ./cashback
 `,
 	"secret": `harnessly secret list|ask|run|file
 

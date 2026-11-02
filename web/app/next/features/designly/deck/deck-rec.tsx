@@ -28,6 +28,7 @@ import {
 } from '@/next/features/designly/deck/recorder';
 import type { IDeckRecording } from '@/next/features/designly/deck/types';
 import { openDictation } from '@/next/features/composer/voice-socket';
+import { voiceSettings } from '@/next/stores/me';
 import { WordedError } from '@/next/core/net/worded';
 import { locale, t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
@@ -192,7 +193,7 @@ const DeckRec = ({ host, machine, artifact, onFinished, onExit, onPaused }: IDec
           audio: new MediaStream(capture.stream.getAudioTracks()),
           mime: audioMime,
           makeRecorder,
-          open: (events) => openDictation(machine, locale(), events),
+          open: (events) => openDictation(machine, locale(), voiceSettings(), events),
           now: () => created.ms(),
           onPartial: (text) => setPrompter((p) => advance(p, text)),
           onFinal: (text, t0) => created.event({ k: 'asr', t0, text }),

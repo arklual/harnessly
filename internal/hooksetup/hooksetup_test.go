@@ -2,10 +2,14 @@ package hooksetup
 
 import (
 	"encoding/json"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -337,5 +341,115 @@ func TestStatusHookScriptPosts(t *testing.T) {
 	}
 	if srv.headers.Get("x-acme-token") != token || srv.headers.Get("x-omux-token") != token {
 		t.Fatalf("headers %v", srv.headers)
+	}
+}
+
+// budgetServer answers the budget hook route with body and records the query.
+func budgetServer(t *testing.T, body string) (port int, queries chan string, headers chan http.Header) {
+	t.Helper()
+	queries, headers = make(chan string, 8), make(chan http.Header, 8)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/budget/hook" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		queries <- r.URL.RawQuery
+		headers <- r.Header.Clone()
+		if body == "" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	_, p, _ := net.SplitHostPort(srv.Listener.Addr().String())
+	port, _ = strconv.Atoi(p)
+	return port, queries, headers
+}
+
+func TestBudgetHookIsWrittenOnlyForAHub(t *testing.T) {
+	for _, on := range []bool{false, true} {
+		cfg := testConfig(filepath.Join(t.TempDir(), ".acme-ai"))
+		cfg.Budget = on
+		w := New(cfg)
+		if _, err := w.Ensure(4000, token); err != nil {
+			t.Fatal(err)
+		}
+		fi, err := os.Stat(w.BudgetHookPath())
+		settings, _ := os.ReadFile(w.HooksPath())
+		if on {
+			if err != nil || fi.Mode().Perm() != 0o755 || !strings.Contains(string(settings), w.BudgetHookPath()) {
+				t.Errorf("on: %v %v", err, fi)
+			}
+		} else if err == nil || strings.Contains(string(settings), "budget") {
+			t.Error("off: the budget hook is there")
+		}
+	}
+}
+
+func TestBudgetHookScript(t *testing.T) {
+	if _, err := exec.LookPath("curl"); err != nil {
+		t.Skip("curl not here")
+	}
+	reply := `{"decision":"block","reason":"Limit reached."}`
+	port, queries, headers := budgetServer(t, reply)
+	home := t.TempDir()
+	cfg := testConfig(filepath.Join(home, ".acme-ai"))
+	cfg.Budget = true
+	w := New(cfg)
+	if _, err := w.Ensure(port, token); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(w.TokenPath(), []byte(token), 0o600)
+	bin := filepath.Join(home, "bin")
+	_ = os.MkdirAll(bin, 0o700)
+	_ = os.WriteFile(filepath.Join(bin, "tmux"), []byte("#!/bin/sh\necho tab-session\n"), 0o755)
+	limits := filepath.Join(home, ".acme-ai", "budget.json")
+	run := func(provider, event string) string {
+		t.Helper()
+		cmd := exec.Command("sh", w.BudgetHookPath(), provider, event)
+		cmd.Env = append(os.Environ(), "HOME="+home, "PATH="+bin+":"+os.Getenv("PATH"))
+		cmd.Stdin = strings.NewReader(`{"hook_event_name":"UserPromptSubmit","prompt":"hi"}`)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		return string(out)
+	}
+	asked := func() bool {
+		select {
+		case <-queries:
+			<-headers
+			return true
+		default:
+			return false
+		}
+	}
+
+	// No list, or a list in mode off: no call at all, and nothing printed.
+	if out := run("claude", "UserPromptSubmit"); out != "" || asked() {
+		t.Fatalf("no list: %q", out)
+	}
+	_ = os.WriteFile(limits, []byte(`{"version":2,"mode":"off","entries":[]}`), 0o600)
+	if out := run("claude", "UserPromptSubmit"); out != "" || asked() {
+		t.Fatalf("mode off: %q", out)
+	}
+
+	// Mode stop: the runtime is asked with the provider, the event and the tmux session, and its answer is the output.
+	_ = os.WriteFile(limits, []byte(`{"version":3,"mode":"stop","entries":[]}`), 0o600)
+	if out := run("codex", "PreToolUse"); out != reply {
+		t.Fatalf("%q", out)
+	}
+	if q := <-queries; q != "provider=codex&event=PreToolUse&session=tab-session" {
+		t.Errorf("%q", q)
+	}
+	if h := <-headers; h.Get("x-acme-token") != token || h.Get("x-omux-token") != token {
+		t.Errorf("headers %v", h)
+	}
+
+	// A runtime that is gone, or without a token file, never stops a chat.
+	_ = os.Remove(w.PortPath())
+	if out := run("claude", "UserPromptSubmit"); out != "" || asked() {
+		t.Errorf("no port file: %q", out)
 	}
 }

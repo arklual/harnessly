@@ -700,6 +700,13 @@
 .hx-dockstat + .hx-qfold .hx-queue {
   border-radius: 0;
 }
+/* Lines stacked over the field read as one card: only the top one keeps its rounded corners. */
+.hx-dockbar + .hx-dockbar,
+.hx-dockbar + .hx-dockstat,
+.hx-dockstat + .hx-dockbar {
+  border-radius: 0;
+  border-top-color: var(--hx-border);
+}
 @keyframes hx-dockstat-in {
   from {
     opacity: 0;

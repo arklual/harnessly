@@ -22,6 +22,9 @@ import { NewSpaceScreen } from './screens/new-space';
 import { NewSiteScreen, SiteScreen, useSitesOn } from './screens/sites';
 import { SpaceProvider, useSpace } from './screens/space';
 import { SpaceSettingsScreen } from './screens/space-settings';
+import { OrgStepScreen } from './org/screens/org-step';
+import { orgStepDue } from './org/step';
+import { OrgRoutes } from './org/routes';
 import { PlainPage } from './ui/frame';
 
 const ROUTES = [
@@ -35,6 +38,10 @@ const ROUTES = [
   '/s/:slug',
   '/s/:slug/settings',
   '/s/:slug/setup/:step',
+  '/org/new',
+  '/o/:org',
+  '/o/:org/:scope',
+  '/o/:org/:scope/:section',
   '/s/:slug/sites/new',
   '/s/:slug/sites/:name',
 ] as const;
@@ -94,7 +101,7 @@ const SessionFailed = ({ error, retry }: { error: ApiError; retry: () => void })
 /** `/`: signed out → sign-in; no space → the first one is made; else the last space, or where its setup stopped. */
 const Landing = () => {
   const api = useApi();
-  const { me } = useSession();
+  const { me, config } = useSession();
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -104,6 +111,11 @@ const Landing = () => {
       }
       if (me.spaces.length === 0) {
         navigate('/new', { replace: true });
+        return;
+      }
+      // The organization step comes once after the release, and can be put off.
+      if (orgStepDue(config, me)) {
+        navigate('/org/new', { replace: true });
         return;
       }
       const remembered = lastSpace();
@@ -125,7 +137,7 @@ const Landing = () => {
     return () => {
       alive = false;
     };
-  }, [api, me]);
+  }, [api, me, config]);
   return <Loading />;
 };
 
@@ -174,8 +186,12 @@ const Routes = () => {
   if (route === '/invite/:token') return <InviteScreen token={params.token ?? ''} />;
   if (!me) return <Redirect to={`/signin?next=${encodeURIComponent(path + search)}`} />;
   if (route === '/new') return <NewSpaceScreen />;
+  if (route === '/org/new') return <OrgStepScreen />;
   if (route === '/settings') return <AccountScreen />;
   if (route === '/browser/:machineId') return <BrowserScreen machineId={params.machineId ?? ''} />;
+  if (route === '/o/:org' || route === '/o/:org/:scope' || route === '/o/:org/:scope/:section') {
+    return <OrgRoutes org={params.org ?? ''} scope={params.scope} section={params.section} />;
+  }
   const slug = params.slug ?? '';
   const SUB = {
     '/s/:slug': 'home',

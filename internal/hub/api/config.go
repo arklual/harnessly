@@ -56,6 +56,7 @@ func (h *Hub) config(w http.ResponseWriter, r *http.Request) error {
 		"runtimeMode": mode,
 		"sites":       sitesCfg,
 		"termsUrl":    terms,
+		"orgs":        h.cfg.Orgs,
 	})
 	return nil
 }

@@ -165,9 +165,13 @@ func (t *deckTab) videoSeek(ms int64) (same bool, err error) {
 	return same, nil
 }
 
-// jpeg is a JPEG of the tab's viewport.
-func (t *deckTab) jpeg() ([]byte, error) {
-	r, err := t.callLong("Page.captureScreenshot", map[string]any{"format": "jpeg", "quality": VideoFrameJPEGQ, "optimizeForSpeed": true})
+// capture is a picture of the tab's viewport: a PNG when the tab is lossless (a final render), else a JPEG.
+func (t *deckTab) capture() ([]byte, error) {
+	params := map[string]any{"format": "jpeg", "quality": VideoFrameJPEGQ, "optimizeForSpeed": true}
+	if t.lossless {
+		params = map[string]any{"format": "png", "optimizeForSpeed": true}
+	}
+	r, err := t.callLong("Page.captureScreenshot", params)
 	if err != nil {
 		return nil, err
 	}
@@ -208,12 +212,12 @@ func (l *Library) videoFrames(ctx context.Context, tab *deckTab, artifact string
 		}
 		shot := videoShot{I: i, T: ms}
 		if same && prev != nil {
-			shot.JPEG, shot.Same = prev, true
+			shot.Image, shot.Same = prev, true
 		} else {
-			if shot.JPEG, err = tab.jpeg(); err != nil {
+			if shot.Image, err = tab.capture(); err != nil {
 				return err
 			}
-			prev = shot.JPEG
+			prev = shot.Image
 		}
 		if err := each(shot); err != nil {
 			return err
@@ -397,7 +401,7 @@ func (l *Library) VideoFrameFiles(ctx context.Context, id, page string, f VideoF
 	}
 	defer release()
 	err = videoFramesImpl(l, ctx, tab, id, sc, f, draft, missing, func(v videoShot) error {
-		return writeFileAtomic(filepath.Join(dir, videoFrameName(key, v.T)), v.JPEG)
+		return writeFileAtomic(filepath.Join(dir, videoFrameName(key, v.T)), v.Image)
 	})
 	if err != nil {
 		return nil, err

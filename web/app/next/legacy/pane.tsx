@@ -47,7 +47,7 @@ const TOOLS = [
 ] as const satisfies readonly { kind: TPaneTabKind; group: string }[];
 
 /** Legacy's tabs the design has no place for: one left open in Legacy does not come over. */
-const GONE: ReadonlySet<TPaneTabKind> = new Set(['overview', 'design']);
+const GONE: ReadonlySet<TPaneTabKind> = new Set(['overview', 'design', 'app']);
 
 /** Legacy's tabs the new pane has tools of its own for: what Legacy's pane gets for them is handed over. */
 const HANDED: ReadonlySet<TPaneTabKind> = new Set(['browser', 'plan', 'side-chat']);
@@ -71,6 +71,7 @@ const ICONS: Record<TPaneTabKind, string> = {
   gallery: 'images',
   task: 'file-text',
   vault: 'key-round',
+  app: 'app-window',
 };
 
 /** A Legacy tab in the new pane's strip is told apart from the pane's own by this prefix. */

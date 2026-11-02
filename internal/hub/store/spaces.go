@@ -20,17 +20,21 @@ type Space struct {
 	CreatedBy      string
 	CreatedAt      time.Time
 	OnboardingStep string
+	// OrgID is the organization the space is a tenant of; "" for the implicit organization of its own (as before
+	// organizations existed).
+	OrgID string
 }
 
-const spaceCols = `id, slug, name, created_by, created_at, onboarding_step`
+const spaceCols = `id, slug, name, created_by, created_at, onboarding_step, org_id`
 
 func scanSpace(row interface{ Scan(...any) error }) (Space, error) {
 	var sp Space
 	var created int64
-	if err := row.Scan(&sp.ID, &sp.Slug, &sp.Name, &sp.CreatedBy, &created, &sp.OnboardingStep); err != nil {
+	var org sql.NullString
+	if err := row.Scan(&sp.ID, &sp.Slug, &sp.Name, &sp.CreatedBy, &created, &sp.OnboardingStep, &org); err != nil {
 		return Space{}, err
 	}
-	sp.CreatedAt = fromMs(created)
+	sp.CreatedAt, sp.OrgID = fromMs(created), org.String
 	return sp, nil
 }
 
@@ -45,8 +49,8 @@ func (s Store) CreateSpace(ctx context.Context, sp *Space) error {
 	if sp.OnboardingStep == "" {
 		sp.OnboardingStep = "machines"
 	}
-	if _, err := s.q.Exec(ctx, `INSERT INTO spaces (`+spaceCols+`) VALUES (?, ?, ?, ?, ?, ?)`,
-		sp.ID, sp.Slug, sp.Name, sp.CreatedBy, Ms(sp.CreatedAt), sp.OnboardingStep); err != nil {
+	if _, err := s.q.Exec(ctx, `INSERT INTO spaces (`+spaceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		sp.ID, sp.Slug, sp.Name, sp.CreatedBy, Ms(sp.CreatedAt), sp.OnboardingStep, nullStr(sp.OrgID)); err != nil {
 		return err
 	}
 	return s.AddMember(ctx, sp.ID, sp.CreatedBy, RoleOwner)
@@ -73,7 +77,7 @@ type SpaceWithRole struct {
 
 // SpacesByUser lists the user's spaces, oldest first.
 func (s Store) SpacesByUser(ctx context.Context, userID string) ([]SpaceWithRole, error) {
-	rows, err := s.q.Query(ctx, `SELECT s.id, s.slug, s.name, s.created_by, s.created_at, s.onboarding_step, m.role
+	rows, err := s.q.Query(ctx, `SELECT s.id, s.slug, s.name, s.created_by, s.created_at, s.onboarding_step, s.org_id, m.role
 		FROM spaces s JOIN memberships m ON m.space_id = s.id WHERE m.user_id = ? ORDER BY s.created_at, s.id`, userID)
 	if err != nil {
 		return nil, err
@@ -83,10 +87,11 @@ func (s Store) SpacesByUser(ctx context.Context, userID string) ([]SpaceWithRole
 	for rows.Next() {
 		var x SpaceWithRole
 		var created int64
-		if err := rows.Scan(&x.ID, &x.Slug, &x.Name, &x.CreatedBy, &created, &x.OnboardingStep, &x.Role); err != nil {
+		var org sql.NullString
+		if err := rows.Scan(&x.ID, &x.Slug, &x.Name, &x.CreatedBy, &created, &x.OnboardingStep, &org, &x.Role); err != nil {
 			return nil, err
 		}
-		x.CreatedAt = fromMs(created)
+		x.CreatedAt, x.OrgID = fromMs(created), org.String
 		out = append(out, x)
 	}
 	return out, rows.Err()

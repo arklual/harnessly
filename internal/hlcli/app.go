@@ -23,7 +23,34 @@ func (c *cli) app(args []string) error {
 	case "validate", "check":
 		return c.appValidate(args)
 	case "install":
+		if sharedInstall(args) {
+			return c.appInstallShared(args)
+		}
 		return c.appInstall(args, false)
+	case "publish":
+		return c.appPublish(args)
+	case "promote":
+		return c.appPromote(args)
+	case "rollback":
+		return c.appRollback(args)
+	case "channels":
+		return c.appChannels(args)
+	case "update":
+		return c.appUpdate(args)
+	case "share":
+		return c.appShare(args)
+	case "shares":
+		return c.appShares(args)
+	case "unshare":
+		return c.appUnshare(args)
+	case "team":
+		return c.appTeam(args)
+	case "public":
+		return c.appPublic(args)
+	case "eval":
+		return c.appEval(args)
+	case "mock-mcp":
+		return c.appMockMCP(args)
 	case "dev":
 		return c.appInstall(args, true)
 	case "list", "ls":
@@ -35,7 +62,7 @@ func (c *cli) app(args []string) error {
 	case "disable", "off":
 		return c.appEnable(args, false)
 	}
-	return usageErr("app takes new, validate, install, dev, list, remove, enable or disable (harnessly app --help)")
+	return usageErr("app takes new, validate, install, dev, list, remove, enable, disable, publish, promote, rollback, channels, update, share, team, public or eval (harnessly app --help)")
 }
 
 // appDir is a folder argument made absolute; none is the working folder.

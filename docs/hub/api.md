@@ -12,6 +12,11 @@ Conventions:
 - `?` in a type means optional (may be absent); `| null` means present and maybe null.
 - Human texts in errors are Russian (the UI may show them as is); the UI decides by `error`, never by `message`.
 
+The new hub (organizations, money, limits, analytics) has its parts in files of their own, each with TS types and mock
+fixtures in `web/app/hub-api/`: [orgs.md](orgs.md) — organizations, tenants, teams, roles, the journal;
+[usage.md](usage.md) — what a machine reports to the hub about spend; [analytics.md](analytics.md) — overview, spend,
+KPI, signals, changes, `/api/me/*`; [limits.md](limits.md) — limits and how a machine applies them.
+
 ## Hub HTTP API
 
 ### Errors
@@ -112,6 +117,7 @@ type Config = {
   profiles: { dir: true; container: boolean; full: true };
   runtimeMode: 'path' | 'subdomain';
   termsUrl: string | null;            // HUB_TERMS_URL; the sign-up line about terms shows only when set
+  orgs: 'off' | 'shadow' | 'on';      // HUB_ORGS: how far organizations are switched on (docs/hub/orgs.md)
 };
 ```
 
@@ -361,6 +367,9 @@ Protocol 2 error strings start with a code and a colon. Codes and the hub's HTTP
 | `env.remove` | `{ name }` | `{ env: string[] }` |
 | `gitkey.ensure` | | `{ publicKey }` — `ssh-ed25519 … harnessly@<hostname>`; made once at `~/.ssh/harnessly_ed25519`, with a `Host *` `IdentityFile` entry added to `~/.ssh/config` |
 | `runtime.session` | `{ subject, name? }` (subject = the person's email) | `{ cookieName, token, expiresAt }` — a page session signed with the pair secret, 12 h |
+| `usage.read` | `{ epoch, after, max }` | `{ epoch, records, last, more }` — facts of spend, [usage.md](usage.md); only when `hello.features` has `usage` |
+| `usage.ack` | `{ epoch, seq }` | `{}` — [usage.md](usage.md) |
+| `budget.set` | `{ version, mode, issuedAt, entries }` | `{ version }` — the limits the machine applies, [limits.md](limits.md#on-the-machine); only when `hello.features` has `budget` |
 | `tunnel.open` | v1, unchanged; target `runtime` only for the hub (passes the policy's route filter) | v1 |
 
 The v1 operations (`transcripts.*`, `state.*`, `conversations.start`, `docs.*`, `design.*`, `eval.*`, `status.send`)
@@ -374,6 +383,7 @@ stay for the closed cluster. The hub does not call them; on a hub link they answ
 | `login` | `{ login: Login }` | each state change of a login |
 | `agents` | `{ agents: AgentStatus[] }` | after an install, login, key change, and when a periodic check (every 5 min) differs |
 | `preflight` | `{ report: PreflightReport }` | after connect and every 30 min |
+| `usage.available` | `{ epoch, seq }` | new spend facts in the outbox ([usage.md](usage.md)), at most every 10 s, and after connect |
 | `policy` | `{ policy: Policy }` | the policy file or the kill switch changed (the kill switch then closes the link) |
 
 ### Types
@@ -387,6 +397,7 @@ type Hello = {
   os: 'linux' | 'darwin'; arch: 'amd64' | 'arm64';
   profile: Profile;
   policy: Policy;
+  budgetVersion?: number;      // with "budget": the version of the limits list the machine holds (limits.md)
 };
 
 type Policy = {
@@ -708,6 +719,10 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_SSH` | `on` | `off` hides «по SSH» |
 | `HUB_SSH_ALLOW_PRIVATE` | `off` | `on` lets the SSH way reach private, loopback and link-local addresses (self-hosted only; the cloud edition ignores it) |
 | `HUB_SECRET_KEY` | | at least 32 characters: seals the spaces' SSH keys; empty: a `secret_key` file in `HUB_DATA_DIR` |
+| `HUB_ORGS` | `off` | organizations, tenants and teams ([orgs.md](orgs.md)): `off` — the schema is there, the hub behaves as before; `shadow` — the new endpoints answer instance administrators only (checking, `hub seed`); `on` — everyone |
+| `HUB_USAGE_INGEST` | `off` | `on`: the hub pulls the machines' spend facts ([usage.md](usage.md)) and keeps the price list; `off`: it never asks |
+| `HUB_LIMITS_ENFORCE` | `off` | limits on machines ([limits.md](limits.md#enforcement)): `off` — computed and shown only; `warn` — machines notify; `stop` — machines do not start chats past a limit |
+| `HUB_RATES_URL` | `https://www.cbr.ru/scripts/XML_daily.asp` | the Central Bank's daily rates the organizations' money is shown in ([analytics.md](analytics.md#money-and-periods)); `off` never fetches: dollars unless an admin put a rate in `currency_rates` |
 | `HUB_MIN_AGENT_VERSION` | | refuse older agents (426 / 4012) |
 | `HUB_TERMS_URL` | | shown under the sign-up |
 | `HUB_WEB_DIR` | | serve the UI from this folder instead of the embedded files (development) |

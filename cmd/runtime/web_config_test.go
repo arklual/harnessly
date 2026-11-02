@@ -82,3 +82,26 @@ func TestPageConfigHubURL(t *testing.T) {
 		t.Errorf("blank: %v", *c.HubURL)
 	}
 }
+
+// The link alone: a machine no hub carries gets «Хаб» and stays out of the hub's mode, which would close its chat terminal.
+func TestPageConfigHubLink(t *testing.T) {
+	t.Setenv("RUNTIME_HUB_URL", "")
+	t.Setenv("RUNTIME_HUB_LINK", " https://hub.example.com/ ")
+	c := pageConfigFromEnv()
+	if c.HubLink == nil || *c.HubLink != "https://hub.example.com" {
+		t.Errorf("link: %v", c.HubLink)
+	}
+	if c.HubURL != nil || hubMode() {
+		t.Errorf("a link must not make a hub-carried runtime: %v %v", c.HubURL, hubMode())
+	}
+
+	t.Setenv("RUNTIME_HUB_LINK", "")
+	if c := pageConfigFromEnv(); c.HubLink != nil {
+		t.Errorf("no hub, no link: %v", *c.HubLink)
+	}
+
+	t.Setenv("RUNTIME_HUB_URL", "https://carrier.example.com")
+	if c := pageConfigFromEnv(); c.HubLink == nil || *c.HubLink != "https://carrier.example.com" {
+		t.Errorf("the carrying hub is the link: %v", c.HubLink)
+	}
+}

@@ -16,6 +16,23 @@
   min-height: 0;
   transition: left 480ms var(--hx-ease-out);
 }
+.hx-video__offer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 0;
+  animation: hx-video-offer-in 160ms ease-out;
+}
+.hx-video__offer[data-state='closing'] {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+@keyframes hx-video-offer-in {
+  from {
+    opacity: 0;
+  }
+}
 .hx-video__stage {
   position: relative;
   flex: 1;

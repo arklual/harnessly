@@ -1,0 +1,434 @@
+/* Обзор (HRN-537) and the participant's view (HRN-541). Cards, rows, the ring, the limit bars. */
+.ov-card {
+  min-width: 0;
+  padding: 1.25rem 1.25rem 1.375rem;
+  border: 1px solid var(--k-border);
+  border-radius: 1.25rem;
+  background: var(--k-surface);
+}
+.ov-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.ov-card__title {
+  margin: 0;
+  color: var(--k-text-secondary);
+  font-size: var(--k-text-l);
+  font-weight: var(--k-weight-semibold);
+}
+.ov-card__sub {
+  margin: 0.25rem 0 0.875rem;
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.ov-card__go {
+  color: var(--k-text-muted);
+  text-decoration: none;
+}
+.ov-empty {
+  margin: 0.75rem 0 0;
+  color: var(--k-text-secondary);
+}
+.ov-pair,
+.mo-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.mo-pair {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+}
+
+/* Signals */
+.ov-signals {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ov-signal {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--k-border);
+}
+.ov-signal:last-child {
+  border-bottom: 0;
+}
+.ov-signal__dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin: 0 0.25rem;
+  border-radius: 50%;
+  background: var(--k-amber);
+}
+.ov-signal[data-sev='critical'] .ov-signal__dot {
+  background: var(--k-danger);
+}
+.ov-signal__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.ov-signal__text b {
+  font-size: var(--k-text-l);
+  font-weight: var(--k-weight-semibold);
+}
+.ov-signal__text span {
+  color: var(--k-text-secondary);
+  font-size: var(--k-text-s);
+}
+.ov-signal__go {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--k-text-secondary);
+  font-size: var(--k-text-s);
+  font-weight: var(--k-weight-medium);
+  text-decoration: none;
+}
+.ov-signal__go:hover {
+  color: var(--k-text-primary);
+}
+
+/* Bar list rows */
+.ov-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.ov-fill {
+  position: relative;
+  min-height: 2.75rem;
+  border-radius: 0.625rem;
+  overflow: hidden;
+}
+.ov-fill__bg {
+  position: absolute;
+  inset: 0;
+  fill: var(--k-surface-input-hover);
+}
+.ov-fill[data-tone='bad'] .ov-fill__bg {
+  fill: var(--k-rose-bg);
+}
+.ov-fill__in {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4375rem 0.75rem;
+}
+.ov-row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.ov-row__text b {
+  font-weight: var(--k-weight-semibold);
+}
+.ov-row__text small {
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.ov-row__val {
+  flex: none;
+  font-weight: var(--k-weight-semibold);
+  text-align: right;
+}
+.ov-fill[data-tone='bad'] .ov-row__val {
+  color: var(--k-rose-soft);
+}
+
+/* The ring and its legend */
+.ov-gauge {
+  position: relative;
+  max-width: 17rem;
+  margin: 0.75rem auto 0.5rem;
+}
+.ov-gauge__seg {
+  stroke: var(--k-text-muted);
+}
+.ov-gauge__seg[data-tone='0'],
+.ov-legend__dot[data-tone='0'] {
+  stroke: var(--k-accent);
+  background: var(--k-accent);
+}
+.ov-gauge__seg[data-tone='1'],
+.ov-legend__dot[data-tone='1'] {
+  stroke: var(--k-teal);
+  background: var(--k-teal);
+}
+.ov-gauge__seg[data-tone='2'],
+.ov-legend__dot[data-tone='2'] {
+  stroke: var(--k-amber-soft);
+  background: var(--k-amber-soft);
+}
+.ov-gauge__seg[data-tone='3'],
+.ov-legend__dot[data-tone='3'] {
+  stroke: var(--k-text-muted);
+  background: var(--k-text-muted);
+}
+.ov-gauge__mid {
+  position: absolute;
+  inset: 38% 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+.ov-gauge__mid b {
+  font-size: 1.5rem;
+  font-weight: var(--k-weight-semibold);
+}
+.ov-gauge__mid small {
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.ov-legend {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ov-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.25rem;
+}
+.ov-legend__dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+.ov-legend__name {
+  flex: 1;
+  min-width: 0;
+}
+.ov-legend__pct {
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.ov-legend__val {
+  min-width: 5.5rem;
+  font-size: var(--k-text-l);
+  font-weight: var(--k-weight-semibold);
+  text-align: right;
+}
+
+/* A lead's people */
+.ov-teamline {
+  margin: 0.75rem 0 0.5rem;
+  color: var(--k-text-secondary);
+  font-size: var(--k-text-s);
+}
+.ov-teamline b {
+  color: var(--k-text-primary);
+}
+.ov-limitbar__fill {
+  fill: var(--k-accent);
+}
+.ov-limitbar[data-tone='bad'] .ov-limitbar__fill {
+  fill: var(--k-danger);
+}
+.ov-limitbar__tick {
+  fill: var(--k-border-strong);
+}
+.ov-people {
+  margin-top: 1rem;
+}
+.ov-people__head,
+.ov-person {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 1fr) 9rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.625rem;
+}
+.ov-people__head {
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.ov-people__head span:nth-child(2) {
+  grid-column: 2 / 4;
+}
+.ov-person {
+  border-top: 1px solid var(--k-border);
+  border-radius: 0.5rem;
+  color: inherit;
+  text-decoration: none;
+  transition: background 160ms ease;
+}
+.ov-person:hover {
+  background: var(--k-surface-input);
+}
+.ov-person__who {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+.ov-person__sum {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+}
+.ov-person__sum small {
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.ov-person__sum[data-tone='bad'] b {
+  color: var(--k-danger);
+}
+
+/* The participant */
+.mo-ico {
+  font-weight: var(--k-weight-semibold);
+}
+.mo-big {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin: 0.5rem 0 0.75rem;
+}
+.mo-big b {
+  font-size: 2rem;
+  font-weight: var(--k-weight-bold);
+  letter-spacing: -0.02em;
+}
+.mo-big span {
+  color: var(--k-text-muted);
+  font-size: var(--k-text-s);
+}
+.mo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0.625rem 0 1.25rem;
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.mo-key::before {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.375rem;
+  border-radius: 0.125rem;
+  background: var(--k-accent);
+  content: '';
+}
+.mo-key--forecast::before {
+  background: var(--k-accent-bg);
+}
+.mo-key--warn::before {
+  width: 0.125rem;
+  background: var(--k-amber);
+}
+.mo-sub {
+  margin: 0 0 0.375rem;
+  color: var(--k-text-muted);
+  font-size: var(--k-text-s);
+  font-weight: var(--k-weight-semibold);
+}
+.mo-note {
+  margin: 0.875rem 0 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--k-border);
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.mo-sent {
+  margin: 0;
+  color: var(--k-green-soft);
+  font-size: var(--k-text-s);
+}
+.mo-error {
+  margin: 0.5rem 0 0;
+  color: var(--k-danger);
+  font-size: var(--k-text-s);
+}
+.mo-chats {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mo-chat {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto 4rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0;
+  border-top: 1px solid var(--k-border);
+}
+.mo-chat:first-child {
+  border-top: 0;
+}
+.mo-chat__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--k-accent);
+}
+.mo-chat[data-end='running'] .mo-chat__dot {
+  background: var(--k-green);
+}
+.mo-chat[data-end='abandoned'] .mo-chat__dot {
+  background: var(--k-amber);
+}
+.mo-chat__end {
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+  text-align: right;
+}
+.mo-chat[data-end='abandoned'] .mo-chat__end {
+  color: var(--k-amber-soft);
+}
+.mo-chat__cost {
+  text-align: right;
+}
+
+/* Phone: one column, the people table becomes a list */
+@media (max-width: 56rem) {
+  .ov-pair,
+  .mo-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ov-people__head {
+    display: none;
+  }
+  .ov-person {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0.25rem;
+  }
+  .ov-person .ov-limitbar {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+  .ov-signal {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.25rem 0.5rem;
+  }
+  .ov-signal__go {
+    grid-column: 2;
+  }
+  .mo-chat {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .mo-chat__end {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: left;
+  }
+}

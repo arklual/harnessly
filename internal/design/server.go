@@ -259,6 +259,10 @@ func (l *Library) serveLibrary(w http.ResponseWriter, r *http.Request, port int)
 	}
 	q := r.URL.Query()
 	id, _ := search(q, "a")
+	if strings.HasPrefix(pathname, motionKitPrefix) {
+		l.serveMotionKit(w, r, pathname, head)
+		return
+	}
 	switch pathname {
 	case versionPath, eventsPath, statePath, logPath, changesPath, boardsPath:
 		need := RoleView

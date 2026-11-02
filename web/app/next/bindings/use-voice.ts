@@ -19,6 +19,7 @@ import {
   loadTakes,
   recordTake,
   startTake,
+  syncTakes,
   useFailedTakes,
   type VoiceTake,
 } from '@/next/features/composer/voice-takes';
@@ -28,6 +29,7 @@ import { WordedError } from '@/next/core/net/worded';
 import { hasFeature, useMachine } from '@/next/stores/machines';
 import type { MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
+import { voiceSettings } from '@/next/stores/me';
 import { dictationLang, voicePrefs } from '@/next/stores/voice';
 import { toast } from '@/next/ui/toast';
 
@@ -325,7 +327,7 @@ export const useVoice = (
       take: startTake(m, rec.mimeType || mimeType || 'audio/webm').id,
       keptAt: Date.now(),
     };
-    session.dictation = openDictation(m, dictationLang(), {
+    session.dictation = openDictation(m, dictationLang(), voiceSettings(), {
       onPreparing: () => {
         if (session.closed || live.current !== session) return;
         setRecording((now) => (now && !now.preparing ? { ...now, preparing: true } : now));
@@ -460,6 +462,7 @@ export const useVoice = (
 
   useEffect(() => {
     tried.current.clear();
+    syncTakes();
   }, [restored]);
   useEffect(() => {
     if (!machine || !linkLive || !hasFeature(machine, 'voice') || live.current) return;

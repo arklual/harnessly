@@ -134,6 +134,20 @@ export interface ISize {
   h: number;
 }
 
+/** The sizes «Резина» takes: whatever was typed, dragged, turned or kept stays within them. */
+export const VIEWPORT_SIZE = { min: 200, max: 3840 } as const;
+/** The least scale a box is drawn at: an area measured empty (a hidden or squeezed pane) must not take it to 0%. */
+export const MIN_FIT = 0.05;
+
+/** The size within the limits, or null when a side is below the least (a box measured in a squeezed area). */
+export const keptSize = (size: ISize | null): ISize | null =>
+  size === null || !(size.w >= VIEWPORT_SIZE.min && size.h >= VIEWPORT_SIZE.min)
+    ? null
+    : {
+        w: Math.min(VIEWPORT_SIZE.max, Math.round(size.w)),
+        h: Math.min(VIEWPORT_SIZE.max, Math.round(size.h)),
+      };
+
 export const VP_KIND = { fill: 'fill', size: 'size', frame: 'frame', overview: 'overview' } as const;
 export type TVpKind = (typeof VP_KIND)[keyof typeof VP_KIND];
 
@@ -188,7 +202,8 @@ export const viewportOf = (
   const base: ISize = custom && size ? size : { w: device.vw ?? area.w, h: device.vh ?? area.h };
   const vw = turned ? base.h : base.w;
   const vh = turned ? base.w : base.h;
-  const fitOf = (w: number, h: number) => Math.min(1, (area.w - PAD) / w, (area.h - padBottom) / h);
+  const fitOf = (w: number, h: number) =>
+    Math.max(MIN_FIT, Math.min(1, (area.w - PAD) / w, (area.h - padBottom) / h));
   if (!device.cls || !device.fw || !device.fh || !device.sw || !device.sh) {
     return { kind: VP_KIND.size, rot: false, vw, vh, cvh: vh, bw: vw, bh: vh, fit: fitOf(vw, vh), k: 1 };
   }

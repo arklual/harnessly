@@ -1,0 +1,27 @@
+{
+  "rule": {
+    "id": "l2veraaaaaaaaaaaaaa",
+    "scope": {
+      "kind": "team",
+      "id": "m2platformteamaaaaaa"
+    },
+    "userId": "u2veraaaaaaaaaaaaaaa",
+    "accountId": null,
+    "modelPattern": null,
+    "forbid": false,
+    "period": "month",
+    "unit": "money",
+    "amount": 100,
+    "warnPct": 0.8,
+    "used": 84,
+    "pct": 0.84,
+    "status": "warn",
+    "resetsAt": "2026-10-31T21:00:00Z",
+    "estimated": false,
+    "setBy": {
+      "userId": "u2borisaaaaaaaaaaaaa",
+      "name": "Борис"
+    },
+    "setAt": "2026-10-01T07:00:00Z"
+  }
+}

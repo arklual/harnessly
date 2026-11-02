@@ -59,6 +59,11 @@ describe('what is not valid', () => {
     expect(view.locked).toBe(false);
   });
 
+  it('drops a kept size under the least of «Резина»', () => {
+    expect(parseView({ v: 1, device: 'fill', size: { w: 150, h: 932 } }).size).toBeNull();
+    expect(parseView({ v: 1, device: 'fill', size: { w: 200, h: 200 } }).size).toEqual({ w: 200, h: 200 });
+  });
+
   it('clamps the zoom and drops a view that is not numbers', () => {
     expect(parseView({ ...kept, v: 1, zoom: { s: 99, x: 1, y: 2 } }).zoom.s).toBe(ZOOM.max);
     expect(parseView({ ...kept, v: 1, zoom: { s: 0.01, x: 1, y: 2 } }).zoom.s).toBe(ZOOM.min);

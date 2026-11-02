@@ -65,7 +65,7 @@ interface IChoiceProps<V extends string | number | null> {
   label: string;
   value: V;
   /** `icon`: a glyph before the label (side-by-side choices only). */
-  choices: readonly { value: V; label: string; sub?: string | null; icon?: string }[];
+  choices: readonly { value: V; label: string; sub?: string | null; icon?: string; disabled?: boolean }[];
   onPick: (value: V) => void;
   disabled?: boolean;
 }
@@ -146,6 +146,7 @@ export const MenuControl = ({
               className="hx-set-menu__item"
               role="option"
               aria-selected={choice.value === value}
+              disabled={choice.disabled}
               onClick={() => {
                 setOpen(false);
                 if (choice.value !== value) onPick(choice.value);

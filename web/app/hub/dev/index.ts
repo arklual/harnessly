@@ -175,6 +175,16 @@ export const SCENARIOS: Record<string, Entry> = {
     path: '/s/acme',
     scenario: { signedIn: true, latency: 2500, spaces: [SPACE('done', [online({ agents: readyAgents })])] },
   },
+  org: {
+    title: 'Организация: хаб на моках (?as=admin|lead|member)',
+    path: '/o/acme/all/overview',
+    scenario: { signedIn: true, spaces: [SPACE('done', [online({ agents: readyAgents })])] },
+  },
+  'org-step': {
+    title: 'Шаг «Организация» (HRN-536, моки)',
+    path: '/org/new',
+    scenario: { signedIn: true, spaces: [SPACE('done', [online({ agents: readyAgents })])] },
+  },
   down: { title: 'Hub не отвечает', path: '/', scenario: { signedIn: false, spaces: [], down: true } },
 };
 

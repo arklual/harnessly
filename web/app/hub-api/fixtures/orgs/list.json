@@ -1,0 +1,21 @@
+{
+  "orgs": [
+    {
+      "id": "o2acmeorgaaaaaaaaaaa",
+      "slug": "acme",
+      "name": "Acme",
+      "timezone": "Europe/Moscow",
+      "currency": "RUB",
+      "createdAt": "2026-10-01T09:00:00Z",
+      "role": "admin"
+    }
+  ],
+  "looseSpaces": [
+    {
+      "id": "s2sandboxaaaaaaaaaaa",
+      "slug": "sandbox",
+      "name": "Песочница",
+      "role": "owner"
+    }
+  ]
+}

@@ -32,6 +32,10 @@ type Config struct {
 	RuntimePort int
 	FilesPort   int
 
+	// UsageFeed builds what fills the usage outbox for a hub (HRN-588). It is a function handed in by cmd/agent because
+	// the usage report that reads the transcripts imports this package. nil: the machine reports no spend.
+	UsageFeed func(UsageDeps) (UsageFeed, error)
+
 	// ClusterURL and RuntimeID make the agent dial the cluster itself; without both it only listens.
 	ClusterURL string
 	RuntimeID  string
@@ -138,6 +142,11 @@ func LoadConfig() (Config, error) {
 	c.Host = env("AGENT_HOST", "127.0.0.1")
 	c.Version = env("AGENT_VERSION", BuildVersion)
 	c.DataDir = env("AGENT_DATA_DIR", filepath.Join(home, ".harnessly"))
+	// Once, at the start: a link on the way there lies in the home folder, where an agent could repoint it; the wall can
+	// pin a folder but not a link.
+	if real, err := filepath.EvalSymlinks(c.DataDir); err == nil {
+		c.DataDir = real
+	}
 	c.ConfigFile = env("AGENT_CONFIG", filepath.Join(c.DataDir, "config.json"))
 	c.SecretFile = env("AGENT_SECRET_FILE", "")
 	c.ClusterURL = env("AGENT_CLUSTER_URL", "")

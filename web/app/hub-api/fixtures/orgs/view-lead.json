@@ -1,0 +1,104 @@
+{
+  "org": {
+    "id": "o2acmeorgaaaaaaaaaaa",
+    "slug": "acme",
+    "name": "Acme",
+    "timezone": "Europe/Moscow",
+    "currency": "RUB",
+    "createdAt": "2026-10-01T09:00:00Z"
+  },
+  "tenants": [
+    {
+      "id": "t2acmetenantaaaaaaaa",
+      "slug": "acme",
+      "name": "Acme",
+      "orgId": "o2acmeorgaaaaaaaaaaa",
+      "createdAt": "2026-10-01T09:00:00Z",
+      "memberCount": 4
+    }
+  ],
+  "teams": [
+    {
+      "id": "m2platformteamaaaaaa",
+      "tenantId": "t2acmetenantaaaaaaaa",
+      "slug": "platform",
+      "name": "Платформа",
+      "createdAt": "2026-10-01T09:00:00Z",
+      "memberCount": 3,
+      "leadIds": ["u2borisaaaaaaaaaaaaa"]
+    },
+    {
+      "id": "m2productteamaaaaaaa",
+      "tenantId": "t2acmetenantaaaaaaaa",
+      "slug": "product",
+      "name": "Продукт",
+      "createdAt": "2026-10-01T09:00:00Z",
+      "memberCount": 2,
+      "leadIds": []
+    }
+  ],
+  "me": {
+    "userId": "u2borisaaaaaaaaaaaaa",
+    "instanceAdmin": false,
+    "grants": [
+      {
+        "userId": "u2borisaaaaaaaaaaaaa",
+        "scope": {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa"
+        },
+        "role": "lead",
+        "grantedBy": "u2annaaaaaaaaaaaaaaa",
+        "grantedAt": "2026-10-01T09:00:00Z"
+      }
+    ],
+    "teams": [
+      {
+        "teamId": "m2platformteamaaaaaa",
+        "isPrimary": true
+      },
+      {
+        "teamId": "m2productteamaaaaaaa",
+        "isPrimary": false
+      }
+    ],
+    "scopes": {
+      "tenant:t2acmetenantaaaaaaaa": {
+        "view": false,
+        "money": false,
+        "manage": false,
+        "grant": [],
+        "setLimit": false,
+        "setChildLimits": false,
+        "needs": {
+          "manage": "tenant_admin",
+          "setLimit": "org_admin"
+        }
+      },
+      "team:m2platformteamaaaaaa": {
+        "view": true,
+        "money": true,
+        "manage": true,
+        "grant": ["lead"],
+        "setLimit": false,
+        "setChildLimits": true,
+        "needs": {
+          "manage": null,
+          "setLimit": "tenant_admin"
+        }
+      },
+      "team:m2productteamaaaaaaa": {
+        "view": false,
+        "money": false,
+        "manage": false,
+        "grant": [],
+        "setLimit": false,
+        "setChildLimits": false,
+        "needs": {
+          "manage": "team_lead",
+          "setLimit": "tenant_admin"
+        }
+      }
+    }
+  }
+}

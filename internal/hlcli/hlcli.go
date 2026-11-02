@@ -19,6 +19,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/panel"
 )
 
 // Env is what the command depends on outside its arguments; tests replace the parts.
@@ -260,6 +262,12 @@ func (c *cli) endpoint() (base, token string, err error) {
 		base = "http://127.0.0.1:" + port
 	}
 	token = strings.TrimSpace(c.env.Getenv("HARNESSLY_CLI_TOKEN"))
+	if file := strings.TrimSpace(c.env.Getenv("HARNESSLY_CLI_TOKEN_FILE")); token == "" && file != "" {
+		// The agent of a chat with apps is given the token of its launch in a file: that one, not the person's.
+		if token = readTrim(file); token == "" {
+			return "", "", fail("no CLI token in %s (HARNESSLY_CLI_TOKEN_FILE)", file)
+		}
+	}
 	if token == "" {
 		token = readTrim(filepath.Join(dir, "cli-token"))
 	}
@@ -759,9 +767,8 @@ func (c *cli) tabClose(args []string) error {
 
 // ---- the right pane ------------------------------------------------------------------------------------------------
 
-// PaneKinds are the tabs of the right pane an agent may open by name.
-var PaneKinds = []string{"overview", "tools", "browser", "terminal", "files", "disk", "changes", "artifacts", "gitlab",
-	"subagents", "economics", "plan", "peers", "design", "side-chat", "gallery", "task"}
+// PaneKinds are the tabs of the right pane an agent may open by name: the pane's registry (internal/panel).
+var PaneKinds = panel.Kinds()
 
 func isPaneKind(s string) bool {
 	for _, k := range PaneKinds {
@@ -808,6 +815,9 @@ func (c *cli) resolveOpen(args []string) (tab, target string, err error) {
 	}
 	t := args[0]
 	switch {
+	case strings.HasPrefix(t, "app:"):
+		// app:<id> or app:<id>/<view>: an installed app's view, in the kind "app".
+		return "app", strings.TrimPrefix(t, "app:"), nil
 	case taskKeyRe.MatchString(t):
 		return "task", t, nil
 	case portRe.MatchString(t):

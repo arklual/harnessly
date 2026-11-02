@@ -35,7 +35,27 @@ func TestDeckRoutesAreRegistered(t *testing.T) {
 			t.Errorf("%s: %d JSON and %d body routes match, want one %s route", p, jsonHits, bodyHits, kind)
 		}
 	}
-	if len(json)+len(body) != len(want) {
-		t.Errorf("%d routes, want %d", len(json)+len(body), len(want))
+	// The pictures of a design (design/image, design/image/file) are registered beside the deck's.
+	pictures := map[string]string{platformAPI + "/design/image": "json", platformAPI + "/design/image/file": "body"}
+	for p, kind := range pictures {
+		r := httptest.NewRequest(http.MethodGet, p+"?artifact=acme", nil)
+		hits := 0
+		routes := len(json)
+		for i := range routes {
+			if kind == "json" && json[i].Match(r) {
+				hits++
+			}
+		}
+		for _, route := range body {
+			if kind == "body" && route.Match(r) {
+				hits++
+			}
+		}
+		if hits != 1 {
+			t.Errorf("%s: %d %s routes match, want one", p, hits, kind)
+		}
+	}
+	if len(json)+len(body) != len(want)+len(pictures) {
+		t.Errorf("%d routes, want %d", len(json)+len(body), len(want)+len(pictures))
 	}
 }

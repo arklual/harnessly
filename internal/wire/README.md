@@ -586,7 +586,8 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     `refused: "menu-unmatched"`. The card then says «decide in the terminal» and offers to open the chat's terminal on
     the agent's pane. The next state of the gate drops the field.
     The runtime asks the same of an open tool permission whenever the screen is read, so `refused` is set as soon as the
-    menu cannot be matched (the card then offers the terminal and no buttons), not only after a press. An open gate may
+    menu cannot be matched (the card then offers the terminal and no buttons), not only after a press. A dialog too tall for its
+    window has its top off the screen: with no terminal attached the window grows and the dialog is read whole. An open gate may
     also carry `autoDenyAt` (epoch ms, absent otherwise): Claude Code 2.1.311 says on the prompt of an unattended session
     that it denies the request by itself in m:ss, and the card shows that countdown.
 56. **Stopping a chat's terminal.** `terminal.stop {opId, id, force?}` ends the conversation's terminal: the agent and

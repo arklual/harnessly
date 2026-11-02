@@ -107,6 +107,7 @@ const ModelPicker = ({
   const anchorRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
+  const segRef = useRef<HTMLDivElement>(null);
 
   const agent = agents.find((a) => agentKey(a) === choiceAgentKey(value)) ?? agents[0];
   // The agents of the second screen: the chat's own, then those a handoff goes to.
@@ -123,6 +124,15 @@ const ModelPicker = ({
     0,
     listed.findIndex((a) => agentKey(a) === browse),
   );
+  // The agent strip scrolls when the agents do not fit: the backing is placed by measure and the chosen one is brought in.
+  useLayoutEffect(() => {
+    const seg = segRef.current;
+    const item = seg?.querySelectorAll<HTMLElement>('.hx-seg__item')[browseIndex];
+    if (!seg || !item) return;
+    seg.style.setProperty('--gx', `${item.offsetLeft}px`);
+    seg.style.setProperty('--gw', `${item.offsetWidth}px`);
+    seg.scrollLeft = Math.max(0, item.offsetLeft - (seg.clientWidth - item.offsetWidth) / 2);
+  }, [browseIndex, listed.length, view]);
   const frozen = !!blocked || !!busy;
   const ultracodeOffered = offersUltracode && model?.ultracode === true;
   const ultracode = ultracodeOffered && value.ultracode;
@@ -389,7 +399,7 @@ const ModelPicker = ({
                 </button>
               </div>
               {segmented && (
-                <div className="hx-seg" data-n={listed.length} data-a={browseIndex}>
+                <div className="hx-seg" ref={segRef}>
                   <span className="hx-seg__glider" />
                   {listed.map((a) => (
                     <button

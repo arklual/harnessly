@@ -1,0 +1,580 @@
+/* An app as the main thing (/apps/<id>?chat=): the page, the chat beside it in three places, the quiet row of the
+   chat's apps, the list of installed apps. The look follows the board «Приложения — чат». */
+
+/* ---- the row of the chat's apps, over the field ---- */
+.hx-chatapps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin: 0 18px var(--hx-space-2);
+}
+.hx-chatapps__chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  animation: hx-chatapp-in var(--hx-dur-md) var(--hx-ease-out) backwards;
+  transition:
+    opacity 200ms var(--hx-ease-out),
+    transform 200ms var(--hx-ease-out);
+}
+.hx-chatapps__chip[data-leaving] {
+  opacity: 0;
+  transform: scale(0.94);
+  pointer-events: none;
+}
+.hx-chatapps__chip[data-busy] {
+  opacity: 0.6;
+}
+.hx-chatapps__name,
+.hx-chatapps__off {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.hx-chatapps__name {
+  min-width: 0;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px 0 0 999px;
+}
+.hx-chatapps__name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-chatapps__off {
+  padding: 3px 8px 3px 4px;
+  border-radius: 0 999px 999px 0;
+  color: var(--hx-fg-3);
+}
+.hx-chatapps__name:hover,
+.hx-chatapps__off:hover:not(:disabled) {
+  color: var(--hx-fg-1);
+}
+.hx-chatapps__off:disabled {
+  cursor: default;
+}
+@keyframes hx-chatapp-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+/* ---- «+» → «Приложение» ---- */
+.hx-pick[data-kind='apps'] .hx-pick__row:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-pick__row--all {
+  margin-top: var(--hx-space-2);
+  border-top: 1px solid var(--hx-border);
+  border-radius: 0 0 8px 8px;
+}
+
+/* ---- the page of an app ---- */
+.hx-appmain {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  animation: hx-appmain-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+}
+@keyframes hx-appmain-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.hx-appmain__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: var(--hx-header-h);
+  padding: 0 var(--hx-space-4);
+}
+.hx-appmain__menu {
+  display: none;
+}
+.hx-appmain__titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-left: var(--hx-space-2);
+}
+.hx-appmain__title {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--hx-text-xl);
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-appmain__sub {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-appmain__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.hx-appmain__stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-appmain__view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0 var(--hx-space-4) var(--hx-space-4);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  overflow: hidden;
+}
+
+/* the chat as a column */
+.hx-appmain__col {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 380px;
+  min-height: 0;
+  margin: 0 0 var(--hx-space-4) var(--hx-space-4);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-stage);
+  overflow: hidden;
+  animation: hx-appmain-col-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+  transition:
+    opacity 240ms var(--hx-ease-out),
+    transform 240ms var(--hx-ease-out);
+}
+.hx-appmain__col[data-state='closing'] {
+  opacity: 0;
+  transform: translateX(-12px);
+  pointer-events: none;
+}
+@keyframes hx-appmain-col-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+/* the chat as a window over the app */
+.hx-appmain__float {
+  position: absolute;
+  z-index: 6;
+  left: var(--fx);
+  top: var(--fy);
+  width: var(--fw);
+  height: var(--fh);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-xl);
+  background: var(--hx-bg-stage);
+  box-shadow: var(--hx-shadow-window);
+  overflow: hidden;
+  animation: hx-appmain-pop-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+  transition:
+    opacity 240ms var(--hx-ease-out),
+    transform 240ms var(--hx-ease-out);
+}
+.hx-appmain__float[data-state='closing'] {
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
+}
+@keyframes hx-appmain-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+.hx-appmain__float-head {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 40px;
+  padding: 0 var(--hx-space-4);
+  border-bottom: 1px solid var(--hx-border);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.hx-appmain__float-head:active {
+  cursor: grabbing;
+}
+.hx-appmain__float-title {
+  overflow: hidden;
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-appmain__float-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hx-appmain__float-size {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+/* the chat's field alone, at the foot */
+.hx-appmain__island {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  bottom: var(--hx-space-6);
+  width: min(600px, calc(100% - 2 * var(--hx-space-6)));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  animation: hx-appmain-island-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+  transition:
+    opacity 240ms var(--hx-ease-out),
+    transform 240ms var(--hx-ease-out);
+}
+.hx-appmain__island[data-state='closing'] {
+  opacity: 0;
+  transform: translate(-50%, 16px);
+  pointer-events: none;
+}
+@keyframes hx-appmain-island-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+}
+.hx-appisland__last {
+  align-self: center;
+  max-width: 100%;
+  padding: 4px 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hx-appisland__box {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--hx-space-2);
+  padding: 6px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 22px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-md);
+}
+.hx-appisland__box:focus-within {
+  border-color: var(--hx-focus);
+}
+.hx-appisland__input {
+  flex: 1;
+  min-width: 0;
+  max-height: 132px;
+  padding: 8px 10px;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+}
+
+/* the placement switch */
+.hx-appmain__modes {
+  position: relative;
+  display: flex;
+  padding: 3px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-hover);
+}
+.hx-appmain__glider {
+  position: absolute;
+  top: 3px;
+  left: calc(3px + var(--seg-i, 0) * 36px);
+  width: 36px;
+  height: 28px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-sm);
+  transition: left 320ms var(--hx-ease-out);
+}
+.hx-appmain__mode {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+.hx-appmain__mode[aria-checked='true'] {
+  color: var(--hx-fg-1);
+}
+
+/* narrow: one column; the chat takes the room under the app, a window or the field floats as it does */
+@media (max-width: 760px) {
+  .hx-appmain__menu {
+    display: inline-flex;
+  }
+  .hx-appmain__body {
+    flex-direction: column;
+  }
+  .hx-appmain__col {
+    order: 2;
+    width: auto;
+    height: 46%;
+    margin: 0 var(--hx-space-4) var(--hx-space-4);
+  }
+  .hx-appmain__float {
+    left: var(--hx-space-3);
+    top: auto;
+    bottom: var(--hx-space-3);
+    width: calc(100% - 2 * var(--hx-space-3));
+    height: 60%;
+  }
+}
+
+/* ---- the inspector under the view ---- */
+.hx-insp {
+  flex: none;
+  max-height: 42%;
+  margin: 0 var(--hx-space-4) var(--hx-space-4);
+  padding: var(--hx-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-4);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-lg);
+  background: var(--hx-bg-raised);
+  overflow-y: auto;
+  font-size: var(--hx-text-sm);
+  animation: hx-appmain-in var(--hx-dur-md) var(--hx-ease-out) backwards;
+}
+.hx-insp__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hx-insp__h {
+  margin: 0 0 var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-insp__head .hx-insp__h {
+  margin: 0;
+}
+.hx-insp__text {
+  margin: 0 0 var(--hx-space-2);
+}
+.hx-insp__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-3);
+  color: var(--hx-fg-3);
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+}
+.hx-insp__none {
+  margin: 0;
+  color: var(--hx-fg-3);
+}
+.hx-insp__warn {
+  margin: var(--hx-space-2) 0 0;
+  color: var(--hx-warning);
+}
+.hx-insp__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hx-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hx-insp__chips li {
+  padding: 2px 8px;
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-hover);
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+}
+.hx-insp__calls {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+}
+.hx-insp__calls td {
+  padding: 3px var(--hx-space-3) 3px 0;
+  white-space: nowrap;
+}
+.hx-insp__calls tr[data-ok='false'] td:last-child {
+  color: var(--hx-danger);
+}
+.hx-insp__scope {
+  display: flex;
+  gap: var(--hx-space-3);
+  padding: 2px 0;
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+}
+.hx-insp__scope-name {
+  flex: none;
+  width: 64px;
+  color: var(--hx-fg-3);
+}
+.hx-insp__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+}
+.hx-insp__link:hover {
+  color: var(--hx-fg-1);
+}
+
+/* ---- the host's own questions ---- */
+.hx-appconfirm {
+  width: min(420px, calc(100vw - 2 * var(--hx-space-6)));
+}
+.hx-appconfirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--hx-space-3);
+  padding-top: var(--hx-space-4);
+}
+
+/* ---- the list of installed apps ---- */
+.hx-appslist {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--hx-space-6) var(--hx-space-6);
+  overflow-y: auto;
+  animation: hx-appmain-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+}
+.hx-appslist__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: var(--hx-header-h);
+}
+.hx-appslist__h1 {
+  margin: 0;
+  font-size: var(--hx-text-xl);
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.01em;
+}
+.hx-appslist__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(640px, 100%);
+}
+.hx-appslist__row {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-4);
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-appslist__row:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-appslist__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hx-appslist__name {
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-appslist__desc {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-appslist__none {
+  margin: 0;
+  color: var(--hx-fg-3);
+  max-width: 460px;
+}
+@media (max-width: 760px) {
+  .hx-appslist .hx-appmain__menu {
+    display: inline-flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-chatapps__chip,
+  .hx-appmain,
+  .hx-appmain__col,
+  .hx-appmain__float,
+  .hx-appmain__island,
+  .hx-insp,
+  .hx-appslist {
+    animation: none;
+    transition: none;
+  }
+}

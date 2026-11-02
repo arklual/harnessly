@@ -309,6 +309,49 @@ func TestHookSettings(t *testing.T) {
 	}
 }
 
+func TestHookSettingsWithTheBudgetHook(t *testing.T) {
+	plain := HookSettingsConfig{StatusHook: "/h/s.sh", Statusline: "/h/l.sh"}
+	with := plain
+	with.BudgetHook = "/h/budget-hook.sh"
+	var got struct {
+		Hooks map[string][]struct {
+			Matcher string
+			Hooks   []struct {
+				Command string
+				Timeout int
+			}
+		}
+	}
+	if err := json.Unmarshal(HookSettings(with), &got); err != nil {
+		t.Fatal(err)
+	}
+	cmds := func(event string) []string {
+		var out []string
+		for _, e := range got.Hooks[event] {
+			for _, h := range e.Hooks {
+				out = append(out, h.Command)
+			}
+		}
+		return out
+	}
+	// The prompt hook runs beside the status hook, and every tool call asks too; no other event does.
+	if c := cmds("UserPromptSubmit"); len(c) != 2 || c[0] != `sh "/h/s.sh" prompt-submit` || c[1] != `sh "/h/budget-hook.sh" claude UserPromptSubmit` {
+		t.Errorf("%q", c)
+	}
+	if c := cmds("PreToolUse"); len(c) != 1 || c[0] != `sh "/h/budget-hook.sh" claude PreToolUse` || got.Hooks["PreToolUse"][0].Matcher != "" {
+		t.Errorf("%q", c)
+	}
+	for _, event := range []string{"SessionStart", "Notification", "Stop"} {
+		if c := cmds(event); len(c) != 1 || strings.Contains(c[0], "budget") {
+			t.Errorf("%s: %q", event, c)
+		}
+	}
+	// Without the option the settings are what they always were.
+	if strings.Contains(string(HookSettings(plain)), "budget") || strings.Contains(string(HookSettings(plain)), "PreToolUse") {
+		t.Error("the plain settings changed")
+	}
+}
+
 func TestPaneTitleAndProcess(t *testing.T) {
 	if got := ParsePaneTitle("⠋ Fix the build  "); got == nil || *got != "Fix the build" {
 		t.Fatalf("%v", got)
@@ -491,3 +534,28 @@ func TestDetectByPidFileOnThisMachine(t *testing.T) {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+// A chat with apps runs Claude under bwrap, which stays its parent (internal/apps/boundary.go), and on a machine with
+// the managed launcher under that: the detector looks through bwrap as if it were not there.
+func TestDetectThroughTheAppsSandbox(t *testing.T) {
+	home := t.TempDir()
+	d := &Detector{Dir: filepath.Join(home, ".claude"), Match: agents.MatchArgv}
+	put(t, filepath.Join(home, ".claude", "sessions", "32.json"), `{"pid":32,"sessionId":"`+id1+`","cwd":"/w"}`)
+	f := fakeProcs{
+		30: {args: "/usr/bin/bwrap --dev-bind / / --ro-bind /d /d -- /opt/runtime sandbox-exec -- claude --settings /s.json", children: []int{31}},
+		31: {args: "/usr/bin/python3 /opt/profile/acme-claude --settings /s.json", children: []int{32}},
+		32: {args: "claude --settings /s.json"},
+		40: {args: "/usr/bin/bwrap --dev-bind / / -- claude", children: []int{41}},
+		41: {args: "claude"},
+	}
+	d.Procs = f.procs()
+	if !d.IsRunning([]int{30}) || !d.IsRunning([]int{40}) {
+		t.Fatal("Claude under bwrap is the shell's child")
+	}
+	if info, err := d.Detect([]int{30}); err != nil || info.Status != agents.Running || info.PID != 32 || info.SessionID != id1 {
+		t.Fatalf("%+v %v", info, err)
+	}
+	if hooked, found := d.RunsWithHooks([]int{30}, "/s.json", "status.sh"); !hooked || !found {
+		t.Fatal("the hooks of a Claude under bwrap")
+	}
+}

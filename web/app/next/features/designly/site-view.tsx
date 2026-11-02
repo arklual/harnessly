@@ -1,6 +1,9 @@
 // An open design as the design draws it (.hx-site): a browser with the design's pages in tabs, its bar — history,
 // the address with the pages, the device and size, more — and the page itself in the chosen viewport, in a case when
 // the device has one. The page is the board on the machine's library server, opened in a preview slot of its own.
+import { KEY_SCOPE } from '@/next/features/keys/commands';
+import { useKeyHint } from '@/next/features/keys/keys-help';
+import { useKeys } from '@/next/features/keys/use-keys';
 import {
   Fragment,
   useCallback,
@@ -20,10 +23,12 @@ import {
   browserOf,
   DEVICES,
   deviceOf,
+  keptSize,
   overviewBox,
   overviewOf,
   SCROLL_START,
   trackScroll,
+  VIEWPORT_SIZE,
   viewportOf,
   viewportVars,
   VP_KIND,
@@ -65,7 +70,10 @@ import { PaneDock, ZoomControls } from '@/next/features/designly/site-dock';
 import { useViewMemory } from '@/next/features/designly/use-view-memory';
 import type { IViewMemory } from '@/next/features/designly/view-memory';
 import { useCanvasZoom } from '@/next/features/designly/use-canvas-zoom';
-import type { MachineId } from '@/next/protocol/v2';
+import type { ConvId, MachineId } from '@/next/protocol/v2';
+import ImageActions, { type IImageOpen } from '@/next/features/designly/image-gen/image-actions';
+import { fileWriter } from '@/next/features/designly/image-gen/canvas';
+import { frameScale, screenBoxOf } from '@/next/features/designly/image-gen/image-act';
 import Icon from '@/next/ui/icon';
 import { SheetGrip, SheetScrim, useSheetDrag } from '@/next/ui/sheet';
 import Swap from '@/next/ui/swap';
@@ -183,6 +191,8 @@ export interface ISiteViewProps {
   viewSeed?: IViewMemory;
   /** Set for a visitor of a guest link. */
   guest?: ISiteGuest;
+  /** Set where the person may change the design: the pictures of its boards get «Изменить» / «Сгенерировать» on them. */
+  images?: { machine: MachineId; artifact: string };
   /** The page alone over the view's whole box: no bar, no device, no zoom (a guest's full screen). */
   full?: boolean;
   /** Set where the gateway keeps the project's access and the person has something to do there. */
@@ -198,6 +208,8 @@ export interface ISiteViewProps {
 }
 
 export interface ISiteStage {
+  /** The design's chat the column shows (the apps' selection items send their tasks to it); null while it has none. */
+  conv?: ConvId | null;
   mode: TSiteMode;
   /** The section's size goes with it: the first window of «Окно» is placed by it. */
   onMode: (mode: TSiteMode, section: { width: number; height: number }) => void;
@@ -234,6 +246,8 @@ export interface ISiteStage {
   onStyled: (gone: number[]) => void;
   /** The blocks the pins stand on: the view asks the bridge to follow them and hands its word to the pins. */
   anchors: IAnchorItem[];
+  /** The blocks (template numbers) a picture is being drawn into on the page: the board shows a veil on each. */
+  veils?: readonly number[];
   /** Whether the page is being picked from (the mode of edits always picks); null while there is no bridge to pick with. */
   picking: boolean | null;
   /** Turns picking on or off: the same switch as the island's button. */
@@ -336,8 +350,14 @@ const SiteView = ({
   memoryKey,
   viewSeed,
   guest,
+  images,
   full = false,
 }: ISiteViewProps) => {
+  const devKey = useKeyHint('site.devtools');
+  const inspectKey = useKeyHint('site.inspect');
+  const hardKey = useKeyHint('site.hardReload');
+  const reloadHint = useKeyHint('site.reload');
+  const pickKey = useKeyHint('site.pick');
   const pop = usePop();
   // A phone has one column: the chat docked to the right is stacked like the left one there.
   const phone = usePhone();
@@ -500,6 +520,10 @@ const SiteView = ({
   // only from the slot's window and origin.
   const pick = stage?.pick ?? false;
   const latestStage = useRef(stage);
+  /** A button on a picture of the page was pressed: the editor or the generator is open for it. */
+  const [imageOpen, setImageOpen] = useState<IImageOpen | null>(null);
+  const imagesOn = images !== undefined && guest === undefined;
+  const latestImagesOn = useRef(imagesOn);
   // The keys of the page act on the latest of what they toggle (they listen once).
   const latestPick = useRef<() => void>(() => undefined);
   const latestInspect = useRef<() => void>(() => undefined);
@@ -507,6 +531,7 @@ const SiteView = ({
   const latestReload = useRef<(hard: boolean) => void>(() => undefined);
   useEffect(() => {
     latestStage.current = stage;
+    latestImagesOn.current = imagesOn;
   });
   // The page scrolls: the field narrows for a while, and a phone's bars fold or unfold by the direction.
   const track = useRef(SCROLL_START);
@@ -560,6 +585,31 @@ const SiteView = ({
   const onCanvas = () => {
     const slot = slotOf();
     slot?.frame.contentWindow?.postMessage({ type: 'tk:canvas', on: true }, slot.origin);
+  };
+  // The blocks a picture is being drawn into: a veil on each, and off the ones that are done.
+  const veiled = useRef<readonly number[]>([]);
+  const sendVeils = (fresh: boolean) => {
+    const slot = slotOf();
+    if (!slot) return;
+    const want = latestStage.current?.veils ?? [];
+    const before = fresh ? [] : veiled.current;
+    for (const tpl of want) {
+      if (!before.includes(tpl))
+        slot.frame.contentWindow?.postMessage({ type: 'tk:gen', tpl, on: true }, slot.origin);
+    }
+    for (const tpl of before) {
+      if (!want.includes(tpl))
+        slot.frame.contentWindow?.postMessage({ type: 'tk:gen', tpl, on: false }, slot.origin);
+    }
+    veiled.current = want;
+  };
+  // Whether the page draws its buttons on pictures: only where the person may change the design.
+  const sendImages = () => {
+    const slot = slotOf();
+    slot?.frame.contentWindow?.postMessage(
+      { type: 'tk:images', on: latestImagesOn.current, scale: frameScale(slot.frame) },
+      slot.origin,
+    );
   };
   const sendAnchors = () => {
     const slot = slotOf();
@@ -651,11 +701,22 @@ const SiteView = ({
         setTweaksOpen(message.open);
         return;
       }
+      if (message?.k === 'images-hello') {
+        sendImages();
+        return;
+      }
+      if (message?.k === 'image-act') {
+        if (latestImagesOn.current && message.act.file !== '')
+          setImageOpen({ act: message.act, box: screenBoxOf(frame.getBoundingClientRect(), message.act) });
+        return;
+      }
       if (message?.k === 'lib-ready') {
         hostTweaks();
+        sendImages();
         // A board of the library follows the pinned blocks itself (its script, not the slot's bridge, which says hello).
         anchorStore.set(null);
         sendAnchors();
+        sendVeils(true);
         // Its script tells Space and the middle button's drag on a canvas too.
         frame.contentWindow?.postMessage({ type: 'tk:canvas', on: true }, origin);
         // And it picks blocks and wears the notes' looks, as the slot's bridge does.
@@ -680,6 +741,7 @@ const SiteView = ({
       }
       if (message?.k === 'hello') {
         hostTweaks();
+        sendImages();
         // The page is on a canvas: its bridge tells Space, the middle button's drag and the wheel it cannot scroll by.
         frame.contentWindow?.postMessage({ type: 'tk:canvas', on: true }, origin);
       }
@@ -727,6 +789,24 @@ const SiteView = ({
     // sendStyles reads the frame of this src and the latest stage; the set's key says when it changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stylesKey, src, reloadKey]);
+  useEffect(() => {
+    sendImages();
+    // sendImages reads the frame of this src and the latest flag; the flag and the page say when to tell it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesOn, src, reloadKey]);
+  // A zoom of the canvas shrinks or grows the page: its buttons are told the scale once the smooth step has settled.
+  useEffect(() => {
+    const timer = window.setTimeout(sendImages, 400);
+    return () => window.clearTimeout(timer);
+    // sendImages reads the frame of this src; only the zoom and the page's address change the scale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvas.pct, src]);
+  const veilsKey = JSON.stringify(stage?.veils ?? []);
+  useEffect(() => {
+    sendVeils(false);
+    // sendVeils reads the frame of this src and the latest stage; the set's key says when it changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [veilsKey, src, reloadKey]);
   // The blocks the pins stand on: the set goes again whenever it changes.
   const anchorsKey = JSON.stringify(stage?.anchors ?? []);
   useEffect(() => {
@@ -758,51 +838,26 @@ const SiteView = ({
     };
   });
 
-  // «V» turns picking on and off, as the tip of the bar's button says; typing in a field is not for it.
+  // The page's keys (features/keys): «V» turns picking on and off; ⌥⌘I turns DevTools on and off, ⇧⌘C inspects an
+  // element on the page, Esc stops that; ⌘R reloads the page of the design, ⇧⌘R clears the cache first (the browser's own
+  // reload is not wanted here). The tips of the buttons say the shortcuts as they are now.
   const canPick = keys && stage !== undefined && stage.picking !== null;
-  useEffect(() => {
-    if (!canPick) return;
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.code !== 'KeyV' || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-      if ((event.target as Element | null)?.closest('input, textarea, select, [contenteditable]')) return;
-      event.preventDefault();
-      latestPick.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [canPick]);
-
-  // ⌥⌘I turns DevTools on and off, ⇧⌘C inspects an element on the page, Esc stops that; as the tips of the buttons say.
   const canDev = keys && devtools !== undefined;
-  useEffect(() => {
-    if (!canDev) return;
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      const mod = event.metaKey || event.ctrlKey;
-      if (event.code === 'KeyI' && event.altKey && mod) {
-        event.preventDefault();
-        setDev((on) => !on);
-      } else if (event.code === 'KeyC' && event.shiftKey && mod && !event.altKey) {
-        event.preventDefault();
-        latestInspect.current();
-      } else if (event.key === 'Escape') {
-        if (latestDom.current.inspect) latestDom.current.setInspect(false);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [canDev]);
-
-  // ⌘R reloads the page of the design, ⇧⌘R clears the cache first, as the tips say; the browser's own reload is not wanted here.
-  useEffect(() => {
-    if (!keys) return;
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.code !== 'KeyR' || !(event.metaKey || event.ctrlKey) || event.altKey) return;
-      event.preventDefault();
-      latestReload.current(event.shiftKey);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [keys]);
+  useKeys(
+    KEY_SCOPE.site,
+    {
+      'site.pick': canPick ? () => latestPick.current() : undefined,
+      'site.devtools': canDev ? () => setDev((on) => !on) : undefined,
+      'site.inspect': canDev ? () => latestInspect.current() : undefined,
+      'site.stopInspect': () => {
+        if (!latestDom.current.inspect) return false;
+        latestDom.current.setInspect(false);
+      },
+      'site.reload': () => latestReload.current(false),
+      'site.hardReload': () => latestReload.current(true),
+    },
+    keys,
+  );
 
   const closeTab = (id: string) => {
     setClosing(id);
@@ -839,17 +894,18 @@ const SiteView = ({
     const root = anchorsRef.current;
     const w = Number.parseInt(root?.querySelector<HTMLInputElement>('[data-size="w"]')?.value ?? '', 10);
     const h = Number.parseInt(root?.querySelector<HTMLInputElement>('[data-size="h"]')?.value ?? '', 10);
-    if (!(w >= 200 && h >= 200)) return;
+    const next = keptSize({ w, h });
+    if (!next) return;
     setDeviceId('fill');
     setRot(false);
-    setSize({ w: Math.min(3840, w), h: Math.min(3840, h) });
+    setSize(next);
   };
   const onSizeKey = (event: KeyboardEvent<HTMLInputElement>) => {
     const el = event.currentTarget;
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
       event.preventDefault();
       const step = (event.shiftKey ? 10 : 1) * (event.key === 'ArrowUp' ? 1 : -1);
-      el.value = String(Math.max(200, (Number.parseInt(el.value, 10) || 0) + step));
+      el.value = String(Math.max(VIEWPORT_SIZE.min, (Number.parseInt(el.value, 10) || 0) + step));
       applySize();
     }
     if (event.key === 'Enter') {
@@ -939,7 +995,7 @@ const SiteView = ({
       sep: true,
       icon: 'panel-bottom',
       label: t('next.site.devtools'),
-      kbd: '⌥⌘I',
+      kbd: devKey ?? undefined,
       on: dev,
       pick: () => {
         pop.close();
@@ -950,7 +1006,7 @@ const SiteView = ({
       id: 'inspect',
       icon: 'square-mouse-pointer',
       label: t('next.site.inspect'),
-      kbd: '⇧⌘C',
+      kbd: inspectKey ?? undefined,
       on: dom.inspect,
       disabled: inspectDisabled,
       pick: () => {
@@ -974,7 +1030,7 @@ const SiteView = ({
       sep: true,
       icon: 'eraser',
       label: t('next.site.hardReload'),
-      kbd: '⇧⌘R',
+      kbd: hardKey ?? undefined,
       pick: () => {
         pop.close();
         onReload(true);
@@ -1240,7 +1296,7 @@ const SiteView = ({
               <Icon name="rotate-cw" />
               <span className="hx-tip" data-pos="below">
                 {t('next.site.reload')}
-                {keys && <kbd>⌘R</kbd>}
+                {keys && reloadHint && <kbd>{reloadHint}</kbd>}
               </span>
             </button>
             <div className="hx-browser__addr">
@@ -1298,7 +1354,7 @@ const SiteView = ({
                 <span className="hx-browser__tool-label">{guest?.pickLabel ?? t('next.site.pick')}</span>
                 <span className="hx-tip" data-pos="below">
                   {guest?.pickTip ?? t('next.site.pickTip')}
-                  {keys && <kbd>{guest ? 'C' : 'V'}</kbd>}
+                  {keys && <kbd>{guest ? 'C' : (pickKey ?? 'V')}</kbd>}
                 </span>
               </button>
             )}
@@ -1369,8 +1425,8 @@ const SiteView = ({
                       aria-label={t('next.site.rotate')}
                       onClick={() => {
                         if (fillOn) {
-                          if (size) setSize({ w: size.h, h: size.w });
-                          else if (vp) setSize({ w: vp.vh, h: vp.vw });
+                          const turned = keptSize(size ?? (vp ? { w: vp.vh, h: vp.vw } : null));
+                          if (turned) setSize(size ? { w: size.h, h: size.w } : turned);
                         } else setRot((r) => !r);
                       }}
                     >
@@ -1490,7 +1546,7 @@ const SiteView = ({
                 <Icon name="panel-bottom" />
                 <span className="hx-tip" data-pos="below" data-align="end">
                   {t('next.site.devtools')}
-                  {keys && <kbd>⌥⌘I</kbd>}
+                  {keys && devKey && <kbd>{devKey}</kbd>}
                 </span>
               </button>
             )}
@@ -1641,6 +1697,7 @@ const SiteView = ({
                                       anchorStore.set(null);
                                       sendAnchors();
                                       onCanvas();
+                                      sendImages();
                                       arm(latestStage.current?.pick === true);
                                       sendStyles();
                                     }}
@@ -1737,6 +1794,16 @@ const SiteView = ({
       </div>
       {stage?.island}
       {stage?.overlay}
+      {images !== undefined && (
+        <ImageActions
+          machine={images.machine}
+          artifact={images.artifact}
+          address={{ file: imageOpen?.act.file ?? '' }}
+          open={imagesOn ? imageOpen : null}
+          write={fileWriter(images.machine, images.artifact, imageOpen?.act.file ?? '')}
+          onClose={() => setImageOpen(null)}
+        />
+      )}
     </section>
   );
 };

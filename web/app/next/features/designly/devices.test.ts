@@ -16,6 +16,11 @@ import {
 const AREA = { w: 1172, h: 776 };
 
 describe('viewportOf', () => {
+  it('never draws a box at 0% in an area measured empty', () => {
+    expect(viewportOf(deviceOf('ip15'), { w: 0, h: 0 }, null, false).fit).toBeGreaterThan(0);
+    expect(viewportOf(deviceOf('fill'), { w: 600, h: 40 }, { w: 300, h: 900 }, false).fit).toBeGreaterThan(0);
+  });
+
   it('«Резина» is the area with a margin of canvas round it', () => {
     expect(viewportOf(deviceOf('fill'), AREA, null, false)).toMatchObject({
       kind: VP_KIND.fill,

@@ -64,6 +64,9 @@ type Config struct {
 	Now func() float64
 	// ShellReady is how long new tmux sessions get before a resume line is typed (500 ms).
 	ShellReady time.Duration
+	// Admit is the reason a new conversation of the provider may not start (a limit of the hub, see internal/budget);
+	// nil, or "", lets it start.
+	Admit func(provider string, launch *agents.Launch) string
 }
 
 // Starter starts conversations.
@@ -263,6 +266,11 @@ func envList(entries []EnvEntry) []agents.EnvVar {
 func (s *Starter) Start(o Options) (Result, error) {
 	if o.Provider != agents.Claude && o.Provider != agents.Codex {
 		return fail(400, msgUnknownAgent.String()), nil
+	}
+	if s.cfg.Admit != nil {
+		if reason := s.cfg.Admit(o.Provider, o.Launch); reason != "" {
+			return fail(403, reason), nil
+		}
 	}
 	env, err := agents.FormatStartEnv(envList(o.Env), s.cfg.EnvPrefix)
 	if err != nil {

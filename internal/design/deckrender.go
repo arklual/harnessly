@@ -138,6 +138,8 @@ type deckTab struct {
 	s       *deckShooter
 	target  string
 	session string
+	// lossless: a video's frames are PNGs (a final render), not JPEGs.
+	lossless bool
 }
 
 func (s *deckShooter) tab() (*deckTab, error) {

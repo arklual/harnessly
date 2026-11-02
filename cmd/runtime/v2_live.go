@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/fileplace"
 	"github.com/ly-solutions/harnessly/internal/history"
 	"net/http"
 	"os"
@@ -50,16 +51,17 @@ var v2Features = []wire.Feature{wire.FeatureQueue, wire.FeatureSteer, wire.Featu
 // Nothing of what the pages wait for goes through the keeper's lock or through a tmux call: the socket, the commands
 // and the pages answer from the actors and the hub; the sync below runs on a goroutine of its own.
 type v2Live struct {
-	c        *core
-	d        deps
-	hub      *wire.Hub
-	rt       *convo.Runtime
-	srv      *wire.Server
-	machine  *liveMachine
-	tm       *v2Tmux
-	starter  *v2Launcher
-	terms    *v2Terminals // nil when the core has no terminal server
-	designly *v2Designly  // nil when the core cannot start agents
+	selections *fileplace.Store
+	c          *core
+	d          deps
+	hub        *wire.Hub
+	rt         *convo.Runtime
+	srv        *wire.Server
+	machine    *liveMachine
+	tm         *v2Tmux
+	starter    *v2Launcher
+	terms      *v2Terminals // nil when the core has no terminal server
+	designly   *v2Designly  // nil when the core cannot start agents
 	// delegation is the agents' delegation of chats to other agents (v2_delegate.go).
 	delegation *delegation.Service
 	// profiles keeps the keys of the backend profiles (Kimi, GLM, Grok) in <DataDir>/providers.
@@ -124,6 +126,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		// One store for the launch lines and the pages: a key saved on a page is the one the next launch reads.
 		v.profiles = c.agents.profiles
 	}
+	shareProviders(d.DataDir, v.profiles)
 	v.machine = newLiveMachine(v2Machine, version, features, d.DataDir, func() int { return v.rt.Busy() }, c.preflight, c.v2Models)
 	v.machine.offers = profileOffers(v.profiles)
 	v.hub = wire.NewHub(v.machine)
@@ -152,7 +155,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	}
 	moveStore := openMoveStore(d)
 	v.rt = convo.New(convo.Deps{Moves: moveStore, Index: index, Digest: digest, ExportDir: filepath.Join(d.DataDir, "v2", "chat-exports"), AgentSession: ses.Find, MachineID: v2Machine, Publisher: publisher, Machine: v.tm, Launcher: v.starter, Handoffs: handoffs,
-		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir}, Titler: newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"), agentEnvDir(d.DataDir)).Title, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
+		Uploads: v2Uploads{uploads}, Refs: v2Refs{v}, Store: convo.NewStore(filepath.Join(d.DataDir, "v2")), Log: v2Log{}, Limits: wire.DefaultLimits, Models: v.machine.modelsOf, Background: v2Background{reader: c.bg, flows: &workflows.Reader{}}, Meta: &sessionmeta.Reader{}, Shots: &shots.Reader{}, PictureRoots: []string{shots.ScratchRoot(), uploadsDir(d), uploads.Dir, imagesDir(d), codexImagesDir(d)}, Titler: newV2Titler(os.Getenv("RUNTIME_SIDE_CHAT_CONFIG"), agentEnvDir(d.DataDir)).Title, Closer: v2Closer{v}, DefaultCwd: d.WorkspaceRoot,
 		Terminals: terminals, IdleStop: func() time.Duration { return runtimeSettings.RuntimeSettings().IdleStop.After() },
 		TerminalOff: chatGuard.Off,
 		AppsOK:      appsOK(apps.Open(d.DataDir)),
@@ -228,6 +231,9 @@ func newV2Live(d deps, c *core) *v2Live {
 	}
 	v.srv.Context = v.rt.Context
 	v.srv.MessageStatus = v.rt.MessageStatus
+	v.srv.FileBytes = http.HandlerFunc(workspaceAccess(v.d).ServeFileBytes)
+	v.selections = fileplace.NewStore()
+	v.srv.PaneSelection = v.selections
 	v.srv.Shot = func(ctx context.Context, conv, id string) (wire.ShotFile, error) {
 		var f shots.File
 		path, err := v.rt.ShotPath(ctx, conv, id)
@@ -257,7 +263,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	}
 	if c.launcher != nil && c.agents != nil {
 		api := designAPI(d)
-		v.designly = &v2Designly{v: v, api: api, file: filepath.Join(d.DataDir, "v2", "designly.json"),
+		v.designly = &v2Designly{v: v, api: api, file: filepath.Join(d.DataDir, "v2", "designly.json"), apps: apps.Open(d.DataDir),
 			links: design.NewChatLinks(api.L, filepath.Join(d.DataDir, "v2", "designly-chats.json"))}
 		v.srv.Designly = v.designly
 	}
@@ -368,8 +374,9 @@ func (v *v2Live) start(ctx context.Context) {
 		v.wg.Add(1)
 		go func() { defer v.wg.Done(); v.designly.backfill(ctx) }()
 	}
-	v.wg.Add(1)
+	v.wg.Add(2)
 	go func() { defer v.wg.Done(); v.serveDelegation(ctx.Done()) }()
+	go func() { defer v.wg.Done(); v.serveAppTools(ctx.Done()) }()
 	agent.Log("info", "v2 started")
 }
 
@@ -633,6 +640,10 @@ func (l *v2Launcher) Launch(req convo.LaunchRequest) error {
 	var files []string
 	if f, ok := l.promptFiles.Load(req.Cwd); ok {
 		files = f.([]string)
+	}
+	// A limit of the hub: the error is what the person is shown (the starter's own refusal comes after the tab).
+	if reason := c.budgetAdmit(string(req.Provider), chosen); reason != "" {
+		return errors.New(reason)
 	}
 	l.starting.Add(1)
 	go func() {

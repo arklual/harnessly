@@ -1,0 +1,123 @@
+{
+  "scope": {
+    "kind": "org",
+    "id": "o2acmeorgaaaaaaaaaaa"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "machines": [
+    {
+      "id": "h2buildboxaaaaaaaaaa",
+      "name": "build-box",
+      "hostname": "build-box",
+      "tenantId": "t2acmetenantaaaaaaaa",
+      "teamId": "m2platformteamaaaaaa",
+      "status": "offline",
+      "disabledAt": null,
+      "agentVersion": "0.16.37",
+      "lastSeenAt": "2026-10-28T11:02:00Z",
+      "lastActiveAt": "2026-10-30T17:40:00Z",
+      "chatsRunning": 0,
+      "people": [
+        {
+          "userId": "u2borisaaaaaaaaaaaaa",
+          "name": "Борис"
+        }
+      ],
+      "access": [],
+      "problems": ["offline"],
+      "cloud": null
+    },
+    {
+      "id": "h2oldboxaaaaaaaaaaaa",
+      "name": "old-box",
+      "hostname": "old-box",
+      "tenantId": "t2acmetenantaaaaaaaa",
+      "teamId": null,
+      "status": "offline",
+      "disabledAt": "2026-10-20T10:00:00Z",
+      "agentVersion": "0.16.37",
+      "lastSeenAt": "2026-10-20T09:59:00Z",
+      "lastActiveAt": "2026-10-30T17:40:00Z",
+      "chatsRunning": 0,
+      "people": [],
+      "access": [],
+      "problems": ["disabled"],
+      "cloud": null
+    },
+    {
+      "id": "h2runneraaaaaaaaaaaa",
+      "name": "runner-a",
+      "hostname": "runner-a",
+      "tenantId": "t2acmetenantaaaaaaaa",
+      "teamId": "m2platformteamaaaaaa",
+      "status": "online",
+      "disabledAt": null,
+      "agentVersion": "0.16.37",
+      "lastSeenAt": "2026-10-30T17:58:00Z",
+      "lastActiveAt": "2026-10-30T17:40:00Z",
+      "chatsRunning": 3,
+      "people": [
+        {
+          "userId": "u2annaaaaaaaaaaaaaaa",
+          "name": "Анна"
+        },
+        {
+          "userId": "u2veraaaaaaaaaaaaaaa",
+          "name": "Вера"
+        }
+      ],
+      "access": [
+        {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa",
+          "label": "Платформа"
+        }
+      ],
+      "problems": [],
+      "cloud": {
+        "provider": "selectel",
+        "flavor": "SL1.4-16384",
+        "vcpus": 4,
+        "ramGb": 16,
+        "diskGb": 100,
+        "priceMonth": {
+          "usd": 48,
+          "shown": 3912.0
+        }
+      }
+    },
+    {
+      "id": "h2productaaaaaaaaaaa",
+      "name": "product-vm",
+      "hostname": "product-vm",
+      "tenantId": "t2acmetenantaaaaaaaa",
+      "teamId": "m2productteamaaaaaaa",
+      "status": "online",
+      "disabledAt": null,
+      "agentVersion": "0.16.37",
+      "lastSeenAt": "2026-10-30T17:58:00Z",
+      "lastActiveAt": "2026-10-30T17:40:00Z",
+      "chatsRunning": 1,
+      "people": [
+        {
+          "userId": "u2glebaaaaaaaaaaaaaa",
+          "name": "Глеб"
+        }
+      ],
+      "access": [
+        {
+          "kind": "user",
+          "id": "u2glebaaaaaaaaaaaaaa",
+          "label": "Глеб"
+        }
+      ],
+      "problems": [],
+      "cloud": null
+    }
+  ]
+}

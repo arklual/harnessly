@@ -19,15 +19,29 @@ const (
 	MaxDownloadBytes = 500 * 1024 * 1024
 )
 
-// VideoTypes are read in ranges.
-var VideoTypes = map[string]string{"mp4": "video/mp4", "m4v": "video/mp4", "webm": "video/webm", "mov": "video/quicktime"}
+// VideoTypes are read in ranges: video, sound, and a PDF, whose viewer asks for the pages it draws.
+var VideoTypes = map[string]string{
+	"pdf":  "application/pdf",
+	"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+	"csv": "text/csv; charset=utf-8", "tsv": "text/tab-separated-values; charset=utf-8",
+	"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docm": "application/vnd.ms-word.document.macroEnabled.12",
+	"pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptm": "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+	"mp4": "video/mp4", "m4v": "video/mp4", "webm": "video/webm", "mov": "video/quicktime", "mkv": "video/x-matroska", "ogv": "video/ogg",
+	"mp3": "audio/mpeg", "wav": "audio/wav", "m4a": "audio/mp4", "aac": "audio/aac", "ogg": "audio/ogg", "oga": "audio/ogg", "opus": "audio/ogg", "flac": "audio/flac",
+}
 
 // PreviewTypes are what the viewer shows, by extension.
 var PreviewTypes = map[string]string{
 	"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml",
+	"avif": "image/avif", "bmp": "image/bmp", "ico": "image/x-icon",
 	"pdf": "application/pdf", "html": "text/html; charset=utf-8", "htm": "text/html; charset=utf-8",
 	"md": "text/markdown; charset=utf-8", "markdown": "text/markdown; charset=utf-8",
-	"mp4": "video/mp4", "m4v": "video/mp4", "webm": "video/webm", "mov": "video/quicktime",
+	"mp4": "video/mp4", "m4v": "video/mp4", "webm": "video/webm", "mov": "video/quicktime", "mkv": "video/x-matroska", "ogv": "video/ogg",
+	"mp3": "audio/mpeg", "wav": "audio/wav", "m4a": "audio/mp4", "aac": "audio/aac", "ogg": "audio/ogg", "oga": "audio/ogg", "opus": "audio/ogg", "flac": "audio/flac",
+	"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+	"csv": "text/csv; charset=utf-8", "tsv": "text/tab-separated-values; charset=utf-8",
+	"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docm": "application/vnd.ms-word.document.macroEnabled.12",
+	"pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptm": "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
 }
 
 // inheritedTypes are extensions the old runtime's type tables answered from their object prototype: such a file
@@ -44,8 +58,10 @@ func PreviewType(ext string) (contentType string, video bool) {
 
 // Access says which files may be opened: under the roots, and not secret-looking.
 type Access struct {
-	Roots  []string
-	secret *regexp.Regexp
+	// VersionsDir keeps the earlier states of the files the viewer edits; "" keeps none.
+	VersionsDir string
+	Roots       []string
+	secret      *regexp.Regexp
 }
 
 // NewAccess builds the rules. roots are the folders files may be in (made absolute and clean); configDirs are more

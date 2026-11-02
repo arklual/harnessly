@@ -180,3 +180,26 @@ func TestRange(t *testing.T) {
 		t.Error("1.2.0 sorts before 1.10.0")
 	}
 }
+
+func TestFilePermissionMasks(t *testing.T) {
+	with := func(perm string) Problems {
+		m, ps := ParseManifest([]byte(strings.Replace(review, `"permissions": []`, `"permissions": ["`+perm+`"]`, 1)))
+		if m == nil {
+			t.Fatalf("%s: %v", perm, ps)
+		}
+		return m.Check()
+	}
+	for _, ok := range []string{"files.read:docs/**", "files.write:out/*.md", "files.read:src/**/*.go"} {
+		if ps := with(ok); len(ps) != 0 {
+			t.Errorf("%s: %v", ok, ps)
+		}
+	}
+	for _, bad := range []string{"files.read:/etc/**", "files.read:../x", "files.write:docs/../../x", "files.read:~/x", "files.write:"} {
+		if ps := with(bad); len(ps.Errors()) == 0 {
+			t.Errorf("%s passed", bad)
+		}
+	}
+	if ps := with("files.write:**"); len(ps.Errors()) != 0 || len(ps) == 0 {
+		t.Errorf("a write over the whole workspace is a warning: %v", ps)
+	}
+}

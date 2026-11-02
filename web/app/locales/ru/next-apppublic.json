@@ -1,0 +1,10 @@
+{
+  "next.apppublic.title": "Публичный каталог",
+  "next.apppublic.search": "Найти приложение",
+  "next.apppublic.none": "Ничего не нашлось.",
+  "next.apppublic.install": "Установить",
+  "next.apppublic.confirm": "Установить с этими правами",
+  "next.apppublic.cancel": "Отмена",
+  "next.apppublic.rights": "Просит права: {rights}",
+  "next.apppublic.norights": "Не просит особых прав."
+}

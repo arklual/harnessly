@@ -1,0 +1,294 @@
+/* A PDF in the pane (features/pane/pdf): a quiet bar over pages on the window's own ground. */
+
+.hx-deliv[data-view='pdf'] {
+  max-width: none;
+  height: 100%;
+  padding-bottom: 0;
+}
+.hx-pdf {
+  height: calc(100dvh - 150px);
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.hx-pdf__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 8px;
+}
+.hx-pdf__grow {
+  flex: 1;
+}
+.hx-pdf__btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+.hx-pdf__btn:hover,
+.hx-pdf__btn[aria-pressed='true'] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-pdf__btn:focus-visible,
+.hx-pdf__zoom:focus-visible,
+.hx-pdf__thumb:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-pdf__page {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.hx-pdf__page-input {
+  width: 38px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: center;
+  outline: none;
+}
+.hx-pdf__page-input:focus {
+  box-shadow: 0 0 0 2px var(--hx-focus);
+}
+.hx-pdf__zoom {
+  min-width: 46px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  font-size: var(--hx-text-xs);
+  font-variant-numeric: tabular-nums;
+  transition: background 160ms ease;
+}
+.hx-pdf__zoom:hover {
+  background: var(--hx-bg-hover);
+}
+
+/* The search slides down over the top of the pages, and back up when it closes. */
+.hx-pdf__find {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    height 200ms var(--hx-ease-out),
+    opacity 160ms ease,
+    margin 200ms var(--hx-ease-out);
+}
+.hx-pdf__find[data-on='true'] {
+  height: 36px;
+  margin-bottom: 8px;
+  opacity: 1;
+}
+.hx-pdf__find-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  font: inherit;
+  outline: none;
+}
+.hx-pdf__find-count {
+  padding: 0 8px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hx-pdf__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.hx-pdf__rail {
+  flex: none;
+  width: 0;
+  overflow: hidden auto;
+  opacity: 0;
+  transition:
+    width 240ms var(--hx-ease-out),
+    opacity 160ms ease;
+}
+.hx-pdf__rail[data-on='true'] {
+  width: 172px;
+  opacity: 1;
+}
+.hx-pdf__rail-tabs {
+  padding: 0 12px 8px 0;
+}
+.hx-pdf__thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 156px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: transparent;
+  color: var(--hx-fg-3);
+  cursor: pointer;
+  font-size: var(--hx-text-xs);
+}
+.hx-pdf__thumb:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-pdf__thumb[data-now='true'] {
+  color: var(--hx-fg-1);
+}
+.hx-pdf__thumb-sheet {
+  --h: 180px;
+  display: block;
+  width: 132px;
+  height: var(--h);
+  overflow: hidden;
+  border-radius: 4px;
+  background: #fff;
+}
+.hx-pdf__thumb[data-now='true'] .hx-pdf__thumb-sheet {
+  box-shadow: 0 0 0 2px var(--hx-accent);
+}
+.hx-pdf__outline {
+  margin: 0;
+  padding: 0 8px 0 0;
+  list-style: none;
+}
+.hx-pdf__outline .hx-pdf__outline {
+  padding-left: 12px;
+}
+.hx-pdf__outline-item {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  font-size: var(--hx-text-xs);
+  text-align: left;
+}
+.hx-pdf__outline-item:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+
+.hx-pdf__scroll {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 0 16px 16px;
+  scrollbar-gutter: stable;
+}
+.hx-pdf__sheet {
+  --w: 600px;
+  --h: 800px;
+  position: relative;
+  width: var(--w);
+  height: var(--h);
+  margin: 0 auto 12px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #fff;
+}
+.hx-pdf__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hx-pdf__wait {
+  display: flex;
+  justify-content: center;
+}
+.hx-pdf__wait-sheet {
+  display: block;
+  width: min(100%, 560px);
+  aspect-ratio: 0.72;
+  border-radius: 4px;
+}
+
+/* pdf.js's text layer (web/pdf_viewer.css): transparent strings at their places over the picture. */
+.hx-pdf__text {
+  --total-scale-factor: var(--scale-factor);
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+}
+.hx-pdf__text :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.hx-pdf__text > :not(.markedContent),
+.hx-pdf__text .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  z-index: 1;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.hx-pdf__text .markedContent {
+  display: contents;
+}
+.hx-pdf__text ::selection {
+  background: rgb(60 90 255 / 28%);
+}
+::highlight(hx-pdf-hit) {
+  background: rgb(255 200 0 / 45%);
+}
+::highlight(hx-pdf-hit-now) {
+  background: rgb(255 140 0 / 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-pdf__find,
+  .hx-pdf__rail {
+    transition: none;
+  }
+}

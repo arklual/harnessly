@@ -1,9 +1,9 @@
 {
-  "next.apps.title": "Apps",
+  "next.apps.title": "Tasks and MRs",
   "next.apps.menu": "Menu",
-  "next.apps.nav": "Apps",
-  "next.apps.settings": "Connected apps",
-  "next.apps.back": "All apps",
+  "next.apps.nav": "Tasks and MRs",
+  "next.apps.settings": "Connections",
+  "next.apps.back": "All lists",
   "next.apps.refresh": "Refresh",
   "next.apps.view": "View",
   "next.apps.tab.tracker": "Tracker",

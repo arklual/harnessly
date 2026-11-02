@@ -249,6 +249,10 @@ type rigOptions struct {
 	runtimeRoute func(w http.ResponseWriter, r *http.Request) bool
 	// before runs on the hub before the agent starts.
 	before func(h *fakeHub)
+	// usageFeed is the usage outbox's feed; nil: the machine keeps none.
+	usageFeed func(UsageDeps) (UsageFeed, error)
+	// beforeStart runs with the data directory before the agent starts.
+	beforeStart func(dataDir string)
 }
 
 func startHubAgent(t *testing.T, o rigOptions) *hubRig {
@@ -275,6 +279,9 @@ func startHubAgent(t *testing.T, o rigOptions) *hubRig {
 	if o.before != nil {
 		o.before(hub)
 	}
+	if o.beforeStart != nil {
+		o.beforeStart(dataDir)
+	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -289,7 +296,7 @@ func startHubAgent(t *testing.T, o rigOptions) *hubRig {
 		RuntimeAPI: base + "/api/agent", StateChangedPath: base + "/api/agent/state-changed", StatusPath: base + "/api/status", SyncPath: base + "/api/sync",
 		RuntimeCookie: "session-token", LocalTokenHeader: "x-agent-local-token", ReportPortEnv: "AGENT_REPORT_PORT",
 		Auth: AuthEd25519, Machine: m, MachineFile: filepath.Join(dataDir, "machine.json"), PolicyFile: policyFile,
-		EnvDir: rig.EnvDir, WorkDir: rig.Home,
+		EnvDir: rig.EnvDir, WorkDir: rig.Home, UsageFeed: o.usageFeed,
 	}
 	a, err := New(cfg)
 	if err != nil {
@@ -495,7 +502,7 @@ func TestHubV1OperationsAreDeniedAndUnknownOnesUnsupported(t *testing.T) {
 		var name string
 		_ = json.Unmarshal(ev["event"], &name)
 		switch name {
-		case "preflight", "agents", "job", "login", "policy":
+		case "preflight", "agents", "job", "login", "policy", "usage.available":
 		default:
 			t.Errorf("event %s on a hub link", name)
 		}
@@ -1103,7 +1110,8 @@ func TestHubPreflightRunAnswers(t *testing.T) {
 	}
 }
 
-// Hub mode runs none of the closed cluster's loops: no transcripts are read.
+// Hub mode runs none of the closed cluster's loops: no transcript is sent (the usage outbox, when a feed is wired, is
+// another thing and sends numbers only).
 func TestHubModeReadsNoTranscripts(t *testing.T) {
 	r := startHubAgent(t, rigOptions{})
 	c := r.connect()

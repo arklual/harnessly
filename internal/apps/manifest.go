@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -178,11 +179,13 @@ func (ps Problems) Error() string {
 }
 
 var (
-	idRe       = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39}$`)
-	semverRe   = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$`)
-	viewIDRe   = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
-	secretRe   = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
-	kindRe     = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
+	idRe     = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39}$`)
+	semverRe = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$`)
+	viewIDRe = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
+	secretRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+	kindRe   = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
+	// appKindRe is a document type an app adds: <publisher>.<name>, as its id, with up to two more segments.
+	appKindRe  = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}(\.[a-z][a-z0-9-]{0,39}){1,3}$`)
 	commandRe  = regexp.MustCompile(`^/[a-z][a-z0-9-]{0,39}$`)
 	hostRe     = regexp.MustCompile(`^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d{1,5})?$`)
 	toolNameRe = regexp.MustCompile(`^[A-Za-z0-9_:.()*@/ -]{1,120}$`)
@@ -329,6 +332,13 @@ func (m *Manifest) Check() Problems {
 		if name == "secrets" && !m.hasSecret(value) {
 			add(path, "the secret %q is not in secrets", value)
 		}
+		if name == "files.read" || name == "files.write" {
+			if why := CheckMask(value); why != "" {
+				add(path, "the mask %q %s: it is a path pattern of the workspace like docs/** or src/*.go", value, why)
+			} else if name == "files.write" && (value == "**" || value == "*") {
+				warn(path, "files.write:%s lets the app write anywhere in the workspace: narrow it to the folders it needs", value)
+			}
+		}
 	}
 	for i, s := range m.Secrets {
 		path := fmt.Sprintf("secrets[%d]", i)
@@ -427,7 +437,7 @@ func (m *Manifest) Check() Problems {
 			add(path+".targets", "is required: where the view shows")
 		}
 		for j, t := range v.Targets {
-			if !targets[t] && !(strings.HasPrefix(t, "sinopia.") && targets["sinopia.*"]) {
+			if !targets[t] && !(wildcardCovers(t) && targets["sinopia.*"]) {
 				add(fmt.Sprintf("%s.targets[%d]", path, j), "%q is not in the app's targets", t)
 			}
 		}
@@ -458,6 +468,7 @@ func (m *Manifest) Check() Problems {
 	if len(m.Sinopia) > 0 && !hasSinopia(targets) {
 		add("sinopia", "sinopia contributions need a sinopia target")
 	}
+	m.checkSinopia(targets, add, warn)
 	if b := m.Backend; b != nil && !strings.HasPrefix(b.URL, "https://") {
 		add("backend.url", "must be an https:// address")
 	}
@@ -511,7 +522,14 @@ func (m *Manifest) HasTarget(target string) bool {
 	if contains(m.Targets, target) {
 		return true
 	}
-	return strings.HasPrefix(target, "sinopia.") && contains(m.Targets, "sinopia.*")
+	return wildcardCovers(target) && contains(m.Targets, "sinopia.*")
+}
+
+// wildcardCovers says whether sinopia.* names the target: the host's own document types, not those an app adds, which an
+// app has to name to be in.
+func wildcardCovers(target string) bool {
+	kind, ok := strings.CutPrefix(target, "sinopia.")
+	return ok && !strings.Contains(kind, ".")
 }
 
 func validTarget(t string) bool {
@@ -520,7 +538,7 @@ func validTarget(t string) bool {
 		return true
 	}
 	kind, ok := strings.CutPrefix(t, "sinopia.")
-	return ok && kindRe.MatchString(kind)
+	return ok && (kindRe.MatchString(kind) || appKindRe.MatchString(kind))
 }
 
 func hasViewTarget(targets map[string]bool) bool { return targets[TargetPane] || targets[TargetApp] }
@@ -559,6 +577,16 @@ func checkToolPattern(p string) string {
 		}
 	}
 	return ""
+}
+
+// FrameURL is the address of a view the app's own server hosts, when it may be framed: https, no credentials in it, and
+// its host listed in network.frames. The page frames nothing else.
+func (m *Manifest) FrameURL(entry string) (string, bool) {
+	u, err := url.Parse(entry)
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Hostname() == "" || m.Network == nil || !hostListed(m.Network.Frames, entry) {
+		return "", false
+	}
+	return u.String(), true
 }
 
 func hostListed(hosts []string, url string) bool {

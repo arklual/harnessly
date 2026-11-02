@@ -1,0 +1,56 @@
+{
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "next": "2026-10-29T10:00:00Z",
+  "sessions": [
+    {
+      "sessionKey": "3f1c2a9e-0000-4000-8000-000000000001",
+      "provider": "claude",
+      "startedAt": "2026-10-30T15:02:00Z",
+      "endedAt": null,
+      "machine": {
+        "id": "h2runneraaaaaaaaaaaa",
+        "name": "runner-a"
+      },
+      "models": ["claude-opus-4-6", "claude-sonnet-4-6"],
+      "list": {
+        "usd": 6.4,
+        "shown": 521.6
+      },
+      "paid": {
+        "usd": 5.1,
+        "shown": 415.65
+      },
+      "funding": "org",
+      "origin": "live",
+      "turns": 23,
+      "mrs": 1,
+      "subagents": 4
+    },
+    {
+      "sessionKey": "3f1c2a9e-0000-4000-8000-000000000002",
+      "provider": "codex",
+      "startedAt": "2026-10-29T10:00:00Z",
+      "endedAt": "2026-10-29T11:12:00Z",
+      "machine": null,
+      "models": ["gpt-5.4"],
+      "list": {
+        "usd": 1.2,
+        "shown": 97.8
+      },
+      "paid": {
+        "usd": 1.2,
+        "shown": 97.8
+      },
+      "funding": "personal",
+      "origin": "live",
+      "turns": 8,
+      "mrs": 0,
+      "subagents": 0
+    }
+  ]
+}

@@ -18,6 +18,7 @@ import { NotePins, NOTE_OUT_MS } from '@/next/features/designly/site-notes';
 import { usePageDraft } from '@/next/features/designly/page-drafts';
 import type { ConvId } from '@/next/protocol/v2';
 import { DECK_CTX_ID } from '@/next/features/designly/deck/chat-context';
+import { useBoardVeils } from '@/next/features/designly/image-gen/canvas';
 import { sendMessage } from '@/next/commands';
 import { patchDesignNotes, useDesignNotes } from '@/next/stores/design-notes';
 import { useConversation } from '@/next/stores/conversations';
@@ -27,7 +28,7 @@ import { PRESENCE, usePresence } from '@/next/ui/presence';
 let noteSeq = 0;
 
 /** `fromChat` is the chat the pane is beside: it gets the notes and the words. */
-export const usePaneStage = ({ machine, fromChat, pageUrl, port }: IStageOptions): ISiteStage => {
+export const usePaneStage = ({ machine, design, fromChat, pageUrl, port }: IStageOptions): ISiteStage => {
   const conv = fromChat as ConvId;
   // The host chat's agent at work: a deck shows its slides as being made meanwhile.
   const agent = useConversation(conv)?.state.k;
@@ -37,6 +38,7 @@ export const usePaneStage = ({ machine, fromChat, pageUrl, port }: IStageOptions
   // The pins and the looks are of the page on screen; the chips of the other pages stay in the field.
   const notes = all.filter((note) => note.page === pageUrl);
   // The card is the page's: another page hides it, the return brings it back.
+  const veils = useBoardVeils(design, pageUrl);
   const [noteDraft, setNoteDraft] = usePageDraft(pageUrl);
   const card = usePresence(noteDraft, NOTE_OUT_MS);
   const shown = card.value;
@@ -119,11 +121,14 @@ export const usePaneStage = ({ machine, fromChat, pageUrl, port }: IStageOptions
         attachments: have?.attachments ?? [],
       });
     },
+    veils,
     pins: <NotePins notes={notes} draft={noteDraft} onOpen={editNote} />,
     overlay: shown && (
       <NoteCard
         key={`${shown.id ?? shown.picked.selector}@${shown.at.x},${shown.at.y}`}
         machine={machine}
+        design={design}
+        pageUrl={pageUrl}
         n={noteNumber}
         draft={shown}
         hidden={card.state === PRESENCE.closing}

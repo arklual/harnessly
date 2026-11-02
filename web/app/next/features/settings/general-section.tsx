@@ -39,8 +39,9 @@ export interface IGeneralSectionProps {
   paneAuto: boolean;
   /** Which things a turn made get a card under its answer (this browser's). */
   feedKinds: TShownKinds;
-  /** The language of the page; it is the installation's, so the row only shows it. */
+  /** The language of the page: the one chosen in this browser, else the installation's. */
   language: 'ru' | 'en';
+  onLanguage: (language: 'ru' | 'en') => void;
   account: {
     name: string;
     /** The line under the name: the e-mail, or how the person gets in. */
@@ -105,6 +106,7 @@ const GeneralSection = ({
   paneAuto,
   feedKinds,
   language,
+  onLanguage,
   account,
   idleStop,
   limitContinue,
@@ -146,8 +148,7 @@ const GeneralSection = ({
           { value: 'ru', label: 'Русский', sub: null },
           { value: 'en', label: 'English', sub: null },
         ]}
-        off
-        onPick={() => undefined}
+        onPick={(value) => onLanguage(value === 'ru' ? 'ru' : 'en')}
       />
     </Group>
     <Group title={t('next.settings.general.work')}>

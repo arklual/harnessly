@@ -11,6 +11,9 @@
 // Only what the slot's own window sends from the slot's origin is read, and only the fields the design uses: they are
 // the page's words, data for the agent, not instructions.
 
+import { readGen, type IDeckGen } from '@/next/features/designly/deck/bridge';
+import { readImageAct, type IImageAct } from '@/next/features/designly/image-gen/image-act';
+
 /** What a picked block looks like, read by the bridge when it is picked. */
 export interface IPickedLook {
   /** `#rrggbb`; null for a clear or unreadable fill. */
@@ -19,6 +22,18 @@ export interface IPickedLook {
   radius: number | null;
   /** 0 to 1. */
   opacity: number;
+}
+
+/** What a picture needs of a picked block: the board names it in its source, so one can be written into it. */
+export interface IPickedDraw {
+  /** The block's `data-dc-tpl`. */
+  tpl: number;
+  /** The board's fingerprint of the block: a write carries it. */
+  was: string;
+  /** Its width over its height; 0 when unknown. */
+  ratio: number;
+  /** What it was drawn from, when it was drawn. */
+  gen: IDeckGen | null;
 }
 
 export interface IPicked {
@@ -36,6 +51,13 @@ export interface IPicked {
   component: string | null;
   /** The block's markup, clipped by the bridge: the agent finds the block in the board by it. */
   html: string;
+  /** Present when the board's source names the block (a library board's script says so): a picture can be drawn into it. */
+  draw?: IPickedDraw;
+  /** Its `data-hl-*` attributes (name without the prefix): how an app's field is bound to it. Absent from a bridge that does not read them. */
+  hl?: Record<string, string>;
+  /** The block's `data-dc-tpl` number and the board's fingerprint of it, for a block of a `.dc.html` board that is itself a template node. */
+  tpl?: number;
+  fp?: string;
 }
 
 /** A box in the page's viewport, in its CSS pixels. */
@@ -92,6 +114,10 @@ export type TDocState = (typeof DOC_STATE)[keyof typeof DOC_STATE];
 
 export type TBridgeMessage =
   | { k: 'hello' }
+  /** The board's script is up and asks whether the person may change pictures (`tk:images`). */
+  | { k: 'images-hello' }
+  /** A button on a picture was pressed (`tk:image-act`). */
+  | { k: 'image-act'; act: IImageAct }
   /** The page is on its way: it has taken `resources` files so far. */
   | { k: 'progress'; state: TDocState; resources: number }
   | { k: 'lib-ready' }
@@ -188,6 +214,16 @@ const MAX_ANCHORS = 64;
 /** A page's pixels are clipped to a sane range: the page's word is data. */
 const MAX_COORD = 1e6;
 
+/** The `data-hl-*` map a page reports: a few short words; anything else is dropped. */
+const readHl = (raw: unknown): Record<string, string> | undefined => {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(raw).slice(0, 12)) {
+    if (/^[a-z0-9-]{1,40}$/.test(name) && typeof value === 'string') out[name] = clip(value, 200);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+};
+
 const readBox = (raw: unknown): IAnchorBox | null => {
   if (!Array.isArray(raw) || raw.length !== 4 || !raw.every(isNum)) return null;
   const [x, y, w, h] = raw.map((v: number) => Math.max(-MAX_COORD, Math.min(MAX_COORD, v)));
@@ -217,6 +253,11 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
   const m = data as Record<string, unknown>;
   if (m.type === 'tk:hello') return { k: 'hello' };
   if (m.type === 'tk:lib-ready') return { k: 'lib-ready' };
+  if (m.type === 'tk:images-hello') return { k: 'images-hello' };
+  if (m.type === 'tk:image-act') {
+    const act = readImageAct(m);
+    return act ? { k: 'image-act', act } : null;
+  }
   if (m.type === 'tk:progress') {
     const state = Object.values(DOC_STATE).find((known) => known === m.state);
     return state && isNum(m.resources)
@@ -279,8 +320,23 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
       rect: { x: coord(r.x), y: coord(r.y), width: coord(r.width), height: coord(r.height) },
       component: component && typeof component.name === 'string' ? clip(component.name, 80) : null,
       html: clip(m.outerHTML, 2048),
+      ...readDraw(m),
+      ...(readHl(m.hl) ? { hl: readHl(m.hl) } : {}),
+      ...(Number.isInteger(m.tpl) && (m.tpl as number) >= 0 ? { tpl: m.tpl as number } : {}),
+      ...(typeof m.fp === 'string' && m.fp !== '' ? { fp: clip(m.fp, 64) } : {}),
     },
   };
+};
+
+const MAX_DRAW_TPL = 1_000_000;
+const MAX_RATIO = 1000;
+
+const readDraw = (m: Record<string, unknown>): { draw?: IPickedDraw } => {
+  const tpl = m.tpl;
+  if (typeof tpl !== 'number' || !Number.isInteger(tpl) || tpl < 0 || tpl > MAX_DRAW_TPL) return {};
+  if (typeof m.was !== 'string' || m.was === '') return {};
+  const ratio = isNum(m.ratio) && m.ratio > 0 && m.ratio <= MAX_RATIO ? m.ratio : 0;
+  return { draw: { tpl, was: clip(m.was, 64), ratio, gen: readGen(m.gen) } };
 };
 
 /** A minified build names its components with a letter or two: such a name tells the person nothing. */

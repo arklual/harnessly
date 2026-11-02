@@ -126,6 +126,7 @@ behaves, and every address (`…_URL`, `…_HOST`) ([api.md](api.md)).
 | `$AGENT_DATA_DIR/agent-env/all.env`, `claude.env`, `codex.env` | 0600 | `KEY='value'` lines for agent launches: keys (`claude.env`, `codex.env`), secrets and the proxy (`all.env` or an agent's own file) |
 | `$AGENT_DATA_DIR/agent-env/proxy.json` | 0600 | the proxy with its credentials |
 | `$AGENT_DATA_DIR/agent-audit.log` | 0600 | one JSON line per change the hub made, never a secret |
+| `$AGENT_DATA_DIR/budget.json` | 0600 | the last `budget.set` (the hub's limits, [limits.md](limits.md)); kept over a restart and while the link is down; only a newer version replaces it |
 | `$AGENT_DATA_DIR/agent-link.json` | 0600 | what the running agent tells `harnessly-agent status` (linked or not, why); refreshed every 20 s |
 | `~/.ssh/harnessly_ed25519`, `.pub`, and the marked block in `~/.ssh/config` | 0600 / 0644 | the machine's git key, made once when the hub asks for it (never over a key that is there) |
 | `$AGENT_DATA_DIR/gitkey.json` | 0600 | which of those files the agent made itself (the key, the `.pub`, `~/.ssh/config`, `~/.ssh`), so `--uninstall` takes away only those |
@@ -228,6 +229,39 @@ The page of a machine that is off shows «Машина не на связи».
 
 Every change the hub makes (a login, a key, a secret, an install, a proxy, a runtime session, a tunnel) is appended to
 `agent-audit.log` with its time, never with a value.
+
+## The hub's limits on the machine
+
+The agent answers `budget.set` by writing the list to `budget.json` (a temporary file, then a rename) and answers the
+version it holds; a version not newer than that changes nothing. It sends the `budget` feature and `budgetVersion` in
+`hello`. The runtime next door reads the file (cached by its mtime; a missing or damaged file is no list, so the
+machine does as it did without a hub) and applies it in two places, under a hub only:
+
+- **New chat.** `launch.Starter` asks `Config.Admit` before it makes a tab, and `v2Launcher.Launch` asks the same first,
+  so the person is shown the reason and the reset time. Only `stop` in `mode = stop` refuses.
+- **Running chat.** `budget-hook.sh`, beside the status hook, runs on every prompt and tool call of Claude Code
+  (`UserPromptSubmit`, `PreToolUse` in `hooks.json`) and of Codex (the `-c hooks.*` flags). It does nothing while the file
+  is missing or its mode is `off`; otherwise it calls `POST /api/budget/hook`, and the runtime's answer is the hook's
+  output: a notice (`systemMessage`, once per chat and entry, and again when the rule's status or period changes), or in
+  `stop` mode a refusal of the prompt (`decision: block`) and an end of the turn at a tool call
+  (`continue: false`). A runtime that is away never stops a chat.
+
+Code: `internal/budget` (matching, the decision, the file), `cmd/runtime/budget_gate.go` (the wiring),
+`internal/agent/budget.go` (the op).
+
+What is not done yet:
+
+- **The person of a chat.** The runtime does not yet know who opened a chat (the person's email reaches the agent in
+  `runtime.session`, not the runtime). A chat is taken to be the machine owner's (`RUNTIME_OWNER_EMAIL`), else the only
+  person the list names; on a shared machine with entries for several people and no owner set, nothing is applied.
+  Next: carry the session's subject into the launch and the tab's metadata, and set `Gate.UserOf`.
+- **The account.** Only subscription logins are known (`claude:<uuid>` from `~/.claude.json`, `codex:<id>` from
+  `auth.json`); a chat on an API key or another endpoint matches entries for any account only. Replace
+  `budget.Accounts` with the usage collector's record of the chat (HRN-588).
+- **The model of an Auto launch** is unknown, so an entry that names a model does not match it.
+- **A Codex tab is not paused through tmux** (the table in [limits.md](limits.md)); a Codex chat is refused through its
+  hooks only, and the shape of a Codex hook's refusal is not yet checked against a Codex CLI of this version. TODO: pause
+  the pane through tmux.
 
 ## Commands
 

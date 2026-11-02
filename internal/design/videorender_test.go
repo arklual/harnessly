@@ -70,7 +70,7 @@ func (g *vrig) frames(_ *Library, ctx context.Context, _ *deckTab, _ string, sc 
 		g.mu.Lock()
 		g.drawn[sc.ID]++
 		g.mu.Unlock()
-		if err := each(videoShot{I: i, T: at, JPEG: g.jpeg, Same: i > 0}); err != nil {
+		if err := each(videoShot{I: i, T: at, Image: g.jpeg, Same: i > 0}); err != nil {
 			return err
 		}
 	}
@@ -225,14 +225,14 @@ func TestSceneKeyFollowsItsInputs(t *testing.T) {
 
 func TestFFmpegCommandLines(t *testing.T) {
 	clip := videoClipArgs(VideoLandscape, false, "/o/c.mp4.part")
-	wantClip := []string{"-hide_banner", "-y", "-loglevel", "error", "-f", "image2pipe", "-c:v", "mjpeg", "-framerate", "30", "-i", "pipe:0",
-		"-vf", "scale=1920:1080:out_range=tv,setsar=1,format=yuv420p", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-r", "30",
-		"-pix_fmt", "yuv420p", "-threads", "2", "-f", "mp4", "/o/c.mp4.part"}
+	wantClip := []string{"-hide_banner", "-y", "-loglevel", "error", "-f", "image2pipe", "-c:v", "png", "-framerate", "30", "-i", "pipe:0",
+		"-vf", "scale=1920:1080:out_color_matrix=bt709:out_range=tv,setsar=1,format=yuv420p", "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-r", "30",
+		"-pix_fmt", "yuv420p", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv", "-threads", "2", "-f", "mp4", "/o/c.mp4.part"}
 	if !reflect.DeepEqual(clip, wantClip) {
 		t.Errorf("clip args\n got %q\nwant %q", clip, wantClip)
 	}
 	draft := strings.Join(videoClipArgs(VideoPortrait, true, "x"), " ")
-	for _, want := range []string{"scale=540:960", "-crf 28"} {
+	for _, want := range []string{"scale=540:960", "-crf 28", "-c:v mjpeg", "-preset veryfast"} {
 		if !strings.Contains(draft, want) {
 			t.Errorf("a draft in 9:16 lacks %q: %s", want, draft)
 		}
@@ -244,7 +244,7 @@ func TestFFmpegCommandLines(t *testing.T) {
 		t.Errorf("join args\n got %q\nwant %q", join, wantJoin)
 	}
 	subs := strings.Join(videoSubsArgs("joined.mp4", "out.mp4", false), " ")
-	for _, want := range []string{"-vf subtitles=subs.ass", "-an", "-movflags +faststart", "-protocol_whitelist file", "-crf 18", "-i joined.mp4"} {
+	for _, want := range []string{"-vf subtitles=subs.ass", "-an", "-movflags +faststart", "-protocol_whitelist file", "-crf 16", "-i joined.mp4"} {
 		if !strings.Contains(subs, want) {
 			t.Errorf("subtitles pass lacks %q: %s", want, subs)
 		}
@@ -593,7 +593,7 @@ func TestRenderRoutesAskForTheRightRole(t *testing.T) {
 	}
 	videoFramesImpl = func(_ *Library, _ context.Context, _ *deckTab, _ string, _ VideoScene, _ VideoFormat, _ bool, times []int64, each func(videoShot) error) error {
 		for i, at := range times {
-			if err := each(videoShot{I: i, T: at, JPEG: []byte("j")}); err != nil {
+			if err := each(videoShot{I: i, T: at, Image: []byte("j")}); err != nil {
 				return err
 			}
 		}

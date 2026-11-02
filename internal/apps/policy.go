@@ -133,7 +133,8 @@ func match(rule string, d Decision, plugin string, call Call) (int, Decision) {
 	case !isMCP:
 		name = call.Tool
 	case server == hostServer && from == "":
-		name = "app." + tool
+		// Claude writes a tool's dots as '_': data_get is the rule app.data.get.
+		name = "app." + strings.ReplaceAll(tool, "_", ".")
 	case from != "" && from != plugin && d == DecideAllow:
 		// Another plugin's server: this app's allow does not reach it.
 		return -1, d
@@ -321,8 +322,43 @@ type SnapshotApp struct {
 
 // The subcommands of `harnessly app` (with their aliases, internal/hlcli app.go) that change what is on: the agent of a
 // chat with apps does not run them.
+//
+// Sharing is the person's word too: the agent publishes to dev and beta (publish), and only a person promotes to stable,
+// rolls a channel back, installs for the team, or hands an app out by link.
 var selfCommands = map[string]bool{"enable": true, "on": true, "disable": true, "off": true, "install": true,
-	"dev": true, "remove": true, "rm": true, "uninstall": true}
+	"dev": true, "remove": true, "rm": true, "uninstall": true,
+	"promote": true, "rollback": true, "team": true, "public": true, "share": true, "unshare": true, "follow": true, "sync": true, "update": true}
+
+// publishesWide says whether the words after `publish` aim it past dev and beta: at the team's catalog or a space (a
+// --team or --space flag with any value, spelled `--team x` or `--team=x`, with one dash or two), or at any channel but
+// an explicit dev or beta. The channel is read the way the CLI reads its flags: `--channel stable`, `--channel=stable`.
+func publishesWide(words []string) bool {
+	channel := ""
+	for i := 0; i < len(words); i++ {
+		w := words[i]
+		if !strings.HasPrefix(w, "-") {
+			if w == "stable" {
+				return true
+			}
+			continue
+		}
+		name, val, hasVal := strings.Cut(strings.TrimLeft(w, "-"), "=")
+		switch name {
+		case "team", "space", "public":
+			return true
+		case "channel", "c":
+			if !hasVal && i+1 < len(words) {
+				i++
+				val = words[i]
+			}
+			channel = val
+			if channel != "dev" && channel != "beta" {
+				return true
+			}
+		}
+	}
+	return channel == "stable"
+}
 
 // selfCommand says whether one simple command is harnessly's app command with a subcommand that changes the apps. It
 // leans to refusing: with the shell's quotes and escapes taken off every word, a harnessly line with an app (or apps)
@@ -338,13 +374,16 @@ func selfCommand(part string) bool {
 		}, w)
 	}
 	seen, app := false, false
-	for _, w := range words {
+	for i, w := range words {
 		switch {
 		case !seen:
 			seen = strings.HasSuffix(w, "harnessly")
 		case w == "app" || w == "apps":
 			app = true
-		case app && selfCommands[w]:
+		case app && selfCommands[w] && !(w == "dev" && words[i-1] == "--channel"):
+			// The dev channel is named like the dev command (`publish --channel dev`): as the value of --channel it is not one.
+			return true
+		case app && w == "publish" && publishesWide(words[i+1:]):
 			return true
 		}
 	}
@@ -383,17 +422,45 @@ func (s Snapshot) selfChange(call Call) string {
 			return "Bash(harnessly …)"
 		}
 		for _, dir := range s.Protected {
-			if dir != "" && strings.Contains(line, dir) {
-				return "Bash(" + dir + ")"
+			for _, form := range protectedForms(dir) {
+				if strings.Contains(line, form) {
+					return "Bash(" + dir + ")"
+				}
 			}
 		}
 	case "Edit", "Write", "MultiEdit", "NotebookEdit":
-		path := filepath.Clean(ruleInput(call))
+		// The file the tool would write is judged by where it really leads: a link from the chat's own folder into the
+		// registry is the registry.
+		path := ruleInput(call)
+		if abs, err := filepath.Abs(path); err == nil {
+			path = abs
+		}
+		forms := []string{filepath.Clean(path)}
+		if real, err := realPath(path); err == nil {
+			forms = append(forms, real)
+		}
 		for _, dir := range s.Protected {
-			if dir != "" && (path == dir || strings.HasPrefix(path, dir+string(filepath.Separator))) {
-				return call.Tool + "(" + dir + ")"
+			for _, d := range protectedForms(dir) {
+				for _, f := range forms {
+					if within(d, f) {
+						return call.Tool + "(" + dir + ")"
+					}
+				}
 			}
 		}
 	}
 	return ""
+}
+
+// protectedForms are the ways a protected folder is written in a path: as the launch named it and as it really is (the
+// data folder can be reached through a link, and a command or a tool may use either).
+func protectedForms(dir string) []string {
+	if dir == "" {
+		return nil
+	}
+	forms := []string{filepath.Clean(dir)}
+	if real, err := realPath(dir); err == nil && real != forms[0] {
+		forms = append(forms, real)
+	}
+	return forms
 }

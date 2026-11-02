@@ -28,6 +28,7 @@ vi.mock('@/next/features/designly/deck/api', () => ({
 vi.mock('@/next/features/designly/video/api', () => ({
   startVideoRender: (...a: unknown[]) => startVideoRender(...a),
   videoRenderJob: vi.fn(),
+  reportVideoView: vi.fn(() => new Promise(() => undefined)),
   videoFileHref: (_m: string, _id: string, f: string) => `file/${f}`,
 }));
 vi.mock('@/next/features/designly/deck/deck-share', () => ({ default: () => <div data-testid="share" /> }));

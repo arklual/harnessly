@@ -1,0 +1,63 @@
+{
+  "scope": {
+    "kind": "org",
+    "id": "o2acmeorgaaaaaaaaaaa"
+  },
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "items": [
+    {
+      "kind": "reread_context",
+      "title": "Перечитанный контекст",
+      "amount": {
+        "usd": 212,
+        "shown": 17278.0
+      },
+      "share": 0.13,
+      "sessions": 148,
+      "hint": "Длинные сессии без /compact перечитывают историю на каждом ходу"
+    },
+    {
+      "kind": "abandoned_sessions",
+      "title": "Брошенные сессии",
+      "amount": {
+        "usd": 96,
+        "shown": 7824.0
+      },
+      "share": 0.06,
+      "sessions": 61,
+      "hint": "Сессии дольше 20 ходов без MR и без продолжения"
+    },
+    {
+      "kind": "failed_tools",
+      "title": "Ошибки инструментов",
+      "amount": {
+        "usd": 41,
+        "shown": 3341.5
+      },
+      "share": 0.025,
+      "sessions": 90,
+      "hint": "Повторы после упавших вызовов"
+    },
+    {
+      "kind": "oversized_model",
+      "title": "Opus там, где хватило бы Sonnet",
+      "amount": {
+        "usd": 37,
+        "shown": 3015.5
+      },
+      "share": 0.023,
+      "sessions": 44,
+      "hint": "Субагенты поиска по коду на Opus"
+    }
+  ]
+}

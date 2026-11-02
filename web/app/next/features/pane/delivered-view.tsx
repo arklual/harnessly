@@ -1,21 +1,37 @@
-// A file that is not text, in the pane: a zip's contents with each file to save, a picture or a PDF as it is, any other
-// file with its name and the way to save it. Used for what the agent handed over and for any such file the pane opens.
-import { useEffect, useState } from 'react';
+// A file that is not text, in the pane: a zip's contents with each file to save, a picture or a PDF as it is, a video or
+// a sound in the player, any other file with its name and the way to save it. Used for what the agent handed over and for any such file the pane opens.
+import { useCallback, useEffect, useState } from 'react';
 import Icon from '@/next/ui/icon';
 import Swap from '@/next/ui/swap';
 import LoadFailed from '@/next/ui/load-failed';
 import { t } from '@/next/i18n';
 import { bytes } from '@/next/features/pane/machine/charts';
-import type { MachineId } from '@/next/protocol/v2';
+import type { ConvId, MachineId } from '@/next/protocol/v2';
+import type { IFileSelection } from '@/next/features/pane/file-selection';
+import { settleFilePlace, useFilePlace } from '@/next/features/pane/file-place';
+import { useFileChanges } from '@/next/features/pane/use-file-changes';
+import { reportFileSelection } from '@/next/features/pane/report-selection';
 import { DELIVERED_VIEW, type DeliveredView } from '@/next/features/pane/delivered-kind';
+import ImageStage from '@/next/features/pane/image-stage';
+import LazyView from '@/next/ui/lazy-view';
+import MediaPlayer from '@/next/features/pane/media/media-player';
+import { SHEET_FILE } from '@/next/features/pane/sheet/sheet-api';
+import { MEDIA_KIND } from '@/next/features/pane/media/media-model';
 import { downloadUrl, listZip, previewUrl, zipEntryUrl, type IZipList } from '@/next/features/pane/delivered';
 
 export interface IDeliveredViewProps {
+  /** The chat the pane is beside: it hears what is selected in the file. */
+  conv: ConvId;
   machine: MachineId;
   /** Absolute path of the file. */
   path: string;
   view: DeliveredView;
 }
+
+const loadPdfView = () => import('@/next/features/pane/pdf/pdf-view');
+const loadSheetView = () => import('@/next/features/pane/sheet/sheet-view');
+const loadDocxView = () => import('@/next/features/pane/docx/docx-view');
+const loadPptxView = () => import('@/next/features/pane/pptx/pptx-view');
 
 const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1);
 
@@ -88,8 +104,25 @@ const ZipContents = ({ machine, path }: { machine: MachineId; path: string }) =>
   );
 };
 
-const DeliveredView = ({ machine, path, view }: IDeliveredViewProps) => {
+const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
   const name = nameOf(path);
+  const onSelection = useCallback(
+    (selection: IFileSelection | null) => reportFileSelection(machine, conv, path, selection),
+    [machine, conv, path],
+  );
+  const place = useFilePlace(path);
+  const onPlaced = useCallback(() => settleFilePlace(path), [path]);
+  // Closed, the file holds no selection any more.
+  useEffect(() => () => reportFileSelection(machine, conv, path, null), [machine, conv, path]);
+  const toFile = { onSelection, place, onPlaced };
+  // A spreadsheet looks after its own file; the rest are read again from an address that says the file changed.
+  const reads =
+    view === DELIVERED_VIEW.pdf ||
+    view === DELIVERED_VIEW.image ||
+    view === DELIVERED_VIEW.video ||
+    view === DELIVERED_VIEW.audio;
+  const changes = useFileChanges(machine, path, reads);
+  const src = changes === 0 ? previewUrl(machine, path) : `${previewUrl(machine, path)}&v=${changes}`;
   return (
     <div className="hx-tv hx-deliv" data-tool="disk" data-view={view}>
       <div className="hx-tv__sum">
@@ -98,10 +131,69 @@ const DeliveredView = ({ machine, path, view }: IDeliveredViewProps) => {
       </div>
       {view === DELIVERED_VIEW.zip && <ZipContents machine={machine} path={path} />}
       {view === DELIVERED_VIEW.image && (
-        <img className="hx-deliv__image" src={previewUrl(machine, path)} alt={name} />
+        <ImageStage key={path} src={src} name={name} onSelection={onSelection} />
       )}
       {view === DELIVERED_VIEW.pdf && (
-        <iframe className="hx-deliv__pdf" src={previewUrl(machine, path)} title={name} />
+        <LazyView
+          load={loadPdfView}
+          props={{ src, name, saveHref: downloadUrl(machine, path), ...toFile }}
+          fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
+          title={t('next.pdf.broken')}
+        />
+      )}
+      {view === DELIVERED_VIEW.video && (
+        <MediaPlayer
+          key={path}
+          src={src}
+          kind={MEDIA_KIND.video}
+          name={name}
+          path={path}
+          saveHref={downloadUrl(machine, path)}
+          {...toFile}
+        />
+      )}
+      {view === DELIVERED_VIEW.audio && (
+        <MediaPlayer
+          key={path}
+          src={src}
+          kind={MEDIA_KIND.audio}
+          name={name}
+          path={path}
+          saveHref={downloadUrl(machine, path)}
+          {...toFile}
+        />
+      )}
+      {view === DELIVERED_VIEW.sheet && (
+        <LazyView
+          load={loadSheetView}
+          props={{
+            machine,
+            path,
+            src: previewUrl(machine, path),
+            name,
+            kind: /\.(?:csv|tsv)$/i.test(path) ? SHEET_FILE.csv : SHEET_FILE.xlsx,
+            saveHref: downloadUrl(machine, path),
+            ...toFile,
+          }}
+          fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
+          title={t('next.sheet.failed')}
+        />
+      )}
+      {view === DELIVERED_VIEW.docx && (
+        <LazyView
+          load={loadDocxView}
+          props={{ machine, path, src: previewUrl(machine, path), name, ...toFile }}
+          fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
+          title={t('next.docx.failed')}
+        />
+      )}
+      {view === DELIVERED_VIEW.pptx && (
+        <LazyView
+          load={loadPptxView}
+          props={{ machine, path, src: previewUrl(machine, path), name, ...toFile }}
+          fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
+          title={t('next.pptx.failed')}
+        />
       )}
       {view === DELIVERED_VIEW.save && <div className="hx-tv__note">{t('next.delivered.saveOnly')}</div>}
     </div>

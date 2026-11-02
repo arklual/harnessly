@@ -368,6 +368,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(ref.c.layoutRoutes(f, d)...)
 	f.Add(ref.c.checkpointRoutes(f, d)...)
 	f.Add(ref.c.hookRoutes(cliTokenFirst(cfg.DataDir, cli.Headers), apiRefusal)...)
+	f.Add(ref.c.budgetRoutes(cliTokenFirst(cfg.DataDir, cli.Headers))...)
 	f.Add(ref.c.timelineSocketRoutes(sessionOK)...)
 	f.Add(ref.c.timelineRoutes(f, d)...)
 	f.Add(ref.c.transcriptRoutes(f, d)...)
@@ -510,9 +511,10 @@ func run(ctx context.Context, cfg gate.Config) error {
 		defer a.gpt.Close()
 	}
 	terms := f.terms
-	var handler http.Handler = f
+	var confined http.Handler = confineAgentToken(&gate.CLIToken{DataDir: cfg.DataDir, Headers: strings.Split(env("RUNTIME_CLI_TOKEN_HEADERS", "x-cli-token"), ",")}, f)
+	handler := confined
 	if cfg.Standalone() {
-		handler = standaloneSlots.guard(apiAlias(appBase(), f))
+		handler = standaloneSlots.guard(apiAlias(appBase(), confined))
 		standaloneSlots.serve(ctx)
 	}
 	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}

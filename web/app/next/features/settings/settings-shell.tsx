@@ -12,6 +12,7 @@ import Icon from '@/next/ui/icon';
 const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent: 'claude' | 'codex' }>> = {
   general: { icon: 'sliders-horizontal' },
   appearance: { icon: 'palette' },
+  keys: { icon: 'keyboard' },
   voice: { icon: 'mic' },
   notifications: { icon: 'bell' },
   safe: { icon: 'lock' },
@@ -27,7 +28,7 @@ const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent:
 
 /** The groups of the list, in the order of SETTINGS_SECTIONS. */
 const NAV_GROUPS = [
-  { id: 'app', sections: ['general', 'appearance', 'notifications', 'voice', 'takes'] },
+  { id: 'app', sections: ['general', 'appearance', 'keys', 'notifications', 'voice', 'takes'] },
   { id: 'agents', sections: ['accounts', 'claude', 'codex', 'skills', 'safe'] },
   { id: 'machine', sections: ['machines', 'apps', 'beta'] },
 ] as const satisfies readonly { id: string; sections: readonly SettingsSection[] }[];

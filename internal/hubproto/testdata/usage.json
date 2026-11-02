@@ -1,0 +1,150 @@
+{
+  "event usage.available": {
+    "epoch": "e7k2",
+    "event": "usage.available",
+    "seq": 42
+  },
+  "request usage.ack": {
+    "epoch": "e7k2",
+    "id": 10,
+    "op": "usage.ack",
+    "seq": 45
+  },
+  "request usage.read": {
+    "after": 40,
+    "epoch": "e7k2",
+    "id": 7,
+    "max": 500,
+    "op": "usage.read"
+  },
+  "result usage.ack": {
+    "id": 10,
+    "ok": true,
+    "result": {}
+  },
+  "result usage.read": {
+    "id": 7,
+    "ok": true,
+    "result": {
+      "epoch": "e7k2",
+      "records": [
+        {
+          "seq": 41,
+          "kind": "call",
+          "at": 1761899000100,
+          "call": {
+            "provider": "claude",
+            "msgKey": "msg_01AbC",
+            "sessionKey": "3f1c2a9e-0000-4000-8000-000000000001",
+            "ts": 1761899000000,
+            "model": "claude-sonnet-4-6",
+            "baseUrlHost": "api.anthropic.com",
+            "input": 12,
+            "output": 830,
+            "cacheRead": 41200,
+            "cacheWrite5m": 1900,
+            "cacheWrite1h": 0
+          }
+        },
+        {
+          "seq": 42,
+          "kind": "call",
+          "at": 1761899100000,
+          "call": {
+            "provider": "claude",
+            "msgKey": "msg_01AbD",
+            "sessionKey": "3f1c2a9e-0000-4000-8000-000000000002",
+            "ts": 1761899099000,
+            "model": "kimi-k2-turbo",
+            "baseUrlHost": "api.kimi.com",
+            "input": 3,
+            "output": 120,
+            "cacheRead": 9000,
+            "cacheWrite5m": 0,
+            "cacheWrite1h": 0
+          }
+        },
+        {
+          "seq": 43,
+          "kind": "session",
+          "at": 1761900000100,
+          "session": {
+            "provider": "claude",
+            "sessionKey": "3f1c2a9e-0000-4000-8000-000000000002",
+            "parentKey": "3f1c2a9e-0000-4000-8000-000000000001",
+            "startedAt": 1761899000000,
+            "endedAt": 1761900000000,
+            "origin": "live",
+            "subject": "anna@example.com",
+            "accountRef": "claude:7d0c6f0e-0000-4000-8000-00000000000a",
+            "authMode": "subscription",
+            "baseUrlHost": "api.anthropic.com",
+            "attribution": "exact",
+            "metrics": {
+              "turns": 14,
+              "waitMs": 61000
+            }
+          }
+        },
+        {
+          "seq": 44,
+          "kind": "window",
+          "at": 1761900000200,
+          "window": {
+            "provider": "claude",
+            "accountRef": "claude:7d0c6f0e-0000-4000-8000-00000000000a",
+            "name": "five_hour",
+            "scope": "all",
+            "lengthSec": 18000,
+            "unit": "pct",
+            "usedPct": 37.5,
+            "used": null,
+            "limit": null,
+            "resetsAt": 1761910000000,
+            "measuredAt": 1761900000000,
+            "source": "oauth-usage",
+            "confidence": "undocumented"
+          }
+        }
+      ],
+      "last": 44,
+      "more": false
+    }
+  },
+  "result usage.read balance": {
+    "id": 8,
+    "ok": true,
+    "result": {
+      "epoch": "e7k2",
+      "records": [
+        {
+          "seq": 45,
+          "kind": "balance",
+          "at": 1761900100000,
+          "balance": {
+            "provider": "openrouter",
+            "accountRef": "key:sha256:9f86d081884c7d65",
+            "currency": "USD",
+            "available": 41.2,
+            "spendCap": 100,
+            "spentInPeriod": null,
+            "measuredAt": 1761900100000,
+            "source": "openrouter-key"
+          }
+        }
+      ],
+      "last": 45,
+      "more": false
+    }
+  },
+  "result usage.read empty": {
+    "id": 9,
+    "ok": true,
+    "result": {
+      "epoch": "e7k2",
+      "records": [],
+      "last": 45,
+      "more": false
+    }
+  }
+}

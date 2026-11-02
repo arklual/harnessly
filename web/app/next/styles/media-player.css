@@ -1,0 +1,361 @@
+/* The pane's media player (features/pane/media). The time is --p (0–1), written by the player's frame loop; the loaded part
+   is --b, the place under the pointer --x, the picture's proportions --ar. */
+
+.hx-deliv[data-view='video'] {
+  max-width: none;
+  height: 100%;
+}
+.hx-deliv[data-view='audio'] {
+  max-width: 720px;
+}
+
+.hx-media {
+  --p: 0;
+  --b: 0;
+  --x: 0;
+  --ar: 1.7778;
+  --room: calc(100dvh - 170px);
+  outline: none;
+}
+.hx-media[data-kind='video'] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.hx-media:focus-visible .hx-media__stage {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 2px;
+}
+
+.hx-media__stage {
+  position: relative;
+  width: min(100%, calc(var(--room) * var(--ar)));
+  aspect-ratio: var(--ar);
+  overflow: hidden;
+  border-radius: var(--hx-radius-lg);
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+}
+.hx-media__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.hx-media[data-full='true'] {
+  align-items: center;
+  background: #000;
+}
+.hx-media[data-full='true'] .hx-media__stage {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+.hx-media[data-idle='true'] .hx-media__stage {
+  cursor: none;
+}
+
+/* The paused file's big button; it grows away when the file starts. */
+.hx-media__big {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 45%);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  transition:
+    opacity 180ms var(--hx-ease-out),
+    transform 260ms var(--hx-ease-out);
+}
+.hx-media__big .hx-icon {
+  width: 26px;
+  height: 26px;
+  margin-left: 3px;
+}
+.hx-media[data-playing='true'] .hx-media__big {
+  opacity: 0;
+  transform: scale(1.35);
+}
+.hx-media__busy {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  margin: -10px 0 0 -10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease 200ms;
+}
+.hx-media[data-waiting='true'][data-playing='true'] .hx-media__busy {
+  opacity: 1;
+}
+
+.hx-media__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-media__stage .hx-media__controls {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 36px 12px 8px;
+  background: linear-gradient(to top, rgb(0 0 0 / 62%), rgb(0 0 0 / 0%));
+  cursor: default;
+  transition:
+    opacity 220ms var(--hx-ease-out),
+    transform 220ms var(--hx-ease-out);
+}
+.hx-media[data-idle='true'] .hx-media__stage .hx-media__controls {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
+.hx-media__track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 16px;
+  cursor: pointer;
+  touch-action: none;
+}
+.hx-media__rail {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 24%);
+  transition: height 140ms var(--hx-ease-out);
+}
+.hx-media__track:hover .hx-media__rail,
+.hx-media__track:active .hx-media__rail {
+  height: 6px;
+}
+.hx-media__buffered,
+.hx-media__played {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+}
+.hx-media__buffered {
+  background: rgb(255 255 255 / 26%);
+  transform: scaleX(var(--b));
+}
+.hx-media__played {
+  background: #fff;
+  transform: scaleX(var(--p));
+}
+
+.hx-media__stretch {
+  --a: 0;
+  --b: 0;
+  position: absolute;
+  top: 50%;
+  left: calc(var(--a) * 100%);
+  width: max(2px, calc((var(--b) - var(--a)) * 100%));
+  height: 12px;
+  border-radius: 2px;
+  background: rgb(123 97 255 / 45%);
+  box-shadow: inset 0 0 0 1px var(--hx-accent);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.hx-media__btn[data-on='true'] {
+  color: var(--hx-accent);
+}
+
+.hx-media__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.hx-media__grow {
+  flex: 1;
+}
+.hx-media__btn,
+.hx-media__rate {
+  display: grid;
+  place-items: center;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.hx-media__btn:hover,
+.hx-media__rate:hover {
+  background: rgb(255 255 255 / 14%);
+}
+.hx-media__btn:focus-visible,
+.hx-media__rate:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-media__rate {
+  min-width: 42px;
+  border-radius: 16px;
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.72;
+}
+.hx-media__rate[data-changed='true'] {
+  opacity: 1;
+}
+.hx-media__clock {
+  padding: 0 8px;
+  font-size: var(--hx-text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The volume's track opens beside its button on hover and stays out of the way otherwise. */
+.hx-media__volume {
+  display: flex;
+  align-items: center;
+}
+.hx-media__vol-track {
+  display: flex;
+  align-items: center;
+  width: 0;
+  height: 32px;
+  overflow: hidden;
+  opacity: 0;
+  cursor: pointer;
+  touch-action: none;
+  transition:
+    width 200ms var(--hx-ease-out),
+    opacity 160ms ease,
+    margin 200ms var(--hx-ease-out);
+}
+.hx-media__volume:hover .hx-media__vol-track,
+.hx-media__volume:focus-within .hx-media__vol-track {
+  width: 64px;
+  margin: 0 8px 0 2px;
+  opacity: 1;
+}
+.hx-media__vol-rail {
+  --v: 1;
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    currentColor calc(var(--v) * 100%),
+    rgb(255 255 255 / 24%) calc(var(--v) * 100%)
+  );
+}
+
+/* The frame under the pointer. */
+.hx-media__preview {
+  position: absolute;
+  left: clamp(84px, calc(var(--x) * 100%), calc(100% - 84px));
+  bottom: 68px;
+  width: 152px;
+  margin-left: -76px;
+  overflow: hidden;
+  border-radius: var(--hx-radius-md);
+  background: #000;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 16%);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    transform 180ms var(--hx-ease-out);
+}
+.hx-media__preview[data-on='true'] {
+  opacity: 1;
+  transform: none;
+}
+.hx-media__preview-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: var(--ar);
+  object-fit: contain;
+}
+.hx-media__preview-time {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 64%);
+  font-size: var(--hx-text-xs);
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+/* A sound: the wave is the track, the played part in the accent. */
+.hx-media[data-kind='audio'] {
+  color: var(--hx-fg-1);
+}
+.hx-media[data-kind='audio'] .hx-media__track {
+  height: 96px;
+}
+.hx-media__wave-box {
+  position: relative;
+  flex: 1;
+  height: 80px;
+}
+.hx-media__wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: var(--hx-border-strong);
+}
+.hx-media__wave[data-played='true'] {
+  fill: var(--hx-accent);
+  clip-path: inset(0 calc((1 - var(--p)) * 100%) 0 0);
+}
+.hx-media[data-kind='audio'] .hx-media__btn:hover,
+.hx-media[data-kind='audio'] .hx-media__rate:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-media[data-kind='audio'] .hx-media__vol-rail {
+  background: linear-gradient(
+    to right,
+    currentColor calc(var(--v) * 100%),
+    var(--hx-border-strong) calc(var(--v) * 100%)
+  );
+}
+
+.hx-media__failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 72px 16px;
+  color: var(--hx-fg-3);
+  text-align: center;
+}
+.hx-media__failed-title {
+  max-width: 340px;
+  color: var(--hx-fg-2);
+}
+.hx-media__failed-save {
+  color: var(--hx-fg-1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-media__big,
+  .hx-media__stage .hx-media__controls,
+  .hx-media__preview {
+    transition: none;
+  }
+}

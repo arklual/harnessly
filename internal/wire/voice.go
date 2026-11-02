@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/jsonlog"
+	"github.com/ly-solutions/harnessly/internal/voice/dict"
 )
 
 // ErrVoiceUnavailable is a machine that cannot recognize speech right now (no decoder, no recognition service); the
@@ -65,7 +66,7 @@ func (s *Server) voice(w http.ResponseWriter, r *http.Request) {
 	case err == nil && body.n == 0:
 		refuse(w, RefuseBadRequest)
 	case err == nil:
-		s.writeChecked(w, r, Transcript{Text: text})
+		s.writeChecked(w, r, Transcript{Text: s.inPersonsWords(text)})
 	case errors.Is(err, ErrVoiceUnavailable):
 		refuse(w, RefuseUnsupported)
 	case errors.Is(err, context.DeadlineExceeded):
@@ -91,4 +92,21 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
 	c.n += int64(n)
 	return n, err
+}
+
+// inPersonsWords puts the person's own words (Settings → Voice) over what was recognized, as the live dictation does.
+// Without settings to read, or without words, the text stays as heard.
+func (s *Server) inPersonsWords(text string) string {
+	if s.Me == nil || text == "" {
+		return text
+	}
+	me, err := s.Me.Me()
+	if err != nil || len(me.Settings.Voice.Words) == 0 {
+		return text
+	}
+	words := make([]dict.Entry, 0, len(me.Settings.Voice.Words))
+	for _, w := range me.Settings.Voice.Words {
+		words = append(words, dict.Entry{Word: w.Word, Heard: w.Heard})
+	}
+	return dict.Apply(text, dict.Clean(words))
 }

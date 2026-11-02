@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кешбэк на доске</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="cb">
+  <header class="cb__head">
+    <h1 class="cb__title" id="field">Поле</h1>
+    <p class="cb__sub" id="hint">Нажмите на подсвеченный элемент доски.</p>
+  </header>
+  <form class="cb__form" id="form" hidden>
+    <input class="cb__input" id="value" name="value" autocomplete="off">
+    <button type="submit" class="cb__send" id="save">Записать</button>
+  </form>
+  <p class="cb__note" id="note" role="status"></p>
+</main>
+<!-- Classic scripts only: the view runs in an opaque-origin frame (see docs/apps.md). -->
+<script src="/__hl/app-sdk.js"></script>
+<script src="inspector.js"></script>
+</body>
+</html>

@@ -78,6 +78,11 @@ type Server struct {
 	// Files reads the folders of the conversations: .../files lists a folder, .../file reads a text file. nil: both are
 	// 404s.
 	Files FilesSource
+	// PaneSelection hears what is selected in a file open in a chat's pane: POST /api/v2/pane-selection. nil: a 404.
+	PaneSelection http.Handler
+	// FileBytes reads a file's revision and saves a file the viewer edits as bytes (a spreadsheet): GET and PUT
+	// /api/v2/file-bytes?path=. nil: a 404.
+	FileBytes http.Handler
 	// Search finds the messages of the conversations that hold the words of a query; nil: GET /api/v2/search is a 404.
 	Search func(ctx context.Context, query string, limit int) (MessageSearch, error)
 	// Digest cuts a conversation to a block of about budget characters for another agent's context and writes the whole

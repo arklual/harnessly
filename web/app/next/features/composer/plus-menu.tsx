@@ -2,7 +2,7 @@
 // mention (project, task, design), and — in a chat — what the machine and the team have: a file of the project, a
 // design, a document, a board, a merge request or a task. Each of those opens its picker in the same panel (back with
 // ←). On a computer it is a small menu over the button; on a phone a sheet from the bottom with large tiles.
-import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useState, type ChangeEvent, type Ref } from 'react';
 import AttachPicker from '@/next/features/composer/attach-picker';
 import {
   ATTACH_KIND,
@@ -10,6 +10,7 @@ import {
   type IAttachScope,
   type TAttachKind,
 } from '@/next/features/composer/attach-sources';
+import AppsPane, { type IPlusApps } from '@/next/features/composer/apps-pane';
 import StashList, { type IStash } from '@/next/features/composer/stash-list';
 import TakesList, { type ITakeRow } from '@/next/features/composer/takes-list';
 import { stashHint } from '@/next/features/composer/keys';
@@ -66,7 +67,14 @@ export interface IPlusAttach {
   onAttach: (row: IAttachRow) => void;
 }
 
+/** What the field can ask of «+» from outside (a shortcut). */
+export interface IPlusMenuHandle {
+  /** Opens the system's file picker. */
+  openFiles: () => void;
+}
+
 interface IPlusMenuProps {
+  ref?: Ref<IPlusMenuHandle>;
   contexts: ComposerContext[];
   /** The files the person picked; the pickers are in this component, so they stay in the page while the menu closes. */
   onFiles: (files: File[]) => void;
@@ -79,10 +87,13 @@ interface IPlusMenuProps {
   stash?: IStash | null;
   /** The person's recordings; without it «+» has no «Записи». */
   takes?: IPlusTakes | null;
+  /** The installed apps a chat can turn on; without it «+» has no «Приложение». */
+  apps?: IPlusApps | null;
   disabled?: boolean;
 }
 
 const PlusMenu = ({
+  ref,
   contexts,
   onFiles,
   onContext,
@@ -90,6 +101,7 @@ const PlusMenu = ({
   attach = null,
   stash = null,
   takes = null,
+  apps = null,
   disabled = false,
 }: IPlusMenuProps) => {
   const phone = usePhone();
@@ -100,6 +112,8 @@ const PlusMenu = ({
   const [stashOpen, setStashOpen] = useState(false);
   // The person's recordings, shown in the panel in the same place.
   const [takesOpen, setTakesOpen] = useState(false);
+  // The installed apps, shown in the panel in the same place.
+  const [appsOpen, setAppsOpen] = useState(false);
   const takesShown = open && takesOpen;
   const onShowTakes = takes?.onShow;
   useEffect(() => {
@@ -126,6 +140,7 @@ const PlusMenu = ({
       setView(null);
       setStashOpen(false);
       setTakesOpen(false);
+      setAppsOpen(false);
       setNow(Date.now());
     }
     setOpen(next);
@@ -139,6 +154,7 @@ const PlusMenu = ({
   const attachFile = (kind: TFileKind) => {
     pickers[kind]?.click();
   };
+  useImperativeHandle(ref, () => ({ openFiles: () => attachFile('file') }));
   const picked = (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     const files = [...(input.files ?? [])];
@@ -292,7 +308,38 @@ const PlusMenu = ({
       </div>
     </div>
   );
+  const appsItem = apps && (
+    <button
+      type="button"
+      className="hx-plus__item"
+      role="menuitem"
+      data-apps="list"
+      onClick={() => setAppsOpen(true)}
+    >
+      <Icon name="layout-grid" size="sm" />
+      <span className="hx-plus__name">{t('next.chatapps.title')}</span>
+      {!phone && <span className="hx-plus__hint">{t('next.chatapps.hint')}</span>}
+      <Icon name="chevron-right" size="sm" className="hx-plus__chev" />
+    </button>
+  );
+  const appsPane = apps && appsOpen && (
+    <AppsPane
+      apps={{
+        ...apps,
+        onPick: (id) => {
+          setOpen(false);
+          apps.onPick(id);
+        },
+        onAll: () => {
+          setOpen(false);
+          apps.onAll();
+        },
+      }}
+      onBack={() => setAppsOpen(false)}
+    />
+  );
   const picker =
+    appsPane ||
     takesPane ||
     stashPane ||
     (attach && view && (
@@ -342,6 +389,7 @@ const PlusMenu = ({
           </button>
         </div>
         {placeItems}
+        {appsItem}
         <button type="button" className="hx-plus__item" role="menuitem" onClick={pick(onPrompts)}>
           <Icon name="history" size="sm" />
           <span className="hx-plus__name">{t('next.plus.prompts')}</span>
@@ -393,6 +441,7 @@ const PlusMenu = ({
       </button>
       {placeItems && <div className="hx-plus__sep" />}
       {placeItems}
+      {appsItem}
       <div className="hx-plus__sep" />
       <button type="button" className="hx-plus__item" role="menuitem" onClick={pick(onPrompts)}>
         <Icon name="history" size="sm" />

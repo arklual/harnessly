@@ -1,9 +1,10 @@
-// The video player's keys. Space or K plays and pauses; ←/→ jump 5 s (Shift: 10 s), J/L jump 10 s, «,» and «.» step a
-// frame; PageUp/PageDown or ↑/↓ change the scene; Home/End go to the ends; 0–9 go to a tenth of the video; I and O mark
-// the range; C comments; F goes full screen. Russian layout letters do the same (л, о, д, ш, щ, с, а, and б, ю on the
-// comma and period keys). Keys typed into a field or into editable text are the field's.
-import { useEffect, useEffectEvent } from 'react';
-import { isTypingTarget } from '@/next/features/designly/deck/use-deck-keys';
+// The video player's keys, from the one list of shortcuts (features/keys; the person may change them in Settings).
+// As they come: Space or K plays and pauses; ←/→ jump 5 s (Shift: 10 s), J/L jump 10 s, «,» and «.» step a frame;
+// PageUp/PageDown or ↑/↓ change the scene; Home/End go to the ends; 0–9 go to a tenth of the video; I and O mark the
+// range; C comments; F goes full screen; ⌥← and ⌥→ change the scene even from the chat's field. The keys are places on
+// the keyboard, so the Russian layout has the same. Keys typed into a field are the field's.
+import { KEY_SCOPE } from '@/next/features/keys/commands';
+import { useKeys, type TKeyHandlers } from '@/next/features/keys/use-keys';
 
 export const VIDEO_KEY = {
   toggle: 'toggle',
@@ -27,69 +28,46 @@ type TPlainKey = Exclude<(typeof VIDEO_KEY)[keyof typeof VIDEO_KEY], 'tenth'>;
 
 export type TVideoKeyAction = { key: TPlainKey } | { key: typeof VIDEO_KEY.tenth; n: number };
 
-/** Layout-independent letters: the Latin key and the Russian one on the same place. */
-const LETTERS: Record<string, TPlainKey> = {
-  k: VIDEO_KEY.toggle,
-  л: VIDEO_KEY.toggle,
-  j: VIDEO_KEY.back10,
-  о: VIDEO_KEY.back10,
-  l: VIDEO_KEY.forward10,
-  д: VIDEO_KEY.forward10,
-  i: VIDEO_KEY.markIn,
-  ш: VIDEO_KEY.markIn,
-  o: VIDEO_KEY.markOut,
-  щ: VIDEO_KEY.markOut,
-  c: VIDEO_KEY.comment,
-  с: VIDEO_KEY.comment,
-  f: VIDEO_KEY.full,
-  а: VIDEO_KEY.full,
-  ',': VIDEO_KEY.frameBack,
-  б: VIDEO_KEY.frameBack,
-  '.': VIDEO_KEY.frameForward,
-  ю: VIDEO_KEY.frameForward,
+const PLAIN: Record<TPlainKey, string> = {
+  toggle: 'video.toggle',
+  back5: 'video.back5',
+  forward5: 'video.forward5',
+  back10: 'video.back10',
+  forward10: 'video.forward10',
+  frameBack: 'video.frameBack',
+  frameForward: 'video.frameForward',
+  prevScene: 'video.prevScene',
+  nextScene: 'video.nextScene',
+  start: 'video.start',
+  end: 'video.end',
+  markIn: 'video.markIn',
+  markOut: 'video.markOut',
+  comment: 'video.comment',
+  full: 'video.full',
 };
 
-const NAMED: Record<string, TPlainKey> = {
-  ' ': VIDEO_KEY.toggle,
-  PageUp: VIDEO_KEY.prevScene,
-  ArrowUp: VIDEO_KEY.prevScene,
-  PageDown: VIDEO_KEY.nextScene,
-  ArrowDown: VIDEO_KEY.nextScene,
-  Home: VIDEO_KEY.start,
-  End: VIDEO_KEY.end,
+/** The digit a chord is, «Digit7» or «Numpad7»; null for anything else. */
+export const digitOf = (chord: string): number | null => {
+  const m = /^(?:Digit|Numpad)([0-9])$/.exec(chord);
+  return m ? Number(m[1]) : null;
 };
 
-/** What a key does; null when it does nothing. */
-export const videoKeyAction = (key: string, shift = false): TVideoKeyAction | null => {
-  if (key === 'ArrowLeft') return { key: shift ? VIDEO_KEY.back10 : VIDEO_KEY.back5 };
-  if (key === 'ArrowRight') return { key: shift ? VIDEO_KEY.forward10 : VIDEO_KEY.forward5 };
-  if (/^[0-9]$/.test(key)) return { key: VIDEO_KEY.tenth, n: Number(key) };
-  const named = Object.hasOwn(NAMED, key) ? NAMED[key] : undefined;
-  if (named !== undefined) return { key: named };
-  const letter = key.toLowerCase();
-  const plain = Object.hasOwn(LETTERS, letter) ? LETTERS[letter] : undefined;
-  return plain === undefined ? null : { key: plain };
+/** The video's handlers of the list's actions. */
+export const videoHandlers = (onKey: (action: TVideoKeyAction) => void): TKeyHandlers => {
+  const handlers: TKeyHandlers = {
+    'global.stepBack': () => onKey({ key: VIDEO_KEY.prevScene }),
+    'global.stepOn': () => onKey({ key: VIDEO_KEY.nextScene }),
+    'video.tenth': (chord) => {
+      const n = digitOf(chord);
+      if (n === null) return false;
+      onKey({ key: VIDEO_KEY.tenth, n });
+    },
+  };
+  for (const key of Object.keys(PLAIN) as TPlainKey[]) handlers[PLAIN[key]] = () => onKey({ key });
+  return handlers;
 };
 
-/**
- * Listens to the window's keys while `on` and calls `onKey` with the action; the keys it acts on do nothing else (no
- * scroll on an arrow or Space). A key with a modifier (but Shift) is the browser's. Space on a focused button is the
- * button's.
- */
+/** While `on`, the video's keys run `onKey`; the keys it acts on do nothing else (no scroll on an arrow or Space). */
 export const useVideoKeys = (on: boolean, onKey: (action: TVideoKeyAction) => void) => {
-  const act = useEffectEvent(onKey);
-  useEffect(() => {
-    if (!on) return;
-    const down = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isTypingTarget(event.target)) return;
-      if (event.key === ' ' && event.target instanceof HTMLButtonElement) return;
-      const action = videoKeyAction(event.key, event.shiftKey);
-      if (action === null) return;
-      event.preventDefault();
-      act(action);
-    };
-    window.addEventListener('keydown', down);
-    return () => window.removeEventListener('keydown', down);
-  }, [on]);
+  useKeys(KEY_SCOPE.video, videoHandlers(onKey), on);
 };

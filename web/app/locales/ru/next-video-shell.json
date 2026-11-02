@@ -38,5 +38,7 @@
   "next.video.shell.shareFormat": "Откроется в формате",
   "next.video.shell.shareNoMp4": "MP4 ещё не собран: пока его нет, гости увидят заглушку",
   "next.video.shell.source": "Источник",
-  "next.video.shell.style": "Стиль"
+  "next.video.shell.style": "Стиль",
+  "offerShow": "Показать",
+  "offerDrop": "Не сейчас"
 }

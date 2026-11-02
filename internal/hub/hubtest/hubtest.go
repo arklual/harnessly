@@ -141,7 +141,7 @@ func New(t *testing.T, opts ...Option) *Stack {
 	// HUB_SMTP_URL stands for the stack's own mailer (s.Mail takes the place of the SMTP server): a hub on https or in the
 	// cloud edition does not start without one.
 	env := map[string]string{"HUB_PUBLIC_URL": s.URL, "HUB_DATA_DIR": t.TempDir(), "HUB_PASSKEY": "off", "HUB_DIST_DIR": s.DistDir,
-		"HUB_SMTP_URL": "smtp://mail.hubtest.invalid:587"}
+		"HUB_SMTP_URL": "smtp://mail.hubtest.invalid:587", "HUB_RATES_URL": "off"}
 	o := api.Options{Mailer: s.Mail, Now: s.Clock.Now, Log: slog.New(slog.NewTextHandler(s.Logs, &slog.HandlerOptions{Level: slog.LevelDebug}))}
 	for _, opt := range opts {
 		opt(env, &o)

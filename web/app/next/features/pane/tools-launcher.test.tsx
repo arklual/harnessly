@@ -74,13 +74,14 @@ describe('ToolsLauncher', () => {
     expect((input as HTMLInputElement).value).toBe('');
   });
 
-  it('puts the quiet tools after the tiles of their group, in a row, and keeps them to the end of the arrows', () => {
+  it('puts the quiet tools after the tiles of their group, in the same grid, and keeps them to the end of the arrows', () => {
     const tools = [{ ...TOOLS[0], quiet: true }, TOOLS[1], TOOLS[2]];
     const onOpen = vi.fn();
     const { container } = render(
       <ToolsLauncher tools={tools} groups={GROUPS} onOpen={onOpen} onAddress={vi.fn()} />,
     );
-    expect(container.querySelectorAll('.hx-tl__quiet [data-quiet]')).toHaveLength(1);
+    expect(container.querySelectorAll('.hx-tl__grid [data-quiet]')).toHaveLength(1);
+    expect(container.querySelectorAll('.hx-tl__tile[data-used]')).toHaveLength(2);
     const input = screen.getByRole('combobox');
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'ArrowDown' });

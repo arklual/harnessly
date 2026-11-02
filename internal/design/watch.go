@@ -30,6 +30,8 @@ type rootWatch struct {
 	dirs     int
 	done     chan struct{}
 	stopping bool
+	// overflow carries "the kernel dropped events" from drainErrors to loop; one pending note is all that is needed.
+	overflow chan struct{}
 }
 
 type watchState struct {
@@ -134,11 +136,12 @@ func startRootWatch(asked string, l *Library) (*rootWatch, error) {
 	if err != nil {
 		return nil, err
 	}
-	rw := &rootWatch{asked: asked, root: root, w: w, done: make(chan struct{})}
+	rw := &rootWatch{asked: asked, root: root, w: w, done: make(chan struct{}), overflow: make(chan struct{}, 1)}
 	if err := rw.addTree(root); err != nil {
 		_ = w.Close()
 		return nil, err
 	}
+	go rw.drainErrors()
 	go rw.loop(l)
 	return rw, nil
 }
@@ -212,13 +215,23 @@ func (rw *rootWatch) loop(l *Library) {
 				}
 			}
 			l.notify(rel)
-		case err, ok := <-rw.w.Errors:
-			if !ok {
-				return
-			}
-			if errors.Is(err, fsnotify.ErrEventOverflow) {
-				l.listing.invalidateAll()
-				l.notify(".")
+		case <-rw.overflow:
+			l.listing.invalidateAll()
+			l.notify(".")
+		}
+	}
+}
+
+// drainErrors reads the watcher's errors on a goroutine of its own. fsnotify sends an error while it holds the lock
+// that Add and Close take, and Errors is not buffered: when the only reader, loop, was itself inside Add (walking a
+// new folder) or the owner was inside Close, the three waited for each other for good. Nothing here may wait on
+// anything but the channel, so the sender is never held up.
+func (rw *rootWatch) drainErrors() {
+	for err := range rw.w.Errors {
+		if errors.Is(err, fsnotify.ErrEventOverflow) {
+			select {
+			case rw.overflow <- struct{}{}:
+			default:
 			}
 		}
 	}

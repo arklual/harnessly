@@ -371,6 +371,43 @@ func TestLimitStaleResetWaits(t *testing.T) {
 	}
 }
 
+// Claude's limit seen as a terminal failure names its reset: the chat waits for it instead of for another model, and
+// what the person wrote goes on then, with no click (HRN-574).
+func TestTerminalLimitWaitsForItsReset(t *testing.T) {
+	r := newRig(t)
+	r.working("big job")
+	reset := r.clock.Now().Add(time.Hour).Truncate(time.Minute).UTC()
+	r.pane.screen = "You've hit your 5-hour limit · resets " + strings.ToLower(reset.Format("3:04PM")) + " (UTC)"
+	r.tick(time.Second)
+	r.tick(time.Second)
+
+	rec := r.record()
+	if rec.TerminalFailure != nil {
+		t.Fatalf("still asks for another model: %+v", rec.TerminalFailure)
+	}
+	h := rec.Limited
+	if h == nil || h.ResetsAt == nil || *h.ResetsAt != reset.UnixMilli() || h.ContinueAt == nil {
+		t.Fatalf("the hold: %+v", h)
+	}
+	if rec.Queue.Paused == nil || rec.Queue.Paused.Reason != wire.PausedLimited {
+		t.Fatalf("the queue: %+v", rec.Queue)
+	}
+
+	r.pane.screen = ""
+	r.idle()
+	r.hook("stop")
+	typed := len(r.pane.calls)
+	r.send("m2", "go on", wire.ModeQueue)
+	r.tick(time.Minute)
+	if got := r.typedLines(typed); len(got) != 0 {
+		t.Fatalf("typed before the reset: %v", got)
+	}
+	r.tickTo(time.UnixMilli(*h.ContinueAt).Add(time.Second))
+	if got := r.typedLines(typed); len(got) != 1 || got[0] != "go on" {
+		t.Fatalf("after the reset typed %v", got)
+	}
+}
+
 // A message held through a restart is still held, and goes on at the reset.
 func TestLimitSurvivesARestart(t *testing.T) {
 	r := newRig(t)

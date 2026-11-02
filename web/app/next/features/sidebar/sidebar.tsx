@@ -1,4 +1,5 @@
 import { Menu } from '@base-ui/react/menu';
+import { useKeyHint } from '@/next/features/keys/keys-help';
 import Logo from '@/next/ui/logo';
 import {
   cloneElement,
@@ -163,7 +164,19 @@ export interface ISidebarProps {
   people?: ReactNode;
   /** The designs at work under «Sinopia Design»: the first five, then «Дальше»; null or empty shows none. */
   designs?: ISidebarDesigns | null;
+  /** The installed apps that are on in the person's chats, under «Приложения»; null shows the item with no rows. */
+  apps?: ISidebarApps | null;
   ref?: Ref<HTMLElement>;
+}
+
+export interface ISidebarApps {
+  rows: readonly { id: string; name: string; chat: string }[];
+  /** The app on screen. */
+  current: string | null;
+  /** The list of every installed app is on screen. */
+  allCurrent: boolean;
+  onOpen: (id: string, chat: string) => void;
+  onAll: () => void;
 }
 
 export interface ISidebarDesigns {
@@ -267,6 +280,52 @@ const keepDesignsFolded = (folded: boolean) => {
     // Blocked storage: the fold holds for this page.
   }
 };
+
+/** The apps under «Приложения» folded by its chevron; per device. */
+const APPS_FOLDED_KEY = 'hx-sidebar-apps-folded';
+
+const readAppsFolded = (): boolean => {
+  try {
+    return localStorage.getItem(APPS_FOLDED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const keepAppsFolded = (folded: boolean) => {
+  try {
+    localStorage.setItem(APPS_FOLDED_KEY, folded ? '1' : '0');
+  } catch {
+    // Blocked storage: the fold holds for this page.
+  }
+};
+
+/** The apps that are on in chats, and the way to all the installed ones. */
+const AppRows = ({ apps }: { apps: ISidebarApps }) => (
+  <>
+    {apps.rows.map((a) => (
+      <button
+        key={a.id}
+        type="button"
+        className="hx-nav__kid"
+        aria-current={a.id === apps.current ? 'page' : undefined}
+        onClick={() => apps.onOpen(a.id, a.chat)}
+      >
+        <Icon name="layout-grid" size="sm" className="hx-nav__kid-icon" />
+        <span className="hx-item__title">{a.name}</span>
+      </button>
+    ))}
+    <button
+      type="button"
+      className="hx-nav__kid"
+      aria-current={apps.allCurrent ? 'page' : undefined}
+      onClick={apps.onAll}
+    >
+      <Icon name="app-window" size="sm" className="hx-nav__kid-icon" />
+      <span className="hx-item__title">{t('next.sidebar.appsAll')}</span>
+    </button>
+  </>
+);
 
 /** The designs at work under «Sinopia Design»: five, then «Дальше» for the rest. */
 const DesignRows = ({
@@ -406,6 +465,7 @@ const Sidebar = ({
   onNewChat,
   onSearch,
   onDesignly,
+  apps = null,
   onNotifications,
   onToggleRail,
   onCloseDrawer,
@@ -417,6 +477,7 @@ const Sidebar = ({
   designs = null,
   ref,
 }: ISidebarProps) => {
+  const railKey = useKeyHint('global.rail');
   const { pending, run } = usePendingList();
   const [renaming, setRenaming] = useState<{ id: string; saving: boolean } | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -424,6 +485,11 @@ const Sidebar = ({
   // Folders whose «Дальше» was pressed: they show all their chats.
   const [longFolders, setLongFolders] = useState<ReadonlySet<string>>(new Set());
   const [allDesigns, setAllDesigns] = useState(false);
+  const [appsFolded, setAppsFolded] = useState(readAppsFolded);
+  const foldApps = () => {
+    keepAppsFolded(!appsFolded);
+    setAppsFolded(!appsFolded);
+  };
   const [designsFolded, setDesignsFolded] = useState(readDesignsFolded);
   const foldDesigns = () => {
     keepDesignsFolded(!designsFolded);
@@ -775,7 +841,7 @@ const Sidebar = ({
             className="hx-brand__open"
             aria-label={t('next.sidebar.expand')}
             data-tip={t('next.sidebar.expand')}
-            data-kbd="⌘B"
+            data-kbd={railKey ?? undefined}
             onClick={onToggleRail}
           >
             <Icon name="panel-left" />
@@ -801,7 +867,7 @@ const Sidebar = ({
           <Icon name="panel-left" />
           <span className="hx-tip" data-pos="below" data-align="end">
             {t('next.sidebar.collapse')}
-            <kbd>⌘B</kbd>
+            {railKey && <kbd>{railKey}</kbd>}
           </span>
         </button>
         <button
@@ -848,12 +914,26 @@ const Sidebar = ({
             )}
           </NavItem>
         )}
+        {apps && (
+          <NavItem
+            icon="layout-grid"
+            label={t('next.sidebar.apps')}
+            current={apps.allCurrent && apps.rows.length === 0}
+            index={3}
+            onClick={apps.onAll}
+            expanded={apps.rows.length > 0 && !appsFolded}
+            list
+            onFold={apps.rows.length > 0 ? foldApps : undefined}
+          >
+            {apps.rows.length > 0 && <AppRows apps={apps} />}
+          </NavItem>
+        )}
         <NavItem
           icon="bell"
           label={t('next.sidebar.notifications')}
           current={notificationsOpen}
           dot={unread}
-          index={3}
+          index={4}
           onClick={onNotifications}
         />
         {more.length > 0 && (
@@ -861,7 +941,7 @@ const Sidebar = ({
             icon="layout-grid"
             label={t('next.sidebar.more')}
             expanded={moreOpen}
-            index={4}
+            index={5}
             onClick={(anchor) => {
               if (isRail(anchor)) onToggleRail();
               setMoreOpen((current) => !current);
@@ -877,6 +957,7 @@ const Sidebar = ({
               >
                 <Icon name={item.icon} size="sm" className="hx-nav__kid-icon" />
                 <span className="hx-item__title">{item.label}</span>
+                {item.external && <Icon name="arrow-up-right" size="sm" className="hx-nav__kid-out" />}
               </button>
             ))}
           </NavItem>

@@ -74,9 +74,54 @@ describe('readDeckMessage', () => {
       kind: 'title',
       size: 44,
       was: 'h1:1x2y3z',
+      ratio: 0,
+      gen: null,
     });
     expect(readDeckMessage({ type: 'tk:deck-select', tpl: 4, rect: [0, 0] })).toBeNull();
+    // The block's words go on for an app's selection item, clipped.
+    expect(
+      readDeckMessage({
+        type: 'tk:deck-select',
+        tpl: 4,
+        rect: [0, 0, 1, 1],
+        text: 'слово '.repeat(200),
+        tag: 'P<script>',
+      }),
+    ).toMatchObject({ k: 'select', text: expect.stringMatching(/^слово слово/), tag: 'pscript' });
+    expect(readDeckMessage({ type: 'tk:deck-select', tpl: 4, rect: [0, 0, 1, 1] })).toMatchObject({
+      text: '',
+    });
     expect(readDeckMessage({ type: 'tk:deck-select', tpl: -1, rect: [0, 0, 1, 1] })).toBeNull();
+  });
+
+  it('reads a picture selection with its shape and what it was drawn from', () => {
+    expect(
+      readDeckMessage({
+        type: 'tk:deck-select',
+        tpl: 9,
+        label: 'Фото',
+        kind: 'image',
+        size: 0,
+        rect: [10, 20, 400, 300],
+        was: 'img:abc',
+        ratio: 1.33,
+        gen: { prompt: 'кот в шляпе', job: 'gen-ab12cd34' },
+      }),
+    ).toMatchObject({
+      k: 'select',
+      kind: 'image',
+      ratio: 1.33,
+      gen: { prompt: 'кот в шляпе', job: 'gen-ab12cd34' },
+    });
+    expect(
+      readDeckMessage({
+        type: 'tk:deck-select',
+        tpl: 9,
+        kind: 'block',
+        rect: [0, 0, 1, 1],
+        gen: { prompt: 'x', job: '../etc' },
+      }),
+    ).toMatchObject({ kind: 'block', ratio: 0, gen: null });
   });
 
   it('cleans the markup of an edited text', () => {

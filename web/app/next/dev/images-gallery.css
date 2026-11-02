@@ -1,0 +1,23 @@
+/* The picture-card gallery's frame (?dev=images): a labelled box for each state; nothing here is part of the product. */
+.hx-ig {
+  display: grid;
+  gap: var(--hx-space-4);
+  padding: var(--hx-space-4);
+  background: var(--hx-bg-app);
+  color: var(--hx-fg-1);
+  height: 100vh;
+  overflow: auto;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  align-items: start;
+}
+.hx-ig__box {
+  min-width: 0;
+  padding: var(--hx-space-3);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+}
+.hx-ig__label {
+  margin-bottom: var(--hx-space-2);
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}

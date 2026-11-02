@@ -88,6 +88,7 @@
   "pane.paneRegistry.gallery": "Галерея",
   "pane.paneRegistry.task": "Задача",
   "pane.paneRegistry.vault": "Сейф",
+  "pane.paneRegistry.app": "Приложение",
   "pane.designCheckPanel.desktop": "десктоп",
   "pane.designCheckPanel.phone": "телефон",
   "pane.designCheckPanel.open": "Открыть «{title}»",

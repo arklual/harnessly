@@ -46,7 +46,7 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
   } else if (value.kind === 'voice') {
     icon = 'mic';
     title = t('next.dockBar.voice', { length: duration(value.ms) });
-    sub = value.more > 0 ? t('next.dockBar.voiceMore', { n: value.more }) : t('next.dockBar.voiceSub');
+    sub = value.more > 0 ? t('next.dockBar.voiceMore', { n: value.more }) : null;
     actions = [
       { key: 'retry', label: t('next.dockBar.voiceRetry'), run: value.onRetry },
       { key: 'drop', label: t('next.dockBar.voiceDrop'), variant: 'ghost', run: value.onDrop },

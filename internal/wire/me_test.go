@@ -31,18 +31,20 @@ func TestMeOfARuntimeOnItsOwn(t *testing.T) {
 	code, me := meCall(t, srv, "GET", "/api/v2/me", "")
 	settings, _ := me["settings"].(map[string]any)
 	if code != 200 || me["rev"] != float64(1) || me["email"] != nil || me["name"] != "Ada" || settings["uiVersion"] != "next" ||
-		settings["density"] != "compact" || settings["defaultMachine"] != nil {
+		settings["density"] != "compact" || settings["defaultMachine"] != nil || len(settings["keys"].(map[string]any)) != 0 {
 		t.Fatalf("me: %d %v", code, me)
 	}
 
-	code, res := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":1,"patch":{"density":"compact","enterSends":false,"defaultMachine":"local"}}`)
+	code, res := meCall(t, srv, "PATCH", "/api/v2/me/settings", `{"rev":1,"patch":{"density":"compact","enterSends":false,"defaultMachine":"local","keys":{"deck.next":["Alt+KeyN"],"global.help":[]}}}`)
 	got, _ := res["me"].(map[string]any)
 	if code != 200 || res["r"] != "accepted" || got["rev"] != float64(2) {
 		t.Fatalf("patch: %d %v", code, res)
 	}
 	_, me = meCall(t, srv, "GET", "/api/v2/me", "")
 	settings, _ = me["settings"].(map[string]any)
-	if settings["density"] != "compact" || settings["enterSends"] != false || settings["defaultMachine"] != "local" || settings["locale"] != "ru" {
+	keys, _ := settings["keys"].(map[string]any)
+	if settings["density"] != "compact" || settings["enterSends"] != false || settings["defaultMachine"] != "local" || settings["locale"] != "ru" ||
+		len(keys) != 2 || len(keys["global.help"].([]any)) != 0 {
 		t.Fatalf("after the patch: %v", me)
 	}
 	// Kept in the file: another Server on it reads the same.
@@ -56,7 +58,8 @@ func TestMeOfARuntimeOnItsOwn(t *testing.T) {
 	}
 	for _, bad := range []string{
 		`{"rev":2,"patch":{"density":"huge"}}`, `{"rev":2,"patch":{"nope":1}}`, `{"rev":2,"patch":{"quickPrompts":[""]}}`,
-		`{"rev":2,"patch":{"defaultMachine":"a b/c"}}`, `{"rev":2,"patch":[]}`, `{"patch":{}}`, `{"rev":2}`, `nonsense`,
+		`{"rev":2,"patch":{"defaultMachine":"a b/c"}}`, `{"rev":2,"patch":{"keys":{"deck/next":["KeyN"]}}}`,
+		`{"rev":2,"patch":{"keys":{"deck.next":["Alt KeyN"]}}}`, `{"rev":2,"patch":{"keys":{"deck.next":null}}}`, `{"rev":2,"patch":{"keys":null}}`, `{"rev":2,"patch":[]}`, `{"patch":{}}`, `{"rev":2}`, `nonsense`,
 	} {
 		if code, res := meCall(t, srv, "PATCH", "/api/v2/me/settings", bad); code != http.StatusBadRequest || res["code"] != "bad-request" {
 			t.Fatalf("%s: %d %v", bad, code, res)
@@ -72,5 +75,35 @@ func TestMeOfARuntimeOnItsOwn(t *testing.T) {
 	none := &wire.Server{}
 	if code, res := meCall(t, none, "GET", "/api/v2/me", ""); code != http.StatusNotFound || res["code"] != "not-found" {
 		t.Fatalf("no store: %d %v", code, res)
+	}
+}
+
+// The dictation's settings: a model and the person's words, replaced whole; an unknown model or a bad word refuses the patch.
+func TestMeVoiceSettings(t *testing.T) {
+	srv := &wire.Server{Me: &wire.FileMe{Path: filepath.Join(t.TempDir(), "v2", "me.json")}}
+	_, me := meCall(t, srv, "GET", "/api/v2/me", "")
+	voice, _ := me["settings"].(map[string]any)["voice"].(map[string]any)
+	if voice["engine"] != "local" || len(voice["words"].([]any)) != 0 {
+		t.Fatalf("default voice: %v", voice)
+	}
+	good := `{"rev":1,"patch":{"voice":{"engine":"openai","words":[{"word":"Sinopia","heard":["синопия"]},{"word":"harnessly","heard":[]}]}}}`
+	if code, res := meCall(t, srv, "PATCH", "/api/v2/me/settings", good); code != 200 || res["r"] != "accepted" {
+		t.Fatalf("voice patch: %d %v", code, res)
+	}
+	_, me = meCall(t, srv, "GET", "/api/v2/me", "")
+	voice, _ = me["settings"].(map[string]any)["voice"].(map[string]any)
+	if voice["engine"] != "openai" || len(voice["words"].([]any)) != 2 {
+		t.Fatalf("saved voice: %v", voice)
+	}
+	for _, bad := range []string{
+		`{"rev":2,"patch":{"voice":{"engine":"whisper","words":[]}}}`,
+		`{"rev":2,"patch":{"voice":{"engine":"local","words":[{"word":"","heard":[]}]}}}`,
+		`{"rev":2,"patch":{"voice":{"engine":"local","words":[{"word":"a","heard":[""]}]}}}`,
+		`{"rev":2,"patch":{"voice":{"engine":"local"}}}`,
+		`{"rev":2,"patch":{"voice":{"engine":"local","words":[],"extra":1}}}`,
+	} {
+		if code, res := meCall(t, srv, "PATCH", "/api/v2/me/settings", bad); code != http.StatusBadRequest || res["code"] != "bad-request" {
+			t.Fatalf("%s: %d %v", bad, code, res)
+		}
 	}
 }

@@ -44,6 +44,31 @@ const must = <T>(v: T | null): T => {
   return v;
 };
 
+// ---- what the person sees and what the agent asks of the player (HRN-580)
+
+export interface IVideoViewCmd {
+  seq: number;
+  kind: 'seek' | 'play' | 'pause' | 'format';
+  t?: number;
+  t1?: number;
+  loop?: boolean;
+  format?: TVideoFormat;
+  offer?: boolean;
+}
+
+export const reportVideoView = async (
+  m: MachineId,
+  artifact: string,
+  report: { t: number; playing: boolean; format: TVideoFormat; touchedAgo: number; acked: number },
+): Promise<readonly IVideoViewCmd[]> => {
+  const answer = await runtimeJson<{ cmds: readonly IVideoViewCmd[] }>(
+    m,
+    video('/view'),
+    postJson({ artifact, ...report }),
+  );
+  return answer.cmds;
+};
+
 // ---- the video, settings, scenes, comments (WP1's routes)
 
 export const fetchVideo = async (

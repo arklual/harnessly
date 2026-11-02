@@ -17,6 +17,7 @@ import {
   MachinesPage,
 } from '@/next/bindings/settings-general';
 import { VoicePage } from '@/next/bindings/settings-voice';
+import { KeysPage } from '@/next/bindings/settings-keys';
 import { NoticesPage } from '@/next/bindings/settings-notices';
 import { AsksSettingsPage } from '@/next/bindings/settings-asks';
 import { NotifyBotsPage } from '@/next/bindings/settings-notify-bots';
@@ -78,6 +79,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
   let body = null;
   if (active === 'general') body = <GeneralPage machine={machine} name={name} pending={pending} />;
   else if (active === 'appearance') body = <AppearancePage pending={pending} />;
+  else if (active === 'keys') body = <KeysPage pending={pending} />;
   else if (active === 'voice') body = <VoicePage machine={machine} />;
   else if (active === 'notifications')
     body = (

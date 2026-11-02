@@ -39,6 +39,9 @@ type HookSettingsConfig struct {
 	Statusline string
 	// Allow are permissions granted without asking (the runtime's own MCP servers, current and former names).
 	Allow []string
+	// BudgetHook is the absolute path of the hub's limit script (hooksetup); "" leaves the settings as they were. It
+	// runs beside the status hook on UserPromptSubmit and on every PreToolUse, where it can stop the chat.
+	BudgetHook string
 	// HookTimeout is each hook's timeout in seconds (3 when 0); the script returns at once, so it hardly matters.
 	HookTimeout int
 }
@@ -52,6 +55,10 @@ type hookCommand struct {
 type hookEntry struct {
 	Matcher string        `json:"matcher"`
 	Hooks   []hookCommand `json:"hooks"`
+}
+
+func budgetCommand(script, hook string, timeout int) hookCommand {
+	return hookCommand{Type: "command", Command: `sh "` + script + `" claude ` + hook, Timeout: timeout}
 }
 
 // orderedHooks writes the hooks object in HookEvents order.
@@ -100,11 +107,20 @@ func HookSettings(c HookSettingsConfig) []byte {
 	}
 	hooks := orderedHooks{}
 	for _, e := range HookEvents {
-		cmd := `sh "` + c.StatusHook + `" ` + e.Event
+		cmds := []hookCommand{{Type: "command", Command: `sh "` + c.StatusHook + `" ` + e.Event, Timeout: timeout}}
+		if c.BudgetHook != "" && e.Hook == "UserPromptSubmit" {
+			cmds = append(cmds, budgetCommand(c.BudgetHook, e.Hook, timeout))
+		}
 		hooks = append(hooks, struct {
 			name  string
 			entry []hookEntry
-		}{e.Hook, []hookEntry{{Matcher: "", Hooks: []hookCommand{{Type: "command", Command: cmd, Timeout: timeout}}}}})
+		}{e.Hook, []hookEntry{{Matcher: "", Hooks: cmds}}})
+	}
+	if c.BudgetHook != "" {
+		hooks = append(hooks, struct {
+			name  string
+			entry []hookEntry
+		}{"PreToolUse", []hookEntry{{Matcher: "", Hooks: []hookCommand{budgetCommand(c.BudgetHook, "PreToolUse", timeout)}}}})
 	}
 	allow := c.Allow
 	if allow == nil {

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
+	"github.com/ly-solutions/harnessly/internal/jsonlog"
 )
 
 const (
@@ -148,7 +148,7 @@ func (c *Collector) rebuild(b *build) {
 	c.Refresh()
 	b.report, b.err = Build(c.Facts(), "", c.cfg.Machine, c.cfg.Timezone, c.cfg.Clock, nowMs(c.now()))
 	if b.err == nil {
-		agent.Log("info", "usage report built", agent.F{K: "ms", V: time.Since(started).Milliseconds()}, agent.F{K: "files", V: c.FileCount()})
+		jsonlog.Log("info", "usage report built", jsonlog.F{K: "ms", V: time.Since(started).Milliseconds()}, jsonlog.F{K: "files", V: c.FileCount()})
 	}
 }
 
@@ -159,6 +159,27 @@ func (c *Collector) Facts() []*Facts {
 	out := make([]*Facts, 0, len(c.order))
 	for _, f := range c.order {
 		out = append(out, c.files[f].facts)
+	}
+	return out
+}
+
+// Entry is the facts of one transcript with where they came from.
+type Entry struct {
+	Path string
+	// MtimeMs is the transcript's modification time when its facts were read, epoch ms.
+	MtimeMs float64
+	Facts   *Facts
+}
+
+// Entries are the transcripts known with their facts, in the order they became known. The agent reads them to tell the
+// hub of calls and sessions; a subagent's file is told apart by its path.
+func (c *Collector) Entries() []Entry {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]Entry, 0, len(c.order))
+	for _, f := range c.order {
+		e := c.files[f]
+		out = append(out, Entry{Path: f, MtimeMs: e.mtimeMs, Facts: e.facts})
 	}
 	return out
 }
@@ -277,10 +298,10 @@ func (c *Collector) saveCache() {
 		if err == nil {
 			return
 		}
-		agent.Log("warn", "usage cache write failed", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "usage cache write failed", jsonlog.F{K: "error", V: err.Error()})
 		return
 	} else {
-		agent.Log("warn", "usage cache write failed", agent.F{K: "error", V: err.Error()})
+		jsonlog.Log("warn", "usage cache write failed", jsonlog.F{K: "error", V: err.Error()})
 	}
 }
 
@@ -363,7 +384,7 @@ func (c *Collector) Refresh() {
 					f, err = c.cfg.Projects.ParseCodex(s.path)
 				}
 				if err != nil {
-					agent.Log("warn", "transcript parse failed", agent.F{K: "error", V: err.Error()}, agent.F{K: "file", V: s.path})
+					jsonlog.Log("warn", "transcript parse failed", jsonlog.F{K: "error", V: err.Error()}, jsonlog.F{K: "file", V: s.path})
 				}
 				results[i] = f
 				c.mu.Lock()

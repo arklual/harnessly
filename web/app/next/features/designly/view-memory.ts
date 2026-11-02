@@ -1,14 +1,12 @@
 // What a design remembers of how it is looked at: the device (and its browser), the canvas's view and the page. It is
 // kept in the browser per design, so the Designly tab and the right pane open the same design the same way.
-import { DEVICES, type ISize } from '@/next/features/designly/devices';
+import { DEVICES, keptSize, type ISize } from '@/next/features/designly/devices';
 import { FIT, ZOOM, ZOOM_FIT, type IZoom, type TFit } from '@/next/features/designly/site-zoom';
 
 const KEY_PREFIX = 'hx-next-dl-view:';
 const VERSION = 1;
 /** The quiet after the last change before the view is written: a pan or a drag is not written frame by frame. */
 export const SAVE_MS = 400;
-/** The sizes «Резина» takes. */
-const SIZE = { min: 1, max: 3840 } as const;
 /** A box that changed by more than this since the view was saved is not the page it was moved over. */
 export const BOX_DRIFT = 0.25;
 
@@ -76,7 +74,11 @@ export const parseView = (raw: unknown): IViewMemory => {
   const fit = fitOf(raw.fit);
   return {
     device,
-    size: device === 'fill' ? sizeOf(raw.size, SIZE.min, SIZE.max) : null,
+    // A kept size under the least of «Резина» (150 × 932 once seen) is dropped: the window fills the area again.
+    size:
+      device === 'fill' && isRecord(raw.size)
+        ? keptSize({ w: num(raw.size.w) ?? 0, h: num(raw.size.h) ?? 0 })
+        : null,
     rot: raw.rot === true,
     chrome: raw.chrome !== false,
     browser: typeof raw.browser === 'string' ? raw.browser : null,

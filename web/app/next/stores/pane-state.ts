@@ -80,6 +80,8 @@ const isPaneTab = (v: unknown): v is TTab => {
       return isString(v.path) && typeof v.file === 'boolean';
     case 'shell':
       return isString(v.terminal);
+    case 'app':
+      return isString(v.app) && stringOrNull(v.view);
     case 'browser':
       return (
         Array.isArray(v.hist) &&
@@ -98,6 +100,7 @@ const REQUEST_KINDS: ReadonlySet<string> = new Set([
   'browser',
   'design',
   'files',
+  'app',
   'plan',
   'subagent',
   'terminal',

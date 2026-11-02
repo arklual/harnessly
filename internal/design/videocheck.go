@@ -1,8 +1,9 @@
 package design
 
 import (
+	"bytes"
 	"context"
-	"crypto/sha256"
+	"image/jpeg"
 	"net/http"
 	"os"
 	"regexp"
@@ -21,12 +22,22 @@ const (
 	videoMinFont = 28
 	// videoCheckBeforeEnd is how far before a scene's end the check looks (one frame at 30 fps).
 	videoCheckBeforeEnd = 1000 / VideoFPS
+	// videoWalkStep is the check's step through a scene's time; videoWalkOutside is how many steps in a row a block may
+	// stay outside the frame (it may be on its way in or the camera may be passing it).
+	videoWalkStep    = 250
+	videoWalkOutside = 4
+	// Two captures of one moment differ when more than this share of pixels is further apart than this level of 255.
+	videoFrameDifferLevel = 48
+	videoFrameDifferShare = 0.002
 )
 
 var (
 	videoScriptRe = regexp.MustCompile(`(?is)<script\b([^>]*)>(.*?)</script>`)
 	videoSrcRe    = regexp.MustCompile(`(?i)\ssrc\s*=`)
-	videoLints    = []struct {
+	// videoOutsideRe: an address a scene would load from outside the project and the kit.
+	videoOutsideRe = regexp.MustCompile(`(?i)<(?:script|link|img|source|iframe|video|audio)\b[^>]*\s(?:src|href)\s*=\s*["']?((?:https?:)?//[^"'\s>]+)`)
+	videoGsapRe    = regexp.MustCompile(`\bgsap\.(?:to|from|fromTo|set|timeline)\s*\(`)
+	videoLints     = []struct {
 		re    *regexp.Regexp
 		code  string
 		level VideoCheckLevel
@@ -34,8 +45,11 @@ var (
 		ru    string
 	}{
 		{regexp.MustCompile(`\bset(?:Timeout|Interval)\s*\(`), VideoCheckTimer, VideoCheckError,
-			"setTimeout / setInterval run on the wall clock: a frame of the video will not match its time. Drive motion by data-tk-at, @keyframes or requestAnimationFrame",
-			"setTimeout / setInterval идут по настенным часам: кадр видео не совпадёт со своим временем. Движение — через data-tk-at, @keyframes или requestAnimationFrame"},
+			"setTimeout / setInterval run on the wall clock: a frame of the video will not match its time. Drive motion by data-tk-at, @keyframes, tkVideo.motion or tkVideo.register",
+			"setTimeout / setInterval идут по настенным часам: кадр видео не совпадёт со своим временем. Движение — через data-tk-at, @keyframes, tkVideo.motion или tkVideo.register"},
+		{regexp.MustCompile(`\brequestAnimationFrame\s*\(`), VideoCheckRaf, VideoCheckWarn,
+			"A requestAnimationFrame loop remembers the previous frame, so seeking breaks it: draw in tkVideo.register's seek(ms) instead",
+			"Цикл requestAnimationFrame помнит прошлый кадр, и перемотка его ломает: рисуй в seek(ms) через tkVideo.register"},
 		{regexp.MustCompile(`\bMath\.random\s*\(`), VideoCheckRandom, VideoCheckWarn,
 			"Math.random is seeded in a video: the same numbers every time, which may not be what you meant",
 			"Math.random в видео с фиксированным зерном: числа каждый раз одни и те же — проверьте, что так и задумано"},
@@ -166,6 +180,15 @@ func videoLintSource(scene, src string) []VideoCheckIssue {
 			out = append(out, VideoCheckIssue{Scene: scene, Code: lint.code, Level: lint.level, Msg: locale.Pick(lint.en, lint.ru)})
 		}
 	}
+	if videoGsapRe.MatchString(code.String()) && !strings.Contains(code.String(), "tkVideo.motion") {
+		out = append(out, VideoCheckIssue{Scene: scene, Code: VideoCheckUnbound, Level: VideoCheckError,
+			Msg: locale.Pick("GSAP outside tkVideo.motion runs on its own clock and does not follow the scene's time: build it in tkVideo.motion(fn)",
+				"GSAP вне tkVideo.motion идёт по своим часам и не следует времени сцены: собирай его в tkVideo.motion(fn)")})
+	}
+	if m := videoOutsideRe.FindStringSubmatch(src); m != nil {
+		out = append(out, VideoCheckIssue{Scene: scene, Code: VideoCheckExternal, Level: VideoCheckError,
+			Msg: locale.Pick("A scene loads nothing from outside the project and the kit: "+m[1], "Сцена не грузит ничего извне проекта и кита: "+m[1])})
+	}
 	return out
 }
 
@@ -191,12 +214,14 @@ func videoSecondsText(ms int64) string {
 
 // videoAudit is what the runtime's audit answers.
 type videoAudit struct {
-	Code  string
-	Block *string
-	Px    int
+	Code   string
+	Block  *string
+	Px     int
+	Detail string
 }
 
-// videoCheckInChrome looks at the scene's last frame in f, and captures two times twice to see they stay the same.
+// videoCheckInChrome captures two moments twice to see they stay the same, whichever way they are reached, looks at the
+// scene's last frame, then walks the scene in time and reads what the board reported.
 func (l *Library) videoCheckInChrome(ctx context.Context, tab *deckTab, id string, sc VideoScene, f VideoFormat) ([]VideoCheckIssue, error) {
 	end := max(sc.Dur-videoCheckBeforeEnd, 0)
 	mid := sc.Dur / 2
@@ -206,10 +231,10 @@ func (l *Library) videoCheckInChrome(ctx context.Context, tab *deckTab, id strin
 	var unstable *int64
 	err := l.videoFrames(ctx, tab, id, sc, f, false, order, func(v videoShot) error {
 		if v.I < 2 {
-			shots[v.T] = v.JPEG
+			shots[v.T] = v.Image
 			return nil
 		}
-		if v.I > 2 && unstable == nil && sha256.Sum256(shots[v.T]) != sha256.Sum256(v.JPEG) {
+		if v.I > 2 && unstable == nil && !videoFramesClose(shots[v.T], v.Image) {
 			at := v.T
 			unstable = &at
 		}
@@ -229,24 +254,163 @@ func (l *Library) videoCheckInChrome(ctx context.Context, tab *deckTab, id strin
 	if f == VideoPortrait {
 		minFont = videoMinFont
 	}
-	raw, err := tab.eval(`window.tkVideo.audit({minFont: ` + strconv.Itoa(minFont) + `})`)
+	raw, err := tab.eval(`(async () => { await window.tkVideo.seek(` + strconv.FormatInt(end, 10) + `); return window.tkVideo.audit({minFont: ` + strconv.Itoa(minFont) + `}); })()`)
 	if err != nil {
 		return nil, err
 	}
 	for _, a := range videoAudits(raw) {
-		code, level := a.Code, VideoCheckWarn
-		switch code {
-		case VideoCheckOverflow, VideoCheckOffscreen:
-			level = VideoCheckError
-		case VideoCheckSmallText:
-		default:
-			continue
+		issue, ok := videoAuditIssue(a, sc, fm, end)
+		if ok {
+			out = append(out, issue)
 		}
-		at := end
-		out = append(out, VideoCheckIssue{Scene: sc.ID, Format: &fm, At: &at, Block: a.Block, Code: code, Level: level,
-			Msg: videoAuditMsg(code, a.Px)})
+	}
+	walked, err := videoWalk(ctx, tab, sc, fm)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, walked...)
+	reported, err := videoReported(tab, sc, fm)
+	if err != nil {
+		return nil, err
+	}
+	return append(out, reported...), nil
+}
+
+// videoAuditIssue words a finding of the audit at the scene's end.
+func videoAuditIssue(a videoAudit, sc VideoScene, f VideoFormat, at int64) (VideoCheckIssue, bool) {
+	level := VideoCheckWarn
+	switch a.Code {
+	case VideoCheckOverflow, VideoCheckOffscreen, VideoCheckOverlap:
+		level = VideoCheckError
+	case VideoCheckSmallText:
+	default:
+		return VideoCheckIssue{}, false
+	}
+	return VideoCheckIssue{Scene: sc.ID, Format: &f, At: &at, Block: a.Block, Code: a.Code, Level: level, Msg: videoAuditMsg(a.Code, a.Px, a.Detail)}, true
+}
+
+// videoWalk seeks through the scene in time without capturing and reads the audit at every step: text that overflows at
+// any moment is an error, a block that stays outside the frame for over a second is a warning (one on its way in is not).
+func videoWalk(ctx context.Context, tab *deckTab, sc VideoScene, f VideoFormat) ([]VideoCheckIssue, error) {
+	out := []VideoCheckIssue{}
+	reported := map[string]bool{}
+	outside := map[string]int{}
+	for t := int64(0); t < sc.Dur; t += videoWalkStep {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		raw, err := tab.eval(`(async () => { await window.tkVideo.seek(` + strconv.FormatInt(t, 10) + `); return window.tkVideo.audit({}); })()`)
+		if err != nil {
+			return nil, err
+		}
+		seen := map[string]bool{}
+		for _, a := range videoAudits(raw) {
+			block := ""
+			if a.Block != nil {
+				block = *a.Block
+			}
+			at := t
+			switch a.Code {
+			case VideoCheckOverflow:
+				if !reported[a.Code+block] {
+					reported[a.Code+block] = true
+					out = append(out, VideoCheckIssue{Scene: sc.ID, Format: &f, At: &at, Block: a.Block, Code: a.Code, Level: VideoCheckError,
+						Msg: locale.Pick("Text overflows its box at this moment", "Текст не помещается в свой блок в этот момент")})
+				}
+			case VideoCheckOffscreen:
+				seen[block] = true
+				outside[block]++
+				if outside[block] > videoWalkOutside && !reported[a.Code+block] {
+					reported[a.Code+block] = true
+					out = append(out, VideoCheckIssue{Scene: sc.ID, Format: &f, At: &at, Block: a.Block, Code: a.Code, Level: VideoCheckWarn,
+						Msg: locale.Pick("A block stays outside the frame for over a second", "Блок больше секунды остаётся за кадром")})
+				}
+			}
+		}
+		for block := range outside {
+			if !seen[block] {
+				delete(outside, block)
+			}
+		}
 	}
 	return out, nil
+}
+
+// videoReported is what the board itself reported: failed engines, scripts and files, outside addresses, motion past the
+// scene's end.
+func videoReported(tab *deckTab, sc VideoScene, f VideoFormat) ([]VideoCheckIssue, error) {
+	raw, err := tab.eval(`({problems: window.tkVideo.problems(), info: window.tkVideo.info()})`)
+	if err != nil {
+		return nil, err
+	}
+	m, _ := raw.(map[string]any)
+	out := []VideoCheckIssue{}
+	seen := map[string]bool{}
+	list, _ := m["problems"].([]any)
+	for _, item := range list {
+		p, _ := item.(map[string]any)
+		code, _ := p["code"].(string)
+		msg, _ := p["msg"].(string)
+		if code == "" || seen[code+msg] {
+			continue
+		}
+		seen[code+msg] = true
+		out = append(out, VideoCheckIssue{Scene: sc.ID, Format: &f, Code: code, Level: VideoCheckError, Msg: videoProblemMsg(code, msg)})
+	}
+	info, _ := m["info"].(map[string]any)
+	if d, ok := info["motionDur"].(float64); ok && int64(d) > sc.Dur {
+		at := sc.Dur
+		out = append(out, VideoCheckIssue{Scene: sc.ID, Format: &f, At: &at, Code: VideoCheckMotionEnd, Level: VideoCheckWarn,
+			Msg: locale.Pick("The motion runs to "+videoSecondsText(int64(d))+", the scene ends at "+videoSecondsText(sc.Dur),
+				"Анимация идёт до "+videoSecondsText(int64(d))+", а сцена кончается на "+videoSecondsText(sc.Dur))})
+	}
+	return out, nil
+}
+
+func videoProblemMsg(code, msg string) string {
+	switch code {
+	case VideoCheckExternal:
+		return locale.Pick("The board reached outside the project and the kit: ", "Доска обратилась за пределы проекта и кита: ") + msg
+	case VideoCheckAsset:
+		return locale.Pick("A file did not load: ", "Файл не загрузился: ") + msg
+	case VideoCheckEngine:
+		return locale.Pick("An engine failed: ", "Движок упал: ") + msg
+	}
+	return locale.Pick("A script failed: ", "Скрипт упал: ") + msg
+}
+
+// videoFramesClose: two pictures of one moment show the same thing. Chrome's raster leaves noise on the edges of text
+// between two draws of the same page, so a byte compare would fail a healthy scene: what counts is pixels that differ
+// visibly, and more than a few of them.
+func videoFramesClose(a, b []byte) bool {
+	if bytes.Equal(a, b) {
+		return true
+	}
+	ia, err := jpeg.Decode(bytes.NewReader(a))
+	if err != nil {
+		return false
+	}
+	ib, err := jpeg.Decode(bytes.NewReader(b))
+	if err != nil || ia.Bounds() != ib.Bounds() {
+		return false
+	}
+	r := ia.Bounds()
+	differ := 0
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			r1, g1, b1, _ := ia.At(x, y).RGBA()
+			r2, g2, b2, _ := ib.At(x, y).RGBA()
+			if videoChannelFar(r1, r2) || videoChannelFar(g1, g2) || videoChannelFar(b1, b2) {
+				differ++
+			}
+		}
+	}
+	return float64(differ) <= videoFrameDifferShare*float64(r.Dx()*r.Dy())
+}
+
+func videoChannelFar(a, b uint32) bool {
+	d := int64(a>>8) - int64(b>>8)
+	return d > videoFrameDifferLevel || d < -videoFrameDifferLevel
 }
 
 // videoAudits reads the runtime's audit; what is not one of its findings is left out.
@@ -266,14 +430,19 @@ func videoAudits(raw any) []videoAudit {
 		if px, ok := m["px"].(float64); ok {
 			a.Px = int(px)
 		}
+		if d, ok := m["detail"].(string); ok {
+			a.Detail = d
+		}
 		out = append(out, a)
 	}
 	return out
 }
 
 // videoAuditMsg words a finding of the runtime for a person.
-func videoAuditMsg(code string, px int) string {
+func videoAuditMsg(code string, px int, detail string) string {
 	switch code {
+	case VideoCheckOverlap:
+		return locale.Pick("Two tweens drive one property at one time, so the frame depends on how it was reached: ", "Два твина ведут одно свойство в одно время, и кадр зависит от пути к нему: ") + detail
 	case VideoCheckOverflow:
 		return locale.Pick("Text overflows its box at the scene's end", "Текст не помещается в свой блок к концу сцены")
 	case VideoCheckOffscreen:

@@ -19,7 +19,7 @@ require (
 require golang.org/x/sys v0.49.0
 
 require (
-	github.com/andybalholm/brotli v1.2.7
+	github.com/andybalholm/brotli v1.2.6
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-webauthn/webauthn v0.18.2
 	github.com/jackc/pgx/v5 v5.11.0
@@ -28,21 +28,22 @@ require (
 )
 
 require (
-	github.com/minio/minio-go/v7 v7.4.1
-	golang.org/x/net v0.62.0
+	github.com/minio/minio-go/v7 v7.0.99
+	go.yaml.in/yaml/v3 v3.0.5
+	golang.org/x/net v0.60.0
+	google.golang.org/grpc v1.75.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/klauspost/compress v1.19.2 // indirect
-	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
+	github.com/go-ini/ini v1.67.0 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/rs/xid v1.6.0 // indirect
-	github.com/zeebo/xxh3 v1.1.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	gopkg.in/ini.v1 v1.67.3 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
 )
 
 require (

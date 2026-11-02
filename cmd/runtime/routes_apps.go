@@ -26,28 +26,74 @@ import (
 
 // appView is an installed app as the page and the CLI see it.
 type appView struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Icon        string   `json:"icon,omitempty"`
-	Version     string   `json:"version"`
-	Trust       string   `json:"trust"`
-	Targets     []string `json:"targets"`
-	Permissions []string `json:"permissions"`
-	Dev         bool     `json:"dev,omitempty"`
-	Dir         string   `json:"dir,omitempty"`
-	InstalledAt int64    `json:"installedAt"`
-	UpdatedAt   int64    `json:"updatedAt"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Icon        string         `json:"icon,omitempty"`
+	Version     string         `json:"version"`
+	Trust       string         `json:"trust"`
+	Targets     []string       `json:"targets"`
+	Permissions []string       `json:"permissions"`
+	Views       []appViewEntry `json:"views"`
+	// MCPServers are the names of the servers in the package's .mcp.json: a card's tool is the app's own only when it
+	// comes from one of them.
+	MCPServers []string `json:"mcpServers"`
+	// Sinopia is what the app puts into the document editor (panels, selection items, bindings, checks); the page shows
+	// them only in a document the app is on in.
+	Sinopia *apps.Sinopia `json:"sinopia,omitempty"`
+	Dev     bool          `json:"dev,omitempty"`
+	// Team: the app is the team's, installed for everybody by an owner; Channel is the channel an install follows.
+	Team        bool   `json:"team,omitempty"`
+	Channel     string `json:"channel,omitempty"`
+	Dir         string `json:"dir,omitempty"`
+	InstalledAt int64  `json:"installedAt"`
+	UpdatedAt   int64  `json:"updatedAt"`
+}
+
+// appViewEntry is a view of an app as the page opens it: Path is its entry on the view server (/<app>/<file>), URL the
+// address of one the app's own server hosts.
+type appViewEntry struct {
+	ID      string   `json:"id"`
+	Title   string   `json:"title,omitempty"`
+	Targets []string `json:"targets"`
+	Height  string   `json:"height,omitempty"`
+	Path    string   `json:"path,omitempty"`
+	URL     string   `json:"url,omitempty"`
 }
 
 func viewOfApp(a apps.Installed, withDir bool) appView {
-	v := appView{ID: a.ID, Version: a.Version, Dev: a.Dev, InstalledAt: a.InstalledAt, UpdatedAt: a.UpdatedAt}
+	v := appView{ID: a.ID, Version: a.Version, Dev: a.Dev, Team: a.Team, Channel: a.Channel, InstalledAt: a.InstalledAt, UpdatedAt: a.UpdatedAt}
 	if m := a.Manifest; m != nil {
 		v.Name, v.Description, v.Icon, v.Trust = m.Name, m.Description, m.Icon, m.Trust
 		v.Targets, v.Permissions = m.Targets, m.Permissions
+		if sin, err := m.SinopiaOf(); err == nil && (len(sin.Panels) > 0 || len(sin.Selection) > 0 || sin.Bindings != nil || len(sin.Checks) > 0) {
+			v.Sinopia = &sin
+		}
 	}
 	if v.Permissions == nil {
 		v.Permissions = []string{}
+	}
+	v.MCPServers = []string{}
+	if pkg, _ := apps.LoadPackage(a.Dir); pkg != nil {
+		for name := range pkg.MCP {
+			v.MCPServers = append(v.MCPServers, name)
+		}
+		slices.Sort(v.MCPServers)
+	}
+	v.Views = []appViewEntry{}
+	if m := a.Manifest; m != nil {
+		for _, mv := range m.Views {
+			e := appViewEntry{ID: mv.ID, Title: mv.Title, Targets: mv.Targets, Height: mv.Height}
+			if strings.HasPrefix(mv.Entry, "https://") {
+				// A view at an address of the app's own server is framed only when its host is listed in network.frames.
+				if u, ok := m.FrameURL(mv.Entry); ok {
+					e.URL = u
+				}
+			} else if p, err := m.ViewPath(mv.ID); err == nil {
+				e.Path = p
+			}
+			v.Views = append(v.Views, e)
+		}
 	}
 	if withDir {
 		v.Dir = a.Dir
@@ -75,6 +121,7 @@ func appRoutes(d deps, c *core) []gate.Route {
 			return rt.Do(ctx, "cli", cmd)
 		},
 	}
+	installLock(d, reg)
 	return appRouteList(d, reg, version, chats)
 }
 
@@ -110,6 +157,10 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		}
 		return out, nil
 	}
+	viewServer := apps.NewViewServer(reg)
+	storage := apps.OpenStorage(d.DataDir)
+	guests := apps.NewGuests(reg, storage)
+	wireAppsEvents(d, reg, guests)
 	failed := func(w http.ResponseWriter, err error) {
 		agent.Log("warn", "apps: "+err.Error())
 		secretJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed"})
@@ -132,7 +183,14 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			failed(w, err)
 			return
 		}
-		secretJSON(w, http.StatusOK, map[string]any{"apps": views})
+		// The views' loopback port starts with the first page that lists apps; the page opens a preview slot on it.
+		port, err := viewServer.EnsureServer()
+		if err != nil {
+			failed(w, err)
+			return
+		}
+		appViewPort.Store(int64(port))
+		secretJSON(w, http.StatusOK, map[string]any{"apps": views, "viewPort": port, "agentWalled": agentWalled(reg.Root)})
 	}
 
 	cliList := func(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +225,10 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		case errors.Is(err, apps.ErrInvalid):
 			secretJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": "invalid", "problems": problems})
 			return
-		case errors.Is(err, apps.ErrHostVersion):
+		case errors.Is(err, apps.ErrKindTaken):
+			secretJSON(w, http.StatusConflict, map[string]any{"error": "kind-taken", "message": err.Error()})
+			return
+		case errors.Is(err, apps.ErrHostVersion), errors.Is(err, apps.ErrPluginName):
 			secretJSON(w, http.StatusConflict, map[string]any{"error": "host-version", "message": err.Error()})
 			return
 		case err != nil:
@@ -196,12 +257,17 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			failed(w, err)
 			return
 		}
+		// The links to the app's views end with it, and the cluster is told.
+		if _, err := guests.RevokeApp(b.ID); err != nil {
+			agent.Log("warn", "apps: links of a removed app not ended", agent.F{K: "id", V: b.ID}, agent.F{K: "error", V: err.Error()})
+		}
 		agent.Log("info", "apps: removed", agent.F{K: "id", V: b.ID})
 		secretJSON(w, http.StatusOK, map[string]any{"removed": b.ID})
 	}
 
 	// enable turns an app on or off in the chat of the calling tab, through the same command the page sends; a tab
-	// changes its own chat only. The agent of a chat with apps is kept from running it by its guard.
+	// changes its own chat only. Turning an app off from the tab is refused in a chat that has apps (use-page): that is the
+	// page's toggle; the agent of such a chat is also kept from running the command by its guard.
 	enable := func(w http.ResponseWriter, r *http.Request) {
 		if !cliOK(w, r, http.MethodPost) {
 			return
@@ -225,6 +291,12 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 			secretJSON(w, http.StatusNotFound, map[string]string{"error": "no-chat"})
 			return
 		}
+		// A chat with apps is the person's to take them out of: the page's toggle does it. A tab (the agent's, or a
+		// script it ran) may add one, never turn one off.
+		if !b.On && len(rec.Apps) > 0 {
+			secretJSON(w, http.StatusConflict, map[string]string{"error": "use-page"})
+			return
+		}
 		next := slices.DeleteFunc(slices.Clone(rec.Apps), func(id string) bool { return id == b.ID })
 		if b.On {
 			next = append(next, b.ID)
@@ -244,12 +316,18 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 		secretJSON(w, http.StatusOK, map[string]any{"conversation": conv, "apps": next})
 	}
 
-	return []gate.Route{
+	routes := append(appBridgeRoutes(d, reg, storage, viewServer, chats), appAskRoutes(d, appAsks)...)
+	routes = append(routes, sinopiaRoutes(d, reg, viewServer)...)
+	routes = append(routes, kindRoutes(d, reg)...)
+	routes = append(routes, appPublicRoutes(d, reg, version)...)
+	routes = append(routes, appShareRoutes(d, reg, guests, version)...)
+	routes = append(routes, []gate.Route{
 		{Match: is(platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},
 		{Match: is("/agents" + platformAPI + "/installed-apps"), Handler: http.HandlerFunc(page)},
 		{Match: is("/api/cli/apps"), Handler: http.HandlerFunc(cliList)},
 		{Match: is("/api/cli/apps/install"), Handler: http.HandlerFunc(install)},
 		{Match: is("/api/cli/apps/remove"), Handler: http.HandlerFunc(remove)},
 		{Match: is("/api/cli/apps/enable"), Handler: http.HandlerFunc(enable)},
-	}
+	}...)
+	return refuseAgentAppChanges(d.CLI, routes)
 }

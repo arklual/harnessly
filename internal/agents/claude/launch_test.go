@@ -200,12 +200,13 @@ type fakeApps struct {
 	ids      []string
 	settings string
 	prompt   string
+	wrap     string
 }
 
 func (f *fakeApps) Claude(ids []string, settingsPath string) (agents.ClaudeApps, error) {
 	f.ids, f.settings = ids, settingsPath
 	return agents.ClaudeApps{Settings: "/data/apps/launch/settings-1.json", PluginDirs: []string{"/data/apps/a", "/dev/b"},
-		PromptFile: f.prompt}, nil
+		PromptFile: f.prompt, Wrap: f.wrap}, nil
 }
 
 // The apps of a chat replace --settings with the copy that carries the guard, add their plugins and their instructions.
@@ -238,5 +239,28 @@ func TestAppsFlags(t *testing.T) {
 	l.Apps = []string{"Not An Id"}
 	if _, err := c.Flags("", l, nil); err == nil {
 		t.Fatal("a bad app id launched")
+	}
+}
+
+// The apps' wall goes between the environment and the CLI, in the new and the resumed launch alike.
+func TestAppsWall(t *testing.T) {
+	c := testConfig(t)
+	c.WorkspacePrompt = nil
+	c.Apps = &fakeApps{wrap: "'/usr/bin/bwrap' '--dev-bind' '/' '/' '--' '/rt' 'sandbox-exec' '--'"}
+	l := launch("opus", "")
+	l.Apps = []string{"acme.a"}
+	line, err := c.LaunchCommand("", l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(line, LaunchEnv+" '/usr/bin/bwrap' '--dev-bind' '/' '/' '--' '/rt' 'sandbox-exec' '--' "+Binary+" --settings ") {
+		t.Fatalf("%q", line)
+	}
+	if line, err = c.ResumeCommand(id1, "", l); err != nil || !strings.Contains(line, "'sandbox-exec' '--' "+Binary+" --resume "+id1) {
+		t.Fatalf("%q %v", line, err)
+	}
+	l.Apps = nil
+	if line, _ = c.LaunchCommand("", l, nil); strings.Contains(line, "bwrap") {
+		t.Fatalf("a chat without apps has no wall: %q", line)
 	}
 }

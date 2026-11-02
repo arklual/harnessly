@@ -425,6 +425,9 @@ func (e Entry) Validate() error {
 		errs = append(errs, needPtr("clientId", e.ClientID), each("attachments", e.Attachments))
 	case EntryTool:
 		errs = append(errs, need("toolUseId", e.ToolUseID))
+		if e.Images != nil {
+			errs = append(errs, in("images.state", e.Images.State, ImageGenStates))
+		}
 	case EntrySubagent:
 		errs = append(errs, need("agentId", e.AgentID), in("status", e.Status, SubagentStatuses))
 	case EntryAnswers:

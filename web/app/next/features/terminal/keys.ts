@@ -1,6 +1,10 @@
 // Which keys a focused terminal leaves to the page. Everything else is the terminal's: xterm turns it into bytes for
 // the session, and nothing of the page (the search, the rail, the digits of an open question, the composer) sees it.
 
+import { chordOf } from '@/next/features/keys/chord';
+import { commandsOfChord } from '@/next/features/keys/keymap';
+import { keyOverrides } from '@/next/features/keys/use-keys';
+
 export interface ITerminalKey {
   key: string;
   code: string;
@@ -12,12 +16,15 @@ export interface ITerminalKey {
 
 /**
  * The page's own keys that stay while the terminal has the focus: ⌃` folds the dock, ⌥⌘S / ⌥⌃S is the side chat,
- * ⌘K and ⌘B are the search and the rail. ⌃K and ⌃B are not: they are the shell's (kill the line, one char back).
+ * every ⌘ shortcut of the page is (⌘K the search, ⌘B the rail, …). ⌃K and ⌃B are not: they are the shell's (kill the
+ * line, one char back).
  */
 export const isReservedKey = (event: ITerminalKey): boolean => {
   if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === '`') return true;
   if (event.altKey && (event.metaKey || event.ctrlKey) && event.code === 'KeyS') return true;
-  if (event.metaKey && !event.ctrlKey && !event.altKey) return event.code === 'KeyK' || event.code === 'KeyB';
+  // ⌘ is the Mac's page key, never the shell's: the shortcuts of the page (features/keys, the person's own too) stay.
+  if (event.metaKey && !event.ctrlKey && !event.altKey)
+    return commandsOfChord(chordOf(event, true) ?? '', keyOverrides()).length > 0;
   return false;
 };
 

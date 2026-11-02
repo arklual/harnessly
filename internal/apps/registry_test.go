@@ -174,4 +174,26 @@ func TestExampleApps(t *testing.T) {
 			t.Errorf("%s: %v", dir, ps)
 		}
 	}
+	// Cashback carries a view: its pane entry loads, and it speaks through classic scripts (a module script cannot carry
+	// the slot's cookie from the view's opaque origin).
+	pkg, ps := LoadPackage(filepath.Join("..", "..", "docs", "apps", "cashback"))
+	if pkg == nil || len(ps) != 0 || len(pkg.Manifest.Views) != 2 || !pkg.Manifest.HasTarget(TargetApp) {
+		t.Fatalf("cashback: %v", ps)
+	}
+	page, err := pkg.File("ui/index.html")
+	if err != nil || !strings.Contains(string(page), `src="/__hl/app-sdk.js"`) || strings.Contains(string(page), `type="module"`) {
+		t.Fatalf("cashback page: %v", err)
+	}
+}
+
+// A generated view loads the SDK as a classic script and ships its own script file.
+func TestScaffoldViewIsClassic(t *testing.T) {
+	dir := scaffold(t, "acme.demo", "pane-chat")
+	page, err := os.ReadFile(filepath.Join(dir, "ui", "index.html"))
+	if err != nil || !strings.Contains(string(page), `<script src="/__hl/app-sdk.js"></script>`) || strings.Contains(string(page), "module") && strings.Contains(string(page), `type="module"`) {
+		t.Fatalf("page: %v %s", err, page)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ui", "main.js")); err != nil {
+		t.Fatal(err)
+	}
 }

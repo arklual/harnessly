@@ -1,8 +1,10 @@
-harnessly design video get|scene|frame|check|render|comments
+harnessly design video guide|get|scene|frame|check|render|comments
 
 A video project is a deck whose boards are scenes. Lengths are set only with these commands; never edit meta/ by hand.
 Times: 8s, 1.5s, 1500ms, 0:06 (m:ss) or plain seconds. Add --json for the runtime's answer.
 
+  harnessly design video guide [basics|director|motion|engines|check]
+      the rules of video work, read when needed: the basics, how to run the work, animation, other engines, what to verify
   harnessly design video get <project>
       scenes with start, length (set or auto), transition, moments, words, open comments; the renders' freshness
   harnessly design video scene add <project> --title TITLE [--dur 6s|auto]
@@ -12,8 +14,11 @@ Times: 8s, 1.5s, 1500ms, 0:06 (m:ss) or plain seconds. Add --json for the runtim
   harnessly design video frame <project> <scene> --at 2.4s [--format 9:16] [--draft]
   harnessly design video frame <project> <scene> --strip 0:6:1s [--format 9:16] [--draft]
       jpg files of the scene at a time (or FROM:TO:STEP, at most 60 frames); open them with Read
+  harnessly design video frame <project> <scene> --sheet [--format 9:16]
+      one picture of the whole scene: a frame per half second with the time on each; open it with Read
   harnessly design video check <project> [--scene S] [--format 16:9|9:16]
-      timers, Math.random, Date, things past the scene's end, overflow, tiny text; exit 1 on errors
+      timers, frame loops, outside addresses, tweens that overlap, engine and script errors, things past the scene's end,
+      overflow and blocks off screen along the scene's time, tiny text, frames that depend on the way there; exit 1 on errors
   harnessly design video render <project> [--format 16:9|9:16] [--scene S] [--draft] [--wait]
       render the mp4 (--scene: only that scene's clip, --draft: half size, never published); --wait shows progress
   harnessly design video comments <project> [--open]

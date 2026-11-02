@@ -20,6 +20,10 @@ export type TDeckHostMessage =
   /** A live move from the host's grip, board px. */
   | { type: 'tk:deck-move'; tpl: number; x: number; y: number }
   | { type: 'tk:deck-pointer'; on: boolean }
+  /** A veil over the element while a picture is drawn into it (works on a canvas board too). */
+  | { type: 'tk:gen'; tpl: number; on: boolean }
+  /** Whether the page draws its buttons on pictures («Изменить», «Сгенерировать»): on while the person may change them. */
+  | { type: 'tk:images'; on: boolean; scale: number }
   /** Ends the edit in place (the phone sheet's «Готово», the host's Esc): the board says the text and deselects. */
   | { type: 'tk:deck-done' }
   /** The host draws its own bars: the library's boards bar and tweaks inside the board stay hidden. */
@@ -28,13 +32,19 @@ export type TDeckHostMessage =
 export const DECK_PRESS = { ring: 'ring', cancel: 'cancel' } as const;
 export type TDeckPress = (typeof DECK_PRESS)[keyof typeof DECK_PRESS];
 
-export const DECK_SELECT_KIND = { title: 'title', text: 'text' } as const;
+export const DECK_SELECT_KIND = { title: 'title', text: 'text', image: 'image', block: 'block' } as const;
 export type TDeckSelectKind = (typeof DECK_SELECT_KIND)[keyof typeof DECK_SELECT_KIND];
 
 export interface IDeckGuide {
   /** 1: a vertical line at x = `at`; 0: a horizontal one at y = `at`. */
   v: 0 | 1;
   at: number;
+}
+
+/** What an element drawn by a picture job remembers: its brief and the name of the job's files. */
+export interface IDeckGen {
+  prompt: string;
+  job: string;
 }
 
 /** Board → host, as read. */
@@ -64,6 +74,13 @@ export type TDeckBoardMessage =
       size: number;
       rect: TDeckRect;
       was: string;
+      /** A picture or an empty block: its width over its height (0 when unknown) and what it was drawn from. */
+      ratio: number;
+      gen: IDeckGen | null;
+      /** The block's words (clipped), for an app's selection item; '' for a picture. */
+      text: string;
+      /** The element's tag name. */
+      tag: string;
     }
   | { k: 'deselect' }
   /** `html` is already limited by the board to b strong i em u s br and text; it is limited again here. */
@@ -91,6 +108,7 @@ export type TDeckBoardMessage =
 
 const HTML_MAX = 20_000;
 const LABEL_MAX = 120;
+const TEXT_MAX = 400;
 const FINGERPRINT_MAX = 64;
 const TPL_MAX = 1_000_000;
 const COORD_MAX = 100_000;
@@ -101,6 +119,25 @@ const coord = (v: unknown): number | null => (isNum(v) && Math.abs(v) <= COORD_M
 const clip = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
 const tplOf = (v: unknown): number | null =>
   Number.isInteger(v) && (v as number) >= 0 && (v as number) <= TPL_MAX ? (v as number) : null;
+
+const RATIO_MAX = 1000;
+const PROMPT_MAX = 1000;
+const JOB_RE = /^gen-[a-z0-9]{4,32}$/;
+
+const readKind = (v: unknown): TDeckSelectKind => {
+  if (v === 'title' || v === 'image' || v === 'block') return v;
+  return 'text';
+};
+
+/** What the board says an element was drawn from; null unless both the brief and a well-formed job name are there. */
+export const readGen = (v: unknown): IDeckGen | null => {
+  if (!v || typeof v !== 'object') return null;
+  const g = v as Record<string, unknown>;
+  if (typeof g.prompt !== 'string' || g.prompt === '' || typeof g.job !== 'string' || !JOB_RE.test(g.job)) {
+    return null;
+  }
+  return { prompt: g.prompt.slice(0, PROMPT_MAX), job: g.job };
+};
 
 const readRect = (v: unknown): TDeckRect | null => {
   if (!Array.isArray(v) || v.length !== 4) return null;
@@ -165,10 +202,16 @@ export const readDeckMessage = (data: unknown): TDeckBoardMessage | null => {
         k: 'select',
         tpl,
         label: clip(m.label, LABEL_MAX),
-        kind: m.kind === 'title' ? 'title' : 'text',
+        kind: readKind(m.kind),
         size: size !== null && size > 0 ? size : 0,
         rect,
         was: clip(m.was, FINGERPRINT_MAX),
+        ratio: isNum(m.ratio) && m.ratio > 0 && m.ratio <= RATIO_MAX ? m.ratio : 0,
+        gen: readGen(m.gen),
+        text: clip(m.text, TEXT_MAX),
+        tag: clip(m.tag, 32)
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, ''),
       };
     }
     case 'tk:deck-deselect':

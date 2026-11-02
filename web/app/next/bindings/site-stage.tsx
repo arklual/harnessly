@@ -64,6 +64,7 @@ import {
   type INotePopoverProps,
 } from '@/next/features/designly/site-notes';
 import { usePageDraft } from '@/next/features/designly/page-drafts';
+import { boardFileOf, useBoardVeils } from '@/next/features/designly/image-gen/canvas';
 import type { Conversation, ConvId, MachineId, Now } from '@/next/protocol/v2';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { useConnection } from '@/next/stores/connection';
@@ -138,11 +139,17 @@ const ConvLast = ({
 export const NoteCard = ({
   machine,
   onTextChange,
+  design,
+  pageUrl,
   ...props
-}: { machine: MachineId; onTextChange?: (text: string) => void } & Omit<
-  INotePopoverProps,
-  'text' | 'onText' | 'mic'
->) => {
+}: {
+  machine: MachineId;
+  onTextChange?: (text: string) => void;
+  /** The design and the page on screen: a picture can be drawn into a block of a board of it. */
+  design?: string;
+  pageUrl?: string;
+} & Omit<INotePopoverProps, 'text' | 'onText' | 'mic' | 'image'>) => {
+  const file = design !== undefined && pageUrl !== undefined ? boardFileOf(design, pageUrl) : null;
   const [text, setTextHere] = useState(props.draft.text);
   const setText = (value: string) => {
     setTextHere(value);
@@ -157,7 +164,15 @@ export const NoteCard = ({
       else if (!voice.recording.busy) voice.onFinishRecording();
     },
   };
-  return <NotePopover {...props} text={text} onText={setText} mic={mic ?? null} />;
+  return (
+    <NotePopover
+      {...props}
+      text={text}
+      onText={setText}
+      mic={mic ?? null}
+      image={design !== undefined && file !== null ? { machine, artifact: design, file } : undefined}
+    />
+  );
 };
 
 const none = (): void => {};
@@ -405,6 +420,8 @@ export const useSiteStage = ({
   const voice = useVoice(machine, text, setText);
 
   const [notes, setNotes] = useState<INote[]>([]);
+  // The blocks of the page on screen a picture is being drawn into.
+  const veils = useBoardVeils(design, pageUrl);
   // A deck's slide (and block) the chat is about: one chip that goes with the next message, then lets go.
   const [deckCtx, setDeckCtx] = useState<IDeckChatContext | null>(null);
   // The card is the page's: another page hides it, the return brings it back.
@@ -597,6 +614,7 @@ export const useSiteStage = ({
   };
 
   return {
+    conv: convId,
     mode,
     onMode: (next, section) => {
       if (next === mode) return;
@@ -629,6 +647,7 @@ export const useSiteStage = ({
       setText(text.trim() === '' ? words : `${text.trimEnd()}\n${words}`);
       setMin(false);
     },
+    veils,
     pins: <NotePins notes={pageNotes} draft={noteDraft} onOpen={editNote} />,
     overlay: (
       <>
@@ -636,6 +655,8 @@ export const useSiteStage = ({
           <NoteCard
             key={`${shown.id ?? shown.picked.selector}@${shown.at.x},${shown.at.y}`}
             machine={machine}
+            design={design}
+            pageUrl={pageUrl}
             n={noteNumber}
             draft={shown}
             hidden={card.state === PRESENCE.closing}

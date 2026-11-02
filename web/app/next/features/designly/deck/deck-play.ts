@@ -1,6 +1,7 @@
 // Moving through the talk in the show and the recording: the keys and the rule «a step of the slide first, then the next
 // slide». The shell owns the slide frames, so it passes in where the talk stands and how to move it (IDeckPlayHost).
-import { useEffect, useEffectEvent } from 'react';
+import { KEY_SCOPE } from '@/next/features/keys/commands';
+import { useKeys } from '@/next/features/keys/use-keys';
 import type { IDeckSlide } from '@/next/features/designly/deck/types';
 
 /** A pointer position over the slide, in the board's pixels. */
@@ -44,50 +45,13 @@ export const prevMove = (index: number, step: number): TPlayMove => {
   return index > 0 ? { to: 'slide', index: index - 1 } : null;
 };
 
-export const PLAY_KEY = { next: 'next', prev: 'prev', exit: 'exit', record: 'record' } as const;
-export type TPlayKey = (typeof PLAY_KEY)[keyof typeof PLAY_KEY];
-
-/** What a key press means in the show; null: not ours. Modifier chords are left to the browser. */
-export const playKey = (e: {
-  key: string;
-  ctrlKey?: boolean;
-  metaKey?: boolean;
-  altKey?: boolean;
-}): TPlayKey | null => {
-  if (e.ctrlKey || e.metaKey || e.altKey) return null;
-  switch (e.key) {
-    case 'ArrowRight':
-    case 'ArrowDown':
-    case 'PageDown':
-    case ' ':
-      return PLAY_KEY.next;
-    case 'ArrowLeft':
-    case 'ArrowUp':
-    case 'PageUp':
-      return PLAY_KEY.prev;
-    case 'Escape':
-      return PLAY_KEY.exit;
-    case 'r':
-    case 'R':
-    case 'к':
-    case 'К':
-      return PLAY_KEY.record;
-    default:
-      return null;
-  }
-};
-
-const typing = (target: EventTarget | null) =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
-
 export interface IPlayHandlers {
   onExit: () => void;
   /** Absent: the R key does nothing (in the recording itself). */
   onRecord?: () => void;
 }
 
-/** Arrows, Space and the rest, for as long as the show or the recording is on screen. Returns the two moves. */
+/** The deck's keys, for as long as the show or the recording is on screen. Returns the two moves. */
 export const useDeckPlay = (host: IDeckPlayHost, handlers: IPlayHandlers) => {
   const total = host.slides.length;
   const move = (m: TPlayMove) => {
@@ -102,21 +66,18 @@ export const useDeckPlay = (host: IDeckPlayHost, handlers: IPlayHandlers) => {
   const next = () => move(nextMove(host.index, total, host.step, host.steps));
   const prev = () => move(prevMove(host.index, host.step));
 
-  const onKey = useEffectEvent((e: KeyboardEvent) => {
-    if (typing(e.target)) return;
-    const key = playKey(e);
-    if (!key) return;
-    e.preventDefault();
-    if (key === PLAY_KEY.next) next();
-    else if (key === PLAY_KEY.prev) prev();
-    else if (key === PLAY_KEY.exit) handlers.onExit();
-    else handlers.onRecord?.();
+  const to = (index: number) => move(index === host.index ? null : { to: 'slide', index });
+  // The deck's shortcuts (features/keys) turn the talk: a step, then a slide; Esc leaves, R records.
+  useKeys(KEY_SCOPE.deck, {
+    'deck.next': next,
+    'deck.prev': prev,
+    'deck.first': () => to(0),
+    'deck.last': () => to(total - 1),
+    'deck.back': handlers.onExit,
+    'deck.rec': handlers.onRecord,
+    'global.stepOn': next,
+    'global.stepBack': prev,
   });
-  useEffect(() => {
-    const listener = (e: KeyboardEvent) => onKey(e);
-    window.addEventListener('keydown', listener);
-    return () => window.removeEventListener('keydown', listener);
-  }, []);
 
   return { next, prev };
 };

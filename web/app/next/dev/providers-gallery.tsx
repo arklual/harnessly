@@ -241,6 +241,16 @@ const SettingsScene = ({ state, check, login }: { state?: string; check?: string
             claude: credentials({ configured: false, tail: null }),
             codex: credentials(codexKey),
           }}
+          speech={{
+            k: 'ready',
+            keys: {
+              openai: { configured: false, tail: null },
+              yandex: { configured: false, tail: null },
+              'yandex-folder': { configured: false, tail: null },
+            },
+            onSave: async () => null,
+            onRemove: async () => null,
+          }}
           vendors={{
             k: 'ready',
             presets: states,

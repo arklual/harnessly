@@ -17,17 +17,44 @@ describe('routes', () => {
   });
 
   it('reads the screens of «More» and writes them back the same', () => {
+    expect(parseRoute('/manage/')).toEqual({ kind: ROUTE.manage });
+    expect(routePath({ kind: ROUTE.manage })).toBe('/manage');
     expect(parseRoute('/stats')).toEqual({ kind: ROUTE.stats });
     expect(parseRoute('/efficiency/')).toEqual({ kind: ROUTE.efficiency });
     expect(routePath({ kind: ROUTE.stats })).toBe('/stats');
     expect(routePath({ kind: ROUTE.efficiency })).toBe('/efficiency');
   });
 
-  it('reads the Apps screen with or without the closing slash and writes it back the same', () => {
-    expect(parseRoute('/apps')).toEqual({ kind: ROUTE.apps });
-    expect(parseRoute('/apps/?tab=gitlab')).toEqual({ kind: ROUTE.apps });
+  it('reads the tasks and MR screen, once «Apps», with or without the closing slash and writes it back the same', () => {
+    expect(parseRoute('/tasks')).toEqual({ kind: ROUTE.tasks });
+    expect(parseRoute('/tasks/?tab=gitlab')).toEqual({ kind: ROUTE.tasks });
+    expect(routePath({ kind: ROUTE.tasks })).toBe('/tasks');
+    expect(parseRoute('/tasks/extra')).toEqual(HOME);
+  });
+
+  it('reads a document of an app type: a path of its own, not a design', () => {
+    expect(parseRoute('/designly/doc/idei-1')).toEqual({ kind: ROUTE.appDoc, id: 'idei-1' });
+    expect(routePath({ kind: ROUTE.appDoc, id: 'idei-1' })).toBe('/designly/doc/idei-1');
+    expect(placeKeyOf('/designly/doc/idei-1/')).toBe('appdoc:idei-1');
+    expect(parseRoute('/designly/idei-1')).toEqual({ kind: ROUTE.site, id: 'idei-1' });
+  });
+
+  it('reads the installed apps and an app opened as the main thing with the chat beside it', () => {
+    expect(parseRoute('/apps/')).toEqual({ kind: ROUTE.apps });
     expect(routePath({ kind: ROUTE.apps })).toBe('/apps');
+    expect(parseRoute('/apps/acme.cashback')).toEqual({ kind: ROUTE.app, id: 'acme.cashback' });
+    expect(parseRoute('/apps/acme.cashback?chat=tab-1')).toEqual({
+      kind: ROUTE.app,
+      id: 'acme.cashback',
+      chat: 'tab-1',
+    });
+    expect(routePath({ kind: ROUTE.app, id: 'acme.cashback', chat: 'tab-1' })).toBe(
+      '/apps/acme.cashback?chat=tab-1',
+    );
+    expect(routePath({ kind: ROUTE.app, id: 'acme.cashback' })).toBe('/apps/acme.cashback');
+    // An id is publisher.name; anything else is not an app.
     expect(parseRoute('/apps/extra')).toEqual(HOME);
+    expect(placeKeyOf('/apps/acme.cashback?chat=a')).toBe('app:acme.cashback');
   });
 
   it('reads Settings with or without a section and writes it back the same', () => {

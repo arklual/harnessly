@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/selfupdate"
@@ -76,6 +77,11 @@ type machineProbe struct {
 	User   string
 	// Invalidate drops what the tool check keeps, after a fix.
 	Invalidate func()
+	// AppsBoundary probes the wall around the agents of chats with apps (internal/apps/boundary.go); applies false on
+	// a machine with no apps, where there is nothing to wall.
+	AppsBoundary func() (applies bool, err error)
+	// ReadFile reads a file of the machine (a sysctl under /proc/sys).
+	ReadFile func(string) ([]byte, error)
 }
 
 // pkgInstall is the command that installs a system package here.
@@ -303,6 +309,18 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 		}
 	}
 
+	// The wall between the agent of a chat with apps and the apps (a Linux mount namespace): without it the chat starts
+	// guarded by the hook alone.
+	if p.GOOS == "linux" && p.AppsBoundary != nil {
+		if applies, err := p.AppsBoundary(); applies {
+			wall := machineCheck{ID: "apps_boundary", OK: err == nil, Title: "bubblewrap"}
+			if err != nil {
+				wall.Detail, wall.FixCommand = err.Error(), p.boundaryFix(err)
+			}
+			add(wall)
+		}
+	}
+
 	// Room on the disk of the data folder: 1 GiB, and the model that is still to come.
 	if free, ok := p.Free(p.DataDir); ok {
 		want := uint64(gib)
@@ -317,6 +335,37 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 		add(disk)
 	}
 	return out
+}
+
+// boundaryFix is the command that lets bwrap make the wall: the package, or the setting of the kernel that refuses the
+// user namespace it needs; "" when none of those is the cause (the detail says what bwrap said).
+func (p machineProbe) boundaryFix(err error) string {
+	if errors.Is(err, apps.ErrNoBwrap) {
+		return p.pkgInstall("bubblewrap")
+	}
+	if errors.Is(err, apps.ErrSelfSSH) {
+		return apps.SelfSSHFix
+	}
+	sysctl := func(name string) string {
+		if p.ReadFile == nil {
+			return ""
+		}
+		raw, err := p.ReadFile("/proc/sys/" + strings.ReplaceAll(name, ".", "/"))
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(raw))
+	}
+	switch {
+	case sysctl("user.max_user_namespaces") == "0":
+		return "echo user.max_user_namespaces=15000 | sudo tee /etc/sysctl.d/60-harnessly-userns.conf && sudo sysctl --system"
+	case sysctl("kernel.unprivileged_userns_clone") == "0":
+		return "echo kernel.unprivileged_userns_clone=1 | sudo tee /etc/sysctl.d/60-harnessly-userns.conf && sudo sysctl --system"
+	case sysctl("kernel.apparmor_restrict_unprivileged_userns") == "1":
+		// Ubuntu lets only programs with an AppArmor profile make one; the apparmor package carries bwrap's.
+		return "sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict"
+	}
+	return ""
 }
 
 // fix runs the fix of a check; only the checks marked fixable have one.
@@ -447,7 +496,17 @@ func newMachineProbe(d deps, self *selfupdate.Updater) machineProbe {
 		GOOS: runtime.GOOS, Home: d.Home, DataDir: d.DataDir, BinDir: binDir, User: name, Shell: shell,
 		Tools: tools.Runtime, ShellPath: tools.ShellPath, HasDecoder: dictation.HasDecoder, Voice: ownVoice(d.DataDir),
 		Update: self, Free: freeBytes, Reach: reach, GitEmail: func() string { return gitEmail(tools.ShellPath())() },
-		LookPath: exec.LookPath, Exists: pathExists, Invalidate: tools.Invalidate,
+		LookPath: exec.LookPath, Exists: pathExists, Invalidate: tools.Invalidate, ReadFile: os.ReadFile,
+		AppsBoundary: func() (bool, error) {
+			root := apps.Open(d.DataDir).Root
+			if _, err := os.Stat(root); err != nil {
+				return false, nil
+			}
+			if err := appBoundary().Ready(root); err != nil {
+				return true, err
+			}
+			return true, appBoundary().Gaps()
+		},
 	}
 }
 

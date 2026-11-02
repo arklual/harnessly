@@ -4,9 +4,12 @@
 // opens it full size, where the arrows and a swipe step through the pictures of the same message. A picture that does
 // not load leaves no card.
 import { createContext, useContext, useMemo, useState } from 'react';
+import { ImageHost } from '@/next/features/chat/image-card';
+import { useChatEditing } from '@/next/features/image-edit/chat-host';
+import ImageEditView from '@/next/features/image-edit/image-editor';
 import type { Picture } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
-import ImageView, { type IImageViewItem } from '@/next/ui/image-view';
+import type { IImageViewItem } from '@/next/ui/image-view';
 import '@/next/styles/pictures.css';
 
 export interface IMessagePictures {
@@ -44,6 +47,9 @@ export const namedIn = (text: string, pictures: readonly Picture[]): Picture[] =
 /** A line left with only its label once the path went: «Скриншот:», «- Screenshot:». */
 const BARE_LABEL = /^[ \t]*(?:[-*][ \t]+)?[\p{L}\p{N} ]{1,40}:[ \t]*$/u;
 
+/** A list item left with only its marker once the path went: «1.», «2)», «-». */
+const BARE_MARKER = /^[ \t]*(?:[-*+]|\d+[.)])[ \t]*$/;
+
 /**
  * The text without the paths of its pictures, and without what they leave: an empty `code`, a line with only its
  * label, the blank lines and the spaces.
@@ -60,7 +66,7 @@ export const withoutPaths = (text: string, pictures: readonly Picture[]): string
     .map((line) => {
       if (!line.includes('\u0000')) return line;
       const left = line.replaceAll('`\u0000`', '').replaceAll('\u0000', '');
-      return BARE_LABEL.test(left) ? '' : left;
+      return BARE_LABEL.test(left) || BARE_MARKER.test(left) ? '' : left;
     })
     .join('\n');
   return out
@@ -123,6 +129,11 @@ interface IPictureCardsProps {
 
 export const PictureCards = ({ pictures, srcOf, side = 'agent' }: IPictureCardsProps) => {
   const [viewing, setViewing] = useState<string | null>(null);
+  const chat = useContext(ImageHost);
+  const shown = viewing === null ? undefined : pictures.find((one) => one.id === viewing);
+  // The agent's pictures can be changed from here; what the person sent themselves is shown as it is.
+  const changeable = side === 'agent' && shown !== undefined && shown.text.startsWith('/');
+  const editing = useChatEditing(chat, changeable ? { id: shown.text, src: srcOf(shown) } : null);
   if (pictures.length === 0) return null;
   const at = viewing === null ? -1 : pictures.findIndex((one) => one.id === viewing);
   const current = at >= 0 ? pictures[at] : null;
@@ -136,8 +147,9 @@ export const PictureCards = ({ pictures, srcOf, side = 'agent' }: IPictureCardsP
       {pictures.map((picture) => (
         <Card key={picture.id} picture={picture} src={srcOf(picture)} onOpen={() => setViewing(picture.id)} />
       ))}
-      <ImageView
+      <ImageEditView
         item={item}
+        editing={editing}
         onClose={() => setViewing(null)}
         position={at >= 0 ? { at: at + 1, of: pictures.length } : undefined}
         onStep={step}

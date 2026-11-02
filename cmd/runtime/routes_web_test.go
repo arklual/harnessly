@@ -57,7 +57,7 @@ func TestWebPageStandalone(t *testing.T) {
 	if w := serveWeb(c, "GET", "/agents", nil); w.Code != http.StatusFound {
 		t.Fatalf("/agents: %d", w.Code)
 	}
-	for _, p := range []string{"/agents/", "/agents/w/ws-a", "/agents/index.html"} {
+	for _, p := range []string{"/agents/", "/agents/w/ws-a", "/agents/index.html", "/agents/apps/harnessly.cashback", "/agents/apps/harnessly.cashback/main"} {
 		w := serveWeb(c, "GET", p, nil)
 		body := w.Body.String()
 		if w.Code != 200 || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/html") ||

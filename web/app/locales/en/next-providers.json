@@ -101,5 +101,15 @@
   "next.providers.gpt.failed.no-login": "Codex is not signed in with a subscription: sign in and turn it on again",
   "next.providers.gpt.failed.download": "Could not download the proxy: check the machine's internet",
   "next.providers.gpt.failed.start": "The proxy did not start",
-  "next.providers.gpt.failed.page": "The machine did not answer"
+  "next.providers.gpt.failed.page": "The machine did not answer",
+  "next.speech.openai": "OpenAI · speech recognition",
+  "next.speech.yandex": "Yandex SpeechKit",
+  "next.speech.hint.openai": "An OpenAI API key for gpt-4o-transcribe. Your recording goes to OpenAI only if you pick this model in Voice input",
+  "next.speech.hint.yandex": "A Yandex Cloud service account API key with the ai.speechkit-stt.user role. Your recording goes to Yandex only if you pick this model in Voice input",
+  "next.speech.hint.yandex-folder": "The folder id — not every account needs it, leave it empty if yours does not",
+  "next.speech.aria.openai": "OpenAI API key",
+  "next.speech.aria.yandex": "Yandex Cloud API key",
+  "next.speech.aria.yandex-folder": "Yandex Cloud folder id",
+  "next.speech.unsupported": "This machine cannot connect cloud recognition yet: update its runtime.",
+  "next.speech.loadFailed": "Could not find out what is connected for voice"
 }

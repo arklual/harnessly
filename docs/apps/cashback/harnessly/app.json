@@ -1,0 +1,34 @@
+{
+  "id": "harnessly.cashback",
+  "name": "Кешбэки",
+  "description": "Категории банковского кешбэка на месяц: человек выбирает в окне, агент видит выбор и помогает не ошибиться; в сайте — карточка кешбэка, поля которой правятся из окна",
+  "version": "0.2.0",
+  "harnessly": ">=0.17.0",
+  "trust": "sandboxed",
+  "targets": ["chat", "pane", "app", "sinopia.site"],
+  "activation": { "on": ["manual", "view", "document"], "openView": "main" },
+  "permissions": ["chat.prompt", "pane.open", "storage", "sinopia.read", "sinopia.write"],
+  "agent": {
+    "instructions": "instructions.md",
+    "skills": ["cashback-picks"],
+    "tools": {
+      "allow": ["app.*"]
+    }
+  },
+  "views": [
+    { "id": "main", "title": "Кешбэки", "entry": "ui/index.html", "targets": ["pane", "app"] },
+    { "id": "inspector", "title": "Кешбэк на доске", "entry": "ui/inspector.html", "targets": ["sinopia.site"] }
+  ],
+  "sinopia": {
+    "bindings": { "schema": "schema/cashback.json", "inspector": "inspector", "lockUnbound": true },
+    "templates": ["templates/cashback-card"],
+    "selection": [
+      {
+        "id": "explain",
+        "title": "Объяснить",
+        "agent": "Объясни человеку, что значит выбранное место карточки кешбэка и как оно считается.",
+        "kinds": ["site"]
+      }
+    ]
+  }
+}

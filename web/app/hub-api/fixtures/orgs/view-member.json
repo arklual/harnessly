@@ -1,0 +1,56 @@
+{
+  "org": {
+    "id": "o2acmeorgaaaaaaaaaaa",
+    "slug": "acme",
+    "name": "Acme",
+    "timezone": "Europe/Moscow",
+    "currency": "RUB",
+    "createdAt": "2026-10-01T09:00:00Z"
+  },
+  "tenants": [
+    {
+      "id": "t2acmetenantaaaaaaaa",
+      "slug": "acme",
+      "name": "Acme",
+      "orgId": "o2acmeorgaaaaaaaaaaa",
+      "createdAt": "2026-10-01T09:00:00Z",
+      "memberCount": 4
+    }
+  ],
+  "teams": [
+    {
+      "id": "m2platformteamaaaaaa",
+      "tenantId": "t2acmetenantaaaaaaaa",
+      "slug": "platform",
+      "name": "Платформа",
+      "createdAt": "2026-10-01T09:00:00Z",
+      "memberCount": 3,
+      "leadIds": ["u2borisaaaaaaaaaaaaa"]
+    }
+  ],
+  "me": {
+    "userId": "u2veraaaaaaaaaaaaaaa",
+    "instanceAdmin": false,
+    "grants": [],
+    "teams": [
+      {
+        "teamId": "m2platformteamaaaaaa",
+        "isPrimary": true
+      }
+    ],
+    "scopes": {
+      "team:m2platformteamaaaaaa": {
+        "view": false,
+        "money": false,
+        "manage": false,
+        "grant": [],
+        "setLimit": false,
+        "setChildLimits": false,
+        "needs": {
+          "manage": "team_lead",
+          "setLimit": "tenant_admin"
+        }
+      }
+    }
+  }
+}

@@ -43,6 +43,12 @@ type LineTyper interface {
 	TypeOnly(text string) error
 }
 
+// DialogGrower is a pane whose window can grow for a dialog that does not fit. GrowForDialog answers true when the
+// window grew and the program had time to redraw.
+type DialogGrower interface {
+	GrowForDialog() bool
+}
+
 var (
 	locksMu sync.Mutex
 	locks   = map[string]*sync.Mutex{}

@@ -1,0 +1,326 @@
+{
+  "scope": {
+    "kind": "team",
+    "id": "m2platformteamaaaaaa"
+  },
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "spend": {
+    "list": {
+      "usd": 1190,
+      "shown": 96985.0
+    },
+    "paid": {
+      "usd": 980,
+      "shown": 79870.0
+    },
+    "limit": {
+      "ruleId": "l2teamplatformaaaaa",
+      "amount": {
+        "usd": 1500,
+        "shown": 122250.0
+      },
+      "pct": 0.793,
+      "status": "ok",
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      }
+    },
+    "forecast": {
+      "usd": 1580,
+      "shown": 128770.0
+    }
+  },
+  "tiles": {
+    "activePeople": {
+      "value": 3,
+      "cmpValue": 3,
+      "unit": "people"
+    },
+    "sessions": {
+      "value": 401,
+      "cmpValue": 377,
+      "unit": "count"
+    },
+    "mrs": {
+      "value": 58,
+      "cmpValue": 50,
+      "unit": "count"
+    },
+    "moneyPerMr": {
+      "value": 16.9,
+      "cmpValue": 17.4,
+      "unit": "usd"
+    }
+  },
+  "attention": [
+    {
+      "id": "g2overaaaaaaaaaaaaaa",
+      "rule": "over_80",
+      "severity": "warn",
+      "scope": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa"
+      },
+      "subject": {
+        "kind": "user",
+        "id": "u2veraaaaaaaaaaaaaaa",
+        "label": "Вера"
+      },
+      "title": "Вера потратила 84% личного лимита",
+      "detail": "$84 из $100 за октябрь",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "raise_limit",
+        "label": "Поднять лимит",
+        "scope": {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa"
+        },
+        "userId": "u2veraaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2requestaaaaaaaaaaa",
+      "rule": "limit_request",
+      "severity": "info",
+      "scope": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa"
+      },
+      "subject": {
+        "kind": "user",
+        "id": "u2veraaaaaaaaaaaaaaa",
+        "label": "Вера"
+      },
+      "title": "Вера просит +$50 на октябрь",
+      "detail": "«Доделать миграцию до релиза»",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "raise_limit",
+        "label": "Поднять лимит",
+        "scope": {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa"
+        },
+        "userId": "u2veraaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2budgetaaaaaaaaaaaa",
+      "rule": "budget_runs_out",
+      "severity": "warn",
+      "scope": {
+        "kind": "tenant",
+        "id": "t2acmetenantaaaaaaaa"
+      },
+      "subject": {
+        "kind": "team",
+        "id": "m2platformteamaaaaaa",
+        "label": "Платформа"
+      },
+      "title": "Бюджет «Платформы» кончится 26 ноября",
+      "detail": "Темп за 7 дней — $41 в день, осталось $310 до конца месяца",
+      "firstAt": "2026-10-29T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "raise_limit",
+        "label": "Поднять лимит",
+        "scope": {
+          "kind": "team",
+          "id": "m2platformteamaaaaaa"
+        },
+        "userId": null
+      }
+    }
+  ],
+  "spendBy": {
+    "by": "person",
+    "rows": [
+      {
+        "key": "u2annaaaaaaaaaaaaaaa",
+        "label": "Анна",
+        "list": {
+          "usd": 520,
+          "shown": 42380.0
+        },
+        "paid": {
+          "usd": 430,
+          "shown": 35045.0
+        },
+        "calls": 1200,
+        "unpricedCalls": 0,
+        "tokens": {
+          "input": 1040000,
+          "output": 4680000,
+          "cacheRead": 208000000,
+          "cacheWrite": 10400000
+        },
+        "limit": null,
+        "forecast": {
+          "usd": 690,
+          "shown": 56235.0
+        },
+        "guessedShare": 0.0
+      },
+      {
+        "key": "u2borisaaaaaaaaaaaaa",
+        "label": "Борис",
+        "list": {
+          "usd": 410,
+          "shown": 33415.0
+        },
+        "paid": {
+          "usd": 330,
+          "shown": 26895.0
+        },
+        "calls": 1200,
+        "unpricedCalls": 0,
+        "tokens": {
+          "input": 820000,
+          "output": 3690000,
+          "cacheRead": 164000000,
+          "cacheWrite": 8200000
+        },
+        "limit": {
+          "ruleId": "l2borisaaaaaaaaaaaa",
+          "amount": {
+            "usd": 500,
+            "shown": 40750.0
+          },
+          "pct": 0.82,
+          "status": "warn",
+          "setBy": {
+            "userId": "u2annaaaaaaaaaaaaaaa",
+            "name": "Анна"
+          }
+        },
+        "forecast": {
+          "usd": 540,
+          "shown": 44010.0
+        },
+        "guessedShare": 0.0
+      },
+      {
+        "key": "u2veraaaaaaaaaaaaaaa",
+        "label": "Вера",
+        "list": {
+          "usd": 260,
+          "shown": 21190.0
+        },
+        "paid": {
+          "usd": 220,
+          "shown": 17930.0
+        },
+        "calls": 1200,
+        "unpricedCalls": 0,
+        "tokens": {
+          "input": 520000,
+          "output": 2340000,
+          "cacheRead": 104000000,
+          "cacheWrite": 5200000
+        },
+        "limit": {
+          "ruleId": "l2veraaaaaaaaaaaaaa",
+          "amount": {
+            "usd": 100,
+            "shown": 8150.0
+          },
+          "pct": 0.84,
+          "status": "warn",
+          "setBy": {
+            "userId": "u2borisaaaaaaaaaaaaa",
+            "name": "Борис"
+          }
+        },
+        "forecast": {
+          "usd": 120,
+          "shown": 9780.0
+        },
+        "guessedShare": 0.12
+      }
+    ]
+  },
+  "subscriptions": [
+    {
+      "accountId": "a2claudemaxaaaaaaaaa",
+      "label": "Claude Max №1",
+      "provider": "anthropic",
+      "plan": "max-20x",
+      "monthlyFee": {
+        "usd": 200,
+        "shown": 16300.0
+      },
+      "preliminary": true,
+      "shares": [
+        {
+          "person": {
+            "userId": "u2annaaaaaaaaaaaaaaa",
+            "name": "Анна"
+          },
+          "share": 0.55,
+          "amount": {
+            "usd": 110,
+            "shown": 8965.0
+          },
+          "windowPct": 21.0
+        },
+        {
+          "person": {
+            "userId": "u2borisaaaaaaaaaaaaa",
+            "name": "Борис"
+          },
+          "share": 0.45,
+          "amount": {
+            "usd": 90,
+            "shown": 7335.0
+          },
+          "windowPct": 17.0
+        }
+      ],
+      "windows": [
+        {
+          "name": "five_hour",
+          "scope": "all",
+          "lengthSec": 18000,
+          "usedPct": 38.0,
+          "resetsAt": "2026-10-30T20:00:00Z",
+          "measuredAt": "2026-10-30T17:55:00Z",
+          "confidence": "undocumented",
+          "waiting": false,
+          "forecastFullAt": null
+        },
+        {
+          "name": "seven_day",
+          "scope": "all",
+          "lengthSec": 604800,
+          "usedPct": 71.0,
+          "resetsAt": "2026-11-02T09:00:00Z",
+          "measuredAt": "2026-10-30T17:55:00Z",
+          "confidence": "undocumented",
+          "waiting": false,
+          "forecastFullAt": null
+        }
+      ]
+    }
+  ],
+  "accountedUntil": "2026-10-30T17:58:00Z"
+}

@@ -3,6 +3,7 @@ package machines
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/coder/websocket"
@@ -84,8 +85,18 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	s.setPolicy(ctx, m, hello.Policy)
 	s.Publish(ctx, m)
 
-	if _, err := s.reg.Do(ctx, m.ID, hubproto.OpLinkSubscribe, map[string]any{"events": subscribed}, callTimeout); err != nil {
+	events := subscribed
+	if s.usage != nil && slices.Contains(hello.Features, hubproto.FeatureUsage) {
+		events = append(slices.Clone(subscribed), hubproto.EventUsageAvailable)
+	}
+	if _, err := s.reg.Do(ctx, m.ID, hubproto.OpLinkSubscribe, map[string]any{"events": events}, callTimeout); err != nil {
 		s.log.Warn("events not subscribed", "machine", m.ID, "error", err)
+	}
+	if s.usage != nil {
+		s.usage.Connected(m.ID, hello.Features)
+	}
+	if s.budget != nil {
+		s.budget.Connected(m.ID, hello)
 	}
 	if _, err := s.RunPreflight(ctx, m); err != nil {
 		s.log.Info("first preflight failed", "machine", m.ID, "error", err)
@@ -151,6 +162,10 @@ func (s *Service) onEvent(_ *link.Link, m store.Machine, ev link.Event) {
 		var e struct{ Policy hubproto.Policy }
 		if json.Unmarshal(ev.Raw, &e) == nil {
 			s.setPolicy(ctx, m, e.Policy)
+		}
+	case hubproto.EventUsageAvailable:
+		if s.usage != nil {
+			s.usage.Trigger(m.ID)
 		}
 	}
 }

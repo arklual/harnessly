@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -120,6 +121,9 @@ func timedRunner(timeout time.Duration) runner {
 }
 
 func execRunner(timeout time.Duration, dir, program string, args ...string) result {
+	if program == "tmux" {
+		program = tmuxBinary()
+	}
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -337,4 +341,51 @@ func lookupEnv(env []string, key string) string {
 		}
 	}
 	return v
+}
+
+var (
+	tmuxBinOnce sync.Once
+	tmuxBin     string
+)
+
+// tmuxBinary is the tmux the runtime runs: RUNTIME_TMUX_BIN, else the first tmux on PATH that is a program and not a
+// script. A person's PATH may start with a guard script for tmux (~/.local/bin/tmux refuses kill-server on the live
+// socket): the runtime ran it for every poll, bash plus `id -u` plus tmux, ~16 programs a second on a machine with a
+// dozen tabs. The guard is for people typing in panes; the runtime never kills its own live server.
+func tmuxBinary() string {
+	tmuxBinOnce.Do(func() {
+		tmuxBin = "tmux"
+		if b := os.Getenv("RUNTIME_TMUX_BIN"); b != "" {
+			tmuxBin = b
+			return
+		}
+		for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+			// A relative entry (or an empty one, which means "here") would pick a tmux out of the working directory.
+			if !filepath.IsAbs(dir) {
+				continue
+			}
+			p := filepath.Join(dir, "tmux")
+			if isProgram(p) {
+				tmuxBin = p
+				return
+			}
+		}
+	})
+	return tmuxBin
+}
+
+// isProgram: an executable regular file that starts as an ELF binary.
+func isProgram(path string) bool {
+	st, err := os.Stat(path)
+	if err != nil || !st.Mode().IsRegular() || st.Mode().Perm()&0o111 == 0 {
+		return false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	head := make([]byte, 4)
+	n, _ := f.Read(head)
+	return n == 4 && bytes.Equal(head, []byte("\x7fELF"))
 }

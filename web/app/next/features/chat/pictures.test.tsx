@@ -32,6 +32,12 @@ describe('pictures a message names', () => {
     expect(withoutPaths(`Сравни: было ${SHOT}, стало лучше`, LISTED)).toBe('Сравни: было , стало лучше');
   });
 
+  it('drops the list items a path leaves empty', () => {
+    expect(withoutPaths(`Готово:\n\n1. ${PASTE}\n2. \`${SHOT}\`\n\nВсё.`, LISTED)).toBe('Готово:\n\nВсё.');
+    expect(withoutPaths(`Готово:\n- ${SHOT}\n* ${PASTE}`, LISTED)).toBe('Готово:');
+    expect(withoutPaths(`1. Было ${SHOT}\n2. Стало`, LISTED)).toBe('1. Было\n2. Стало');
+  });
+
   it('shows a card under the agent text, and a picture that does not load leaves none', () => {
     render(
       <MessagePictures.Provider value={{ pictures: LISTED, srcOf }}>
