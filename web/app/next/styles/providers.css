@@ -175,6 +175,12 @@
 .hx-acct--solo {
   padding: 14px 16px;
 }
+/* A card that is only a switch (Авто): the switch block without the rule and indent it has at a card's foot. */
+.hx-acct--switch .hx-gpt {
+  margin: 0;
+  padding-top: 0;
+  border-top: 0;
+}
 .hx-acct__how {
   display: flex;
   flex-direction: column;

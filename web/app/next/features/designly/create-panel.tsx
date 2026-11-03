@@ -4,9 +4,11 @@
 // closes on the scrim, the cross, «Готово», Esc and, on the phone, a swipe down. The design system is its first
 // block: a short list, the one picked ticked.
 import { useEffect, useEffectEvent, useLayoutEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { IDesignSystem } from '@/next/features/designly/api';
 import Icon from '@/next/ui/icon';
 import { SheetGrip, useFocusTrap, useSheetDrag } from '@/next/ui/sheet';
+import { usePortalContainer } from '@/next/ui/portal';
 import { usePresentFlag } from '@/next/ui/presence';
 import { useMedia } from '@/next/ui/use-media';
 import { t } from '@/next/i18n';
@@ -52,6 +54,8 @@ const CreatePanel = ({ open, onClose, anchor, label, children }: ICreatePanelPro
   const { mounted, state } = usePresentFlag(open, phone ? EXIT_PHONE_MS : EXIT_WIDE_MS);
   const [box, setBox] = useState<HTMLElement | null>(null);
   const close = useEffectEvent(onClose);
+  // The start's hero moves with the scroll (a transform), which would take a fixed panel along: it opens outside it.
+  const container = usePortalContainer();
 
   useEffect(() => {
     if (!open) return;
@@ -73,7 +77,7 @@ const CreatePanel = ({ open, onClose, anchor, label, children }: ICreatePanelPro
   }, [box, anchor, phone, mounted]);
 
   if (!mounted) return null;
-  return (
+  return createPortal(
     <>
       <div className="hx-deck-scrim" data-state={state} onClick={onClose} aria-hidden="true" />
       <section
@@ -104,7 +108,8 @@ const CreatePanel = ({ open, onClose, anchor, label, children }: ICreatePanelPro
           {t('next.deck.settings.done')}
         </button>
       </section>
-    </>
+    </>,
+    container?.current ?? document.body,
   );
 };
 

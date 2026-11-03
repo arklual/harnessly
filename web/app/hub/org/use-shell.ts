@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { OrgApi } from './api';
 import type { ShellData } from './types';
@@ -17,8 +17,11 @@ export const useShellLoad = (api: OrgApi, org: string, scopeSlug: string) => {
       alive = false;
     };
   }, [api, org, scopeSlug, tick]);
+  const refresh = useCallback(() => setTick((n) => n + 1), []);
   return {
     ...state,
+    /** Fetches again without clearing what is shown (the tenant was renamed). */
+    refresh,
     reload: () => {
       setState({ data: null, error: null });
       setTick((n) => n + 1);

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
@@ -121,6 +122,15 @@ func (a *Access) saveBytes(w http.ResponseWriter, r *http.Request, real string, 
 	if err := os.Chmod(tmp.Name(), st.Mode().Perm()); err != nil {
 		failed()
 		return
+	}
+	// The kernel stamps files by a coarse clock: a save of the same size in the same tick
+	// would carry the old revision, and a stale save over it would pass. Step past it.
+	if saved, err := os.Stat(tmp.Name()); err == nil && !saved.ModTime().After(st.ModTime()) {
+		later := st.ModTime().Add(time.Microsecond)
+		if err := os.Chtimes(tmp.Name(), later, later); err != nil {
+			failed()
+			return
+		}
 	}
 	a.keepVersion(real, st)
 	if err := os.Rename(tmp.Name(), real); err != nil {

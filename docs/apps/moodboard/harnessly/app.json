@@ -3,7 +3,7 @@
   "name": "Мудборд",
   "description": "Новый тип документа Sinopia: доска с карточками-идеями, весь формат собран из SDK приложения",
   "version": "0.1.0",
-  "harnessly": ">=0.17.0",
+  "harnessly": ">=0.16.68",
   "trust": "sandboxed",
   "targets": ["sinopia.acme.moodboard"],
   "activation": { "on": ["document"] },

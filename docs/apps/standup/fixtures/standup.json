@@ -1,0 +1,33 @@
+{
+  "tools": [
+    {
+      "name": "list_entries",
+      "description": "The day's standup entries as JSON. Each has updatedBy: 'person' means the person edited it in the window.",
+      "inputSchema": { "type": "object", "properties": { "date": { "type": "string" } } },
+      "result": "{\"date\":\"2026-11-03\",\"entries\":[{\"id\":\"e-dana\",\"person\":\"Дана\",\"yesterday\":\"ревью API\",\"today\":\"починить логин\",\"blockers\":\"нет\",\"updatedAt\":\"2026-11-03T06:00:00.000Z\",\"updatedBy\":\"agent\"}]}"
+    },
+    {
+      "name": "save_entry",
+      "description": "Creates one teammate's update for the day, or changes the texts passed and keeps the others, in the teammate's own words. Refuses to empty an entry, and to change one the person edited unless expectedUpdatedAt is its current updatedAt.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "person": { "type": "string" },
+          "yesterday": { "type": "string" },
+          "today": { "type": "string" },
+          "blockers": { "type": "string" },
+          "expectedUpdatedAt": { "type": "string" },
+          "date": { "type": "string" }
+        },
+        "required": ["person"]
+      },
+      "result": "{\"saved\":{\"id\":\"e-1\",\"person\":\"Костя\",\"updatedBy\":\"agent\"}}"
+    },
+    {
+      "name": "show_standup",
+      "description": "Shows the day's entries as a card in the chat.",
+      "inputSchema": { "type": "object", "properties": { "date": { "type": "string" } } },
+      "result": "{\"_meta\":{\"ui\":{\"resourceUri\":\"ui://harnessly.standup/card\"}},\"data\":{\"date\":\"2026-11-03\"}}"
+    }
+  ]
+}

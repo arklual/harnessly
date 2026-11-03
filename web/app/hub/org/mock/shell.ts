@@ -3,6 +3,7 @@ import type { ShellApi } from '../api/shell';
 import { OrgApiError } from '../api/errors';
 import type { OrgChoice, TeamRef, TenantRef, Viewer } from '../types';
 import { later, type MockCtx } from './ctx';
+import { renamedTenants } from './tenant';
 
 export const TENANTS: TenantRef[] = [
   { id: 't-product', slug: 'product', name: 'Продукт', recent: true },
@@ -40,7 +41,10 @@ export const shellMock = (ctx: MockCtx): ShellApi => ({
     return later({
       viewer,
       org: { id: `org-${known.slug}`, slug: known.slug, name: known.name },
-      tenants: ctx.role === 'admin' ? TENANTS : TENANTS.slice(0, 1),
+      tenants: (ctx.role === 'admin' ? TENANTS : TENANTS.slice(0, 1)).map((t) => ({
+        ...t,
+        name: renamedTenants.get(t.id) ?? t.name,
+      })),
       teams: ctx.role === 'member' ? TEAMS.filter((t) => t.id === viewer.teamId) : TEAMS,
       orgs: ORGS,
     });

@@ -190,7 +190,7 @@ func newV2Live(d deps, c *core) *v2Live {
 		}
 	}
 	v.srv.HandoffDraft = (&v2Handoff{rt: v.rt, runtimeFile: os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")}).Draft
-	v.srv.Files = &v2Files{record: v.rt.Record, touched: v.rt.Touched}
+	v.srv.Files = &v2Files{record: v.rt.Record, touched: v.rt.Touched, delivered: v.rt.Delivered}
 	v.srv.Tasks = v.rt.Tasks
 	if terminals != nil {
 		v.srv.Rewind = v.rt
@@ -219,6 +219,10 @@ func newV2Live(d deps, c *core) *v2Live {
 	if c.agents != nil && c.agents.gpt != nil {
 		// The proxy that comes up or goes down by itself changes whether the gpt profile is offered.
 		c.agents.gpt.Notify(v.machine.republishProfiles)
+	}
+	if c.agents != nil && c.agents.router != nil {
+		// A subscription that rests after its limit, or comes back, changes what the auto profile can take.
+		c.agents.router.Notify(v.machine.republishProfiles)
 	}
 	// A key an agent printed (a `cat` of its file, an environment dump) leaves the machine masked.
 	wire.SetRedactor(v.profiles.Redact)

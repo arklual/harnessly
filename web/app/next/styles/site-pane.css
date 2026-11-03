@@ -32,12 +32,12 @@
   display: none;
 }
 /* The device keeps the pill's room under it (site-view's DOCK_ROOM). */
-.hx-site[data-variant='pane'] .hx-vparea:not([data-dev='fill']) {
+.hx-site[data-variant='pane'] .hx-vparea:not([data-dev='fill'], [data-dev='overview']) {
   padding-bottom: calc(24px + 64px);
 }
 /* A phone has no pill (site-view's dockShown): the device keeps only the area's own margin. */
 @media (max-width: 900px) {
-  .hx-site[data-variant='pane'] .hx-vparea:not([data-dev='fill']) {
+  .hx-site[data-variant='pane'] .hx-vparea:not([data-dev='fill'], [data-dev='overview']) {
     padding-bottom: 24px;
   }
 }
@@ -283,6 +283,10 @@
   bottom: 64px;
   width: min(600px, calc(100% - 24px));
 }
-.hx-site[data-variant='pane'][data-mode='island'] .hx-vparea:not([data-dev='fill']) {
+.hx-site[data-variant='pane'][data-mode='island'] .hx-vparea:not([data-dev='fill'], [data-dev='overview']) {
   padding-bottom: calc(24px + 64px + 64px);
+}
+/* «Обзор» has the pill's room in its row: the field over the pill is what the area adds (site-view's DOCK_ROOM). */
+.hx-site[data-variant='pane'][data-mode='island'] .hx-vparea[data-dev='overview'] {
+  padding-bottom: 64px;
 }

@@ -9,6 +9,7 @@ import { liveMember } from './live/member';
 import { liveOverview } from './live/overview';
 import { liveShell, roleIn, viewerTeam } from './live/shell';
 import { liveTeams } from './live/teams';
+import { liveTenant } from './live/tenant';
 
 export const liveOrgApi = (): OrgApi => {
   let here: { view: OrgView; scope: ApiScope } | null = null;
@@ -50,5 +51,6 @@ export const liveOrgApi = (): OrgApi => {
       return { org: view.org.slug, view, scope: team ? { kind: 'team', id: team } : scope };
     }),
     ...liveTeams(),
+    ...liveTenant(),
   };
 };

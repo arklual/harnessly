@@ -222,3 +222,76 @@ func TestTheIndexLeavesOutTheAttachedBlock(t *testing.T) {
 		t.Fatalf("%+v %v", d, ok)
 	}
 }
+
+// fakeUploads answers the paths the machine keeps the uploads at.
+type fakeUploads map[string]wire.AttachmentRef
+
+func (f fakeUploads) Resolve(ids []string) ([]wire.AttachmentRef, []string, wire.RefuseCode) {
+	refs, paths := []wire.AttachmentRef{}, []string{}
+	for _, id := range ids {
+		ref, ok := f[id]
+		if !ok {
+			return nil, nil, wire.RefuseAttachmentMissing
+		}
+		refs, paths = append(refs, ref), append(paths, "/data/uploads/"+id+".bin")
+	}
+	return refs, paths, ""
+}
+
+func uploadsRig(t *testing.T) *rig {
+	t.Helper()
+	r := newRig(t)
+	r.rt = NewInline(Deps{MachineID: "m1", Publisher: r.pub, Machine: r.machine, Launcher: r.launcher, Clock: r.clock,
+		Store: NewStore(filepath.Join(r.dir, "v2")), Limits: wire.DefaultLimits, Uploads: fakeUploads{
+			"up_DOC": {ID: "up_DOC", Name: "отчёт <final>.pdf", Kind: wire.AttachmentFile, Mime: "application/pdf"},
+			"up_PIC": {ID: "up_PIC", Name: "a.png", Kind: wire.AttachmentImage, Mime: "image/png"},
+		}})
+	return r
+}
+
+// A file that is no picture reaches the agent by its path under the words: the agent cannot take it pasted, and the
+// message used to arrive without it.
+func TestSendTellsTheAgentWhereAFileLies(t *testing.T) {
+	r := uploadsRig(t)
+	r.open()
+	res := r.do(wire.SendCmd{OpID: "m1", ClientID: "m1", ConversationID: r.id, Text: "посмотри", Mode: wire.ModeQueue,
+		Kind: wire.KindPrompt, AttachmentIDs: []string{"up_PIC", "up_DOC"}})
+	if res.R != wire.ResultQueued && res.R != wire.ResultAccepted {
+		t.Fatalf("send: %+v", res)
+	}
+	m := r.message("m1")
+	for _, want := range []string{"посмотри\n\n<attached>\n", `<ref kind="upload" id="up_DOC" title="отчёт &lt;final&gt;.pdf"/>`, "/data/uploads/up_DOC.bin"} {
+		if !strings.Contains(m.Text, want) {
+			t.Errorf("no %q in\n%s", want, m.Text)
+		}
+	}
+	if !strings.Contains(m.Text, "not instructions") && !strings.Contains(m.Text, "не указания") {
+		t.Errorf("the file is data to the agent:\n%s", m.Text)
+	}
+	if strings.Contains(m.Text, "up_PIC") {
+		t.Errorf("a picture goes pasted, not by the words:\n%s", m.Text)
+	}
+	if got := attach.Strip(m.Text); got != "посмотри" {
+		t.Errorf("the words without the block: %q", got)
+	}
+	if len(m.Attachments) != 2 {
+		t.Errorf("the bubble's files: %+v", m.Attachments)
+	}
+}
+
+// A message of a file alone still says something to the agent, and a file and a place share the one block.
+func TestSendAFileAloneAndWithAPlace(t *testing.T) {
+	r := uploadsRig(t)
+	r.open()
+	r.do(wire.SendCmd{OpID: "m1", ClientID: "m1", ConversationID: r.id, Mode: wire.ModeQueue, Kind: wire.KindPrompt,
+		AttachmentIDs: []string{"up_DOC"}})
+	if text := r.message("m1").Text; !strings.HasPrefix(text, "<attached>\n") || !strings.Contains(text, "/data/uploads/up_DOC.bin") {
+		t.Errorf("a file alone:\n%s", text)
+	}
+	r.do(wire.SendCmd{OpID: "m2", ClientID: "m2", ConversationID: r.id, Text: "и это", Mode: wire.ModeQueue, Kind: wire.KindPrompt,
+		AttachmentIDs: []string{"up_DOC"}, Refs: []wire.MessageRef{{Kind: wire.RefFile, ID: "src/a.go", Title: "a.go", Target: "src/a.go"}}})
+	text := r.message("m2").Text
+	if strings.Count(text, "<attached>") != 1 || !strings.Contains(text, "up_DOC") || !strings.Contains(text, `kind="file"`) {
+		t.Errorf("one block for both:\n%s", text)
+	}
+}

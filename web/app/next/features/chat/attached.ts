@@ -2,11 +2,13 @@
 // the runtime writes them under the person's words (internal/attach): one `<attached>` block at the end of the text, a
 // line per place led by `<ref kind=".." id=".." title=".."/>`. The page never shows the block: it reads it back into
 // chips, the words stay the person's own.
-import { REF_KINDS, type MessageRef, type RefKind } from '@/next/protocol/v2';
+import { REF_KINDS, type AttachmentRef, type MessageRef, type RefKind } from '@/next/protocol/v2';
 
 /** The block at the very end of a text, after a blank line or alone. */
 const BLOCK_RE = /(?:^|\n\n)<attached>\n([\s\S]*?)\n<\/attached>\s*$/;
 const REF_RE = /^<ref kind="([a-z]+)" id="([^"]*)" title="([^"]*)"\/>/;
+/** A file the person uploaded with the message (attach.UploadItem): a file of the bubble, not a place. */
+const UPLOAD_RE = /^<ref kind="upload" id="([^"]*)" title="([^"]*)"\/>/;
 
 const unescape = (s: string): string =>
   s.replace(/&(quot|lt|gt|amp);/g, (_, name: string) => {
@@ -40,6 +42,23 @@ export const readAttached = (text: string): IAttachedRead => {
     return [{ kind, id, title: unescape(tag[3]), target: kind === 'design' ? '' : id }];
   });
   return { text: text.slice(0, m.index).trimEnd(), refs };
+};
+
+/**
+ * The files of a message: its own attachments and the uploads its block names. A message read back from the transcript
+ * has no attachments of its own, and its files stay in the bubble by the block.
+ */
+export const filesOf = (text: string, own: readonly AttachmentRef[]): AttachmentRef[] => {
+  const block = BLOCK_RE.exec(text);
+  if (!block) return [...own];
+  const named = block[1].split('\n').flatMap((line): AttachmentRef[] => {
+    const tag = UPLOAD_RE.exec(line);
+    if (!tag) return [];
+    const id = unescape(tag[1]);
+    if (own.some((file) => file.id === id)) return [];
+    return [{ id, name: unescape(tag[2]), kind: 'file', mime: 'application/octet-stream' }];
+  });
+  return [...own, ...named];
 };
 
 /**

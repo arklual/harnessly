@@ -6,6 +6,13 @@
 .hx-sinopia__main {
   display: contents;
 }
+/* In the right pane the wrapper stands between the body and the editor, so the body's rules for a direct child
+   (site-pane.css, deck.css) do not see it: the body gives the editor its height here, with or without a panel. */
+.hx-pane__body:has(> .hx-sinopia) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .hx-sinopia[data-aside] {
   position: relative;
   display: flex;

@@ -1,15 +1,38 @@
-// Designly's start (the design's .hx-dl): «Что нарисуем?» with the field on top, what to make under it, and the
-// library below — the machine's designs as cards with their pictures. Scrolled, the field goes up and the library's
-// row sticks. A card opens the design; a brief sent starts a project and its agent, and its card draws while it works.
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+// Designly's start (the design's .hx-dl): «Что нарисуем?» with the one field on top, what to make under it, and the
+// library below — the machine's designs as cards with their pictures. A tile switches the kind in place: the field,
+// its text and its files stay, «Настройки» offers what the kind has. Scrolled, the field goes up and the library's row
+// sticks. A card opens the design; a brief sent starts a project and its agent, and its card draws while it works.
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type RefObject,
+} from 'react';
 import Modal from '@/next/features/shell/modal';
 import { Button } from '@/next/ui/button';
 import Icon from '@/next/ui/icon';
-import DsPicker from '@/next/features/designly/ds-picker';
+import CreatePanel, { DsChoice } from '@/next/features/designly/create-panel';
+import { DeckFound, deckSettingsLabel, useDeckStart } from '@/next/features/designly/deck/deck-start';
+import DeckSettings from '@/next/features/designly/deck/deck-settings';
+import { isPptx } from '@/next/features/designly/deck/create-settings';
+import VideoSettings, { videoSettingsLabel } from '@/next/features/designly/video/video-settings';
+import {
+  DEFAULT_VIDEO_SETTINGS,
+  toWireVideo,
+  type IVideoCreateSettings,
+} from '@/next/features/designly/video/video-create-settings';
 import { RecordingTime, RecordingWave } from '@/next/features/composer/composer';
 import ModelPicker, { type IModelPickerProps } from '@/next/features/composer/model-picker';
 import type { Recording } from '@/next/features/composer/types';
+import type { IUploads } from '@/next/bindings/use-uploads';
 import { RoundButton } from '@/next/ui/button';
+import { useFieldEdges, useFitField } from '@/next/ui/use-fit-field';
+import { useStableFn } from '@/next/ui/use-stable-fn';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
 import Swap from '@/next/ui/swap';
 import { usePresence } from '@/next/ui/presence';
@@ -23,7 +46,7 @@ import {
   type TDesignScope,
 } from '@/next/features/designly/owners';
 import type { IAppKind } from '@/next/features/app-catalog/api';
-import type { DesignOwner } from '@/next/protocol/v2';
+import type { DesignlyDeck, DesignlyVideo, DesignOwner, MachineId } from '@/next/protocol/v2';
 import { plural, t } from '@/next/i18n';
 import { formatAgoFull } from '@/next/i18n/format';
 import '@/next/styles/designly.css';
@@ -58,23 +81,35 @@ export interface IDesignCard {
   appKind?: string;
 }
 
-/** The start of a project: the brief's field, the kinds, the model and the design system. */
+/** What the field sends: the brief with what its kind adds. */
+export interface IDesignStart {
+  brief: string;
+  kind: TDesignKind;
+  /** The machine's design system it is built on; null for none. */
+  designSystem: string | null;
+  deck: DesignlyDeck | null;
+  video: DesignlyVideo | null;
+  attachmentIds: string[];
+}
+
+/** The start of a project: the brief's field, the kinds, the model and the settings of each kind. */
 export interface IDesignlyCompose {
+  machine: MachineId;
+  /** The kind the field opens on; an address of its own can ask for one. */
+  initialKind?: TDesignKind;
   /** The design systems a new project can take; null while they load. */
   systems: readonly IDesignSystem[] | null;
-  /** Sending a brief: resolves once the project and its agent exist (the card is in the list then). */
-  onCreate: (brief: string, kind: TDesignKind, designSystem: string | null) => Promise<void>;
+  /** Sending a brief: resolves once the project and its agent exist; rejects (the caller says why) when they do not. */
+  onCreate: (start: IDesignStart) => Promise<void>;
   /** The brief in the field; the screen keeps it so dictation can write into it. */
   brief: string;
   onBrief: (value: string) => void;
+  /** The files going with the brief. */
+  uploads: IUploads;
   /** The agent, model and depth that draw, as in the chat; null while the machine's agents are unknown. */
   picker: IModelPickerProps | null;
   /** Dictation into the brief; without onMic the microphone is not offered. */
   voice: IDesignlyVoice;
-  /** The Presentation tile: a deck is made on its own create screen, with the brief typed so far. */
-  onDeck?: () => void;
-  /** The Video tile: a video is made on its own create screen, with the brief typed so far. */
-  onVideo?: () => void;
   /** The document types installed apps add; a tile each. null while they load or when the machine lists none. */
   appKinds?: readonly IAppKind[] | null;
   /** A new document of an app's type, named by the brief typed so far; resolves once it is made, rejects (the caller says why). */
@@ -95,13 +130,6 @@ export interface IDesignlyHomeProps {
   /** Where a project is started; null is the library alone (the right pane's: its chat is the field). */
   compose: IDesignlyCompose | null;
   /** What the machine lacks for designs, with the command that fixes it; null when nothing is missing. */
-  notice?: IDesignlyNotice | null;
-}
-
-export interface IDesignlyNotice {
-  title: string;
-  text: string;
-  command: string | null;
 }
 
 export interface IDesignlyVoice {
@@ -230,68 +258,143 @@ interface IHeroProps extends IDesignlyCompose {
   inputRef: RefObject<HTMLTextAreaElement | null>;
 }
 
-/** «Что нарисуем?»: the field with its model, design system and microphone, and the kinds under it. */
+/** «Что нарисуем?»: the one field with its files, settings, model and microphone, and the kinds under it. */
 const Hero = ({
+  machine,
+  initialKind = DESIGN_KIND.site,
   systems,
   onCreate,
   brief,
   onBrief,
+  uploads,
   picker,
   voice,
-  onDeck,
-  onVideo,
   appKinds = null,
   onAppKind,
   inputRef,
 }: IHeroProps) => {
-  const [kind, setKind] = useState<TDesignKind>(DESIGN_KIND.site);
+  const [kind, setKind] = useState<TDesignKind>(initialKind);
   // The app type being made: one at a time, the tile waits for the machine's answer.
   const [making, setMaking] = useState<string | null>(null);
   const [ds, setDs] = useState<string | null>(null);
+  const [videoSettings, setVideoSettings] = useState<IVideoCreateSettings>(DEFAULT_VIDEO_SETTINGS);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [box, setBox] = useState<HTMLElement | null>(null);
   const { value: bar, state: barState } = usePresence(voice.recording, REC_EXIT_MS);
   const [sending, setSending] = useState(false);
   const startsRef = useRef<HTMLDivElement>(null);
+  const filePicker = useRef<HTMLInputElement>(null);
   const hsStep = useHScroll(startsRef);
+  const templatePicker = useRef<HTMLInputElement>(null);
+  const deck = useDeckStart({
+    machine,
+    uploads,
+    ds,
+    onDs: setDs,
+    active: kind === DESIGN_KIND.slides,
+    templatePicker,
+  });
+  useFitField(inputRef, brief);
+  useFieldEdges(inputRef, brief);
+
+  const offered = systems ?? [];
+  const system = offered.find((x) => x.id === ds)?.label ?? null;
+  const isDeck = kind === DESIGN_KIND.slides;
+  const isVideo = kind === DESIGN_KIND.video;
+  const hasSettings = kind !== DESIGN_KIND.ds;
+  const busy = sending || uploads.uploading || (isDeck && deck.reading);
+
+  const settingsLabel = () => {
+    if (isDeck)
+      return deckSettingsLabel(deck.settings, system ?? (deck.styled ? deck.style?.name : null) ?? null);
+    if (isVideo) return videoSettingsLabel(videoSettings, system);
+    return system ?? t('next.deck.create.settingsChip');
+  };
+  const label = settingsLabel();
 
   const send = () => {
     const text = brief.trim();
-    if (sending) return;
+    if (busy) return;
     // An empty field is not an error: the button takes the person back to it, as the design does.
     if (!text) {
       inputRef.current?.focus();
       return;
     }
     setSending(true);
-    void onCreate(text, kind, kind === DESIGN_KIND.ds ? null : ds)
+    void onCreate({
+      brief: text,
+      kind,
+      designSystem: hasSettings ? ds : null,
+      deck: isDeck ? deck.wire() : null,
+      video: isVideo ? toWireVideo(videoSettings) : null,
+      attachmentIds: uploads.ready.map((a) => a.id),
+    })
+      .then(() => deck.reset())
       // A refusal is said by the caller; the brief stays in the field to send again.
-      .then(
-        () => onBrief(''),
-        () => undefined,
-      )
+      .catch(() => undefined)
       .finally(() => setSending(false));
   };
   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       send();
     }
+  };
+  const pickFiles = (event: ChangeEvent<HTMLInputElement>) => {
+    deck.addFiles([...(event.target.files ?? [])]);
+    event.target.value = '';
   };
 
   return (
     <div className="hx-dl__hero">
       <div className="hx-dl__title">{t('next.designly.title')}</div>
       <div className="hx-dl__sub">{t('next.designly.sub')}</div>
-      <div className="hx-dl__composer">
+      <div className="hx-dl__composer" ref={setBox}>
         <textarea
           ref={inputRef}
           className="hx-dl__input"
           rows={2}
           value={brief}
+          aria-label={t('next.designly.brief')}
           placeholder={t(`next.designly.hint.${kind}`)}
           disabled={sending}
           onChange={(event) => onBrief(event.target.value)}
           onKeyDown={onKey}
         />
+        {uploads.attachments.length > 0 && (
+          <div className="hx-deck-files">
+            {uploads.attachments.map((a) => {
+              const template = isDeck && isPptx(a.name);
+              const read = deck.reads.find((r) => r.name === a.name);
+              return (
+                <span key={a.id} className="hx-deck-file" data-state={a.status} title={a.error ?? undefined}>
+                  <Icon
+                    name={a.status === 'uploading' ? 'loader-circle' : template ? 'layers' : 'file-text'}
+                    size="sm"
+                  />
+                  {a.name}
+                  {template && read?.state === 'ok' && <small>{t('next.deck.create.styleChip')}</small>}
+                  {a.status === 'error' && (
+                    <button
+                      type="button"
+                      aria-label={t('next.composer.retryAttachment', { name: a.name })}
+                      onClick={() => uploads.onRetry(a.id)}
+                    >
+                      <Icon name="rotate-ccw" size="sm" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={t('next.composer.removeAttachment', { name: a.name })}
+                    onClick={() => deck.removeFile(a.id, a.name)}
+                  >
+                    <Icon name="x" size="sm" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
         {bar && (
           <div className="hx-dl__bar hx-recbar" data-state={barState}>
             <RoundButton
@@ -322,27 +425,51 @@ const Hero = ({
           </div>
         )}
         <div className="hx-dl__bar" hidden={bar !== null}>
+          <input ref={filePicker} type="file" multiple hidden tabIndex={-1} onChange={pickFiles} />
+          <input ref={templatePicker} type="file" accept=".pptx" hidden tabIndex={-1} onChange={pickFiles} />
+          <button
+            type="button"
+            className="hx-btn"
+            data-variant="ghost"
+            data-size="sm"
+            data-shape="icon"
+            aria-label={t('next.designly.attach')}
+            onClick={() => filePicker.current?.click()}
+          >
+            <Icon name="paperclip" />
+          </button>
+          {hasSettings && (
+            <button
+              type="button"
+              className="hx-deck-chip"
+              data-on={settingsOpen || label !== t('next.deck.create.settingsChip') ? '1' : '0'}
+              aria-expanded={settingsOpen}
+              aria-haspopup="dialog"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Icon name="sliders-horizontal" size="sm" />
+              <span className="hx-deck-chip__text">{label}</span>
+            </button>
+          )}
+          <span className="hx-spacer" />
           {picker && (
             <div className="hx-dl__model">
               <ModelPicker {...picker} />
             </div>
           )}
-          <span className="hx-spacer" />
-          <DsPicker systems={systems ?? []} value={ds} shown={kind !== DESIGN_KIND.ds} onChange={setDs} />
           {voice.onMic && <RoundButton icon="mic" label={t('next.composer.voice')} onClick={voice.onMic} />}
-          <button
-            type="button"
-            className="hx-round"
-            data-variant="accent"
-            aria-label={t('next.designly.send')}
-            aria-busy={sending || undefined}
-            disabled={sending}
+          <RoundButton
+            icon="arrow-up"
+            variant="accent"
+            label={t('next.designly.send')}
+            keys={['↵']}
+            busy={busy}
+            disabled={busy}
             onClick={send}
-          >
-            <Icon name={sending ? 'loader-circle' : 'arrow-up'} />
-          </button>
+          />
         </div>
       </div>
+      {isDeck && deck.styled && deck.style && <DeckFound style={deck.style} />}
       <div className="hx-hs">
         <button
           type="button"
@@ -378,14 +505,6 @@ const Hero = ({
               role="radio"
               aria-checked={k === kind}
               onClick={() => {
-                if (k === DESIGN_KIND.slides && onDeck) {
-                  onDeck();
-                  return;
-                }
-                if (k === DESIGN_KIND.video && onVideo) {
-                  onVideo();
-                  return;
-                }
                 setKind(k);
                 inputRef.current?.focus();
               }}
@@ -428,6 +547,47 @@ const Hero = ({
             ))}
         </div>
       </div>
+      {isDeck && (
+        <DeckSettings
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          settings={deck.settings}
+          onChange={deck.changeSettings}
+          styleName={deck.style?.name ?? null}
+          anchor={box}
+          systems={offered}
+          ds={ds}
+          onDs={deck.chooseSystem}
+          template={{
+            label: t('next.deck.create.dsTemplate'),
+            desc: deck.style?.name ?? t('next.deck.create.dsTemplateDesc'),
+            active: deck.styled,
+            onPick: deck.chooseTemplate,
+          }}
+        />
+      )}
+      {isVideo && (
+        <VideoSettings
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          anchor={box}
+          settings={videoSettings}
+          onChange={setVideoSettings}
+          systems={offered}
+          ds={ds}
+          onDs={setDs}
+        />
+      )}
+      {kind === DESIGN_KIND.site && (
+        <CreatePanel
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          anchor={box}
+          label={t('next.deck.create.settingsChip')}
+        >
+          <DsChoice systems={offered} value={ds} onChange={setDs} />
+        </CreatePanel>
+      )}
     </div>
   );
 };
@@ -440,6 +600,101 @@ const cardSub = (card: IDesignCard, now: number): string => {
   return `${plural(card.boards, `next.designly.units.${card.kind}`)} · ${ago}`;
 };
 
+interface IDesignCardProps {
+  card: IDesignCard;
+  index: number;
+  now: number;
+  pinning: boolean;
+  deletable: boolean;
+  onOpen: (id: string) => void;
+  onPin: (card: IDesignCard) => void;
+  onDelete: (card: IDesignCard) => void;
+}
+
+/** One card of the library. Memoized: a keystroke in the field above does not draw the library again. */
+const DesignCard = memo(
+  ({ card, index, now, pinning, deletable, onOpen, onPin, onDelete }: IDesignCardProps) => (
+    <div
+      data-id={card.id}
+      className="hx-dl-card"
+      data-state={card.drawing ? 'gen' : 'ready'}
+      data-pinned={card.pinned}
+      data-i={Math.min(index, 8)}
+      tabIndex={0}
+      role="button"
+      aria-label={card.title}
+      onClick={() => onOpen(card.id)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' && event.target === event.currentTarget) onOpen(card.id);
+      }}
+    >
+      <div className="hx-dl-card__shot">
+        <CardShot image={card.image} />
+        <span className="hx-dl-card__alt" />
+        {!card.appKind && (
+          <button
+            type="button"
+            className="hx-dl-card__pin hx-tipped"
+            aria-pressed={card.pinned}
+            aria-busy={pinning || undefined}
+            aria-label={card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
+            disabled={pinning}
+            onClick={(event) => {
+              event.stopPropagation();
+              onPin(card);
+            }}
+          >
+            <Icon name="pin" size="sm" />
+            <span className="hx-tip" data-pos="below" data-align="end">
+              {card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
+            </span>
+          </button>
+        )}
+        {deletable && (
+          <button
+            type="button"
+            className="hx-dl-card__del hx-tipped"
+            aria-label={t('next.designly.delete')}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(card);
+            }}
+          >
+            <Icon name="trash-2" size="sm" />
+            <span className="hx-tip" data-pos="below" data-align="start">
+              {t('next.designly.delete')}
+            </span>
+          </button>
+        )}
+        <span className="hx-dl-card__gen">
+          <Icon name="loader-circle" size="sm" />
+          {t('next.designly.drawing')}
+        </span>
+      </div>
+      <div className="hx-dl-card__meta">
+        <span className="hx-dl-card__text">
+          <span className="hx-dl-card__title">{card.title}</span>
+          <span className="hx-dl-card__sub">
+            <Icon name={card.appKind ? 'blocks' : KIND_ICON[card.kind]} size="sm" />
+            {cardSub(card, now)}
+          </span>
+        </span>
+        {card.owner && (
+          <span
+            className="hx-dl-card__who"
+            role="img"
+            aria-label={t('next.designly.owner', { name: card.owner.name })}
+            title={t('next.designly.owner', { name: card.owner.name })}
+          >
+            {initialOf(card.owner.name)}
+          </span>
+        )}
+      </div>
+    </div>
+  ),
+);
+DesignCard.displayName = 'DesignCard';
+
 const DesignlyHome = ({
   cards,
   error,
@@ -449,7 +704,6 @@ const DesignlyHome = ({
   onOpen,
   onRetry,
   compose,
-  notice = null,
 }: IDesignlyHomeProps) => {
   const [pinning, setPinning] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<IDesignCard | null>(null);
@@ -501,10 +755,13 @@ const DesignlyHome = ({
 
   const q = query.trim().toLowerCase();
   // Pinned first, then the latest change.
-  const shown =
-    cards
-      ?.filter((c) => inScope(scope, c.owner) && (!q || c.title.toLowerCase().includes(q)))
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt) ?? null;
+  const shown = useMemo(
+    () =>
+      cards
+        ?.filter((c) => inScope(scope, c.owner) && (!q || c.title.toLowerCase().includes(q)))
+        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt) ?? null,
+    [cards, scope, q],
+  );
 
   // Pinning: the cards were measured before the machine kept the pin; when the new order is on screen, each one
   // travels from its old place (FLIP: all reads first, then the animations). Not with reduced motion.
@@ -531,7 +788,8 @@ const DesignlyHome = ({
     });
   }, [order]);
 
-  const pin = (card: IDesignCard) => {
+  const open = useStableFn(onOpen);
+  const pin = useStableFn((card: IDesignCard) => {
     const grid = gridRef.current;
     const rects = new Map<string, DOMRect>();
     for (const el of grid?.children ?? []) {
@@ -549,7 +807,7 @@ const DesignlyHome = ({
           flipFrom.current = null;
         }, FLIP_KEEP_MS);
       });
-  };
+  });
 
   const confirmDelete = () => {
     if (!deleting || !onDelete || deleteBusy) return;
@@ -566,13 +824,6 @@ const DesignlyHome = ({
   return (
     <section className="hx-dl" ref={rootRef} data-library={compose === null}>
       {compose && <Hero {...compose} inputRef={inputRef} />}
-      {notice && (
-        <div className="hx-dl__notice" role="status">
-          <div className="hx-dl__notice-title">{notice.title}</div>
-          <div className="hx-dl__notice-text">{notice.text}</div>
-          {notice.command && <code className="hx-dl__notice-cmd">{notice.command}</code>}
-        </div>
-      )}
 
       <div className="hx-dl__body">
         <div className="hx-dl__toolbar">
@@ -592,7 +843,7 @@ const DesignlyHome = ({
             ))}
           </div>
           <span className="hx-spacer" />
-          <label className="hx-dl__search">
+          <label className="hx-dl__search" data-filled={query !== ''}>
             <Icon name="search" size="sm" />
             <input
               type="search"
@@ -623,84 +874,17 @@ const DesignlyHome = ({
             {shown && shown.length > 0 && (
               <div className="hx-dl__grid" ref={gridRef}>
                 {shown.map((card, i) => (
-                  <div
+                  <DesignCard
                     key={card.id}
-                    data-id={card.id}
-                    className="hx-dl-card"
-                    data-state={card.drawing ? 'gen' : 'ready'}
-                    data-pinned={card.pinned}
-                    data-i={Math.min(i, 8)}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={card.title}
-                    onClick={() => onOpen(card.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && event.target === event.currentTarget) onOpen(card.id);
-                    }}
-                  >
-                    <div className="hx-dl-card__shot">
-                      <CardShot image={card.image} />
-                      <span className="hx-dl-card__alt" />
-                      {!card.appKind && (
-                        <button
-                          type="button"
-                          className="hx-dl-card__pin hx-tipped"
-                          aria-pressed={card.pinned}
-                          aria-busy={pinning === card.id || undefined}
-                          aria-label={card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
-                          disabled={pinning === card.id}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            pin(card);
-                          }}
-                        >
-                          <Icon name="pin" size="sm" />
-                          <span className="hx-tip" data-pos="below" data-align="end">
-                            {card.pinned ? t('next.designly.unpin') : t('next.designly.pin')}
-                          </span>
-                        </button>
-                      )}
-                      {onDelete && card.canDelete && (
-                        <button
-                          type="button"
-                          className="hx-dl-card__del hx-tipped"
-                          aria-label={t('next.designly.delete')}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDeleting(card);
-                          }}
-                        >
-                          <Icon name="trash-2" size="sm" />
-                          <span className="hx-tip" data-pos="below" data-align="start">
-                            {t('next.designly.delete')}
-                          </span>
-                        </button>
-                      )}
-                      <span className="hx-dl-card__gen">
-                        <Icon name="loader-circle" size="sm" />
-                        {t('next.designly.drawing')}
-                      </span>
-                    </div>
-                    <div className="hx-dl-card__meta">
-                      <span className="hx-dl-card__text">
-                        <span className="hx-dl-card__title">{card.title}</span>
-                        <span className="hx-dl-card__sub">
-                          <Icon name={card.appKind ? 'blocks' : KIND_ICON[card.kind]} size="sm" />
-                          {cardSub(card, now)}
-                        </span>
-                      </span>
-                      {card.owner && (
-                        <span
-                          className="hx-dl-card__who"
-                          role="img"
-                          aria-label={t('next.designly.owner', { name: card.owner.name })}
-                          title={t('next.designly.owner', { name: card.owner.name })}
-                        >
-                          {initialOf(card.owner.name)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                    card={card}
+                    index={i}
+                    now={now}
+                    pinning={pinning === card.id}
+                    deletable={onDelete !== undefined && card.canDelete === true}
+                    onOpen={open}
+                    onPin={pin}
+                    onDelete={setDeleting}
+                  />
                 ))}
               </div>
             )}

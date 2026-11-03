@@ -643,6 +643,19 @@ func (f *Feed) Touched(p string) bool {
 	return false
 }
 
+// Delivered is the sha256 the agent's latest hand-over of the file at this path vouched for (deliver_file's card).
+func (f *Feed) Delivered(p string) (string, bool) {
+	sum, ok := "", false
+	for _, t := range f.b.turns {
+		for _, o := range t.rec.Outputs {
+			if o.Kind == wire.OutputDelivery && o.Ref == p && o.SHA256 != "" {
+				sum, ok = o.SHA256, true
+			}
+		}
+	}
+	return sum, ok
+}
+
 // Tasks is the agent's task list as the entries read so far make it, in the order the tasks were made.
 func (f *Feed) Tasks() []wire.Task { return f.b.tasks.all() }
 

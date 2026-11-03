@@ -24,7 +24,7 @@ func runSeed(ctx context.Context, args []string, lookup func(string) (string, bo
 		return 2
 	}
 	if *file == "" || fs.NArg() > 0 {
-		fmt.Fprintln(stderr, "usage: hub seed --file seed.yaml [--dry-run]")
+		fmt.Fprintln(stderr, "usage: hub seed --file seed.yaml [--dry-run]  (orgs: and offboard:, docs/hub/orgs.md)")
 		return 2
 	}
 	cfg, err := config.Load(lookup)

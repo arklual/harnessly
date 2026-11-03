@@ -837,6 +837,19 @@ func (r *Runtime) Touched(ctx context.Context, id, path string) (bool, error) {
 	return live(r, ctx, id, func(c *conv, now time.Time) (bool, error) { return c.fd.Touched(path), nil })
 }
 
+// Delivered is the sha256 of the file at this path as the agent handed it over in this conversation (deliver_file).
+func (r *Runtime) Delivered(ctx context.Context, id, path string) (string, bool, error) {
+	type got struct {
+		sum string
+		ok  bool
+	}
+	g, err := live(r, ctx, id, func(c *conv, now time.Time) (got, error) {
+		sum, ok := c.fd.Delivered(path)
+		return got{sum, ok}, nil
+	})
+	return g.sum, g.ok, err
+}
+
 func (r *Runtime) Tasks(ctx context.Context, id string) ([]wire.Task, error) {
 	return live(r, ctx, id, func(c *conv, now time.Time) ([]wire.Task, error) { return c.fd.Tasks(), nil })
 }

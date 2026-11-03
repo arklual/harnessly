@@ -141,7 +141,8 @@ test.beforeAll(async ({ browser }) => {
   await page.addLocatorHandler(
     page.locator('.hx-notices .hx-notice__x').first(),
     async (x) => {
-      await x.click();
+      // a notice that is sliding away is never "stable", and one that left must not hold the test up
+      await x.dispatchEvent('click', undefined, { timeout: 2_000 }).catch(() => undefined);
     },
     { noWaitAfter: true },
   );
@@ -207,6 +208,17 @@ test('2. the editor plays, and a seek shows a block only from its data-tk-at', a
       return `${res.status} ${body.artifacts?.find((a) => a.id === id)?.kind ?? 'absent'}`;
     }, project);
   await expect.poll(kind, { timeout: 300_000 }).toBe('200 video');
+  // A runtime that has just started has no preview slots yet: the editor would open on its failure.
+  const slots = () =>
+    page.evaluate(async () => {
+      const res = await fetch('/agents/api/preview/open?machine=local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      return res.status;
+    });
+  await expect.poll(slots, { timeout: 60_000 }).toBe(400);
   await page.goto(`${rt.url}/agents/designly/${project}`);
   await expect(track()).toBeVisible({ timeout: 300_000 });
   await expect(page.locator('.hx-video-tl__tile')).toHaveCount(3);

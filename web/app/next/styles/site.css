@@ -2430,9 +2430,11 @@
 }
 .hx-ovw__card {
   flex: none;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: calc(var(--w) * var(--s));
   animation: hx-dl-in 380ms var(--site-ease) backwards;
 }
 .hx-ovw__card:nth-child(2) {
@@ -2452,8 +2454,10 @@
   align-items: center;
   gap: 6px;
   align-self: flex-start;
+  max-width: 100%;
   height: 24px;
   padding: 0 8px 0 6px;
+  overflow: hidden;
   border: 0;
   border-radius: 6px;
   background: none;
@@ -2470,9 +2474,24 @@
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
+.hx-ovw__label .hx-icon {
+  flex: none;
+}
+.hx-ovw__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .hx-ovw__size {
+  flex: none;
   color: rgba(255, 255, 255, 0.45);
   font-variant-numeric: tabular-nums;
+}
+/* The label is no wider than its screen: on a small card the name stays, the sizes are in its tip. */
+@container (max-width: 180px) {
+  .hx-ovw__size {
+    display: none;
+  }
 }
 .hx-ovw__screen {
   position: relative;

@@ -222,6 +222,40 @@ func ReadProjectFile(root, relative string) (Object, *EditorError) {
 	return Object{{"path", relative}, {"content", string(data)}, {"revision", revisionOf(realRoot, target, data)}, {"bytes", len(data)}}, nil
 }
 
+// errNotAsHandedOver: a file handed over is no longer the one that was.
+var errNotAsHandedOver = func() *EditorError {
+	return &EditorError{409, locale.Pick("The file changed after it was handed over.", "Файл изменился после того, как его отдали.")}
+}
+
+// ReadDeliveredFile is a file the agent handed over on purpose (deliver_file), which may lie outside the project (in
+// /tmp). Only that one file opens: the path must be clean and absolute with no link in it, and the bytes must be the
+// ones the card vouched for (sha256), so a file swapped or replaced by a link after the hand-over is refused.
+func ReadDeliveredFile(file, sha string) (Object, *EditorError) {
+	if !filepath.IsAbs(file) || filepath.Clean(file) != file || strings.Contains(file, "\x00") || sha == "" {
+		return nil, errNotInProject()
+	}
+	real, err := Realpath(file)
+	if err != nil {
+		return nil, editorFail(err)
+	}
+	if real != file {
+		return nil, errLinkOutside()
+	}
+	f, err := openNoFollow(real, syscall.O_RDONLY)
+	if err != nil {
+		return nil, editorFail(err)
+	}
+	defer f.Close()
+	data, ee := readBounded(f)
+	if ee != nil {
+		return nil, ee
+	}
+	if sum := sha256.Sum256(data); hex.EncodeToString(sum[:]) != sha {
+		return nil, errNotAsHandedOver()
+	}
+	return Object{{"path", file}, {"content", string(data)}, {"revision", revisionOf(filepath.Dir(real), real, data)}, {"bytes", len(data)}}, nil
+}
+
 func openNoFollow(target string, mode int) (*os.File, error) {
 	fd, err := syscall.Open(target, mode|syscall.O_NOFOLLOW|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
 	if err != nil {

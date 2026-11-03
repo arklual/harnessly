@@ -166,7 +166,14 @@ export interface ISidebarProps {
   designs?: ISidebarDesigns | null;
   /** The installed apps that are on in the person's chats, under «Приложения»; null shows the item with no rows. */
   apps?: ISidebarApps | null;
+  /** «Документация», quiet under «Приложения»; none where the owner has no documentation. */
+  help?: ISidebarHelp;
   ref?: Ref<HTMLElement>;
+}
+
+export interface ISidebarHelp {
+  current: boolean;
+  onOpen: () => void;
 }
 
 export interface ISidebarApps {
@@ -466,6 +473,7 @@ const Sidebar = ({
   onSearch,
   onDesignly,
   apps = null,
+  help,
   onNotifications,
   onToggleRail,
   onCloseDrawer,
@@ -928,12 +936,21 @@ const Sidebar = ({
             {apps.rows.length > 0 && <AppRows apps={apps} />}
           </NavItem>
         )}
+        {help && (
+          <NavItem
+            icon="book-open"
+            label={t('next.sidebar.help')}
+            current={help.current}
+            index={4}
+            onClick={help.onOpen}
+          />
+        )}
         <NavItem
           icon="bell"
           label={t('next.sidebar.notifications')}
           current={notificationsOpen}
           dot={unread}
-          index={4}
+          index={5}
           onClick={onNotifications}
         />
         {more.length > 0 && (
@@ -941,7 +958,7 @@ const Sidebar = ({
             icon="layout-grid"
             label={t('next.sidebar.more')}
             expanded={moreOpen}
-            index={5}
+            index={6}
             onClick={(anchor) => {
               if (isRail(anchor)) onToggleRail();
               setMoreOpen((current) => !current);

@@ -76,6 +76,7 @@ set up inside a tab. Which skills follow which service is configured:
 | Skill | When | What the agent learns |
 | --- | --- | --- |
 | `harnessly` | always | the [`harnessly` command](#the-harnessly-command): show a document, board, file or dev server in the right pane, start and read another agent in a new tab |
+| `apps` | always | how to write a plugin or an app: it sends the agent to the guide in the binary, `harnessly app docs` |
 | `boards` | `RUNTIME_BOARDS_URL` | read a board from its link as text, draw a diagram from a node and edge graph, edit shapes, answer comments (the `boards` command) |
 | `artifacts` | `RUNTIME_ARTIFACTS_URL` | search the catalog before writing, publish, publish a new version under the same slug, share only when asked (the `artifacts` command) |
 

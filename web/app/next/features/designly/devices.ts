@@ -235,10 +235,9 @@ export const viewportVars = (vp: IViewport, device: IDevice): Record<string, str
   return vars;
 };
 
-/** The devices «Обзор» shows side by side, and the least scale they are drawn at. */
+/** The devices «Обзор» shows side by side. */
 export const OVERVIEW_IDS = ['ip15', 'px7', 'ipad', 'lap'] as const;
 const OVERVIEW_GAP = 28;
-const OVERVIEW_MIN_SCALE = 0.2;
 
 export interface IOverviewCard {
   device: IDevice;
@@ -256,7 +255,7 @@ export const overviewOf = (area: ISize, underField: boolean): IOverviewCard[] =>
   const across = area.w - 48 - OVERVIEW_GAP * (devices.length - 1);
   const sum = devices.reduce((total, d) => total + (d.vw ?? 0), 0);
   const tallest = Math.max(...devices.map((d) => d.vh ?? 0));
-  const scale = Math.max(OVERVIEW_MIN_SCALE, Math.min(1, across / sum, room / tallest));
+  const scale = Math.max(MIN_FIT, Math.min(1, across / sum, room / tallest));
   return devices.map((device) => ({ device, w: device.vw ?? 0, h: device.vh ?? 0, scale }));
 };
 

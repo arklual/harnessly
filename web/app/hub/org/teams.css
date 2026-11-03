@@ -541,3 +541,58 @@
     display: none;
   }
 }
+
+/* Invitations and the tenant's settings */
+.ht-invite {
+  display: flex;
+  flex-direction: column;
+}
+.ht-invite__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.ht-invite__row .k-field {
+  flex: 1;
+  min-width: 0;
+}
+.ht-invite__fresh {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--k-border);
+}
+.ht-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ht-list__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  font-size: var(--k-text-s);
+}
+.ht-list__row[data-busy] {
+  opacity: 0.6;
+}
+.ht-list__who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 8rem;
+}
+.ht-list__who small {
+  color: var(--k-text-muted);
+  font-size: var(--k-text-xs);
+}
+.ht-list__foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}

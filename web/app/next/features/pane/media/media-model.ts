@@ -38,6 +38,12 @@ const KEYS: Readonly<Record<string, TMediaAction>> = {
 
 export const mediaActionOf = (code: string): TMediaAction | null => KEYS[code] ?? null;
 
+/** Where a video opens: a hair past the start, so that the browser shows the first frame instead of a black one. */
+export const FIRST_FRAME_AT = 0.001;
+
+/** The file stands somewhere the person put it: where it opens does not count as a moment they chose. */
+export const movedFromStart = (time: number): boolean => time > FIRST_FRAME_AT;
+
 /** The tenth of the file a digit key goes to; null for any other key. */
 export const tenthOf = (code: string): number | null => {
   const found = /^(?:Digit|Numpad)(\d)$/.exec(code);

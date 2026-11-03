@@ -2,20 +2,22 @@
 // conversation in its folder works), starts a new project from a brief and waits for the runtime before the field
 // clears — the card comes from the library itself. A pin waits for the machine too.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import DesignlyHome, { type IDesignCard, type TDesignKind } from '@/next/features/designly/designly-home';
+import DesignlyHome, {
+  DESIGN_KIND,
+  type IDesignCard,
+  type IDesignStart,
+  type TDesignKind,
+} from '@/next/features/designly/designly-home';
 import {
   createDesign,
   deleteDesign,
-  fetchEngine,
   fetchLibrary,
   fetchSystems,
   pinDesign,
   thumbPath,
   type IDesign,
-  type IDesignEngine,
   type IDesignSystem,
 } from '@/next/features/designly/api';
-import type { IDesignlyNotice } from '@/next/features/designly/designly-home';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useConversationList } from '@/next/stores/conversations';
 import { bindDesignConv } from '@/next/bindings/design-conv';
@@ -27,9 +29,8 @@ import { useStartChoice } from '@/next/bindings/use-start-choice';
 import { rememberChoice } from '@/next/features/composer/start-choice';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import { useVoice } from '@/next/bindings/use-voice';
-import { DECK_NEW_DRAFT } from '@/next/features/designly/deck/deck-create';
-import { VIDEO_NEW_DRAFT } from '@/next/features/designly/video/video-create';
-import { setDraftText } from '@/next/stores/drafts';
+import { useUploads } from '@/next/bindings/use-uploads';
+import { clearDraft, setDraftText, useDraft, type DesignDraftKey } from '@/next/stores/drafts';
 import {
   createKindDocument,
   loadKindDocs,
@@ -177,37 +178,6 @@ const useDesignLibrary = (machine: MachineId, withAppDocs = false) => {
   return { cards, error, now, load, onPin, onDelete, onRetry, appDocIds };
 };
 
-/** The machine's engine, browser and ffmpeg; null until (or unless) the machine answered. */
-const useDesignEngine = (machine: MachineId): IDesignEngine | null => {
-  const [engine, setEngine] = useState<IDesignEngine | null>(null);
-  const restored = useLinkRestored(machine);
-  useEffect(() => {
-    const abort = new AbortController();
-    // An older runtime has no such route: nothing is said then.
-    fetchEngine(machine, abort.signal).then(setEngine, () => undefined);
-    return () => abort.abort();
-  }, [machine, restored]);
-  return engine;
-};
-
-/** What the person is told is missing: the engine first (nothing can be made without it), then the tools. */
-const noticeOf = (engine: IDesignEngine | null): IDesignlyNotice | null => {
-  if (engine === null) return null;
-  if (!engine.ready)
-    return {
-      title: t('next.designly.engine.missing'),
-      text: t('next.designly.engine.missingText'),
-      command: engine.fetch,
-    };
-  const tools = [!engine.chrome && 'Chromium', !engine.ffmpeg && 'ffmpeg'].filter(Boolean).join(', ');
-  if (!tools) return null;
-  return {
-    title: t('next.designly.engine.tools', { tools }),
-    text: t('next.designly.engine.toolsText'),
-    command: null,
-  };
-};
-
 interface IDesignlyLibraryProps {
   machine: MachineId;
   onOpen: (id: string) => void;
@@ -217,10 +187,8 @@ interface IDesignlyLibraryProps {
 export const DesignlyLibrary = ({ machine, onOpen }: IDesignlyLibraryProps) => {
   // The documents of the types apps add are listed here as in the whole library; opening one is the pane's to tell.
   const { cards, error, now, onPin, onDelete, onRetry } = useDesignLibrary(machine, true);
-  const notice = noticeOf(useDesignEngine(machine));
   return (
     <DesignlyHome
-      notice={notice}
       cards={cards}
       error={error}
       now={now}
@@ -237,11 +205,16 @@ interface IDesignlyViewProps {
   machine: MachineId;
   /** The machines a design can be made on, for a person with several; picking one makes it the open machine. */
   machines?: IModelPickerProps['machine'];
+  /** The kind the field opens on; an address of its own can ask for one. */
+  initialKind?: TDesignKind;
 }
 
-const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
+/** The draft of the start's field, one for every kind: the brief and its uploaded files survive a reload. */
+const START_DRAFT: DesignDraftKey = 'design:new-start';
+const setBrief = (value: string) => setDraftText(START_DRAFT, value);
+
+const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewProps) => {
   const { cards, error, now, load, onPin, onDelete, onRetry, appDocIds } = useDesignLibrary(machine, true);
-  const notice = noticeOf(useDesignEngine(machine));
   const [systems, setSystems] = useState<IDesignSystem[] | null>(null);
   const restored = useLinkRestored(machine);
 
@@ -259,7 +232,9 @@ const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
   // effort, else the last pick. A design starts through its own request, which has no backend profile.
   const { choice, agents, onPick } = useStartChoice(machine, true);
 
-  const [brief, setBrief] = useState('');
+  const draft = useDraft(START_DRAFT);
+  const brief = draft?.text ?? '';
+  const uploads = useUploads(machine, START_DRAFT, draft?.attachments ?? []);
   const voice = useVoice(machine, brief, setBrief);
 
   // The document types installed apps add are only an offer: an older runtime, or none installed, shows no tile.
@@ -288,9 +263,10 @@ const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
     goTo({ kind: ROUTE.appDoc, id: created.document });
   };
 
-  const onCreate = async (brief: string, kind: TDesignKind, designSystem: string | null) => {
+  const onCreate = async ({ brief, kind, designSystem, deck, video, attachmentIds }: IDesignStart) => {
     const title = titleOf(brief);
     if (choice) rememberChoice(choice);
+    let id: string;
     try {
       const created = await createDesign(machine, {
         title,
@@ -300,20 +276,30 @@ const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
         model: choice?.model ?? null,
         effort: choice?.effort ?? null,
         designSystem,
+        ...(deck ? { deck } : {}),
+        ...(video ? { video } : {}),
+        ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
       });
+      id = created.id;
       // The chat that draws the new design is the one its page opens on.
       bindDesignConv(designKey(machine, created.id), { id: created.conv, fresh: true });
     } catch (failure) {
       toast(t('next.designly.createFailed'), { tone: 'error', description: (failure as Error).message });
       throw failure;
     }
+    clearDraft(START_DRAFT);
+    uploads.reset();
     toast(t('next.designly.started', { title }));
+    // A deck and a video are made inside their project; a site or a design system draws on its card here.
+    if (kind === DESIGN_KIND.slides || kind === DESIGN_KIND.video) {
+      goTo({ kind: ROUTE.site, id });
+      return;
+    }
     await load();
   };
 
   return (
     <DesignlyHome
-      notice={notice}
       cards={cards}
       error={error}
       now={now}
@@ -322,10 +308,13 @@ const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
       onOpen={(id) => goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id })}
       onRetry={onRetry}
       compose={{
+        machine,
+        initialKind,
         systems,
         onCreate,
         brief,
         onBrief: setBrief,
+        uploads,
         picker: choice && {
           value: choice,
           agents,
@@ -336,18 +325,6 @@ const DesignlyView = ({ machine, machines = null }: IDesignlyViewProps) => {
         },
         appKinds,
         onAppKind,
-        onDeck: () => {
-          // The brief typed so far goes with the person to the deck's create screen.
-          if (brief.trim()) setDraftText(DECK_NEW_DRAFT, brief);
-          setBrief('');
-          goTo({ kind: ROUTE.designlyNew });
-        },
-        onVideo: () => {
-          // The brief typed so far goes with the person to the video's create screen.
-          if (brief.trim()) setDraftText(VIDEO_NEW_DRAFT, brief);
-          setBrief('');
-          goTo({ kind: ROUTE.videoNew });
-        },
         voice: {
           recording: voice.recording,
           onMic: voice.onMic,

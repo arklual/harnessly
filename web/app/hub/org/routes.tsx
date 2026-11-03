@@ -6,9 +6,12 @@ import { AnalyticsScreen } from './screens/analytics';
 import { MachinesScreen } from './screens/machines';
 import { OverviewScreen } from './screens/overview';
 import { TeamsScreen } from './screens/teams';
+import { useEffect } from 'react';
+
 import { Redirect } from '../lib/router';
 import { OrgProvider, useOrg } from './context';
 import { sectionsOf } from './nav';
+import { rememberOrg } from './step';
 import { OrgShell } from './shell';
 import { ALL_SCOPE, type Section } from './types';
 
@@ -38,6 +41,7 @@ export interface OrgRouteProps {
 }
 
 export const OrgRoutes = ({ org, scope, section }: OrgRouteProps) => {
+  useEffect(() => rememberOrg(org), [org]);
   if (!scope) return <Redirect to={`/o/${org}/${ALL_SCOPE}/overview`} />;
   if (!isSection(section)) return <Redirect to={`/o/${org}/${scope}/overview`} />;
   return (

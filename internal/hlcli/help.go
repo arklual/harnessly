@@ -62,6 +62,8 @@ PUBLISH A SITE
                                     needs --url (the hub) and a deploy token; harnessly site --help has the rest
 
 APPS (an app is a Claude Code plugin plus harnessly/app.json: instructions, skills, MCP, views; turned on per chat)
+  harnessly app docs [PAGE]         the guide, step by step, with diagrams and examples: start here (needs no runtime)
+  harnessly app docs export DIR     write the guide and the example packages into DIR, to search and copy
   harnessly app new ID [--template chat|pane-chat] [--dir DIR]
                                     write a new package that passes validate, e.g. harnessly app new acme.cashback
   harnessly app validate [DIR] [--strict]
@@ -192,6 +194,7 @@ An app is a package: a Claude Code plugin (instructions.md, skills/, commands/, 
 harnessly/app.json that says where it works (targets: chat, pane, app, sinopia.<kind>), what it may do (permissions)
 and what the agent of a chat gets while it is on (agent: instructions, skills, mcp, tools).
 
+  harnessly app docs                    # the guide built into this binary: read it first
   harnessly app new acme.cashback --template pane-chat
   harnessly app validate ./cashback --strict
   harnessly app dev ./cashback          # the folder itself, for writing it

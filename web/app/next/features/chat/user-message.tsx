@@ -22,7 +22,7 @@ import { parseContextBlock } from '@/next/features/chat/handoff';
 import { ContextCard } from '@/next/features/chat/handoff-card';
 import { PEER_DELIVERY, PeerCard, type TPeerDelivery } from '@/next/features/chat/peer-card';
 import { PictureCards, useNamedPictures, withoutPaths } from '@/next/features/chat/pictures';
-import { attachedOf } from '@/next/features/chat/attached';
+import { attachedOf, filesOf } from '@/next/features/chat/attached';
 import CopyButton from '@/next/features/chat/copy-button';
 import { RefChips } from '@/next/features/chat/ref-chips';
 
@@ -240,6 +240,7 @@ const UserMessage = ({
   const fade = useSentFade(outgoing !== null && phase === MESSAGE_PHASE.sent, outgoing?.stateSince ?? 0);
   // The places the runtime wrote under the words (`<attached>`) are chips, never the block itself.
   const placed = attachedOf(text, outgoing?.refs);
+  const files = filesOf(text, attachments);
   // A picture's path in the words (a paste of the old view) is the picture itself, without the path.
   const pictures = useNamedPictures(placed.text);
   if (!fade.mounted) return null;
@@ -279,7 +280,7 @@ const UserMessage = ({
             {t(tag)}
           </div>
         )}
-        {attachments.length > 0 && <Attachments items={attachments} />}
+        {files.length > 0 && <Attachments items={files} />}
         {placed.refs.length > 0 && (
           <div className="hx-msg-user__files hx-msg-user__refs">
             <RefChips refs={placed.refs} />

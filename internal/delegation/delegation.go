@@ -384,7 +384,8 @@ func (s *Service) Send(ctx context.Context, callerID, id, text string) (wire.Con
 		return wire.Conversation{}, refuse("bad-request", "text: 1 to %d characters", PromptMax)
 	}
 	asked := s.now().UnixMilli()
-	if res := s.deliver(ctx, caller, id, text); res.R != wire.ResultAccepted {
+	// Queued is delivered too: the chat takes it when it can. Calling that a refusal made an agent send the message again.
+	if res := s.deliver(ctx, caller, id, text); res.R == wire.ResultRefused {
 		return wire.Conversation{}, refuse(string(res.Code), "the message was not queued")
 	}
 	if _, ok := s.Book.Get(id); ok {
@@ -553,7 +554,7 @@ func (s *Service) Observe(rec wire.Conversation) {
 	if p, _ := s.Book.Get(rec.ID); p.Wakes >= MaxWakes {
 		text += fmt.Sprintf("\n\nThis chat has woken you %d times, the most it may: it will not wake you again. Use wait_conversation from now on.", MaxWakes)
 	}
-	if res := s.deliver(ctx, rec, parent.ID, text); res.R != wire.ResultAccepted && s.Log != nil {
+	if res := s.deliver(ctx, rec, parent.ID, text); res.R == wire.ResultRefused && s.Log != nil {
 		s.Log("delegation: the parent was not woken", "parent", parent.ID, "child", rec.ID, "code", string(res.Code))
 	}
 }

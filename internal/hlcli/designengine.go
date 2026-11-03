@@ -11,15 +11,16 @@ import (
 	"github.com/ly-solutions/harnessly/internal/design"
 )
 
-// harnessly design engine fetch|status|hook: the board engine of the design tool, which the runtime does not ship.
+// harnessly design engine fetch|status|hook: the vendor's board engine, an optional alternative to the built-in one.
 // fetch reads it with the person's own Claude Code and account into the engine folder of this machine; status says
 // what the machine has; hook is the fetch session's PreToolUse hook (not for people).
 
 const engineHelp = `harnessly design engine fetch [--canvas URL] [--claude PATH] [--model MODEL] [--dir DIR]
 harnessly design engine status [--dir DIR]
 
-The board engine and the format's rules belong to the design tool's vendor and are not shipped with harnessly. fetch
-gets the current release with your own Claude Code, logged in to your own claude.ai account: a short session on a small
+Designs work out of the box on the engine built into harnessly. This command is optional: it adds the vendor's engine
+(Anthropic's), which belongs to its vendor and is not shipped with harnessly. fetch gets the current release with your
+own Claude Code, logged in to your own claude.ai account (an API key will not do): a short session on a small
 model whose only tool is Artifact, allowed to read (and, the first time, to make one private empty canvas of the
 design type on your account, which it remembers). The files are checked against their checksums and kept as a release
 in the engine folder; new projects start on the newest one, existing ones stay on theirs until you upgrade them.
@@ -127,15 +128,14 @@ func (c *cli) engineStatus(dir string) error {
 		}
 		return "no"
 	}
-	release := "none"
+	engine := "built-in"
 	if s.Release != nil {
-		release = *s.Release
+		engine = "vendor's, release " + *s.Release + " (" + dir + ")"
+	} else if s.Source == design.EngineSourceFile {
+		engine = "the file RUNTIME_DESIGN_ENGINE_FILE names"
 	}
-	c.out("engine   %s (release %s, %s)\nchrome   %s (checks, pictures, PDF and video exports)\nffmpeg   %s (video exports, recordings)\n",
-		yes(s.Ready), release, dir, yes(s.Chrome), yes(s.Ffmpeg))
-	if !s.Ready {
-		c.out("\nRun `%s` to fetch the engine with your Claude account.\n", s.Fetch)
-	}
+	c.out("engine   %s\nchrome   %s (checks, pictures, PDF and video exports)\nffmpeg   %s (video exports, recordings)\n",
+		engine, yes(s.Chrome), yes(s.Ffmpeg))
 	return nil
 }
 

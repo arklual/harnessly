@@ -37,6 +37,7 @@ import type {
 } from '@/next/features/composer/types';
 import useKeyboardInset from '@/next/features/composer/use-keyboard-inset';
 import { RoundButton } from '@/next/ui/button';
+import { useFitField } from '@/next/ui/use-fit-field';
 import { boxOf, canAnimate, claimEdit, FLIGHT_EASE, FLIGHT_MS, launchFrom } from '@/next/ui/flight';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { toast } from '@/next/ui/toast';
@@ -152,53 +153,6 @@ export { RecordingTime, RecordingWave };
 /** The text that left the field fades up and away over this long, while the bubble takes it over. */
 const LIFT_MS = 200;
 const LIFT_PX = 10;
-/** The field eases to its new height as the text grows or goes (sent, cleared): ease-out, this long. */
-const GROW_MS = 180;
-
-/**
- * Sets the field's height from its text and eases it there from the height it shows now. A height animation still running
- * (the text grew a moment ago: dictation that ends with «send», a paste sent at once) is cancelled before the text is
- * measured: while it runs it holds the field at its in-between height, scrollHeight reads that height and an emptied
- * field would keep it. Returns the new animation, or null where the field jumps (no change, no motion, `animate` off).
- */
-/** Whether `next` is `prev` with text put in at one place and nothing taken out: typing, a paste without a selection. */
-const onlyAdded = (prev: string, next: string) => {
-  if (next.length <= prev.length) return false;
-  let head = 0;
-  while (head < prev.length && prev.charCodeAt(head) === next.charCodeAt(head)) head++;
-  let tail = 0;
-  while (
-    tail < prev.length - head &&
-    prev.charCodeAt(prev.length - 1 - tail) === next.charCodeAt(next.length - 1 - tail)
-  )
-    tail++;
-  return head + tail === prev.length;
-};
-
-/** The field's height after a fit, and whether CSS capped it below its text (it then scrolls). */
-interface IFit {
-  grow: Animation | null;
-  capped: boolean;
-}
-
-const fitHeight = (field: HTMLTextAreaElement, running: Animation | null, animate: boolean): IFit => {
-  const was = field.offsetHeight;
-  running?.cancel();
-  field.style.height = 'auto';
-  const content = field.scrollHeight;
-  field.style.height = `${content}px`;
-  const target = field.offsetHeight;
-  // Held lower than its text (the max height): more text scrolls inside and the height stays.
-  const capped = target + 1 < content;
-  if (!animate || was <= 0 || Math.abs(target - was) <= 1 || !canAnimate(field))
-    return { grow: null, capped };
-  const grow = field.animate([{ height: `${was}px` }, { height: `${target}px` }], {
-    duration: GROW_MS,
-    easing: FLIGHT_EASE,
-  });
-  return { grow, capped };
-};
-
 const Composer = (props: IComposerProps) => {
   const { value, onChange, onSubmit, mode, picker, attachments, recording, maxText } = props;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -229,55 +183,7 @@ const Composer = (props: IComposerProps) => {
   useKeyboardInset(rootRef);
   useImperativeHandle(props.inputRef, () => fieldRef.current as HTMLTextAreaElement, []);
 
-  // The field's height follows its text; CSS caps it at 40% of the screen and scrolls past that.
-  // It grows by easing from the old height to the new, and a text that is set from outside (dictation, a message taken
-  // back from the queue) shows its end: the caret stays in sight.
-  // It shrinks the same way when the text leaves (into the queue, into the agent's turn, deleted): the measure never
-  // reads a height an earlier animation still holds (fitHeight).
-  // Measuring the height lays the page out three times, so a keystroke that only adds text measures once: the field
-  // needs a new height only when the text no longer fits it, and never once it has reached its cap.
-  const growRef = useRef<Animation | null>(null);
-  const shownRef = useRef({ value, capped: false });
-  useLayoutEffect(() => {
-    const field = fieldRef.current;
-    if (!field) return;
-    const shown = shownRef.current;
-    const added = onlyAdded(shown.value, value) && growRef.current?.playState !== 'running';
-    shown.value = value;
-    if (!added || (!shown.capped && field.scrollHeight > field.clientHeight)) {
-      const fit = fitHeight(field, growRef.current, true);
-      growRef.current = fit.grow;
-      shown.capped = fit.capped;
-    }
-    if (field.selectionStart === field.value.length) field.scrollTop = field.scrollHeight;
-  }, [value]);
-
-  // The field can be laid out narrow first (a column that is still opening) and wide later: the text then wraps
-  // otherwise, and the height computed for the old width is wrong. Recalculate on a width change too, once per frame.
-  useEffect(() => {
-    const field = fieldRef.current;
-    if (!field || typeof ResizeObserver === 'undefined') return;
-    let width = field.clientWidth;
-    let frame = 0;
-    // A width change mid-ease goes on easing to the height of the new width; otherwise the field just takes it.
-    const fit = () => {
-      frame = 0;
-      const easing = growRef.current?.playState === 'running';
-      const fit = fitHeight(field, growRef.current, easing);
-      growRef.current = fit.grow;
-      shownRef.current.capped = fit.capped;
-    };
-    const watcher = new ResizeObserver(() => {
-      if (field.clientWidth === width) return;
-      width = field.clientWidth;
-      if (frame === 0) frame = requestAnimationFrame(fit);
-    });
-    watcher.observe(field);
-    return () => {
-      watcher.disconnect();
-      if (frame !== 0) cancelAnimationFrame(frame);
-    };
-  }, []);
+  useFitField(fieldRef, value);
 
   // While it listens the layer over the field shows the same text: the newest words are in view, the layer scrolls with
   // the field and wraps where the field's scrollbar leaves room.

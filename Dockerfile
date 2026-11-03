@@ -31,6 +31,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
+COPY docs ./docs
 COPY skills ./skills
 COPY deploy ./deploy
 COPY web/*.go ./web/

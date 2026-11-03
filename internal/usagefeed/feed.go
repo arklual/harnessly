@@ -94,6 +94,9 @@ type sessState struct {
 	Calls  int   `json:"calls"`
 	LastTs int64 `json:"lastTs"`
 	Ended  bool  `json:"ended"`
+	// Metrics is the signature of the metrics last written; a state from before metrics has none, so every session
+	// is written once more with them.
+	Metrics string `json:"metrics,omitempty"`
 }
 
 // identState: what a provider's identity was when first seen and since when. Facts older than Since are not given an
@@ -166,6 +169,7 @@ type session struct {
 	provider, key, parent string
 	first, last           float64 // epoch seconds
 	calls                 int
+	m                     metrics
 }
 
 // sessionOf names the session a transcript belongs to. A Claude subagent's transcript carries its parent's session id
@@ -265,6 +269,7 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 			order = append(order, sid)
 		}
 		s.calls += len(fa.Messages)
+		s.m.add(fa)
 		if fa.FirstTs > 0 && (s.first == 0 || fa.FirstTs < s.first) {
 			s.first = fa.FirstTs
 		}
@@ -344,7 +349,8 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 		}
 		lastMs := ms(s.last)
 		over := nowMs-lastMs >= ended.Milliseconds()
-		cur := sessState{Calls: s.calls, LastTs: lastMs, Ended: over}
+		met := s.m.values()
+		cur := sessState{Calls: s.calls, LastTs: lastMs, Ended: over, Metrics: signature(met)}
 		if prev, ok := f.st.Sessions[sid]; ok && prev == cur {
 			continue
 		}
@@ -353,7 +359,7 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 		startedAt := ms(s.first)
 		fact := &hubproto.UsageSessionFact{
 			Provider: s.provider, SessionKey: s.key, ParentKey: s.parent, StartedAt: startedAt,
-			Origin: hubproto.OriginLive, Attribution: hubproto.AttributionGuessed,
+			Origin: hubproto.OriginLive, Attribution: hubproto.AttributionGuessed, Metrics: met,
 		}
 		if startedAt >= f.st.Idents[s.provider].Since {
 			fact.AccountRef, fact.AuthMode, fact.BaseURLHost = id.AccountRef, id.AuthMode, id.BaseURLHost

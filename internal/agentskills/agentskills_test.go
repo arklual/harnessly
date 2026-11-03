@@ -47,7 +47,7 @@ func TestBothServicesInstallEverythingForBothAgents(t *testing.T) {
 	if !res.Changed() {
 		t.Fatal("nothing written")
 	}
-	for _, name := range []string{"harnessly", "boards", "artifacts"} {
+	for _, name := range []string{"harnessly", "apps", "boards", "artifacts"} {
 		for _, p := range []string{
 			filepath.Join(d.codex, "skills", "harnessly", name, "SKILL.md"),
 			filepath.Join(ClaudePluginDir(d.data), "skills", name, "SKILL.md"),
@@ -198,6 +198,7 @@ func fakeSource(version string, extra bool) fstest.MapFS {
 	m := fstest.MapFS{
 		"MANIFEST.sha256": {Data: []byte("manifest " + version)},
 		"upstream/agent-skills/plugins/harnessly/skills/harnessly/SKILL.md": {Data: []byte("---\nname: harnessly\n---\nv" + version)},
+		"upstream/agent-skills/plugins/harnessly/skills/apps/SKILL.md":      {Data: []byte("---\nname: harnessly\n---\nv" + version)},
 		"upstream/agent-skills/plugins/boards/skills/boards/SKILL.md":       {Data: []byte("---\nname: boards\n---\nv" + version)},
 		"upstream/agent-skills/plugins/boards/skills/boards/scripts/boards": {Data: []byte("#!/bin/sh\necho v" + version)},
 		"upstream/artifacts/skills/artifacts/SKILL.md":                      {Data: []byte("---\nname: artifacts\n---\nv" + version)},

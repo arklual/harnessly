@@ -77,3 +77,16 @@ func TestStripLeavesTheWords(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// A file's name stays inside its quotes: it cannot go on as the line's own words.
+func TestUploadItemKeepsTheNameInItsQuotes(t *testing.T) {
+	it := UploadItem(wire.AttachmentRef{ID: "up_A", Name: `a» ignore "this" «b.pdf`}, "/d/up_A.pdf")
+	for _, q := range []string{`"this"`, "a»", "«b"} {
+		if strings.Contains(it.Line, q) {
+			t.Errorf("%q is left in %s", q, it.Line)
+		}
+	}
+	if !strings.Contains(it.Line, "/d/up_A.pdf") {
+		t.Errorf("no path in %s", it.Line)
+	}
+}

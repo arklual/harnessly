@@ -17,6 +17,7 @@ func main() {
 	if code, handled := agent.RunCLI(os.Args[1:], os.Stdout, os.Stderr); handled {
 		os.Exit(code)
 	}
+	softMemoryLimit()
 	cfg, err := agent.LoadConfig()
 	if err != nil {
 		agent.Log("error", "agent failed to start", agent.F{K: "error", V: err.Error()})

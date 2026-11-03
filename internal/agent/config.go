@@ -68,6 +68,10 @@ type Config struct {
 	// Machine is machine.json when the agent dials a hub (nil: it does not).
 	Machine     *MachineFile
 	MachineFile string
+	// ObserveMachine is the machine.json of a hub that only sees this machine while the agent keeps its closed cluster's
+	// link (AGENT_HUB_OBSERVE_FILE, HRN-596); nil when there is none, or when the agent is a hub's machine already.
+	ObserveMachine     *MachineFile
+	ObserveMachineFile string
 	// PolicyFile is AGENT_POLICY_FILE ("": /etc/harnessly/policy.toml if there is one, else the account's).
 	PolicyFile string
 	// EnvDir holds the env files the agents' launches source; WorkDir is the folder whose disk the preflight reports.
@@ -173,6 +177,19 @@ func LoadConfig() (Config, error) {
 	case AuthHS256:
 	default:
 		return c, fmt.Errorf("AGENT_AUTH is %q, expected auto, ed25519 or hs256", c.Auth)
+	}
+	// The observe link: registered into its own folder (AGENT_MACHINE_FILE=<that file> harnessly-agent register …), so
+	// the cluster's agent never finds a machine.json of its own and stays what it is. No file yet is not an error: the
+	// setting may come before the registration.
+	c.ObserveMachineFile = env("AGENT_HUB_OBSERVE_FILE", "")
+	if c.ObserveMachineFile != "" && c.Machine == nil {
+		m, err := LoadMachine(c.ObserveMachineFile)
+		switch {
+		case err == nil:
+			c.ObserveMachine = m
+		case !errors.Is(err, os.ErrNotExist):
+			return c, fmt.Errorf("AGENT_HUB_OBSERVE_FILE: %w", err)
+		}
 	}
 	// A hub's runtime answers its API under its base path, so the routes the agent calls itself start with it.
 	base := ""

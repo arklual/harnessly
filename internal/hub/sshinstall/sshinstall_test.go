@@ -586,11 +586,13 @@ func TestAnotherSpacesOwnerCannotInstallOnMyServer(t *testing.T) {
 	// su.srv trusts the key of the first space only. Someone else's space, on the same hub:
 	intruder := su.s.SignIn("intruder@example.com")
 	theirs, _ := intruder.NewSpace("Чужое")
+	// Listening before the start: the refusal comes in milliseconds, and a stream opened after it never hears the event.
+	events := intruder.Events(theirs)
 	r := intruder.Do("POST", "/api/spaces/"+theirs+"/machines/ssh", map[string]any{"host": "10.0.0.7", "user": "root", "profile": "dir", "hostKeyFingerprint": su.srv.fingerprint()})
 	if r.Code != http.StatusAccepted {
 		t.Fatalf("start: %s", r)
 	}
-	ev := intruder.Events(theirs).Await("failure", func(e hubtest.Event) bool { return e.Name == "job" && strings.Contains(string(e.Data), `"failed"`) })
+	ev := events.Await("failure", func(e hubtest.Event) bool { return e.Name == "job" && strings.Contains(string(e.Data), `"failed"`) })
 	var d struct{ Job jobView }
 	_ = json.Unmarshal(ev.Data, &d)
 	if d.Job.Error == nil || d.Job.Error.Code != "ssh_auth" {

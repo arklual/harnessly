@@ -65,6 +65,9 @@ func usageRoute(d deps, authorized func(*http.Request) bool) *usagereport.Route 
 		Timezone:   env("RUNTIME_USAGE_TIMEZONE", "UTC"),
 		Machine:    host,
 	})
+	if d.UsageRefresh > 0 {
+		go collector.KeepFresh(d.UsageRefresh, nil)
+	}
 	return &usagereport.Route{Collector: collector, Authorized: authorized, SessionOK: d.SessionOK, Claims: d.Claims,
 		Owner: os.Getenv("RUNTIME_USAGE_OWNER"), Machine: host}
 }

@@ -139,9 +139,17 @@ const VideoPlayer = ({
   // only while that scene stays in its slot; any later load of it is the plain address.
   const [spent, setSpent] = useState(false);
   const ticketScene = scenes.findIndex((s) => s.path === path);
+  // The plain address is refused until the ticket's frame has set the cookie, and a refused frame is not loaded again:
+  // the other frame waits for it, whenever that frame is on the way.
+  const ticketPending =
+    !spent &&
+    ticketScene !== -1 &&
+    (src === null || !ready.includes(src)) &&
+    (index === ticketScene || index + 1 === ticketScene);
   const addressOf = (i: number | null): string | null => {
     if (i === null) return null;
     if (!spent && i === ticketScene) return src;
+    if (ticketPending) return null;
     return frameSrc(scenes[i].path);
   };
   const slotSrc = (slot: TVideoSlotIndex) => addressOf(sceneOf(slot));
@@ -225,21 +233,22 @@ const VideoPlayer = ({
     }
   });
 
+  // An effect event: the ticket may come after the player mounted, so the addresses are the ones of the moment.
+  const listen = useEffectEvent((event: MessageEvent) => {
+    for (const slot of SLOTS) {
+      const win = frameRefs[slot].current?.contentWindow;
+      if (!win || event.source !== win) continue;
+      if (event.origin !== originOf(slots[slot].src)) return;
+      const read = readVideoMessage(event.data);
+      if (read !== null) take(slot, read);
+      return;
+    }
+  });
+
   useEffect(() => {
-    const listen = (event: MessageEvent) => {
-      for (const slot of SLOTS) {
-        const win = frameRefs[slot].current?.contentWindow;
-        if (!win || event.source !== win) continue;
-        if (event.origin !== originOf(slots[slot].src)) return;
-        const read = readVideoMessage(event.data);
-        if (read !== null) take(slot, read);
-        return;
-      }
-    };
-    window.addEventListener('message', listen);
-    return () => window.removeEventListener('message', listen);
-    // the frames are refs; the slot addresses are read when a message comes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const hear = (event: MessageEvent) => listen(event);
+    window.addEventListener('message', hear);
+    return () => window.removeEventListener('message', hear);
   }, []);
 
   // A scene on screen, a format or a source changed: both frames are told again.

@@ -194,22 +194,39 @@ func claudeSession(bin, model, budget, settings, dir string) func(context.Contex
 		cmd.Env = append(append(os.Environ(), "CLAUDE_CODE_ARTIFACT=1"), env...)
 		cmd.Stdin = nil
 		out, err := cmd.Output()
-		if err != nil {
-			msg := strings.TrimSpace(string(out))
+		var res sessionAnswer
+		parsed := json.Unmarshal(out, &res) == nil
+		if err != nil || res.IsError {
+			detail := strings.TrimSpace(res.Result)
+			if !parsed || detail == "" {
+				detail = strings.TrimSpace(string(out))
+			}
 			var ee *exec.ExitError
 			if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-				msg += " " + strings.TrimSpace(string(ee.Stderr))
+				detail = strings.TrimSpace(detail + " " + string(ee.Stderr))
 			}
-			return "", fmt.Errorf("the Claude Code session failed (is it logged in to a claude.ai account?): %s", clip(msg, 400))
+			return "", sessionFailure(detail, os.Getenv("ANTHROPIC_API_KEY") != "")
 		}
-		var res struct {
-			Result string `json:"result"`
-		}
-		if err := json.Unmarshal(out, &res); err != nil {
+		if !parsed {
 			return "", fmt.Errorf("the Claude Code session answered something else than JSON: %s", clip(string(out), 300))
 		}
 		return res.Result, nil
 	}
+}
+
+// sessionAnswer is the part of `claude -p --output-format json` that says how the session ended.
+type sessionAnswer struct {
+	Result  string `json:"result"`
+	IsError bool   `json:"is_error"`
+}
+
+// sessionFailure says why the fetch cannot go on. Fetching is optional, so it says that designs work without it.
+func sessionFailure(detail string, apiKey bool) error {
+	const works = "Designs keep working on the built-in engine; this command is only needed for the vendor's engine."
+	if apiKey {
+		return fmt.Errorf("the vendor's engine is only available through a claude.ai account, and this machine's Claude Code uses an API key. %s\nClaude Code said: %s", works, clip(detail, 400))
+	}
+	return fmt.Errorf("the Claude Code session failed: %s\nThe vendor's engine needs Claude Code logged in to a claude.ai account (run `claude`, then /login). %s", clip(detail, 400), works)
 }
 
 func clip(s string, n int) string {

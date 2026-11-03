@@ -555,6 +555,28 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.hx-appslist__help {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  align-self: flex-start;
+  margin: var(--hx-space-3) 0 0 12px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+  transition: color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-appslist__help:hover {
+  color: var(--hx-fg-1);
+}
+.hx-appslist__help:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
 .hx-appslist__none {
   margin: 0;
   color: var(--hx-fg-3);

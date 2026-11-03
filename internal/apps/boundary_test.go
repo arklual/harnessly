@@ -491,3 +491,20 @@ echo end`
 		t.Fatalf("the agent reaches outside: %s", out)
 	}
 }
+
+func TestSSHConfigMask(t *testing.T) {
+	dir := t.TempDir()
+	if got := sshConfigMask(dir); !slices.Equal(got, []string{"--tmpfs", dir}) {
+		t.Fatalf("got %v", got)
+	}
+	if got := sshConfigMask(filepath.Join(dir, "none")); got != nil {
+		t.Fatalf("a missing folder: %v", got)
+	}
+}
+
+// HRN-621. A launch line waiting in its file runs outside the wall: an agent must not reach it.
+func TestSealHidesWaitingLaunchLines(t *testing.T) {
+	if slices.Contains(dataReadonly, "launch-lines") || slices.Contains(dataWritable, "launch-lines") {
+		t.Fatal("launch-lines is on the seal's list")
+	}
+}

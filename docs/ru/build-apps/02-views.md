@@ -1,0 +1,208 @@
+# Окна: интерфейс приложения
+
+Окно это статичная страница вашего пакета. Человек видит её во вкладке панели, карточкой в чате, на отдельной странице приложения или внутри документа Sinopia. Она работает в браузере, в песочнице, и всё, что она делает кроме рисования, идёт через хост.
+
+## Старт
+
+```sh
+harnessly app new acme.notes --template pane-chat
+harnessly app dev ./notes
+harnessly app enable acme.notes
+harnessly open app:acme.notes       # вкладка панели; окно с целью app открывается и по /apps/acme.notes?chat=<id>
+```
+
+```html
+<!-- ui/index.html -->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="/__hl/app-sdk.js"></script>
+    <script src="main.js"></script>
+  </head>
+  <body><main id="root"></main></body>
+</html>
+```
+
+```js
+// ui/main.js: обычный скрипт, не модуль
+harnessly.connect().then(async (hl) => {
+  const note = (await hl.storage.chat.get('note')) ?? '';
+  const area = document.createElement('textarea');
+  area.value = note;
+  area.disabled = hl.context.readOnly === true;
+  area.addEventListener('change', () => hl.storage.chat.set('note', area.value));
+  document.getElementById('root').append(area);
+}).catch((e) => {
+  document.getElementById('root').textContent = 'Open this inside harnessly: ' + e.code;
+});
+```
+
+```json
+"targets": ["chat", "pane", "app"],
+"permissions": ["storage", "chat.prompt", "pane.open"],
+"views": [{ "id": "main", "title": "Notes", "entry": "ui/index.html", "targets": ["pane", "app"] }]
+```
+
+## Где показывается окно
+
+| Цель окна | Где | Как открывается |
+| --- | --- | --- |
+| `pane` | Вкладка правой панели | `harnessly open app:<id>[/<view>]`, `hl.pane.open`, `app.open` у агента. Приложение только с окнами `app` здесь не открывается |
+| `app` | `/apps/<id>?chat=<conversation>`: вся страница, чат рядом (колонкой, окном или одним полем) | «во всю ширину» в панели, «Приложения» в боковой панели |
+| `chat` | Карточка в ленте | Результат инструмента, который её называет, или `hl.chat.card` |
+| `sinopia.<kind>` | Панель или инспектор документа | См. [Sinopia](04-sinopia.md) |
+
+`activation.openView` называет окно, которое показывает `harnessly open app:<id>`. Иначе это первое окно с целью `pane`.
+
+## Как окно говорит с хостом
+
+```mermaid
+sequenceDiagram
+  participant V as Окно (изолированный фрейм)
+  participant P as Страница (хост)
+  participant R as Рантайм на машине
+  participant A as Агент
+  V->>P: ui/initialize с одноразовым ключом сессии
+  P-->>V: контекст, токены темы, закрытый порт
+  V->>P: hl.storage.chat.set(key, value)
+  P->>P: проверяет права и цели
+  P->>R: вызов хранилища с сессией окна
+  R-->>P: ok или quota / not-on
+  P-->>V: результат или HarnesslyError
+  V->>P: hl.chat.send(text)
+  P->>A: сообщение «[Название приложения] text»
+  A->>R: app.data_set (MCP-инструмент harnessly-app)
+  V->>P: hl.storage.chat.get(key) читает то, что записал агент
+```
+
+Сторона агента и сторона окна делят **хранилище чата** (`app.data_*` и `hl.storage.chat` это одни и те же данные) и **файлы рабочей папки**. Окно не получает уведомления, когда пишет агент. Читайте заново, например по `hl.on('context')` или после сообщения агента, либо опрашивайте редко. Событие `tool-result` пока не подключено.
+
+## Песочница
+
+Фрейм изолирован без `allow-same-origin`, на собственном источнике. Отсюда следует:
+
+- `localStorage` и cookie нет. Используйте `hl.storage`.
+- **Только обычные скрипты.** Непрозрачный источник фрейма отправляет cookie слота с обычными скриптами, стилями и картинками, но не с модулями, шрифтами и `fetch` ваших файлов без credentials: они возвращают 401. Данные отдавайте скриптом, который задаёт глобальную переменную. Сборщик подойдёт, если он пишет один обычный файл (IIFE). SDK есть и в `/__hl/app-sdk.mjs`, чтобы сборщик мог его импортировать.
+- Нет встроенных скриптов и нет `eval` (`script-src 'self'`). Встроенные стили разрешены.
+- Наружу ничего не уходит без `network`: `connect-src` равен `'none'`, пока `network.connect` не назовёт хост. См. [Бэкенд](03-backend.md).
+- Отдаются только точка входа окна, её папка и `ui/`. Файл до 10 МБ, файлы с точкой в начале имени никогда.
+
+```json
+"network": {
+  "connect": ["api.example.com"],
+  "resources": ["cdn.example.com"],
+  "frames": ["embed.example.com"]
+}
+```
+
+Записи имеют вид `host`, `*.host`, `host:port`, при желании с `https://` или `wss://`. `*` требует `network.reason` и оставляет публичную публикацию на ревью.
+
+## Дизайн: тема и размеры
+
+`hl.connect()` задаёт `<html data-theme="light|dark">`, `color-scheme`, `lang` и эти токены на `:root`, а при смене темы обновляет их. SDK не приносит таблицы стилей, а до подключения токенов нет, поэтому дайте каждому токену значение по умолчанию.
+
+| Токен | Назначение | Светлая | Тёмная |
+| --- | --- | --- | --- |
+| `--t-bg` | Страница | `#ffffff` | `#141416` |
+| `--t-surface` | Карточки | `#f6f6f7` | `#1c1c1f` |
+| `--t-surface-hover` | Наведение | `#ececee` | `#26262a` |
+| `--t-text` | Основной текст | `#17171a` | `#ececf0` |
+| `--t-text-secondary` | Второстепенный текст | `#4a4a52` | `#b4b4bc` |
+| `--t-text-muted` | Приглушённый текст | `#76767f` | `#8a8a94` |
+| `--t-border` | Границы | `#e2e2e6` | `#2e2e33` |
+| `--t-border-strong` | Сильные границы | `#c9c9cf` | `#44444b` |
+| `--t-accent` | Акцент | `#3b5bdb` | `#748ffc` |
+| `--t-danger` | Ошибки | `#d6336c` | `#f06595` |
+| `--t-success` | Успех | `#2f9e44` | `#69db7c` |
+
+Значения взяты со страницы гостя. Внутри приложения они следуют теме хоста, поэтому используйте имена и не вписывайте цвета жёстко. Токен с пустым источником пропускается.
+
+```css
+:root { --t-bg: #ffffff; --t-text: #17171a; --t-border: #e2e2e6; --t-accent: #3b5bdb; }
+html[data-theme='dark'] { --t-bg: #141416; --t-text: #ececf0; --t-border: #2e2e33; --t-accent: #748ffc; }
+body { margin: 0; background: var(--t-bg); color: var(--t-text); font: 14px/1.45 system-ui, sans-serif; }
+```
+
+- Окно должно работать в обеих темах и от ширины 360 px. Панель узкая: верстайте сначала под неё.
+- Язык: `hl.context.locale` равен `ru` или `en`. Ваши тексты хост не переводит.
+- Учитывайте `hl.context.readOnly === true`: не давайте способа менять документ. Хост всё равно отклонит запись.
+
+## SDK
+
+`harnessly.connect()` отклоняется с `host_unavailable` вне harnessly. Иначе у `hl` есть:
+
+| Вызов | Право | Что делает |
+| --- | --- | --- |
+| `hl.context` | нет | `app`, `target`, `view`, `theme`, `locale`, `chat` (null, если приложение в чате выключено), `readOnly`, `data` (у карточки). `user` всегда `null` |
+| `hl.host` | нет | `{name, version}` |
+| `hl.on(event, fn)` | нет | Рабочие события: `context`, `theme` и `selection` в Sinopia |
+| `hl.chat.send(text)` | `chat.prompt` | Сообщение агенту до 20 000 символов, показывается с названием приложения в одну строку |
+| `hl.chat.read({last})` | `chat.read` | Последние сообщения в виде `{role, text}`: по умолчанию 20, не больше 200 |
+| `hl.chat.card(view, data)` | `chat.card` | Карточка в конце ленты. Хранится в этом браузере, не больше 20 на чат, данные до 20 000 символов |
+| `hl.pane.open(target)` | `pane.open` | Только `app:<id>[/<view>]` |
+| `hl.tools.call('server.tool', args)` | нет | Инструмент вашего **удалённого https**-сервера. Возвращает сырой результат MCP: `isError` проверяйте сами. См. [Бэкенд](03-backend.md) |
+| `hl.storage.<scope>.get/set/delete/keys` | `storage` | Области ниже; `get` несуществующего ключа даёт `null` |
+| `hl.files.read(path)`, `hl.files.write(path, text)` | `files.read:<mask>`, `files.write:<mask>` | Файлы папки чата, как текст |
+| `hl.ui.confirm(text)` | нет | Диалог с настоящим именем приложения в заголовке. **Возвращает boolean.** До 500 символов; время не ограничено |
+| `hl.ui.toast(text)` | нет | Уведомление до 500 символов |
+| `hl.notify(text)` | `notify` | То же уведомление, до 2000 символов |
+| `hl.resize(height)` | нет | Высота карточки (карточки отправляют её сами) |
+| `hl.sinopia.*` | `sinopia.*` | См. [Sinopia](04-sinopia.md) |
+| `hl.close()` | нет | Перестаёт слушать |
+
+Вызовов не больше 60 в секунду на окно (`rate_limited`). Вызов без ответа отклоняется с `host_unavailable` через 30 с.
+
+Протокол это MCP Apps (JSON-RPC 2.0 поверх `postMessage`), поэтому стандартное окно MCP Apps работает без изменений. Тогда токены лежат в `hostContext.styles.variables`, а наши в `hostContext.harnessly`.
+
+## Хранилище
+
+| Область | Что хранит | Лимит |
+| --- | --- | --- |
+| `install` | Установку на этой машине | 5 МБ |
+| `user` | Человека | 1 МБ |
+| `chat` | Чат, в котором окно: делится с `app.data_*` агента | 256 КБ на чат, 20 МБ на все чаты |
+| `space` | Команду; для записи нужно `storage.space.write` | 10 МБ |
+| `doc` | Документ Sinopia | 100 КБ на документ, 20 МБ всего |
+
+Ключ это от 1 до 256 символов. Запись сверх лимита отклоняется целиком, и окно видит `host_unavailable` со словом `quota`.
+
+## Файлы рабочей папки
+
+```json
+"permissions": ["files.read:reports/**", "files.write:reports/*.md"]
+```
+
+`*` это цепочка символов внутри имени, `**` любое число папок. До 4 МБ, только текст; отсутствующий файл или не текст отклоняется с `invalid_params`. Путь оценивается по тому, куда он ведёт на самом деле, с раскрытием симлинков, и должен лежать в папке чата и подходить под маску. Секреты (`.env`, `.git/`, `.ssh/`, `*.pem` и другие) исключены, что бы ни говорила маска. Запись также отказывает для `.claude`, `.mcp.json`, `.vscode`, `.harnessly`, `.github`, `CLAUDE.md`, `AGENTS.md` и любого файла с точкой в начале имени, который не назван маской с собственной точкой. Для этого нужен чат с включённым приложением: у окна вне чата рабочей папки нет.
+
+## Карточки в чате
+
+Окно с целью `chat` рисует результат инструмента:
+
+```json
+"views": [{ "id": "card", "entry": "ui/card.html", "targets": ["chat"] }],
+"chat": { "cards": ["card"] }
+```
+
+Инструмент вашего сервера (в том числе локального) отвечает одной строкой JSON короче 100 символов, в своём поле `text`:
+
+```json
+{"_meta":{"ui":{"resourceUri":"ui://acme.notes/card"}},"data":{"date":"2026-11-03"}}
+```
+
+Лента рисует окно под этим шагом, а `data` попадает в `hl.context.data`. Передайте идентификатор, остальное карточка прочитает сама. Лимит и причина описаны в разделе [Бэкенд](03-backend.md#карточки-из-инструмента). Назвать своё окно может только инструмент собственного сервера приложения.
+
+## Инструменты хоста для агента
+
+Чат с приложениями получает MCP-сервер `harnessly-app`. В правилах инструментов они записываются как `app.*`.
+
+| Инструмент | Правило | Что делает |
+| --- | --- | --- |
+| `open` | `app.open` | Открывает окно в панели |
+| `data_get`, `data_set` | `app.data.get`, `app.data.set` | Хранилище чата по `key` |
+| `ask` | `app.ask` | Кладёт выбор (от 2 до 8 вариантов) поверх окна, ждёт до десяти минут, отвечает вариантом или `cancelled`; не больше 5 открытых на чат |
+
+Расскажите агенту о них в `instructions.md`: через `app.ask` он подтверждает что-либо внутри вашего интерфейса.
+
+Дальше: [Бэкенд](03-backend.md) или скопируйте [`cashback`](../../apps/cashback).

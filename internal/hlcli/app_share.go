@@ -733,6 +733,9 @@ func (c *cli) printEval(rep apps.EvalReport) {
 		for _, e := range cr.Errors {
 			c.out("\terror: %s\n", e)
 		}
+		for _, n := range cr.Notes {
+			c.out("\tnote: %s\n", n)
+		}
 	}
 	c.out("%d of %d runs passed (%.0f%%, needs %.0f%%): %s\n", rep.Passed, rep.Runs, rep.PassRate*100, rep.Threshold*100, map[bool]string{true: "ok", false: "not ok"}[rep.Ok])
 	if rep.BaselineRate != nil {

@@ -157,6 +157,17 @@ const PRESETS: readonly IPresetState[] = [
     login: { account: 'sergey@example.test' },
     switch: { on: false },
   },
+  {
+    id: 'auto',
+    label: 'Авто · GLM + Kimi',
+    vendor: 'auto',
+    via: 'claude',
+    host: 'api.kimi.com',
+    hint: '',
+    key: { configured: false, tail: null },
+    models: [model('auto', 'Авто'), model('auto-fast', 'Авто · быстро')],
+    switch: { on: false },
+  },
 ];
 
 const startStates = (state: string | undefined): IPresetState[] =>

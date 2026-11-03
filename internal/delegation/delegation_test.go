@@ -25,6 +25,7 @@ type fakeConvs struct {
 	feeds    map[string][]wire.Entry
 	turns    map[string][]wire.Turn
 	sent     map[string][]string // the texts DeliverPeer queued, by conversation
+	queued   bool                // DeliverPeer answers queued: the agent is starting
 	projects []wire.Project
 	n        int
 	now      func() time.Time
@@ -123,6 +124,9 @@ func (f *fakeConvs) DeliverPeer(_ context.Context, conv, clientID, text string, 
 	f.entry(conv, wire.Entry{T: wire.EntryUser, Text: text})
 	rec.State.K = wire.StateWorking
 	f.recs[conv] = rec
+	if f.queued {
+		return wire.CmdResult{R: wire.ResultQueued}
+	}
 	return wire.CmdResult{R: wire.ResultAccepted}
 }
 
@@ -416,5 +420,19 @@ func TestWakeUpsAreBounded(t *testing.T) {
 	again := &Book{Path: r.svc.Book.Path}
 	if p, ok := again.Get(loud); !ok || p.Wakes != MaxWakes || !p.Notify {
 		t.Fatalf("book: %+v", p)
+	}
+}
+
+// HRN-621. A message queued for an agent that is starting is delivered: a refusal here made the sender send it again.
+func TestSendQueuedIsDelivered(t *testing.T) {
+	r := newTestRig(t)
+	text, isErr := r.call("tab-root", "delegate_task", map[string]any{"provider": "claude", "prompt": "first"})
+	if isErr {
+		t.Fatal(text)
+	}
+	child := idOf(t, text)
+	r.convs.queued = true
+	if text, isErr := r.call("tab-root", "send_to_conversation", map[string]any{"id": child, "text": "second"}); isErr {
+		t.Fatalf("a queued message answered as refused: %s", text)
 	}
 }

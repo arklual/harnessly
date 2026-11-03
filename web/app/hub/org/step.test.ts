@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Config, Me } from '../lib/types';
-import { deferOrgStep, orgStepDue } from './step';
+import type { OrgList } from '../../hub-api/orgs';
+import { deferOrgStep, orgLanding, orgStepDue, rememberOrg } from './step';
 
 const config = (orgs: string) => ({ orgs }) as unknown as Config;
 const me = (role: 'owner' | 'member') =>
@@ -26,5 +27,26 @@ describe('organization step', () => {
   it('leaves a person who put it off alone', () => {
     deferOrgStep();
     expect(orgStepDue(config('on'), me('owner'))).toBe(false);
+  });
+
+  const list = (...slugs: string[]): OrgList =>
+    ({
+      orgs: slugs.map((slug) => ({ slug, name: slug, role: 'admin' })),
+      looseSpaces: [],
+    }) as unknown as OrgList;
+
+  it('is not due for a person already in an organization', () => {
+    expect(orgStepDue(config('on'), me('owner'), list('acme'))).toBe(false);
+    expect(orgStepDue(config('on'), me('owner'), list())).toBe(true);
+  });
+
+  it('lands a member of an organization in its hub, the last one opened first', () => {
+    expect(orgLanding(null)).toBeNull();
+    expect(orgLanding(list())).toBeNull();
+    expect(orgLanding(list('acme', 'harnessly'))).toBe('/o/acme');
+    rememberOrg('harnessly');
+    expect(orgLanding(list('acme', 'harnessly'))).toBe('/o/harnessly');
+    rememberOrg('gone');
+    expect(orgLanding(list('acme', 'harnessly'))).toBe('/o/acme');
   });
 });

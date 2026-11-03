@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/browser"
 	"github.com/ly-solutions/harnessly/internal/gate"
@@ -172,6 +173,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	})
 	tmuxNames = tm
 	hooks := hookConfigFromEnv(configFile)
+	// HRN-621: off the seal's list (internal/apps/seal.go), so no wall shows it.
+	agents.SetLineDir(filepath.Join(cfg.DataDir, "launch-lines"))
 	pusher := newSharedPusher(cfg.DataDir, hooks)
 	ref.c = newCore(coreConfig{DataDir: cfg.DataDir, Home: home, Tmux: tm, Term: terms,
 		MetaKey: os.Getenv("RUNTIME_TAB_META_KEY"), AgentHeader: os.Getenv("RUNTIME_AGENT_TOKEN_HEADER"),
@@ -290,6 +293,14 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			Handler: gptRelay,
 		})
 	}
+	if ref.c.agents != nil && ref.c.agents.router != nil {
+		// The router a Claude Code chat on the auto profile talks to: only that chat, which holds the router's key.
+		router := ref.c.agents.router
+		routes = append(routes, gate.Route{
+			Match:   func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, providers.RouterPath+"/") },
+			Handler: router,
+		})
+	}
 	if ref.c.agents != nil && ref.c.agents.profiles != nil {
 		// The relay a Codex chat on a vendor profile talks to (xAI): only the runtime's own CLIs, which hold its token.
 		relays := providers.Relays(ref.c.agents.profiles, providers.RelayPrefix)
@@ -338,6 +349,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		Cookie:        cookieName,
 		SignSession:   func() string { return agent.SignHS256(secret, "user", "", sessionMaxAge) },
 		Tools:         preflight.New(home),
+		UsageRefresh:  usageRefresh(),
 		Upstream:      cfg.Upstream,
 		Standalone:    cfg.Standalone(),
 		SliceOn:       f.SliceOn,
@@ -550,4 +562,14 @@ func run(ctx context.Context, cfg gate.Config) error {
 		closeVoiceEngines()
 	}
 	return nil
+}
+
+// usageRefresh is RUNTIME_USAGE_REFRESH: a duration, 2 minutes when unset, 0 when "off" or not a duration.
+func usageRefresh() time.Duration {
+	v := env("RUNTIME_USAGE_REFRESH", "2m")
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		return 0
+	}
+	return d
 }

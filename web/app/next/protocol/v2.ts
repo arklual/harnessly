@@ -440,7 +440,7 @@ export interface MachineAgent {
 }
 /** A profile id: lower case, `^[a-z][a-z0-9-]{0,31}$`. The runtime owns the list (`kimi`, `glm`, `xai`…). */
 export type ProfileId = string;
-export const PROFILE_VENDORS = ['kimi', 'glm', 'grok', 'gpt'] as const;
+export const PROFILE_VENDORS = ['kimi', 'glm', 'grok', 'gpt', 'auto'] as const;
 export type ProfileVendor = (typeof PROFILE_VENDORS)[number];
 /** A backend profile a machine can start a conversation on: another vendor's models behind this CLI. */
 export interface ProfileOffer {

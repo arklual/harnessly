@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Стендап</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="su">
+  <header class="su__head">
+    <h1 class="su__title">Стендап</h1>
+    <span class="su__date" id="date"></span>
+  </header>
+  <p class="su__note" id="note" role="status"></p>
+  <ul class="su__list" id="list"></ul>
+</main>
+<!-- Classic scripts only: the view runs in an opaque-origin frame, which sends the slot's cookie with classic scripts,
+     stylesheets and images but not with module scripts or CORS loads, so those would come back 401. -->
+<script src="/__hl/app-sdk.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

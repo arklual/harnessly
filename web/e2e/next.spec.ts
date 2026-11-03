@@ -2144,6 +2144,7 @@ test('12. Settings opens from the profile menu, the Apps screen and the machine 
     'Safe',
     'Machines',
     'Apps',
+    'Sinopia Design',
     'Beta',
   ]);
   await expect(set.locator('.hx-set__nav-caption')).toHaveText(['App', 'Agents', 'Machine']);

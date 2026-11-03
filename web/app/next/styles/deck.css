@@ -2409,109 +2409,6 @@
     max-width: none;
   }
 }
-
-/* ---- create and settings (WP5) ---- */
-
-/* The create screen: the bar, the stage card, the brief's box, the template card. */
-.hx-deck-new {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--hx-bg-rail);
-  overflow: hidden;
-}
-.hx-deck-new__bar {
-  flex: none;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-}
-.hx-deck-new__addr {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 36px;
-  flex: 0 1 380px;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  padding: 0 12px;
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-full);
-  background: var(--hx-bg-raised);
-  font-size: var(--hx-text-sm);
-}
-.hx-deck-new__addr b {
-  font-weight: 600;
-}
-.hx-deck-new__addr span {
-  color: var(--hx-fg-2);
-}
-.hx-deck-new__addr em {
-  font-style: normal;
-  color: var(--hx-fg-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.hx-deck-new__stage {
-  flex: 1;
-  min-height: 0;
-  margin: 0 10px 10px;
-  padding: 24px;
-  box-sizing: border-box;
-  border-radius: 14px;
-  background: var(--hx-bg-stage);
-  box-shadow: var(--hx-shadow-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* The field stands in the upper part, so the settings popover has room under it. */
-  justify-content: flex-start;
-  padding-top: clamp(40px, 18vh, 180px);
-  overflow-y: auto;
-  animation: hx-deck-fade 300ms ease;
-}
-.hx-deck-new__stage h2 {
-  margin: 0 0 18px;
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-.hx-deck-box {
-  width: min(640px, 100%);
-  box-sizing: border-box;
-  padding: 14px 14px 10px 18px;
-  border-radius: 22px;
-  background: var(--hx-bg-raised);
-  box-shadow:
-    var(--hx-shadow-md),
-    0 0 0 1px var(--hx-border);
-}
-.hx-deck-box textarea {
-  display: block;
-  width: 100%;
-  min-height: 72px;
-  /* It grows with its text (use-fit-field.ts) as the chat's field does, up to 40% of the screen and 320 px. */
-  max-height: min(40dvh, 320px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border: 0;
-  background: none;
-  outline: none;
-  resize: none;
-  font: inherit;
-  font-size: var(--hx-text-md);
-  line-height: 1.5;
-  color: var(--hx-fg-1);
-}
-.hx-deck-box textarea::placeholder {
-  color: var(--hx-fg-3);
-}
 .hx-deck-files {
   display: flex;
   flex-wrap: wrap;
@@ -2560,14 +2457,6 @@
   background: var(--hx-bg-active);
   color: var(--hx-fg-1);
 }
-.hx-deck-boxrow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.hx-deck-boxrow__grow {
-  flex: 1;
-}
 .hx-deck-chip {
   display: inline-flex;
   align-items: center;
@@ -2589,12 +2478,12 @@
 }
 /* The settings button says what differs from the start; a long say ends in an ellipsis at half the row, the row keeps
    its place. In a narrow field the model's pill gives way first, so a plain «Настройки» is never cut. */
-.hx-deck-boxrow > .hx-deck-chip {
+.hx-dl__bar > .hx-deck-chip {
   min-width: 0;
   max-width: 50%;
   flex: 0 0 auto;
 }
-.hx-deck-boxrow > .hx-picker-anchor {
+.hx-dl__bar .hx-picker-anchor {
   flex: 0 1 auto;
 }
 .hx-deck-chip__text {
@@ -2702,51 +2591,9 @@
   display: flex;
 }
 
-/* The design system picker as a chip of the composer's bar (ds-picker.tsx, variant chip): it keeps its name on a phone. */
-.hx-dl-ds[data-variant='chip'] {
-  margin-right: 0;
-}
-.hx-dl-ds[data-variant='chip'] .hx-dl-ds__btn {
-  width: auto;
-  height: 30px;
-  padding: 0 11px;
-  gap: 6px;
-  justify-content: flex-start;
-  border-radius: 15px;
-  background: var(--hx-bg-hover);
-  color: var(--hx-fg-2);
-  font-weight: var(--hx-weight-regular, 400);
-}
-.hx-dl-ds[data-variant='chip'] .hx-dl-ds__btn:hover,
-.hx-dl-ds[data-variant='chip'] .hx-dl-ds__btn[aria-expanded='true'] {
-  background: var(--hx-bg-active);
-}
-.hx-dl-ds[data-variant='chip'] .hx-dl-ds__name {
-  display: inline;
-  max-width: 180px;
-}
-.hx-dl-ds[data-variant='chip'] .hx-dl-ds__btn [data-chev] {
-  display: inline-block;
-}
-.hx-dl-ds[data-variant='chip'] .hx-dl-ds__short {
-  display: none !important;
-}
-.hx-dl-ds[data-variant='chip'] .hx-dl-pop {
-  right: auto;
-  left: 0;
-  z-index: 12;
-  transform-origin: 24px 0;
-}
-
-/* ?dev=deck-create: the screen in a window of its own. */
-.hx-gallery-deck {
-  display: flex;
-  height: 100vh;
-}
-
 /* Settings: a popover over the stage; below 560 px a sheet over a scrim. */
 .hx-deck-scrim {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 8;
   background: transparent;
@@ -3001,47 +2848,7 @@
   }
 }
 
-@media (max-width: 960px) {
-  .hx-deck-new__bar {
-    gap: 2px;
-  }
-  .hx-deck-new__addr {
-    flex: 1 1 auto;
-  }
-}
-
 @media (max-width: 560px) {
-  .hx-deck-new__bar {
-    gap: 4px;
-    padding: 0 8px;
-  }
-  .hx-deck-new__addr {
-    border: 0;
-    background: none;
-    padding: 0 4px;
-  }
-  .hx-deck-new__addr b {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .hx-deck-new__addr span,
-  .hx-deck-new__addr em {
-    display: none;
-  }
-  .hx-deck-new__stage {
-    justify-content: flex-start;
-    padding: 28px 14px 14px;
-  }
-  .hx-deck-new__stage h2 {
-    font-size: 24px;
-    margin-bottom: 14px;
-  }
-  .hx-deck-box {
-    padding: 12px 12px 10px 14px;
-  }
-  .hx-deck-box textarea {
-    font-size: 16px;
-  }
   .hx-deck-found {
     flex-wrap: wrap;
     gap: 10px 12px;

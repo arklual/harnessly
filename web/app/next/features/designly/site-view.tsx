@@ -428,7 +428,9 @@ const SiteView = ({
   const browsers = phoneBrowser && device.os ? BROWSERS[device.os] : [];
   // «Обзор» keeps room at the bottom for the field, or for a guest's list of comments.
   const ovwRoom = underField || guest !== undefined;
-  const cards = vp && overview ? overviewOf({ w: vp.vw, h: vp.vh }, ovwRoom) : [];
+  // The pane's field over the pill keeps its own room in the area (site-pane.css).
+  const fieldRoom = paneBottomChat && dockShown ? DOCK_ROOM : 0;
+  const cards = vp && overview ? overviewOf({ w: vp.vw, h: vp.vh - fieldRoom }, ovwRoom) : [];
   const qr = useMemo(() => (phoneUrl ? qrModules(phoneUrl) : null), [phoneUrl]);
   // The canvas: the page's box zooms and pans over its area; another device or size starts at the fit again.
   const canvas = useCanvasZoom(

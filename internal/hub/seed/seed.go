@@ -1,6 +1,7 @@
 // Package seed makes organizations, tenants, teams, people and roles from a file (`hub seed`, docs/hub/orgs.md,
-// «Seeding»). It only adds and updates, by natural keys, in one transaction: a second run changes nothing, and a dry run
-// is the same run rolled back.
+// «Seeding»). It adds and updates by natural keys, in one transaction: a second run changes nothing, and a dry run is the
+// same run rolled back. The one thing it takes away is a person listed under offboard: every role, tenant, team and
+// session they have.
 package seed
 
 import (
@@ -9,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/mail"
 	"regexp"
 	"strings"
@@ -17,20 +19,47 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hub/usage"
 )
 
 // File is the seed file.
 type File struct {
 	Orgs []Org `yaml:"orgs"`
+	// Offboard lists people to take out of the installation: their roles, tenants, teams and sessions go, the user row
+	// stays (their history and audit point at it). Signing in afterwards finds nothing to open.
+	Offboard []string `yaml:"offboard"`
 }
 
 type Org struct {
-	Slug     string   `yaml:"slug"`
-	Name     string   `yaml:"name"`
-	Timezone string   `yaml:"timezone"`
-	Currency string   `yaml:"currency"`
-	Admins   []string `yaml:"admins"`
-	Tenants  []Tenant `yaml:"tenants"`
+	Slug     string    `yaml:"slug"`
+	Name     string    `yaml:"name"`
+	Timezone string    `yaml:"timezone"`
+	Currency string    `yaml:"currency"`
+	Admins   []string  `yaml:"admins"`
+	Tenants  []Tenant  `yaml:"tenants"`
+	Accounts []Account `yaml:"accounts"`
+}
+
+// Account registers a model account the organization's machines report: who pays for it and what it costs a month. A
+// machine names an account it has not seen before personal; this is how an admin says the organization pays.
+type Account struct {
+	// Provider is the CLI the account is used with: claude or codex.
+	Provider string `yaml:"provider"`
+	// Ref is the account as the machines report it: claude:<account uuid>, codex:<account id>, key:<key hash>.
+	Ref   string `yaml:"ref"`
+	Label string `yaml:"label"`
+	Plan  string `yaml:"plan"`
+	// Funding is who pays: org (the default) or personal.
+	Funding string `yaml:"funding"`
+	// MonthlyFee is a subscription's fee in USD a month, split over its use on the money screens.
+	MonthlyFee float64 `yaml:"monthlyFee"`
+	Owner      string  `yaml:"owner"`
+	// Tenant narrows the account to one tenant of the organization; empty keeps the scope it has (the organization for
+	// a new one).
+	Tenant string `yaml:"tenant"`
+	// History gives the account the owner's sessions of this CLI that came with no account: those the machine had
+	// before it first reported which account it signs in with.
+	History bool `yaml:"history"`
 }
 
 type Tenant struct {
@@ -63,6 +92,45 @@ func Parse(r io.Reader) (File, error) {
 }
 
 func (f *File) check() error {
+	var err error
+	if f.Offboard, err = emails("offboard", f.Offboard); err != nil {
+		return err
+	}
+	leaving := map[string]bool{}
+	for _, e := range f.Offboard {
+		leaving[e] = true
+	}
+	if err := f.checkOrgs(); err != nil {
+		return err
+	}
+	for _, o := range f.Orgs {
+		for _, e := range o.people() {
+			if leaving[e] {
+				return fmt.Errorf("offboard: %s is also given a role in org %s", e, o.Slug)
+			}
+		}
+	}
+	return nil
+}
+
+// people is every address the org's part of the file gives a role.
+func (o Org) people() []string {
+	out := append([]string{}, o.Admins...)
+	for _, x := range o.Accounts {
+		if x.Owner != "" {
+			out = append(out, x.Owner)
+		}
+	}
+	for _, t := range o.Tenants {
+		out = append(append(out, t.Owners...), t.Members...)
+		for _, m := range t.Teams {
+			out = append(append(out, m.Leads...), m.Members...)
+		}
+	}
+	return out
+}
+
+func (f *File) checkOrgs() error {
 	orgSlugs, spaceSlugs := map[string]bool{}, map[string]bool{}
 	for i := range f.Orgs {
 		o := &f.Orgs[i]
@@ -133,6 +201,57 @@ func (f *File) check() error {
 				}
 			}
 		}
+		if err := o.checkAccounts(where); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var refRe = regexp.MustCompile(`^(claude|codex|key):[A-Za-z0-9._-]{1,100}$`)
+
+func (o *Org) checkAccounts(where string) error {
+	refs := map[string]bool{}
+	for i := range o.Accounts {
+		x := &o.Accounts[i]
+		aw := fmt.Sprintf("%s.accounts[%d]", where, i)
+		if x.Provider != "claude" && x.Provider != "codex" {
+			return fmt.Errorf("%s: provider must be claude or codex", aw)
+		}
+		if !refRe.MatchString(x.Ref) {
+			return fmt.Errorf("%s: ref %q must be claude:<id>, codex:<id> or key:<hash>", aw, x.Ref)
+		}
+		if refs[x.Provider+" "+x.Ref] {
+			return fmt.Errorf("%s: ref %q twice", aw, x.Ref)
+		}
+		refs[x.Provider+" "+x.Ref] = true
+		x.Label, x.Plan = strings.TrimSpace(x.Label), strings.TrimSpace(x.Plan)
+		if len([]rune(x.Label)) > 60 || len([]rune(x.Plan)) > 60 {
+			return fmt.Errorf("%s: label and plan are at most 60 characters", aw)
+		}
+		switch x.Funding {
+		case "":
+			x.Funding = store.FundingOrg
+		case store.FundingOrg, store.FundingPersonal:
+		default:
+			return fmt.Errorf("%s: funding must be org or personal", aw)
+		}
+		if x.MonthlyFee < 0 || x.MonthlyFee > 1e6 || math.IsNaN(x.MonthlyFee) {
+			return fmt.Errorf("%s: monthlyFee must be 0–1000000 USD", aw)
+		}
+		if x.Owner != "" {
+			e, err := emails(aw+".owner", []string{x.Owner})
+			if err != nil {
+				return err
+			}
+			x.Owner = e[0]
+		}
+		if x.History && x.Owner == "" {
+			return fmt.Errorf("%s: history needs an owner", aw)
+		}
+		if x.Tenant != "" && !slugRe.MatchString(x.Tenant) {
+			return fmt.Errorf("%s: tenant %q is not a slug", aw, x.Tenant)
+		}
 	}
 	return nil
 }
@@ -174,6 +293,11 @@ func Apply(ctx context.Context, db *store.DB, f File, dry bool, now time.Time) (
 		a := &applier{ctx: ctx, st: st, now: now.UTC(), users: map[string]store.User{}}
 		for _, o := range f.Orgs {
 			if err := a.org(o); err != nil {
+				return err
+			}
+		}
+		for _, e := range f.Offboard {
+			if err := a.offboard(e); err != nil {
 				return err
 			}
 		}
@@ -283,7 +407,117 @@ func (a *applier) org(in Org) error {
 			return err
 		}
 	}
+	for _, x := range in.Accounts {
+		if err := a.account(o, x); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// account registers the account in the organization, gives its funding to its sessions, gives it the owner's sessions
+// without an account when asked, and sums anew the hours whose money that moved.
+func (a *applier) account(o store.Org, in Account) error {
+	orgKey := o.ID
+	provider := usage.PriceProvider(in.Provider, "")
+	kind := "subscription"
+	if strings.HasPrefix(in.Ref, "key:") {
+		kind = "api_key"
+	}
+	ownerID := ""
+	if in.Owner != "" {
+		u, err := a.user(in.Owner)
+		if err != nil {
+			return err
+		}
+		ownerID = u.ID
+	}
+	scopeKind, scopeID := "", ""
+	if in.Tenant != "" {
+		sp, err := a.st.SpaceBySlug(a.ctx, in.Tenant)
+		if store.IsNotFound(err) || (err == nil && sp.OrgID != o.ID) {
+			return fmt.Errorf("account %s: tenant %s is not in org %s", in.Ref, in.Tenant, o.Slug)
+		}
+		if err != nil {
+			return err
+		}
+		scopeKind, scopeID = store.ScopeTenant, sp.ID
+	}
+	fee := int64(math.Round(in.MonthlyFee * 1e6))
+	cur, err := a.st.AccountByRef(a.ctx, orgKey, provider, in.Ref)
+	switch {
+	case store.IsNotFound(err):
+		cur = store.Account{OrgKey: orgKey, ScopeKind: def(scopeKind, store.ScopeOrg), ScopeID: def(scopeID, o.ID), Provider: provider, Kind: kind,
+			Plan: in.Plan, AccountRef: in.Ref, Label: in.Label, Funding: in.Funding, OwnerUserID: ownerID, MonthlyFeeMicros: fee, CreatedAt: a.now}
+		if err := a.st.CreateAccount(a.ctx, &cur); err != nil {
+			return err
+		}
+		a.note("+ account %s %s (%s) in org %s", in.Provider, in.Ref, cur.Funding, o.Slug)
+		if err := a.audit(o.ID, "", "", store.ScopeOrg, o.ID, "account.create", "account", cur.ID, accountAfter(cur)); err != nil {
+			return err
+		}
+	case err != nil:
+		return err
+	default:
+		next := cur
+		next.Label, next.Plan, next.Kind, next.Funding, next.MonthlyFeeMicros, next.Discovered = in.Label, in.Plan, kind, in.Funding, fee, false
+		if ownerID != "" {
+			next.OwnerUserID = ownerID
+		}
+		if scopeKind != "" {
+			next.ScopeKind, next.ScopeID = scopeKind, scopeID
+		}
+		if next != cur {
+			if err := a.st.UpdateAccount(a.ctx, next); err != nil {
+				return err
+			}
+			a.note("~ account %s %s (%s) in org %s", in.Provider, in.Ref, next.Funding, o.Slug)
+			if err := a.audit(o.ID, "", "", store.ScopeOrg, o.ID, "account.update", "account", cur.ID, accountAfter(next)); err != nil {
+				return err
+			}
+			cur = next
+		}
+	}
+	moved, err := a.st.SetAccountFunding(a.ctx, orgKey, cur.ID, cur.Funding)
+	if err != nil {
+		return err
+	}
+	if len(moved) > 0 {
+		a.note("~ %d sessions of account %s %s now %s", len(moved), in.Provider, in.Ref, cur.Funding)
+	}
+	if in.History {
+		keys, err := a.st.SessionsWithoutAccount(a.ctx, orgKey, ownerID, in.Provider)
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := a.st.SetSessionsAccount(a.ctx, orgKey, in.Provider, keys, cur.ID, cur.Funding); err != nil {
+				return err
+			}
+			a.note("~ %d sessions of %s without an account given account %s %s", len(keys), in.Owner, in.Provider, in.Ref)
+			moved = append(moved, keys...)
+		}
+	}
+	if len(moved) == 0 {
+		return nil
+	}
+	hours, err := a.st.CallHours(a.ctx, orgKey, moved)
+	if err != nil {
+		return err
+	}
+	return a.st.Rollup(a.ctx, orgKey, hours)
+}
+
+func accountAfter(x store.Account) map[string]any {
+	return map[string]any{"provider": x.Provider, "label": x.Label, "plan": x.Plan, "kind": x.Kind, "funding": x.Funding,
+		"monthlyFeeMicros": x.MonthlyFeeMicros, "scopeKind": x.ScopeKind, "scopeId": x.ScopeID}
+}
+
+func def(v, d string) string {
+	if v == "" {
+		return d
+	}
+	return v
 }
 
 func (a *applier) tenant(o store.Org, in Tenant) error {
@@ -446,6 +680,113 @@ func (a *applier) firstTeamIn(spaceID, userID string) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// offboard takes the person out of every tenant, team and role and ends their sessions. Someone who never signed in
+// and was never seeded is nothing to do. The last owner of a tenant is refused: the tenant would have no one to run it.
+func (a *applier) offboard(email string) error {
+	u, err := a.st.UserByEmail(a.ctx, email)
+	if store.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	teams, err := a.st.TeamsOfUser(a.ctx, u.ID)
+	if err != nil {
+		return err
+	}
+	for _, m := range teams {
+		t, err := a.st.TeamByID(a.ctx, m.TeamID)
+		if err != nil {
+			return err
+		}
+		orgID, err := a.orgOfSpace(t.SpaceID)
+		if err != nil {
+			return err
+		}
+		if err := a.st.RemoveTeamMember(a.ctx, t.ID, u.ID); err != nil {
+			return err
+		}
+		a.note("- %s from team %s", email, t.Slug)
+		if err := a.audit(orgID, t.SpaceID, t.ID, store.ScopeTeam, t.ID, "member.remove", "user", u.ID, nil); err != nil {
+			return err
+		}
+	}
+	spaces, err := a.st.SpacesByUser(a.ctx, u.ID)
+	if err != nil {
+		return err
+	}
+	for _, sp := range spaces {
+		if sp.Role == store.RoleOwner {
+			n, err := a.st.CountOwners(a.ctx, sp.ID)
+			if err != nil {
+				return err
+			}
+			if n <= 1 {
+				return fmt.Errorf("offboard: %s is the last owner of tenant %s, name another owner first", email, sp.Slug)
+			}
+		}
+		if err := a.st.RemoveMember(a.ctx, sp.ID, u.ID); err != nil {
+			return err
+		}
+		a.note("- %s %s of tenant %s", sp.Role, email, sp.Slug)
+		if err := a.audit(sp.OrgID, sp.ID, "", store.ScopeTenant, sp.ID, "member.remove", "user", u.ID, map[string]any{"role": sp.Role}); err != nil {
+			return err
+		}
+	}
+	grants, err := a.st.GrantsOfUser(a.ctx, u.ID)
+	if err != nil {
+		return err
+	}
+	for _, g := range grants {
+		removed, err := a.st.Revoke(a.ctx, u.ID, g.ScopeKind, g.ScopeID, g.Role)
+		if err != nil {
+			return err
+		}
+		if !removed {
+			continue
+		}
+		orgID, spaceID, teamID, err := a.chainOf(g.ScopeKind, g.ScopeID)
+		if err != nil {
+			return err
+		}
+		a.note("- %s %s of %s %s", g.Role, email, g.ScopeKind, g.ScopeID)
+		if err := a.audit(orgID, spaceID, teamID, g.ScopeKind, g.ScopeID, "grant.remove", "user", u.ID, map[string]any{"role": g.Role}); err != nil {
+			return err
+		}
+	}
+	if u.IsAdmin {
+		if err := a.st.SetUserAdmin(a.ctx, u.ID, false); err != nil {
+			return err
+		}
+		a.note("- instance admin %s", email)
+	}
+	return a.st.DeleteUserSessions(a.ctx, u.ID, "")
+}
+
+func (a *applier) orgOfSpace(spaceID string) (string, error) {
+	sp, err := a.st.SpaceByID(a.ctx, spaceID)
+	return sp.OrgID, err
+}
+
+// chainOf names the organization, tenant and team a scope sits in, for the audit line.
+func (a *applier) chainOf(kind, id string) (orgID, spaceID, teamID string, err error) {
+	switch kind {
+	case store.ScopeOrg:
+		return id, "", "", nil
+	case store.ScopeTenant:
+		orgID, err = a.orgOfSpace(id)
+		return orgID, id, "", err
+	case store.ScopeTeam:
+		t, err := a.st.TeamByID(a.ctx, id)
+		if err != nil {
+			return "", "", "", err
+		}
+		orgID, err = a.orgOfSpace(t.SpaceID)
+		return orgID, t.SpaceID, id, err
+	}
+	return "", "", "", nil
 }
 
 func jsonOf(v any) string {

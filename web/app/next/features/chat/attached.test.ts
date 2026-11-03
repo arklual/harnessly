@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attachedOf, readAttached } from '@/next/features/chat/attached';
+import { attachedOf, filesOf, readAttached } from '@/next/features/chat/attached';
 import type { MessageRef } from '@/next/protocol/v2';
 
 const block = [
@@ -81,5 +81,23 @@ describe('readAttached: another chat', () => {
     );
     expect(read.text).toBe('continue that');
     expect(read.refs).toEqual([{ kind: 'chat', id: 'tab-old', title: 'Old work', target: 'tab-old' }]);
+  });
+});
+
+describe('filesOf', () => {
+  const own = { id: 'up_A', name: 'a.pdf', kind: 'file', mime: 'application/pdf' } as const;
+  const block =
+    '<attached>\nПрикреплено:\n<ref kind="upload" id="up_A" title="a.pdf"/> Файл\n<ref kind="upload" id="up_B" title="b &amp; c.zip"/> Файл\n</attached>';
+
+  it('shows a file once while the message has it and the block names it', () => {
+    expect(filesOf(block, [own]).map((f) => f.id)).toEqual(['up_A', 'up_B']);
+  });
+
+  it('keeps the files of a message read back from the transcript', () => {
+    expect(filesOf(`words\n\n${block}`, []).map((f) => f.name)).toEqual(['a.pdf', 'b & c.zip']);
+  });
+
+  it('takes an upload for no place, and the block off the words', () => {
+    expect(readAttached(block)).toEqual({ text: '', refs: [] });
   });
 });

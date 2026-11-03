@@ -145,7 +145,8 @@ behind looks the same as a backlog written earlier, so such a batch is kept as t
   new outbox's records win.
 - `accountRef` of a session, window or balance → the organization's account of that provider and ref; an unknown one is
   made `discovered`, personal, owned by the person it came with (the machine creator for windows and balances), kind
-  `api_key` for a `key:` ref and `subscription` otherwise, until an admin registers it.
+  `api_key` for a `key:` ref and `subscription` otherwise, until an admin registers it (`hub seed`, `accounts:`,
+  orgs.md). A session record without `accountRef` keeps the account the session already has.
 - `window` and `balance` → `account_windows`, `account_balances` (only a newer measurement replaces).
 - A kind the hub does not know is skipped, so an agent newer than the hub never stops the cursor.
 - `usage_rollup_hour` (key: the UTC hour start in epoch ms) is summed anew for every hour the batch touched: the hours of
@@ -164,4 +165,5 @@ in effect at its time and keeps that row's `effective_from` as `price_ver`. The 
 (`opus-4-6`) for Anthropic, the table's model for OpenAI, the model name for the rest (`internal/hub/usage.PriceKey`).
 The hub seeds the rows of `internal/pricing` (the runtime's numbers, so the two agree) and never overwrites a row that is
 there. Prices of other providers are added as rows with their own `effective_from` once confirmed; until then their calls
-have no price.
+have no price. On start the hub also prices the stored calls that came without a price by the list as it is now
+(`usage.PriceUnpriced`) and sums their hours anew, so a model added to the table later gets its past calls too.

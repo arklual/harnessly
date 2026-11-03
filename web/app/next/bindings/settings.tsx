@@ -16,6 +16,7 @@ import {
   GeneralPage,
   MachinesPage,
 } from '@/next/bindings/settings-general';
+import { DesignPage } from '@/next/bindings/settings-design';
 import { VoicePage } from '@/next/bindings/settings-voice';
 import { KeysPage } from '@/next/bindings/settings-keys';
 import { NoticesPage } from '@/next/bindings/settings-notices';
@@ -110,6 +111,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
         <PeersPage machine={machine} now={now} pending={pending} />
       </>
     );
+  else if (active === 'design') body = <DesignPage machine={machine} />;
   else if (active === 'beta') body = <BetaPage />;
   else body = <AppsPage machine={machine} />;
 

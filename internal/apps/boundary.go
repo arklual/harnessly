@@ -182,6 +182,7 @@ func (b *Boundary) sealedArgs(protected []string, seal *Seal, hidden ...string) 
 	args = append(args, seal.homeArgs(bound)...)
 	args = append(args, busMask()...)
 	args = append(args, tmuxMask()...)
+	args = append(args, sshConfigMask(sshConfigDir)...)
 	args = append(args, socketMask()...)
 	// The person's own credentials (the runtime's cli-token, the key agent tokens are signed with, the MCP config that
 	// carries the cli-token) read as empty inside: the agent has a token of its own launch, which the routes that
@@ -299,6 +300,20 @@ func busMask() []string {
 		out = append(out, "--tmpfs", filepath.Join(dir, "systemd"))
 	}
 	return out
+}
+
+// sshConfigDir is what the system's ssh_config includes.
+const sshConfigDir = "/etc/ssh/ssh_config.d"
+
+// sshConfigMask keeps ssh working in the wall (HRN-621): ssh refuses an Included file not owned by root or the user, and
+// in a user namespace root's files belong to nobody, so one file in this folder ends every ssh and every git over ssh with
+// «Bad owner or permissions». The folder is empty inside; the drop-ins (a package's proxy for local VMs, cloud-init's) do
+// not apply in the wall, the person's ~/.ssh/config does. The sshd of the machine, not this, refuses a login to itself.
+func sshConfigMask(dir string) []string {
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return nil
+	}
+	return []string{"--tmpfs", dir}
 }
 
 // renamable says whether a folder's entries can be renamed by the person: it is writable, or the person owns it and so

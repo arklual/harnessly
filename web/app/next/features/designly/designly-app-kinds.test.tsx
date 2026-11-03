@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import DesignlyHome, { type IDesignCard } from '@/next/features/designly/designly-home';
 import type { IAppKind } from '@/next/features/app-catalog/api';
+import type { MachineId } from '@/next/protocol/v2';
 
 const kind: IAppKind = {
   id: 'acme.moodboard',
@@ -45,10 +46,20 @@ const Home = ({
     onOpen={onOpen}
     onRetry={vi.fn()}
     compose={{
+      machine: 'm1' as MachineId,
       systems: [],
       onCreate: vi.fn(),
       brief: '',
       onBrief: vi.fn(),
+      uploads: {
+        attachments: [],
+        ready: [],
+        uploading: false,
+        onFiles: vi.fn(),
+        onRemove: vi.fn(),
+        onRetry: vi.fn(),
+        reset: vi.fn(),
+      },
       picker: null,
       voice: { recording: null, onCancel: vi.fn(), onFinish: vi.fn() },
       appKinds: kinds,
@@ -65,6 +76,14 @@ beforeAll(() => {
     disconnect() {}
   };
   vi.stubGlobal('ResizeObserver', observer);
+  // The settings panel of the start asks whether the window is a phone's.
+  window.matchMedia ??= ((query: string) =>
+    ({
+      matches: false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }) as unknown as MediaQueryList) as typeof window.matchMedia;
 });
 afterEach(cleanup);
 

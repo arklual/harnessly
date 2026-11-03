@@ -23,6 +23,7 @@ const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent:
   skills: { icon: 'blocks' },
   machines: { icon: 'server' },
   apps: { icon: 'layout-grid' },
+  design: { icon: 'pen-tool' },
   beta: { icon: 'sparkles' },
 };
 
@@ -30,7 +31,7 @@ const SECTION_MARK: Readonly<Record<SettingsSection, { icon: string } | { agent:
 const NAV_GROUPS = [
   { id: 'app', sections: ['general', 'appearance', 'keys', 'notifications', 'voice', 'takes'] },
   { id: 'agents', sections: ['accounts', 'claude', 'codex', 'skills', 'safe'] },
-  { id: 'machine', sections: ['machines', 'apps', 'beta'] },
+  { id: 'machine', sections: ['machines', 'apps', 'design', 'beta'] },
 ] as const satisfies readonly { id: string; sections: readonly SettingsSection[] }[];
 
 interface ISettingsShellProps {

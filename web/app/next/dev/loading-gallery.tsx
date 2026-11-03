@@ -11,6 +11,7 @@
 //   feed-states     the feed on its way, older turns on their way, the start of the conversation, a feed catching up
 //   limits          the composer's chip with limits that did not come
 // Each retry answers after a pause and the scene goes on to its loaded state. Never part of a production path.
+import type { MachineId } from '@/next/protocol/v2';
 import '@/next/styles/tokens.css';
 import '@/next/styles/base.css';
 import '@/next/styles/shell.css';
@@ -122,10 +123,20 @@ const DesignlyScene = ({ fail }: { fail: boolean }) => {
         void later(null).then(() => setList(cards(now)));
       }}
       compose={{
+        machine: 'gallery' as MachineId,
         systems: [],
         onCreate: () => later(undefined),
         brief: '',
         onBrief: noop,
+        uploads: {
+          attachments: [],
+          ready: [],
+          uploading: false,
+          onFiles: () => undefined,
+          onRemove: () => undefined,
+          onRetry: () => undefined,
+          reset: () => undefined,
+        },
         picker: null,
         voice: VOICE,
       }}

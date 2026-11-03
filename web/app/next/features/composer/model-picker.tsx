@@ -299,7 +299,9 @@ const ModelPicker = ({
                   </span>
                   <span className="hx-picker__model">
                     <i className="hx-agent" data-agent={agent.vendor ?? value.provider} aria-hidden="true" />
-                    {agent.name} · {modelName(agent, value.model)}
+                    <span className="hx-picker__model-text">
+                      {agent.name} · {modelName(agent, value.model)}
+                    </span>
                     <Icon name="chevron-right" size="sm" />
                   </span>
                 </button>
@@ -416,7 +418,10 @@ const ModelPicker = ({
                 </div>
               )}
               <div className="hx-carousel">
-                <div className="hx-carousel__track" data-n={listed.length} data-a={browseIndex}>
+                <div
+                  className="hx-carousel__track"
+                  ref={(el) => el?.style.setProperty('--a', String(browseIndex))}
+                >
                   {listed.map((a, index) => {
                     const active = index === browseIndex;
                     const across = crosses(a);

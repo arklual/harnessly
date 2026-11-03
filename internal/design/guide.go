@@ -22,9 +22,7 @@ var textFiles embed.FS
 
 const (
 	GuideFile    = "CLAUDE.md"
-	guideVersion = 10
-	// DesignArtifactType is the published artifact type of the design tool: its instructions are read, never published to.
-	DesignArtifactType = "https://claude.ai/artifact/QKN21svewxgyPb6SYRqWnd"
+	guideVersion = 11
 )
 
 // text is an embedded text with the deployment's words put in. A text has an English file (guide.md) and a Russian one
@@ -59,7 +57,8 @@ func textFileExists(name string) bool {
 
 func (l *Library) GuidePath() string { return filepath.Join(l.Root(), GuideFile) }
 
-func (l *Library) Guide() string { return l.text("guide.md") }
+// Guide is the library's rules: how to work here, then the board format, so a design needs no account to read them.
+func (l *Library) Guide() string { return l.text("guide.md") + "\n" + l.text("format.md") }
 
 // EnsureGuide writes the rules next to the artifacts when they are missing or older than this runtime's.
 func (l *Library) EnsureGuide() error {

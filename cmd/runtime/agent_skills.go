@@ -108,6 +108,7 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"harnessly tab create -t codex-cli --prompt \"<the whole task>\"   # start another agent (claude-code | codex-cli | terminal)\n" +
 		"harnessly tab status <id>         # is it working or waiting\n" +
 		"harnessly tab result <id>         # what its screen shows: read its answer\n" +
+		"harnessly app docs                # how to write a plugin or an app: the guide, with examples\n" +
 		"harnessly --help                  # everything, with examples\n" +
 		"```\n\n")
 	b.WriteString("Show the person what they should look at: after you publish a document or draw a board, or when a dev server is running, " +

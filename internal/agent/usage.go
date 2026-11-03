@@ -52,7 +52,10 @@ type UsageDeps struct {
 	// Dir is the outbox's folder, where the feed keeps what it has written.
 	Dir           string
 	Home, DataDir string
-	Hostname      string
+	// RuntimeDir is the runtime's data directory, where it keeps its usage facts file; DataDir is the agent's own
+	// folder for the hub, which is a subfolder of it on a machine that only observes.
+	RuntimeDir string
+	Hostname   string
 	// Getenv is a variable as a CLI started by the agent would see it (provider is claude or codex).
 	Getenv func(provider, name string) string
 }
@@ -64,13 +67,13 @@ func (h *hub) startUsage() {
 	if cfg.UsageFeed == nil {
 		return
 	}
-	dir := filepath.Join(cfg.DataDir, usageOutboxDir)
+	dir := filepath.Join(h.dir, usageOutboxDir)
 	box, err := usageoutbox.Open(dir, nil)
 	if err != nil {
 		Log("warn", "usage outbox not opened; this machine reports no spend to the hub", F{"error", err.Error()})
 		return
 	}
-	feed, err := cfg.UsageFeed(UsageDeps{Box: box, Dir: dir, Home: cfg.Home, DataDir: cfg.DataDir, Hostname: h.a.hello.Hostname, Getenv: h.cliEnv})
+	feed, err := cfg.UsageFeed(UsageDeps{Box: box, Dir: dir, Home: cfg.Home, DataDir: h.dir, RuntimeDir: cfg.DataDir, Hostname: h.a.hello.Hostname, Getenv: h.cliEnv})
 	if err != nil {
 		_ = box.Close()
 		Log("warn", "usage feed not started; this machine reports no spend to the hub", F{"error", err.Error()})

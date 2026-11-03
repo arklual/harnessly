@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FIRST_FRAME_AT,
   formatTime,
   MEDIA_ACTION,
   mediaActionOf,
+  movedFromStart,
   nextRate,
   peaksOf,
   tenthOf,
@@ -24,6 +26,12 @@ describe('the media player', () => {
     expect(tenthOf('Digit3')).toBe(0.3);
     expect(tenthOf('Numpad0')).toBe(0);
     expect(tenthOf('KeyA')).toBeNull();
+  });
+
+  it('does not take the place a video opens at for a moment the person chose', () => {
+    expect(movedFromStart(0)).toBe(false);
+    expect(movedFromStart(FIRST_FRAME_AT)).toBe(false);
+    expect(movedFromStart(0.04)).toBe(true);
   });
 
   it('cycles the speed through all its values', () => {

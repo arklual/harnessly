@@ -2,7 +2,11 @@ package agents
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"time"
 )
 
 // The line that starts an agent is typed into whatever shell the pane runs: bash, zsh, fish, sh. Each reads its own
@@ -60,8 +64,63 @@ func ForAnyShell(line string) string {
 			prefix, command = line[:i+len(envSourceEnd)], line[i+len(envSourceEnd):]
 		}
 	}
-	return anyShellPrefix + AnyShellQuote(prefix+"exec env "+command)
+	body := prefix + "exec env " + command
+	if typed := AnyShellQuote(body); len(typed) <= longLine {
+		return anyShellPrefix + typed
+	}
+	if short, ok := lineInFile(body); ok {
+		return short
+	}
+	return anyShellPrefix + AnyShellQuote(body)
 }
+
+// longLine is the most bytes of a line that is typed as it is. A shell takes typed keys one by one and redraws the line
+// for each: 7 KB (the wall of a chat with apps, HRN-621) took zsh 13 s and more, a launch counts as failed after 15 s, and
+// typed before the shell's line editor is up the terminal's own 4 KB limit loses the line and its Enter.
+const longLine = 1 << 10
+
+// A line kept this long was never run: its shell went away first.
+const lineFileAge = time.Hour
+
+var lineDir atomic.Pointer[string]
+
+// SetLineDir names the folder long launch lines wait in. It must be one the wall of a chat with apps hides (the data
+// folder's own, off the seal's list, internal/apps/seal.go): an agent that could write a waiting line would run outside
+// its wall. Without it long lines are typed whole.
+func SetLineDir(dir string) { lineDir.Store(&dir) }
+
+// lineInFile keeps body in a file readable only by its owner and gives the short line that runs it; the file removes
+// itself first. Run by `.`, in the `sh -c` itself, so its exec makes the pane's foreground process the agent's CLI.
+func lineInFile(body string) (string, bool) {
+	dir := lineDir.Load()
+	if dir == nil || *dir == "" || os.MkdirAll(*dir, 0o700) != nil {
+		return "", false
+	}
+	sweepLines(*dir)
+	f, err := os.CreateTemp(*dir, "line-*")
+	if err != nil {
+		return "", false
+	}
+	name := f.Name()
+	_, err = f.WriteString("rm -f -- " + shellWord(name) + "\n" + body + "\n")
+	if cerr := f.Close(); err != nil || cerr != nil {
+		_ = os.Remove(name)
+		return "", false
+	}
+	return anyShellPrefix + AnyShellQuote(". "+shellWord(name)), true
+}
+
+func sweepLines(dir string) {
+	old, _ := filepath.Glob(filepath.Join(dir, "line-*"))
+	for _, f := range old {
+		if info, err := os.Stat(f); err == nil && time.Since(info.ModTime()) > lineFileAge {
+			_ = os.Remove(f)
+		}
+	}
+}
+
+// shellWord is s as one word of sh.
+func shellWord(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
 // PrintfQuote is s as one sh word that keeps every character, newlines and control characters too, on one typed line:
 // `"$(printf %b '…')"` with the escapes printf's %b reads. ($'…' would do in bash and zsh, but not in dash or fish.)

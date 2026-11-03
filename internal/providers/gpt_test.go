@@ -384,7 +384,7 @@ func TestAGPTChatGoesToTheProxyWithTheProxysKey(t *testing.T) {
 	src := &Source{Store: st}
 	list, _ := src.Profiles(context.Background())
 	for _, p := range list.Profiles {
-		if (p.ID == "gpt") != (p.Switch != nil) {
+		if (p.ID == "gpt" || p.ID == "auto") != (p.Switch != nil) {
 			t.Errorf("%s: switch %+v", p.ID, p.Switch)
 		}
 		if p.ID == "gpt" && (!p.Switch.On || p.Key.Configured || p.Login == nil && st.Logins["gpt"] != nil) {

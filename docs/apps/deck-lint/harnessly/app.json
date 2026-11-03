@@ -3,17 +3,14 @@
   "name": "Валидатор презентаций",
   "description": "Находит слайды, где слишком много текста или мелкий шрифт, отмечает их на доске и не даёт поделиться, пока есть ошибки",
   "version": "0.1.0",
-  "harnessly": ">=0.17.0",
+  "harnessly": ">=0.16.68",
   "trust": "sandboxed",
   "targets": ["sinopia.slides"],
   "activation": { "on": ["document"] },
   "permissions": ["sinopia.read", "sinopia.write"],
   "agent": {
     "instructions": "instructions.md",
-    "skills": ["deck-fixes"],
-    "tools": {
-      "allow": ["app.*"]
-    }
+    "skills": ["deck-fixes"]
   },
   "views": [
     { "id": "panel", "title": "Проверка презентации", "entry": "ui/panel.html", "targets": ["sinopia.slides"] }

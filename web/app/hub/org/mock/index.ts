@@ -8,6 +8,7 @@ import { analyticsMock } from './analytics';
 import { machinesMock } from './machines';
 import { shellMock } from './shell';
 import { teamsMock } from './teams';
+import { tenantMock } from './tenant';
 import type { MockCtx } from './ctx';
 
 export const mockOrgApi = (ctx: MockCtx): OrgApi => ({
@@ -18,4 +19,5 @@ export const mockOrgApi = (ctx: MockCtx): OrgApi => ({
   ...analyticsMock(ctx),
   ...machinesMock(ctx),
   ...teamsMock(ctx),
+  ...tenantMock(ctx),
 });

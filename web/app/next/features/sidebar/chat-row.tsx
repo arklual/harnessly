@@ -212,28 +212,6 @@ const ChatRow = ({
         </button>
       )}
       <span className="hx-item__end">
-        {busy && (
-          <i
-            className="hx-icon hx-chat-status"
-            data-i="loader-circle"
-            data-size="sm"
-            data-status="busy"
-            role="img"
-            aria-label={label ?? t('next.chatRow.busy')}
-            title={label ?? t('next.chatRow.busy')}
-          />
-        )}
-        {!busy && look && (
-          <i
-            className="hx-icon hx-chat-status"
-            data-i={look.icon}
-            data-size="sm"
-            data-status={chat.status}
-            role="img"
-            aria-label={chat.waitsFor ?? look.label}
-            title={chat.waitsFor ?? look.label}
-          />
-        )}
         {showMenu && menuMount === MENU_MOUNT.none && (
           <button
             type="button"
@@ -292,6 +270,28 @@ const ChatRow = ({
                 <Icon name="ellipsis" size="sm" />
               </button>
             }
+          />
+        )}
+        {busy && (
+          <i
+            className="hx-icon hx-chat-status"
+            data-i="loader-circle"
+            data-size="sm"
+            data-status="busy"
+            role="img"
+            aria-label={label ?? t('next.chatRow.busy')}
+            title={label ?? t('next.chatRow.busy')}
+          />
+        )}
+        {!busy && look && (
+          <i
+            className="hx-icon hx-chat-status"
+            data-i={look.icon}
+            data-size="sm"
+            data-status={chat.status}
+            role="img"
+            aria-label={chat.waitsFor ?? look.label}
+            title={chat.waitsFor ?? look.label}
           />
         )}
       </span>

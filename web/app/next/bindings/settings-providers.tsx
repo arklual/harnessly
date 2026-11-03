@@ -20,10 +20,15 @@ const isMissing = (res: Exclude<Awaited<ReturnType<typeof loadProviders>>, { ok:
   res.r === 'refused' ? res.code === 'not-found' : res.code === 'http' && res.status === 404;
 
 /** What a refused switch says: the runtime's reason in the person's words, or that the machine did not answer. */
-const switchFailure = (res: Exclude<Awaited<ReturnType<typeof putProviderSwitch>>, { ok: true }>): string =>
-  res.r === 'refused' && 'reason' in res
-    ? t(`next.providers.gpt.failed.${res.reason}`)
-    : t('next.providers.gpt.failed.page');
+const switchFailure = (
+  preset: PresetId,
+  res: Exclude<Awaited<ReturnType<typeof putProviderSwitch>>, { ok: true }>,
+): string => {
+  const kind = preset === 'auto' ? 'auto' : 'gpt';
+  return res.r === 'refused' && 'reason' in res
+    ? t(`next.providers.${kind}.failed.${res.reason}`)
+    : t(`next.providers.${kind}.failed.page`);
+};
 
 /** The presets of a machine and the actions on them; the first-run step uses the same hook. */
 export const useProviders = (machine: MachineId, enabled = true) => {
@@ -82,11 +87,11 @@ export const useProviders = (machine: MachineId, enabled = true) => {
     },
     [machine],
   );
-  // The switch of a profile (GPT in Claude Code) answers with the whole profile once the machine has done it.
+  // The switch of a profile (GPT in Claude Code, Авто) answers with the whole profile once the machine has done it.
   const onSwitch = useCallback(
     async (preset: PresetId, on: boolean): Promise<string | null> => {
       const res = await putProviderSwitch(machine, preset, on);
-      if (!('ok' in res)) return switchFailure(res);
+      if (!('ok' in res)) return switchFailure(preset, res);
       setState((now) =>
         now.k !== 'ready'
           ? now

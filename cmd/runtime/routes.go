@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/machine"
@@ -50,6 +51,9 @@ type deps struct {
 	FirstWorkspace func() error
 	// MachineKit hands the v2's Machine tool what the machine slice looks at the machine with (nil in a test that has none).
 	MachineKit *machineKitRef
+	// UsageRefresh is how often the usage collector passes over the transcripts in the background, so the facts file
+	// the machine's agent reads stays current (RUNTIME_USAGE_REFRESH, 2m; 0 or off: only when the report is asked for).
+	UsageRefresh time.Duration
 }
 
 // platformAPI is the prefix of the routes the platform's own pages call (peers, commands, file previews…); the

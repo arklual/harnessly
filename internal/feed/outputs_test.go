@@ -145,3 +145,24 @@ func TestAHandedOverFileIsACard(t *testing.T) {
 		t.Fatalf("%+v", o)
 	}
 }
+
+// HRN-630: the feed vouches for a handed-over file by the sha256 of its latest hand-over, and for nothing it only wrote.
+func TestDeliveredIsTheLatestHandOver(t *testing.T) {
+	first := delivery.Info{Path: "/tmp/r.md", Name: "r.md", Mime: "text/markdown", Size: 1, SHA256: "aa"}
+	second := first
+	second.SHA256, second.Size = "bb", 2
+	text := `{"type":"user","timestamp":"2026-10-12T10:00:00.000Z","message":{"role":"user","content":"отдай"}}` + "\n" +
+		toolPair(t, 1, "Write", map[string]any{"file_path": "/tmp/written.md", "content": "x"}, "ok") +
+		toolPair(t, 2, "mcp__preview__deliver_file", map[string]any{"path": first.Path}, delivery.Message(first)) +
+		toolPair(t, 3, "mcp__preview__deliver_file", map[string]any{"path": first.Path}, delivery.Message(second))
+	f := New("c1", wire.ProviderClaude, &ClaudeSource{Path: write(t, text)})
+	f.Load()
+	if sum, ok := f.Delivered("/tmp/r.md"); !ok || sum != "bb" {
+		t.Fatalf("%q %v", sum, ok)
+	}
+	for _, p := range []string{"/tmp/written.md", "/tmp/other.md"} {
+		if _, ok := f.Delivered(p); ok {
+			t.Fatalf("%s must not be vouched for", p)
+		}
+	}
+}

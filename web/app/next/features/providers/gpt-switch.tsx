@@ -1,7 +1,8 @@
-// «GPT в Claude Code» at the foot of the Codex card: one switch that adds the Codex models to the model picker of Claude
-// Code chats. It runs on the Codex sign-in by subscription through a small proxy the machine starts, so it is offered only
-// while Codex is signed in that way, and it never changes the Codex chats themselves. The switch is pessimistic: it moves
-// when the machine says the proxy is up (or down), and a refusal is said under it with a way to try again.
+// The switch of a profile the machine runs on a local proxy. «GPT в Claude Code» at the foot of the Codex card adds the
+// Codex models to the model picker of Claude Code chats; it runs on the Codex sign-in by subscription, so it is offered
+// only while Codex is signed in that way. «Авто» under the vendor cards adds a model that sends each turn to GLM or
+// Kimi Code by the person's keys, so it is offered once one of them is saved. The switch is pessimistic: it moves when
+// the machine says the proxy is up (or down), and a refusal is said under it with a way to try again.
 import { useEffect, useRef, useState } from 'react';
 import type { IPresetState } from '@/next/features/providers/model';
 import { SetButton } from '@/next/features/settings/rows';
@@ -9,16 +10,21 @@ import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import Switch from '@/next/ui/switch';
 
+/** Which switch: its texts are `next.providers.<kind>.*`. */
+export type SwitchKind = 'gpt' | 'auto';
+
 interface IGptSwitchProps {
-  /** The runtime's `gpt` profile; undefined from a runtime that has none (the block is then not drawn). */
+  kind?: SwitchKind;
+  /** The runtime's profile; undefined from a runtime that has none (the block is then not drawn). */
   preset: IPresetState | undefined;
-  /** Codex is signed in by subscription on the machine: the only sign-in the profile can run on. */
+  /** The profile has what it runs on: Codex signed in by subscription for gpt, a key of GLM or Kimi Code for auto. */
   ready: boolean;
   /** Turns the profile on or off; resolves null when the machine did it, else the reason. */
   onSwitch: (on: boolean) => Promise<string | null>;
 }
 
-const GptSwitch = ({ preset, ready, onSwitch }: IGptSwitchProps) => {
+const GptSwitch = ({ kind = 'gpt', preset, ready, onSwitch }: IGptSwitchProps) => {
+  const k = (key: string) => `next.providers.${kind}.${key}`;
   const [busy, setBusy] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** What the last press asked for: «Повторить» asks it again. */
@@ -53,9 +59,9 @@ const GptSwitch = ({ preset, ready, onSwitch }: IGptSwitchProps) => {
     <div className="hx-gpt">
       <div className="hx-gpt__head">
         <div className="hx-gpt__text">
-          <div className="hx-gpt__name">{t('next.providers.gpt.title')}</div>
+          <div className="hx-gpt__name">{t(k('title'))}</div>
           <p className="hx-preset__where">
-            {ready ? t('next.providers.gpt.hint') : t('next.providers.gpt.needLogin')}
+            {ready ? t(k('hint')) : t(k('needLogin'))}
             {ready && (
               <>
                 {' · '}
@@ -65,14 +71,14 @@ const GptSwitch = ({ preset, ready, onSwitch }: IGptSwitchProps) => {
                   aria-expanded={more}
                   onClick={() => setMore(!more)}
                 >
-                  {t(more ? 'next.providers.gpt.less' : 'next.providers.gpt.more')}
+                  {t(k(more ? 'less' : 'more'))}
                 </button>
               </>
             )}
           </p>
         </div>
         <Switch
-          label={t('next.providers.gpt.title')}
+          label={t(k('title'))}
           checked={busy ?? on}
           disabled={!ready || busy !== null}
           onChange={(next) => void flip(next)}
@@ -80,14 +86,14 @@ const GptSwitch = ({ preset, ready, onSwitch }: IGptSwitchProps) => {
       </div>
       <div className="hx-reveal" data-open={ready && more}>
         <div className="hx-reveal__in" inert={!(ready && more) || undefined}>
-          <p className="hx-gpt__note">{t('next.providers.gpt.how')}</p>
+          <p className="hx-gpt__note">{t(k('how'))}</p>
         </div>
       </div>
       <div className="hx-reveal" data-open={busy === true}>
         <div className="hx-reveal__in">
           <div className="hx-preset__saved hx-gpt__state">
             <Icon name="loader-circle" size="sm" className="hx-spin-ic" />
-            <span>{t('next.providers.gpt.starting')}</span>
+            <span>{t(k('starting'))}</span>
           </div>
         </div>
       </div>
@@ -95,9 +101,9 @@ const GptSwitch = ({ preset, ready, onSwitch }: IGptSwitchProps) => {
         <div className="hx-reveal__in" inert={!on || undefined}>
           <div className="hx-preset__saved hx-gpt__state">
             <Icon name="check" size="sm" />
-            <span>{t('next.providers.gpt.on', { models })}</span>
+            <span>{t(k('on'), { models })}</span>
           </div>
-          <p className="hx-preset__where hx-gpt__sub">{t('next.providers.gpt.pick')}</p>
+          <p className="hx-preset__where hx-gpt__sub">{t(k('pick'))}</p>
         </div>
       </div>
       <div className="hx-reveal" data-open={error !== null}>
@@ -108,7 +114,7 @@ const GptSwitch = ({ preset, ready, onSwitch }: IGptSwitchProps) => {
           </div>
           <div className="hx-preset__row hx-gpt__retry">
             <SetButton tone="ghost" onClick={() => void flip(tried)}>
-              {t('next.providers.gpt.retry')}
+              {t(k('retry'))}
             </SetButton>
           </div>
         </div>

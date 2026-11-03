@@ -392,15 +392,18 @@ type AgentSession struct {
 const agentSessionCols = `org_key, provider, session_key, parent_key, machine_id, user_id, space_id, team_id, account_id, funding, origin, attribution, started_at, ended_at, metrics, seq, updated_at`
 
 // PutSession inserts a session or replaces it with a record of a later seq from the same machine, or of any machine when
-// the stored one is older by update time. True when the row changed.
+// the stored one is older by update time. A record that names no account keeps the account the session has (an admin
+// gave it one, or an earlier record named it). True when the row changed.
 func (s Store) PutSession(ctx context.Context, x AgentSession) (bool, error) {
 	if x.Metrics == "" {
 		x.Metrics = "{}"
 	}
 	res, err := s.q.Exec(ctx, `INSERT INTO agent_sessions (`+agentSessionCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (org_key, provider, session_key) DO UPDATE SET parent_key = excluded.parent_key, machine_id = excluded.machine_id,
-		user_id = excluded.user_id, space_id = excluded.space_id, team_id = excluded.team_id, account_id = excluded.account_id,
-		funding = excluded.funding, origin = excluded.origin, attribution = excluded.attribution, started_at = excluded.started_at,
+		user_id = excluded.user_id, space_id = excluded.space_id, team_id = excluded.team_id,
+		account_id = COALESCE(excluded.account_id, agent_sessions.account_id),
+		funding = CASE WHEN excluded.account_id IS NULL AND agent_sessions.account_id IS NOT NULL THEN agent_sessions.funding ELSE excluded.funding END,
+		origin = excluded.origin, attribution = excluded.attribution, started_at = excluded.started_at,
 		ended_at = excluded.ended_at, metrics = excluded.metrics, seq = excluded.seq, updated_at = excluded.updated_at
 		WHERE (COALESCE(excluded.machine_id, '') = COALESCE(agent_sessions.machine_id, '') AND excluded.seq > agent_sessions.seq)
 		   OR (COALESCE(excluded.machine_id, '') <> COALESCE(agent_sessions.machine_id, '') AND excluded.updated_at > agent_sessions.updated_at)`,
@@ -654,4 +657,87 @@ func (s Store) RollupRows(ctx context.Context, orgKey string, from, to int64) ([
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// SessionsWithoutAccount are the keys of the person's sessions of a CLI in the organization that have no account.
+func (s Store) SessionsWithoutAccount(ctx context.Context, orgKey, userID, provider string) ([]string, error) {
+	return s.sessionKeys(ctx, `SELECT session_key FROM agent_sessions WHERE org_key = ? AND user_id = ? AND provider = ? AND account_id IS NULL`,
+		orgKey, userID, provider)
+}
+
+// SetAccountFunding gives every session of the account its funding and returns the keys of those that changed.
+func (s Store) SetAccountFunding(ctx context.Context, orgKey, accountID, funding string) ([]string, error) {
+	keys, err := s.sessionKeys(ctx, `SELECT session_key FROM agent_sessions WHERE org_key = ? AND account_id = ? AND funding <> ?`, orgKey, accountID, funding)
+	if err != nil || len(keys) == 0 {
+		return nil, err
+	}
+	_, err = s.q.Exec(ctx, `UPDATE agent_sessions SET funding = ? WHERE org_key = ? AND account_id = ?`, funding, orgKey, accountID)
+	return keys, err
+}
+
+func (s Store) sessionKeys(ctx context.Context, q string, args ...any) ([]string, error) {
+	rows, err := s.q.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		out = append(out, k)
+	}
+	return out, rows.Err()
+}
+
+// SetSessionsAccount gives the sessions (keys of one CLI in the organization) the account and its funding.
+func (s Store) SetSessionsAccount(ctx context.Context, orgKey, provider string, keys []string, accountID, funding string) error {
+	for len(keys) > 0 {
+		n := min(len(keys), 200)
+		args := []any{accountID, funding, orgKey, provider}
+		for _, k := range keys[:n] {
+			args = append(args, k)
+		}
+		keys = keys[n:]
+		if _, err := s.q.Exec(ctx, `UPDATE agent_sessions SET account_id = ?, funding = ? WHERE org_key = ? AND provider = ? AND session_key IN (`+
+			strings.Repeat("?, ", n-1)+`?)`, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UnpricedCalls are up to limit calls without a price, after the key (org, provider, msg) given, in key order; the
+// token columns and what prices them are filled.
+func (s Store) UnpricedCalls(ctx context.Context, after [3]string, limit int) ([]UsageCall, error) {
+	rows, err := s.q.Query(ctx, `SELECT org_key, provider, msg_key, ts, model, price_provider, input, output, cache_read, cache_write_5m, cache_write_1h
+		FROM usage_calls WHERE list_cost_micros IS NULL AND (org_key, provider, msg_key) > (?, ?, ?)
+		ORDER BY org_key, provider, msg_key LIMIT ?`, after[0], after[1], after[2], limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []UsageCall
+	for rows.Next() {
+		var c UsageCall
+		if err := rows.Scan(&c.OrgKey, &c.Provider, &c.MsgKey, &c.Ts, &c.Model, &c.PriceProvider, &c.Input, &c.Output, &c.CacheRead,
+			&c.CacheWrite5m, &c.CacheWrite1h); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// PriceCall gives a call without a price its price; false when it had one already.
+func (s Store) PriceCall(ctx context.Context, orgKey, provider, msgKey string, micros, ver int64) (bool, error) {
+	res, err := s.q.Exec(ctx, `UPDATE usage_calls SET list_cost_micros = ?, price_ver = ?
+		WHERE org_key = ? AND provider = ? AND msg_key = ? AND list_cost_micros IS NULL`, micros, ver, orgKey, provider, msgKey)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }

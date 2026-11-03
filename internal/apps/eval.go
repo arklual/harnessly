@@ -162,6 +162,15 @@ type Transcript struct {
 	// InputTokens and OutputTokens add up what the run read and wrote, the cache's included in the input.
 	InputTokens  int `json:"inputTokens"`
 	OutputTokens int `json:"outputTokens"`
+	// MCPServers are the servers Claude Code reports in the first event of a stream (name, status), when it did.
+	MCPServers []MCPStatus `json:"mcpServers,omitempty"`
+	sawInit    bool
+}
+
+// MCPStatus is one MCP server of a session and whether it connected.
+type MCPStatus struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
 
 // ToolName is a tool as a scenario names it. Claude calls the tool of a server of the app's package
@@ -201,9 +210,11 @@ func ParseTranscript(raw []byte) (Transcript, error) {
 			continue
 		}
 		var e struct {
-			Type    string  `json:"type"`
-			Result  *string `json:"result"`
-			Message struct {
+			Type       string      `json:"type"`
+			Subtype    string      `json:"subtype"`
+			Result     *string     `json:"result"`
+			MCPServers []MCPStatus `json:"mcp_servers"`
+			Message    struct {
 				Content json.RawMessage `json:"content"`
 			} `json:"message"`
 		}
@@ -211,6 +222,11 @@ func ParseTranscript(raw []byte) (Transcript, error) {
 			continue
 		}
 		switch e.Type {
+		case "system":
+			if e.Subtype == "init" {
+				tr.sawInit = true
+				tr.MCPServers = e.MCPServers
+			}
 		case "result":
 			if e.Result != nil {
 				result = e.Result
@@ -379,6 +395,8 @@ type CaseReport struct {
 	Failures map[string]int `json:"failures,omitempty"`
 	// Errors are the runs that could not be made or judged (the agent did not start, timed out…); they count as failed.
 	Errors []string `json:"errors,omitempty"`
+	// Notes are things about the scenario itself the author should know (a server of the package that has no mock here).
+	Notes []string `json:"notes,omitempty"`
 	// BaselineRuns and BaselinePassed are the runs without the app, when the scenario asks for them.
 	BaselineRuns   int `json:"baselineRuns,omitempty"`
 	BaselinePassed int `json:"baselinePassed,omitempty"`
@@ -454,6 +472,7 @@ func RunEval(ctx context.Context, dir string, opt EvalOptions) (EvalReport, erro
 		if err != nil {
 			return rep, fmt.Errorf("scenario %s: %w", c.Name, err)
 		}
+		cr.Notes = mockNotes(pkg, c)
 		for i := 0; i < runs; i++ {
 			tr, err := opt.Agent.Run(ctx, RunSpec{Prompt: c.Prompt, Package: runDir, WithApp: true, Timeout: opt.Timeout})
 			if err != nil {
@@ -535,4 +554,32 @@ func WriteEvalReport(dir string, rep EvalReport) error {
 		return err
 	}
 	return writeFileAtomic(filepath.Join(dir, filepath.FromSlash(EvalReportPath)), append(raw, '\n'))
+}
+
+// mockNotes tell the author what a scenario leaves of the package's servers: one with no mock in `mocks.mcp` is dropped
+// from the run (an eval never reaches the real backend), so the agent has none of its tools; a mock for a server the
+// package does not have is a server the agent is not allowed to use.
+func mockNotes(pkg *Package, c EvalCase) []string {
+	var notes []string
+	names := make([]string, 0, len(pkg.MCP))
+	for name := range pkg.MCP {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if _, ok := c.Mocks.MCP[name]; !ok {
+			notes = append(notes, fmt.Sprintf("the package's MCP server %q has no mock in mocks.mcp of this scenario: the agent runs without its tools", name))
+		}
+	}
+	mocked := make([]string, 0, len(c.Mocks.MCP))
+	for name := range c.Mocks.MCP {
+		mocked = append(mocked, name)
+	}
+	sort.Strings(mocked)
+	for _, name := range mocked {
+		if _, ok := pkg.MCP[name]; !ok {
+			notes = append(notes, fmt.Sprintf("mocks.mcp names the server %q, which the package's .mcp.json does not have: the agent is not given it", name))
+		}
+	}
+	return notes
 }

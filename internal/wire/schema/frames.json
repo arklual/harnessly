@@ -385,7 +385,7 @@
       }
     },
     "ProfileId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$"},
-    "ProfileVendor": {"enum": ["kimi", "glm", "grok", "gpt"]},
+    "ProfileVendor": {"enum": ["kimi", "glm", "grok", "gpt", "auto"]},
     "ProfileTestReason": {"enum": ["no-key", "unauthorized", "forbidden", "rate-limited", "unreachable", "timeout", "rejected"]},
     "ProfileSwitchReason": {"enum": ["no-login", "download", "start"]},
     "ProfileOffer": {

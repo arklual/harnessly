@@ -77,9 +77,9 @@ the pane for you.
 ### Sinopia Design
 
 A design space for prototypes, sites and presentations. Every design is a plain folder on your machine, with its page
-model, history and exports (PDF, PNG, PowerPoint, one offline HTML file for a deck). The board engine is not part of
-harnessly: you bring your own. Each machine fetches it once with the owner's own Claude account, through the Claude
-CLI installed and logged in on that machine:
+model, history and exports (PDF, PNG, PowerPoint, one offline HTML file for a deck). Designs work right after install, with an API
+key or any agent: boards run on the engine built into harnessly. If you have a claude.ai account, you can also add
+Anthropic's engine (optional, Settings → the design section has the command):
 
 ```sh
 harnessly design engine fetch
@@ -245,7 +245,7 @@ gh attestation verify oci://ghcr.io/ly-solutions/harnessly:latest --repo ly-solu
 | [Deploy](docs/deploy.md) | quick start, verification, updating, systemd, Docker, compose, Helm, Argo CD |
 | [Configuration](docs/configuration.md) | every `RUNTIME_*` and `AGENT_*` variable |
 | [Voice input](docs/voice.md) | the microphone, the built-in recognition, how to change or turn it off |
-| [Board engine](docs/design-engine.md) | fetching the design engine with your own Claude account |
+| [Board engine](docs/design-engine.md) | the built-in engine, the optional vendor engine, moving upstream changes over |
 | [Design pages](docs/design-pages.md) | the page model of a design project and the page commands |
 | [Integrations](docs/integrations.md) | boards, artifacts and the agent skills |
 | [Architecture](docs/architecture.md) | the runtime gate, the core, tmux, the machine agent, the repository layout |

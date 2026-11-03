@@ -3,21 +3,22 @@
 import '../teams.css';
 
 import { useMemo, useState } from 'react';
-import { Gauge, Mail, Plus, Search, Users, UsersRound, Wallet } from 'lucide-react';
+import { Gauge, Mail, Plus, Search, Settings, Users, UsersRound, Wallet } from 'lucide-react';
 
 import { Button } from '@kit';
 
 import { useNow } from '../../lib/hooks';
-import { Link } from '../../lib/router';
 import type { TeamsView } from '../api/teams';
 import { useOrg } from '../context';
 import { useLoad } from '../hooks';
 import { Loading, LoadError, Page, PageHead, Seg } from '../ui/page';
 import { MiniBars, ProgressLine, Tile } from '../ui/tile';
+import { InviteSheet } from './teams/invite';
 import { Journal } from './teams/journal';
 import { kRub, levelOf, people as peopleText, plural, sharePct, thousand } from './teams/format';
 import { NewTeamSheet, PersonSheet, ScopeSheet, TeamSheet } from './teams/sheets';
 import { FlatPeople, TeamSection } from './teams/table';
+import { TenantSheet } from './teams/tenant-sheet';
 
 type View = 'teams' | 'list';
 
@@ -102,6 +103,7 @@ export const TeamsScreen = () => {
   const [q, setQ] = useState('');
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const [sheet, setSheet] = useState<{ kind: 'person' | 'team' | 'scope' | 'new'; id: string } | null>(null);
+  const [tenantSheet, setTenantSheet] = useState<'invite' | 'settings' | null>(null);
   const [kept, setKept] = useState(sheet);
   if (sheet && sheet !== kept) setKept(sheet);
   const done = (v: TeamsView) => {
@@ -147,16 +149,24 @@ export const TeamsScreen = () => {
           view && (
             <>
               {view.can.invite && scope.kind === 'tenant' && (
-                <Link
-                  to={`/s/${view.spaceSlug}/settings`}
-                  className="k-btn"
-                  data-appearance="outline"
-                  data-size="s"
+                <Button
+                  appearance="outline"
+                  size="s"
+                  icon={<Mail size={14} />}
+                  onClick={() => setTenantSheet('invite')}
                 >
-                  <span className="k-btn__content">
-                    <Mail size={14} aria-hidden="true" /> Пригласить
-                  </span>
-                </Link>
+                  Пригласить
+                </Button>
+              )}
+              {scope.kind === 'tenant' && shell.viewer.role === 'admin' && (
+                <Button
+                  appearance="outline"
+                  size="s"
+                  icon={<Settings size={14} />}
+                  onClick={() => setTenantSheet('settings')}
+                >
+                  Настройки тенанта
+                </Button>
               )}
               {view.can.createTeam && (
                 <Button
@@ -244,6 +254,20 @@ export const TeamsScreen = () => {
             onDone={done}
           />
           <NewTeamSheet open={sheet?.kind === 'new'} onClose={close} onDone={done} />
+          {scope.kind === 'tenant' && (
+            <>
+              <InviteSheet
+                open={tenantSheet === 'invite'}
+                tenant={scope.tenant}
+                onClose={() => setTenantSheet(null)}
+              />
+              <TenantSheet
+                open={tenantSheet === 'settings'}
+                tenant={scope.tenant}
+                onClose={() => setTenantSheet(null)}
+              />
+            </>
+          )}
         </>
       )}
     </Page>

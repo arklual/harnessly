@@ -1,7 +1,9 @@
 # Apps
 
 An app is a package you write once and turn on where you work: in a chat, a pane tab, a full screen of its own or a
-Sinopia document. A plugin is an app without views. The format is a Claude Code plugin plus one manifest of ours:
+Sinopia document. A plugin is an app without views. This page is the reference; to learn it step by step, with diagrams and
+examples, read [the guide](build-apps/README.md) (`harnessly app docs` on a machine). The format is a Claude Code plugin plus one
+manifest of ours:
 
 ```text
 acme-cashback/
@@ -17,6 +19,7 @@ acme-cashback/
 ## Commands
 
 ```sh
+harnessly app docs                                      # the guide, built into the binary
 harnessly app new acme.cashback --template pane-chat   # templates: chat, pane-chat
 harnessly app validate ./cashback --strict              # every problem names its field; --strict fails on warnings
 harnessly app dev ./cashback                            # install the folder itself while you write it
@@ -39,14 +42,14 @@ install points at your folder and is never deleted by `remove`.
 | `name`, `description` | yes | What people see |
 | `version` | yes | `1.2.0`; a published version never changes |
 | `harnessly` | yes | Host versions it works with (apps came in 0.16.36): `>=0.16.36`, `>=0.17`, `^0.17`, `>=0.17 <1`, `0.16 \|\| >=0.18` |
-| `trust` | yes | `declarative` (text only), `sandboxed` (views run scripts in a sandbox), `trusted` (local processes; installed by hand) |
+| `trust` | yes | `declarative` (no outbound `network` for views), `sandboxed` (adds `network` and a framed `https://` view), `trusted` (adds local processes; installed by hand). A view's scripts run on every tier |
 | `targets` | yes | `chat`, `pane`, `app`, `sinopia.<kind>`, `sinopia.*` |
-| `activation` | no | `on`: `manual`, `command:/x`, `view`, `document`, `always`; `openView` |
+| `activation` | no | `on`: `document` turns the app on in the documents of its kinds. `manual`, `command:/x`, `view`, `always` are checked and turn nothing on. `openView`: the view `harnessly open app:<id>` shows |
 | `permissions` | yes | `chat.prompt`, `chat.read`, `chat.card`, `pane.open`, `storage`, `storage.space.write`, `ai`, `files.read:<mask>`, `files.write:<mask>`, `secrets:<name>`, `sinopia.read\|write\|comment\|export\|kind`, `users.read`, `notify` |
 | `network` | no | `connect`, `resources`, `frames`: host names; `*` needs `reason` |
-| `secrets` | no | `{name, description}`: the person types the value at install, the app never reads it |
-| `settings` | no | JSON Schema of an object: the install form |
-| `agent` | no | `instructions`, `skills`, `mcp`, `context`, `tools` (`allow`, `deny`, `confirm`), `validators`, `flow`, `exclusive` |
+| `secrets` | no | `{name, description}`: checked, not used yet. There is no install prompt and nothing can read a value. An agent uses `harnessly secret` instead |
+| `settings` | no | JSON Schema of an object: checked, not used yet. There is no install form |
+| `agent` | no | `instructions` and `tools` (`allow`, `deny`, `confirm`) act. `mcp` is what a Sinopia `tool` must name. `skills` is checked against the files (all of `skills/` loads anyway). `context`, `validators`, `flow`, `exclusive` are checked, not used yet |
 | `views` | no | `{id, title, entry, targets}`: `entry` is a file of the package or an `https://` address listed in `network.frames` |
 | `chat` | no | `commands` (`/name`, a file `commands/name.md`), `cards` (views with the chat target) |
 
@@ -80,7 +83,7 @@ app (`403 not-on`), so the view has no chat area, and the page does not pass the
 
 A view is a page of the package (`views[].entry`, a file under `ui/` or its own folder) that the person sees in a pane
 tab or as a card in the chat. The runtime shows it in a sandboxed frame on an origin of its own (a preview slot), never
-the page's, so the preview's DevTools (console, network, throttle) work on it. Only the entry, its folder and `ui/`
+the page's. The preview tools see the view's own file loads (`preview_network`), not its console or its bridge calls. Only the entry, its folder and `ui/`
 are served; nothing else of the package is.
 
 - **Open one** with `harnessly open app:<id>` or `harnessly open app:<id>/<view>` (the app's first pane view when none
@@ -93,7 +96,9 @@ are served; nothing else of the package is.
   package (no inline scripts, no eval), `connect-src` is `'none'` unless `network.connect` lists addresses, images,
   fonts and media take `network.resources`, nested frames `network.frames`.
 - **Theme.** The host passes `--t-*` tokens and the language at the handshake and when they change; the SDK applies
-  them to the page. A view works in the light and the dark theme and from 360 px wide.
+  them to `:root` with `<html data-theme>`, `color-scheme` and `lang`, and has no stylesheet of its own: give defaults. The
+  tokens are `--t-bg`, `--t-surface`, `--t-surface-hover`, `--t-text`, `--t-text-secondary`, `--t-text-muted`, `--t-border`,
+  `--t-border-strong`, `--t-accent`, `--t-danger`, `--t-success`. A view works in the light and the dark theme and from 360 px wide.
 
 ### `@harnessly/app-sdk`
 
@@ -112,14 +117,14 @@ One dependency-free file the runtime serves to every view at `/__hl/app-sdk.js` 
 
 | Call | Permission | What it does |
 | --- | --- | --- |
-| `hl.on(event, fn)` | none | `context`, `theme`, `tool-result`, `tool-input`, `flow`, `data`, `selection`, `visibility` |
-| `hl.chat.send(text, {as})` | `chat.prompt` | A message to the agent of this chat; the chat always shows the app's real name before it, on one line |
+| `hl.on(event, fn)` | none | `context`, `theme`, `selection`. `tool-result`, `tool-input`, `flow`, `data`, `visibility` are not sent by the page yet |
+| `hl.chat.send(text)` | `chat.prompt` | A message to the agent of this chat; the chat always shows the app's real name before it, on one line |
 | `hl.chat.read({last})` | `chat.read` | The latest messages of the chat |
 | `hl.chat.card(view, data)` | `chat.card` | A card of the app in the feed |
-| `hl.pane.open(target)` | `pane.open` | Opens `app:<id>[/<view>]` (built-in tabs later) |
-| `hl.tools.call('server.tool', args)` | none | A tool of the app's own remote MCP server (`.mcp.json`), called by the host |
+| `hl.pane.open(target)` | `pane.open` | Opens `app:<id>[/<view>]`; anything else is `invalid_params` |
+| `hl.tools.call('server.tool', args)` | none | A tool of the app's own remote MCP server (`.mcp.json`), called by the machine: `https://` on a public address only, 30 s, 4 MB. A `command` server is `policy_blocked`, a header with `${` is not sent. Answers the raw MCP result, `isError` included |
 | `hl.storage.<scope>.get/set/delete/keys` | `storage` | Scopes `install`, `user`, `chat`, `space`, `doc`; writing `space` needs `storage.space.write` |
-| `hl.flow.*`, `hl.data.*` | none | The process and the data shared with the agent (when the host runs one) |
+| `hl.flow.*`, `hl.data.*` | none | Not connected in the page yet: `host_unavailable` |
 | `hl.ui.toast/confirm`, `hl.notify(text)` | `notify` for the last | A notice, a question, a message to the person |
 | `hl.resize(height)` | none | The height of a card (sent by itself for cards) |
 
@@ -147,7 +152,7 @@ the stand-in as `source`), and answers the view's own `ui/initialize` from the h
 the SDK, which knows nothing of nonce or port. The host context is MCP Apps' (`theme` is `light` or `dark`,
 `styles.variables` the tokens, `locale`, `displayMode`); the whole of ours is under `hostContext.harnessly`, which is
 what `hl.context` is. A view session lives an hour unused (twelve at the most); a mounted view renews it every ten minutes through
-`POST <platform>/apps/session/renew`, which changes nothing but the end. A view at the app's own address (`views[].url`)
+`POST <platform>/apps/session/renew`, which changes nothing but the end. A view at the app's own address (`views[].entry` an `https://` address listed in `network.frames`)
 is not served by the host, so it has no nonce; only the navigation rule holds for it. Views may post their forms to
 themselves (`form-action 'self'`) and nowhere else.
 
@@ -160,15 +165,15 @@ KB per document and 20 MB in all. A write past a limit is refused whole.
 
 ### Cards in the chat
 
-A tool of the app's own MCP server answers with a JSON object that names a view of the app and the data to draw it with:
+A tool of the app's own MCP server names a view of the app and the data to draw it with:
 
 ```json
-{ "_meta": { "ui": { "resourceUri": "ui://acme.cashback/card" } }, "structuredContent": { "percent": 5 } }
+{"_meta":{"ui":{"resourceUri":"ui://acme.cashback/card"}},"data":{"percent":5}}
 ```
 
-The feed draws the app's view `card` (a view with the `chat` target) under that tool step, through the same bridge; the
-data is `hl.context.data`. "Open in the pane" opens the app's pane view. Only a tool of the app's own server may name the
-app's view.
+The feed draws the app's view `card` (a view with the `chat` target) under that tool step, through the same bridge; the data is `hl.context.data`. The feed reads this
+from the agent's transcript, where a result is the first line of its text, cut at 100 characters: so the answer's `text` has to be this one line, under 100 characters, and a card
+with more to show reads it from a file or storage. "Open in the pane" opens the app's pane view. Only a tool of the app's own server may name the app's view.
 
 ### The app as the main thing
 
@@ -188,7 +193,7 @@ These are done by the page, after the bridge has checked the call against `permi
 | --- | --- |
 | `hl.chat.read({last})` | The latest messages of the chat as `{role, text}`, text only (up to 200) |
 | `hl.chat.card(view, data)` | Puts a card of the app's `chat` view (`data` up to 20 KB) at the end of the chat's feed, under the app's name. The feed is the agent's transcript and cannot be written into, so a posted card stays at the tail and is kept in this browser, not on the machine |
-| `hl.ui.confirm(text)` | A dialog titled with the app's real name; resolves `{ok}` |
+| `hl.ui.confirm(text)` | A dialog titled with the app's real name; resolves a boolean, `true` only for its OK |
 | `hl.notify(text)`, `hl.ui.toast(text)` | The platform's notice, under the app's name |
 
 ### Files of the workspace
@@ -234,6 +239,10 @@ is a built-in tool (`Edit`), a built-in tool with a mask on its input (`Bash(git
 too), a tool of an MCP server (`bank-cashback.create`, `bank-cashback.*`), the host's `app.*` tools, `mcp:*` for every
 MCP tool or `*`.
 
+**`allow` grants nothing**: the hook answers only for `deny` and `confirm`, so `allow` only beats a broader rule, and a call it wins is left to the
+chat's own permissions. `Edit(<mask>)` is matched against `file_path` exactly as Claude wrote it, normally absolute (`Edit(*/docs/*)`), and `Edit` does
+not cover `Write`, `MultiEdit` or `NotebookEdit`.
+
 Within one app the most specific rule wins: an exact name beats a mask, a longer mask beats a shorter one, `mcp:*` and
 `*` lose to everything; on a tie `deny` beats `confirm`, `confirm` beats `allow`. Across the apps of a chat a `deny` of
 any app wins, then a `confirm`. A call no rule names is left to the chat's own permissions.
@@ -253,7 +262,7 @@ call.
 
 A chat with apps gets one more MCP server, `harnessly-app` (the runtime's own endpoint, added to the launch only when the
 chat has apps). Its tools answer for the apps on in that chat and no others; `app` names one and may be left out when only
-one app is on. Claude writes tool names with `_`, the tool rules with `.`: `mcp__harnessly-app__data_get` is `app.data.get`.
+one app is on. Claude writes tool names with `_`, the tool rules with `.`: `mcp__harnessly-app__data_get` is `app.data.get`, `sinopia_set_fields` is `app.sinopia.set.fields`.
 
 | Tool (rule) | What it does |
 | --- | --- |
@@ -466,7 +475,7 @@ harnessly app unshare <link id>
 
 The guest opens `<machine address>/apps/guest/<token>/` and gets only the app's view: no chat, no agent (guest AI is
 off; the host refuses `ui/message`, `tools/call`, the chat, pane, flow, notify and document calls with
-`permission_denied`), the theme and `hl.openLink`. Its `hl.storage.*` is the link's own area (every scope names it) and
+`permission_denied`), the theme and the wire method `ui/open-link` (https; the SDK has no call for it, and the app's normal page does not answer it). Its `hl.storage.*` is the link's own area (every scope names it) and
 needs the `storage` permission; a link reads only unless it was made with `--write`. The view runs in the same sandbox
 (opaque origin, the CSP of its `network`). A link ends at its time (7 days by default, 30 at most), when it is revoked, or
 when the app is uninstalled. Only the token's hash is kept. The page itself carries no token for the view to read.
@@ -474,7 +483,7 @@ when the app is uninstalled. Only the token's hash is kept. The page itself carr
 The runtime answers these routes without a session (the token is the authority); how far a guest can reach the machine is
 the deployment's: through the hub's proxy a guest would need the hub session, so a public link is for a machine the
 guest can reach directly, or for the platform's gateway to relay. Data a guest sees beyond the link's storage comes from
-the app's own server (`backend`).
+the app's own server, through `network.connect` or a framed view.
 
 ### Evals
 
@@ -501,12 +510,17 @@ the app's own server (`backend`).
 - `mocks.mcp` maps a server of the package's `.mcp.json` to a fixture, `{"tools": [{"name", "description", "inputSchema",
   "result"}]}`, a file of the package. The eval runs a copy of the package whose `.mcp.json` has only the mocked servers,
   each answering from its fixture (`harnessly app mock-mcp <fixture>`, a stdio MCP server): an eval never reaches the
-  app's real backend.
+  app's real backend. **A server of the package with no mock in the scenario is dropped, and the agent runs without its
+  tools**: put `mocks.mcp` on every scenario that needs them (the report says in a `note:` when a server has no mock, or a
+  mock names a server the package does not have). If a mocked server does not come up in the run, the run is an error
+  that says which server, not a failed expectation.
 - The agent is Claude Code in print mode, in an empty folder, with the app's package as a plugin, the chat's app-guard
   hook, only the app's tools allowed, nothing of the person's own settings or plugins, no session kept. It uses the
-  person's own login. `--agent codex` is not supported yet.
+  person's own login; the person's claude.ai connectors are switched off (`--strict-mcp-config` is not used: it would hide
+  the plugin's own servers too). `--agent codex` is not supported yet.
 - A scenario runs `runs` times (default 3); a run passes when all `expect` holds and every `llm` grader (a second
-  print-mode call that answers PASS or FAIL; `--no-judge` leaves them unjudged and the report says so) agrees.
+  print-mode call that answers PASS or FAIL as its first word, asked once more if it does not settle or contradicts itself;
+  `--no-judge` leaves them unjudged and the report says so) agrees.
 - `baseline: true` also runs the prompt without the app: the report shows the pass rate without it and what the app adds
   to the input tokens of a run.
 - The report is printed and left in `.harnessly/eval.json` (`--no-report` skips it, `--json` prints it as JSON). The exit
@@ -528,6 +542,9 @@ holds now, in layers:
   the hook.
 - **Off from the page only.** `POST /api/cli/apps/enable` with `on: false` from the tab of a chat that has apps is refused
   (`use-page`); the page's switch (`conversation.apps`) does it.
+- **The source of every app is out of reach.** The registry and the package and source folder of every installed app are read-only in a chat with any app,
+  dev installs included, not only the apps on in that chat. So an agent writes an app in a chat with no apps on.
+
 - **A token of the launch, not the person's.** The agent's CLI calls the runtime with a token of its own launch,
   `agent.<launch>.<expMs>.<hmac>` signed with the runtime's `agent-token-key` and good for 30 days (a resume issues a new one),
   read from the private file `HARNESSLY_CLI_TOKEN_FILE` names. With it, the routes that change the apps (`install`, `remove`,
@@ -561,6 +578,8 @@ What a machine needs: the `bubblewrap` package, and unprivileged user namespaces
 loaded (Ubuntu 26.04's apparmor package carries it); elsewhere `user.max_user_namespaces` above 0 (and Debian's `kernel.unprivileged_userns_clone=1`).
 The runtime's unit must not set `RestrictNamespaces=`, `NoNewPrivileges=` is fine, and `ProtectHome=`/`ReadOnlyPaths=` of the
 unit already apply inside.
+
+`/etc/ssh/ssh_config.d` is empty inside: ssh refuses an included file it cannot see as root's, and in the namespace root's files belong to nobody. So ssh and git over ssh work in the wall by the person's `~/.ssh/config`, without the system's drop-ins.
 
 The wall also takes from the agent what would let it pass for the person, or have its code run outside later:
 
@@ -612,6 +631,7 @@ still refuses its being made.
 - [`apps/mr-review`](apps/mr-review): review without edits, a comment in the MR only after the person confirms; `evals/no-edits.json` is a check to copy for `harnessly app eval`.
 - [`apps/cashback`](apps/cashback): a pane and full-screen view with the month's picks in the chat's storage; the agent reads and writes them with `app.data.*`, shows the view with `app.open` and confirms changes with `app.ask`. In a site it adds a card template whose elements carry `data-hl-field`, and an inspector view that opens on a click on one of them and writes the value back with `hl.sinopia.setFields`.
 - [`apps/moodboard`](apps/moodboard): a Sinopia document type of its own (`acme.moodboard`) built from the SDK alone: its editor view, a JSON Schema and a migration between two versions of the format.
+- [`apps/standup`](apps/standup): a `trusted` app with a local stdio server, the workspace's files as the shared store, a pane and full-screen view, a card from a tool's result, and the worked example of [the guide](build-apps/08-worked-example.md).
 - [`apps/deck-lint`](apps/deck-lint): «Валидатор презентаций», on in presentations only (`sinopia.slides`): word and font-size rules that mark the slides' blocks and stop a share while one is an error, a panel with the longest texts, a selection item that asks the agent to shorten the text.
 
 ## State

@@ -66,6 +66,7 @@ import { useSidebarApps } from '@/next/bindings/use-sidebar-apps';
 import AppMainPage from '@/next/bindings/app-main';
 import AppDocPage from '@/next/bindings/app-doc';
 import AppsListPage from '@/next/bindings/apps-list';
+import HelpPage from '@/next/bindings/help';
 import { AppConfirmHost } from '@/next/features/app-views/confirm';
 import LegacyScreen, { LEGACY_SCREEN, ManageScreen } from '@/next/legacy/screens';
 import {
@@ -83,11 +84,10 @@ import { goTo, HOME, ROUTE, useRoute, type TRoute } from '@/next/routes/routes';
 import AppsScreen from '@/next/bindings/apps';
 import SettingsScreen from '@/next/bindings/settings';
 import DesignlyView from '@/next/bindings/designly';
+import { DESIGN_KIND } from '@/next/features/designly/designly-home';
 import { useWorkingDesigns } from '@/next/bindings/working-designs';
 import { useDesignBound } from '@/next/bindings/design-conv';
 import { designKey } from '@/next/features/designly/design-conv';
-import DeckCreateView from '@/next/bindings/designly-deck-new';
-import VideoCreateView from '@/next/bindings/designly-video-new';
 import DesignlySite from '@/next/bindings/designly-site';
 import SiteWait from '@/next/features/designly/site-wait';
 import InviteAccept from '@/next/features/designly/access/invite-accept';
@@ -629,6 +629,13 @@ const Shell = ({ owner }: IShellProps) => {
       onManageMachines={() => openScreen({ kind: ROUTE.settings, section: 'machines' })}
       people={<PeopleBlock machine={noV2 ? null : model.active} />}
       apps={sidebarApps}
+      help={{
+        current: route.kind === ROUTE.help,
+        onOpen: () => {
+          navigate({ kind: ROUTE.help, page: null });
+          setDrawerOpen(false);
+        },
+      }}
       designs={
         workingDesigns && {
           rows: workingDesigns,
@@ -796,6 +803,7 @@ const Shell = ({ owner }: IShellProps) => {
         route.kind !== ROUTE.invite &&
         route.kind !== ROUTE.tasks &&
         route.kind !== ROUTE.apps &&
+        route.kind !== ROUTE.help &&
         route.kind !== ROUTE.app &&
         route.kind !== ROUTE.appDoc &&
         route.kind !== ROUTE.settings && (
@@ -881,16 +889,35 @@ const Shell = ({ owner }: IShellProps) => {
         <DesignlyView key={model.active} machine={model.active} machines={designMachine} />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.designlyNew && model.active && (
-        <DeckCreateView key={model.active} machine={model.active} machines={designMachine} />
+        <DesignlyView
+          key={model.active}
+          machine={model.active}
+          machines={designMachine}
+          initialKind={DESIGN_KIND.slides}
+        />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.videoNew && model.active && (
-        <VideoCreateView key={model.active} machine={model.active} machines={designMachine} />
+        <DesignlyView
+          key={model.active}
+          machine={model.active}
+          machines={designMachine}
+          initialKind={DESIGN_KIND.video}
+        />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.tasks && model.active && (
         <AppsScreen key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.apps && model.active && (
         <AppsListPage key={model.active} machine={model.active} onOpenDrawer={() => setDrawerOpen(true)} />
+      )}
+      {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.help && model.active && (
+        <HelpPage
+          key={model.active}
+          machine={model.active}
+          page={route.page}
+          anchor={route.anchor ?? null}
+          onOpenDrawer={() => setDrawerOpen(true)}
+        />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.app && model.active && (
         <AppMainPage

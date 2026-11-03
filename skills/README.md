@@ -5,7 +5,7 @@ documents, boards and the workspace at once. They are not written here: they are
 
 | Source | What is taken |
 | --- | --- |
-| [ly-solutions/agent-skills](https://github.com/ly-solutions/agent-skills) | `plugins/harnessly` (the workspace skill), `plugins/boards` (the boards skill and its `boards` helper) |
+| [ly-solutions/agent-skills](https://github.com/ly-solutions/agent-skills) | `plugins/harnessly` (the workspace skill and the skill for writing apps), `plugins/boards` (the boards skill and its `boards` helper) |
 | [ly-solutions/artifacts](https://github.com/ly-solutions/artifacts) | `skills/artifacts` and the `artifacts` command line client (`bin/artifacts.mjs`, `src/cli.mjs`; Node.js standard library only) |
 
 Both are Apache-2.0 (their `LICENSE` files are vendored next to them).

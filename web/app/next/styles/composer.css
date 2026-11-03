@@ -327,6 +327,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Only the name gives way in a narrow pill: the mark, the depth and the arrow keep their size. */
+.hx-model > :not(.hx-model__name, .hx-tip) {
+  flex: none;
+}
 .hx-model__effort {
   color: var(--hx-fg-3);
   font-weight: var(--hx-weight-regular);
@@ -777,8 +781,10 @@
 }
 .hx-queue__row {
   display: flex;
+  /* A row too narrow for words, reason and button gives the button its own line instead of laying them over each other. */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 0 10px;
   min-height: 36px;
   padding: 0 4px 0 10px;
   border-radius: 12px;
@@ -883,14 +889,18 @@
   bottom: -1px;
 }
 .hx-queue__main {
-  flex: 1;
+  flex: 1 1 15rem;
   display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+  /* What does not fit stays inside the cell: the note never reaches the button next to it. */
+  overflow: hidden;
 }
 .hx-queue__text {
   min-width: 0;
+  /* The words give way first, so the reason beside them stays whole as long as it can. */
+  flex-shrink: 1000;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -898,7 +908,10 @@
   color: var(--hx-fg-1);
 }
 .hx-queue__note {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
   white-space: nowrap;
@@ -931,6 +944,7 @@
 .hx-queue__steer {
   position: relative;
   flex: none;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1099,6 +1113,7 @@
     margin: 0 14px;
   }
   .hx-queue__main {
+    flex: 1 1 9rem;
     flex-direction: column;
     align-items: stretch;
     gap: 0;

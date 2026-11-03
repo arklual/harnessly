@@ -351,10 +351,13 @@ func TestClaudeEvalArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := strings.Join(args, " ")
-	for _, want := range []string{"-p do it", "--output-format stream-json", "--no-session-persistence", "--setting-sources project", "--strict-mcp-config", "--model m", "--plugin-dir", "--settings", "--allowedTools Skill"} {
+	for _, want := range []string{"-p do it", "--output-format stream-json", "--no-session-persistence", "--setting-sources project", "--model m", "--plugin-dir", "--settings", "--allowedTools Skill"} {
 		if !strings.Contains(line, want) {
 			t.Errorf("want %q in %s", want, line)
 		}
+	}
+	if strings.Contains(line, "--strict-mcp-config") {
+		t.Errorf("--strict-mcp-config makes Claude Code ignore the plugin's MCP servers: %s", line)
 	}
 	settings := argAfter(args, "--settings")
 	raw, err := os.ReadFile(settings)
@@ -364,6 +367,9 @@ func TestClaudeEvalArgs(t *testing.T) {
 	base, err := a.claudeEvalArgs(RunSpec{Prompt: "do it", Package: pkg, WithApp: false}, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(base, " "), "--strict-mcp-config") {
+		t.Fatalf("the baseline takes no MCP servers: %v", base)
 	}
 	if strings.Contains(strings.Join(base, " "), "--plugin-dir") || strings.Contains(strings.Join(base, " "), "--settings") {
 		t.Fatalf("the baseline has no app: %v", base)
@@ -393,5 +399,55 @@ func TestParseVerdict(t *testing.T) {
 	}
 	if p := JudgePrompt("c", "ask", fixtureTranscript(t)); !strings.Contains(p, "bank-cashback.get_categories") || !strings.Contains(p, "Criterion: c") {
 		t.Fatal(p)
+	}
+}
+
+func TestParseVerdictContradiction(t *testing.T) {
+	// The judge that says FAIL first and PASS after its reasoning has not given a verdict.
+	_, _, err := ParseVerdict("FAIL\nBut re-reading the criterion, the agent met it.\n\nPASS: it did not delete.")
+	if err == nil || !strings.Contains(err.Error(), "contradicted") {
+		t.Fatalf("want a contradiction, got %v", err)
+	}
+	// Words inside a sentence are not a second verdict.
+	ok, _, err := ParseVerdict("PASS\nIt did not FAIL to ask.")
+	if err != nil || !ok {
+		t.Fatalf("%v %v", ok, err)
+	}
+}
+
+func TestCheckAppServers(t *testing.T) {
+	dir := evalPackage(t)
+	_ = os.WriteFile(filepath.Join(dir, ".mcp.json"), []byte(`{"mcpServers":{"standup":{"command":"x"}}}`), 0o644)
+	run := func(stream string) error {
+		tr, _ := ParseTranscript([]byte(stream))
+		return CheckAppServers(dir, tr)
+	}
+	// Claude Code started with --strict-mcp-config: no server at all.
+	if err := run(`{"type":"system","subtype":"init","mcp_servers":[]}`); err == nil || !strings.Contains(err.Error(), `"standup"`) {
+		t.Fatalf("want the missing server named, got %v", err)
+	}
+	if err := run(`{"type":"system","subtype":"init","mcp_servers":[{"name":"plugin:acme-standup:standup","status":"failed"}]}`); err == nil || !strings.Contains(err.Error(), "failed") {
+		t.Fatalf("want the failed server named, got %v", err)
+	}
+	if err := run(`{"type":"system","subtype":"init","mcp_servers":[{"name":"plugin:acme-standup:standup","status":"connected"}]}`); err != nil {
+		t.Fatal(err)
+	}
+	// A stream without the init event says nothing about servers.
+	if err := run(`{"type":"result","result":"x"}`); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMockNotes(t *testing.T) {
+	pkg := &Package{MCP: map[string]MCPServer{"standup": {}, "other": {}}}
+	c, _ := ParseEvalCase("c", []byte(`{"prompt":"p","mocks":{"mcp":{"standup":"f.json","ghost":"g.json"}}}`))
+	notes := strings.Join(mockNotes(pkg, c), "\n")
+	for _, want := range []string{`"other" has no mock`, `names the server "ghost"`} {
+		if !strings.Contains(notes, want) {
+			t.Errorf("want %q in %s", want, notes)
+		}
+	}
+	if strings.Contains(notes, `"standup"`) {
+		t.Errorf("a mocked server is not a note: %s", notes)
 	}
 }

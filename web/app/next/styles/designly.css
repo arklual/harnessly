@@ -54,6 +54,29 @@
   display: block;
   width: 100%;
   min-height: 52px;
+  /* It grows with its text (use-fit-field.ts) up to a third of the screen, then the text scrolls inside, so the buttons
+     and the kinds stay on screen. A text that goes on past an edge fades there and never runs into the buttons. */
+  max-height: min(30dvh, 280px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hx-border-strong) transparent;
+  --fade-top: 0px;
+  --fade-bottom: 0px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent
+  );
   resize: none;
   border: 0;
   outline: 0;
@@ -63,6 +86,12 @@
   font: inherit;
   font-size: var(--hx-text-lg);
   line-height: 26px;
+}
+.hx-dl__input[data-fade-top='true'] {
+  --fade-top: 20px;
+}
+.hx-dl__input[data-fade-bottom='true'] {
+  --fade-bottom: 20px;
 }
 .hx-dl__input::placeholder {
   color: var(--hx-fg-3);
@@ -587,111 +616,6 @@
 .hx-dl[data-fly] .hx-dl__body {
   animation: hx-dl-in 620ms var(--dl-ease) 260ms backwards;
 }
-.hx-dl-ds {
-  display: grid;
-  grid-template-columns: 1fr;
-  margin-right: var(--hx-space-1);
-  transition:
-    grid-template-columns 420ms var(--dl-ease),
-    opacity 260ms ease,
-    margin 420ms var(--dl-ease);
-  position: relative;
-}
-.hx-dl-ds[data-on='false'] {
-  grid-template-columns: 0fr;
-  opacity: 0;
-  margin-right: 0;
-  pointer-events: none;
-}
-.hx-dl-ds__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  height: 32px;
-  padding: 0 8px 0 10px;
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--hx-radius-full);
-  background: none;
-  color: var(--hx-fg-1);
-  font: inherit;
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-medium);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background var(--hx-dur-sm) var(--hx-ease-out);
-}
-.hx-dl-ds__btn:hover,
-.hx-dl-ds__btn[aria-expanded='true'] {
-  background: var(--hx-bg-hover);
-}
-.hx-dl-ds__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.hx-dl-ds__short {
-  display: none;
-}
-.hx-dl-ds__btn [data-chev] {
-  flex: none;
-  color: var(--hx-fg-3);
-  transition: transform 420ms var(--hx-ease-out);
-}
-.hx-dl-ds__btn[aria-expanded='true'] [data-chev] {
-  transform: rotate(180deg);
-}
-.hx-dl-dot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--hx-orb);
-}
-.hx-dl-dot[data-ds='shop'] {
-  background: linear-gradient(135deg, #ff7a59, #ffb547);
-}
-.hx-dl-dot[data-ds='charts'] {
-  background: linear-gradient(135deg, #34d399, #0ea5e9);
-}
-.hx-dl-dot[data-ds='hx'] {
-  background: linear-gradient(135deg, #a78bfa, #6366f1);
-}
-.hx-dl-dot[data-ds='marketing'] {
-  background: linear-gradient(135deg, #f472b6, #fb7185);
-}
-.hx-dl-dot[data-ds='legacy'] {
-  background: var(--hx-fg-3);
-}
-/* A system the design does not name: one of eight tones picked by a hash of its id (ds-recent.ts). */
-.hx-dl-dot[data-tone='0'] {
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
-}
-.hx-dl-dot[data-tone='1'] {
-  background: linear-gradient(135deg, #22d3ee, #3b82f6);
-}
-.hx-dl-dot[data-tone='2'] {
-  background: linear-gradient(135deg, #84cc16, #10b981);
-}
-.hx-dl-dot[data-tone='3'] {
-  background: linear-gradient(135deg, #e879f9, #8b5cf6);
-}
-.hx-dl-dot[data-tone='4'] {
-  background: linear-gradient(135deg, #fb923c, #f43f5e);
-}
-.hx-dl-dot[data-tone='5'] {
-  background: linear-gradient(135deg, #2dd4bf, #6366f1);
-}
-.hx-dl-dot[data-tone='6'] {
-  background: linear-gradient(135deg, #facc15, #f97316);
-}
-.hx-dl-dot[data-tone='7'] {
-  background: linear-gradient(135deg, #60a5fa, #a78bfa);
-}
-.hx-dl-dot[data-ds='none'] {
-  background: none;
-  box-shadow: inset 0 0 0 1.5px var(--hx-fg-3);
-}
 .hx-dl-pop {
   display: flex;
   flex-direction: column;
@@ -739,14 +663,12 @@
   padding-top: 4px;
   border-top: 1px solid var(--hx-border);
 }
-.hx-dl-pop .hx-option .hx-dl-dot {
-  margin: 0 4px 0 2px;
-}
 .hx-dl__hero:has(.hx-dl-pop) {
   position: relative;
   z-index: 6;
 }
-.hx-dl__hero:has(.hx-picker, .hx-dl-pop) {
+.hx-dl__hero:has(.hx-picker, .hx-dl-pop),
+.hx-dl__hero:focus-within {
   opacity: 1;
   transition: opacity 200ms var(--hx-ease-out);
 }
@@ -815,25 +737,12 @@
   .hx-dl__bar .hx-model__effort {
     display: none;
   }
-  .hx-dl-ds__name,
-  .hx-dl-ds__btn [data-chev] {
-    display: none;
-  }
-  .hx-dl-ds__short {
-    display: block;
-    max-width: 96px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   .hx-dl__model .hx-model > .hx-icon:last-child,
   .hx-dl__model .hx-model > [data-chev] {
     display: none;
   }
   .hx-dl__model .hx-model {
     padding-inline: 12px;
-  }
-  .hx-dl-ds {
-    margin-right: 0;
   }
   .hx-dl__starts {
     flex-wrap: nowrap;
@@ -916,17 +825,8 @@
   }
   .hx-dl__input {
     min-height: 44px;
-    max-height: 40dvh;
+    max-height: min(26dvh, 240px);
     overflow-y: auto;
-  }
-  .hx-dl-ds__short {
-    display: none !important;
-  }
-  .hx-dl-ds__btn {
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    justify-content: center;
   }
   .hx-dl__starts {
     display: flex;
@@ -1010,12 +910,12 @@
     transition: opacity 160ms ease;
   }
   .hx-dl__search:focus-within,
-  .hx-dl__search:has(input:not(:placeholder-shown)) {
+  .hx-dl__search[data-filled='true'] {
     clip-path: inset(0 0 0 0 round 18px);
     box-shadow: none;
   }
   .hx-dl__search:focus-within input,
-  .hx-dl__search:has(input:not(:placeholder-shown)) input {
+  .hx-dl__search[data-filled='true'] input {
     opacity: 1;
     transition: opacity 200ms ease 120ms;
   }
@@ -1182,29 +1082,3 @@
 }
 
 /* What the machine lacks for designs (the board engine, a browser, ffmpeg) and the command that fixes it. */
-.hx-dl__notice {
-  max-width: 1120px;
-  margin: var(--hx-space-4) auto 0;
-  padding: var(--hx-space-3) var(--hx-space-4);
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-md);
-  background: var(--hx-bg-raised);
-}
-.hx-dl__notice-title {
-  font-weight: var(--hx-weight-semibold);
-  color: var(--hx-fg-1);
-}
-.hx-dl__notice-text {
-  margin-top: var(--hx-space-1);
-  font-size: var(--hx-text-sm);
-  color: var(--hx-fg-2);
-}
-.hx-dl__notice-cmd {
-  display: inline-block;
-  margin-top: var(--hx-space-2);
-  padding: var(--hx-space-1) var(--hx-space-2);
-  border-radius: var(--hx-radius-md);
-  background: var(--hx-bg-hover);
-  font-size: var(--hx-text-sm);
-  user-select: all;
-}

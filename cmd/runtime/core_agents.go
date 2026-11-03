@@ -41,6 +41,8 @@ type coreAgents struct {
 	profiles *providers.Store
 	// gpt is the switch of the gpt profile and the proxy it keeps; nil while the runtime's port is unknown.
 	gpt *providers.GPTProxy
+	// router is the switch of the auto profile and the endpoint its chats talk to; nil while the runtime's port is unknown.
+	router *providers.Router
 	// launchOn: the launch slice is on, so conversations start and resume here (set by main); starter and resume are
 	// the core's, set once it exists.
 	launchOn func() bool
@@ -104,8 +106,13 @@ func skipPermissions(configFile string) func() bool {
 func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	profiles := &providers.Store{Dir: filepath.Join(c.DataDir, "providers"), Logins: profileLogins(c.Home)}
 	gpt := gptProxy(c, profiles)
+	profiles.Switches = map[string]providers.Switch{}
 	if gpt != nil {
-		profiles.Switches = map[string]providers.Switch{"gpt": gpt}
+		profiles.Switches["gpt"] = gpt
+	}
+	router := modelRouter(c, profiles)
+	if router != nil {
+		profiles.Switches["auto"] = router
 	}
 	launcher := providers.Launcher{Store: profiles, Relay: codexRelay(c)}
 	editor := func() (string, error) {
@@ -124,6 +131,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	return &coreAgents{
 		profiles: profiles,
 		gpt:      gpt,
+		router:   router,
 		checker:  preflight.New(c.Home),
 		envDir:   c.EnvDir,
 		options:  catalog.LaunchConfig{ClaudeDir: c.ClaudeDir, CodexDir: c.CodexDir, RuntimeConfig: c.ConfigFile, DefaultsKey: c.DefaultsKey},
@@ -204,6 +212,17 @@ func gptProxy(c coreAgentsConfig, store *providers.Store) *providers.GPTProxy {
 	}
 	return &providers.GPTProxy{Dir: filepath.Join(store.Dir, "gpt-proxy"), OnFile: filepath.Join(store.Dir, "gpt.on"),
 		Login: login, RelayBase: relay}
+}
+
+// modelRouter is the switch of the auto profile over the store's GLM and Kimi Code keys, mounted on the runtime's port;
+// nil while the port is unknown.
+func modelRouter(c coreAgentsConfig, store *providers.Store) *providers.Router {
+	base := codex.MCPURL(c.Port, providers.RouterPath)
+	if base == "" {
+		return nil
+	}
+	return &providers.Router{Dir: filepath.Join(store.Dir, "auto-router"), OnFile: filepath.Join(store.Dir, "auto.on"),
+		Base: base, Store: store}
 }
 
 // codexRelay is the runtime's relay as Codex is told about it: on the runtime's port, behind the CLI token Codex

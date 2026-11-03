@@ -354,6 +354,26 @@ const gptOf = (vendors: Extract<VendorCards, { k: 'ready' }>) => {
   };
 };
 
+/** The vendor profiles the auto profile routes between: it is offered once one of them has a key. */
+const AUTO_TARGETS: readonly string[] = ['kimi-code', 'glm', 'glm-cn'];
+
+/** «Авто» under the vendor cards: the switch of the `auto` profile; nothing from a runtime that has none. */
+const AutoCard = ({ vendors }: { vendors: Extract<VendorCards, { k: 'ready' }> }) => {
+  const preset = vendors.presets.find((p) => p.vendor === 'auto');
+  if (!preset) return null;
+  const ready = vendors.presets.some((p) => AUTO_TARGETS.includes(p.id) && p.key.configured);
+  return (
+    <div className="hx-acct hx-acct--solo hx-acct--switch">
+      <GptSwitch
+        kind="auto"
+        preset={preset}
+        ready={ready}
+        onSwitch={(on) => vendors.onSwitch(preset.id, on)}
+      />
+    </div>
+  );
+};
+
 const AccountsSection = ({
   cards,
   credentials,
@@ -392,6 +412,7 @@ const AccountsSection = ({
           onTest={vendors.onTest}
         />
       ))}
+    {vendors.k === 'ready' && <AutoCard vendors={vendors} />}
     {vendors.k === 'loading' && <Skeleton className="hx-set__sk" />}
     {vendors.k === 'failed' && (
       <div className="hx-acct hx-acct--solo">

@@ -189,12 +189,52 @@ const render = (md: string, paths: boolean): ReactElement => {
   return tree;
 };
 
+/** A page of the documentation (/help) drawn by the same components: its links are the page's to take, its headings carry ids. */
+export interface IGuideLinks {
+  /** What a link of the page becomes: a link inside the section, an outside one, or plain text. */
+  link: (href: string, children: ReactNode) => ReactNode;
+  /** The id of a heading, so `#anchor` links reach it. */
+  headingId: (text: string) => string;
+}
+
+const heading = (Tag: 'h1' | 'h2' | 'h3' | 'h4', guide: IGuideLinks) => {
+  const Heading = ({ children }: { children?: ReactNode }) => (
+    <Tag id={guide.headingId(textOf(children))}>{children}</Tag>
+  );
+  return Heading;
+};
+
+const guideComponents = (guide: IGuideLinks): Components =>
+  ({
+    ...components,
+    a: ({ href, children }) => guide.link(href ?? '', children),
+    h1: heading('h1', guide),
+    h2: heading('h2', guide),
+    h3: heading('h3', guide),
+    h4: heading('h4', guide),
+  }) as Components;
+
 interface IMarkdownProps {
   md: string;
   /** Paths in inline code open as files (another agent's report). */
   paths?: boolean;
+  /** The documentation's page: its links and headings are its own, and the result is not kept. */
+  guide?: IGuideLinks;
 }
 
-const Markdown = ({ md, paths = false }: IMarkdownProps) => <div className="hx-md">{render(md, paths)}</div>;
+const Markdown = ({ md, paths = false, guide }: IMarkdownProps) => {
+  if (guide)
+    return (
+      <div className="hx-md">
+        {renderTree({
+          children: md,
+          remarkPlugins: WITH_GFM,
+          components: guideComponents(guide),
+          skipHtml: true,
+        })}
+      </div>
+    );
+  return <div className="hx-md">{render(md, paths)}</div>;
+};
 
 export default Markdown;

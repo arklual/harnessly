@@ -13,13 +13,42 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-03c',
+    items: [{ key: 'docs', icon: 'book-open' }],
+  },
+  {
+    id: '2026-11-03b',
+    items: [{ key: 'queueNote', icon: 'message-square' }],
+  },
+  {
+    id: '2026-11-03a',
+    items: [{ key: 'files', icon: 'paperclip' }],
+  },
+  {
+    id: '2026-11-02q',
+    items: [
+      { key: 'paneOverview', icon: 'palette' },
+      { key: 'playerMoment', icon: 'play' },
+    ],
+  },
+  {
+    id: '2026-11-02p',
+    items: [{ key: 'oneStart', icon: 'palette' }],
+  },
+  {
+    id: '2026-11-02o',
+    items: [
+      { key: 'videoSeek', icon: 'play' },
+      { key: 'designNoSetup', icon: 'pen-tool' },
+    ],
+  },
+  {
     id: '2026-11-02n',
     items: [{ key: 'limitReset', icon: 'clock' }],
   },
   {
     id: '2026-11-02m',
     items: [
-      { key: 'player', icon: 'play' },
       { key: 'language', icon: 'languages' },
       { key: 'longCommand', icon: 'shield-question' },
     ],

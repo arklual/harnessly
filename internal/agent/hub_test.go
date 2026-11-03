@@ -253,6 +253,8 @@ type rigOptions struct {
 	usageFeed func(UsageDeps) (UsageFeed, error)
 	// beforeStart runs with the data directory before the agent starts.
 	beforeStart func(dataDir string)
+	// observe runs the agent as the closed cluster's, with the machine as an observe link of its own folder.
+	observe bool
 }
 
 func startHubAgent(t *testing.T, o rigOptions) *hubRig {
@@ -289,6 +291,9 @@ func startHubAgent(t *testing.T, o rigOptions) *hubRig {
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
 	base := m.RuntimeBasePath
+	if o.observe {
+		base = "/agents"
+	}
 	cfg := Config{
 		Home: rig.Home, Host: "127.0.0.1", Port: port, Version: "9.9.9-test", ScanInterval: time.Hour,
 		DataDir: dataDir, ConfigFile: filepath.Join(dataDir, "config.json"), SecretFile: secretFile,
@@ -297,6 +302,10 @@ func startHubAgent(t *testing.T, o rigOptions) *hubRig {
 		RuntimeCookie: "session-token", LocalTokenHeader: "x-agent-local-token", ReportPortEnv: "AGENT_REPORT_PORT",
 		Auth: AuthEd25519, Machine: m, MachineFile: filepath.Join(dataDir, "machine.json"), PolicyFile: policyFile,
 		EnvDir: rig.EnvDir, WorkDir: rig.Home, UsageFeed: o.usageFeed,
+	}
+	if o.observe {
+		cfg.Auth, cfg.Machine = AuthHS256, nil
+		cfg.ObserveMachine, cfg.ObserveMachineFile = m, filepath.Join(dataDir, "hub", "machine.json")
 	}
 	a, err := New(cfg)
 	if err != nil {
@@ -1123,5 +1132,68 @@ func TestHubModeReadsNoTranscripts(t *testing.T) {
 		if strings.Contains(string(ev["event"]), "transcripts") {
 			t.Errorf("a transcript event on a hub link: %s", ev)
 		}
+	}
+}
+
+func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
+	r := startHubAgent(t, rigOptions{observe: true})
+	if r.agent.hub == nil || !r.agent.hub.observe {
+		t.Fatal("the cluster's agent did not start an observe link")
+	}
+	c := r.connect()
+	hello := decode[hubproto.Hello](t, c.mustCall("hello", nil))
+	p := hello.Policy
+	if p.Terminal || p.AgentLogin || p.Keys || p.Env || p.Install || p.RuntimeSession || p.Source != observeSource {
+		t.Fatalf("observe policy %+v", p)
+	}
+	for _, f := range hello.Features {
+		if f == "tunnel" || f == hubproto.FeatureBudget {
+			t.Errorf("an observe link offers %s: %v", f, hello.Features)
+		}
+	}
+	m := r.machine
+	for op, params := range map[string]map[string]any{
+		"key.deliver":     {"provider": "claude", "envelope": seal(t, m, "key:claude", "sk-x")},
+		"env.deliver":     {"name": "A_TOKEN", "envelope": seal(t, m, "env:A_TOKEN", "v")},
+		"gitkey.ensure":   nil,
+		"proxy.set":       {"scope": "all", "url": "http://a:1"},
+		"agents.install":  {"jobId": strings.Repeat("a", 32), "provider": "claude"},
+		"login.start":     {"loginId": "l", "provider": "claude", "method": "link"},
+		"runtime.session": {"subject": "a@example.com"},
+		"tunnel.open":     {"spec": map[string]string{"tunnelId": strings.Repeat("a", 32), "target": "runtime"}},
+		"budget.set":      {"version": 1, "mode": "stop", "entries": []any{}},
+	} {
+		if _, e := c.call(op, params); !strings.HasPrefix(e, "policy_denied: ") {
+			t.Errorf("%s: %q", op, e)
+		}
+	}
+	// What can be read stays open.
+	c.mustCall("agents.status", nil)
+	c.mustCall("preflight.run", nil)
+
+	// The cluster's tunnels keep the runtime's own port: no route filter was put in front of it.
+	if got := r.agent.tunnels.runtimePort; got != r.runtime.port {
+		t.Errorf("the cluster's tunnels now go to port %d, not the runtime's %d", got, r.runtime.port)
+	}
+	// The link's files are in its own folder; the data folder has no machine.json, audit or limits of its own.
+	dataDir := filepath.Join(r.rig.Home, ".harnessly")
+	hubDir := filepath.Join(dataDir, "hub")
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if st, _ := ReadLinkState(LinkStatePath(hubDir)); st.Linked {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the observe link's state never said linked")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for _, name := range []string{"machine.json", "agent-audit.log", linkStateFile, "budget.json"} {
+		if _, err := os.Stat(filepath.Join(dataDir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s in the cluster agent's data folder: %v", name, err)
+		}
+	}
+	if raw, _ := os.ReadFile(filepath.Join(hubDir, "agent-audit.log")); !strings.Contains(string(raw), `"op":"policy.denied"`) {
+		t.Errorf("the observe link's audit: %s", raw)
 	}
 }

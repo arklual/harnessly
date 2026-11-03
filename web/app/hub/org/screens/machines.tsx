@@ -16,10 +16,10 @@ import {
   Check,
 } from 'lucide-react';
 
-import { Popup } from '@kit';
+import { Button, Popup } from '@kit';
 
 import { useNow } from '../../lib/hooks';
-import { Link, navigate, useQuery } from '../../lib/router';
+import { navigate, useQuery } from '../../lib/router';
 import type { MachineGroup, MachinesList } from '../api/machines';
 import { useOrg } from '../context';
 import { useLoad } from '../hooks';
@@ -28,6 +28,7 @@ import { MiniBars, ProgressLine, Tile } from '../ui/tile';
 import { useClosing } from '../ui/closing';
 import { plural } from './machines/format';
 import { FlatList, GroupBlock } from './machines/list';
+import { AddMachineSheet } from './machines/add';
 import { MachineSheet } from './machines/sheet';
 
 type View = 'groups' | 'list';
@@ -169,6 +170,9 @@ export const MachinesScreen = () => {
   const openId = query.get('machine');
   const [kept, setKept] = useState(openId);
   if (openId && openId !== kept) setKept(openId);
+  const [adding, setAdding] = useState(false);
+  const addable = org ? shell.tenants : [scope.tenant];
+  const canAdd = shell.viewer.role === 'admin' && addable.length > 0;
   const [view, setView] = useState<View>('groups');
   const [q, setQ] = useState('');
   const [tenant, setTenant] = useState('');
@@ -201,17 +205,10 @@ export const MachinesScreen = () => {
         title={org ? 'Машины организации' : 'Машины'}
         sub={sub}
         actions={
-          !org && shell.viewer.role === 'admin' ? (
-            <Link
-              to={`/s/${scope.tenant.slug}/setup/machines`}
-              className="k-btn"
-              data-appearance="outline"
-              data-size="s"
-            >
-              <span className="k-btn__content">
-                <Plus size={14} aria-hidden="true" /> Добавить машину
-              </span>
-            </Link>
+          canAdd ? (
+            <Button appearance="outline" size="s" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
+              Добавить машину
+            </Button>
           ) : undefined
         }
       />
@@ -291,6 +288,7 @@ export const MachinesScreen = () => {
           )}
         </>
       )}
+      <AddMachineSheet open={adding} tenants={addable} onClose={() => setAdding(false)} onAdded={refresh} />
       <MachineSheet
         id={kept}
         name={named}

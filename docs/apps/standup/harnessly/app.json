@@ -1,0 +1,31 @@
+{
+  "id": "harnessly.standup",
+  "name": "Стендап",
+  "description": "Ежедневный стендап команды: агент собирает апдейты в файлы чата, человек правит и удаляет их в окне",
+  "version": "0.1.0",
+  "harnessly": ">=0.16.68",
+  "trust": "trusted",
+  "targets": ["chat", "pane", "app"],
+  "activation": { "openView": "main" },
+  "permissions": ["chat.prompt", "files.read:standup/*.json", "files.write:standup/*.json"],
+  "agent": {
+    "instructions": "instructions.md",
+    "tools": {
+      "deny": [
+        "Edit(*/standup/*)",
+        "Write(*/standup/*)",
+        "MultiEdit(*/standup/*)",
+        "NotebookEdit(*/standup/*)",
+        "Bash(rm *standup*)",
+        "Bash(unlink *standup*)",
+        "Bash(mv *standup*)",
+        "Bash(shred *standup*)",
+        "Bash(find *standup*)"
+      ]
+    }
+  },
+  "views": [
+    { "id": "main", "title": "Стендап", "entry": "ui/index.html", "targets": ["pane", "app"] },
+    { "id": "card", "title": "Стендап за день", "entry": "ui/card.html", "targets": ["chat"] }
+  ]
+}

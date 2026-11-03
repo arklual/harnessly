@@ -242,17 +242,28 @@ func (c *Collector) loadCache() {
 		return
 	}
 	c.loaded = true
-	raw, err := os.ReadFile(c.cfg.CacheFile)
-	if err != nil {
-		return
+	order, files := readFacts(c.cfg.CacheFile)
+	for _, name := range order {
+		if _, ok := c.files[name]; !ok {
+			c.order = append(c.order, name)
+		}
+		c.files[name] = files[name]
 	}
-	if !valid(raw) {
-		return
+}
+
+// readFacts reads a facts file: the transcripts in the file's order and their facts. A missing, unreadable or
+// other-version file has none.
+func readFacts(path string) ([]string, map[string]*cachedFile) {
+	raw, err := os.ReadFile(path)
+	if err != nil || !valid(raw) {
+		return nil, nil
 	}
 	top := objectOf(raw[skipWS(raw, 0):])
 	if top == nil || top.num("version") != cacheVersion {
-		return
+		return nil, nil
 	}
+	var order []string
+	files := map[string]*cachedFile{}
 	for _, m := range objectOf(top.raw("files")) {
 		name := decodeString(append(append([]byte{'"'}, m.name...), '"'))
 		e := objectOf(m.value)
@@ -260,11 +271,12 @@ func (c *Collector) loadCache() {
 		if facts == nil {
 			continue
 		}
-		if _, ok := c.files[name]; !ok {
-			c.order = append(c.order, name)
+		if _, ok := files[name]; !ok {
+			order = append(order, name)
 		}
-		c.files[name] = &cachedFile{size: e.num("size"), mtimeMs: e.num("mtimeMs"), facts: factsOf(facts)}
+		files[name] = &cachedFile{size: e.num("size"), mtimeMs: e.num("mtimeMs"), facts: factsOf(facts)}
 	}
+	return order, files
 }
 
 func (c *Collector) saveCache() {

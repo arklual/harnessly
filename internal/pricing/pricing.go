@@ -20,6 +20,7 @@ var claudePrices = map[string]claudePrice{
 	"fable-5":    {10, 50, 12.5, 20, 1},
 	"opus-5-5":   {4, 20, 5, 8, 0.2},
 	"opus-5":     {5, 25, 6.25, 10, 0.5},
+	"sonnet-5-5": {2, 10, 2.5, 4, 0.2},
 	"sonnet-5":   {2, 10, 2.5, 4, 0.2},
 	"opus-4-8":   {5, 25, 6.25, 10, 0.5},
 	"opus-4-7":   {5, 25, 6.25, 10, 0.5},
@@ -32,6 +33,7 @@ var claudePrices = map[string]claudePrice{
 	"sonnet-4":   {3, 15, 3.75, 6, 0.3},
 	"sonnet-3-7": {3, 15, 3.75, 6, 0.3},
 	"sonnet-3-5": {3, 15, 3.75, 6, 0.3},
+	"haiku-5-5":  {0.1, 0.5, 0.125, 0.2, 0.01},
 	"haiku-4-5":  {1, 5, 1.25, 2, 0.1},
 	"haiku-3-5":  {0.8, 4, 1, 1.6, 0.08},
 	"haiku-3":    {0.25, 1.25, 0.3, 0.5, 0.03},
@@ -128,6 +130,7 @@ type openAIPrice struct {
 func usd(v float64) *float64 { return &v }
 
 var openAIPrices = map[string]openAIPrice{
+	"gpt-5.6-sol":         {4, 20, usd(0.4)}, // list price since 21.08.2026 (was 5 / 30 / 0.5)
 	"gpt-5.5":             {5, 30, usd(0.5)},
 	"gpt-5.4":             {2.5, 15, usd(0.25)},
 	"gpt-5.4-mini":        {0.75, 4.5, usd(0.075)},
@@ -152,7 +155,7 @@ var openAIPrices = map[string]openAIPrice{
 }
 
 // openAIOrder is the table's own order (the order a model id tries the rows in breaks ties of length by it).
-var openAIOrder = []string{"gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.2-codex", "gpt-5.2-chat-latest", "gpt-5.2",
+var openAIOrder = []string{"gpt-5.6-sol", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.2-codex", "gpt-5.2-chat-latest", "gpt-5.2",
 	"gpt-5.1-codex-max", "gpt-5.1-codex", "gpt-5.1-chat-latest", "gpt-5.1", "gpt-5-codex", "gpt-5-chat-latest", "gpt-5-mini",
 	"gpt-5-nano", "gpt-5", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4.1", "gpt-4o-mini", "gpt-4o"}
 

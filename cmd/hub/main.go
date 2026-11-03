@@ -7,6 +7,7 @@
 //	hub healthcheck    ask a running hub on this host whether it is up (for container health checks)
 //	hub sites          run the sites module on its own (docs/hub/sites.md)
 //	hub seed           make organizations, tenants, teams and roles from a file (docs/hub/orgs.md, «Seeding»)
+//	hub machine-code   a registration code for a person's machine, without the page (AGENT_HUB_OBSERVE_FILE)
 //	hub version
 package main
 
@@ -80,6 +81,8 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 		return runSites(ctx, args, lookup, stdout, stderr)
 	case "seed":
 		return runSeed(ctx, args, lookup, stdout, stderr)
+	case "machine-code":
+		return runMachineCode(ctx, args, lookup, stdout, stderr)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0
@@ -89,7 +92,7 @@ func run(ctx context.Context, args []string, lookup func(string) (string, bool),
 	}
 }
 
-const usage = `usage: hub [serve | check-config | healthcheck | sites | seed --file seed.yaml [--dry-run] | version]
+const usage = `usage: hub [serve | check-config | healthcheck | sites | seed --file seed.yaml [--dry-run] | machine-code --space <slug> --owner <email> [--profile p] | version]
 
 The hub is configured by HUB_* environment variables; see docs/hub/deploy.md.
 `

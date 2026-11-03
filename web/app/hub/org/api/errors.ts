@@ -19,6 +19,8 @@ export class OrgApiError extends Error {
     | 'not_ready'
     | 'network'
     | 'invalid_request'
+    // A refusal of the space endpoints (machine codes, invites, members): the message is already the text to show.
+    | 'hub'
     | 'internal';
   /** Who could do it, when the hub says. */
   readonly needs: Needs | null;

@@ -4,6 +4,7 @@
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import type { IBrowser, IOverviewCard } from '@/next/features/designly/devices';
+import { postDeck } from '@/next/features/designly/deck/bridge';
 
 interface IBarsProps {
   browser: IBrowser;
@@ -124,6 +125,7 @@ export const Overview = ({ cards, room, src, onPick }: IOverviewProps) => (
             type="button"
             className="hx-ovw__label"
             aria-label={`${name}: ${t('next.site.overviewOpen')}`}
+            title={`${name} ${w}×${h}`}
             onClick={() => onPick(device.id)}
           >
             <Icon name={device.icon} size="sm" />
@@ -132,7 +134,17 @@ export const Overview = ({ cards, room, src, onPick }: IOverviewProps) => (
           </button>
           <div className="hx-ovw__screen" data-round={w < 1000}>
             <div className="hx-ovw__scroll">
-              {src !== null && <iframe className="hx-ovw__frame" src={src} title={name} />}
+              {src !== null && (
+                <iframe
+                  className="hx-ovw__frame"
+                  src={src}
+                  title={name}
+                  // The board draws the library's boards bar unless it is told the host draws its own.
+                  onLoad={(event) =>
+                    postDeck(event.currentTarget, src, { type: 'tk:tweaks-host', on: true, open: false })
+                  }
+                />
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-<!-- {{tag}}-library-guide v10 -->
+<!-- {{tag}}-library-guide v11 -->
 # Макеты Claude Design: как их править
 
 Эта папка — общая библиотека макетов всей команды (на {{host}} это `{{shared}}`): здесь работают агенты
@@ -27,9 +27,7 @@
 
 1. Прочитай `artifact.json` артефакта (название, откуда проект, список досок) и README дизайн-системы проекта:
    `project/_ds/*/README.md`. Там компоненты, токены и правила, по которым макет собран.
-2. Если нужна полная инструкция Claude Design (формат доски, приёмы оформления), прочитай тип Design инструментом
-   Artifact: `read` с `type_url` https://claude.ai/artifact/QKN21svewxgyPb6SYRqWnd и его файлы
-   `artifact-type/reference/format.md`, `craft.md`, `design-system-components.md`.
+2. Формат доски и приёмы оформления описаны ниже в этом файле.
 3. Найди доску: сначала путь из `template:`, иначе поиском по тексту элемента в `project/`.
 
 ## Новые доски

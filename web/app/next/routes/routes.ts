@@ -17,6 +17,7 @@ export const ROUTE = {
   tasks: 'tasks',
   apps: 'apps',
   app: 'app',
+  help: 'help',
   settings: 'settings',
 } as const;
 
@@ -35,6 +36,7 @@ export const SETTINGS_SECTIONS = [
   'safe',
   'machines',
   'apps',
+  'design',
   'beta',
 ] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
@@ -66,6 +68,8 @@ export type TRoute =
   | { kind: typeof ROUTE.apps }
   /** An app opened as the main thing: `/apps/:id`, `?chat=` the chat it works in (its column shows it). */
   | { kind: typeof ROUTE.app; id: string; chat?: string }
+  /** The documentation: `/help` (its first page) and `/help/:page`, `#anchor` a heading of it. */
+  | { kind: typeof ROUTE.help; page: string | null; anchor?: string }
   /** Settings: `/settings` (the list of sections; on a wide window the first one is open) and `/settings/:section`. */
   | { kind: typeof ROUTE.settings; section: SettingsSection | null };
 
@@ -84,6 +88,7 @@ const EFFICIENCY_RE = /^\/efficiency\/?$/;
 const TASKS_RE = /^\/tasks\/?$/;
 const APPS_RE = /^\/apps\/?$/;
 const APP_RE = /^\/apps\/([a-z0-9][a-z0-9-]{0,39}\.[a-z0-9][a-z0-9-]{0,39})\/?$/;
+const HELP_RE = /^\/help(?:\/([a-z0-9][a-z0-9-]{0,62}))?\/?$/;
 const SETTINGS_RE = /^\/settings(?:\/([a-z]+))?\/?$/;
 
 /** One parameter of an address's query, when it names one. */
@@ -92,6 +97,17 @@ const queryParam = (path: string, name: string): string | null => {
   if (!query) return null;
   try {
     return new URLSearchParams(query).get(name) || null;
+  } catch {
+    return null;
+  }
+};
+
+/** The `#hash` of an address, read; null when it has none. */
+const hashOf = (path: string): string | null => {
+  const raw = path.split('#')[1];
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw);
   } catch {
     return null;
   }
@@ -112,6 +128,11 @@ export const parseRoute = (path: string): TRoute => {
   if (app?.[1]) {
     const chat = queryParam(path, 'chat');
     return { kind: ROUTE.app, id: app[1], ...(chat ? { chat } : {}) };
+  }
+  const help = HELP_RE.exec(pathname);
+  if (help) {
+    const anchor = hashOf(path);
+    return { kind: ROUTE.help, page: help[1] ?? null, ...(anchor ? { anchor } : {}) };
   }
   const settings = SETTINGS_RE.exec(pathname);
   if (settings) {
@@ -181,6 +202,10 @@ export const routePath = (route: TRoute): string => {
       return route.chat
         ? `/apps/${route.id}?${new URLSearchParams({ chat: route.chat })}`.replace(/%3A/gi, ':')
         : `/apps/${route.id}`;
+    case ROUTE.help: {
+      const base = route.page ? `/help/${route.page}` : '/help';
+      return route.anchor ? `${base}#${encodeURIComponent(route.anchor)}` : base;
+    }
     case ROUTE.settings:
       return route.section ? `/settings/${route.section}` : '/settings';
     default:

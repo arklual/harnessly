@@ -104,8 +104,11 @@ func New(cfg Config) (*Agent, error) {
 	}
 	a.state = newStateFiles(cfg.DataDir, cfg.ExtraStateFiles, a.broadcast, a.notifyRuntimeOfState)
 	a.transcripts = newTranscriptWatch(a.roots, a.broadcast)
-	if cfg.Machine != nil {
-		a.hub = newHub(a)
+	switch {
+	case cfg.Machine != nil:
+		a.hub = newHub(a, cfg.Machine, cfg.DataDir, false)
+	case cfg.ObserveMachine != nil:
+		a.hub = newHub(a, cfg.ObserveMachine, filepath.Dir(cfg.ObserveMachineFile), true)
 	}
 	a.replica = newReplica(a)
 	return a, nil
@@ -570,7 +573,7 @@ func (a *Agent) settleState(requestID string, res StateResult) {
 
 // Run starts the loops, the loopback server and, when configured, the call to the cluster. It returns when ctx ends.
 func (a *Agent) Run(ctx context.Context) error {
-	if a.hub != nil {
+	if a.hub != nil && !a.hub.observe {
 		return a.runHub(ctx)
 	}
 	a.transcripts.WatchRoots()
@@ -590,6 +593,21 @@ func (a *Agent) Run(ctx context.Context) error {
 		go a.dialCluster(ctx)
 	} else if a.cfg.ClusterURL != "" {
 		Log("warn", "AGENT_CLUSTER_URL without AGENT_RUNTIME_ID, not dialling")
+	}
+	if a.hub != nil {
+		// The observe link runs next to the cluster's: a hub that cannot be reached or refuses the machine leaves the
+		// cluster's link as it is.
+		if err := a.hub.start(ctx); err != nil {
+			Log("warn", "the observe link to the hub did not start", F{"error", err.Error()})
+		} else {
+			defer a.hub.stop()
+			dialed := make(chan struct{})
+			go func() {
+				defer close(dialed)
+				a.hub.dialHub(ctx)
+			}()
+			defer func() { <-dialed }()
+		}
 	}
 	return a.listen(ctx)
 }

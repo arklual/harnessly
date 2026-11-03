@@ -153,3 +153,54 @@ func Seed(ctx context.Context, s store.Store) (int, error) {
 	}
 	return n, nil
 }
+
+// PriceUnpriced prices the stored calls that had no price when they came (a model the list did not know yet) by the list
+// as it is now, and sums their hours anew. It returns how many it priced; calls whose model the list still lacks stay.
+func PriceUnpriced(ctx context.Context, s store.Store) (int, error) {
+	prices, err := s.Prices(ctx)
+	if err != nil {
+		return 0, err
+	}
+	b := NewBook(prices)
+	hours := map[string]map[int64]bool{}
+	n := 0
+	var after [3]string
+	for {
+		calls, err := s.UnpricedCalls(ctx, after, 500)
+		if err != nil {
+			return n, err
+		}
+		for _, c := range calls {
+			after = [3]string{c.OrgKey, c.Provider, c.MsgKey}
+			cost, ver, unit, ok := b.Cost(c.PriceProvider, c.Model, c.Ts,
+				Tokens{Input: c.Input, Output: c.Output, CacheRead: c.CacheRead, CacheWrite5m: c.CacheWrite5m, CacheWrite1h: c.CacheWrite1h})
+			if !ok || unit != "usd" {
+				continue
+			}
+			done, err := s.PriceCall(ctx, c.OrgKey, c.Provider, c.MsgKey, cost, ver)
+			if err != nil {
+				return n, err
+			}
+			if done {
+				n++
+				if hours[c.OrgKey] == nil {
+					hours[c.OrgKey] = map[int64]bool{}
+				}
+				hours[c.OrgKey][store.HourMs(c.Ts)] = true
+			}
+		}
+		if len(calls) < 500 {
+			break
+		}
+	}
+	for org, hs := range hours {
+		list := make([]int64, 0, len(hs))
+		for h := range hs {
+			list = append(list, h)
+		}
+		if err := s.Rollup(ctx, org, list); err != nil {
+			return n, err
+		}
+	}
+	return n, nil
+}

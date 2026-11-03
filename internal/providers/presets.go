@@ -129,6 +129,19 @@ var presets = []Preset{
 		Small: "gpt-6-luna", Test: "gpt-6-luna",
 		Switched: true,
 	},
+	{
+		// The router over the person's GLM and Kimi Code keys (Router): each turn goes to the heavy or the light model
+		// of whichever subscription is up. BaseURL is the heavy tier's first vendor, the one shown.
+		ID: "auto", Label: "Авто · GLM + Kimi", Vendor: wire.VendorAuto, Via: wire.ProviderClaude,
+		BaseURL: "https://api.kimi.com/coding/", Host: "api.kimi.com", Hint: "Через Claude Code: каждый ход — на GLM или Kimi Code по вашим ключам",
+		Models: []Model{
+			{ID: RouterModelAuto, Label: "Авто", Hint: "Сложное — K3.1 Pro или GLM 5.3, простое — GLM Flash", Window: million, Efforts: lowHighMax, DefaultEffort: wire.EffortHigh},
+			{ID: RouterModelFast, Label: "Авто · быстро", Hint: "Всегда быстрая модель", Window: million, Efforts: lowHighMax, DefaultEffort: wire.EffortHigh},
+		},
+		Small: RouterModelFast, Test: RouterModelFast,
+		Env:      map[string]string{"API_TIMEOUT_MS": "3000000"},
+		Switched: true,
+	},
 }
 
 // Presets are the vendor setups the runtime knows, in the order the Settings screen lists them.

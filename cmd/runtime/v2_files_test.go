@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
@@ -229,4 +231,59 @@ func TestV2FilesOpenAFileATurnTouchedOutsideTheFolder(t *testing.T) {
 			t.Fatalf("%s: %v", p, err)
 		}
 	}
+}
+
+// HRN-630: a file handed over with deliver_file opens from its card although it lies outside the folder (in /tmp); no
+// other file there does, and neither does the file once a link or other bytes took its place.
+func TestV2FilesOpenADeliveredFileOutsideTheFolder(t *testing.T) {
+	cwd, tmp := t.TempDir(), t.TempDir()
+	given := filepath.Join(tmp, "report.md")
+	if err := os.WriteFile(given, []byte("# report\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(tmp, "other.md")
+	if err := os.WriteFile(other, []byte("secret\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256([]byte("# report\n"))
+	f := &v2Files{
+		record: func(id string) (wire.Conversation, bool) { return wire.Conversation{ID: id, Cwd: cwd}, true },
+		delivered: func(_ context.Context, _ string, p string) (string, bool, error) {
+			return hex.EncodeToString(sum[:]), p == given, nil
+		},
+	}
+	ctx := context.Background()
+	refused := func(p string, code wire.RefuseCode) {
+		t.Helper()
+		var fe *wire.FileError
+		if _, err := f.File(ctx, "tab", p); !errors.As(err, &fe) || fe.Code != code {
+			t.Fatalf("%s: %v", p, err)
+		}
+	}
+	got, err := f.File(ctx, "tab", given)
+	if err != nil || got.Content != "# report\n" || got.Path != given {
+		t.Fatalf("%+v %v", got, err)
+	}
+	// Not handed over: still refused, as is a path that is not clean; and the hand-over is never a way to save.
+	refused(other, wire.RefuseForbidden)
+	refused(tmp+"/./report.md", wire.RefuseForbidden)
+	if _, err := f.Save(ctx, "tab", given, "x", got.Revision); err == nil {
+		t.Fatal("a delivered file must not be writable")
+	}
+	// Other bytes after the hand-over.
+	if err := os.WriteFile(given, []byte("# swapped\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	refused(given, wire.RefuseConflict)
+	// A link in its place, even to a file with the very same bytes.
+	if err := os.Remove(given); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(other, []byte("# report\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, given); err != nil {
+		t.Fatal(err)
+	}
+	refused(given, wire.RefuseForbidden)
 }

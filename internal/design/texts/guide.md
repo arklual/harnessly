@@ -1,4 +1,4 @@
-<!-- {{tag}}-library-guide v10 -->
+<!-- {{tag}}-library-guide v11 -->
 # Claude Design projects: how to edit them
 
 This folder is the shared library of the whole team's designs (on {{host}} it is `{{shared}}`): the agents of several
@@ -32,9 +32,7 @@ Agents of several people edit this folder, often at once. To avoid overwriting e
 1. Read the artifact's `artifact.json` (the title, where the project came from, the list of boards) and the README of the
    project's design system: `project/_ds/*/README.md`. It has the components, the tokens and the rules the design is
    built by.
-2. If you need the full Claude Design instructions (the board format, styling techniques), read the Design type with the
-   Artifact tool: `read` with `type_url` https://claude.ai/artifact/QKN21svewxgyPb6SYRqWnd and its files
-   `artifact-type/reference/format.md`, `craft.md`, `design-system-components.md`.
+2. The board format and styling techniques are described further down in this file.
 3. Find the board: first the path from `template:`, otherwise search for the element's text in `project/`.
 
 ## New boards

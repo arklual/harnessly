@@ -12,11 +12,13 @@ export interface IAppsListProps {
   error: string | null;
   onOpen: (app: IInstalledApp) => void;
   onOpenDrawer: () => void;
+  /** «How to write an app»: the documentation. */
+  onHelp: () => void;
   /** Under the list: the team's catalog. */
   footer?: ReactNode;
 }
 
-const AppsList = ({ apps, error, onOpen, onOpenDrawer, footer }: IAppsListProps) => {
+const AppsList = ({ apps, error, onOpen, onOpenDrawer, onHelp, footer }: IAppsListProps) => {
   let body = null;
   if (error) body = <p className="hx-appslist__none">{error}</p>;
   else if (apps === null) body = <div className="hx-appview__wait" aria-busy="true" />;
@@ -50,6 +52,10 @@ const AppsList = ({ apps, error, onOpen, onOpenDrawer, footer }: IAppsListProps)
         <h1 className="hx-appslist__h1">{t('next.sidebar.apps')}</h1>
       </div>
       {body}
+      <button type="button" className="hx-appslist__help" onClick={onHelp}>
+        <Icon name="book-open" size="sm" />
+        {t('next.appslist.help')}
+      </button>
       {footer}
     </div>
   );

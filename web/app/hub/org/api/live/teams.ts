@@ -204,7 +204,6 @@ export const buildTeamsView = (input: TeamsInput): TeamsView => {
     notAccepted: everyone.filter((p) => p.invited).length,
     notVisiting: everyone.filter((p) => !p.invited && !seenWithin(p, NOT_VISITING)).length,
     can: { createTeam: scope.kind === 'tenant' && (caps?.manage ?? false), invite: caps?.manage ?? false },
-    spaceSlug: (tenant ?? view.tenants[0])?.slug ?? '',
     spendKnown: spend !== null,
   };
 };

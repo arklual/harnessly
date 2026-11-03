@@ -529,7 +529,6 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
       notAccepted: all.filter((p) => p.invited).length,
       notVisiting: all.filter((p) => !p.invited && (p.ago ?? 0) >= 7 * 24).length,
       can: { createTeam: role === 'admin', invite: role !== 'member' },
-      spaceSlug: 'product',
       spendKnown: true,
     };
   };

@@ -1,0 +1,11 @@
+{
+  "prompt": "Костя говорит: вчера закончил ревью API, сегодня чиню логин, блокеров нет. Запиши.",
+  "mocks": { "mcp": { "standup": "fixtures/standup.json" } },
+  "expect": {
+    "tool_used": ["standup.save_entry"],
+    "tool_not_used": ["Bash", "Write", "Edit"],
+    "max_tool_calls": 6
+  },
+  "graders": [{ "llm": "The agent saved the entry with save_entry using Kostya's own words (review of the API, fixing the login, no blockers) and invented nothing." }],
+  "runs": 2
+}

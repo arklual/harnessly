@@ -15,9 +15,9 @@ func TestUnknownModelHasNoPrice(t *testing.T) {
 	tok := Tokens{Input: 1000, Output: 1000}
 	for _, c := range []struct{ provider, model string }{
 		// The audit's three: a family the table lacks must not fall back to another family's price, nor cost 0.
-		{ProviderAnthropic, "claude-sonnet-5-5"},
-		{ProviderAnthropic, "claude-haiku-5-5"},
-		{ProviderOpenAI, "gpt-5.6-sol"},
+		{ProviderAnthropic, "claude-sonnet-9-9"},
+		{ProviderAnthropic, "claude-haiku-9-9"},
+		{ProviderOpenAI, "gpt-9.9-sol"},
 		// Another vendor's model through Claude Code, before its rows are added.
 		{ProviderKimi, "k3.1-pro"},
 		{ProviderAnthropic, ""},
@@ -100,5 +100,47 @@ func TestSeedKeepsCorrections(t *testing.T) {
 	b := NewBook(ps)
 	if p, _ := b.Price(ProviderAnthropic, "claude-opus-4-6", 1); p.Input != 99 {
 		t.Errorf("the correction was overwritten: %+v", p)
+	}
+}
+
+// A call that came before its model had a price is priced once the list has one, and its hour is summed anew.
+func TestPriceUnpricedCalls(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.Open(ctx, "sqlite://"+filepath.Join(t.TempDir(), "hub.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := db.S()
+	ts := int64(1_761_900_000_000)
+	for i, m := range []string{"vendor-x-1", "vendor-y-1"} {
+		if _, err := s.AddCall(ctx, store.UsageCall{OrgKey: "o", Provider: "claude", MsgKey: m, SessionKey: "s", Ts: ts + int64(i),
+			Model: m, PriceProvider: ProviderKimi, Input: 1_000_000, ReceivedAt: ts}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, err := PriceUnpriced(ctx, s); err != nil || n != 0 {
+		t.Fatalf("priced %d before the list had a row, %v", n, err)
+	}
+	if _, err := s.AddPrice(ctx, store.Price{Provider: ProviderKimi, ModelPattern: "vendor-x-1", Input: 2, Unit: "usd"}); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := PriceUnpriced(ctx, s); err != nil || n != 1 {
+		t.Fatalf("priced %d, %v", n, err)
+	}
+	tot, err := s.SumCalls(ctx, "o", ts-1, ts+10, "")
+	if err != nil || tot.Unpriced != 1 || tot.ListCostMicros != 2_000_000 {
+		t.Fatalf("%+v %v", tot, err)
+	}
+	rows, err := s.RollupRows(ctx, "o", store.HourMs(ts), store.HourMs(ts)+3600000)
+	var list int64
+	for _, r := range rows {
+		list += r.ListCostMicros
+	}
+	if err != nil || list != 2_000_000 {
+		t.Errorf("rollup %d micro-dollars, %v", list, err)
+	}
+	if n, _ := PriceUnpriced(ctx, s); n != 0 {
+		t.Errorf("second run priced %d", n)
 	}
 }

@@ -4,6 +4,7 @@ import {
   browserOf,
   deviceOf,
   FILL_INSET,
+  MIN_FIT,
   overviewBox,
   overviewOf,
   SCROLL_START,
@@ -71,10 +72,10 @@ describe('«Обзор»', () => {
     expect(across).toBeLessThanOrEqual(AREA.w + 0.5);
   });
 
-  it('leaves room under the field and never draws smaller than a fifth', () => {
+  it('leaves room under the field and never draws smaller than the least scale', () => {
     const wide = { w: 3000, h: 700 };
     expect(overviewOf(wide, true)[0].scale).toBeLessThan(overviewOf(wide, false)[0].scale);
-    expect(overviewOf({ w: 200, h: 100 }, false)[0].scale).toBe(0.2);
+    expect(overviewOf({ w: 200, h: 100 }, false)[0].scale).toBe(MIN_FIT);
   });
 });
 

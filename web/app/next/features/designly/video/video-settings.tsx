@@ -3,6 +3,7 @@
 import CreatePanel, { DsChoice } from '@/next/features/designly/create-panel';
 import type { IDesignSystem } from '@/next/features/designly/api';
 import {
+  DEFAULT_VIDEO_SETTINGS,
   VIDEO_FORMATS_PICK,
   type IVideoCreateSettings,
   type TVideoFormatsPick,
@@ -33,6 +34,17 @@ const SECONDS_KEY = {
 export const secondsLabel = (seconds: number | null): string => {
   if (seconds === null) return t('next.video.create.anyLength');
   return t(SECONDS_KEY[seconds as keyof typeof SECONDS_KEY]);
+};
+
+/** What the settings button says: «Настройки» alone while all is as it starts, else what differs, joined by « · ». */
+export const videoSettingsLabel = (s: IVideoCreateSettings, look: string | null): string => {
+  const parts: string[] = [];
+  if (look !== null) parts.push(look);
+  if (s.formats !== DEFAULT_VIDEO_SETTINGS.formats) parts.push(formatLabel(s.formats));
+  if (s.seconds !== null) parts.push(secondsLabel(s.seconds));
+  if (s.subs !== DEFAULT_VIDEO_SETTINGS.subs)
+    parts.push(s.subs ? t('next.video.create.subs') : t('next.video.create.noSubs'));
+  return parts.length > 0 ? parts.join(' · ') : t('next.deck.create.settingsChip');
 };
 
 interface IVideoSettingsProps {

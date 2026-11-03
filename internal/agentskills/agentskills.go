@@ -1,5 +1,5 @@
 // Package agentskills installs the skills agents use in a harnessly workspace, for both Claude Code and Codex: the
-// workspace skill (the harnessly command), the boards skill when a boards server is configured, and the artifacts skill
+// workspace skill (the harnessly command), the skill for writing apps, the boards skill when a boards server is configured, and the artifacts skill
 // when an artifacts catalog is. The skills are the vendored files of skills.Upstream.
 //
 // Nothing of the person's own is touched. Everything lands in folders named for harnessly:
@@ -85,6 +85,7 @@ type skill struct {
 func (o Options) skills() []skill {
 	return []skill{
 		{"harnessly", "upstream/agent-skills/plugins/harnessly/skills/harnessly", true},
+		{"apps", "upstream/agent-skills/plugins/harnessly/skills/apps", true},
 		{"boards", "upstream/agent-skills/plugins/boards/skills/boards", o.Boards},
 		{"artifacts", "upstream/artifacts/skills/artifacts", o.Artifacts},
 	}

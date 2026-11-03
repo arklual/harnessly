@@ -18,6 +18,8 @@ func (c *cli) app(args []string) error {
 		sub, args = args[0], args[1:]
 	}
 	switch sub {
+	case "docs":
+		return c.appDocs(args)
 	case "new":
 		return c.appNew(args)
 	case "validate", "check":

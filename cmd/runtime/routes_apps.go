@@ -319,6 +319,7 @@ func appRouteList(d deps, reg *apps.Registry, version string, chats appChats) []
 	routes := append(appBridgeRoutes(d, reg, storage, viewServer, chats), appAskRoutes(d, appAsks)...)
 	routes = append(routes, sinopiaRoutes(d, reg, viewServer)...)
 	routes = append(routes, kindRoutes(d, reg)...)
+	routes = append(routes, helpRoutes(d)...)
 	routes = append(routes, appPublicRoutes(d, reg, version)...)
 	routes = append(routes, appShareRoutes(d, reg, guests, version)...)
 	routes = append(routes, []gate.Route{

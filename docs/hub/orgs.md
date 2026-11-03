@@ -216,5 +216,33 @@ orgs:
             members: [anna@example.com, boris@example.com]   # the first team of a person in a tenant is primary
 ```
 
+`offboard:` takes people out: every role, tenant and team membership and every session of the listed addresses goes,
+the `users` row stays (usage and audit point at it), and signing in again opens nothing. The last owner of a tenant is
+refused (name another owner first), and an address both seeded and offboarded in one file is an error.
+
+```yaml
+offboard: [old-address@example.com]
+```
+
+`accounts:` under an organization registers the model accounts its machines report (docs/hub/usage.md, `accountRef`):
+a machine names an account it has not seen before personal, and only an organization's accounts count as its money.
+Upserted by `(org, provider, ref)`; the account stops being `discovered`, its sessions take its funding and the hours of
+their calls are summed anew. `history: true` also gives it the owner's sessions of that CLI that came with no account (a
+machine sends the account only for sessions started after it first saw it); a later record of such a session that names
+no account keeps the one given.
+
+```yaml
+    accounts:
+      - provider: claude          # the CLI: claude or codex
+        ref: claude:<account uuid> # as the machine reports it: claude:<uuid>, codex:<id>, key:<hash>
+        label: Claude Max (Anna)
+        plan: Max 20x
+        funding: org              # org (default) or personal
+        monthlyFee: 200           # USD a month, split over its use on the money screens
+        owner: anna@example.com
+        tenant: acme              # optional: narrows the account to one tenant
+        history: true             # optional, needs owner
+```
+
 The file of a real installation holds real names and addresses: it lives with the installation's secrets (OpenBao or
 the deploy values), never in this repository.

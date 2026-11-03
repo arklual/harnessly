@@ -19,6 +19,9 @@ type v2Files struct {
 	// touched is whether a turn of the conversation wrote, edited or read the file at an absolute path: such a file
 	// opens from its card in the feed although it lies outside the conversation's folder (a worktree beside it).
 	touched func(ctx context.Context, conv, path string) (bool, error)
+	// delivered is the sha256 of a file the agent handed over in the conversation (deliver_file), which may lie in /tmp:
+	// that one file opens to read, as long as its bytes are the ones handed over. nil for none.
+	delivered func(ctx context.Context, conv, path string) (string, bool, error)
 }
 
 var _ wire.FilesSource = (*v2Files)(nil)
@@ -104,6 +107,19 @@ func (f *v2Files) File(ctx context.Context, conv, file string) (wire.FileContent
 	root, rel, err := f.place(ctx, conv, file)
 	if err != nil {
 		return wire.FileContent{}, err
+	}
+	if strings.HasPrefix(rel, "/") && f.delivered != nil {
+		sum, ok, err := f.delivered(ctx, conv, file)
+		if err != nil {
+			return wire.FileContent{}, err
+		}
+		if ok {
+			obj, ee := files.ReadDeliveredFile(file, sum)
+			if ee != nil {
+				return wire.FileContent{}, fileError(ee)
+			}
+			return fileContent(file, obj), nil
+		}
 	}
 	obj, ee := files.ReadProjectFile(root, rel)
 	if ee != nil {

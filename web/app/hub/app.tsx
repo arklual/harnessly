@@ -1,5 +1,5 @@
 // The hub UI's routes (docs/hub/api.md, "UI routes"): which screen a path shows, and who may see it.
-import { useEffect } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 
 import { Button, EmptyState, Spinner } from '@kit';
 
@@ -23,7 +23,10 @@ import { NewSiteScreen, SiteScreen, useSitesOn } from './screens/sites';
 import { SpaceProvider, useSpace } from './screens/space';
 import { SpaceSettingsScreen } from './screens/space-settings';
 import { OrgStepScreen } from './org/screens/org-step';
-import { orgStepDue } from './org/step';
+import { http } from './org/api/live/http';
+import { orgTargetFor, sectionForSpaceRoute } from './org/redirect';
+import { orgLanding, orgStepDue, orgStepOn } from './org/step';
+import type { OrgList } from '../hub-api/orgs';
 import { OrgRoutes } from './org/routes';
 import { PlainPage } from './ui/frame';
 
@@ -109,12 +112,23 @@ const Landing = () => {
         navigate('/signin', { replace: true });
         return;
       }
+      // A member of an organization lands in its hub; without HUB_ORGS=on, or when the list fails, the spaces as before.
+      let orgs: OrgList | null = null;
+      if (orgStepOn(config)) {
+        orgs = await http.get<OrgList>('/api/orgs').catch(() => null);
+        if (!alive) return;
+        const target = orgLanding(orgs);
+        if (target) {
+          navigate(target, { replace: true });
+          return;
+        }
+      }
       if (me.spaces.length === 0) {
         navigate('/new', { replace: true });
         return;
       }
       // The organization step comes once after the release, and can be put off.
-      if (orgStepDue(config, me)) {
+      if (orgStepDue(config, me, orgs)) {
         navigate('/org/new', { replace: true });
         return;
       }
@@ -173,6 +187,36 @@ const SpaceRoutes = ({
   return screen;
 };
 
+/** The old address of a tenant of an organization leads to the organization hub; any other space opens as before. */
+const SpaceEntry = ({
+  route,
+  slug,
+  step,
+  children,
+}: {
+  route: string;
+  slug: string;
+  step: string | undefined;
+  children: ReactNode;
+}) => {
+  const { config } = useSession();
+  const key = `${route}|${slug}|${step ?? ''}`;
+  // Only the routes with a place in the organization hub need the question, and only where organizations are on.
+  const asks = sectionForSpaceRoute(route, step) !== null && orgStepOn(config);
+  const [answer, setAnswer] = useState<{ key: string; to: string | null } | null>(null);
+  useEffect(() => {
+    if (!asks) return;
+    let alive = true;
+    void orgTargetFor(config, route, slug, step).then((to) => alive && setAnswer({ key, to }));
+    return () => {
+      alive = false;
+    };
+  }, [asks, config, route, slug, step, key]);
+  if (!asks) return <>{children}</>;
+  if (answer?.key !== key) return <Loading />;
+  return answer.to ? <Redirect to={answer.to} /> : <>{children}</>;
+};
+
 const Routes = () => {
   const { path, search } = useLocation();
   const { me } = useSession();
@@ -201,9 +245,11 @@ const Routes = () => {
   } as const;
   const sub = route in SUB ? SUB[route as keyof typeof SUB] : 'setup';
   return (
-    <SpaceProvider slug={slug}>
-      <SpaceRoutes sub={sub} step={params.step} site={params.name} />
-    </SpaceProvider>
+    <SpaceEntry route={route} slug={slug} step={params.step}>
+      <SpaceProvider slug={slug}>
+        <SpaceRoutes sub={sub} step={params.step} site={params.name} />
+      </SpaceProvider>
+    </SpaceEntry>
   );
 };
 

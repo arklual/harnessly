@@ -104,8 +104,6 @@ export interface TeamsView {
   can: { createTeam: boolean; invite: boolean };
   /** The hub counts spend per person and team; false: the amounts are only what the limits have seen. */
   spendKnown: boolean;
-  /** The tenant's space slug, where invitations live (`/s/<slug>/settings`). */
-  spaceSlug: string;
 }
 
 export type { AuditAction };

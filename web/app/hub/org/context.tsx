@@ -16,6 +16,8 @@ export interface OrgCtx {
   /** The path prefix of the current scope: `/o/acme/product`. */
   base: string;
   section: Section;
+  /** Loads the shell again behind the screen: after the tenant got a new name. */
+  refreshShell: () => void;
 }
 
 const Ctx = createContext<OrgCtx | null>(null);
@@ -45,7 +47,7 @@ export const OrgProvider = ({
   children: (scope: Scope) => ReactNode;
 }) => {
   const api = useMemo(() => createOrgApi(dataMode(), mockRole()), []);
-  const { data, error, reload } = useShellLoad(api, org, scopeSlug);
+  const { data, error, reload, refresh } = useShellLoad(api, org, scopeSlug);
   if (error) {
     return (
       <div className="ho-state">
@@ -71,7 +73,15 @@ export const OrgProvider = ({
     );
   }
   return (
-    <Inner api={api} shell={data} scope={scope} scopeSlug={scopeSlug} org={org} section={section}>
+    <Inner
+      api={api}
+      shell={data}
+      scope={scope}
+      scopeSlug={scopeSlug}
+      org={org}
+      section={section}
+      refreshShell={refresh}
+    >
       {children}
     </Inner>
   );
@@ -84,6 +94,7 @@ const Inner = ({
   scopeSlug,
   org,
   section,
+  refreshShell,
   children,
 }: {
   api: OrgApi;
@@ -92,11 +103,12 @@ const Inner = ({
   scopeSlug: string;
   org: string;
   section: Section;
+  refreshShell: () => void;
   children: (scope: Scope) => ReactNode;
 }) => {
   const value = useMemo<OrgCtx>(
-    () => ({ api, shell, scope, base: `/o/${org}/${scopeSlug}`, section }),
-    [api, shell, scope, org, scopeSlug, section],
+    () => ({ api, shell, scope, base: `/o/${org}/${scopeSlug}`, section, refreshShell }),
+    [api, shell, scope, org, scopeSlug, section, refreshShell],
   );
   return <Ctx.Provider value={value}>{children(scope)}</Ctx.Provider>;
 };

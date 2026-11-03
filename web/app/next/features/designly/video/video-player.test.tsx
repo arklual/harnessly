@@ -85,13 +85,33 @@ afterEach(() => {
 describe('VideoPlayer', () => {
   it('holds the scene on screen and the next one in two frames', () => {
     const { container } = render(<VideoPlayer {...props()} />);
-    const [a, b] = frames(container);
-    expect(a.src).toBe(`${ORIGIN}/first/s1.dc.html`);
+    const [a] = frames(container);
+    say(a.contentWindow, { type: 'tk:video-ready', moments: [] });
+    const [first, b] = frames(container);
+    expect(first.src).toBe(`${ORIGIN}/first/s1.dc.html`);
     expect(b.src).toBe(`${ORIGIN}/open/s2.dc.html`);
+  });
+
+  it('loads the next scene only after the frame with the ticket has set the cookie', () => {
+    const { container } = render(<VideoPlayer {...props()} />);
+    expect(frames(container)).toHaveLength(1);
+    say(frames(container)[0].contentWindow, { type: 'tk:video-ready', moments: [] });
+    expect(frames(container)).toHaveLength(2);
+  });
+
+  it('hears a scene whose ticket came after the player mounted', () => {
+    const { container, rerender } = render(<VideoPlayer {...props({ src: null })} />);
+    expect(frames(container)).toHaveLength(0);
+    rerender(<VideoPlayer {...props()} />);
+    const [a] = frames(container);
+    const toA = vi.spyOn(a.contentWindow as Window, 'postMessage');
+    say(a.contentWindow, { type: 'tk:video-ready', moments: [] });
+    expect(toA).toHaveBeenCalledWith({ type: 'tk:video-seek', t: 0 }, ORIGIN);
   });
 
   it('swaps the frames at a scene boundary: the next scene was already in the other frame', () => {
     const { container, rerender } = render(<VideoPlayer {...props()} />);
+    say(frames(container)[0].contentWindow, { type: 'tk:video-ready', moments: [] });
     const [a, b] = frames(container);
     rerender(<VideoPlayer {...props({ time: 4000 })} />);
     expect(frames(container)[0]).toBe(a);
@@ -131,6 +151,9 @@ describe('VideoPlayer', () => {
     const { container } = render(
       <VideoPlayer {...props({ path: 's2.dc.html', src: `${ORIGIN}/first/s2.dc.html` })} />,
     );
+    const [ticket] = frames(container);
+    expect(ticket.src).toBe(`${ORIGIN}/first/s2.dc.html`);
+    say(ticket.contentWindow, { type: 'tk:video-ready', moments: [] });
     const [a, b] = frames(container);
     expect(a.src).toBe(`${ORIGIN}/open/s1.dc.html`);
     expect(b.src).toBe(`${ORIGIN}/first/s2.dc.html`);
@@ -138,10 +161,11 @@ describe('VideoPlayer', () => {
 
   it('shows the frame of the current scene only when it is ready', () => {
     const { container } = render(<VideoPlayer {...props()} />);
-    const [a, b] = frames(container);
+    const [a] = frames(container);
     expect(a.dataset.on).toBe('1');
-    expect(b.dataset.on).toBe('0');
     say(a.contentWindow, { type: 'tk:video-ready', moments: [] });
+    const b = frames(container)[1];
+    expect(b.dataset.on).toBe('0');
     expect(a.dataset.on).toBe('1');
   });
 

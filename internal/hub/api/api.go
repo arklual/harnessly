@@ -140,6 +140,17 @@ func New(o Options) (*Hub, error) {
 		if n > 0 {
 			log.Info("price list seeded", "rows", n)
 		}
+		// Calls that came before their model had a price get it now; in the background, so a long backlog does not hold
+		// the start.
+		go func() {
+			pctx, pcancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer pcancel()
+			if n, err := usage.PriceUnpriced(pctx, db.S()); err != nil {
+				log.Warn("pricing stored calls", "err", err)
+			} else if n > 0 {
+				log.Info("stored calls priced", "calls", n)
+			}
+		}()
 		h.Ingest = ingest.New(ingest.Deps{DB: db, Reg: h.Registry, Log: log, Now: o.Now})
 		usageSink = h.Ingest
 	}

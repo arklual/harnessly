@@ -59,7 +59,7 @@ func (h *hub) allow(op string, ok bool, what string) error {
 		return nil
 	}
 	h.audit.Record("policy.denied", false, map[string]any{"denied": op})
-	return hubproto.Errf(hubproto.CodePolicyDenied, "%s is switched off by this machine's policy (%s)", what, h.policy.Current().Source)
+	return hubproto.Errf(hubproto.CodePolicyDenied, "%s is switched off by this machine's policy (%s)", what, h.current().Source)
 }
 
 func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), error) {
@@ -67,7 +67,7 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 	if h.policy.Disabled() {
 		return nil, nil, hubproto.Errf(hubproto.CodePolicyDenied, "this agent is switched off on the machine")
 	}
-	pol := h.policy.Current()
+	pol := h.current()
 	switch op {
 	case hubproto.OpHello:
 		return h.hello(), nil, nil
@@ -122,6 +122,9 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 	case hubproto.OpTunnelOpen:
 		return h.opTunnel(l, req, pol)
 	case hubproto.OpBudgetSet:
+		if h.observe {
+			return nil, nil, h.allow(op, false, "the hub's limits")
+		}
 		return h.opBudget(req)
 	}
 	if closedClusterOps[op] {

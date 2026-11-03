@@ -57,13 +57,14 @@ export const createDesign = (m: MachineId, body: DesignlyCreate) =>
 export const fetchSystems = (m: MachineId, signal?: AbortSignal) =>
   page(m, '/designly/systems', parsePage.designlySystems, { signal });
 
-/** What the machine has for designs: the board engine (fetched with the owner's own account), a browser, ffmpeg. */
+/** What the machine has for designs: where new designs' engine comes from, a browser, ffmpeg. */
 export interface IDesignEngine {
-  ready: boolean;
+  source: 'own' | 'vendor' | 'file';
+  /** The vendor's release new designs start on. */
   release: string | null;
   chrome: boolean;
   ffmpeg: boolean;
-  /** The command that fetches the engine, to run in a terminal of the machine. */
+  /** The command that adds the vendor's engine, to run in a terminal of the machine (optional). */
   fetch: string;
 }
 

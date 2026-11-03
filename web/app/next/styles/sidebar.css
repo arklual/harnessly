@@ -363,7 +363,12 @@ a.hx-brand__name:hover {
   opacity: 1;
   transform: none;
 }
-.hx-item:hover .hx-item__end:has(.hx-item__more) .hx-chat-status {
+/* The status comes after the menu in the row, so these are plain sibling selectors. No :has() here: :has() around
+   :focus-visible makes every keystroke anywhere on the page recompute every row. */
+.hx-item__more ~ .hx-chat-status {
+  pointer-events: none;
+}
+.hx-item:hover .hx-item__more ~ .hx-chat-status {
   opacity: 0;
   transform: scale(0.8);
 }
@@ -1505,7 +1510,7 @@ button.hx-nav__add {
   opacity: 1;
   transform: none;
 }
-.hx-item__end:has(.hx-item__menu:focus-visible) .hx-chat-status {
+.hx-item__menu:focus-visible ~ .hx-chat-status {
   opacity: 0;
 }
 

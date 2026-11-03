@@ -107,3 +107,60 @@ func TestAnyShellQuoteAndAppendArgs(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// HRN-621. A long line waits in a file: what is typed is short, it runs the same, and the file does not stay.
+func TestForAnyShellKeepsALongLineInAFile(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "launch-lines")
+	agents.SetLineDir(dir)
+	t.Cleanup(func() { agents.SetLineDir("") })
+	out := filepath.Join(t.TempDir(), "out")
+	word := strings.Repeat("x", 7000)
+	line := agents.ForAnyShell("VAR=ok sh -c 'printf %s \"$VAR-$1\" > \"$2\"' sh " + word + " " + out)
+	if len(line) > 200 {
+		t.Fatalf("typed line is %d bytes: %s", len(line), line)
+	}
+	files, _ := filepath.Glob(filepath.Join(dir, "line-*"))
+	if len(files) != 1 {
+		t.Fatalf("files: %v", files)
+	}
+	info, err := os.Stat(files[0])
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %v, %v", info.Mode(), err)
+	}
+	if dirInfo, err := os.Stat(dir); err != nil || dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("folder %v, %v", dirInfo.Mode(), err)
+	}
+	if got := agents.ForAnyShell(line); got != line {
+		t.Fatalf("wrapped twice: %s", got)
+	}
+	if b, err := exec.Command("sh", "-c", "eval \"$1\"", "sh", line).CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, b)
+	}
+	got, err := os.ReadFile(out)
+	if err != nil || string(got) != "ok-"+word {
+		t.Fatalf("ran with %q, %v", got, err)
+	}
+	if left, _ := filepath.Glob(filepath.Join(dir, "line-*")); len(left) != 0 {
+		t.Fatalf("left behind: %v", left)
+	}
+}
+
+func TestForAnyShellTypesAShortLineWhole(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "launch-lines")
+	agents.SetLineDir(dir)
+	t.Cleanup(func() { agents.SetLineDir("") })
+	if got := agents.ForAnyShell("claude --model haiku"); got != "sh -c 'exec env claude --model haiku'" {
+		t.Fatalf("got %s", got)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("a short line made the folder: %v", err)
+	}
+}
+
+func TestForAnyShellWithoutAFolderTypesTheLongLine(t *testing.T) {
+	agents.SetLineDir("")
+	long := strings.Repeat("x", 2000)
+	if got := agents.ForAnyShell("claude " + long); !strings.Contains(got, long) {
+		t.Fatalf("got %s", got)
+	}
+}

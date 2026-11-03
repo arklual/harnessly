@@ -1,0 +1,172 @@
+/* The documentation, /help: the contents beside the page (above it on a phone), one layout. The name is the largest thing. */
+.hx-help {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--hx-space-6) var(--hx-space-6);
+  overflow-y: auto;
+  animation: hx-appmain-in var(--hx-dur-lg) var(--hx-ease-out) backwards;
+}
+.hx-help__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--hx-space-2);
+  min-height: var(--hx-header-h);
+}
+.hx-help .hx-help__menu {
+  display: none;
+}
+.hx-help__h1 {
+  margin: 0;
+  font-size: var(--hx-text-xl);
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.01em;
+}
+.hx-help__body {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--hx-space-6);
+  align-items: start;
+}
+.hx-help__toc {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-2);
+  max-height: calc(100dvh - var(--hx-header-h) - var(--hx-space-6));
+  overflow-y: auto;
+}
+.hx-help__filter {
+  margin: 0 0 var(--hx-space-2);
+  padding: 8px 12px;
+  color: var(--hx-fg-1);
+  background: var(--hx-bg-pane);
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  font: inherit;
+}
+.hx-help__filter:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+.hx-help__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-help__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hx-help__row,
+.hx-help__sub {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: var(--hx-radius-md);
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--hx-dur-sm) var(--hx-ease-out),
+    color var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-help__row {
+  padding: 8px 12px;
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-help__sub {
+  padding: 4px 12px 4px 24px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-help__row:hover,
+.hx-help__sub:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-help__row[aria-current='page'] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-help__row:focus-visible,
+.hx-help__sub:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: -2px;
+}
+.hx-help__page {
+  min-width: 0;
+}
+.hx-help__article {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hx-space-3);
+  width: min(760px, 100%);
+}
+/* A heading reached by an anchor stops below the top, not under it. */
+.hx-help__article :is(h1, h2, h3, h4) {
+  scroll-margin-top: var(--hx-space-4);
+}
+.hx-help__article .hx-md h1 {
+  font-size: var(--hx-text-xl);
+}
+.hx-help__article .hx-md h2 {
+  margin-top: var(--hx-space-4);
+}
+.hx-help__article .hx-md a {
+  color: var(--hx-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hx-help__plain {
+  color: var(--hx-fg-2);
+}
+.hx-help__none {
+  margin: 0;
+  color: var(--hx-fg-3);
+  max-width: 460px;
+}
+.hx-help__sk {
+  display: block;
+  height: 16px;
+  width: 100%;
+  border-radius: var(--hx-radius-md);
+}
+.hx-help__sk--title {
+  height: 28px;
+  width: 50%;
+}
+.hx-help__sk--short {
+  width: 70%;
+}
+@media (max-width: 760px) {
+  .hx-help {
+    padding: 0 var(--hx-space-4) var(--hx-space-6);
+  }
+  .hx-help .hx-help__menu {
+    display: inline-flex;
+  }
+  .hx-help__body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--hx-space-4);
+  }
+  .hx-help__toc {
+    position: static;
+    max-height: 36dvh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-help {
+    animation: none;
+  }
+  .hx-help__row,
+  .hx-help__sub {
+    transition: none;
+  }
+}

@@ -105,8 +105,8 @@
 .hx-media__stage .hx-media__controls {
   position: absolute;
   inset: auto 0 0;
-  padding: 36px 12px 8px;
-  background: linear-gradient(to top, rgb(0 0 0 / 62%), rgb(0 0 0 / 0%));
+  padding: 56px 12px 8px;
+  background: linear-gradient(to top, rgb(0 0 0 / 82%), rgb(0 0 0 / 55%) 55%, rgb(0 0 0 / 0%));
   cursor: default;
   transition:
     opacity 220ms var(--hx-ease-out),

@@ -4,14 +4,25 @@ The design library (prototypes, sites, decks; named by `RUNTIME_DESIGN_NAME`) ke
 your machine. Its boards are written in the board format of Claude Design, and a board draws itself with that format's
 engine, which the board loads as `./support.js`.
 
-**The engine is not part of harnessly.** It belongs to the format's vendor and is published as an artifact type on
-claude.ai, so harnessly neither ships it in the repository, the binaries, the container images nor serves it from a
-hub. Each machine fetches it once with its owner's own Claude account.
+**Nothing to set up.** harnessly ships its own engine (`internal/design/ownengine/support.js`, Apache 2.0), an
+independent implementation of the format. It needs no account, so designs work with an API key, with Codex and offline.
 
-## Fetching it
+## Which engine a project gets
 
-You need Claude Code installed on the machine and logged in with your claude.ai account (`claude` in a terminal of
-the machine, then `/login`). Then, in a terminal of the machine:
+A new project gets, in order:
+
+1. the file named by `RUNTIME_DESIGN_ENGINE_FILE`;
+2. the newest stable release this machine keeps (`RUNTIME_DESIGN_RELEASES_DIR`, by default the engine folder);
+3. the built-in engine.
+
+A project keeps the engine it was made with, until you upgrade it from the panel. Settings → the design section and
+`harnessly design engine status` show what the machine has.
+
+## Optional: Anthropic's engine
+
+Anthropic's engine belongs to its vendor and is not part of harnessly. New Claude Design features reach it before the
+built-in engine. To use it you need Claude Code on the machine, logged in with a claude.ai account (`claude`, then
+`/login`); an API key will not do. Then, in a terminal of the machine:
 
 ```sh
 harnessly design engine fetch
@@ -30,15 +41,7 @@ What happens:
    `<engine folder>/upstream/design/<release>/`, listed in `<engine folder>/releases.json`.
 
 The engine folder is `RUNTIME_DESIGN_ENGINE_DIR`, by default `design-engine` in the runtime's data folder
-(`~/.harnessly/design-engine`). Run the command again to pick up a newer release: new projects start on the newest
-one, existing projects stay on theirs until you upgrade them from the panel.
-
-`harnessly design engine status` shows what the machine has.
-
-## Without the engine
-
-The library still lists and opens the designs it has (each project carries the `support.js` it was made with). Making
-a new design is refused with the command above, and the design page says what is missing.
+(`~/.harnessly/design-engine`). Run the command again to pick up a newer release.
 
 ## The rest: Chromium and ffmpeg
 
@@ -56,3 +59,7 @@ ffmpeg. Both are optional: designs work without them.
 A team that wants every machine on the same releases can keep one mirror of releases (a folder with `releases.json`
 and the releases' files, laid out as above) and point `RUNTIME_DESIGN_RELEASES_DIR` at a checkout of it on each
 machine. Keep such a mirror private: the files are the vendor's, fetched under your account.
+
+## Keeping the built-in engine up to date
+
+The built-in engine does not update by itself; see [moving upstream changes over](design-engine-upstream.md).

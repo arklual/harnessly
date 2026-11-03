@@ -1,5 +1,5 @@
 /* The video shell, written by WP3c only: hx-video-* classes. The deck's classes (hx-deck, hx-deck__bar,
-   hx-deck-panel, hx-deck-pop, hx-deck-new) carry the bar, the panel and the create screen; this file adds the main
+   hx-deck-panel, hx-deck-pop) carry the bar and the panel; this file adds the main
    column (stage and timeline), the empty and phone states, the render popover and the create screen's choices. */
 
 /* Main column: the stage over the timeline, beside the docked panel (--pw is the deck's). */

@@ -1,6 +1,7 @@
 package design
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,7 +14,6 @@ import (
 )
 
 // The package's tests make projects from the shipped template: they get a stand-in engine.
-func init() { testEngine = []byte("/* test engine */\n") }
 
 // realEngine is a fetched board engine for the tests that run it in a browser: the file HARNESSLY_TEST_ENGINE names
 // (`harnessly design engine fetch`, then upstream/design/<release>/artifact-type/dc-runtime.js of the engine folder).
@@ -114,11 +114,11 @@ func TestFetchEngine(t *testing.T) {
 	// The folder is a releases mirror the library reads: new projects get the fetched engine.
 	l := New(Config{LibraryDir: t.TempDir(), ReleasesDir: dir, Texts: Texts{CLI: "acme"}})
 	t.Cleanup(l.StopWatching)
-	if s := l.Engine(); !s.Ready || s.Release == nil || *s.Release != "100-ab" || s.Fetch != "acme design engine fetch" {
+	if s := l.Engine(); s.Source != EngineSourceVendor || s.Release == nil || *s.Release != "100-ab" || s.Fetch != "acme design engine fetch" {
 		t.Fatalf("status: %+v", s)
 	}
-	if b, err := l.engineBytes(); err != nil || string(b) != engine {
-		t.Fatalf("engine: %q %v", b, err)
+	if b := l.engineBytes(); string(b) != engine {
+		t.Fatalf("engine: %q", b)
 	}
 
 	// The same release again downloads nothing.
@@ -148,17 +148,33 @@ func TestFetchEngineChecksum(t *testing.T) {
 	}
 }
 
-func TestNoEngineRefusesNewProject(t *testing.T) {
-	saved := testEngine
-	testEngine = nil
-	t.Cleanup(func() { testEngine = saved })
+func TestNewProjectGetsOwnEngineWithoutFetching(t *testing.T) {
 	root := t.TempDir()
 	l := New(Config{LibraryDir: root, Texts: Texts{CLI: "acme"}})
 	t.Cleanup(l.StopWatching)
-	if s := l.Engine(); s.Ready {
-		t.Fatal("no engine here")
+	if s := l.Engine(); s.Source != EngineSourceOwn || !s.Ready || s.Release != nil {
+		t.Fatalf("status: %+v", s)
 	}
-	if _, err := l.CreateProject("Landing"); err == nil || !strings.Contains(err.Error(), "acme design engine fetch") {
-		t.Fatalf("refusal: %v", err)
+	p, err := l.CreateProject("Landing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(p.Dir, ProjectDirname, SupportJSName))
+	if err != nil || !bytes.Equal(got, ownEngine) || len(ownEngine) == 0 {
+		t.Fatalf("support.js is our engine: %d bytes, %v", len(got), err)
+	}
+}
+
+func TestSessionFailureSaysWhy(t *testing.T) {
+	for _, c := range []struct {
+		apiKey bool
+		want   string
+	}{{true, "API key"}, {false, "/login"}} {
+		err := sessionFailure("Invalid API key", c.apiKey)
+		for _, w := range []string{c.want, "Invalid API key", "built-in engine"} {
+			if !strings.Contains(err.Error(), w) {
+				t.Fatalf("%q lacks %q", err, w)
+			}
+		}
 	}
 }

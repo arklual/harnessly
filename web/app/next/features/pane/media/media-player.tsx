@@ -13,11 +13,13 @@ import { useAudioWave, WAVE_MAX_SECONDS } from '@/next/features/pane/media/use-a
 import {
   clamp01,
   FRAME_SECONDS,
+  FIRST_FRAME_AT,
   formatTime,
   JUMP_SECONDS,
   MEDIA_ACTION,
   MEDIA_KIND,
   mediaActionOf,
+  movedFromStart,
   nextRate,
   tenthOf,
   VOLUME_STEP,
@@ -167,7 +169,7 @@ const MediaPlayer = ({
 
   // What is marked, or the moment it stands paused at once the person moved it, goes to the chat. Asked from a place by the
   // agent, it is no selection of the person's.
-  const reportable = time > 0 && !playing;
+  const reportable = movedFromStart(time) && !playing;
   const selected = mark ? `${mark.from}-${mark.to}` : reportable ? `${time}` : '';
   const reportNow = useEffectEvent(() => {
     if (fromAgent.current) {
@@ -395,7 +397,7 @@ const MediaPlayer = ({
         />
         <span className="hx-media__clock">{clock}</span>
         <Control
-          icon="locate"
+          icon="message-square-plus"
           label={t('next.media.mark')}
           keys={['S']}
           on={mark !== null}
@@ -481,7 +483,7 @@ const MediaPlayer = ({
               media.current = element;
             }}
             className="hx-media__video"
-            src={`${src}#t=0.001`}
+            src={`${src}#t=${FIRST_FRAME_AT}`}
             preload="metadata"
             playsInline
             {...events}

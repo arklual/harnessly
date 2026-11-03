@@ -54,6 +54,12 @@ type hub struct {
 	check   *agentnet.Checker
 	shell   *preflight.Checker
 	filter  *routeFilter
+	// observe: the hub only sees the machine (HRN-596). The agent runs its closed cluster's link as before, and the hub
+	// link answers what can be read (hello, preflight, agents, spend) under a policy that allows nothing: no tunnel to the
+	// runtime, no keys, env, logins or installs, no limits, and nothing of the cluster's tunnels is touched.
+	observe bool
+	// dir is the folder of the hub link's own files: the data folder, or the observe link's own folder.
+	dir string
 	// policyChanged wakes keepRuntimePolicy when the policy file changes.
 	policyChanged chan struct{}
 
@@ -87,20 +93,22 @@ func (h *hub) goBG(f func()) {
 	}()
 }
 
-func newHub(a *Agent) *hub {
+func newHub(a *Agent, m *MachineFile, dir string, observe bool) *hub {
 	cfg := a.cfg
 	h := &hub{
 		a:             a,
-		machine:       cfg.Machine,
-		policy:        NewPolicyStore(cfg.PolicyFile, cfg.Home, cfg.DataDir),
-		audit:         NewAudit(filepath.Join(cfg.DataDir, "agent-audit.log")),
+		machine:       m,
+		observe:       observe,
+		dir:           dir,
+		policy:        NewPolicyStore(cfg.PolicyFile, cfg.Home, dir),
+		audit:         NewAudit(filepath.Join(dir, "agent-audit.log")),
 		env:           agentnet.NewEnvDir(cfg.EnvDir),
-		budget:        newBudgetKeeper(cfg.DataDir),
+		budget:        newBudgetKeeper(dir),
 		check:         &agentnet.Checker{},
 		shell:         &preflight.Checker{Home: cfg.Home, Env: os.Environ()},
 		checks:        map[string]hubproto.ProviderCheck{},
 		policyChanged: make(chan struct{}, 1),
-		state:         LinkState{PID: os.Getpid(), MachineID: cfg.Machine.MachineID, HubURL: cfg.Machine.HubURL, Version: cfg.Version},
+		state:         LinkState{PID: os.Getpid(), MachineID: m.MachineID, HubURL: m.HubURL, Version: cfg.Version},
 	}
 	h.proxies = agentnet.NewProxies(h.env)
 	h.policy.OnPolicy = h.onPolicy
@@ -113,16 +121,20 @@ func (h *hub) start(ctx context.Context) error {
 	h.ctx = ctx
 	cfg := h.a.cfg
 	h.policy.Reload(true)
-	if err := h.proxies.Start(); err != nil {
-		Log("warn", "proxy settings not restored", F{"error", err.Error()})
+	// An observe link changes nothing of the machine: the proxies stay as the cluster's runtime set them.
+	if !h.observe {
+		if err := h.proxies.Start(); err != nil {
+			Log("warn", "proxy settings not restored", F{"error", err.Error()})
+		}
 	}
-	// Tunnels to the runtime end at the filter, which asks the policy before anything reaches the runtime.
-	if cfg.RuntimePort != 0 {
+	// Tunnels to the runtime end at the filter, which asks the policy before anything reaches the runtime. An observe
+	// link opens no tunnel, and the cluster's tunnels keep their own ports.
+	if cfg.RuntimePort != 0 && !h.observe {
 		h.filter = newRouteFilter(cfg.RuntimePort, h.machine.RuntimeBasePath, h.policy.Current, h.audit)
 		h.filter.protected = h.policy.ProtectedPaths
 		h.filter.protectedTrees = func() []string {
 			return append(h.policy.ProtectedPaths(), cfg.MachineFile, cfg.EnvDir,
-				filepath.Join(cfg.DataDir, linkStateFile), h.audit.path, h.audit.path+".1")
+				filepath.Join(h.dir, linkStateFile), h.audit.path, h.audit.path+".1")
 		}
 		h.filter.roots = []string{cfg.Home, cfg.WorkDir}
 		port, err := h.filter.Start()
@@ -132,7 +144,7 @@ func (h *hub) start(ctx context.Context) error {
 		h.a.tunnels.runtimePort, h.a.tunnels.filesPort = port, 0
 	}
 	h.installs = install.NewManager(ctx, install.Deps{
-		Shell: h.shell, EnvDir: cfg.EnvDir, Home: cfg.Home, JobsDir: filepath.Join(cfg.DataDir, "agent-install"),
+		Shell: h.shell, EnvDir: cfg.EnvDir, Home: cfg.Home, JobsDir: filepath.Join(h.dir, "agent-install"),
 		Preflight: h.report,
 		Check: func(ctx context.Context, provider string) hubproto.ProviderCheck {
 			return h.checkProvider(ctx, provider, nil, true)
@@ -141,7 +153,7 @@ func (h *hub) start(ctx context.Context) error {
 		Done: func(string, bool) { h.goBG(func() { h.refreshAgents(true) }) },
 	})
 	h.logins = agentlogin.New(ctx, agentlogin.Config{
-		Shell: h.shell, EnvDir: cfg.EnvDir, Dir: filepath.Join(cfg.DataDir, "agent-login"), Version: cfg.Version,
+		Shell: h.shell, EnvDir: cfg.EnvDir, Dir: filepath.Join(h.dir, "agent-login"), Version: cfg.Version,
 		Status:   h.oneStatus,
 		Console:  h.openConsole,
 		Emit:     func(l hubproto.Login) { h.emit(hubproto.EventLogin, "login", l) },
@@ -160,7 +172,7 @@ func (h *hub) start(ctx context.Context) error {
 		}
 	})
 	h.setLink(false, "dialling the hub")
-	if cfg.RuntimePort != 0 {
+	if cfg.RuntimePort != 0 && !h.observe {
 		h.goBG(func() { h.keepRuntimePolicy(ctx) })
 	}
 	h.goBG(func() { every(ctx, linkStateEvery, false, h.heartbeat) })
@@ -174,7 +186,7 @@ func (h *hub) start(ctx context.Context) error {
 func (h *hub) stop() {
 	h.bg.Wait()
 	h.stopUsage()
-	_ = os.Remove(LinkStatePath(h.a.cfg.DataDir))
+	_ = os.Remove(LinkStatePath(h.dir))
 	if h.filter != nil {
 		h.filter.Close()
 	}
@@ -187,6 +199,17 @@ func (h *hub) stop() {
 	if h.installs != nil {
 		h.installs.Wait()
 	}
+}
+
+// observeSource is the policy's source an observe link reports: the hub shows it next to what it cannot do.
+const observeSource = "observe-only: this machine is run by its own cluster, the hub sees it and changes nothing"
+
+// current is the policy the hub link is under: the policy file's, and nothing at all on an observe link.
+func (h *hub) current() hubproto.Policy {
+	if h.observe {
+		return closedPolicy(observeSource)
+	}
+	return h.policy.Current()
 }
 
 // hubLinks are the links of hubs.
@@ -240,7 +263,7 @@ func (h *hub) heartbeat() {
 
 func (h *hub) writeStateLocked(now time.Time) {
 	h.state.UpdatedAt = now.UnixMilli()
-	if err := WriteLinkState(LinkStatePath(h.a.cfg.DataDir), h.state); err != nil {
+	if err := WriteLinkState(LinkStatePath(h.dir), h.state); err != nil {
 		Log("warn", "agent-link.json not written; `harnessly-agent status` cannot say if the machine is linked", F{"error", err.Error()})
 	}
 }
@@ -267,12 +290,12 @@ func (h *hub) linkDown(l *link) {
 func (h *hub) onPolicy(old, now hubproto.Policy) {
 	h.audit.Record("policy.changed", true, map[string]any{"policy": now})
 	Log("info", "policy changed", F{"source", now.Source})
-	if Narrowed(old, now) {
+	if Narrowed(old, now) && !h.observe {
 		if n := h.a.tunnels.DropAll(); n > 0 {
 			Log("info", "tunnels closed by the narrower policy", F{"tunnels", n})
 		}
 	}
-	h.emit(hubproto.EventPolicy, "policy", now)
+	h.emit(hubproto.EventPolicy, "policy", h.current())
 	select {
 	case h.policyChanged <- struct{}{}:
 	default:
@@ -323,8 +346,10 @@ func (h *hub) onSwitch(off bool) {
 	}
 	h.setLink(false, "switched off on this machine")
 	Log("warn", "the agent is switched off on this machine, closing the hub link")
-	h.a.tunnels.DropAll()
-	h.emit(hubproto.EventPolicy, "policy", h.policy.Current())
+	if !h.observe {
+		h.a.tunnels.DropAll()
+	}
+	h.emit(hubproto.EventPolicy, "policy", h.current())
 	for _, l := range h.hubLinks() {
 		go l.closeAfterFlush(websocket.StatusNormalClosure, "switched off on the machine")
 	}
@@ -334,7 +359,7 @@ func (h *hub) onSwitch(off bool) {
 func (h *hub) hello() hubproto.Hello {
 	a := h.a
 	features := []string{}
-	if a.cfg.RuntimePort != 0 {
+	if a.cfg.RuntimePort != 0 && !h.observe {
 		// Of the closed cluster's features only the tunnel is served to a hub.
 		features = append(features, "tunnel")
 	}
@@ -342,11 +367,13 @@ func (h *hub) hello() hubproto.Hello {
 	if h.usage != nil {
 		features = append(features, hubproto.FeatureUsage)
 	}
-	features = append(features, hubproto.FeatureBudget)
+	if !h.observe {
+		features = append(features, hubproto.FeatureBudget)
+	}
 	return hubproto.Hello{
 		Protocol: hubproto.Version, AgentVersion: a.hello.AgentVersion, User: a.hello.User, Home: a.hello.Home,
 		Hostname: a.hello.Hostname, Features: features, MachineID: h.machine.MachineID, OS: runtime.GOOS, Arch: runtime.GOARCH,
-		Profile: h.machine.Profile, Policy: h.policy.Current(), BudgetVersion: h.budget.Version(),
+		Profile: h.machine.Profile, Policy: h.current(), BudgetVersion: h.budget.Version(),
 	}
 }
 

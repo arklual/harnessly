@@ -2130,3 +2130,22 @@
   align-items: center;
   gap: 4px;
 }
+
+/* A command to run in a terminal, with its copy button (Settings, the design tool). */
+.hx-set__command {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: var(--hx-space-2);
+  min-width: 0;
+}
+.hx-set__command-text {
+  flex: 1;
+  min-width: 0;
+  padding: var(--hx-space-1) var(--hx-space-2);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-hover);
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-sm);
+  overflow-wrap: anywhere;
+}

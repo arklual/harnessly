@@ -86,6 +86,10 @@ func addOutput(t *turn, out wire.TurnOutput) {
 			if out.Op == wire.OutputCreated {
 				t.rec.Outputs[i].Op = out.Op
 			}
+			if out.Kind == wire.OutputDelivery {
+				// A file handed over again after a change is the new bytes: the card vouches for the last hand-over.
+				t.rec.Outputs[i].SHA256, t.rec.Outputs[i].Size = out.SHA256, out.Size
+			}
 			return
 		}
 	}

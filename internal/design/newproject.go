@@ -9,9 +9,8 @@ import (
 )
 
 // The new-project template the runtime ships, used when the library has no .template/ of its own: a board template
-// that pulls in ./support.js. support.js itself, the board engine of the design tool's format, is not ours and is not
-// shipped: a new project gets the engine this machine has (engine.go), and without one it is refused with the command
-// that fetches it. Every new project gets meta/ besides, whichever template it came from.
+// that pulls in ./support.js, the engine this machine gives new projects (engine.go). Every new project gets meta/
+// besides, whichever template it came from.
 
 //go:embed all:newproject
 var newProjectFiles embed.FS
@@ -34,11 +33,7 @@ func (l *Library) hasOwnTemplate() bool {
 
 // writeShippedTemplate puts the shipped template into a fresh folder opened as into.
 func (l *Library) writeShippedTemplate(into *os.File) error {
-	engine, err := l.engineBytes()
-	if err != nil {
-		return l.noEngineErr()
-	}
-	err = fs.WalkDir(newProjectFiles, newProjectRoot, func(p string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(newProjectFiles, newProjectRoot, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || p == newProjectRoot {
 			return err
 		}
@@ -56,7 +51,7 @@ func (l *Library) writeShippedTemplate(into *os.File) error {
 	if err != nil {
 		return err
 	}
-	return writeNewFile(viaFd(into, ProjectDirname+"/"+SupportJSName), engine)
+	return writeNewFile(viaFd(into, ProjectDirname+"/"+SupportJSName), l.engineBytes())
 }
 
 // writeNewFile writes a file that must not exist yet, never through a link.
