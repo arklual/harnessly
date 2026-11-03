@@ -213,7 +213,7 @@ const send = async (
 };
 
 /** The resource the dialog is about, as one string: a design is its project id, a catalog document is `doc:<slug>`
- * . The gateway's routes differ by kind, the rules and the screens are the same. */
+ *  The gateway's routes differ by kind, the rules and the screens are the same. */
 export const DOC_PREFIX = 'doc:';
 export const docRef = (slug: string): string => `${DOC_PREFIX}${slug}`;
 export const isDocRef = (project: string): boolean => project.startsWith(DOC_PREFIX);
