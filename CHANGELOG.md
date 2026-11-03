@@ -68,8 +68,7 @@ All notable changes to this project are documented here. The format follows
   clock (build-ins by `data-tk-at`, the board's animations seeked, a seeded `Math.random`), talks to the player by
   `tk:video-*` messages and to headless Chrome by `window.tkVideo`. `GET /design/video/frame` and `design video frame`
   draw a cached JPEG of a scene at a time (draft or full size), `design video check` lints the boards' scripts and finds
-  moments past a scene's end, text that overflows, blocks off screen, small text in 9:16 and frames that do not repeat
- .
+  moments past a scene's end, text that overflows, blocks off screen, small text in 9:16 and frames that do not repeat.
 - Presentations: sharing a deck never waits for its PDF. The link is made and can be copied at once; the runtime keeps
   the guests' PDF (`POST /design/deck/pdf`, a marker in `.media/pdf-auto`), builds it in the background, again a few
   seconds after the deck stops changing, and publishes each build the usual way. The share sheet says how the PDF is
