@@ -107,7 +107,7 @@ describe('useChatMade', () => {
 
   it('lists a tracker task by its own name, among the cards, and it does not make the chat hold documents', async () => {
     mocks.loadMade.mockReturnValue(
-      ok({ items: [item('task', 'https://tracker.example.com/issue/HRN-7', 'Fix it')], complete: true }),
+      ok({ items: [item('task', 'https://tracker.example.com/issue/ABC-7', 'Fix it')], complete: true }),
     );
     const { result } = renderHook(() => useChatMade(conv(), true));
     await flush();
@@ -115,7 +115,7 @@ describe('useChatMade', () => {
     expect(result.current.holds?.documents).toBe(false);
     expect(result.current.open(result.current.cards![0])).toMatchObject({
       kind: 'task',
-      ref: 'https://tracker.example.com/issue/HRN-7',
+      ref: 'https://tracker.example.com/issue/ABC-7',
     });
     expect(mocks.retryMetas).not.toHaveBeenCalled();
   });

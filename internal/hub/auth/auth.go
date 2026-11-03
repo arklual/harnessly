@@ -61,6 +61,7 @@ type Service struct {
 	oauth   map[string]*oauthProvider
 	oauthOr []string // provider routes in display order
 	ep      Endpoints
+	proxy   *proxyGate
 }
 
 // New builds the service: it prepares WebAuthn when passkeys are on and the OAuth providers that are configured.
@@ -92,6 +93,7 @@ func New(d Deps) (*Service, error) {
 		}
 	}
 	s.initOAuth()
+	s.initProxyJWT()
 	return s, nil
 }
 
@@ -176,6 +178,9 @@ func (s *Service) startSession(ctx context.Context, w http.ResponseWriter, r *ht
 	}
 	_ = st.TouchLogin(ctx, u.ID, now)
 	s.Audit(ctx, u.ID, "login", r, method)
+	if s.ProxiedHost(r) {
+		return nil
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: s.CookieName(), Value: token, Path: "/", HttpOnly: true, Secure: s.cfg.Secure,
 		SameSite: http.SameSiteLaxMode, MaxAge: int(sessionAbsolute.Seconds()),
@@ -199,8 +204,11 @@ func (s *Service) Audit(ctx context.Context, userID, kind string, r *http.Reques
 }
 
 // Authenticate finds the person behind the request's session cookie. It returns nil, nil when there is none, or the
-// session is over (absolute 30 days, idle 14 days).
+// session is over (absolute 30 days, idle 14 days). On the gateway's address it is the gateway's assertion instead.
 func (s *Service) Authenticate(r *http.Request) (*Principal, error) {
+	if s.ProxiedHost(r) {
+		return s.proxyPrincipal(r)
+	}
 	c, err := r.Cookie(s.CookieName())
 	if err != nil || c.Value == "" {
 		return nil, nil

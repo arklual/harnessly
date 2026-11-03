@@ -15,7 +15,8 @@ Conventions:
 The new hub (organizations, money, limits, analytics) has its parts in files of their own, each with TS types and mock
 fixtures in `web/app/hub-api/`: [orgs.md](orgs.md) — organizations, tenants, teams, roles, the journal;
 [usage.md](usage.md) — what a machine reports to the hub about spend; [analytics.md](analytics.md) — overview, spend,
-KPI, signals, changes, `/api/me/*`; [limits.md](limits.md) — limits and how a machine applies them.
+KPI, signals, changes, `/api/me/*`; [limits.md](limits.md) — limits and how a machine applies them;
+[environment.md](environment.md) — the skills, MCP servers, repositories and documents a team's machines get, and the catalog they come from.
 
 ## Hub HTTP API
 
@@ -99,6 +100,7 @@ below, passed through by the hub unchanged except times converted to RFC 3339 st
 type Config = {
   version: string;
   publicUrl: string;                  // HUB_PUBLIC_URL, no trailing slash
+  agentUrl: string;                   // HUB_AGENT_URL: where machines reach the hub; equals publicUrl when unset
   edition: 'self-hosted' | 'cloud';
   signup: 'open' | 'invite';
   auth: {
@@ -118,6 +120,7 @@ type Config = {
   runtimeMode: 'path' | 'subdomain';
   termsUrl: string | null;            // HUB_TERMS_URL; the sign-up line about terms shows only when set
   orgs: 'off' | 'shadow' | 'on';      // HUB_ORGS: how far organizations are switched on (docs/hub/orgs.md)
+  features: string[];                 // flags the instance itself has on for every organization (see «Feature flags»)
 };
 ```
 
@@ -149,6 +152,24 @@ Provider details the hub follows: GitHub — scopes `read:user user:email`, the 
 `real_name`), email treated as unverified. OIDC — discovery from the issuer, PKCE S256, `nonce`, scopes `openid email
 profile` unless `HUB_OIDC_<ID>_SCOPES`, `email_verified` honoured.
 
+### Proxy sign-in
+
+When the hub stands behind a proxy that has already signed the person in with its own identity provider, the proxy can
+pass the provider's signed token in a header and the person needs no hub sign-in. It is off unless
+`HUB_PROXY_JWT_JWKS_URL` is set.
+
+- The token is believed only on a connection from `HUB_TRUSTED_PROXIES`; from any other peer the header is ignored.
+- It is checked on every request: the signature (RS256 or ES256) against the provider's key set at
+  `HUB_PROXY_JWT_JWKS_URL` (kept for an hour; an unknown `kid` refetches it, at most once in 30 seconds), `exp` and `nbf`
+  with a small leeway, `aud` against `HUB_PROXY_JWT_AUDIENCE` and, when set, `iss` against `HUB_PROXY_JWT_ISSUER`. A
+  token that fails any check is no one: the request is unauthenticated (401), it does not fall back to a cookie.
+- The person is found by the verified email (`HUB_PROXY_JWT_EMAIL_CLAIM`, default `email`; `email_verified: false` is
+  refused). An unknown email gets an account only when `HUB_SIGNUP=open`; otherwise 403 `no_account`. The account keeps
+  an identity with provider `proxy`.
+- No cookie is set and no session is stored. Because the header is sent by the browser on every request of the proxy's
+  site, including cross-site ones, a state-changing request still needs the CSRF proof when the token travels in
+  `Authorization`.
+
 ### Me
 
 | Method, path | Request | Response |
@@ -161,6 +182,9 @@ profile` unless `HUB_OIDC_<ID>_SCOPES`, `email_verified` honoured.
 | `DELETE /api/me/identities/{provider}` | | 204; 409 `conflict` (`last_method`) |
 
 `type Passkey = { id: string; name: string; createdAt: string; lastUsedAt: string | null }`
+
+The person's numbers are described in [analytics.md](analytics.md#the-person-apime): `GET /api/me/usage`, `/api/me/sessions`,
+`/api/me/kpis`, `/api/me/kpis/{kpi}/series?org=` and `/api/me/week?org=` (chats and MRs of the last 7 days).
 
 ### Spaces and invites
 
@@ -205,6 +229,80 @@ type Invite = {
 
 Owners receive `job` and `login`; members receive `machine`, `machineRemoved`, `members`.
 
+### Feature flags
+
+Parts of the hub that are new ship dark: each is a flag, off until switched on for an organization. A flag is on for an
+organization when, in this order: the instance forces it (`HUB_FEATURES_FORCE`: `name` on, `-name` off); else the
+organization chose (the `org_features` table); else the instance defaults it on (`HUB_FEATURES_DEFAULT`); else it is
+off. A choice made by this process is seen at once, one made by another replica within 5 seconds.
+
+| Flag | Switches on |
+| --- | --- |
+| `ui.hx` | the new interface, and the background signal checker for the organization ([analytics.md](analytics.md#signals-требует-внимания)) |
+| `org.events` | the organization's live stream, «Organization events» below |
+| `env` | the machines' environment screen |
+| `catalog` | the catalog of tools and skills |
+| `machine.resources` | editing a machine's resources and showing their price |
+
+| Method, path | Who | Request | Response |
+| --- | --- | --- | --- |
+| `GET /api/orgs/{org}/features` | a member of the organization | | 200 `FeaturesResponse`, every flag the hub knows in order |
+| `PUT /api/orgs/{org}/features/{name}` | an instance administrator | `{ "enabled": true }` | 200 `{ feature: FeatureView }`; 404 for an unknown flag, 403 for anyone else; journal `org.feature` |
+
+```json
+{ "features": [
+  { "name": "ui.hx", "enabled": true, "forced": false },
+  { "name": "org.events", "enabled": true, "forced": true }
+] }
+```
+
+`forced: true`: the instance decides (`HUB_FEATURES_FORCE`), the organization's choice changes nothing. The flags that
+are on also come in the organization's view as `features: string[]` (`GET /api/orgs/{org}`), and the instance's own in
+`GET /api/config` as `features`.
+
+### Organization events (SSE)
+
+`GET /api/orgs/{org}/events?scope=all|<tenant slug>` — `text/event-stream`, the live channel of the organization's
+screens. It is gated by the `org.events` flag: with the flag off the answer is 404 `not_enabled`. `scope` is `all` (the
+default) or the slug (or `tenant:<id>`) of one tenant; a scope that is none of them is 400 `invalid_request`, an outsider of the
+organization 404, a person with no part in the tenant 403.
+
+- Headers `Content-Type: text/event-stream`, `Cache-Control: no-cache, no-transform`, `X-Accel-Buffering: no`. The first
+  lines are `retry: 3000` and a comment; an idle stream gets a comment `: heartbeat` every 25 seconds.
+- Every event is `id: <n>`, `event: <kind>`, one `data:` line of JSON. Ids grow with every event of the process and start
+  from the clock after a restart. The hub keeps the last 500 events of an organization: a reconnect with
+  `Last-Event-ID` (or `?lastEventId=`) gets the events it missed that it may see; if the ring no longer holds them, or the
+  id is from before a restart, it gets `event: resync` (`data: {}`) and the page refetches what it shows. A stream that
+  does not keep up (64 events waiting) drops events and says `resync` as well. The stream never carries the only copy of
+  anything: every resource an event announces has its GET.
+- What a person sees depends on their role in the scope: an administrator everything, a lead what concerns their tenant
+  and organization-wide events, a member only the events addressed to them. A tenant stream gets only that tenant's
+  events. Streams end when the person leaves the organization or their role changes.
+
+| `event` | `data` | Sent when, to whom |
+| --- | --- | --- |
+| `usage.tick` | `{ spendToday: Money, tokensToday, activeNow, chatsNow }` | every 10 seconds, and only while somebody listens to the scope; the organization's numbers to its administrators, a tenant's to its leads on the tenant stream only |
+| `signal.new` | `{ signal: Signal }` | a signal was opened: to the leads of its tenant and administrators, and to the person it is addressed to |
+| `limit.request` | `{ signalId, userId, name, scope: { kind, id } }` | a person asked for a higher limit: to those who may raise it |
+| `resync` | `{}` | the stream lost events; refetch |
+
+`spendToday` is the money the organization's accounts paid since midnight of its zone (`Money`, [analytics.md](analytics.md#money-and-periods)),
+`tokensToday` the input, output and cache tokens of all funding, `activeNow` the people with a chat moved in the last 15
+minutes, `chatsNow` those chats.
+
+```
+id: 1793660400000017
+event: usage.tick
+data: {"spendToday":{"usd":12.4,"shown":1115.2},"tokensToday":4210000,"activeNow":3,"chatsNow":4}
+
+id: 1793660400000018
+event: signal.new
+data: {"signal":{"id":"g2offlineaaaaaaaaaaa","rule":"machine_offline","severity":"warn", …}}
+```
+
+The bus is behind an interface (`events.OrgBus`): the one in memory serves a single hub process; a replica set needs
+one over a shared channel (for example PostgreSQL LISTEN/NOTIFY), which the rest of the hub does not notice.
+
 ### Machines
 
 | Method, path | Who | Request | Response |
@@ -219,6 +317,23 @@ Owners receive `job` and `login`; members receive `machine`, `machineRemoved`, `
 | `DELETE /api/machines/{machineId}` | owner | | 204 (revoked, link closed with 4010) |
 | `GET /api/machines/{machineId}/open` | member | `?redirect=1` answers 302 instead | `{ url }` — path mode: `/m/<id>/` (403 `machine_untrusted` unless an instance administrator connected the machine); subdomain mode: `https://<id>.<HUB_RUNTIME_DOMAIN>/m/<id>/?hl_ticket=<t>` (60 s, single use) |
 | `POST /api/machines/{machineId}/preflight` | owner | `{}` | `{ preflight: PreflightReport }` (runs it again) |
+
+Resources, load and operations of a machine (only with the organization's `machine.resources` feature, 404 `not_enabled`
+otherwise; [machines-resources.md](machines-resources.md)):
+
+| Method, path | Who | Request | Response |
+| --- | --- | --- | --- |
+| `GET /api/machines/{machineId}/resources` | view of the tenant | | `ResourcesResponse` — size, price, plans, hardware, console link, active operations; 200 with `provider.supported: false` without a provider |
+| `POST /api/machines/{machineId}/resources/quote` | manage | `{ cpu, ramGB, diskGB }` | `{ machineId, want, price, current, delta }` |
+| `POST /api/machines/{machineId}/resize` | manage | `{ cpu, ramGB, diskGB }` | 202 `{ op }`; 409 `not_managed`, `current_unknown`, `no_change`, `op_busy`; 422 `not_supported`, `disk_shrink` |
+| `GET /api/machines/{machineId}/ops` | view | `?active=1` | `{ machineId, ops: Op[] }` — the last 50 |
+| `POST /api/machines/{machineId}/ops/{opId}/cancel` | manage | | `{ op }`; 409 `not_cancellable`, `op_finished` |
+| `GET /api/machines/{machineId}/metrics` | view | `?range=1h\|6h\|24h\|7d` | `MetricsResponse` — five-minute buckets of CPU, memory, disk and chats |
+| `PUT /api/machines/{machineId}/managed` | manage | `{ capability: 'budget'\|'env'\|'resources'\|'access', managed }` | `{ machineId, managed: { budget, env, resources, access } }` |
+| `POST /api/machines/{machineId}/restart` | manage | `{ what: 'runner'\|'machine'\|'vm', when?: 'now'\|'drain'\|'after_chats' }` | 202 `{ jobId, op }` (see [analytics.md](analytics.md#machines)) |
+
+With `HUB_ACCESS_ENFORCE=on`, `GET /api/machines/{machineId}/open` and every request through the proxy answer 403
+`machine_access` to a member who is not on the machine's access list.
 
 `command` is exactly `curl -fsSL <publicUrl>/install | sh -s -- --token <code> --profile <profile>`, with `sudo sh` in place
 of `sh` for the `dir` profile (it needs root); the UI shows and copies it as is.
@@ -370,6 +485,7 @@ Protocol 2 error strings start with a code and a colon. Codes and the hub's HTTP
 | `usage.read` | `{ epoch, after, max }` | `{ epoch, records, last, more }` — facts of spend, [usage.md](usage.md); only when `hello.features` has `usage` |
 | `usage.ack` | `{ epoch, seq }` | `{}` — [usage.md](usage.md) |
 | `budget.set` | `{ version, mode, issuedAt, entries }` | `{ version }` — the limits the machine applies, [limits.md](limits.md#on-the-machine); only when `hello.features` has `budget` |
+| `env.set` | `{ rev, hash, items: EnvItem[] }` | `EnvState` `{ rev, hash, applied: { itemId, status: 'ok' \| 'error' \| 'pending', message? }[] }` — the machine's whole environment list, [environment.md](environment.md#machines); only when `hello.features` has `environment`. A wrong `hash` is refused |
 | `tunnel.open` | v1, unchanged; target `runtime` only for the hub (passes the policy's route filter) | v1 |
 
 The v1 operations (`transcripts.*`, `state.*`, `conversations.start`, `docs.*`, `design.*`, `eval.*`, `status.send`)
@@ -385,6 +501,7 @@ stay for the closed cluster. The hub does not call them; on a hub link they answ
 | `preflight` | `{ report: PreflightReport }` | after connect and every 30 min |
 | `usage.available` | `{ epoch, seq }` | new spend facts in the outbox ([usage.md](usage.md)), at most every 10 s, and after connect |
 | `policy` | `{ policy: Policy }` | the policy file or the kill switch changed (the kill switch then closes the link) |
+| `env.state` | `{ state: EnvState }` | the outcome of applying the environment list changed without a new `env.set` ([environment.md](environment.md#machines)) |
 
 ### Types
 
@@ -720,9 +837,18 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_SSH_ALLOW_PRIVATE` | `off` | `on` lets the SSH way reach private, loopback and link-local addresses (self-hosted only; the cloud edition ignores it) |
 | `HUB_SECRET_KEY` | | at least 32 characters: seals the spaces' SSH keys; empty: a `secret_key` file in `HUB_DATA_DIR` |
 | `HUB_ORGS` | `off` | organizations, tenants and teams ([orgs.md](orgs.md)): `off` — the schema is there, the hub behaves as before; `shadow` — the new endpoints answer instance administrators only (checking, `hub seed`); `on` — everyone |
+| `HUB_ENV_FEATURES` | | environment and catalog ([environment.md](environment.md)): `env`, `catalog` (comma separated) or `all`; empty — off, the endpoints answer 404 `not_enabled` and no machine gets a list. Needs `HUB_ORGS` other than `off`; tool numbers need `HUB_USAGE_INGEST=on` |
 | `HUB_USAGE_INGEST` | `off` | `on`: the hub pulls the machines' spend facts ([usage.md](usage.md)) and keeps the price list; `off`: it never asks |
 | `HUB_LIMITS_ENFORCE` | `off` | limits on machines ([limits.md](limits.md#enforcement)): `off` — computed and shown only; `warn` — machines notify; `stop` — machines do not start chats past a limit |
 | `HUB_RATES_URL` | `https://www.cbr.ru/scripts/XML_daily.asp` | the Central Bank's daily rates the organizations' money is shown in ([analytics.md](analytics.md#money-and-periods)); `off` never fetches: dollars unless an admin put a rate in `currency_rates` |
+| `HUB_AGENT_URL` | `HUB_PUBLIC_URL` | the address machines reach the hub at (`http(s)://host[:port]`, no path), when it differs from the people's one: the install command and script, registration, the signature of a machine's dial, the ssh install and the runtime domain use it; people's links, cookies and sign-in keep `HUB_PUBLIC_URL`; reported as `agentUrl` in `/api/config` |
+| `HUB_FEATURES_FORCE` | | comma-separated flags the instance decides for every organization: `name` forces on, `-name` forces off ([Feature flags](#feature-flags)) |
+| `HUB_FEATURES_DEFAULT` | | comma-separated flags that are on for every organization that has not chosen |
+| `HUB_PROXY_JWT_JWKS_URL` | | the identity provider's key set; setting it turns [proxy sign-in](#proxy-sign-in) on |
+| `HUB_PROXY_JWT_AUDIENCE` | | required with the key set: the `aud` the token must carry |
+| `HUB_PROXY_JWT_ISSUER` | | when set, the `iss` the token must carry |
+| `HUB_PROXY_JWT_HEADER` | `X-Forwarded-Access-Token` | the header the proxy passes the token in (`Authorization` takes `Bearer <token>`) |
+| `HUB_PROXY_JWT_EMAIL_CLAIM` | `email` | the claim that holds the person's email |
 | `HUB_MIN_AGENT_VERSION` | | refuse older agents (426 / 4012) |
 | `HUB_TERMS_URL` | | shown under the sign-up |
 | `HUB_WEB_DIR` | | serve the UI from this folder instead of the embedded files (development) |

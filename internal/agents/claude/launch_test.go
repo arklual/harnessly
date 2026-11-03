@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -197,16 +198,22 @@ func TestPluginDirFlag(t *testing.T) {
 }
 
 type fakeApps struct {
-	ids      []string
-	settings string
-	prompt   string
-	wrap     string
+	ids       []string
+	settings  string
+	prompt    string
+	wrap      string
+	retoken   string
+	retokened string
 }
 
 func (f *fakeApps) Claude(ids []string, settingsPath string) (agents.ClaudeApps, error) {
 	f.ids, f.settings = ids, settingsPath
-	return agents.ClaudeApps{Settings: "/data/apps/launch/settings-1.json", PluginDirs: []string{"/data/apps/a", "/dev/b"},
-		PromptFile: f.prompt, Wrap: f.wrap}, nil
+	out := agents.ClaudeApps{Settings: "/data/apps/launch/settings-1.json", PluginDirs: []string{"/data/apps/a", "/dev/b"},
+		PromptFile: f.prompt, Wrap: f.wrap}
+	if f.retoken != "" {
+		out.Retoken = func(src string) (string, error) { f.retokened = src; return f.retoken, nil }
+	}
+	return out, nil
 }
 
 // The apps of a chat replace --settings with the copy that carries the guard, add their plugins and their instructions.
@@ -262,5 +269,61 @@ func TestAppsWall(t *testing.T) {
 	l.Apps = nil
 	if line, _ = c.LaunchCommand("", l, nil); strings.Contains(line, "bwrap") {
 		t.Fatalf("a chat without apps has no wall: %q", line)
+	}
+}
+
+// The person's MCP servers come as one more --mcp-config at every launch and resume, with their tools allowed in a copy
+// of the settings; without servers the line is as it was.
+func TestExtraMCP(t *testing.T) {
+	dir := t.TempDir()
+	c := testConfig(t)
+	c.WorkspacePrompt = nil
+	c.HooksPath = filepath.Join(dir, "hooks.json")
+	if err := os.WriteFile(c.HooksPath, []byte(`{"permissions":{"allow":["mcp__rt"]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	extra := filepath.Join(dir, "mcp", "servers-1.json")
+	servers := []string{}
+	c.ExtraMCP = func() (string, []string) {
+		if len(servers) == 0 {
+			return "", nil
+		}
+		return extra, servers
+	}
+	got, err := c.Flags("", nil, nil)
+	if err != nil || got != "--settings "+c.HooksPath+" --mcp-config /tmp/preview-mcp.json" {
+		t.Fatalf("no servers: %q %v", got, err)
+	}
+	servers = []string{"mcp__mcp-linear"}
+	got, err = c.Flags("", nil, nil)
+	if err != nil || !strings.HasSuffix(got, " --mcp-config /tmp/preview-mcp.json --mcp-config '"+extra+"'") {
+		t.Fatalf("with servers: %q %v", got, err)
+	}
+	settings := regexp.MustCompile(`--settings '([^']+)'`).FindStringSubmatch(got)
+	if settings == nil || settings[1] == c.HooksPath {
+		t.Fatalf("the settings are not the copy: %q", got)
+	}
+	raw, _ := os.ReadFile(settings[1])
+	var s struct {
+		Permissions struct {
+			Allow []string `json:"allow"`
+		} `json:"permissions"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil || !slices.Equal(s.Permissions.Allow, []string{"mcp__rt", "mcp__mcp-linear"}) {
+		t.Fatalf("allow: %s %v", raw, err)
+	}
+	if line, err := c.ResumeCommand(id1, "", nil); err != nil || !strings.Contains(line, "--mcp-config '"+extra+"'") {
+		t.Fatalf("resume: %q %v", line, err)
+	}
+	// Under the apps the config goes in with the launch's token, as the copy Retoken gives.
+	l := launch("opus", "")
+	l.Apps = []string{"acme.a"}
+	c.Apps = &fakeApps{retoken: "/data/apps/launch/xmcp-1.json"}
+	got, err = c.Flags("", l, nil)
+	if err != nil || !strings.Contains(got, "--mcp-config '/data/apps/launch/xmcp-1.json'") || strings.Contains(got, extra) {
+		t.Fatalf("apps: %q %v", got, err)
+	}
+	if f := c.Apps.(*fakeApps); f.settings != settings[1] || f.retokened != extra {
+		t.Fatalf("the apps extend %q, retoken %q", f.settings, f.retokened)
 	}
 }

@@ -71,6 +71,8 @@ type View struct {
 	Tenants []TenantView `json:"tenants"`
 	Teams   []TeamView   `json:"teams"`
 	Me      MeView       `json:"me"`
+	// Features are the flags that are on for the organization (docs/hub/api.md, «Feature flags»).
+	Features []string `json:"features"`
 }
 
 func orgView(o store.Org) OrgView {
@@ -116,7 +118,7 @@ func teamView(ctx context.Context, st store.Store, t store.Team) (TeamView, erro
 func buildView(ctx context.Context, st store.Store, p authz.Principal, o store.Org) (View, error) {
 	az := authz.New(st)
 	v := View{Org: orgView(o), Tenants: []TenantView{}, Teams: []TeamView{},
-		Me: MeView{UserID: p.UserID, InstanceAdmin: p.InstanceAdmin, Grants: []GrantView{}, Teams: []TeamRef{}, Scopes: map[string]authz.Capabilities{}}}
+		Features: []string{}, Me: MeView{UserID: p.UserID, InstanceAdmin: p.InstanceAdmin, Grants: []GrantView{}, Teams: []TeamRef{}, Scopes: map[string]authz.Capabilities{}}}
 
 	myTeams, err := st.TeamsOfUser(ctx, p.UserID)
 	if err != nil {

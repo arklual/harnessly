@@ -1,0 +1,87 @@
+{
+  "machineId": "h2runneraaaaaaaaaaaa",
+  "managed": true,
+  "provider": {
+    "name": "http",
+    "supported": true
+  },
+  "providerError": null,
+  "current": {
+    "cpu": 4,
+    "ramGB": 16,
+    "diskGB": 100
+  },
+  "price": {
+    "amount": 1900000,
+    "currency": "RUB",
+    "period": "month"
+  },
+  "plans": [
+    {
+      "id": "p4",
+      "name": "4 / 16",
+      "cpu": 4,
+      "ramGB": 16,
+      "diskGB": 100,
+      "price": {
+        "amount": 1900000,
+        "currency": "RUB",
+        "period": "month"
+      },
+      "current": true
+    },
+    {
+      "id": "p8",
+      "name": "8 / 32",
+      "cpu": 8,
+      "ramGB": 32,
+      "diskGB": 160,
+      "price": {
+        "amount": 3600000,
+        "currency": "RUB",
+        "period": "month"
+      },
+      "current": false
+    },
+    {
+      "id": "p16",
+      "name": "16 / 64",
+      "cpu": 16,
+      "ramGB": 64,
+      "diskGB": 320,
+      "price": null,
+      "current": false
+    }
+  ],
+  "hardware": {
+    "cores": 4,
+    "ramBytes": 17179869184,
+    "diskBytes": 107374182400,
+    "model": "Example CPU",
+    "laptop": false,
+    "os": "linux",
+    "arch": "amd64",
+    "updatedAt": "2026-10-30T17:50:00Z"
+  },
+  "consoleUrl": "https://console.example.org/servers/1042",
+  "activeOps": [
+    {
+      "id": "o2resizeaaaaaaaaaaaa",
+      "machineId": "h2runneraaaaaaaaaaaa",
+      "kind": "resize",
+      "status": "running",
+      "params": {
+        "cpu": 8,
+        "ramGB": 32,
+        "diskGB": 160
+      },
+      "error": null,
+      "createdBy": "u2annaaaaaaaaaaaaaaa",
+      "createdAt": "2026-10-30T17:55:00Z",
+      "updatedAt": "2026-10-30T17:56:00Z",
+      "finishedAt": null,
+      "chatsNow": null
+    }
+  ],
+  "updatedAt": "2026-10-30T17:58:00Z"
+}

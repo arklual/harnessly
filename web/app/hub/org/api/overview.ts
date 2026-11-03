@@ -1,4 +1,4 @@
-// Обзор (HRN-537): the numbers of the first screen for an admin and a team lead. Money is in rubles (the display
+// Обзор: the numbers of the first screen for an admin and a team lead. Money is in rubles (the display
 // currency, `$` next to it is the same money at the month's rate). Shapes to align with the analytics and limits
 // contracts (docs/hub/orgs.md has none of these yet): spend/limits → limits.md, subscriptions/signals → analytics.md.
 import type { Section } from '../types';
@@ -7,6 +7,8 @@ export type OverviewPeriod = 'week' | 'month';
 
 /** The head tiles. `bars` is the last days, oldest first, the last one is today. */
 export interface OverviewTiles {
+  /** What the head tiles count: today (the default), or the whole period while the hub gives no «today» yet. */
+  basis?: 'today' | 'period';
   spend: { rub: number; usd: number; tokens: number; bars: number[] };
   active: { now: number; total: number; bars: number[] };
   tasks: { closed: number; inProgress: number; bars: number[] };
@@ -31,6 +33,8 @@ export interface Money {
 export interface TeamSpend extends Money {
   id: string;
   name: string;
+  /** The row of the people of no team: drawn quieter. */
+  noTeam?: boolean;
 }
 
 export interface TeamEfficiency {
@@ -38,8 +42,10 @@ export interface TeamEfficiency {
   name: string;
   /** Tasks closed per person in the period. */
   tasksPerPerson: number;
-  /** Share of chats that ended in a result, 0..100. */
-  resultPct: number;
+  /** Share of chats that ended in a result, 0..100; null while there are too few chats to tell. */
+  resultPct: number | null;
+  /** The row of the people of no team: drawn quieter. */
+  noTeam?: boolean;
 }
 
 export interface SubscriptionUse {

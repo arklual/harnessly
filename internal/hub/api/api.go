@@ -17,7 +17,9 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/buildinfo"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/dist"
+	"github.com/ly-solutions/harnessly/internal/hub/env"
 	"github.com/ly-solutions/harnessly/internal/hub/events"
+	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/ingest"
 	"github.com/ly-solutions/harnessly/internal/hub/limits"
@@ -25,6 +27,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/machines"
 	"github.com/ly-solutions/harnessly/internal/hub/mail"
 	"github.com/ly-solutions/harnessly/internal/hub/orgs"
+	"github.com/ly-solutions/harnessly/internal/hub/provider"
 	"github.com/ly-solutions/harnessly/internal/hub/proxy"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/rates"
@@ -60,6 +63,16 @@ type Options struct {
 	SiteBlobs sites.Blobs
 	// AgentTimeout shortens every wait for an agent's answer in the owner endpoints (tests).
 	AgentTimeout time.Duration
+	// EnvFeatures says which parts of the environment section are on for an organization; nil: the ones HUB_ENV_FEATURES
+	// names, for every organization.
+	EnvFeatures env.FeatureGate
+	// Provider replaces the machines' provider that the settings (HUB_PROVIDER*) name (tests).
+	Provider provider.Provider
+	// Features says whether an organization has a feature on; nil: the resources, load and operations of machines are
+	// on for every organization when HUB_MACHINE_RESOURCES=on, else dark (docs/hub/machines-resources.md).
+	Features machines.FeatureGate
+	// Publisher carries the machines' live events to the organization's channel; nil: the space's own stream.
+	Publisher machines.Publisher
 }
 
 // Hub is the assembled hub.
@@ -70,11 +83,17 @@ type Hub struct {
 	Spaces    *spaces.Service
 	Orgs      *orgs.Service
 	Analytics *analytics.Service
-	Machines  *machines.Service
+	// Env is the environment and the catalog of the organizations; its endpoints answer 404 while the features are off.
+	Env *env.Service
+	// Features are the organizations' flags.
+	Features *features.Store
+	Machines *machines.Service
 	// Ingest pulls the machines' spend facts; nil unless HUB_USAGE_INGEST=on.
 	Ingest *ingest.Service
 	// Limits sends the machines their limit lists; nil while HUB_LIMITS_ENFORCE=off.
-	Limits   *limits.Pusher
+	Limits *limits.Pusher
+	// EnvPush sends the machines their environment lists; nil without a feature on.
+	EnvPush  *env.Pusher
 	Relay    *relay.Service
 	Proxy    *proxy.Service
 	Dist     *dist.Handler
@@ -82,7 +101,9 @@ type Hub struct {
 	Dialer   *link.Dialer
 	Registry *link.Registry
 	Events   *events.Broker
-	Tickets  *ticket.Store
+	// OrgEvents is the bus of the organizations' live stream (GET /api/orgs/{org}/events).
+	OrgEvents *events.MemoryBus
+	Tickets   *ticket.Store
 	// Sites is the published-sites module; nil when HARNESSLY_SITES is off.
 	Sites *sites.Service
 
@@ -104,7 +125,7 @@ func New(o Options) (*Hub, error) {
 			o.Limiter = o.Limiter.WithClock(o.Now)
 		}
 	}
-	host, err := hubproto.DialHost(cfg.PublicURL)
+	host, err := hubproto.DialHost(cfg.AgentURL)
 	if err != nil {
 		return nil, err
 	}
@@ -126,8 +147,22 @@ func New(o Options) (*Hub, error) {
 		budgetSink, limitsChanged = h.Limits, h.Limits.Kick
 	}
 	rb := &rates.Book{DB: db, URL: cfg.RatesURL, Client: o.HTTPClient, Log: log, Now: o.Now}
-	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb})
+	h.Features = features.New(db, cfg.Features, o.Now)
+	h.OrgEvents = events.NewMemoryBus(o.Now)
+	h.Orgs = orgs.New(orgs.Deps{Config: cfg, DB: db, Auth: h.Auth, Limiter: o.Limiter, Log: log, Now: o.Now, LimitsChanged: limitsChanged, Rates: rb, Features: h.Features, Events: h.OrgEvents})
 	h.Analytics = analytics.New(analytics.Deps{DB: db, Gate: h.Orgs.Gate, Log: log, Now: o.Now, Rates: rb})
+	// A part is on for an organization when the instance switches it on for all (HUB_ENV_FEATURES, HUB_MACHINE_RESOURCES)
+	// or the organization's flags say so (features.Store: HUB_FEATURES_FORCE, the org's choice, HUB_FEATURES_DEFAULT).
+	envFeatures := o.EnvFeatures
+	if envFeatures == nil {
+		envFeatures = anyGate{env.StaticFeatures(cfg.EnvFeatures), h.Features}
+	}
+	h.Env = env.New(env.Deps{DB: db, Gate: h.Orgs.Gate, Features: envFeatures, Publisher: orgEvents{db: db, broker: h.Events}, Log: log, Now: o.Now,
+		Changed: func() {
+			if h.EnvPush != nil {
+				h.EnvPush.Kick()
+			}
+		}})
 	var usageSink machines.UsageSink
 	if cfg.UsageIngest {
 		// The price list starts from the runtime's own numbers; a row an administrator corrected is never overwritten.
@@ -154,15 +189,37 @@ func New(o Options) (*Hub, error) {
 		h.Ingest = ingest.New(ingest.Deps{DB: db, Reg: h.Registry, Log: log, Now: o.Now})
 		usageSink = h.Ingest
 	}
+	var envSink machines.EnvSink
+	// An organization may switch the environment on at any time, so the pusher is always there; it pushes nothing to the
+	// machines of an organization whose feature is off.
+	h.EnvPush = env.NewPusher(env.PushDeps{DB: db, Reg: h.Registry, Features: envFeatures, Log: log, Now: o.Now})
+	envSink = h.EnvPush
+	machineFeatures := o.Features
+	if machineFeatures == nil {
+		var static []string
+		if cfg.Machines.Resources {
+			static = []string{machines.FeatureResources}
+		}
+		machineFeatures = anyGate{env.StaticFeatures(static), h.Features}
+	}
+	prov := o.Provider
+	if prov == nil {
+		if prov, err = newProvider(cfg); err != nil {
+			return nil, err
+		}
+	}
 	h.Machines = machines.New(machines.Deps{
 		Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Limiter: o.Limiter, Log: log, Now: o.Now,
-		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink,
+		OnRevoked: func(machineID string) { px.Forget(machineID) }, Usage: usageSink, Budget: budgetSink, Env: envSink,
+		Provider: prov, Features: machineFeatures, Publisher: o.Publisher,
 	})
 	h.Analytics.UseMachines(h.Machines)
+	h.Analytics.UseEvents(h.OrgEvents)
+	h.Analytics.UseFeatures(h.Features)
 	h.Relay = relay.New(relay.Deps{Auth: h.Auth, DB: db, Machines: h.Machines, Reg: h.Registry, Log: log, Now: o.Now, Timeout: o.AgentTimeout})
 	px = proxy.New(proxy.Deps{Config: cfg, DB: db, Auth: h.Auth, Spaces: h.Spaces, Reg: h.Registry, Tickets: h.Tickets, Log: log, Now: o.Now})
 	h.Proxy = px
-	h.Dist = dist.New(cfg.DistDir, cfg.PublicURL, buildinfo.Version, cfg.ContainerImage)
+	h.Dist = dist.New(cfg.DistDir, cfg.AgentURL, buildinfo.Version, cfg.ContainerImage)
 	if cfg.SSH {
 		// The way is optional: a hub whose data folder cannot hold the key runs without it, and the page hides it.
 		h.SSH, err = sshinstall.New(sshinstall.Deps{
@@ -204,6 +261,7 @@ func New(o Options) (*Hub, error) {
 	h.Spaces.Mount(mux)
 	h.Orgs.Mount(mux)
 	h.Analytics.Mount(mux)
+	h.Env.Mount(mux)
 	h.Machines.Mount(mux)
 	if h.SSH != nil {
 		h.SSH.Mount(h.Spaces.Sub())
@@ -282,6 +340,10 @@ func (h *Hub) readyz(w http.ResponseWriter, r *http.Request) {
 // expired (sessions, challenges, tickets, remembered nonces).
 func (h *Hub) Run(ctx context.Context) {
 	go h.Machines.RunLocalCode(ctx)
+	if h.Machines.Enabled() {
+		go h.runMachineOps(ctx)
+	}
+	go h.Analytics.RunLive(ctx, h.OrgEvents.Active)
 	if h.Sites != nil {
 		go h.Sites.Run(ctx)
 	}
@@ -302,9 +364,37 @@ func (h *Hub) Run(ctx context.Context) {
 	}
 }
 
+// runMachineOps picks up the machines' unfinished operations and keeps their upkeep (docs/hub/machines-resources.md).
+func (h *Hub) runMachineOps(ctx context.Context) {
+	h.Machines.ResumeOps(ctx)
+	tick := time.NewTicker(time.Minute)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			h.Machines.Maintain(ctx)
+		}
+	}
+}
+
+// newProvider is the provider the settings name.
+func newProvider(cfg *config.Config) (provider.Provider, error) {
+	if cfg.Machines.Provider != "http" {
+		return provider.None{}, nil
+	}
+	p, err := provider.NewHTTP(provider.HTTPConfig{BaseURL: cfg.Machines.ProviderURL, TokenFile: cfg.Machines.ProviderTokenFile})
+	if err != nil {
+		return nil, fmt.Errorf("provider: %w", err)
+	}
+	return p, nil
+}
+
 // Shutdown ends the open event streams, agent links and SSH installs, which would otherwise hold the server from stopping.
 func (h *Hub) Shutdown() {
 	h.Events.Close()
+	h.OrgEvents.Close()
 	h.Registry.CloseAll()
 	if h.Ingest != nil {
 		h.Ingest.Close()
@@ -312,7 +402,22 @@ func (h *Hub) Shutdown() {
 	if h.Limits != nil {
 		h.Limits.Close()
 	}
+	if h.EnvPush != nil {
+		h.EnvPush.Close()
+	}
 	if h.SSH != nil {
 		h.SSH.Close()
 	}
+}
+
+// anyGate is on for a feature when any of its gates is.
+type anyGate []env.FeatureGate
+
+func (g anyGate) On(ctx context.Context, orgID, name string) bool {
+	for _, x := range g {
+		if x != nil && x.On(ctx, orgID, name) {
+			return true
+		}
+	}
+	return false
 }

@@ -22,7 +22,7 @@
 //   window.tkVideo = {v: 2, ready(): Promise, seek(ms): Promise<{same}>, audit(opts?): Promise<issue[]>, moments(),
 //                     scene({transition}), problems(): problem[], info(): {engines, motionDur}}
 //
-// The board's motion engines (HRN-576). All of them hang on one time:
+// The board's motion engines. All of them hang on one time:
 //   tkVideo.motion(build)  build(root) runs once the board is drawn and the fonts and images are in. With GSAP on the page
 //                          every tween and timeline it makes is gathered into one paused timeline and sought with t.
 //   tkVideo.register({name, ready?(), seek(ms)})  any other engine (a canvas, three.js, lottie): ready may return a promise

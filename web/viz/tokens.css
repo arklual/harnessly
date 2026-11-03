@@ -1,0 +1,147 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Design tokens the chart reads (values of the design system), scoped to the chart host and the portal that holds the hint bubbles. */
+.viz-root {
+  --t-accent-amber: oklch(0.8 0.16 80);
+  --t-accent-amber-bg: oklch(0.8 0.16 80 / 12%);
+  --t-accent-amber-soft: oklch(0.56 0.13 80);
+  --t-accent-blue: oklch(0.6 0.19 255);
+  --t-accent-blue-bg: oklch(0.6 0.19 255 / 10%);
+  --t-accent-blue-soft: oklch(0.47 0.15 255);
+  --t-accent-green: oklch(0.72 0.19 155);
+  --t-accent-green-bg: oklch(0.72 0.19 155 / 11%);
+  --t-accent-green-soft: oklch(0.48 0.13 155);
+  --t-accent-purple: oklch(0.55 0.24 285);
+  --t-accent-purple-bg: oklch(0.55 0.24 285 / 10%);
+  --t-accent-purple-grad: linear-gradient(135deg, oklch(0.55 0.24 285), oklch(0.68 0.24 295));
+  --t-accent-purple-soft: oklch(0.49 0.19 285);
+  --t-accent-rose: oklch(0.64 0.24 15);
+  --t-accent-rose-bg: oklch(0.64 0.24 15 / 11%);
+  --t-accent-rose-soft: oklch(0.56 0.19 15);
+  --t-accent-teal: oklch(0.75 0.12 180);
+  --t-accent-teal-bg: oklch(0.75 0.12 180 / 12%);
+  --t-accent-teal-soft: oklch(0.44 0.09 180);
+  --t-active-overlay: oklch(0.145 0 0 / 0.1);
+  --t-bg: oklch(0.992 0.004 95);
+  --t-bg-interactive: var(--t-surface-input);
+  --t-bg-surface: var(--t-surface);
+  --t-border-default: oklch(0.145 0 0 / 0.14);
+  --t-border-subtle: oklch(0.145 0 0 / 0.08);
+  --t-surface-raised: oklch(0.98 0 0);
+  --t-button-accent-fg: oklch(1 0 0);
+  --t-button-quiet-fg: oklch(0.33 0.02 255);
+  --t-button-radius: var(--t-radius-md);
+  --t-disabled-opacity: 0.56;
+  --t-duration-base: 180ms;
+  --t-duration-fast: 120ms;
+  --t-duration-hint: 300ms;
+  --t-duration-hint-exit: 150ms;
+  --t-duration-state: 150ms;
+  --t-ease-expressive: cubic-bezier(0.4, 0.1, 0.2, 1);
+  --t-ease-standard: cubic-bezier(0.2, 0, 0.4, 0.9);
+  --t-fg-muted: var(--t-text-muted);
+  --t-fg-primary: var(--t-text-primary);
+  --t-fg-secondary: var(--t-text-secondary);
+  --t-focus-ring: oklch(0.68 0.24 295 / 0.65);
+  --t-font-body-m: var(--t-font-weight-regular) calc(var(--t-font-offset, 0rem) + 1rem) / calc(24 / 16)
+    var(--t-font-family-ui);
+  --t-font-body-s: var(--t-font-weight-regular) calc(var(--t-font-offset, 0rem) + 0.875rem) / calc(20 / 14)
+    var(--t-font-family-ui);
+  --t-font-body-xs: var(--t-font-weight-regular) calc(var(--t-font-offset, 0rem) + 0.75rem) / calc(16 / 12)
+    var(--t-font-family-ui);
+  --t-font-control-s: var(--t-font-weight-regular) calc(var(--t-font-offset, 0rem) + 0.8125rem) /
+    calc(16 / 13) var(--t-font-family-ui);
+  --t-font-family-display: var(--t-font-family-ui);
+  --t-font-family-inter:
+    'Inter Variable', 'Inter', 'Inter Fallback', system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --t-font-family-ui: var(--t-font-family-inter);
+  --t-font-h6: var(--t-font-weight-bold) calc(var(--t-font-offset, 0rem) + 1.25rem) / calc(24 / 20)
+    var(--t-font-family-display);
+  --t-font-ui-2xs: var(--t-font-weight-regular) calc(var(--t-font-offset, 0rem) + 0.6875rem) / calc(12 / 11)
+    var(--t-font-family-ui);
+  --t-font-ui-s: var(--t-font-weight-regular) calc(var(--t-font-offset, 0rem) + 0.875rem) / calc(16 / 14)
+    var(--t-font-family-ui);
+  --t-font-ui-xs: var(--t-font-weight-regular) calc(var(--t-font-offset, 0rem) + 0.75rem) / calc(15 / 12)
+    var(--t-font-family-ui);
+  --t-font-weight-bold: 700;
+  --t-font-weight-medium: 500;
+  --t-font-weight-regular: 400;
+  --t-font-weight-semibold: 600;
+  --t-hint-bg: var(--t-text);
+  --t-hint-fg: var(--t-bg);
+  --t-hint-max-width: 20rem;
+  --t-hitbox-min: 2.75rem;
+  --t-hover-overlay: oklch(0.145 0 0 / 0.05);
+  --t-letter-spacing-heading: -0.011em;
+  --t-radius-2xl: 1rem;
+  --t-radius-control-s: 0.625rem;
+  --t-radius-control-xs: 0.25rem;
+  --t-radius-lg: 0.75rem;
+  --t-radius-md: 0.625rem;
+  --t-radius-sm: 0.4375rem;
+  --t-radius-xl: 0.875rem;
+  --t-shadow-sm: 0 0.0625rem 0.125rem color-mix(in srgb, var(--t-text) 8%, transparent);
+  --t-space-1: 0.25rem;
+  --t-space-12: 3rem;
+  --t-space-2: 0.5rem;
+  --t-space-3: 0.75rem;
+  --t-space-4: 1rem;
+  --t-space-5: 1.25rem;
+  --t-space-6: 1.5rem;
+  --t-space-8: 2rem;
+  --t-surface: oklch(1 0 0);
+  --t-surface-hover: oklch(0.985 0.006 260);
+  --t-surface-input: oklch(0.98 0 0);
+  --t-text: oklch(0.26 0.02 255);
+  --t-text-muted: oklch(0.62 0.014 255);
+  --t-text-primary: oklch(0.145 0 0);
+  --t-text-secondary: oklch(0.48 0.015 255);
+}
+
+[data-theme='dark'] .viz-root,
+[data-hx-theme='dark'] .viz-root,
+.dark .viz-root {
+  --t-accent-amber: oklch(0.8 0.16 80);
+  --t-accent-amber-bg: oklch(0.8 0.16 80 / 12%);
+  --t-accent-amber-soft: oklch(0.85 0.14 85);
+  --t-accent-blue: oklch(0.6 0.19 255);
+  --t-accent-blue-bg: oklch(0.6 0.19 255 / 12%);
+  --t-accent-blue-soft: oklch(0.73 0.14 255);
+  --t-accent-green: oklch(0.72 0.19 155);
+  --t-accent-green-bg: oklch(0.72 0.19 155 / 12%);
+  --t-accent-green-soft: oklch(0.8 0.17 155);
+  --t-accent-purple: oklch(0.55 0.24 285);
+  --t-accent-purple-bg: oklch(0.55 0.24 285 / 12%);
+  --t-accent-purple-grad: linear-gradient(135deg, oklch(0.55 0.24 285), oklch(0.68 0.24 295));
+  --t-accent-purple-soft: oklch(0.72 0.17 285);
+  --t-accent-rose: oklch(0.64 0.24 15);
+  --t-accent-rose-bg: oklch(0.64 0.24 15 / 12%);
+  --t-accent-rose-soft: oklch(0.74 0.18 15);
+  --t-accent-teal: oklch(0.75 0.12 180);
+  --t-accent-teal-bg: oklch(0.75 0.12 180 / 12%);
+  --t-accent-teal-soft: oklch(0.82 0.1 180);
+  --t-active-overlay: oklch(1 0 0 / 0.12);
+  --t-bg: oklch(0.13 0 0);
+  --t-border-default: oklch(1 0 0 / 0.14);
+  --t-border-subtle: oklch(1 0 0 / 0.08);
+  --t-surface-raised: oklch(0.22 0 0);
+  --t-button-accent-fg: oklch(1 0 0);
+  --t-button-quiet-fg: oklch(0.88 0 0);
+  --t-focus-ring: oklch(0.68 0.24 295 / 0.65);
+  --t-hint-bg: var(--t-text);
+  --t-hint-fg: var(--t-bg);
+  --t-hover-overlay: oklch(1 0 0 / 0.07);
+  --t-radius-2xl: 1rem;
+  --t-radius-lg: 0.75rem;
+  --t-radius-md: 0.625rem;
+  --t-radius-sm: 0.4375rem;
+  --t-radius-xl: 0.875rem;
+  --t-shadow-sm: 0 0.0625rem 0.125rem color-mix(in srgb, var(--t-text) 8%, transparent);
+  --t-surface: oklch(0.17 0 0);
+  --t-surface-hover: oklch(0.19 0 0);
+  --t-surface-input: oklch(0.19 0 0);
+  --t-text: oklch(0.98 0 0);
+  --t-text-muted: oklch(0.42 0 0);
+  --t-text-primary: oklch(1 0 0);
+  --t-text-secondary: oklch(0.55 0 0);
+}

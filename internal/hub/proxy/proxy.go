@@ -26,6 +26,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/config"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
+	"github.com/ly-solutions/harnessly/internal/hub/machaccess"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
 	"github.com/ly-solutions/harnessly/internal/hub/ticket"
@@ -71,12 +72,14 @@ type Service struct {
 	tickets *ticket.Store
 	log     *slog.Logger
 	now     func() time.Time
+	acc     *machaccess.Checker
 
 	mu         sync.Mutex
 	transports map[string]*http.Transport
 	grants     map[string]grantEntry
 	calls      map[string]*grantCall
 	authz      map[string]time.Time
+	access     map[string]time.Time
 	trust      map[string]time.Time
 	tracked    map[string]map[uint64]context.CancelFunc
 	nextTrack  uint64
@@ -98,7 +101,7 @@ func New(d Deps) *Service {
 	s := &Service{
 		cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, tickets: d.Tickets, log: d.Log, now: d.Now,
 		transports: map[string]*http.Transport{}, grants: map[string]grantEntry{}, calls: map[string]*grantCall{},
-		authz: map[string]time.Time{}, trust: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
+		authz: map[string]time.Time{}, access: map[string]time.Time{}, trust: map[string]time.Time{}, tracked: map[string]map[uint64]context.CancelFunc{},
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -106,6 +109,7 @@ func New(d Deps) *Service {
 	if s.log == nil {
 		s.log = slog.Default()
 	}
+	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log}
 	return s
 }
 
@@ -199,10 +203,39 @@ func (s *Service) admit(ctx context.Context, userID, id string) (store.Machine, 
 		s.authz[key] = s.now().Add(authzTTL)
 		s.mu.Unlock()
 	}
+	if err := s.allowed(ctx, userID, m); err != nil {
+		return store.Machine{}, err
+	}
 	if err := s.trusted(ctx, m); err != nil {
 		return store.Machine{}, err
 	}
 	return m, nil
+}
+
+// allowed is the machine's access list (HUB_ACCESS_ENFORCE, internal/hub/machaccess). Every way into a machine passes
+// admit, so this is the one place the proxy asks; a yes is believed for authzTTL like the membership check. Requests
+// already in flight and open sockets are not ended by a change of the list, so running chats go on.
+func (s *Service) allowed(ctx context.Context, userID string, m store.Machine) error {
+	if !s.acc.Enforcing() {
+		return nil
+	}
+	key := userID + "/" + m.ID
+	s.mu.Lock()
+	until, ok := s.access[key]
+	s.mu.Unlock()
+	if ok && s.now().Before(until) {
+		return nil
+	}
+	if err := s.acc.Check(ctx, userID, m); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if len(s.access) >= maxAuthz {
+		s.access = map[string]time.Time{}
+	}
+	s.access[key] = s.now().Add(authzTTL)
+	s.mu.Unlock()
+	return nil
 }
 
 // trusted is the rule of path mode (auth.Service.RequireTrustedMachine): only a machine an administrator connected runs on

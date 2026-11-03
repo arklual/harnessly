@@ -28,8 +28,9 @@ func (s *Service) CSRF(next http.Handler) http.Handler {
 			return
 		}
 		// A deploy token is no cookie: a page of another site cannot send an Authorization header without the
-		// API agreeing to it, which it does not.
-		if strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+		// API agreeing to it, which it does not. A proxy's token is no such proof: the proxy adds it to every request
+		// of the browser, a page of another site's among them.
+		if strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") && !s.proxyInAuthorization(r) {
 			next.ServeHTTP(w, r)
 			return
 		}

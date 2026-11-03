@@ -326,3 +326,88 @@ func TestIngestOff(t *testing.T) {
 		t.Errorf("prices = %d, %v", n, err)
 	}
 }
+
+func toolFact(session, day, kind, name string, calls, errs int64) hubproto.UsageRecord {
+	return hubproto.UsageRecord{Kind: hubproto.UsageTool, Tool: &hubproto.UsageToolFact{
+		Provider: "claude", SessionKey: session, Day: day, ToolKind: kind, ToolName: name, Calls: calls, Errors: errs,
+	}}
+}
+
+// Tool facts are attributed to the person and team of their session, matched to the catalog by name, and a later fact of
+// the same session, day and tool replaces the earlier.
+func TestIngestToolFacts(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_USAGE_INGEST", "on"))
+	ctx := context.Background()
+	ann := s.SignIn("ann@example.com")
+	bob := s.SignIn("bob@example.com")
+	spaceID, _ := ann.NewSpace("Acme")
+	ann.Join(spaceID, bob)
+	sp, err := s.DB.S().SpaceByID(ctx, spaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgKey := store.OrgKey(sp)
+	st := s.DB.S()
+	skill, err := st.AddCatalogItem(ctx, store.CatalogItem{OrgID: orgKey, Kind: store.CatalogSkill, Name: "Review", CreatedAt: s.Clock.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := s.Clock.Now().UnixMilli()
+	day := s.Clock.Now().UTC().Format("2006-01-02")
+	o := &outbox{epoch: "e1"}
+	o.add(now, session("s1", "", "bob@example.com", "", now-60_000))
+	o.add(now, toolFact("s1", day, "skill", "review", 2, 0))
+	o.add(now, toolFact("s1", day, "skill", "review", 3, 1)) // the same day again: replaces
+	o.add(now, toolFact("s1", day, "skill", "acme:review", 1, 0))
+	o.add(now, toolFact("s1", day, "mcp", "grafana", 4, 9)) // errors cannot exceed calls
+	o.add(now, toolFact("s1", day, "bash", "Bash", 7, 0))
+	o.add(now, toolFact("s1", day, "weird", "x", 1, 0))              // an unknown kind is "other"
+	o.add(now, toolFact("s1", "not-a-day", "skill", "review", 1, 0)) // skipped
+	o.add(now, toolFact("s1", day, "skill", "review-none", 0, 0))    // no calls: skipped
+	o.add(now, toolFact("nobody", day, "skill", "review", 5, 0))     // a session the hub has no record of: the machine's creator
+	a := usageMachine(t, s, ann, spaceID, o)
+	s.Eventually("the outbox acked", func() bool { return o.lastAck().Seq == 10 })
+
+	rows, err := st.ToolUsageOf(ctx, orgKey, "2000-01-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	type key struct{ kind, name, user string }
+	got := map[key]store.ToolUsageRow{}
+	for _, r := range rows {
+		got[key{r.ToolKind, r.ToolName, r.UserID}] = r
+	}
+	if len(rows) != 6 {
+		t.Fatalf("%d rows: %+v", len(rows), rows)
+	}
+	s1, err := st.SessionByKey(ctx, orgKey, "claude", "s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := got[key{"skill", "review", bob.ID}]
+	if r.Calls != 3 || r.Errors != 1 || r.ItemID != skill.ID || r.TeamID != s1.TeamID || r.SpaceID != spaceID || r.Day != day || r.LastAt != now {
+		t.Errorf("skill row = %+v", r)
+	}
+	if r := got[key{"skill", "acme:review", bob.ID}]; r.Calls != 1 || r.ItemID != skill.ID {
+		t.Errorf("qualified skill row = %+v", r)
+	}
+	if r := got[key{"mcp", "grafana", bob.ID}]; r.Calls != 4 || r.Errors != 4 || r.ItemID != "" {
+		t.Errorf("mcp row = %+v", r)
+	}
+	if r := got[key{"bash", "Bash", bob.ID}]; r.Calls != 7 || r.ItemID != "" {
+		t.Errorf("bash row = %+v", r)
+	}
+	if r := got[key{"other", "x", bob.ID}]; r.Calls != 1 {
+		t.Errorf("other row = %+v", r)
+	}
+	if r := got[key{"skill", "review", ann.ID}]; r.Calls != 5 || r.ItemID != skill.ID {
+		t.Errorf("row of a session the hub does not know = %+v", r)
+	}
+
+	// An old hub's behaviour is the same code path as "a kind this hub does not know": a tool record without a body is
+	// skipped, not an error.
+	o.add(now, hubproto.UsageRecord{Kind: hubproto.UsageTool})
+	a.Emit(map[string]any{"event": hubproto.EventUsageAvailable, "epoch": "e1", "seq": 11})
+	s.Eventually("the empty record acked", func() bool { return o.lastAck().Seq == 11 })
+}

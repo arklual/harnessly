@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/connections"
 	"github.com/ly-solutions/harnessly/internal/files"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 )
@@ -64,6 +65,9 @@ type Config struct {
 	OrganizerFile string
 	// Transport carries every outgoing request; nil is the default one.
 	Transport http.RoundTripper
+	// Connections are the person's trackers and wikis (internal/connections); nil for none. The tracker app, task cards
+	// and link previews read a connection that is not the deployment's tracker through it.
+	Connections *connections.Service
 }
 
 // Service holds the caches the answers share.
@@ -87,10 +91,7 @@ func New(cfg Config) *Service {
 	if t == nil {
 		t = http.DefaultTransport
 	}
-	homes := []string{cfg.Home}
-	if u, err := user.Current(); err == nil && u.HomeDir != "" && u.HomeDir != cfg.Home {
-		homes = append(homes, u.HomeDir)
-	}
+	homes := homesOf(cfg.Home)
 	if cfg.ReaderPath == "" {
 		cfg.ReaderPath = "/"
 	}
@@ -108,14 +109,27 @@ func New(cfg Config) *Service {
 	}
 }
 
+// homesOf are the homes token files are looked for in: the runtime user's, then the process owner's.
+func homesOf(home string) []string {
+	homes := []string{home}
+	if u, err := user.Current(); err == nil && u.HomeDir != "" && u.HomeDir != home {
+		homes = append(homes, u.HomeDir)
+	}
+	return homes
+}
+
 // secret is an environment variable, else the first non-empty file of the names in a secret folder of a home; read
 // on every use, so a rotated token is taken at once.
 func (s *Service) secret(envName string, names ...string) string {
+	return secretIn(s.homes, s.cfg.SecretDirs, envName, names...)
+}
+
+func secretIn(homes, dirs []string, envName string, names ...string) string {
 	if v := jscompat.Trim(os.Getenv(envName)); v != "" {
 		return v
 	}
-	for _, home := range s.homes {
-		for _, dir := range s.cfg.SecretDirs {
+	for _, home := range homes {
+		for _, dir := range dirs {
 			for _, name := range names {
 				raw, err := os.ReadFile(filepath.Join(home, dir, name))
 				if err != nil {
@@ -135,6 +149,24 @@ func (s *Service) trackerToken() string {
 		return ""
 	}
 	return s.secret("YOUTRACK_TOKEN", "youtrack-token")
+}
+
+// TrackerToken is the deployment tracker's token as the tracker routes read it (YOUTRACK_TOKEN, else a youtrack-token
+// file in a secret folder of a home); "" without a tracker or a token. Read on every call.
+func TrackerToken(cfg Config) string {
+	if cfg.TrackerURL == "" {
+		return ""
+	}
+	return secretIn(homesOf(cfg.Home), cfg.SecretDirs, "YOUTRACK_TOKEN", "youtrack-token")
+}
+
+// GitLabSelfToken is the token of the deployment's own GitLab (the first of GitLabHosts) as the GitLab routes read it;
+// "" without one.
+func GitLabSelfToken(cfg Config) string {
+	if len(cfg.GitLabHosts) == 0 {
+		return ""
+	}
+	return secretIn(homesOf(cfg.Home), cfg.SecretDirs, "GITLAB_SELF_TOKEN", "gitlab-self-token")
 }
 
 // gitlabToken: each GitLab gets only its own token, the public one never sees the self-hosted one's.

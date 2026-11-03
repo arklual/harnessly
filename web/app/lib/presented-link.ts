@@ -4,6 +4,7 @@ import {
   gitlabHosts,
   isArtifactsUrl,
   isBoardsUrl,
+  isConnectionUrl,
   isTrackerHost,
 } from '@/lib/site';
 import { appConfig } from '@/platform/config';
@@ -22,6 +23,8 @@ export interface IPresentedLink {
   project?: string;
   /** A board of the boards service, shown among the documents. */
   board?: boolean;
+  /** On the instance of one of the person's connections: the runtime reads it as an issue or a page. */
+  connection?: boolean;
 }
 
 const ISSUE_PATH = /^\/(?:youtrack\/)?issue\/([A-Z][A-Z0-9]*-\d+)(?:\/|$)/;
@@ -50,7 +53,10 @@ export const presentLink = (href: string): IPresentedLink => {
 
   if (isTrackerHost(host)) {
     const key = url.pathname.match(ISSUE_PATH)?.[1];
-    return key ? { kind: 'issue', label: key, detail, key } : { kind: 'web', label: detail, detail };
+    if (key) return { kind: 'issue', label: key, detail, key };
+    return isConnectionUrl(url)
+      ? { kind: 'web', label: detail, detail, connection: true }
+      : { kind: 'web', label: detail, detail };
   }
   if (gitlabHosts().includes(host)) {
     const mr = url.pathname.match(MR_PATH);
@@ -85,6 +91,7 @@ export const presentLink = (href: string): IPresentedLink => {
   if (github) return { kind: 'issue', label: githubKeyOf(github), detail, key: githubKeyOf(github) };
   if (host === 'github.com' || host === appConfig().githubHost)
     return { kind: 'github', label: detail, detail };
+  if (isConnectionUrl(url)) return { kind: 'web', label: detail, detail, connection: true };
   return { kind: 'web', label: detail, detail };
 };
 
@@ -92,4 +99,6 @@ export const presentLink = (href: string): IPresentedLink => {
 export const isWorkProduct = (kind: LinkKind) =>
   kind === 'artifact' || kind === 'claude-artifact' || kind === 'mr' || kind === 'issue';
 
-export const hasLinkMeta = (kind: LinkKind) => kind === 'artifact' || kind === 'mr' || kind === 'issue';
+/** The runtime can say more about the link: a title, a state (link-meta). */
+export const hasLinkMeta = (link: Pick<IPresentedLink, 'kind' | 'connection'>) =>
+  link.kind === 'artifact' || link.kind === 'mr' || link.kind === 'issue' || link.connection === true;

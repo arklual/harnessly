@@ -20,6 +20,20 @@ export interface MachineAccess {
   people: PersonRef[];
 }
 
+/** An amount in minor units (kopecks, cents) with its currency, as the provider prices it. */
+export interface Money {
+  amount: number;
+  currency: string;
+}
+
+/** Which of the machine's capabilities the hub manages (null while the feature is off). */
+export interface MachineManaged {
+  budget: boolean;
+  env: boolean;
+  resources: boolean;
+  access: boolean;
+}
+
 export interface OrgMachine {
   id: string;
   name: string;
@@ -39,7 +53,13 @@ export interface OrgMachine {
   /** The machine is switched off in the hub (disabled_at) — also `state: 'disabled'`, who and when for the hint. */
   disabledBy: string | null;
   disabledAt: string | null;
-  busy: { kind: MachineBusyKind; chats?: number } | null;
+  busy: {
+    kind: MachineBusyKind;
+    chats?: number;
+    /** The operation in flight on the hub (live); a drain or a restart without a provider call can be cancelled. */
+    opId?: string;
+    cancellable?: boolean;
+  } | null;
   /** Chats running now; null while it is not reachable. */
   chats: number | null;
   /** 0..100; null while it is not reachable. */
@@ -60,6 +80,15 @@ export interface OrgMachine {
   /** The viewer may resize and disable it (a tenant's admin and above); `needs` is the hint when not. */
   canAdmin: boolean;
   needs: 'org_admin' | 'tenant_admin' | 'team_lead' | null;
+  /** The viewer's own machine (the «Мои» group of a participant). */
+  mine?: boolean;
+  /** Chats in the last 7 days; null when the hub does not count them. */
+  weekChats?: number | null;
+  /** The system on it: «Ubuntu 24.04». */
+  os?: string | null;
+  /** The rented server: who rents it, which plan and what the provider charges. Absent on a laptop. */
+  rent?: { provider: string; plan: string; price: Money | null } | null;
+  managed?: MachineManaged | null;
 }
 
 export interface MachineGroup {
@@ -69,6 +98,8 @@ export interface MachineGroup {
   sub: string;
   /** Where «Все N машин» leads (a tenant slug), when the group is a tenant of the organization. */
   tenantSlug: string | null;
+  /** The tenant is pinned by the viewer (the filter «Закреплённые»). */
+  pinned?: boolean;
   total: number;
   offline: number;
   idle: number;
@@ -129,6 +160,17 @@ export interface MachineDetail {
   teamLabel: string | null;
   /** People who would get access with «команда» and «все в тенанте». */
   audience: { team: number | null; tenant: number };
+  /** The provider's console for this server (the fallback when the hub cannot reach the machine). */
+  consoleUrl?: string | null;
+  /** Why the provider's plans could not be read; the resources editor then stays closed. */
+  providerError?: string | null;
+}
+
+/** What a resize would cost: the new price per month and the difference from the current one. */
+export interface ResourceQuote {
+  price: Money | null;
+  current: Money | null;
+  delta: Money | null;
 }
 
 export interface MachineScopeArg {
@@ -143,10 +185,14 @@ export interface MachinesApi {
   machinesList(org: string, arg: MachineScopeArg): Promise<MachinesList>;
   machineDetail(id: string): Promise<MachineDetail>;
   resizeMachine(id: string, to: { cores: number; ramGb: number; diskGb: number }): Promise<MachineDetail>;
+  /** The price of a resize, before it is applied. */
+  quoteResources(id: string, to: { cores: number; ramGb: number; diskGb: number }): Promise<ResourceQuote>;
   restartMachine(id: string, what: RestartWhat, when: RestartWhen): Promise<MachineDetail>;
   /** Lets chats finish no longer: cancels a restart that waits for them. */
   cancelRestart(id: string): Promise<MachineDetail>;
   disableMachine(id: string): Promise<MachineDetail>;
   enableMachine(id: string): Promise<MachineDetail>;
   setMachineAccess(id: string, access: { mode: AccessMode; personIds: string[] }): Promise<MachineDetail>;
+  /** Where «Открыть» leads: the address of the machine's runtime (`GET /api/machines/{id}/open`). */
+  openMachine(id: string): Promise<{ url: string }>;
 }

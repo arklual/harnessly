@@ -1,0 +1,118 @@
+/* What the design board gets from its canvas and the page needs on its own: the page frame, the drawers' anchor and a
+   phone layout (the board draws only the desktop; on a phone the sidebar becomes a drawer behind a menu button). */
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+body:has(> #root > .hx-root) {
+  background: var(--hx-shell);
+}
+.hx-root.ad {
+  position: relative;
+  font-family: var(--hx-font-ui);
+  color: var(--hx-fg-1);
+  -webkit-font-smoothing: antialiased;
+  /* The board is drawn with the font's own line height; the app's global 1.5 makes every two-line label taller */
+  line-height: normal;
+}
+
+/* Phone: the menu button and the sidebar as a drawer, movement through transform and opacity only */
+.hxh-menu,
+.hxh-side-scrim {
+  display: none;
+}
+@media (max-width: 900px) {
+  .hxh-menu {
+    display: inline-flex;
+    position: absolute;
+    z-index: 25;
+    top: 10px;
+    left: 10px;
+  }
+  .ad .hx-sidebar {
+    display: flex;
+    position: absolute;
+    z-index: 70;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(300px, 86vw);
+    background: var(--hx-shell);
+    box-shadow: var(--hx-shadow-overlay);
+    transform: translateX(-104%);
+    transition: transform 320ms var(--hx-ease-out);
+  }
+  .ad[data-hxh-side='open'] .hx-sidebar {
+    transform: none;
+  }
+  .ad[data-hxh-side='open'] .hxh-side-scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 69;
+    background: rgba(10, 10, 12, 0.32);
+    animation: ad-fade 200ms ease;
+  }
+  /* The hub has no section list to drill out of: the page is always the one in view (settings.css slides it in only
+     when the section list is shown, which the hub does not have) */
+  .ad .hx-set__page {
+    transform: none;
+    visibility: visible;
+    box-shadow: none;
+    transition: none;
+  }
+  .ad .hx-set__page-in {
+    padding-top: 44px;
+  }
+  /* The board's phone tiles scroll sideways and bleed past the gutter; the hub's dash tiles are a 2×2 grid there, so the
+     scroll padding and the edge fade only pushed them in */
+  .ad .mo-tiles .sx-grid {
+    padding-inline: 0;
+    mask-image: none;
+  }
+  .ad .ad-sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 88vh;
+    border-radius: 20px 20px 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ad .hx-sidebar {
+    transition: none;
+  }
+}
+
+/* The switcher's search is a real field in the page; on the board it is a drawn row */
+.ad .ad-pop__search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  outline: none;
+}
+.ad .ad-pop__search input::placeholder {
+  color: var(--hx-fg-3);
+}
+.ad .ad-pop__empty {
+  padding: 8px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+
+/* Where drawers and dialogs draw: no box of its own, so they sit against the hub root and take no grid row */
+.hxh-layer {
+  display: contents;
+}
+.hxh-wait {
+  min-height: 40vh;
+}

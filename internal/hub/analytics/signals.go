@@ -162,21 +162,33 @@ func limitChanged(m *money, g store.Signal) bool {
 // person after it was made (limitChanged); otherwise it stays until the person asks again or it is resolved so.
 func (s *Service) syncSignals(ctx context.Context, x *orgScope, m *money, fs []found) error {
 	now := x.now
-	return s.db.Tx(ctx, func(st store.Store) error {
+	var fresh []store.Signal
+	err := s.db.Tx(ctx, func(st store.Store) error {
+		fresh = fresh[:0]
 		seen := map[string]bool{}
 		for _, f := range fs {
 			seen[f.rule+"|"+f.key] = true
 			g, err := st.SignalByKey(ctx, x.org.ID, f.rule, f.key)
 			switch {
 			case store.IsNotFound(err):
-				if _, err = st.AddSignal(ctx, f.row(x.org.ID, now)); err != nil {
+				row := f.row(x.org.ID, now)
+				ok, err := st.AddSignal(ctx, row)
+				if err != nil {
 					return err
+				}
+				if ok {
+					fresh = append(fresh, row)
 				}
 			case err != nil:
 				return err
 			default:
-				if err = st.UpdateSignal(ctx, f.fill(g, now)); err != nil {
+				reopened := g.ResolvedAt != nil
+				g = f.fill(g, now)
+				if err = st.UpdateSignal(ctx, g); err != nil {
 					return err
+				}
+				if reopened {
+					fresh = append(fresh, g)
 				}
 			}
 		}
@@ -196,6 +208,9 @@ func (s *Service) syncSignals(ctx context.Context, x *orgScope, m *money, fs []f
 				gone = g.ScopeKind == x.sc.Kind && g.ScopeID == x.sc.ID
 			case ruleLimitRequest:
 				gone = limitChanged(m, g)
+			default:
+				// The checker's rules are found only by the checker, which has looked at the whole organization.
+				gone = x.full && slices.Contains(orgRules, g.Rule)
 			}
 			if gone {
 				g.ResolvedAt = &now
@@ -206,6 +221,13 @@ func (s *Service) syncSignals(ctx context.Context, x *orgScope, m *money, fs []f
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	for _, g := range fresh {
+		s.announce(ctx, x.org.ID, x.now, g)
+	}
+	return nil
 }
 
 func latest(a time.Time, b *time.Time) time.Time {
@@ -532,6 +554,10 @@ func (s *Service) limitRequest(w http.ResponseWriter, r *http.Request, p *auth.P
 		return err
 	}
 	resp.Request.ID = signalID(f.rule, f.key)
+	if g, err := s.db.S().SignalByKey(ctx, o.ID, f.rule, f.key); err == nil {
+		s.publishLimitRequest(ctx, o.ID, g)
+		s.announce(ctx, o.ID, now, g)
+	}
 	httpx.WriteJSON(w, http.StatusCreated, resp)
 	return nil
 }

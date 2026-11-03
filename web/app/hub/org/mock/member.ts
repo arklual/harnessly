@@ -26,7 +26,8 @@ export const memberMock = (_ctx: MockCtx): MemberApi => ({
         warnPct: 80,
         mode: 'stop',
         setBy: { userId: 'u-anya', name: 'Аня' },
-        resetsAt: new Date(now + 24 * HOUR).toISOString(),
+        // The limit is monthly: it starts over on the 1st.
+        resetsAt: new Date(new Date(now).getFullYear(), new Date(now).getMonth() + 1, 1).toISOString(),
         breakdown,
       },
       chats: [
@@ -86,13 +87,13 @@ export const memberMock = (_ctx: MockCtx): MemberApi => ({
         },
       ],
       tiles: {
-        chats: { week: 25, running: 3, bars: [3, 5, 1, 7, 2, 4, 6, 5, 8, 4, 3, 2, 9] },
-        mr: { week: 5, merged: 4, bars: [1, 2, 0, 1, 0, 0, 2, 2, 0, 3, 1, 0, 2] },
+        chats: { week: 25, running: 3, bars: [3, 4, 5, 2, 0, 1, 4, 5, 3, 6, 4, 1, 0, 5] },
+        mr: { week: 5, merged: 4, bars: [1, 0, 1, 0, 0, 0, 1, 1, 0, 2, 1, 0, 0, 1] },
         machine: {
           name: 'andrey-main',
           online: true,
           loadPct: 41,
-          bars: [2, 4, 5, 3, 6, 5, 7, 6, 4, 5, 4, 3, 4],
+          bars: [15, 21, 27.5, 19, 6, 4, 23.5, 30.5, 26, 22, 19.5, 5, 3, 20.5],
         },
       },
     };

@@ -1,4 +1,4 @@
-// Команды и лимиты (HRN-540): people by team with their roles and limits, the sheets to change them, the journal.
+// Команды и лимиты: people by team with their roles and limits, the sheets to change them, the journal.
 // A lead sees only their team («Моя команда»). Whatever the role may not change is disabled and says who can.
 import '../teams.css';
 

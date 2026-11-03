@@ -14,7 +14,7 @@ import (
 	"sync"
 )
 
-// The motion kit of a video's board (HRN-576): GSAP and its plugins, and the deck's fonts, served by the library itself,
+// The motion kit of a video's board: GSAP and its plugins, and the deck's fonts, served by the library itself,
 // so a scene loads no third-party address and draws the same on a machine with nothing installed. Only what a board asks
 // for is loaded; a board that asks for nothing costs nothing.
 const motionKitPrefix = "/__lib/motion/"

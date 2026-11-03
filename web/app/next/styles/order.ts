@@ -72,6 +72,7 @@ import '@/next/styles/providers.css';
 import '@/next/styles/notify-bots.css';
 import '@/next/styles/asks.css';
 import '@/next/styles/safe.css';
+import '@/next/styles/connections.css';
 import '@/next/styles/notices.css';
 import '@/next/styles/whats-new.css';
 import '@/next/styles/motion.css';

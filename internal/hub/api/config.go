@@ -35,6 +35,7 @@ func (h *Hub) config(w http.ResponseWriter, r *http.Request) error {
 	httpx.WriteJSON(w, http.StatusOK, obj{
 		"version":   buildinfo.Version,
 		"publicUrl": h.cfg.PublicURL,
+		"agentUrl":  h.cfg.AgentURL,
 		"edition":   h.cfg.Edition,
 		"signup":    h.cfg.Signup,
 		"auth": obj{
@@ -57,6 +58,11 @@ func (h *Hub) config(w http.ResponseWriter, r *http.Request) error {
 		"sites":       sitesCfg,
 		"termsUrl":    terms,
 		"orgs":        h.cfg.Orgs,
+		// proxied: the page came through a gateway that signs its people in (config.ProxyJWT); it shows no sign-in or
+		// sign-out of its own.
+		"proxied": h.Auth.ProxiedHost(r),
+		// What the instance itself switches on for every organization; an organization's own flags are in its view.
+		"features": h.Features.Instance(),
 	})
 	return nil
 }

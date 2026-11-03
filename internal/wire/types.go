@@ -2531,10 +2531,12 @@ type PermissionKind string
 const (
 	PermTool PermissionKind = "tool"
 	PermPlan PermissionKind = "plan"
+	// PermDialog is any other menu the agent stands on, which no tool call named: its words are in PlanMD.
+	PermDialog PermissionKind = "dialog"
 )
 
 // PermissionKinds is every PermissionKind, in the schema's order.
-var PermissionKinds = []PermissionKind{PermTool, PermPlan}
+var PermissionKinds = []PermissionKind{PermTool, PermPlan, PermDialog}
 
 // PermissionScope is what a permission option grants.
 type PermissionScope string

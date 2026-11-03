@@ -559,3 +559,31 @@ func TestDetectThroughTheAppsSandbox(t *testing.T) {
 		t.Fatal("the hooks of a Claude under bwrap")
 	}
 }
+
+// the sessions a pane's Claude goes by are its pid file's (rewritten on /clear) and its --resume's; a Claude
+// started from inside it (the agent's Bash running `claude -p`) is deeper and does not count.
+func TestSessionIDsOfThePaneClaude(t *testing.T) {
+	home := t.TempDir()
+	d := &Detector{Dir: filepath.Join(home, ".claude"), Match: agents.MatchArgv}
+	const nested = "99999999-8888-7777-6666-555555555555"
+	put(t, filepath.Join(home, ".claude", "sessions", "21.json"), `{"pid":21,"sessionId":"`+id1+`","cwd":"/w"}`)
+	put(t, filepath.Join(home, ".claude", "sessions", "23.json"), `{"pid":23,"sessionId":"`+nested+`","cwd":"/w"}`)
+	f := fakeProcs{
+		21: {args: "claude --settings /h.json --resume " + id2, children: []int{22}},
+		22: {args: "/bin/bash -c claude -p hi", children: []int{23}},
+		23: {args: "claude -p hi --settings /h.json"},
+	}
+	d.Procs = f.procs()
+	if got := d.SessionIDs([]int{21}); !slices.Equal(got, []string{id1, id2}) {
+		t.Fatalf("the pane's Claude: %v", got)
+	}
+	// After /clear Claude rewrites its pid file before the new session's SessionStart.
+	put(t, filepath.Join(home, ".claude", "sessions", "21.json"), `{"pid":21,"sessionId":"`+id2+`","cwd":"/w"}`)
+	f[21] = fakeProc{args: "claude", children: []int{22}}
+	if got := d.SessionIDs([]int{21}); !slices.Equal(got, []string{id2}) {
+		t.Fatalf("after /clear: %v", got)
+	}
+	if got := d.SessionIDs([]int{30}); got != nil {
+		t.Fatalf("no Claude: %v", got)
+	}
+}

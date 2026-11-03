@@ -27,7 +27,7 @@ export const artifactItemOf = (link: IArtifactLink): IArtifactItem => {
     fallback: presented.label,
     where: presented.detail,
     github: githubRefOf(link.url) !== null,
-    readable: hasLinkMeta(presented.kind),
+    readable: hasLinkMeta(presented),
     at: link.timestamp,
   };
 };

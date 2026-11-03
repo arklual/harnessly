@@ -33,7 +33,7 @@ func longCommand(t *testing.T) PickWant {
 	return PickWant{N: 1, Label: "Yes", Command: "$ " + strings.TrimSpace(string(raw))}
 }
 
-// HRN-586: a chat's pane runs at 80×24 with no terminal attached. Claude 2.1.316 draws a 1.3 KB command past the top of
+// a chat's pane runs at 80×24 with no terminal attached. Claude 2.1.316 draws a 1.3 KB command past the top of
 // that window, and the alternate screen keeps nothing in the scrollback. The window grows and the dialog is whole.
 func TestLookGrowsAWindowTheDialogDoesNotFit(t *testing.T) {
 	want := longCommand(t)

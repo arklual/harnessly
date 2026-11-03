@@ -36,6 +36,7 @@ export const SETTINGS_SECTIONS = [
   'safe',
   'machines',
   'apps',
+  'connections',
   'design',
   'beta',
 ] as const;

@@ -52,7 +52,8 @@ is `verdict: 'noise'`, shown as «не отличить от шума».
 
 `metrics` keys (numbers): `turns`, `agentMs`, `waitMs`, `waits`, `activeIntervals` (the session's working intervals,
 encoded as a count here and kept as pairs on the machine), `toolCalls`, `toolErrors`, `carryTokens`, `firstCtx`,
-`inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `skillsListed`, `skillsLoaded`, `mrs`, `mrsMerged`, `firstMrMs`.
+`inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `skillsListed`, `skillsLoaded`, `mrs`, `mrsMerged`, `firstMrMs`,
+`waitingSince` (optional, epoch ms: since when the agent waits for its person).
 Until the machine's scanner fills the MR fields, an installation may fill them from its own merge-request source.
 
 ## Signals («Требует внимания»)
@@ -61,19 +62,322 @@ A signal lives while its condition holds, deduplicated by `rule + subject`, can 
 level that can act on it; after 48 hours without action it is raised one level (`escalated: true`). A lead sees their
 team's signals; a member only their own.
 
-| `rule` | When | `action.kind` |
-| --- | --- | --- |
-| `budget_runs_out` | at the pace of the last 7 days the budget ends before the period does | `raise_limit` |
-| `over_80` | a person or a team passed 80% of a limit | `raise_limit` |
-| `window_90` | a shared account's window is at 90% or more before its reset | `move_account` («Перекинуть на №N») |
-| `tool_errors_up` | `tool_errors` rose above the noise | `open_kpi` |
-| `invite_pending` | an invitation waits 3 days | `resend_invite` |
-| `machine_offline`, `machine_idle` | a machine is offline, or idle for a week | `open_machine` |
-| `unknown_account` | a machine of the organization used an account nobody registered | `register_account` |
-| `model_no_price` | calls of a model without a price | `open_prices` |
-| `invoice_mismatch` | the estimate differs from the provider's bill by more than 5% | `open_kpi` (money) |
-| `chat_waiting` | a chat waits for its person for more than an hour | `open_chat` |
-| `limit_request` | a person asked for more («Попросить больше») | `raise_limit` |
+| `rule` | Object (dedup key) | When | Severity | `action.kind`, `target` |
+| --- | --- | --- | --- | --- |
+| `budget_runs_out` | scope | at the pace of the last 7 days the budget ends before the period does | warn | `raise_limit`, the person or `scopeKind:scopeId` |
+| `over_80` | person or team | passed 80% of a limit | warn (critical at 100%) | `raise_limit`, same |
+| `machine_offline` | machine | not heard from for `machineOfflineAfter` = 15 min | warn; critical from `machineOfflineCritical` = 24 h | `open_machine`, the machine id |
+| `machine_idle` | machine | online, no top-level session for a week | info | `open_machine`, the machine id |
+| `invite_pending` | invitation | an invitation by email waits `invitePendingAfter` = 3 days | info; warn from `inviteWarnAfter` = 7 days | `resend_invite`, the invitation id |
+| `window_90` | account | an organization-funded account's freshest window (measured within `windowFresh` = 24 h, not yet reset) is at `windowPct` = 90% or more | warn; critical from `windowCriticalPct` = 98% | `move_account` to the account of the same provider and kind with the lowest use under `windowSpare` = 70% (the signal stays without the move when none is spare), the target account id |
+| `tool_errors_up` | organization | the `tool_errors` KPI is «worse» over the last `toolErrorsWeek` = 7 whole days against the 7 before them | warn | `open_kpi`, `tool_errors` |
+| `unknown_account` | account | a machine of the organization used an account nobody registered (`Discovered`); the detail carries the month's list money | warn | `register_account`, the account id |
+| `model_no_price` | model | the hourly rollup of the last `unpricedWindow` = 7 days holds calls of the model without a price (`Unpriced > 0`); no money is guessed | warn | `open_prices`, the model |
+| `invoice_mismatch` | account | the estimate differs from the provider's bill by more than 5% | warn | `open_kpi` (money), `money` |
+| `chat_waiting` | chat | a chat waits for its person longer than `chatWaitingAfter` = 1 hour (session metric `waitingSince`) | info; warn from `chatWaitingWarn` = 4 h | `open_chat`, the session key |
+| `limit_request` | person | a person asked for more («Попросить больше») | warn | `raise_limit`, same |
+
+`action` is `{ kind, label, target, … }`: `target` is the one thing the action is about (a person, an account, a
+machine, an invitation, a KPI, a chat, a model; a `raise_limit` of a team or a tenant without a person has
+`team:<id>` or `tenant:<id>`), so a button can go to it without knowing the variant; the other fields are the variant's
+own.
+
+As built:
+
+- The nine rules after `over_80` and `budget_runs_out` are about the organization as a whole and are found only by
+  the background checker, not by a screen read: the screens show what the checker kept. The checker runs for the
+  organizations with the `ui.hx` flag on ([api.md](api.md), «Features»): every 5 minutes (`checkEvery`) and, after an
+  event that can change a rule (a limit set, a machine going offline), 10 seconds after it (`triggerAfter`; events
+  within it share one run).
+- One open signal per rule × object. A signal whose condition no longer holds is resolved by the checker; a
+  rule with no data to look at (no machines, no windows) finds nothing. A snoozed signal stays hidden until its time
+  or until its severity rises.
+- `invoice_mismatch` is defined but finds nothing: the hub holds no provider invoices to compare the estimate with.
+  The rule starts to work when an invoice source is written; nothing is guessed meanwhile.
+- `chat_waiting` needs the session metric `waitingSince` (epoch ms; the moment the agent began to wait for its
+  person). The machine's scanner does not set it yet, so until it does the rule finds nothing; a chat that is ended does
+  not count. The signal is addressed to the person of the session.
+- `tool_errors_up` uses the sessions-based `tool_errors` KPI and does not need the daily per-tool table; the table
+  can add «which tool» to the detail when it exists.
+- New signals are announced on the organization's stream as `signal.new` ([api.md](api.md), «Events»).
+
+## Today and efficiency
+
+`GET …/overview` carries two more blocks, both counted from the same sessions and hourly rows as the rest of the screen
+. `today` is «Сегодня», `efficiency` is «Эффективность». Fixtures: `overview-admin.json`, `overview-lead.json`.
+
+```
+"today": {"day": "2026-10-31", "spend": {"paid": {"usd": 86.4, "shown": 7041.6}, "list": {"usd": 104.2, "shown": 8492.3}, "tokens": 18400000}, "active": {"people": 3, "of": 4}, "tasks": {"closed": 5, "inWork": 2}, "sparks": {"spend": [{"day": "2026-10-18", "value": 52.1}, {"day": "2026-10-19", "value": 61.0}, {"day": "2026-10-20", "value": 48.3}, {"day": "2026-10-21", "value": 0}, {"day": "2026-10-22", "value": 0}, {"day": "2026-10-23", "value": 35.7}, {"day": "2026-10-24", "value": 72.4}, {"day": "2026-10-25", "value": 66.9}, {"day": "2026-10-26", "value": 58.2}, {"day": "2026-10-27", "value": 71.0}, {"day": "2026-10-28", "value": 64.4}, {"day": "2026-10-29", "value": 80.3}, {"day": "2026-10-30", "value": 95.1}, {"day": "2026-10-31", "value": 86.4}], "active": [{"day": "2026-10-18", "value": 3}, {"day": "2026-10-19", "value": 4}, {"day": "2026-10-20", "value": 4}, {"day": "2026-10-21", "value": 0}, {"day": "2026-10-22", "value": 0}, {"day": "2026-10-23", "value": 2}, {"day": "2026-10-24", "value": 4}, {"day": "2026-10-25", "value": 4}, {"day": "2026-10-26", "value": 3}, {"day": "2026-10-27", "value": 4}, {"day": "2026-10-28", "value": 4}, {"day": "2026-10-29", "value": 4}, {"day": "2026-10-30", "value": 4}, {"day": "2026-10-31", "value": 3}], "tasks": [{"day": "2026-10-18", "value": 3}, {"day": "2026-10-19", "value": 4}, {"day": "2026-10-20", "value": 2}, {"day": "2026-10-21", "value": 0}, {"day": "2026-10-22", "value": 0}, {"day": "2026-10-23", "value": 1}, {"day": "2026-10-24", "value": 5}, {"day": "2026-10-25", "value": 4}, {"day": "2026-10-26", "value": 3}, {"day": "2026-10-27", "value": 6}, {"day": "2026-10-28", "value": 4}, {"day": "2026-10-29", "value": 5}, {"day": "2026-10-30", "value": 7}, {"day": "2026-10-31", "value": 5}]}}
+```
+
+- `day` is today in the organization's zone. `spend.paid` / `spend.list` are what the organization's accounts paid /
+  listed since midnight of that zone (the same figure as `usage.tick.spendToday`); `spend.tokens` are the input, output
+  and cache tokens of all funding of the scope (as `tokensToday`).
+- `active.people` are the people with a live top-level session that overlaps today; `active.of` are the people of the
+  scope (a team: its members; otherwise the members of the tenants under the scope).
+- `tasks.closed` are the sessions that **ended** today with `mrs ≥ 1` (a closed task); `tasks.inWork` are the sessions
+  still running (no end) and updated in the last 15 minutes (the same ones `usage.tick.chatsNow` counts).
+- `sparks` are the last 14 days, oldest first, today included, one point per day of the zone (a day with nothing is a
+  `0`, not a hole). `spend` is paid dollars. There is no strip for the subscriptions tile: the hub keeps no history of
+  a window's percent.
+
+```
+"efficiency": {
+  "teams": [
+    {
+      "key": "m2platformteamaaaaaa",
+      "label": "Платформа",
+      "people": 3,
+      "closed": 18,
+      "perPersonMonth": 6.0,
+      "reached": {
+        "value": 0.71,
+        "n": 64
+      }
+    },
+    {
+      "key": "m2productteamaaaaaaa",
+      "label": "Продукт",
+      "people": 1,
+      "closed": 3,
+      "perPersonMonth": 3.0,
+      "reached": {
+        "value": null,
+        "n": 4
+      }
+    }
+  ],
+  "reached": {
+    "value": 0.68,
+    "n": 68
+  }
+}
+```
+
+- `teams` are the scope's teams (and «Без команды» with `key: ""` when sessions belong to none), the most tasks per
+  person first; rows without a `perPersonMonth` go last.
+- `closed` are the team's sessions that ended in the period with `mrs ≥ 1`. `perPersonMonth = closed ÷ people ÷ months`,
+  rounded to 0.1: `months` is the number of calendar months for a period of whole months and `days ÷ 30` for any other
+  period. It is `null` with no people.
+- `reached` is the completion KPI over the sessions started in the period: the share of those with `turns ≥ 3` that made
+  an MR. `value` is `null` below 5 sessions (`n` is how many there are), never a made-up number.
+
+Also on the overview and the spend answers:
+
+- `tokens.total` (a field of `Tokens`) is input + output + cache read + cache write.
+- `spendBy.totals` is the sum of the rows as `{ list, paid, tokens }`, so a header does not add rows up in the browser:
+  `{"list": {"usd": 1610, "shown": 131215.0}, "paid": {"usd": 1380, "shown": 112470.0}, "tokens": 693910000}`.
+
+## People and the week
+
+`GET /api/orgs/{org}/people?scope=&period=` (money) is the lead's «Расход по людям». Fixture: `people-lead.json`.
+It needs a team or tenant scope to be useful, but the organization scope answers too (all its people).
+
+```
+{
+  "scope": {
+    "kind": "team",
+    "id": "m2platformteamaaaaaa"
+  },
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "total": {
+    "list": {
+      "usd": 1190,
+      "shown": 96985.0
+    },
+    "paid": {
+      "usd": 980,
+      "shown": 79870.0
+    },
+    "limit": {
+      "ruleId": "l2teamplatformaaaaa",
+      "amount": {
+        "usd": 1500,
+        "shown": 122250.0
+      },
+      "pct": 0.653,
+      "status": "ok",
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      }
+    },
+    "tone": "ok"
+  },
+  "week": {
+    "from": "2026-10-25",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "people": [
+    {
+      "userId": "u2annaaaaaaaaaaaaaaa",
+      "name": "Анна",
+      "role": "owner",
+      "list": {
+        "usd": 520,
+        "shown": 42380.0
+      },
+      "paid": {
+        "usd": 430,
+        "shown": 35045.0
+      },
+      "share": 0.287,
+      "limit": null,
+      "hot": false,
+      "chats": {
+        "n": 14,
+        "running": 1
+      },
+      "mrs": {
+        "n": 6,
+        "merged": 5
+      }
+    },
+    {
+      "userId": "u2borisaaaaaaaaaaaaa",
+      "name": "Борис",
+      "role": "member",
+      "list": {
+        "usd": 410,
+        "shown": 33415.0
+      },
+      "paid": {
+        "usd": 330,
+        "shown": 26895.0
+      },
+      "share": 0.22,
+      "limit": null,
+      "hot": false,
+      "chats": {
+        "n": 11,
+        "running": 0
+      },
+      "mrs": {
+        "n": 4,
+        "merged": 4
+      }
+    },
+    {
+      "userId": "u2veraaaaaaaaaaaaaaa",
+      "name": "Вера",
+      "role": "member",
+      "list": {
+        "usd": 260,
+        "shown": 21190.0
+      },
+      "paid": {
+        "usd": 220,
+        "shown": 17930.0
+      },
+      "share": 0.147,
+      "limit": {
+        "ruleId": "l2veralimitaaaaaaaa",
+        "amount": {
+          "usd": 250,
+          "shown": 20375.0
+        },
+        "pct": 0.88,
+        "status": "warn",
+        "setBy": {
+          "userId": "u2annaaaaaaaaaaaaaaa",
+          "name": "Анна"
+        }
+      },
+      "hot": true,
+      "chats": {
+        "n": 9,
+        "running": 2
+      },
+      "mrs": {
+        "n": 3,
+        "merged": 2
+      }
+    }
+  ]
+}
+```
+
+- `people` are the members of the scope and everybody who spent in it, the largest `paid` first, then by name.
+  Spend that has no known user is not a row but stays in `total`.
+- `list` / `paid` are the person's money in the period (the organization's accounts only, as in `…/spend?by=person`).
+- `share` is `paid ÷ the scope's own limit` (3 decimals); `null` when the scope has no limit. `limit` is the person's own
+  monthly limit with its use (`LimitBar`), `null` when they have none; `hot` is `limit.pct ≥ 0.8`.
+- `total.tone` is the colour of the scope's own limit: `ok`, `warn` from 75% and `risk` from 90%; `null` without a limit.
+- `chats` and `mrs` are the person's last `week` (7 days of the zone, today included): chats started, those still
+  running (not ended, moved in the last 15 minutes), MRs made (`mrs`) and merged (`mrsMerged`).
+- `role` is the person's role in the scope's tenant, `""` when they have none there. People invited but not yet entered
+  are not listed.
+
+`GET /api/me/week?org=` is the member's overview tiles «Чатов за неделю» and «MR за неделю». Fixture:
+`me-week-member.json`. The person's own live top-level sessions of the last 7 days; `org` only chooses the zone.
+
+```
+{
+  "week": {
+    "from": "2026-10-25",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "chats": {
+    "n": 25,
+    "running": 3
+  },
+  "mrs": {
+    "n": 5,
+    "merged": 4
+  }
+}
+```
+
+`GET /api/me/kpis/{kpi}/series?org=&from=&to=&by=day|week` is the person's own KPI chart, with the shape of
+`…/kpis/{kpi}/series` without `split`. Fixture: `me-kpi-series-member.json`. The sessions are all the person's own, so
+the chart agrees with `/api/me/kpis`. Unknown KPI — 404, `by` other than `day`/`week` — 400.
+
+Markers (here and in the organization's series) carry what the chart draws:
+
+```
+"markers": [
+  {
+    "changeId": "c2subagentsaaaaaaaaa",
+    "at": "2026-10-15T09:00:00Z",
+    "title": "Субагенты на Sonnet",
+    "layer": "team",
+    "author": {
+      "userId": "u2annaaaaaaaaaaaaaaa",
+      "name": "Анна"
+    },
+    "icon": "edit",
+    "verdict": "better"
+  },
+  {
+    "changeId": "c2claudeversionaaaaa",
+    "at": "2026-10-22T03:10:00Z",
+    "title": "Claude Code 2.4.1 → 2.5.0",
+    "layer": "org",
+    "author": null,
+    "icon": "rocket",
+    "verdict": "noise"
+  }
+]
+```
+
+- `layer` is where the change applies: `org`, `tenant` or `team`; `author` is who made it (`null` for a detected one);
+  `icon` is `edit` (a manual change), `rocket` (a new version of a tool), `announce` (any other detected change: a model, skill or policy); `verdict` is the
+  change's effect on this KPI as before.
+- Markers of `/api/me/…` come only with `?org=`: a change belongs to an organization, so without it `markers` is `[]`.
+  With it they are the organization's changes plus those of the tenants and teams the person's own sessions in the period
+  belong to.
 
 ## Endpoints
 
@@ -90,6 +394,7 @@ team's signals; a member only their own.
 | `POST …/changes` | manage of the scope | `{ scope, title, at }` | 201 `{ change: Change }`; journal `change.create` |
 | `GET …/changes/{id}/effect?scope=` | view | | `EffectResponse` — 7 days before against 7 after, live sessions, every KPI; `overlaps` lists other changes in the windows (then `verdict: 'mixed'`) |
 | `GET …/waste?scope=&period=` | money | | `WasteResponse` — «Куда уходят деньги впустую» |
+| `GET …/people?scope=&period=` | money | | `PeopleResponse` — «Расход по людям» of a team or tenant: each person's money, share, personal limit, week's chats and MRs ([below](#people-and-the-week)) |
 
 ### Machines
 
@@ -97,7 +402,8 @@ team's signals; a member only their own.
 | --- | --- | --- | --- |
 | `GET …/machines?scope=&problems=1` | view | | `MachinesResponse` — the scope's machines, those with problems first; `problems=1` only those |
 | `PATCH /api/machines/{id}` | manage of its tenant (team: the team's lead may change `access`) | `{ name?, teamId?, access? }` | `{ machine: HubMachine }`; journal `machine.team`, `machine.access` |
-| `POST /api/machines/{id}/restart` | manage | `{ what: 'runner' \| 'vm', when: 'now' \| 'after_chats' }` | 202 `{ jobId }`; `runner` is the agent operation `runtime.restart`, `vm` goes to the cloud (Selectel) |
+| `POST /api/machines/{id}/restart` | manage | `{ what: 'runner' \| 'machine' \| 'vm', when: 'now' \| 'drain' \| 'after_chats' }` | 202 `{ jobId, op }`; `runner` is the agent operation `runtime.restart`; `machine` (also `vm`) restarts the server through the provider, and `drain` stops new chats first. Without the `machine.resources` feature only `runner`/`vm` and `now`/`after_chats` work, and `vm` answers 501. See [machines-resources.md](machines-resources.md) |
+| `GET /api/machines/{id}/resources`, `POST …/resources/quote`, `POST …/resize`, `GET …/ops`, `POST …/ops/{opId}/cancel`, `GET …/metrics`, `PUT …/managed` | view / manage | | the machine's server, load and operations, only with the `machine.resources` feature (404 `not_enabled` otherwise); [machines-resources.md](machines-resources.md) |
 | `POST /api/machines/{id}/disable` | manage | `{}` | `{ machine }` — the link is closed, the key kept; the machine cannot be opened |
 | `POST /api/machines/{id}/enable` | manage | `{}` | `{ machine }` — it comes back with the same files |
 
@@ -112,13 +418,15 @@ Every signed-in person, in any organization or none; only their own sessions.
 | `GET /api/me/usage?period=&org=` | | `MeUsageResponse` — their money on organization and personal accounts, by day, model and account; `accountedUntil` is «на сервере учтено до …» |
 | `GET /api/me/sessions?from=&to=&before=&limit=50` | | `MeSessionsResponse` — their sessions with price and result, no text |
 | `GET /api/me/kpis?from=&to=&cmpFrom=&cmpTo=` | | `KpisResponse` with `scope: 'me'` |
+| `GET /api/me/kpis/{kpi}/series?org=&from=&to=&by=day\|week` | | `KpiSeriesResponse` — the person's own KPI over time, with the changes of `?org=` as markers ([below](#people-and-the-week)) |
+| `GET /api/me/week?org=` | | `MeWeek` — their chats and MRs of the last 7 days |
 | `GET /api/me/limits` | | [limits.md](limits.md) |
 | `POST /api/me/limit-requests` | `{ amountUsd, reason, scope }` | 201 `LimitRequestResponse` — a `limit_request` signal to those who may raise it |
 
 The agent app's «Управление» screen keeps its local history (`/api/platform/stats` of the runtime) and adds these with
 the «на сервере учтено до …» line.
 
-As built (HRN-590):
+As built:
 
 - Days are cut in the zone of `?org=`, of the person's only organization, or `Europe/Moscow`.
 - `paid` is computed at read time from the hourly rollup: a subscription's fee × the row's `list` ÷ everyone's `list` on
@@ -130,9 +438,9 @@ As built (HRN-590):
 - The endpoints follow `HUB_ORGS` like the rest of the organizations' API (404 when off, instance admins only in
   `shadow`).
 
-As built (HRN-613): the organization's `…/overview`, `…/spend`, `…/kpis`, `…/changes` and `…/waste`, and the rate.
+As built: the organization's `…/overview`, `…/spend`, `…/kpis`, `…/changes` and `…/waste`, and the rate.
 
-As built (HRN-613, machines):
+As built (machines):
 
 - `…/machines` lists the machines of the scope's tenants (a team scope: the machines in that team), those with problems
   first, then by name. A row is computed from what the hub holds: `status` from the link, `lastActiveAt` and
@@ -143,9 +451,17 @@ As built (HRN-613, machines):
   chat for 7 days; not for a machine that never connected), `agent_old` (below `HUB_MIN_AGENT_VERSION`), `disk_low`
   (the last preflight reported less than 10% or 5 GiB free), `login_expired` (an installed agent reports
   `logged_out`).
-- `cloud` is always `null` and `currency` is only the organization's: no cloud provider is connected to the hub, so
-  there is no flavor and no price.
-- `access` is stored and shown, not enforced: opening and the proxy still follow the tenant's membership.
+- `cloud` is `null` unless the organization has the `machine.resources` feature on and the hub knows the server of the
+  machine (from a provider, [provider.md](provider.md)); then it is `{ provider, plan, cpu, ramGB, diskGB, price,
+  externalId }`, each part `null` when unknown, and `price` is `{ amount, currency, period }` with `amount` in minor
+  units. The hub never makes a price up. With the feature on the row also carries `hardware` (what the machine said of
+  itself), `load` (`{ cpuPct, ramPct, diskPct, at }`, the last reading, dropped after 3 minutes), `week` (`{ chats, calls,
+  unpriced, spend }` of the last seven days, `spend` a `Money` of the priced calls, `null` when none was priced),
+  `managed` (`{ budget, env, resources, access }`) and `activeOps` (the unfinished operations). With it off these are
+  `null` and `[]`.
+- `access` is stored and shown. Whether it is kept when someone opens the machine is `HUB_ACCESS_ENFORCE`: `off`
+  (default) follows the tenant's membership only, `warn` logs who would be refused, `on` answers 403 `machine_access`
+  ([machines-resources.md](machines-resources.md#access)).
 - `PATCH` with `teamId` or `access` answers `{ machine: HubMachine }`; a name alone keeps the old answer (the machine as
   the space sees it). The team and every entry of `access` must belong to the machine's tenant. A lead of the machine's
   team may send `access` alone. Journal: `machine.team`, `machine.access`, and `machine.disable`, `machine.enable`.
@@ -154,7 +470,9 @@ As built (HRN-613, machines):
   `restart` too.
 - `restart` with `what: 'runner'` sends the agent operation `runtime.restart` `{ jobId, when }` and answers 202
   `{ jobId }`; an agent that does not know it gives 422 `restart_unsupported`. `what: 'vm'` answers 501
-  `not_implemented` («Перезапуск ВМ пока недоступен»): the hub has no cloud provider to ask.
+  `not_implemented` («Перезапуск ВМ пока недоступен») while the organization's `machine.resources` feature is off; with
+  it on, `vm` is `machine`: a reboot through the provider (422 `not_supported` without one), and `when: 'drain'` is
+  accepted. The answer then also carries `op`, and the restart is a stored operation ([machines-resources.md](machines-resources.md#operations)).
 - All of it follows `HUB_ORGS` (404 when off, instance administrators only in `shadow`).
 
 - **Rate.** The organization's `currency` (default `RUB`) is shown at the Central Bank's rate on the 1st of the period's
@@ -245,9 +563,15 @@ As built (HRN-613, machines):
   scope's chain in those 14 days goes to `overlaps` and turns each verdict but `too_few` into `mixed`.
 - **`…/waste`** (money) is where the organization's list money went to waste, over the live top-level sessions of the
   scope that started in the period with `funding: 'org'` only; each session counts at its list money (subagents'
-  calls included). Three kinds: `reread_context` is Σ list × min(1, `carryTokens` ÷ (`inputTokens` + `cacheReadTokens` +
-  `cacheWriteTokens`)); `failed_tools` is Σ list × min(1, `toolErrors` ÷ `toolCalls`); `abandoned_sessions` is the whole
-  list of the ended sessions with 3 turns or more and no MR (the `completion` KPI's rule). `sessions` is how many
-  contributed, `share` the item's part of the scope's whole list spend (0 when it is 0, 3 decimals). Items of zero are
-  left out, the rest are sorted by amount; `items` is `[]` when none. `long_waits` and `oversized_model` are not
-  computed yet and are not in the answer.
+  calls included). Exactly four kinds, each `{kind, money, share, sessions, explain}` (plus `title`, `hint`, and `amount`,
+  the first version's name for `money`, kept equal to it): `abandoned_sessions` is the whole list of the ended sessions
+  with 3 turns or more and no MR (the `completion` KPI's rule); `retries_after_errors` is Σ list × min(1, `toolErrors` ÷
+  `toolCalls`), an estimate (the machines do not measure what a retry cost); `long_context` is the list money of the
+  calls whose context (input + cache read + cache write) was 250 000 tokens or more, taken from the usage calls and
+  capped by the session's list; `extra_skills` is Σ list × the part of the input the start context of unused skills
+  takes (`firstCtx` × (`skillsListed` − `skillsLoaded`) ÷ `skillsListed` × `turns`, over input + cache read + cache
+  write, at most 1), an upper estimate. `explain` says in words how the number was counted and says «оценка» when it is
+  one. `sessions` is how many contributed, `share` the item's part of the scope's whole list spend (0 when it is 0, 3
+  decimals). A session can be in several kinds, so the items are not added up. Items of zero are left out, the rest are
+  sorted by amount; `items` is `[]` when none. The first version's `reread_context`, `failed_tools`, `long_waits` and
+  `oversized_model` are gone.

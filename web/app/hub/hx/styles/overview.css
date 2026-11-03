@@ -1,0 +1,142 @@
+/* «Обзор»: what the board's own sheets do not carry. The board gets `.t-card` from the design system's bundle; here it
+   is written with the tokens of this build. The rest are the states a live screen has and a still board has not. */
+.t-card {
+  border: 0.0625rem solid color-mix(in srgb, var(--t-text-primary) 14%, transparent);
+  border-radius: 0.875rem;
+  background: var(--t-bg-surface);
+  color: var(--t-text-primary);
+  box-shadow: 0 0.0625rem 0.125rem color-mix(in srgb, var(--t-text) 8%, transparent);
+}
+
+/* A new answer is on its way (the period or the tenant changed): the old numbers stay, a little quieter. */
+.ad-dash[data-busy='1'] .mx {
+  opacity: 0.55;
+  transition: opacity 160ms var(--hx-ease-out);
+  pointer-events: none;
+}
+
+/* A card with nothing to show says so in one line. */
+.ov-empty {
+  margin: 0;
+  padding: 8px 4px 4px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+
+.ov-error-line {
+  margin: 8px 0 0;
+  color: #c4361f;
+  font-size: var(--hx-text-xs);
+}
+
+/* A failed load: the reason as it is and a retry. */
+.ov-err {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 20px 0 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, #e5484d 40%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, #e5484d 6%, transparent);
+  font-size: var(--hx-text-sm);
+}
+.ov-err b {
+  font-weight: 600;
+}
+.ov-err span {
+  flex: 1 1 16rem;
+  color: var(--hx-fg-2);
+}
+
+/* The shapes of the screen while the numbers are on their way. */
+.ov-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+.ov-sk .sx-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .ov-sk .sx-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.ov-sk__tile,
+.ov-sk__card {
+  border-radius: 14px;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--t-text-primary) 5%, transparent) 30%,
+    color-mix(in srgb, var(--t-text-primary) 10%, transparent) 50%,
+    color-mix(in srgb, var(--t-text-primary) 5%, transparent) 70%
+  );
+  background-size: 300% 100%;
+  animation: ov-shimmer 1.4s linear infinite;
+}
+.ov-sk__tile {
+  height: 150px;
+}
+.ov-sk__card {
+  height: 280px;
+}
+.ov-sk__card--short {
+  height: 200px;
+}
+.ov-sk .me-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .ov-sk .me-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@keyframes ov-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ov-sk__tile,
+  .ov-sk__card {
+    animation: none;
+  }
+}
+
+/* The board never sets a line-height on its page, so its lines are `normal`; the shell's 1.5 would grow every row. */
+.ad-dash {
+  line-height: normal;
+}
+
+/* The board draws the people list at desktop width only; on a phone the bar drops under the name and the figures stay
+   on the right, so nothing runs past the card */
+@media (max-width: 640px) {
+  .ad .ld-head,
+  .ad .ld-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+  }
+  .ad .ld-head > :nth-child(2) {
+    display: none;
+  }
+  .ad .ld-row > .ld-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* The title link of a card stretches over the whole header; the controls on the right sit above it and stay clickable */
+.mx .viz-card__header > .viz-card__actions {
+  position: relative;
+  z-index: 1;
+}

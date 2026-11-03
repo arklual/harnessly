@@ -111,3 +111,207 @@ func TestBackgroundAgentAsksAfterTheTurn(t *testing.T) {
 		t.Fatalf("gate: %+v", g)
 	}
 }
+
+// Claude 2.1.316 writes the ExitPlanMode call only once its menu is answered. The screen opens the plan's card,
+// its answer reaches the menu, and the call written after that opens no second card.
+func TestPlanCardFromTheScreen(t *testing.T) {
+	r := newRig(t)
+	r.user("plan it")
+	r.busy()
+	r.open()
+	r.settle(wire.StateWorking)
+	r.pane.screen = tui(t, "claude-2.1.316-plan.ansi.txt")
+	r.tick(time.Second)
+	if k := r.state().K; k != wire.StateWaitingPermission {
+		t.Fatalf("state: %s", k)
+	}
+	ps := r.snap().Permissions
+	if len(ps) != 1 || ps[0].Kind != wire.PermPlan || len(ps[0].Options) != 3 {
+		t.Fatalf("permissions: %+v", ps)
+	}
+	if ps[0].TurnID == nil {
+		t.Fatal("a card outside its turn")
+	}
+	r.pane.onSend = func(call string) {
+		if call == "keys:2" {
+			r.busy()
+		}
+	}
+	res := r.do(wire.DecideCmd{OpID: "d1", ConversationID: r.id, PermissionID: ps[0].ID, OptionID: "2"})
+	if res.R != wire.ResultAccepted || !strings.Contains(strings.Join(r.pane.calls, ","), "keys:2") {
+		t.Fatalf("decide: %+v %v", res, r.pane.calls)
+	}
+	// The call comes after the answer, and its result with it: no second card, none left open.
+	r.line(`"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_plan","name":"ExitPlanMode","input":{"plan":"## Plan"}}]}`)
+	r.result("toolu_plan", "approved")
+	r.tick(time.Second)
+	ps = r.snap().Permissions
+	if len(ps) != 1 || ps[0].State.K == wire.GateStateOpen {
+		t.Fatalf("after the call: %+v", ps)
+	}
+	if k := r.state().K; k == wire.StateWaitingPermission {
+		t.Fatalf("still waiting: %s", k)
+	}
+}
+
+// A low window under the chat: the card comes as well, with the option that fits.
+func TestCutPermissionOpensACard(t *testing.T) {
+	r := newRig(t)
+	r.user("clean up")
+	r.busy()
+	r.open()
+	r.settle(wire.StateWorking)
+	r.pane.screen = " Do you want to proceed?\n ❯ 1. Yes\n\n Esc to cancel · Tab to amend\n"
+	for range 8 {
+		r.tick(time.Second)
+	}
+	if k := r.state().K; k != wire.StateWaitingPermission {
+		t.Fatalf("state: %s", k)
+	}
+	ps := r.snap().Permissions
+	if len(ps) != 1 || ps[0].Kind != wire.PermDialog || len(ps[0].Options) != 0 || ps[0].State.Refused == nil {
+		t.Fatalf("a cut menu is no button to press: %+v", ps)
+	}
+	// The whole dialog comes into view: the card of the permission takes over, with its options.
+	r.pane.screen = " Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel\n"
+	r.tick(time.Second)
+	r.tick(time.Second)
+	ps = r.snap().Permissions
+	last := ps[len(ps)-1]
+	if len(ps) != 2 || last.Kind != wire.PermTool || len(last.Options) != 2 || ps[0].State.K == wire.GateStateOpen {
+		t.Fatalf("permissions: %+v", ps)
+	}
+}
+
+// The menu on the screen is not the one the card shows: no key goes in.
+func TestDialogCardDoesNotAnswerAnotherMenu(t *testing.T) {
+	r := newRig(t)
+	r.user("pick")
+	r.busy()
+	r.open()
+	r.settle(wire.StateWorking)
+	r.pane.screen = " Which one?\n ❯ 1. Yes\n   2. Later\n\n Esc to cancel\n"
+	for range 8 {
+		r.tick(time.Second)
+	}
+	ps := r.snap().Permissions
+	if len(ps) != 1 || ps[0].Kind != wire.PermDialog {
+		t.Fatalf("permissions: %+v", ps)
+	}
+	r.pane.screen = " Delete everything?\n ❯ 1. Yes\n   2. Later\n\n Esc to cancel\n"
+	r.tick(time.Second)
+	if g := r.snap().Permissions[0].State; g.Refused == nil {
+		t.Fatalf("gate: %+v", g)
+	}
+	r.do(wire.DecideCmd{OpID: "d1", ConversationID: r.id, PermissionID: ps[0].ID, OptionID: "1"})
+	r.tick(time.Second)
+	for _, call := range r.pane.calls {
+		if strings.HasPrefix(call, "keys:") {
+			t.Fatalf("a key went in: %v", r.pane.calls)
+		}
+	}
+}
+
+// A menu nobody announced: a card once it has stood a while, none for one that goes at once, none between turns.
+func TestUnknownMenuOpensACard(t *testing.T) {
+	const menu = " Which one?\n ❯ 1. Red\n   2. Blue\n\n Esc to cancel\n"
+	r := newRig(t)
+	r.user("pick")
+	r.busy()
+	r.open()
+	r.settle(wire.StateWorking)
+	r.pane.screen = menu
+	r.tick(time.Second)
+	if n := len(r.snap().Permissions); n != 0 {
+		t.Fatalf("a card at once: %d", n)
+	}
+	for range 8 {
+		r.tick(time.Second)
+	}
+	ps := r.snap().Permissions
+	if len(ps) != 1 || ps[0].Kind != wire.PermDialog || len(ps[0].Options) != 2 || ps[0].State.Refused != nil {
+		t.Fatalf("permissions: %+v", ps)
+	}
+	r.pane.onSend = func(call string) {
+		if call == "keys:2" {
+			r.busy()
+		}
+	}
+	if res := r.do(wire.DecideCmd{OpID: "d1", ConversationID: r.id, PermissionID: ps[0].ID, OptionID: "2"}); res.R != wire.ResultAccepted {
+		t.Fatalf("decide: %+v", res)
+	}
+	r.tick(time.Second)
+	if k := r.state().K; k == wire.StateWaitingPermission {
+		t.Fatalf("still waiting: %s", k)
+	}
+
+	idle := newRig(t)
+	idle.user("hi")
+	idle.busy()
+	idle.open()
+	idle.settle(wire.StateWorking)
+	idle.say("done")
+	idle.turnEnd()
+	idle.idle()
+	idle.hook("stop")
+	idle.pane.screen = menu
+	for range 8 {
+		idle.tick(time.Second)
+	}
+	if n := len(idle.snap().Permissions); n != 0 {
+		t.Fatalf("a card for a picker between turns: %d", n)
+	}
+}
+
+// The hook says the agent waits, and the screen is no menu anybody knows: the card comes all the same and sends the
+// person to the terminal; no key goes in, and it leaves with the wait.
+func TestPromptTheScreenCannotReadStillGetsACard(t *testing.T) {
+	r := newRig(t)
+	r.user("go")
+	r.busy()
+	r.open()
+	r.settle(wire.StateWorking)
+	r.pane.screen = " A dialog of a new version\n press y to go on\n"
+	if err := r.rt.Hook(r.id, Hook{Kind: "notification", Notification: "permission_prompt"}); err != nil {
+		t.Fatal(err)
+	}
+	r.tick(time.Second)
+	if n := len(r.snap().Permissions); n != 0 {
+		t.Fatalf("a card at once: %d", n)
+	}
+	for range 8 {
+		r.tick(time.Second)
+	}
+	ps := r.snap().Permissions
+	if len(ps) != 1 || ps[0].Kind != wire.PermDialog || ps[0].State.Refused == nil || *ps[0].State.Refused != wire.GateRefusedMenuUnmatched {
+		t.Fatalf("permissions: %+v", ps)
+	}
+	for _, call := range r.pane.calls {
+		if strings.HasPrefix(call, "keys:") {
+			t.Fatalf("a key went in: %v", r.pane.calls)
+		}
+	}
+	r.busy()
+	r.tick(time.Second)
+	if k := r.state().K; k == wire.StateWaitingPermission {
+		t.Fatalf("still waiting: %s", k)
+	}
+}
+
+// The hook came and the agent is back at work by itself: no card.
+func TestPromptThatWentByItselfGetsNoCard(t *testing.T) {
+	r := newRig(t)
+	r.user("go")
+	r.busy()
+	r.open()
+	r.settle(wire.StateWorking)
+	if err := r.rt.Hook(r.id, Hook{Kind: "notification", Notification: "permission_prompt"}); err != nil {
+		t.Fatal(err)
+	}
+	for range 8 {
+		r.tick(time.Second)
+	}
+	if n := len(r.snap().Permissions); n != 0 {
+		t.Fatalf("a card: %d", n)
+	}
+}

@@ -6,7 +6,7 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const RATE = 90;
 
-const money = (rub: number, tokens: number) => ({ rub, usd: Math.round(rub / RATE), tokens });
+const money = (rub: number, tokens: number, usd = Math.round(rub / RATE)) => ({ rub, usd, tokens });
 
 const SIGNALS: Signal[] = [
   {
@@ -123,10 +123,11 @@ const people = (now: number): PersonSpend[] => [
   },
 ];
 
+// The last 14 days, oldest first: the shapes of the board's tiles.
 const BARS = {
-  spend: [5, 6, 6, 7, 6, 8, 8, 7, 9, 9, 10, 10, 11, 8],
-  active: [20, 21, 21, 22, 22, 23, 22, 23, 22, 23, 23, 23, 22, 23],
-  tasks: [4, 5, 6, 6, 7, 9, 8, 10, 11, 10, 12, 13, 14, 15],
+  spend: [9, 11, 10, 12, 14, 13, 12, 15, 14, 16, 15, 17, 16, 14],
+  active: [18, 20, 19, 21, 22, 20, 23, 22, 21, 23, 24, 22, 23, 23],
+  tasks: [5, 6, 7, 6, 8, 7, 9, 8, 9, 10, 9, 11, 10, 14],
 };
 
 export const overviewMock = (ctx: MockCtx): OverviewApi => ({
@@ -150,34 +151,35 @@ export const overviewMock = (ctx: MockCtx): OverviewApi => ({
       byTeam:
         ctx.role === 'admin'
           ? {
-              total: money(Math.round(312000 * k), Math.round(1_400_000_000 * k)),
+              total: money(Math.round(312000 * k), Math.round(1_460_000_000 * k), Math.round(3450 * k)),
               teams: [
                 {
                   id: 'tm-front',
                   name: 'Фронт',
-                  ...money(Math.round(118000 * k), Math.round(530_000_000 * k)),
+                  ...money(Math.round(118000 * k), Math.round(410_000_000 * k), Math.round(1300 * k)),
                 },
                 {
                   id: 'tm-back',
                   name: 'Бэкенд',
-                  ...money(Math.round(96000 * k), Math.round(430_000_000 * k)),
+                  ...money(Math.round(96000 * k), Math.round(380_000_000 * k), Math.round(1060 * k)),
                 },
                 {
                   id: 'tm-design',
                   name: 'Дизайн',
-                  ...money(Math.round(54000 * k), Math.round(240_000_000 * k)),
+                  ...money(Math.round(54000 * k), Math.round(520_000_000 * k), Math.round(600 * k)),
                 },
                 {
                   id: 'none',
                   name: 'Без команды',
-                  ...money(Math.round(44000 * k), Math.round(200_000_000 * k)),
+                  noTeam: true,
+                  ...money(Math.round(44000 * k), Math.round(150_000_000 * k), Math.round(490 * k)),
                 },
               ],
               efficiency: [
                 { id: 'tm-back', name: 'Бэкенд', tasksPerPerson: 8.1, resultPct: 74 },
                 { id: 'tm-front', name: 'Фронт', tasksPerPerson: 7.4, resultPct: 69 },
                 { id: 'tm-design', name: 'Дизайн', tasksPerPerson: 5.2, resultPct: 81 },
-                { id: 'none', name: 'Без команды', tasksPerPerson: 3.0, resultPct: 52 },
+                { id: 'none', name: 'Без команды', noTeam: true, tasksPerPerson: 3.0, resultPct: 52 },
               ],
             }
           : null,

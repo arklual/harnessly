@@ -1,8 +1,16 @@
 // Runtime schemas of analytics.ts, for the fixture test.
 
 import { currency, money, period, personRef } from './common.schema';
+import {
+  machineCloud,
+  machineHardware,
+  machineLoad,
+  machineManaged,
+  machineOp,
+  machineWeek,
+} from './machines.schema';
 import { scope } from './orgs.schema';
-import { arr, bool, day, lit, nullable, num, obj, oneOf, str, time } from './schema';
+import { arr, bool, day, lit, nullable, num, obj, oneOf, opt, str, time } from './schema';
 
 export const kpiId = lit(
   'money_per_mr',
@@ -43,7 +51,15 @@ export const kpisResponse = obj({
 
 const seriesPoint = obj({ day, value: nullable(num), n: num });
 const effectVerdict = lit('better', 'worse', 'noise', 'mixed', 'too_few');
-const changeMarker = obj({ changeId: str, at: time, title: str, verdict: nullable(effectVerdict) });
+const changeMarker = obj({
+  changeId: str,
+  at: time,
+  title: str,
+  layer: lit('org', 'tenant', 'team'),
+  author: nullable(personRef),
+  icon: lit('edit', 'announce', 'rocket'),
+  verdict: nullable(effectVerdict),
+});
 
 export const kpiSeriesResponse = obj({
   kpi: kpiId,
@@ -55,14 +71,14 @@ export const kpiSeriesResponse = obj({
 });
 
 export const signalAction = oneOf(
-  obj({ kind: lit('raise_limit'), label: str, scope, userId: nullable(str) }),
-  obj({ kind: lit('move_account'), label: str, fromAccountId: str, toAccountId: str }),
-  obj({ kind: lit('open_machine'), label: str, machineId: str }),
-  obj({ kind: lit('resend_invite'), label: str, inviteId: str, tenantId: str }),
-  obj({ kind: lit('register_account'), label: str, accountId: str }),
-  obj({ kind: lit('open_kpi'), label: str, kpi: kpiId, scope }),
-  obj({ kind: lit('open_chat'), label: str, machineId: str, sessionKey: str }),
-  obj({ kind: lit('open_prices'), label: str, model: str }),
+  obj({ kind: lit('raise_limit'), label: str, target: str, scope, userId: nullable(str) }),
+  obj({ kind: lit('move_account'), label: str, target: str, fromAccountId: str, toAccountId: str }),
+  obj({ kind: lit('open_machine'), label: str, target: str, machineId: str }),
+  obj({ kind: lit('resend_invite'), label: str, target: str, inviteId: str, tenantId: str }),
+  obj({ kind: lit('register_account'), label: str, target: str, accountId: str }),
+  obj({ kind: lit('open_kpi'), label: str, target: str, kpi: kpiId, scope }),
+  obj({ kind: lit('open_chat'), label: str, target: str, machineId: str, sessionKey: str }),
+  obj({ kind: lit('open_prices'), label: str, target: str, model: str }),
 );
 
 export const signal = obj({
@@ -113,7 +129,7 @@ export const spendRow = obj({
   paid: money,
   calls: num,
   unpricedCalls: num,
-  tokens: obj({ input: num, output: num, cacheRead: num, cacheWrite: num }),
+  tokens: obj({ total: num, input: num, output: num, cacheRead: num, cacheWrite: num }),
   limit: nullable(limitBar),
   forecast: nullable(money),
   guessedShare: num,
@@ -152,6 +168,20 @@ export const subscription = obj({
 });
 export const subscriptionsResponse = obj({ scope, period, currency, subscriptions: arr(subscription) });
 
+const dayValue = obj({ day, value: num });
+const reached = obj({ value: nullable(num), n: num });
+export const todayView = obj({
+  day,
+  spend: obj({ paid: money, list: money, tokens: num }),
+  active: obj({ people: num, of: num }),
+  tasks: obj({ closed: num, inWork: num }),
+  sparks: obj({ spend: arr(dayValue), active: arr(dayValue), tasks: arr(dayValue) }),
+});
+export const efficiencyView = obj({
+  teams: arr(obj({ key: str, label: str, people: num, closed: num, perPersonMonth: nullable(num), reached })),
+  reached,
+});
+
 const tile = obj({ value: nullable(num), cmpValue: nullable(num), unit: oneOf(kpiUnit, lit('people')) });
 export const overviewResponse = obj({
   scope,
@@ -160,15 +190,56 @@ export const overviewResponse = obj({
   spend: spendTotal,
   tiles: obj({ activePeople: tile, sessions: tile, mrs: tile, moneyPerMr: tile }),
   attention: arr(signal),
-  spendBy: obj({ by: spendBy, rows: arr(spendRow) }),
+  spendBy: obj({ by: spendBy, rows: arr(spendRow), totals: obj({ list: money, paid: money, tokens: num }) }),
+  today: todayView,
+  efficiency: efficiencyView,
   subscriptions: arr(subscription),
   accountedUntil: nullable(time),
 });
 
+const chats = obj({ n: num, running: num });
+const mrs = obj({ n: num, merged: num });
+export const peopleResponse = obj({
+  scope,
+  period,
+  currency,
+  total: obj({
+    list: money,
+    paid: money,
+    limit: nullable(limitBar),
+    tone: nullable(lit('ok', 'warn', 'risk')),
+  }),
+  week: period,
+  people: arr(
+    obj({
+      userId: str,
+      name: str,
+      role: str,
+      list: money,
+      paid: money,
+      share: nullable(num),
+      limit: nullable(limitBar),
+      hot: bool,
+      chats,
+      mrs,
+    }),
+  ),
+});
+export const meWeek = obj({ week: period, chats, mrs });
+
 export const change = obj({
   id: str,
   scope,
-  kind: lit('manual', 'claude_version', 'codex_version', 'default_model', 'skills', 'plugins', 'policy'),
+  kind: lit(
+    'manual',
+    'claude_version',
+    'codex_version',
+    'default_model',
+    'skills',
+    'plugins',
+    'policy',
+    'env',
+  ),
   title: str,
   at: time,
   author: nullable(personRef),
@@ -201,12 +272,14 @@ export const wasteResponse = obj({
   currency,
   items: arr(
     obj({
-      kind: lit('reread_context', 'failed_tools', 'abandoned_sessions', 'long_waits', 'oversized_model'),
+      kind: lit('abandoned_sessions', 'retries_after_errors', 'long_context', 'extra_skills'),
       title: str,
       amount: money,
+      money,
       share: num,
       sessions: num,
       hint: str,
+      explain: str,
     }),
   ),
 });
@@ -227,11 +300,19 @@ export const hubMachine = obj({
   people: arr(personRef),
   access: arr(accessSubject),
   problems: arr(lit('offline', 'idle_week', 'agent_old', 'disk_low', 'login_expired', 'disabled')),
-  cloud: nullable(
-    obj({ provider: lit('selectel'), flavor: str, vcpus: num, ramGb: num, diskGb: num, priceMonth: money }),
-  ),
+  cloud: nullable(machineCloud),
+  hardware: nullable(machineHardware),
+  load: nullable(machineLoad),
+  week: nullable(machineWeek),
+  managed: nullable(machineManaged),
+  activeOps: arr(machineOp),
 });
 export const machinesResponse = obj({ scope, currency, machines: arr(hubMachine) });
+export const restartRequest = obj({
+  what: lit('runner', 'machine', 'vm'),
+  when: opt(lit('now', 'drain', 'after_chats')),
+});
+export const restartResponse = obj({ jobId: str, op: opt(machineOp) });
 
 const funding = lit('org', 'personal');
 export const meUsageResponse = obj({

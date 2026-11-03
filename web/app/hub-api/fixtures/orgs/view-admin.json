@@ -108,5 +108,6 @@
         }
       }
     }
-  }
+  },
+  "features": ["ui.hx", "org.events"]
 }

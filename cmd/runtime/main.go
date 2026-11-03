@@ -173,7 +173,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	})
 	tmuxNames = tm
 	hooks := hookConfigFromEnv(configFile)
-	// HRN-621: off the seal's list (internal/apps/seal.go), so no wall shows it.
+	// off the seal's list (internal/apps/seal.go), so no wall shows it.
 	agents.SetLineDir(filepath.Join(cfg.DataDir, "launch-lines"))
 	pusher := newSharedPusher(cfg.DataDir, hooks)
 	ref.c = newCore(coreConfig{DataDir: cfg.DataDir, Home: home, Tmux: tm, Term: terms,
@@ -355,7 +355,15 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		SliceOn:       f.SliceOn,
 		RuntimePort:   runtimePort(cfg),
 		CoreRunning:   func() bool { return ref.running() != nil },
-		MachineKit:    &machineKitRef{},
+		Busy: func() int {
+			if c := ref.running(); c != nil {
+				if v := c.v2.Load(); v != nil && v.rt != nil {
+					return v.rt.Busy()
+				}
+			}
+			return 0
+		},
+		MachineKit: &machineKitRef{},
 		FirstWorkspace: func() error {
 			c := ref.running()
 			if c == nil {
@@ -416,9 +424,13 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(notifyBotRoutes(d)...)
 	f.Add(askRoutes(d, ref.c)...)
 	f.Add(secretRoutes(d, ref.c)...)
+	f.Add(connectionRoutes(d)...)
+	f.Add(mcpRoutes(d)...)
 	f.Add(appRoutes(d, ref.c)...)
 	f.Add(v2Routes(d, ref.c)...)
 	if w := webConfigFromEnv(cfg.Standalone()); w != nil {
+		conns := connectionsFor(d)
+		w.connHosts = func() []string { return connectionHosts(conns) }
 		f.Add(gate.Route{Match: w.matches, Handler: w.handler()})
 	}
 	if cfg.Standalone() {

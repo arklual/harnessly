@@ -581,7 +581,7 @@ func (r *run) look(ctx context.Context, client *ssh.Client) (facts, bool) {
 // install runs the installer and reads the end of its output when it fails.
 func (r *run) install(ctx context.Context, client *ssh.Client, f facts) bool {
 	r.set("install", "run", "")
-	script := installScript(r.s.cfg.PublicURL, r.code, r.t.profile, f.UID)
+	script := installScript(r.s.cfg.AgentURL, r.code, r.t.profile, f.UID)
 	out, status, err := execute(ctx, client, inSh(script), installLimit)
 	switch {
 	case err != nil && status < 0:
@@ -625,9 +625,9 @@ func (r *run) waitOnline(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-deadline.C:
-			msg := "Агент поставился, но не вышел на связь с хабом. Проверьте, что сервер открывает " + s.cfg.PublicURL
+			msg := "Агент поставился, но не вышел на связь с хабом. Проверьте, что сервер открывает " + s.cfg.AgentURL
 			if r.machineID == "" {
-				msg = "Установщик отработал, но машина не зарегистрировалась в хабе. Проверьте, что сервер открывает " + s.cfg.PublicURL
+				msg = "Установщик отработал, но машина не зарегистрировалась в хабе. Проверьте, что сервер открывает " + s.cfg.AgentURL
 			}
 			r.fail("online", "not_online", msg, "")
 			return

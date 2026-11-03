@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/fileplace"
@@ -130,7 +131,7 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.machine = newLiveMachine(v2Machine, version, features, d.DataDir, func() int { return v.rt.Busy() }, c.preflight, c.v2Models)
 	v.machine.offers = profileOffers(v.profiles)
 	v.hub = wire.NewHub(v.machine)
-	v.tm = &v2Tmux{tm: c.cfg.Tmux, guard: chatGuard}
+	v.tm = &v2Tmux{tm: c.cfg.Tmux, term: c.cfg.Term, guard: chatGuard}
 	v.starter = &v2Launcher{v: v}
 	uploads := &wire.Uploads{Dir: filepath.Join(d.DataDir, "v2", "uploads"), Limits: wire.DefaultLimits}
 	ses := newV2Sessions(d.Home, func() map[string]string { return v.rt.AttachedSessions() })
@@ -584,6 +585,49 @@ func (v *v2Live) hook(session string, ev agents.Event) {
 		return
 	}
 	_ = v.rt.Hook(id, convo.Hook{Kind: string(ev.Kind), Notification: ev.NotificationType})
+}
+
+// permissionRequest holds a Claude PermissionRequest for the conversation of a tmux session, and answers with the hook's
+// output once the person decided; false leaves it to Claude's own dialog.
+func (v *v2Live) permissionRequest(ctx context.Context, session string, f map[string]any) (any, bool) {
+	if !v.ready.Load() {
+		return nil, false
+	}
+	id := v.rt.ConvOfSession(session)
+	if id == "" {
+		if _, _, tab, ok := v.c.cfg.Tmux.ParseSessionName(session); ok && v.rt.Has(tab) {
+			id = tab
+		}
+	}
+	if id == "" {
+		return nil, false
+	}
+	tool, _ := f["tool_name"].(string)
+	cwd, _ := f["cwd"].(string)
+	input, err := json.Marshal(f["tool_input"])
+	if err != nil {
+		return nil, false
+	}
+	var suggestions json.RawMessage
+	if list, ok := f["permission_suggestions"].([]any); ok && len(list) > 0 {
+		if suggestions, err = json.Marshal(list); err != nil {
+			return nil, false
+		}
+	}
+	reply, ok := v.rt.PermissionRequest(ctx, id, convo.PermissionAsk{Tool: tool, Input: input, Suggestions: suggestions, Cwd: cwd})
+	if !ok {
+		return nil, false
+	}
+	// The route writes plain JSON values.
+	raw, err := json.Marshal(reply)
+	if err != nil {
+		return nil, false
+	}
+	var decision map[string]any
+	if json.Unmarshal(raw, &decision) != nil {
+		return nil, false
+	}
+	return map[string]any{"hookSpecificOutput": map[string]any{"hookEventName": "PermissionRequest", "decision": decision}}, true
 }
 
 // --- starting agents ---

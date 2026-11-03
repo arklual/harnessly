@@ -112,6 +112,7 @@
   "next.gate.planAuto": "Править без вопросов",
   "next.gate.planModeLabel": "Как работать по плану",
   "next.gate.planTitle": "План",
+  "next.gate.dialogTitle": "Агент ждёт ответа",
   "next.gate.retry": "Повторить",
   "next.gate.revise": "Доработать",
   "next.gate.slow": "Агент отвечает дольше обычного…",

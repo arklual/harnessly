@@ -125,6 +125,12 @@ type Provider interface {
 	RunsWithHooks(children []int) (hooked, found bool)
 }
 
+// AgentSessions is a provider that can tell which sessions the agent a pane runs goes by (Claude: by its pid file),
+// nil when it cannot. The keeper asks it to tell a hook of the tab's agent from one of an agent started inside it.
+type AgentSessions interface {
+	AgentSessions(children []int) []string
+}
+
 // Queue is the prompt queue as the keeper drives it.
 type Queue interface {
 	// Schedule looks at the tab's queue after delay (a turn just ended, a launch ended, a restart).

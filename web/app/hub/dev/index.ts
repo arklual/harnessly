@@ -181,7 +181,7 @@ export const SCENARIOS: Record<string, Entry> = {
     scenario: { signedIn: true, spaces: [SPACE('done', [online({ agents: readyAgents })])] },
   },
   'org-step': {
-    title: 'Шаг «Организация» (HRN-536, моки)',
+    title: 'Шаг «Организация» (моки)',
     path: '/org/new',
     scenario: { signedIn: true, spaces: [SPACE('done', [online({ agents: readyAgents })])] },
   },

@@ -100,6 +100,17 @@ SECRETS (the safe of this machine: tokens and keys the person put in, outside th
                                     print the path of a short-lived file (0600) with the value, for a tool that wants
                                     a path. There is no command that prints a value.
 
+TRACKERS AND WIKIS (the person's Jira, Confluence, YouTrack, Linear, GitLab, GitHub…, connected in Settings → Connections)
+  harnessly connections             what is connected: id, product, name, address, capabilities, state, primary
+  harnessly issues [--conn ID] [--mine] [--open] [--project KEY] [--limit N] [TEXT...]
+                                    search issues of the primary tracker (or of --conn): key, status, title, link
+  harnessly issue KEY|URL [--conn ID]
+                                    one issue with its description and last comments; a link is read by the
+                                    connection it belongs to
+  harnessly pages [--conn ID] TEXT...   search wiki pages;  harnessly page ID|URL [--conn ID]   read one
+                                    Never ask for a tracker's token: if a service is not connected, ask the person to
+                                    connect it in Settings → Connections.
+
 ASK A PERSON (through the same bots; the person sets who and where in Settings → Notifications)
   harnessly ask people              the people you may tag, who may approve, the chats, the default wait
   harnessly ask --to NAME [--option A --option B] [--details TEXT] [--timeout 30m] QUESTION...
@@ -229,6 +240,11 @@ waiting), or exits 1 with "declined". A name the safe already has is ready at on
 run passes the command's exit code on and masks the values in its output; quote $VAR inside sh -c, never echo it.
 Never print a value, write it into the workspace or a commit, or ask the person to paste it into the chat.
 `,
+	"connections": connectionsHelp,
+	"issues":      connectionsHelp,
+	"issue":       connectionsHelp,
+	"pages":       connectionsHelp,
+	"page":        connectionsHelp,
 	"tab": `harnessly tab list|create|send|status|result|close
 
   harnessly tab list
@@ -340,3 +356,23 @@ and say so, or stop and leave the question for the person.
 	"workspaces": "harnessly workspaces\n\nList the workspaces: id, name and folders. -w takes the id.\n",
 	"api-guide":  "harnessly api-guide\n\nPrint the runtime's HTTP API for agents: the /api/cli routes with their payloads.\n",
 }
+
+const connectionsHelp = `harnessly connections | issues | issue | pages | page
+
+The person's trackers, wikis and code hosts are connected in Settings → Connections (Jira, Confluence, YouTrack, Linear,
+GitLab, GitHub, …, in the cloud or on their own servers). These commands read them through the runtime: you never hold
+their tokens. Reads only.
+
+  harnessly connections                       id, product, name, address, capabilities, state (primary, deployment)
+  harnessly issues --mine --open              my open issues in the primary tracker
+  harnessly issues --conn c1a2b3 --project ABC login bug
+  harnessly issues --native 'project = ABC AND status = "In Review"'   a query in the product's own language
+  harnessly issue ABC-12                      a key of the primary tracker (--conn for another one)
+  harnessly issue https://acme.atlassian.net/browse/ABC-12   a link: the connection that owns it answers
+  harnessly pages onboarding checklist        search the primary wiki
+  harnessly page https://acme.atlassian.net/wiki/spaces/ENG/pages/123456/Runbook
+
+--json prints the runtime's answer as it is. "refused: denied" means the service no longer accepts the connection: ask
+the person to reconnect it. A link no connection owns, or a product that is not connected: ask the person to connect
+it in Settings → Connections. Never ask for a token in the chat.
+`

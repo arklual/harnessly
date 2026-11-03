@@ -1,0 +1,80 @@
+{
+  "entryId": "entry-org-review",
+  "itemId": "item-review",
+  "kind": "skill",
+  "name": "Ревью кода",
+  "hint": "Ревью кода для работы",
+  "layer": "org",
+  "scopeId": "org-acme",
+  "enabled": true,
+  "callsWeek": 4,
+  "people": 1,
+  "perDay": 0.6,
+  "bars14": [
+    {
+      "day": "2026-10-20",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-21",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-22",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-23",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-24",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-25",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-26",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-27",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-28",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-29",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-30",
+      "calls": 0
+    },
+    {
+      "day": "2026-10-31",
+      "calls": 0
+    },
+    {
+      "day": "2026-11-01",
+      "calls": 0
+    },
+    {
+      "day": "2026-11-02",
+      "calls": 4
+    }
+  ],
+  "lastUsedAt": "2026-11-01T14:20:00Z",
+  "unused": false,
+  "audience": {
+    "mode": "tenant",
+    "teams": []
+  },
+  "pinned": true,
+  "locked": false,
+  "lockedReason": null
+}

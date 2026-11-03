@@ -77,6 +77,32 @@ type routeFilter struct {
 	srv            *http.Server
 	port           atomic.Int64
 	denials        atomic.Int64
+	// draining says the runtime is about to restart and starts no new chat (runtime.restart, when = drain).
+	draining func() bool
+}
+
+// drainReason is the verdict on a request that would start a chat while the machine drains.
+const drainReason = "this machine is restarting its runner: new chats are not started until it is back"
+
+// chatStartOps are the commands of the chat page that start an agent.
+var chatStartOps = map[string]bool{
+	"conversation.create": true, "conversation.resume": true, "conversation.fork": true, "conversation.handoff": true,
+}
+
+// startsChat says the request starts a chat (or an agent in an old one).
+func startsChat(method string, forms []string) bool {
+	if method != http.MethodPost {
+		return false
+	}
+	for _, form := range forms {
+		if form == "/api/platform/conversations" {
+			return true
+		}
+		if op, ok := strings.CutPrefix(form, "/api/v2/cmd/"); ok && chatStartOps[op] {
+			return true
+		}
+	}
+	return false
 }
 
 // newRouteFilter filters requests for the runtime at 127.0.0.1:runtimePort, whose routes live under base.
@@ -134,6 +160,10 @@ func (f *routeFilter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reason, err := f.decide(f.policy(), r)
 	if err != nil {
 		writeFilterError(w, http.StatusBadRequest, "the request body could not be read", "")
+		return
+	}
+	if reason == drainReason {
+		writeFilterError(w, http.StatusServiceUnavailable, reason, "machine_draining")
 		return
 	}
 	if reason != "" {
@@ -212,6 +242,9 @@ func (f *routeFilter) decide(p hubproto.Policy, r *http.Request) (string, error)
 		if reason := f.protectedWrite(r, forms); reason != "" {
 			return reason, nil
 		}
+	}
+	if f.draining != nil && f.draining() && startsChat(r.Method, forms) {
+		return drainReason, nil
 	}
 	if p.Terminal {
 		return "", nil

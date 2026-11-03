@@ -37,8 +37,12 @@ type Screen struct {
 	// Panel: a TUI panel or picker is open over the box (Claude's /effort slider, its /model picker).
 	Panel bool
 	// Aside: one of those the person left open (Claude's /login, /model, /effort), which Esc closes safely.
-	Aside     screen.Aside
-	Options   []string // the menu's options as the screen shows them
+	Aside   screen.Aside
+	Options []string // the menu's options as the screen shows them
+	// Request is what the menu asks, its heading on the screen.
+	Request string
+	// cut: the window is too low for the menu, some of its options are not drawn.
+	cut       bool
 	Input     string
 	InputLine bool
 	Box       string
@@ -52,6 +56,9 @@ type Screen struct {
 	// styled is the capture the screen was read from, colours and all.
 	styled string
 }
+
+// Cut: the menu shows only the options that fit.
+func (s Screen) Cut() bool { return s.cut }
 
 // PromptReady: the agent shows an input line and is not working.
 func (s Screen) PromptReady() bool { return s.Readable && s.InputLine && !s.Busy && s.Menu == NoMenu }
@@ -71,6 +78,11 @@ func Read(styled string, provider wire.Provider) Screen {
 	s := Screen{Readable: true, Plain: st.Plain, Busy: st.Busy, Panel: st.Panel, Input: st.Input, InputLine: st.InputLine,
 		styled: styled}
 	s.Menu, s.Options = menuOf(st)
+	if st.Menu != nil {
+		// A picker scrolled in its window (the /model list) stays as it is: the person reads it in the terminal.
+		s.cut = st.Menu.Cut && (len(st.Menu.Options) == 1 || s.Menu == MenuPlan || s.Menu == MenuPermission)
+		s.Request = menuRequest(st.Menu)
+	}
 	if st.Busy && provider != wire.ProviderCodex {
 		s.Word = liveReply(st.Plain)
 	}
@@ -101,19 +113,38 @@ func Look(p Pane, provider wire.Provider) Screen {
 	if !s.dialogCut(provider) {
 		return s
 	}
-	g, ok := p.(DialogGrower)
-	if !ok || !g.GrowForDialog() {
-		return s
+	if g, ok := p.(DialogGrower); ok && g.GrowForDialog() {
+		styled, ok = p.CaptureStyled()
+		if !ok {
+			return Screen{}
+		}
+		return Read(styled, provider)
 	}
-	styled, ok = p.CaptureStyled()
-	if !ok {
-		return Screen{}
+	// A terminal is attached and keeps its size: the dialog is read at a larger one for a moment.
+	if t, ok := p.(TallCapturer); ok {
+		if tall, ok := t.CaptureTall(styled); ok {
+			return Read(tall, provider)
+		}
 	}
-	return Read(styled, provider)
+	return s
 }
 
-// dialogCut: Claude's permission dialog is up without the solid rule it always opens with, so its top is off the screen.
+func menuRequest(m *screen.Menu) string {
+	parts := []string{}
+	for _, p := range []*string{m.Title, m.Request} {
+		if p != nil && !blank(*p) {
+			parts = append(parts, strings.TrimSpace(*p))
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+// dialogCut: the menu shows only the options that fit, or Claude's permission dialog is up without the solid rule it
+// always opens with, so its top is off the screen.
 func (s Screen) dialogCut(provider wire.Provider) bool {
+	if s.cut {
+		return true
+	}
 	if provider == wire.ProviderCodex || s.Menu != MenuPermission {
 		return false
 	}

@@ -831,6 +831,9 @@ func (e NowEv) Validate() error           { return e.Now.Validate() }
 func (e QuestionAskedEv) Validate() error { return under("question", e.Question.Validate()) }
 
 func (e PermissionRequestedEv) Validate() error {
+	if e.Permission.Kind == PermDialog {
+		return under("permission", e.Permission.Validate())
+	}
 	return errors.Join(under("permission", e.Permission.Validate()), kindOf(e.Permission, PermTool))
 }
 

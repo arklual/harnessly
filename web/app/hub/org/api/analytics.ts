@@ -1,4 +1,4 @@
-// The Аналитика section's contract (HRN-538). `…/kpis`, `…/kpis/{kpi}/series`, `…/changes`, `…/waste` of
+// The Аналитика section's contract. `…/kpis`, `…/kpis/{kpi}/series`, `…/changes`, `…/waste` of
 // docs/hub (analytics) map onto these shapes; until those contracts land the mock (../mock/analytics.ts) is the
 // reference and live answers `not_ready`.
 
@@ -53,9 +53,19 @@ export interface ChangeRef {
   at: string;
 }
 
+/** A week of the picker's strip: the money spent in it makes the bar, the unfinished week is marked. */
+export interface FrameWeek extends Week {
+  /** Null/absent: no number yet, the bar is drawn at the minimum. */
+  spendUsd?: number | null;
+  /** The week is still going (the last one of the strip). */
+  current?: boolean;
+}
+
 /** What the pickers need before any number: the weeks to choose from and the latest change for the preset. */
 export interface AnalyticsFrame {
-  weeks: Week[];
+  weeks: FrameWeek[];
+  /** The last day with data: the big chart ends here. Absent: the period's last day. */
+  today?: string;
   defaultPeriod: Week;
   lastChange: ChangeRef | null;
 }
@@ -72,6 +82,12 @@ export interface Summary {
   mrs: number;
 }
 
+/** One line of a hover bubble: «Фронт · 14%». */
+export interface DetailRow {
+  label: string;
+  value: string;
+}
+
 export type SignalTone = 'high' | 'mid';
 export interface Signal {
   id: string;
@@ -79,6 +95,8 @@ export interface Signal {
   title: string;
   text: string;
   action: { label: string; section: 'machines' | 'teams' | 'analytics' | 'overview' };
+  /** The numbers behind the card, for its hover bubble. Absent: the bubble is not drawn. */
+  detail?: DetailRow[];
 }
 
 export type ChangeKind = 'tool' | 'model' | 'plugins';
@@ -109,6 +127,8 @@ export interface WasteItem {
   text: string;
   usd: number;
   tone: 'violet' | 'rose' | 'amber' | 'teal';
+  /** Where the number comes from, for the row's hover bubble. */
+  detail?: DetailRow[];
 }
 
 export interface Waste {
@@ -121,7 +141,7 @@ export interface PeerRow {
   id: string;
   name: string;
   /** One cell per column; `score` -1 (worse than the average) … 1 (better). */
-  cells: { text: string; score: number }[];
+  cells: { text: string; score: number; mean?: string }[];
 }
 
 export interface Peers {
@@ -155,6 +175,10 @@ export interface Marker {
   title: string;
   /** Index into `days`. */
   index: number;
+  /** The icon the hub picked: a written edit, a new version of a tool, anything else. Absent: told from `kind`. */
+  icon?: 'edit' | 'announce' | 'rocket';
+  /** «окружение организации · Аня»: the layer and the author, under the title in the chart's bubble. */
+  detail?: string;
 }
 
 export interface KpiChart {
@@ -169,6 +193,10 @@ export interface KpiChart {
   periodFrom: number;
   periodTo: number;
   markers: Marker[];
+  /** The scope's own value day by day (not the sum of `lines`: a share is not a sum), aligned to `days`. */
+  total?: (number | null)[];
+  /** The same value one comparison back: day `i` holds what `days[i]` held at the compare period's distance. */
+  previous?: (number | null)[];
 }
 
 export interface AnalyticsApi {

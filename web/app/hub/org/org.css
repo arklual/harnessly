@@ -1,5 +1,5 @@
 /*
- * The organization hub (HRN-531). Built on the kit's tokens (--k-*), like the rest of the hub UI. Classes are `ho-*`.
+ * The organization hub. Built on the kit's tokens (--k-*), like the rest of the hub UI. Classes are `ho-*`.
  * One responsive implementation: the sidebar is a column on a wide screen and a drawer behind a button on a phone.
  * Nothing here is sized by inline styles; data-driven sizes are SVG attributes.
  */

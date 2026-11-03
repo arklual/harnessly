@@ -23,6 +23,7 @@ import { NoticesPage } from '@/next/bindings/settings-notices';
 import { AsksSettingsPage } from '@/next/bindings/settings-asks';
 import { NotifyBotsPage } from '@/next/bindings/settings-notify-bots';
 import { PeersPage } from '@/next/bindings/settings-peers';
+import { ConnectionsPage } from '@/next/bindings/settings-connections';
 import { SafePage } from '@/next/bindings/settings-safe';
 import { TakesPage } from '@/next/bindings/settings-takes';
 import SettingsShell from '@/next/features/settings/settings-shell';
@@ -111,6 +112,7 @@ const SettingsScreen = ({ machine, section, name, onOpenDrawer }: ISettingsScree
         <PeersPage machine={machine} now={now} pending={pending} />
       </>
     );
+  else if (active === 'connections') body = <ConnectionsPage machine={machine} />;
   else if (active === 'design') body = <DesignPage machine={machine} />;
   else if (active === 'beta') body = <BetaPage />;
   else body = <AppsPage machine={machine} />;

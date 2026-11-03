@@ -27,6 +27,9 @@ import (
 type v2Pane struct {
 	tm      *tmux.Tmux
 	session string
+	// term and tall read a cut dialog with the page's terminal attached; nil term never does.
+	term tmux.Terminal
+	tall *tallCaptures
 }
 
 func (p v2Pane) CaptureStyled() (string, bool) { return p.tm.CaptureStyled(p.session) }
@@ -44,10 +47,52 @@ const (
 
 func (p v2Pane) GrowForDialog() bool { return p.tm.GrowDetached(p.session, dialogCols, dialogRows) }
 
+// tallEvery is how seldom the person's terminal changes size for a dialog that keeps changing (a countdown in it).
+const tallEvery = 15 * time.Second
+
+// tallCaptures keeps the last tall look of every session: a dialog that stands on the screen is read once, the terminal
+// under the chat does not jump at each look.
+type tallCaptures struct {
+	mu   sync.Mutex
+	last map[string]tallCapture
+}
+
+type tallCapture struct {
+	short, tall string
+	at          time.Time
+}
+
+func (p v2Pane) CaptureTall(short string) (string, bool) {
+	if p.tall == nil {
+		return "", false
+	}
+	p.tall.mu.Lock()
+	defer p.tall.mu.Unlock()
+	last, seen := p.tall.last[p.session]
+	if seen && last.short == short {
+		return last.tall, true
+	}
+	if seen && time.Since(last.at) < tallEvery {
+		return "", false
+	}
+	tall, ok := p.tm.CaptureStyledTall(p.term, p.session, dialogCols, dialogRows)
+	if !ok {
+		return "", false
+	}
+	if p.tall.last == nil {
+		p.tall.last = map[string]tallCapture{}
+	}
+	p.tall.last[p.session] = tallCapture{short: short, tall: tall, at: time.Now()}
+	return tall, true
+}
+
 // v2Tmux is convo.Machine over tmux. A pane that looks gone, or an agent that looks exited, is believed only when
 // the look before agreed: one call that failed on a loaded machine must not stop a working agent.
 type v2Tmux struct {
 	tm *tmux.Tmux
+	// term is the page's terminal, tall the dialogs read through it.
+	term tmux.Terminal
+	tall tallCaptures
 	// guard says whether the terminal is off: then the pane takes no write while a shell is in its foreground.
 	guard *chatguard.Guard
 
@@ -110,7 +155,7 @@ func (m *v2Tmux) Pane(session string) typist.Pane {
 	}
 	// While the terminal is off every write is checked against what is in the pane's foreground: text that reaches a
 	// bare shell runs as commands (see internal/chatguard).
-	return chatguard.Guarded(v2Pane{tm: m.tm, session: session}, m.guard, func() string { return m.tm.PaneCurrentCommand(session) })
+	return chatguard.Guarded(v2Pane{tm: m.tm, session: session, term: m.term, tall: &m.tall}, m.guard, func() string { return m.tm.PaneCurrentCommand(session) })
 }
 
 // Probe: what runs in the session. A look that says "no session" or "a shell" is reported only when the previous look

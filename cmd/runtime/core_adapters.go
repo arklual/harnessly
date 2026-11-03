@@ -177,6 +177,7 @@ func (p claudeProvider) TranscriptIn(cwd, id string) string   { return p.det.Tra
 func (p claudeProvider) RunsWithHooks(children []int) (bool, bool) {
 	return p.det.RunsWithHooks(children, p.hooks, "status-hook.sh")
 }
+func (p claudeProvider) AgentSessions(children []int) []string { return p.det.SessionIDs(children) }
 
 type codexProvider struct {
 	det   *codex.Detector

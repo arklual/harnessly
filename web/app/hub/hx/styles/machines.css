@@ -1,0 +1,143 @@
+/* «Машины»: what the board does not draw because it has no loading, error or refusal in it. Only opacity moves. */
+.ad .mx-skel {
+  display: block;
+  border-radius: 8px;
+  background: var(--hx-bg-hover);
+  animation: mo-pulse 1.2s ease-in-out infinite;
+}
+.ad .mx-skel-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.ad .mx-skel-tiles .mx-skel {
+  height: 112px;
+  border-radius: 14px;
+}
+.ad .mx-skel-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.ad .mx-skel-bar .mx-skel {
+  height: 36px;
+  width: 260px;
+}
+.ad .mx-skel-bar .mx-skel + .mx-skel {
+  margin-left: auto;
+  width: 200px;
+}
+.ad .mx-skel-list {
+  margin-top: 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.ad .mx-skel-list .mx-skel {
+  height: 52px;
+  border-radius: 0;
+  background: none;
+  position: relative;
+}
+.ad .mx-skel-list .mx-skel::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 20px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--hx-bg-hover);
+}
+.ad .mx-skel-list .mx-skel + .mx-skel {
+  box-shadow: inset 0 1px 0 var(--hx-border);
+}
+.ad .mx-skel-list .mx-skel:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.ad .mx-skel-list .mx-skel:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.ad .mx-skel-list .mx-skel:nth-child(4) {
+  animation-delay: 0.36s;
+}
+.ad .mx-skel-card {
+  display: grid;
+  gap: 14px;
+  padding: 4px 0;
+}
+.ad .mx-skel-card .mx-skel {
+  height: 44px;
+  border-radius: 12px;
+}
+.ad .mx-skel-card .mx-skel:nth-child(2) {
+  height: 96px;
+  animation-delay: 0.12s;
+}
+.ad .mx-skel-card .mx-skel:nth-child(3) {
+  height: 72px;
+  animation-delay: 0.24s;
+}
+.ad .mx-skel-card .mx-skel:nth-child(4) {
+  height: 72px;
+  animation-delay: 0.36s;
+}
+/* a failed load: one row with the retry */
+.ad .mx-err {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--hx-border);
+  border-radius: 14px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.ad .mx-err span {
+  flex: 1;
+  min-width: 0;
+}
+.ad .md .mx-err {
+  margin-top: 0;
+}
+/* a refused action in the card: the card is back to what it was, this says why */
+.ad .md-err {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(217, 83, 74, 0.1);
+  color: #c4372f;
+  font-size: var(--hx-text-xs);
+  line-height: 1.45;
+}
+.ad .md-err span {
+  flex: 1;
+  min-width: 0;
+}
+.ad .md-err .md-link {
+  flex: none;
+}
+[data-hx-theme='dark'] .ad .md-err {
+  color: #f0948c;
+}
+@media (max-width: 900px) {
+  .ad .mx-skel-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ad .mx-skel-bar .mx-skel {
+    width: 100%;
+  }
+  .ad .mx-skel-bar .mx-skel + .mx-skel {
+    display: none;
+  }
+}
+/* the board is drawn on a page whose text has the browser's own line height; the app's base is taller */
+.ad .mo,
+.ad .ad-mrow {
+  line-height: normal;
+}

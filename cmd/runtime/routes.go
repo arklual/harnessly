@@ -47,7 +47,9 @@ type deps struct {
 	RuntimePort int
 	// CoreRunning says whether the core (the layout store's keeper) runs in this process; FirstWorkspace makes a
 	// machine's first workspace there.
-	CoreRunning    func() bool
+	CoreRunning func() bool
+	// Busy is how many chats have an agent at work now (0 while the core is not up).
+	Busy           func() int
 	FirstWorkspace func() error
 	// MachineKit hands the v2's Machine tool what the machine slice looks at the machine with (nil in a test that has none).
 	MachineKit *machineKitRef

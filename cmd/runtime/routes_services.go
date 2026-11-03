@@ -89,6 +89,7 @@ func handlersFor(d deps) (*services.Handlers, services.Config) {
 	if h := servicesFor[d.CLI]; h != nil {
 		return h, cfg
 	}
+	cfg.Connections = connectionsFor(d)
 	h := &services.Handlers{S: services.New(cfg), Session: d.SessionOK}
 	servicesFor[d.CLI] = h
 	return h, cfg
@@ -193,15 +194,21 @@ func serviceRoutes(d deps) []gate.JSONRoute {
 		)
 	}
 	out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/change-view"), Compute: viaMemory(d, h.ChangeView)})
-	if cfg.TrackerURL != "" && len(cfg.GitLabHosts) > 0 && (cfg.DocsHost != "" || len(cfg.PortalOrigins) > 0) {
-		out = append(out,
-			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/link-meta"), Compute: viaMemory(d, h.LinkMeta)},
-			gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/link-meta/projects"), Compute: viaMemory(d, h.Projects)},
-		)
+	// Link previews and task cards also answer once the person connected a tracker or a wiki of their own, whatever the
+	// deployment names.
+	conns := connectionsFor(d)
+	whenOwn := func(on bool, route string) func(*http.Request) bool {
+		at := routeAt(route)
+		return func(r *http.Request) bool { return at(r) && (on || hasOwnConnection(conns)) }
 	}
-	if cfg.TrackerURL != "" && cfg.TaskKey != nil {
-		out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/task"), Compute: viaMemory(d, h.Task)})
+	linkMetaOn := cfg.TrackerURL != "" && len(cfg.GitLabHosts) > 0 && (cfg.DocsHost != "" || len(cfg.PortalOrigins) > 0)
+	if linkMetaOn {
+		out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/link-meta/projects"), Compute: viaMemory(d, h.Projects)})
 	}
+	out = append(out,
+		gate.JSONRoute{Slice: "services", Match: whenOwn(linkMetaOn, platformAPI+"/link-meta"), Compute: viaMemory(d, h.LinkMeta)},
+		gate.JSONRoute{Slice: "services", Match: whenOwn(cfg.TrackerURL != "" && cfg.TaskKey != nil, platformAPI+"/task"), Compute: viaMemory(d, h.Task)},
+	)
 	if cfg.OrganizerFile != "" {
 		out = append(out, gate.JSONRoute{Slice: "services", Match: routeAt(platformAPI + "/organizer"), Compute: viaMemory(d, h.Organizer)})
 	}

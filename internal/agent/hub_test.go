@@ -492,6 +492,42 @@ func TestHubDialIsSignedAndHelloAnswers(t *testing.T) {
 	}
 }
 
+func TestHubHelloAdvertisesMetricsDrainAndHardware(t *testing.T) {
+	r := startHubAgent(t, rigOptions{})
+	c := r.connect()
+	hello := decode[hubproto.Hello](t, c.mustCall("hello", nil))
+	have := map[string]bool{}
+	for _, f := range hello.Features {
+		have[f] = true
+	}
+	if !have[hubproto.FeatureMetrics] || !have[hubproto.FeatureDrain] {
+		t.Errorf("features %v", hello.Features)
+	}
+	if hello.Hardware == nil || hello.Hardware.OS == "" || hello.Hardware.Arch == "" {
+		t.Errorf("hardware %+v", hello.Hardware)
+	}
+	// Without a subscription naming it, no sample is pushed to the hub.
+	time.Sleep(200 * time.Millisecond)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, ev := range c.events {
+		if string(ev["event"]) == `"`+hubproto.EventMetricsSample+`"` {
+			t.Errorf("a sample went to a hub that did not ask: %v", ev)
+		}
+	}
+}
+
+func TestHubObserveLinkHasNoDrain(t *testing.T) {
+	r := startHubAgent(t, rigOptions{observe: true})
+	c := r.connect()
+	hello := decode[hubproto.Hello](t, c.mustCall("hello", nil))
+	for _, f := range hello.Features {
+		if f == hubproto.FeatureDrain {
+			t.Errorf("an observe link offers drain: %v", hello.Features)
+		}
+	}
+}
+
 func TestHubV1OperationsAreDeniedAndUnknownOnesUnsupported(t *testing.T) {
 	r := startHubAgent(t, rigOptions{})
 	c := r.connect()
@@ -1147,7 +1183,7 @@ func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
 		t.Fatalf("observe policy %+v", p)
 	}
 	for _, f := range hello.Features {
-		if f == "tunnel" || f == hubproto.FeatureBudget {
+		if f == "tunnel" || f == hubproto.FeatureBudget || f == hubproto.FeatureEnvironment {
 			t.Errorf("an observe link offers %s: %v", f, hello.Features)
 		}
 	}
@@ -1162,6 +1198,7 @@ func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
 		"runtime.session": {"subject": "a@example.com"},
 		"tunnel.open":     {"spec": map[string]string{"tunnelId": strings.Repeat("a", 32), "target": "runtime"}},
 		"budget.set":      {"version": 1, "mode": "stop", "entries": []any{}},
+		"env.set":         {"rev": 1, "hash": hubproto.EnvHash(nil), "items": []any{}},
 	} {
 		if _, e := c.call(op, params); !strings.HasPrefix(e, "policy_denied: ") {
 			t.Errorf("%s: %q", op, e)

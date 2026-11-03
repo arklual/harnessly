@@ -18,3 +18,6 @@ docs/hub/plan.md
 
 # The deck's PDF e2e drives the machine CLI of the internal deployment and names its hosts and headers.
 web/e2e/deck-share-pdf.spec.ts
+
+# The chart's pixel-parity check drives the internal design board's bundle as the reference and names its paths.
+web/e2e/parity/viz

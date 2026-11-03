@@ -1,0 +1,219 @@
+{
+  "signals": [
+    {
+      "id": "g2offlineaaaaaaaaaaa",
+      "rule": "machine_offline",
+      "severity": "warn",
+      "scope": {
+        "kind": "tenant",
+        "id": "s2acmeaaaaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "machine",
+        "id": "m2buildaaaaaaaaaaaaa",
+        "label": "build-1"
+      },
+      "title": "Машина build-1 не выходит на связь",
+      "detail": "Последний раз была на связи 3 ч назад",
+      "firstAt": "2026-10-30T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "open_machine",
+        "label": "Открыть машину",
+        "target": "m2buildaaaaaaaaaaaaa",
+        "machineId": "m2buildaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2idleaaaaaaaaaaaaaa",
+      "rule": "machine_idle",
+      "severity": "info",
+      "scope": {
+        "kind": "tenant",
+        "id": "s2acmeaaaaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "machine",
+        "id": "m2spareaaaaaaaaaaaaa",
+        "label": "spare-2"
+      },
+      "title": "На машине spare-2 неделю нет чатов",
+      "detail": "Включена, но простаивает",
+      "firstAt": "2026-10-30T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "open_machine",
+        "label": "Открыть машину",
+        "target": "m2spareaaaaaaaaaaaaa",
+        "machineId": "m2spareaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2inviteaaaaaaaaaaaa",
+      "rule": "invite_pending",
+      "severity": "info",
+      "scope": {
+        "kind": "tenant",
+        "id": "s2acmeaaaaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "invite",
+        "id": "i2danaaaaaaaaaaaaaaa",
+        "label": "dan@example.org"
+      },
+      "title": "Приглашение для dan@example.org ждёт 4 дня",
+      "detail": "Приглашение не принято",
+      "firstAt": "2026-10-30T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "resend_invite",
+        "label": "Отправить снова",
+        "target": "i2danaaaaaaaaaaaaaaa",
+        "inviteId": "i2danaaaaaaaaaaaaaaa",
+        "tenantId": "s2acmeaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2windowaaaaaaaaaaaa",
+      "rule": "window_90",
+      "severity": "warn",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeaaaaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "account",
+        "id": "a2max1aaaaaaaaaaaaaa",
+        "label": "Max №1"
+      },
+      "title": "Окно подписки Max №1 занято на 93%",
+      "detail": "Сброс через 2 ч",
+      "firstAt": "2026-10-30T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "move_account",
+        "label": "Перекинуть на №2",
+        "target": "a2max2aaaaaaaaaaaaaa",
+        "fromAccountId": "a2max1aaaaaaaaaaaaaa",
+        "toAccountId": "a2max2aaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2toolerrorsaaaaaaaa",
+      "rule": "tool_errors_up",
+      "severity": "warn",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeaaaaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "org",
+        "id": "o2acmeaaaaaaaaaaaaaa",
+        "label": "Acme"
+      },
+      "title": "Ошибок инструментов стало больше",
+      "detail": "С 1% до 20% вызовов за неделю",
+      "firstAt": "2026-10-30T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "open_kpi",
+        "label": "Посмотреть показатель",
+        "target": "tool_errors",
+        "kpi": "tool_errors",
+        "scope": {
+          "kind": "org",
+          "id": "o2acmeaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "id": "g2unknownaaaaaaaaaaa",
+      "rule": "unknown_account",
+      "severity": "warn",
+      "scope": {
+        "kind": "tenant",
+        "id": "s2acmeaaaaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "account",
+        "id": "a2strangeraaaaaaaaaa",
+        "label": "stranger"
+      },
+      "title": "Машина использует неизвестный аккаунт",
+      "detail": "Списано по прайсу $12 за месяц",
+      "firstAt": "2026-10-30T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "register_account",
+        "label": "Зарегистрировать",
+        "target": "a2strangeraaaaaaaaaa",
+        "accountId": "a2strangeraaaaaaaaaa"
+      }
+    },
+    {
+      "id": "g2noprice0aaaaaaaaaa",
+      "rule": "model_no_price",
+      "severity": "warn",
+      "scope": {
+        "kind": "org",
+        "id": "o2acmeaaaaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "model",
+        "id": "model-x-9",
+        "label": "model-x-9"
+      },
+      "title": "Нет цены у модели model-x-9",
+      "detail": "2 вызовов за 7 дней без цены",
+      "firstAt": "2026-10-30T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "open_prices",
+        "label": "Задать цену",
+        "target": "model-x-9",
+        "model": "model-x-9"
+      }
+    },
+    {
+      "id": "g2waitingaaaaaaaaaaa",
+      "rule": "chat_waiting",
+      "severity": "info",
+      "scope": {
+        "kind": "tenant",
+        "id": "s2acmeaaaaaaaaaaaaaa"
+      },
+      "subject": {
+        "kind": "user",
+        "id": "u2veraaaaaaaaaaaaaaa",
+        "label": "Вера"
+      },
+      "title": "Чат Веры ждёт ответа 2 ч",
+      "detail": "Агент остановился и ждёт человека",
+      "firstAt": "2026-10-30T08:00:00Z",
+      "lastAt": "2026-10-30T17:50:00Z",
+      "snoozedUntil": null,
+      "escalated": false,
+      "action": {
+        "kind": "open_chat",
+        "label": "Открыть чат",
+        "target": "wait1",
+        "machineId": "m2buildaaaaaaaaaaaaa",
+        "sessionKey": "wait1"
+      }
+    }
+  ]
+}

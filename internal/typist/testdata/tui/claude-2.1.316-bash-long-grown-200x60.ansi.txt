@@ -6,7 +6,7 @@
 
 [38;5;246m[48;5;237m❯ [38;5;231mCall the Bash tool exactly once with the exact command stored between the markers, verbatim, on one line. Do not read anything first, do not explain.[39m
   [38;5;231mBEGIN[39m
-  [38;5;231mfalse && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/hrn-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add "$@"; [39m
+  [38;5;231mfalse && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/wrk-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add "$@"; [39m
   [38;5;231m}; union web/app/hub/org/api/live.ts web/app/hub/org/mock/index.ts; GIT_EDITOR=true git cherry-pick --continue >/dev/null 2>&1 && echo ok 96bb8995; for c in 6399604c c5cb8f03 242c1747 c59e5b6b [39m
   [38;5;231mba3cde0d; do if git cherry-pick $c >/dev/null 2>&1; then echo "ok $c"; continue; fi; U=$(git diff --name-only --diff-filter=U); echo "CONFLICT $c: $U" | tr '\n' ' '; echo; bad=""; for f in ${(f)U};[39m
   [38;5;231mdo case $f in web/app/hub/org/api/live.ts|web/app/hub/org/mock/index.ts|web/app/hub/org/org.css|web/app/hub/org/api/index.ts|web/app/hub/org/api/types.ts) ;; *) bad="$bad $f";; esac; done; if [ -n[39m
@@ -16,14 +16,14 @@
   [38;5;231mEND[39m
 
 [38;5;246m[49m●[39m Running guarded cherry-pick script (short-circuited by false)
-[38;5;246m  ⎿  $ false && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/hrn-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add [39m
+[38;5;246m  ⎿  $ false && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/wrk-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add [39m
      [38;5;246m"$@"; }; union web/app/hub/org/api/live.ts web/app/hub/org/mock/index.ts; GIT_EDITOR=true git cherry-pick …[39m
 
 [38;5;153m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 [39m [1m[38;5;153mBash command[0m
  [38;5;246mRun guarded cherry-pick script (short-circuited by false)[39m
 [38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
-[39m [2m│[0m false && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/hrn-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add "$@";
+[39m [2m│[0m false && { cd /nonexistent/repro/.worktrees/harnessly-wrk3182-harnessly-wrk3182-.worktrees-wrk-3182-ship-ec9eeac5/wrk-531; union(){ sed -i -E '/^(<<<<<<< |=======$|>>>>>>> )/d' "$@"; git add "$@";
  [2m│[0m }; union web/app/hub/org/api/live.ts web/app/hub/org/mock/index.ts; GIT_EDITOR=true git cherry-pick --continue >/dev/null 2>&1 && echo ok 96bb8995; for c in 6399604c c5cb8f03 242c1747 c59e5b6b
  [2m│[0m ba3cde0d; do if git cherry-pick $c >/dev/null 2>&1; then echo "ok $c"; continue; fi; U=$(git diff --name-only --diff-filter=U); echo "CONFLICT $c: $U" | tr '\n' ' '; echo; bad=""; for f in
  [2m│[0m ${(f)U}; do case $f in web/app/hub/org/api/live.ts|web/app/hub/org/mock/index.ts|web/app/hub/org/org.css|web/app/hub/org/api/index.ts|web/app/hub/org/api/types.ts) ;; *) bad="$bad $f";; esac;

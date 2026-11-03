@@ -146,6 +146,9 @@ func (l *Launcher) Claude(ids []string, settingsPath string) (agents.ClaudeApps,
 				_ = os.Remove(f)
 			}
 		}
+		// Other MCP configs of the runtime (the person's MCP servers, reached through it) go in with this token too:
+		// the person's would read as nothing behind the wall.
+		out.Retoken = func(src string) (string, error) { return retokenMCP(dir, "xmcp", src, tok) }
 	}
 	if l.MCPConfigPath != "" {
 		if out.MCPConfig, err = l.hostMCP(dir, token); err != nil {
@@ -164,7 +167,13 @@ func (l *Launcher) Claude(ids []string, settingsPath string) (agents.ClaudeApps,
 // runtimeMCP is the runtime's own --mcp-config for a chat with apps: the same server, with the launch's token in its
 // headers in place of the person's.
 func (l *Launcher) runtimeMCP(dir, token string) (string, error) {
-	raw, err := os.ReadFile(l.MCPConfigPath)
+	return retokenMCP(dir, "rmcp", l.MCPConfigPath, token)
+}
+
+// retokenMCP writes a copy of the MCP config at src with token in every header of every server, into dir under prefix,
+// and gives its path.
+func retokenMCP(dir, prefix, src, token string) (string, error) {
+	raw, err := os.ReadFile(src)
 	if err != nil {
 		return "", err
 	}
@@ -172,7 +181,7 @@ func (l *Launcher) runtimeMCP(dir, token string) (string, error) {
 		Servers map[string]map[string]any `json:"mcpServers"`
 	}
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return "", fmt.Errorf("%s: %w", l.MCPConfigPath, err)
+		return "", fmt.Errorf("%s: %w", src, err)
 	}
 	for _, srv := range cfg.Servers {
 		withToken(srv, token)
@@ -181,7 +190,7 @@ func (l *Launcher) runtimeMCP(dir, token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return writeByContent(dir, "rmcp", ".json", body)
+	return writeByContent(dir, prefix, ".json", body)
 }
 
 // withToken puts the token in every header of a server's config (the runtime's config carries the cli-token in each).

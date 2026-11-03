@@ -469,7 +469,10 @@ func (c *conv) decide(device string, m wire.DecideCmd, now time.Time) wire.CmdRe
 	if g.p == nil {
 		return wire.Refused(wire.RefuseGateClosed)
 	}
-	want := typist.PickWant{Plan: g.p.Kind == wire.PermPlan, Cwd: c.rec.Cwd}
+	want := typist.PickWant{Plan: g.p.Kind == wire.PermPlan, Dialog: g.p.Kind == wire.PermDialog, Cwd: c.rec.Cwd}
+	if want.Dialog && g.p.PlanMD != nil {
+		want.Request = *g.p.PlanMD
+	}
 	if g.p.Command != nil {
 		want.Command = *g.p.Command
 	}
@@ -483,6 +486,10 @@ func (c *conv) decide(device string, m wire.DecideCmd, now time.Time) wire.CmdRe
 	}
 	if want.N == 0 {
 		return wire.Refused(wire.RefuseOptionUnknown)
+	}
+	if g.reply != nil {
+		c.answerHook(g, m, device, now)
+		return wire.Accepted(wire.ConvChannel(c.rec.ID), c.convSeq())
 	}
 	c.answering(g, m.OpID, device, now)
 	clock, provider := c.d.Clock, c.rec.Provider

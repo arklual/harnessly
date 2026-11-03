@@ -13,12 +13,23 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-03d',
+    items: [
+      { key: 'connections', icon: 'plug' },
+      { key: 'agentsRead', icon: 'book-open' },
+      { key: 'mcp', icon: 'blocks' },
+    ],
+  },
+  {
     id: '2026-11-03c',
     items: [{ key: 'docs', icon: 'book-open' }],
   },
   {
     id: '2026-11-03b',
-    items: [{ key: 'queueNote', icon: 'message-square' }],
+    items: [
+      { key: 'queueNote', icon: 'message-square' },
+      { key: 'gates', icon: 'shield-question' },
+    ],
   },
   {
     id: '2026-11-03a',

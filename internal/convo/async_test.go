@@ -238,3 +238,53 @@ func TestAFullMailboxRefusesWhatItDoesNotTake(t *testing.T) {
 		t.Fatalf("the retry: %+v", res)
 	}
 }
+
+// countingMachine counts the looks at its one pane, a terminal that never draws the agent's box.
+type countingMachine struct {
+	mu     sync.Mutex
+	looked int
+	pane   *lockedPane
+}
+
+func (m *countingMachine) Pane(string) typist.Pane { return m.pane }
+func (m *countingMachine) Probe(string) Probe {
+	m.mu.Lock()
+	m.looked++
+	m.mu.Unlock()
+	return Probe{Session: true, Foreground: true}
+}
+
+func (m *countingMachine) looks() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.looked
+}
+
+// a starting agent is looked at every LookStarting, not every LookEvery, so the moment it can take the first
+// message is not missed by up to a second; the conversations at rest keep their slower pace.
+func TestAStartingAgentIsLookedAtOften(t *testing.T) {
+	dir := t.TempDir()
+	m := &countingMachine{pane: &lockedPane{}}
+	rt := New(Deps{MachineID: "m1", Publisher: &fakePub{t: t, seqs: map[wire.Channel]int64{}}, Machine: m,
+		Launcher: &lockedLauncher{}, Store: NewStore(filepath.Join(dir, "v2")), Limits: wire.DefaultLimits})
+	if err := rt.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Stop()
+	res := rt.Do(context.Background(), "d", wire.ConversationCreateCmd{OpID: "c1", Cwd: "/w", Provider: wire.ProviderClaude})
+	if res.R != wire.ResultAccepted || res.ID == nil {
+		t.Fatalf("create: %+v", res)
+	}
+	if err := rt.Attach(*res.ID, "s1", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if cs, err := rt.Conversations(context.Background()); err != nil || len(cs.Conversations) != 1 || cs.Conversations[0].State.K != wire.StateStarting {
+		t.Fatalf("not starting: %+v %v", cs, err)
+	}
+	before := m.looks()
+	time.Sleep(LookEvery + LookStarting/2)
+	// A look a second apart makes one or two here; a look every LookStarting about four.
+	if n := m.looks() - before; n < 3 {
+		t.Fatalf("a starting agent was looked at %d times in %v", n, LookEvery+LookStarting/2)
+	}
+}

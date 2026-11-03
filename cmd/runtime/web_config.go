@@ -12,30 +12,35 @@ import (
 // pageConfig is what the page needs to know about this installation, written into <meta name="hl-config"> when the
 // runtime serves index.html (web/app/platform/config.ts reads it). It names services and copy only; no token is in it.
 type pageConfig struct {
-	ProductName        string            `json:"productName"`
-	DesignName         string            `json:"designName"`
-	MarkURL            *string           `json:"markUrl"`
-	Locale             string            `json:"locale"`
-	ArtifactsURL       *string           `json:"artifactsUrl"`
-	BoardsURL          *string           `json:"boardsUrl"`
-	ReaderURL          *string           `json:"readerUrl"`
-	StandDomain        *string           `json:"standDomain"`
-	StandSignInHosts   []string          `json:"standSignInHosts"`
-	PaneHosts          []string          `json:"paneHosts"`
-	DefaultPins        []pagePin         `json:"defaultPins"`
-	People             map[string]string `json:"people"`
-	TrackerIssueURL    *string           `json:"trackerIssueUrl"`
-	TrackerHosts       []string          `json:"trackerHosts"`
-	TaskKeyPattern     string            `json:"taskKeyPattern,omitempty"`
-	GitlabHosts        []string          `json:"gitlabHosts"`
-	LayoutKey          string            `json:"layoutKey"`
-	LaunchDefaultsKey  string            `json:"launchDefaultsKey"`
-	SpeedPosthogHost   *string           `json:"speedPosthogHost"`
-	SpeedPosthogKey    *string           `json:"speedPosthogKey"`
-	Features           map[string]bool   `json:"features"`
-	UploadHeaderPrefix string            `json:"uploadHeaderPrefix"`
-	GithubHost         string            `json:"githubHost"`
-	Copy               map[string]any    `json:"copy,omitempty"`
+	ProductName      string            `json:"productName"`
+	DesignName       string            `json:"designName"`
+	MarkURL          *string           `json:"markUrl"`
+	Locale           string            `json:"locale"`
+	ArtifactsURL     *string           `json:"artifactsUrl"`
+	BoardsURL        *string           `json:"boardsUrl"`
+	ReaderURL        *string           `json:"readerUrl"`
+	StandDomain      *string           `json:"standDomain"`
+	StandSignInHosts []string          `json:"standSignInHosts"`
+	PaneHosts        []string          `json:"paneHosts"`
+	DefaultPins      []pagePin         `json:"defaultPins"`
+	People           map[string]string `json:"people"`
+	TrackerIssueURL  *string           `json:"trackerIssueUrl"`
+	TrackerHosts     []string          `json:"trackerHosts"`
+	TaskKeyPattern   string            `json:"taskKeyPattern,omitempty"`
+	GitlabHosts      []string          `json:"gitlabHosts"`
+	// ConnectionHosts are the hosts (host[:port], lower case) of the connections with issues or pages, the deployment's
+	// and the person's (Settings → Connections), as they are when the page loads: their links get a preview
+	// (<platform>/link-meta?url=) and an issue opens as a task card (<platform>/connections/resolve?url= names the
+	// connection and the key for <platform>/task?key=&conn=).
+	ConnectionHosts    []string        `json:"connectionHosts"`
+	LayoutKey          string          `json:"layoutKey"`
+	LaunchDefaultsKey  string          `json:"launchDefaultsKey"`
+	SpeedPosthogHost   *string         `json:"speedPosthogHost"`
+	SpeedPosthogKey    *string         `json:"speedPosthogKey"`
+	Features           map[string]bool `json:"features"`
+	UploadHeaderPrefix string          `json:"uploadHeaderPrefix"`
+	GithubHost         string          `json:"githubHost"`
+	Copy               map[string]any  `json:"copy,omitempty"`
 	// HubURL is the public address of the hub this machine is connected to (RUNTIME_HUB_URL), without a trailing slash;
 	// null for a runtime no hub carries. The page links back to the hub and signs out there.
 	HubURL *string `json:"hubUrl"`
@@ -110,6 +115,7 @@ func pageConfigFromEnv() pageConfig {
 		People:            people(os.Getenv("RUNTIME_PEOPLE")),
 		TrackerHosts:      list(splitList(os.Getenv("RUNTIME_TRACKER_HOSTS"))),
 		GitlabHosts:       list(splitList(env("RUNTIME_GITLAB_HOSTS", "gitlab.com"))),
+		ConnectionHosts:   []string{},
 		LayoutKey:         env("RUNTIME_LAYOUT_KEY", "layout"),
 		LaunchDefaultsKey: env("RUNTIME_LAUNCH_DEFAULTS_KEY", "launchDefaults"),
 		SpeedPosthogHost:  optional(os.Getenv("RUNTIME_SPEED_POSTHOG_HOST")),

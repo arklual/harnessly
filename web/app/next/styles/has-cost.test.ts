@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 // A state a keystroke touches, inside :has(): the browser then checks every ancestor at each key pressed anywhere on the
 // page and recomputes what those rules reach. One such rule on the sidebar's rows doubled the cost of a letter in every
-// field (HRN-629). Put the state on the element from code, or use a sibling selector.
+// field. Put the state on the element from code, or use a sibling selector.
 const COSTLY = /:has\([^{}]*:(focus-visible|placeholder-shown)/;
 
 describe('the stylesheets', () => {

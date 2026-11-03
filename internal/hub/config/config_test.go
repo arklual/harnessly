@@ -333,3 +333,117 @@ func TestSitesConfig(t *testing.T) {
 		t.Error("abuse url scheme")
 	}
 }
+
+func TestProxyJWT(t *testing.T) {
+	load := func(env map[string]string) (*Config, error) {
+		env["HUB_PUBLIC_URL"] = "https://hub.example.com"
+		env["HUB_DATA_DIR"] = t.TempDir()
+		env["HUB_MAIL_LOG"] = "allow"
+		return Load(func(k string) (string, bool) { v, ok := env[k]; return v, ok })
+	}
+	c, err := load(map[string]string{"HUB_PROXY_JWT_JWKS_URL": "https://tl.example.com/.well-known/jwks.json", "HUB_PROXY_JWT_AUDIENCE": "gw", "HUB_PROXY_JWT_HOST": "AI.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.ProxyJWT.On() || c.ProxyJWT.Host != "ai.example.com" || c.ProxyJWT.Header != "Teleport-Jwt-Assertion" || c.ProxyJWT.EmailClaim != "sub" {
+		t.Errorf("proxy jwt %+v", c.ProxyJWT)
+	}
+	for name, env := range map[string]map[string]string{
+		"no host":   {"HUB_PROXY_JWT_JWKS_URL": "https://tl.example.com/jwks", "HUB_PROXY_JWT_AUDIENCE": "gw"},
+		"hub's own": {"HUB_PROXY_JWT_JWKS_URL": "https://tl.example.com/jwks", "HUB_PROXY_JWT_AUDIENCE": "gw", "HUB_PROXY_JWT_HOST": "hub.example.com"},
+		"not a url": {"HUB_PROXY_JWT_JWKS_URL": "tl.example.com", "HUB_PROXY_JWT_AUDIENCE": "gw", "HUB_PROXY_JWT_HOST": "ai.example.com"},
+	} {
+		if _, err := load(env); err == nil {
+			t.Errorf("%s: no error", name)
+		}
+	}
+	c, err = load(map[string]string{"HUB_EDITION": "cloud", "HUB_PROXY_JWT_JWKS_URL": "https://tl.example.com/jwks", "HUB_PROXY_JWT_AUDIENCE": "gw", "HUB_PROXY_JWT_HOST": "ai.example.com", "HUB_SMTP_URL": "smtp://mail.example.com:25"})
+	if err == nil && c.ProxyJWT.On() {
+		t.Error("the cloud takes a gateway's assertions")
+	}
+}
+
+func TestMachinesConfig(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "http://localhost:8040"}
+	load := func(extra map[string]string) (*Config, error) {
+		env := map[string]string{}
+		for k, v := range base {
+			env[k] = v
+		}
+		for k, v := range extra {
+			env[k] = v
+		}
+		return Load(func(k string) (string, bool) { v, ok := env[k]; return v, ok })
+	}
+	c, err := load(nil)
+	if err != nil || c.Machines.Provider != "none" || c.Machines.AccessEnforce != AccessOff || c.Machines.Resources {
+		t.Fatalf("defaults: %+v %v", c, err)
+	}
+	c, err = load(map[string]string{"HUB_PROVIDER_URL": "https://p.example.org", "HUB_PROVIDER_TOKEN_FILE": "/run/p/token", "HUB_ACCESS_ENFORCE": "WARN", "HUB_MACHINE_RESOURCES": "ON"})
+	if err != nil || c.Machines.Provider != "http" || c.Machines.ProviderTokenFile != "/run/p/token" || c.Machines.AccessEnforce != AccessWarn || !c.Machines.Resources {
+		t.Fatalf("http: %+v %v", c, err)
+	}
+	for _, bad := range []map[string]string{{"HUB_PROVIDER": "http"}, {"HUB_PROVIDER": "cloud"}, {"HUB_ACCESS_ENFORCE": "strict"}, {"HUB_MACHINE_RESOURCES": "1"}} {
+		if _, err := load(bad); err == nil {
+			t.Errorf("%v must be refused", bad)
+		}
+	}
+}
+
+func TestAgentURLDefaultsToThePublicOne(t *testing.T) {
+	c, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "https://ai.example.com", "HUB_SMTP_URL": "smtp://mail.example.com"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.AgentURL != "https://ai.example.com" || c.AgentHost != "ai.example.com" || !c.AgentSecure {
+		t.Errorf("default agent url: %q %q %v", c.AgentURL, c.AgentHost, c.AgentSecure)
+	}
+	c, err = Load(env(map[string]string{"HUB_PUBLIC_URL": "https://ai.example.com", "HUB_SMTP_URL": "smtp://mail.example.com",
+		"HUB_AGENT_URL": "http://Hub.Example.com:8040/", "HUB_RUNTIME_DOMAIN": "m.example.net"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.AgentURL != "http://Hub.Example.com:8040" || c.AgentHost != "hub.example.com:8040" || c.AgentSecure || c.PublicURL != "https://ai.example.com" {
+		t.Errorf("agent url: %q %q %v", c.AgentURL, c.AgentHost, c.AgentSecure)
+	}
+	// A machine's own origin carries the machines' port, and neither of the hub's hosts is one.
+	if got := c.RuntimeHost("abc"); got != "abc.m.example.net:8040" {
+		t.Errorf("RuntimeHost = %q", got)
+	}
+	if c.MachineIDFromHost("hub.example.com:8040") != "" || c.MachineIDFromHost("ai.example.com") != "" {
+		t.Error("a hub host is no machine")
+	}
+}
+
+func TestFeatureLists(t *testing.T) {
+	base := map[string]string{"HUB_PUBLIC_URL": "https://h.example.com", "HUB_SMTP_URL": "smtp://mail.example.com"}
+	with := func(kv ...string) map[string]string {
+		m := map[string]string{}
+		for k, v := range base {
+			m[k] = v
+		}
+		for i := 0; i < len(kv); i += 2 {
+			m[kv[i]] = kv[i+1]
+		}
+		return m
+	}
+	c, err := Load(env(with("HUB_FEATURES_FORCE", " Env, -org.events ", "HUB_FEATURES_DEFAULT", "ui.hx")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Features.Force) != 2 || !c.Features.Force["env"] || c.Features.Force["org.events"] || !c.Features.Default["ui.hx"] {
+		t.Errorf("features: %+v", c.Features)
+	}
+	for name, tc := range map[string]struct {
+		env  map[string]string
+		want string
+	}{
+		"feature name":    {with("HUB_FEATURES_FORCE", "Bad Name"), "not a feature name"},
+		"agent url path":  {with("HUB_AGENT_URL", "https://a.example.com/x"), "HUB_AGENT_URL"},
+		"agent url bogus": {with("HUB_AGENT_URL", "nope"), "HUB_AGENT_URL"},
+	} {
+		if _, err := Load(env(tc.env)); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: %v, want %q", name, err, tc.want)
+		}
+	}
+}

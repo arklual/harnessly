@@ -502,7 +502,7 @@ func TestSSHConfigMask(t *testing.T) {
 	}
 }
 
-// HRN-621. A launch line waiting in its file runs outside the wall: an agent must not reach it.
+// A launch line waiting in its file runs outside the wall: an agent must not reach it.
 func TestSealHidesWaitingLaunchLines(t *testing.T) {
 	if slices.Contains(dataReadonly, "launch-lines") || slices.Contains(dataWritable, "launch-lines") {
 		t.Fatal("launch-lines is on the seal's list")

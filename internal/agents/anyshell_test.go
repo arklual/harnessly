@@ -108,7 +108,7 @@ func TestAnyShellQuoteAndAppendArgs(t *testing.T) {
 	}
 }
 
-// HRN-621. A long line waits in a file: what is typed is short, it runs the same, and the file does not stay.
+// A long line waits in a file: what is typed is short, it runs the same, and the file does not stay.
 func TestForAnyShellKeepsALongLineInAFile(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "launch-lines")
 	agents.SetLineDir(dir)

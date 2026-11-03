@@ -51,6 +51,11 @@ type PickWant struct {
 	Label string
 	// Plan: the menu is a plan's approval, not a tool's permission.
 	Plan bool
+	// Dialog: the menu is one no tool call named, known by its heading and options. A permission or a plan is never one:
+	// a label like «Yes» says nothing of what it approves.
+	Dialog bool
+	// Request is a dialog's heading, as the gate showed it.
+	Request string
 	// Command is the tool call the permission asks about ("" for a plan, or when the gate did not know it).
 	Command string
 	// Cwd is the session's working directory: the one a «cd <dir> &&» of the command may be left out for.
@@ -261,13 +266,51 @@ func drawnCall(styled, tool, arg string) bool {
 	return strings.TrimSpace(plain[rule+3]) == tool+"("+arg+")"
 }
 
+var planFileRE = regexp.MustCompile(`~/\.claude/plans/([A-Za-z0-9._-]+\.md)`)
+
+// DrawnPlanFile is the name of the plan file Claude's plan dialog names under ~/.claude/plans; "" when it names none.
+func DrawnPlanFile(plain string) string {
+	if m := planFileRE.FindStringSubmatch(plain); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// DrawnPlan is the plan as Claude's plan dialog draws it, between its dashed rules; "" when they are off the screen.
+func DrawnPlan(plain string) string {
+	lines := strings.Split(plain, "\n")
+	first, last := -1, -1
+	for i, l := range lines {
+		if dashedRuleRE.MatchString(l) {
+			if first < 0 {
+				first = i
+			}
+			last = i
+		}
+	}
+	if first < 0 || last <= first {
+		return ""
+	}
+	out := make([]string, 0, last-first)
+	for _, l := range lines[first+1 : last] {
+		out = append(out, strings.TrimPrefix(l, " "))
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
+}
+
 // matches: the screen shows the menu the person decided on.
 func (w PickWant) matches(s Screen) error {
 	kind := MenuPermission
 	if w.Plan {
 		kind = MenuPlan
 	}
+	if w.Dialog {
+		kind = MenuOther
+	}
 	if !s.Readable || s.Menu != kind {
+		return ErrMenuChanged
+	}
+	if w.Dialog && strings.Join(strings.Fields(s.Request), " ") != strings.Join(strings.Fields(w.Request), " ") {
 		return ErrMenuChanged
 	}
 	label, ok := optionOf(s.Options, w.N)
@@ -305,7 +348,8 @@ func Pick(p Pane, c Clock, provider wire.Provider, want PickWant) error {
 		if !ok {
 			continue
 		}
-		if s := Read(styled, provider); s.Menu != MenuPermission && s.Menu != MenuPlan {
+		s := Read(styled, provider)
+		if want.Dialog && (s.Menu == NoMenu || want.matches(s) != nil) || !want.Dialog && s.Menu != MenuPermission && s.Menu != MenuPlan {
 			return nil
 		}
 	}

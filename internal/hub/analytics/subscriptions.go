@@ -16,7 +16,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/usage"
 )
 
-// The organization's subscriptions (docs/hub/analytics.md, «As built (HRN-613)»): each subscription account of the
+// The organization's subscriptions (docs/hub/analytics.md, «As built»): each subscription account of the
 // organization with its fee split between the people of the scope and the rate-limit windows the hub has measured.
 
 // WindowView is one measured rate-limit window of an account.

@@ -195,6 +195,8 @@ type batch struct {
 	users   map[string]string // email → user id ("" unknown)
 	hours   []int64
 	changed []string // session keys whose attribution may have moved
+	catalog []store.CatalogItem
+	loaded  bool // catalog was read
 }
 
 func (s *Service) store(ctx context.Context, tx store.Store, m store.Machine, after int64, records []hubproto.UsageRecord, received time.Time) error {
@@ -245,6 +247,10 @@ func (b *batch) record(ctx context.Context, r hubproto.UsageRecord) error {
 	case hubproto.UsageSession:
 		if r.Session != nil {
 			return b.session(ctx, r.Seq, r.At, *r.Session)
+		}
+	case hubproto.UsageTool:
+		if r.Tool != nil {
+			return b.tool(ctx, r.At, *r.Tool)
 		}
 	case hubproto.UsageWindow:
 		if r.Window != nil {
@@ -320,6 +326,43 @@ func (b *batch) session(ctx context.Context, seq, at int64, x hubproto.UsageSess
 		b.changed = append(b.changed, x.SessionKey)
 	}
 	return err
+}
+
+// tool keeps the calls of one tool of a session on a day. The session says who and which team (it was stored before, in
+// this batch or an earlier one); a session the hub has not seen is the machine creator's, as a session's own guess is.
+func (b *batch) tool(ctx context.Context, at int64, x hubproto.UsageToolFact) error {
+	if x.SessionKey == "" || x.Provider == "" || x.ToolName == "" || x.Calls <= 0 {
+		return nil
+	}
+	if _, err := time.Parse("2006-01-02", x.Day); err != nil {
+		return nil
+	}
+	kind := oneOf(x.ToolKind, "other", "skill", "mcp", "bash")
+	row := store.ToolUsage{
+		OrgKey: b.orgKey, SpaceID: b.space.ID, TeamID: b.m.TeamID, UserID: b.m.CreatedBy, MachineID: b.m.ID, SessionKey: x.SessionKey,
+		ToolKind: kind, ToolName: x.ToolName, Day: x.Day, Calls: x.Calls, Errors: min(max(x.Errors, 0), x.Calls), LastAt: at + b.shift,
+	}
+	switch s, err := b.tx.SessionByKey(ctx, b.orgKey, x.Provider, x.SessionKey); {
+	case err == nil:
+		row.UserID, row.TeamID = s.UserID, s.TeamID
+	case !store.IsNotFound(err):
+		return err
+	default:
+		team, err := b.team(ctx, row.UserID)
+		if err != nil {
+			return err
+		}
+		row.TeamID = team
+	}
+	if !b.loaded {
+		items, err := b.tx.CatalogItems(ctx, b.orgKey, true)
+		if err != nil {
+			return err
+		}
+		b.catalog, b.loaded = items, true
+	}
+	row.ItemID = store.ItemForTool(b.catalog, kind, x.ToolName)
+	return b.tx.UpsertToolUsage(ctx, row)
 }
 
 func (b *batch) window(ctx context.Context, w hubproto.UsageWindowFact) error {

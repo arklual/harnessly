@@ -18,7 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agents"
 )
 
-// The operating system's wall between the agent of a chat with apps and the apps (HRN-527). The guard hook and Claude's
+// The operating system's wall between the agent of a chat with apps and the apps. The guard hook and Claude's
 // deny rules judge the agent's tool calls; a shell the agent bends (a script, `cd` and a relative path, python) passes
 // them, because the agent runs as the person. So the agent's process tree runs in a mount namespace of its own, made by
 // bubblewrap: the whole machine bound as it is (`--dev-bind / /`), and over it the registry and every installed
@@ -305,7 +305,7 @@ func busMask() []string {
 // sshConfigDir is what the system's ssh_config includes.
 const sshConfigDir = "/etc/ssh/ssh_config.d"
 
-// sshConfigMask keeps ssh working in the wall (HRN-621): ssh refuses an Included file not owned by root or the user, and
+// sshConfigMask keeps ssh working in the wall: ssh refuses an Included file not owned by root or the user, and
 // in a user namespace root's files belong to nobody, so one file in this folder ends every ssh and every git over ssh with
 // «Bad owner or permissions». The folder is empty inside; the drop-ins (a package's proxy for local VMs, cloud-init's) do
 // not apply in the wall, the person's ~/.ssh/config does. The sshd of the machine, not this, refuses a login to itself.

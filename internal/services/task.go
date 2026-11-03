@@ -258,6 +258,11 @@ func (s *Service) loadTask(ctx context.Context, key string) taskResult {
 // Task is one tracker task: one request per task, kept a minute, shared while in flight; a failure is never kept.
 // err is one of the Task* errors.
 func (s *Service) Task(ctx context.Context, key string) (*jsvalue.Object, string) {
+	return s.cachedTask(ctx, key, func(ctx context.Context) taskResult { return s.loadTask(ctx, key) })
+}
+
+// cachedTask is a task by its cache key, loaded by load when it is not kept.
+func (s *Service) cachedTask(ctx context.Context, key string, load func(context.Context) taskResult) (*jsvalue.Object, string) {
 	st := s.tasks
 	st.mu.Lock()
 	if e, ok := st.entries[key]; ok && time.Since(e.at) < taskFresh {
@@ -272,7 +277,7 @@ func (s *Service) Task(ctx context.Context, key string) (*jsvalue.Object, string
 	call := &taskCall{done: make(chan struct{})}
 	st.inflight[key] = call
 	st.mu.Unlock()
-	call.res = s.loadTask(context.WithoutCancel(ctx), key)
+	call.res = load(context.WithoutCancel(ctx))
 	st.mu.Lock()
 	if call.res.task != nil {
 		if _, ok := st.entries[key]; ok {

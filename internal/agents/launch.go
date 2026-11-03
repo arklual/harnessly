@@ -61,6 +61,9 @@ type ClaudeApps struct {
 	// Env are `VAR='value'` shell words the CLI gets after the launch's own environment (the agent's token file,
 	// HARNESSLY_CLI_TOKEN_FILE); "" for none.
 	Env string
+	// Retoken copies an MCP config of the runtime's (one that carries the person's token in its headers) with the
+	// launch's token in its place, and gives the copy's path; nil when the launch has no token of its own.
+	Retoken func(mcpConfigPath string) (string, error)
 }
 
 // ErrNoApps: a launch names apps and this machine has none.

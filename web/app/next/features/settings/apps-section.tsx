@@ -1,6 +1,6 @@
-// «Apps»: the services the agent works with on the machine, as the Apps screen reads them. An app is connected where
-// its address and token are kept — in the machine's environment — so the page says what it found and why an app is
-// off; it has no connect button to press.
+// «Apps»: the services the agent works with on the machine, as the Apps screen reads them. An app set up by the
+// machine's environment is shown as it is found, with why it is off; the person's own tracker, wiki or code host is
+// connected by a link in Settings → Connections, which the foot leads to.
 import { Group, SetButton } from '@/next/features/settings/rows';
 import { APP_REGISTRY } from '@/next/features/apps/model';
 import { t } from '@/next/i18n';
@@ -16,6 +16,8 @@ export interface IAppsSectionProps {
   error: string | null;
   onOpen: () => void;
   onRetry: () => void;
+  /** Settings → Connections, where the person connects their own tracker or wiki. */
+  onConnections: () => void;
 }
 
 /** What an app says about itself when it is not ready: the same words as its screen. */
@@ -34,7 +36,7 @@ const stateText = (app: AppFeed): string => {
   }
 };
 
-const AppsSection = ({ feed, error, onOpen, onRetry }: IAppsSectionProps) => (
+const AppsSection = ({ feed, error, onOpen, onRetry, onConnections }: IAppsSectionProps) => (
   <>
     {error && (
       <Group>
@@ -86,7 +88,12 @@ const AppsSection = ({ feed, error, onOpen, onRetry }: IAppsSectionProps) => (
         )}
       </Swap>
     )}
-    <div className="hx-set__foot">{t('next.settings.apps.foot')}</div>
+    <div className="hx-set__foot">
+      {t('next.settings.apps.foot')}{' '}
+      <button type="button" className="hx-set__foot-link" onClick={onConnections}>
+        {t('next.settings.apps.toConnections')}
+      </button>
+    </div>
   </>
 );
 

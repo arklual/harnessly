@@ -6,8 +6,9 @@ import { AnalyticsScreen } from './screens/analytics';
 import { MachinesScreen } from './screens/machines';
 import { OverviewScreen } from './screens/overview';
 import { TeamsScreen } from './screens/teams';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
+import { hxOn } from '../hx/flag';
 import { Redirect } from '../lib/router';
 import { OrgProvider, useOrg } from './context';
 import { sectionsOf } from './nav';
@@ -15,7 +16,10 @@ import { rememberOrg } from './step';
 import { OrgShell } from './shell';
 import { ALL_SCOPE, type Section } from './types';
 
-const SECTIONS: readonly Section[] = ['overview', 'analytics', 'machines', 'teams'];
+const SECTIONS: readonly Section[] = ['overview', 'analytics', 'machines', 'teams', 'team', 'env'];
+
+// The new hub of the board «Хаб» behind the organization's `ui.hx` feature; its code and styles load only then.
+const HxApp = lazy(() => import('../hx'));
 
 export const isSection = (v: string | undefined): v is Section => SECTIONS.some((s) => s === v);
 
@@ -46,11 +50,17 @@ export const OrgRoutes = ({ org, scope, section }: OrgRouteProps) => {
   if (!isSection(section)) return <Redirect to={`/o/${org}/${scope}/overview`} />;
   return (
     <OrgProvider key={org} org={org} scopeSlug={scope} section={section}>
-      {() => (
-        <OrgShell>
-          <Screen />
-        </OrgShell>
-      )}
+      {(_, shell) =>
+        hxOn(shell.features) ? (
+          <Suspense fallback={null}>
+            <HxApp />
+          </Suspense>
+        ) : (
+          <OrgShell>
+            <Screen />
+          </OrgShell>
+        )
+      }
     </OrgProvider>
   );
 };

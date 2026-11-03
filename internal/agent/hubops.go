@@ -121,11 +121,18 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 		return h.opUsage(op, req)
 	case hubproto.OpTunnelOpen:
 		return h.opTunnel(l, req, pol)
+	case hubproto.OpRuntimeRestart, hubproto.OpRuntimeRestartCancel:
+		return h.opRestart(op, req)
 	case hubproto.OpBudgetSet:
 		if h.observe {
 			return nil, nil, h.allow(op, false, "the hub's limits")
 		}
 		return h.opBudget(req)
+	case hubproto.OpEnvSet:
+		if h.observe {
+			return nil, nil, h.allow(op, false, "the hub's environment")
+		}
+		return h.opEnvSet(req)
 	}
 	if closedClusterOps[op] {
 		return nil, nil, hubproto.Errf(hubproto.CodePolicyDenied, "%s is not served on a hub link", op)

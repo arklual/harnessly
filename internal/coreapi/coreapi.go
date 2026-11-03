@@ -4,6 +4,7 @@
 package coreapi
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -101,6 +102,9 @@ func (t Timings) withDefaults() Timings {
 // Config is what the routes use.
 type Config struct {
 	Keeper Keeper
+	// PermissionRequest holds Claude's PermissionRequest hook for the conversation of a tmux session until the person
+	// decided, and answers with what the hook prints; false, or nil, leaves it to Claude's own dialog.
+	PermissionRequest func(ctx context.Context, session string, request map[string]any) (any, bool)
 	// TokenOK checks the runtime's cli-token in the hook's headers.
 	TokenOK func(*http.Request) bool
 	// APIRefusal is the dispatcher's answer to a caller with neither a page session nor the cli-token (refused false
@@ -199,7 +203,7 @@ func methodNotAllowed(r *http.Request, msg string) (int, any, http.Header) {
 	return answer(r, http.StatusMethodNotAllowed, errorBody(msg), http.Header{"Allow": {"POST"}})
 }
 
-// hook: Claude's status hook script reports {event, session, notificationType?, at?}; Codex's posts its payload with
+// hook: Claude's status hook script reports {event, session, notificationType?, at?, agentSessionId?}; Codex's posts its payload with
 // ?provider=codex&tmuxSession=. Every success is a 204.
 func (c *Config) hook(r *http.Request, body any) (int, any, http.Header) {
 	if r.Method != http.MethodPost {
@@ -217,8 +221,23 @@ func (c *Config) hook(r *http.Request, body any) (int, any, http.Header) {
 	}
 	if p, ok := queryString(r, "provider"); ok && p == "codex" {
 		return c.codexHook(r, body)
+	} else if ok && p == "claude-permission" {
+		return c.permissionHook(r, body)
 	}
 	return c.claudeHook(body)
+}
+
+// permissionHook holds Claude's PermissionRequest until the person decided; no content leaves it to Claude's dialog.
+func (c *Config) permissionHook(r *http.Request, body any) (int, any, http.Header) {
+	session, _ := queryString(r, "tmuxSession")
+	if c.PermissionRequest == nil || session == "" {
+		return http.StatusNoContent, nil, nil
+	}
+	answer, ok := c.PermissionRequest(r.Context(), session, fields(body))
+	if !ok {
+		return http.StatusNoContent, nil, nil
+	}
+	return http.StatusOK, answer, nil
 }
 
 func (c *Config) claudeHook(body any) (int, any, http.Header) {
@@ -239,6 +258,7 @@ func (c *Config) claudeHook(body any) (int, any, http.Header) {
 	if at, isNum := f["at"].(float64); isNum && !math.IsInf(at, 0) && !math.IsNaN(at) {
 		firedAt = &at
 	}
+	ev.AgentSession, _ = f["agentSessionId"].(string)
 	c.Keeper.HandleProviderEvent(claude.ProviderID, session, ev, firedAt)
 	return http.StatusNoContent, nil, nil
 }

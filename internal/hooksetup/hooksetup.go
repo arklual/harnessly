@@ -23,17 +23,18 @@ import (
 
 // File names in the data folder; agents started earlier hold these paths.
 const (
-	PortFile       = "port"
-	TokenFile      = "cli-token"
-	StatusHookFile = "status-hook.sh"
-	StatuslineFile = "statusline.sh"
-	CodexHookFile  = "codex-hook.sh"
-	BudgetHookFile = "budget-hook.sh"
-	HooksFile      = "hooks.json"
-	MCPConfigFile  = "preview-mcp.json"
-	LauncherFile   = "codex-launcher.js"
-	HandoffDir     = "prompt-handoff"
-	BinDir         = "bin"
+	PortFile           = "port"
+	TokenFile          = "cli-token"
+	StatusHookFile     = "status-hook.sh"
+	StatuslineFile     = "statusline.sh"
+	CodexHookFile      = "codex-hook.sh"
+	BudgetHookFile     = "budget-hook.sh"
+	PermissionHookFile = "permission-hook.sh"
+	HooksFile          = "hooks.json"
+	MCPConfigFile      = "preview-mcp.json"
+	LauncherFile       = "codex-launcher.js"
+	HandoffDir         = "prompt-handoff"
+	BinDir             = "bin"
 )
 
 // Config names the product's parts.
@@ -87,15 +88,16 @@ func (w *Writer) path(name ...string) string {
 }
 
 // Paths of the files.
-func (w *Writer) PortPath() string       { return w.path(PortFile) }
-func (w *Writer) TokenPath() string      { return w.path(TokenFile) }
-func (w *Writer) StatusHookPath() string { return w.path(StatusHookFile) }
-func (w *Writer) StatuslinePath() string { return w.path(StatuslineFile) }
-func (w *Writer) CodexHookPath() string  { return w.path(CodexHookFile) }
-func (w *Writer) BudgetHookPath() string { return w.path(BudgetHookFile) }
-func (w *Writer) HooksPath() string      { return w.path(HooksFile) }
-func (w *Writer) MCPConfigPath() string  { return w.path(MCPConfigFile) }
-func (w *Writer) LauncherPath() string   { return w.path(LauncherFile) }
+func (w *Writer) PortPath() string           { return w.path(PortFile) }
+func (w *Writer) TokenPath() string          { return w.path(TokenFile) }
+func (w *Writer) StatusHookPath() string     { return w.path(StatusHookFile) }
+func (w *Writer) PermissionHookPath() string { return w.path(PermissionHookFile) }
+func (w *Writer) StatuslinePath() string     { return w.path(StatuslineFile) }
+func (w *Writer) CodexHookPath() string      { return w.path(CodexHookFile) }
+func (w *Writer) BudgetHookPath() string     { return w.path(BudgetHookFile) }
+func (w *Writer) HooksPath() string          { return w.path(HooksFile) }
+func (w *Writer) MCPConfigPath() string      { return w.path(MCPConfigFile) }
+func (w *Writer) LauncherPath() string       { return w.path(LauncherFile) }
 func (w *Writer) HandoffDir() string {
 	if w.cfg.Handoff != "" {
 		return w.cfg.Handoff
@@ -149,9 +151,14 @@ case "$AT" in ''|*[!0-9]*) AT="" ;; esac
 # some date builds (uutils) ignore the width in %3N and print nanoseconds: keep the first 13 digits, milliseconds
 [ "${#AT}" -gt 13 ] && AT=$(printf '%.13s' "$AT")
 
+# Claude's JSON on stdin, read once (a hook run by hand from a terminal has none to give)
+INPUT=""
+[ -t 0 ] || INPUT=$(cat)
+# the agent's own session: a Claude started from the tab's terminal shares the tab's tmux session, not this
+AGENT_SESSION=$(printf '%s\n' "$INPUT" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([0-9A-Za-z_-]*\)".*/\1/p' | head -n 1)
 NOTIFICATION_TYPE=""
 if [ "$EVENT" = "notification" ]; then
-  NOTIFICATION_TYPE=$(sed -n 's/.*"notification_type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+  NOTIFICATION_TYPE=$(printf '%s\n' "$INPUT" | sed -n 's/.*"notification_type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
 fi
 
 (
@@ -160,6 +167,9 @@ fi
   if [ -n "$NOTIFICATION_TYPE" ]; then
     PAYLOAD="${PAYLOAD},\"notificationType\":\"${NOTIFICATION_TYPE}\""
   fi
+  if [ -n "$AGENT_SESSION" ]; then
+    PAYLOAD="${PAYLOAD},\"agentSessionId\":\"${AGENT_SESSION}\""
+  fi
   if [ -n "$AT" ]; then
     PAYLOAD="${PAYLOAD},\"at\":${AT}"
   fi
@@ -167,6 +177,20 @@ fi
   curl -s --max-time 30 -X POST -o /dev/null -H 'Content-Type: application/json'` + c.headerArgs(" ", dq) + ` -d "$PAYLOAD" "http://localhost:${PORT}/api/status/hook" 2>/dev/null
 ) </dev/null >/dev/null 2>&1 &
 exit 0
+`)
+}
+
+// PermissionHookScript is what Claude's PermissionRequest runs: the request goes to the runtime, which answers once the
+// person decided; what it prints is the hook's answer. Printing nothing, for any reason at all, leaves the decision to
+// Claude's own dialog in the terminal.
+func (c Config) PermissionHookScript() []byte {
+	return []byte(`#!/bin/sh
+` + c.preamble() + `SESSION="${HARNESSLY_SESSION:-$(tmux display-message -p '#{session_name}' 2>/dev/null)}"
+curl -sf --max-time 86400 -X POST \
+  -H 'Content-Type: application/json' \
+` + c.headerLines() + ` \
+  --data-binary @- \
+  "http://localhost:${PORT}/api/status/hook?provider=claude-permission&tmuxSession=${SESSION}" 2>/dev/null || exit 0
 `)
 }
 
@@ -270,7 +294,7 @@ func (c Config) MCPConfig(port int, token string) []byte {
 
 // HookSettings is the `--settings` file Claude is launched with.
 func (w *Writer) HookSettings() []byte {
-	c := claude.HookSettingsConfig{StatusHook: w.StatusHookPath(), Statusline: w.StatuslinePath(), Allow: w.cfg.Allow}
+	c := claude.HookSettingsConfig{StatusHook: w.StatusHookPath(), PermissionHook: w.PermissionHookPath(), Statusline: w.StatuslinePath(), Allow: w.cfg.Allow}
 	if w.cfg.Budget {
 		c.BudgetHook = w.BudgetHookPath()
 	}
@@ -325,6 +349,9 @@ func (w *Writer) Ensure(port int, token string) (Result, error) {
 		return res, err
 	}
 	if err := writeManaged(w.StatusHookPath(), w.cfg.StatusHookScript(), 0o755); err != nil {
+		return res, err
+	}
+	if err := writeManaged(w.PermissionHookPath(), w.cfg.PermissionHookScript(), 0o755); err != nil {
 		return res, err
 	}
 	if err := writeManaged(w.StatuslinePath(), w.cfg.StatuslineScript(), 0o755); err != nil {

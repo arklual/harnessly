@@ -46,7 +46,7 @@ func (s *Service) InstallCommand(code, profile string) string {
 	if hubproto.Profile(profile) == hubproto.ProfileDir {
 		shell = "sudo sh"
 	}
-	return "curl -fsSL " + s.cfg.PublicURL + "/install | " + shell + " -s -- --token " + code + " --profile " + profile
+	return "curl -fsSL " + s.cfg.AgentURL + "/install | " + shell + " -s -- --token " + code + " --profile " + profile
 }
 
 func (s *Service) createCode(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
@@ -237,7 +237,7 @@ func (s *Service) register(w http.ResponseWriter, r *http.Request) error {
 	}
 	s.auth.Audit(ctx, code.CreatedBy, "machine_registered", r, m.ID+" "+m.Profile+" "+m.Via)
 
-	res := hubproto.RegisterResponse{MachineID: m.ID, DialURL: DialURL(s.cfg.PublicURL), RuntimeBasePath: "/m/" + m.ID, HubURL: s.cfg.PublicURL}
+	res := hubproto.RegisterResponse{MachineID: m.ID, DialURL: DialURL(s.cfg.AgentURL), RuntimeBasePath: "/m/" + m.ID, HubURL: s.cfg.AgentURL}
 	if m.SpaceID != "" {
 		sp, err := s.db.S().SpaceByID(ctx, m.SpaceID)
 		if err != nil {

@@ -71,6 +71,13 @@ const toolVariant = (index: number, scope: PermissionScope): 'primary' | 'ghost'
   return undefined;
 };
 
+/** The card's title: a plan, a menu no tool call named, else by the tool. */
+const titleKey = ({ kind, tool, command }: Permission): string => {
+  if (kind === 'plan') return 'next.gate.planTitle';
+  if (kind === 'dialog') return 'next.gate.dialogTitle';
+  return permTitleKey(tool, command);
+};
+
 type TPlanMode = 'plan-ask' | 'plan-auto';
 
 const Done = ({ permission, device, decided }: Omit<IGateCardProps, 'onDecide' | 'onOpenTerminal'>) => {
@@ -138,9 +145,7 @@ const GateCard = ({ permission, device, decided, onDecide, onOpenTerminal = null
         <span className="hx-gate__ic">
           <Icon name={plan ? 'list-checks' : 'shield-question'} size="sm" />
         </span>
-        <span className="hx-gate__title">
-          {plan ? t('next.gate.planTitle') : t(permTitleKey(permission.tool, permission.command))}
-        </span>
+        <span className="hx-gate__title">{t(titleKey(permission))}</span>
         <span className="hx-gate__where">
           {plan ? '' : [permission.tool, permission.cwd].filter(Boolean).join(' · ')}
         </span>
@@ -155,6 +160,9 @@ const GateCard = ({ permission, device, decided, onDecide, onOpenTerminal = null
         <div className="hx-gate__planmd">
           <Md md={permission.planMd} />
         </div>
+      )}
+      {permission.kind === 'dialog' && permission.planMd && waiting && (
+        <div className="hx-gate__planmd">{permission.planMd}</div>
       )}
       {live && !plan && (
         <div className="hx-gate__acts">

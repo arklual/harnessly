@@ -258,7 +258,7 @@ func nullI(v *int64) any {
 }
 
 // PutWindow records a measurement. Only a newer measurement with a value replaces the row: a measurement with nothing
-// in it (after a reset, before the provider reports again) leaves the window as it was (HRN-112); the UI then sees
+// in it (after a reset, before the provider reports again) leaves the window as it was; the UI then sees
 // resets_at in the past and says «ждём замер». True when the row changed.
 func (s Store) PutWindow(ctx context.Context, w AccountWindow) (bool, error) {
 	if w.UsedPct == nil && w.Used == nil {

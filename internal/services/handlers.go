@@ -258,12 +258,17 @@ func (h *Handlers) LinkMeta(w http.ResponseWriter, r *http.Request) {
 	}
 	var target *linkTarget
 	if u, ok := queryString(r, "url"); ok {
-		target = h.S.parseLinkTarget(u)
+		if target = h.S.parseLinkTarget(u); target == nil {
+			target = h.S.connLinkTarget(u)
+		}
 	} else if k, ok := queryString(r, "key"); ok {
 		var err error
 		if target, err = h.S.issueTargetFromKey(r.Context(), k); err != nil {
 			failed(w)
 			return
+		}
+		if target == nil {
+			target = h.S.connKeyTarget(k)
 		}
 	}
 	if target == nil {
@@ -357,7 +362,8 @@ func (h *Handlers) Favicon(w http.ResponseWriter, r *http.Request) {
 
 var taskStatus = map[string]int{TaskNotFound: 404, TaskNoToken: 503, TaskTracker: 502}
 
-// Task: GET ?key=, a tracker task for the card.
+// Task: GET ?key=[&conn=], a tracker task for the card: a key of the deployment's tracker as before, else an issue of
+// the connection conn names (the primary one with issues when none is named).
 func (h *Handlers) Task(w http.ResponseWriter, r *http.Request) {
 	if _, ok := readBody(w, r); !ok {
 		return
@@ -372,11 +378,18 @@ func (h *Handlers) Task(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key, ok := queryString(r, "key")
-	if !ok || !h.S.IsTaskKey(key) {
+	conn, _ := queryString(r, "conn")
+	var task *jsvalue.Object
+	var fail string
+	switch {
+	case ok && h.S.IsTaskKey(key) && h.S.servesTracker(conn):
+		task, fail = h.S.Task(r.Context(), key)
+	case ok && h.S.ConnTaskKey(conn, key):
+		task, fail = h.S.ConnTask(r.Context(), conn, key)
+	default:
 		writeJSON(w, r, 400, errorBody("Unsupported key"))
 		return
 	}
-	task, fail := h.S.Task(r.Context(), key)
 	w.Header().Set("Cache-Control", "private, no-store")
 	if task == nil {
 		writeJSON(w, r, taskStatus[fail], errorBody(fail))

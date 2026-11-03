@@ -1,0 +1,168 @@
+/* «Аналитика»: what the board's own sheets do not carry. The board gets `.t-card` from the design system's bundle, here
+   it is written with the tokens of this build; the rest are the states a live screen has and a still board has not. */
+.t-card {
+  border: 0.0625rem solid color-mix(in srgb, var(--t-text-primary) 14%, transparent);
+  border-radius: 0.875rem;
+  background: var(--t-bg-surface);
+  color: var(--t-text-primary);
+  box-shadow: 0 0.0625rem 0.125rem color-mix(in srgb, var(--t-text) 8%, transparent);
+}
+
+/* The card titles of the board are not buttons: no pointer on them. */
+.ad .anx .mx-card-title,
+.ad .anx .at-title {
+  cursor: default;
+}
+
+/* The week cells of the picker read their lines tight, as on the board (a looser inherited line makes the strip taller). */
+.ad .anx-wk {
+  line-height: 1.25;
+}
+
+/* A new answer is on its way (the period changed): the old numbers stay, a little quieter, and still clickable. */
+.ad .anx[data-busy='1'] .anm-wrap,
+.ad .anx[data-busy='1'] .mx > .t-card {
+  opacity: 0.6;
+  transition: opacity 160ms var(--hx-ease-out);
+}
+.ad .anx .anm-wrap,
+.ad .anx .mx > .t-card {
+  transition: opacity 200ms var(--hx-ease-out);
+}
+
+/* A tile with no number: the dash says so, the sparkline is not drawn. */
+.ad .anm__v[data-none='1'] {
+  color: var(--t-text-muted);
+}
+.ad .anm[data-none='1'] .anm-spark {
+  visibility: hidden;
+}
+
+/* The big chart: the place is held while the module and the series come. */
+.ad .anx-viz[data-wait='1']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.875rem;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--t-text-primary) 4%, transparent) 30%,
+    color-mix(in srgb, var(--t-text-primary) 9%, transparent) 50%,
+    color-mix(in srgb, var(--t-text-primary) 4%, transparent) 70%
+  );
+  background-size: 300% 100%;
+  animation: an-shimmer 1.4s linear infinite;
+  pointer-events: none;
+}
+.ad .anx-viz[data-wait='1'] > * {
+  opacity: 0;
+}
+.ad .anx-viz > * {
+  transition: opacity 180ms var(--hx-ease-out);
+}
+.ad .anx-viz[data-stale='1'] > * {
+  opacity: 0.55;
+}
+@keyframes an-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* A card with nothing to show says so in one line. */
+.ad .an-empty {
+  margin: 0;
+  padding: 8px 4px 4px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+
+/* A failed load: the reason as it is and a retry. */
+.ad .an-err {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 20px 0 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, #e5484d 40%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, #e5484d 6%, transparent);
+  font-size: var(--hx-text-sm);
+}
+.ad .an-err b {
+  font-weight: 600;
+}
+.ad .an-err span {
+  flex: 1 1 16rem;
+  color: var(--hx-fg-2);
+}
+
+/* The shapes of the screen while the numbers are on their way. */
+.ad .an-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+.ad .an-sk__tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.ad .an-sk .hx-sk {
+  border-radius: 14px;
+}
+.ad .an-sk__tile {
+  height: 112px;
+}
+.ad .an-sk__chart {
+  height: 340px;
+}
+@media (max-width: 900px) {
+  .ad .an-sk__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phone: the title, then the two period buttons under it, the picker stays inside the screen, nothing scrolls sideways. */
+@media (max-width: 600px) {
+  .ad .ad-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .ad .ad-tools {
+    padding-top: 0;
+  }
+  .ad .ad-tools,
+  .ad .anx-per {
+    width: 100%;
+    max-width: 100%;
+  }
+  .ad .anx-per__row {
+    justify-content: space-between;
+  }
+  .ad .anx-per__f {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .ad .anx-per__btn {
+    width: 100%;
+  }
+  .ad .anx-wp {
+    left: 0;
+    right: 0;
+    width: auto;
+    max-width: calc(100vw - 32px);
+  }
+  /* The thirteen weeks do not fit: the strip scrolls, the newest weeks come first into view. */
+  .ad .anx-wp__weeks {
+    grid-template-columns: repeat(13, 44px);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+}

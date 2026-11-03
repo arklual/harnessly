@@ -6,6 +6,7 @@ import type {
   AnalyticsFrame,
   AnalyticsQuery,
   Change,
+  FrameWeek,
   Kpi,
   KpiChart,
   KpiId,
@@ -16,42 +17,31 @@ import type {
   Week,
 } from '../api/analytics';
 import { addDays, daysBetween } from '../dates';
+import { BOARD_CURVES } from './analytics-board';
 import { later, type MockCtx } from './ctx';
 
-/** The Monday of the current week of the fixtures; the weeks before it are the choices. */
+/** The Monday of the current (unfinished) week of the fixtures; the weeks before it are the choices. */
 const CURRENT_MONDAY = '2026-10-26';
-const WEEKS = 12;
+/** The last day of the fixtures: the week of 26 Oct is still going. */
+const TODAY = '2026-10-30';
+const WEEKS = 13;
+/** What the agents cost in each week, oldest first: the bars of the picker. */
+const WEEK_SPEND = [610, 640, 590, 700, 720, 760, 740, 800, 690, 720, 780, 830, 520];
 
 const weekOf = (monday: string): Week => ({ from: monday, to: addDays(monday, 6) });
 
-const weeks = (): Week[] =>
-  Array.from({ length: WEEKS }, (_, i) => weekOf(addDays(CURRENT_MONDAY, (i - (WEEKS - 1)) * 7)));
+const weeks = (): FrameWeek[] =>
+  Array.from({ length: WEEKS }, (_, i) => ({
+    ...weekOf(addDays(CURRENT_MONDAY, (i - (WEEKS - 1)) * 7)),
+    spendUsd: WEEK_SPEND[i] ?? null,
+    current: i === WEEKS - 1,
+  }));
 
 const LAST_CHANGE = { id: 'ch-sonnet', title: 'Субагенты на Sonnet', at: '2026-10-09' };
-
-const hash = (s: string): number => {
-  let h = 2166136261;
-  for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
-  return h >>> 0;
-};
-/** A repeatable 0..1 for (seed, i). */
-const rnd = (seed: string, i: number): number => (hash(`${seed}:${i}`) % 10_000) / 10_000;
-
-/** A line around `base`, drifting by `trend` over `n` points, with noise `amp` (a share of base). */
-const wave = (seed: string, n: number, base: number, trend: number, amp: number): number[] =>
-  Array.from({ length: n }, (_, i) => {
-    const t = n > 1 ? i / (n - 1) : 0;
-    const swing = Math.sin(i * 0.9 + (hash(seed) % 7)) * 0.4 + (rnd(seed, i) - 0.5);
-    return Math.max(0, base * (1 + trend * (t - 0.5)) * (1 + swing * amp));
-  });
 
 interface KpiSeed extends Omit<Kpi, 'series' | 'prevSeries' | 'value' | 'prev'> {
   value: number;
   prev: number;
-  trend: number;
-  amp: number;
-  /** The screen shows a flat line (a start that does not move). */
-  flat?: boolean;
 }
 
 const KPI_SEEDS: KpiSeed[] = [
@@ -59,183 +49,160 @@ const KPI_SEEDS: KpiSeed[] = [
     id: 'moneyPerMr',
     group: 'result',
     title: 'Деньги на MR',
-    hint: 'Вся работа агентов, делённая на смёрженные MR. Падает — результат дешевле.',
+    hint: 'Вся работа агентов, делённая на смёрженные MR. Падает — результат дешевле',
     format: 'usd',
     delta: 'rel',
     better: 'down',
     noise: 3,
     value: 18.5,
     prev: 21,
-    trend: -0.3,
-    amp: 0.12,
   },
   {
     id: 'yield',
     group: 'result',
     title: 'Доходимость',
-    hint: 'Какая доля чатов дошла до результата: MR, правка или ответ, которым пользуются.',
+    hint: 'Доля сессий, которые дошли до смёрженного MR, а не брошены на полпути',
     format: 'pct',
     delta: 'pts',
     better: 'up',
     noise: 2,
     value: 64,
     prev: 59,
-    trend: 0.2,
-    amp: 0.07,
   },
   {
     id: 'timeToMr',
     group: 'result',
     title: 'Время до MR',
-    hint: 'От первого сообщения до открытого MR. Падает — быстрее.',
+    hint: 'Медиана от первого сообщения в сессии до открытого MR',
     format: 'minutes',
     delta: 'rel',
     better: 'down',
     noise: 5,
     value: 130,
     prev: 153,
-    trend: -0.25,
-    amp: 0.14,
   },
   {
     id: 'mrPerPerson',
     group: 'result',
     title: 'MR на человека',
-    hint: 'Смёрженные MR на человека за месяц.',
+    hint: 'Смёрженные MR на одного активного человека за период',
     format: 'perMonth',
     delta: 'rel',
     better: 'up',
     noise: 3,
     value: 6.6,
     prev: 6.1,
-    trend: 0.2,
-    amp: 0.1,
   },
   {
     id: 'autonomy',
     group: 'agent',
     title: 'Автономность',
-    hint: 'Сколько агент работает, пока человек не вмешался. Растёт — агенту доверяют больше.',
+    hint: 'Сколько агент работает сам между двумя вмешательствами человека',
     format: 'minutes',
     delta: 'rel',
     better: 'up',
     noise: 3,
     value: 38,
     prev: 35,
-    trend: 0.25,
-    amp: 0.15,
   },
   {
     id: 'waiting',
     group: 'agent',
     title: 'Ждёт человека',
-    hint: 'Как долго агент стоит и ждёт ответа. Падает — меньше простоя.',
+    hint: 'p90 от вопроса агента до ответа человека. Ночь не считается',
     format: 'minutes',
     delta: 'rel',
     better: 'down',
     noise: 5,
     value: 50,
     prev: 49,
-    trend: 0.05,
-    amp: 0.3,
   },
   {
     id: 'parallel',
     group: 'agent',
     title: 'Параллельность',
-    hint: 'Сколько сессий один человек ведёт одновременно.',
+    hint: 'Сколько сессий у человека идёт одновременно в рабочее время',
     format: 'count',
     delta: 'abs',
     better: 'up',
     noise: 0.1,
     value: 2.4,
     prev: 2.1,
-    trend: 0.3,
-    amp: 0.1,
   },
   {
     id: 'toolErrors',
     group: 'agent',
     title: 'Ошибки инструментов',
-    hint: 'Доля вызовов инструментов, которые закончились ошибкой. Падает — лучше.',
+    hint: 'Сломанные вызовы Bash, MCP и прочего: каждый — лишний шаг и повтор',
     format: 'pct',
     delta: 'pts',
     better: 'down',
     noise: 0.3,
     value: 3.4,
     prev: 2.6,
-    trend: 0.5,
-    amp: 0.2,
   },
   {
     id: 'reread',
     group: 'env',
     title: 'Перечитанный контекст',
-    hint: 'Доля токенов, которые агент читает повторно в длинной сессии.',
+    hint: 'Доля входа модели — старые ответы инструментов, которые она читает на каждом шаге',
     format: 'pct',
     delta: 'pts',
     better: 'down',
     noise: 2,
     value: 31,
     prev: 35,
-    trend: -0.15,
-    amp: 0.05,
   },
   {
     id: 'sessionStart',
     group: 'env',
     title: 'Старт сессии',
-    hint: 'Сколько токенов съедает окружение до первого вопроса.',
+    hint: 'Токены до первого слова человека: промпт, скиллы, инструменты, память',
     format: 'tokens',
     delta: 'rel',
     better: 'down',
     noise: 5,
     value: 23_000,
     prev: 50_000,
-    trend: 0,
-    amp: 0.004,
-    flat: true,
   },
   {
     id: 'cache',
     group: 'env',
     title: 'Кэш',
-    hint: 'Доля токенов, которые взяты из кэша.',
+    hint: 'Доля входа, прочитанная из кэша. Чем выше, тем дешевле каждый шаг',
     format: 'pct',
     delta: 'pts',
     better: 'up',
     noise: 1,
     value: 88,
     prev: 85,
-    trend: 0.1,
-    amp: 0.02,
   },
   {
     id: 'skills',
     group: 'env',
     title: 'Скиллы в ходу',
-    hint: 'Доля установленных скиллов, которые хоть раз сработали за период.',
+    hint: 'Доля скиллов из листинга, которые хоть раз загружались. Остальные только занимают старт',
     format: 'pct',
     delta: 'pts',
     better: 'up',
     noise: 2,
     value: 35,
     prev: 31,
-    trend: 0.15,
-    amp: 0.03,
   },
 ];
 
-const POINTS = 30;
+/** The tiles' lines: the board's shapes scaled to the KPI's own level, the period against the comparison. */
+const sparkFor = (seed: KpiSeed): { series: number[]; prevSeries: number[] } => {
+  const curves = BOARD_CURVES[seed.id];
+  const lo = Math.min(seed.value, seed.prev) * 0.7;
+  const hi = Math.max(seed.value, seed.prev) * 1.2;
+  const at = (n: number): number => lo + n * (hi - lo);
+  return { series: curves.sparkNow.map(at), prevSeries: curves.sparkPrev.map(at) };
+};
 
-const kpisFor = (q: AnalyticsQuery): Kpi[] =>
-  KPI_SEEDS.map(({ trend, amp, flat, ...k }) => {
-    const seed = `${k.id}:${q.period.from}`;
-    const series = flat
-      ? wave(seed, POINTS, k.value, 0, amp).map((v, i) => (i < 2 ? k.prev : v))
-      : wave(seed, POINTS, k.value, trend, amp);
-    const prevSeries = wave(seed + 'p', POINTS, k.prev, 0, amp);
-    return { ...k, series, prevSeries };
+const kpisFor = (): Kpi[] =>
+  KPI_SEEDS.map((seed) => {
+    return { ...seed, ...sparkFor(seed) };
   });
 
 const SIGNALS: Signal[] = [
@@ -243,8 +210,14 @@ const SIGNALS: Signal[] = [
     id: 's-mcp',
     tone: 'high',
     title: 'MCP «Трекер задач» ломается в 11% вызовов',
-    text: 'с 21.10, после обновления до 2.3 — агенты повторяют вызов, = $310 за период',
+    text: 'с 21.10, после обновления до 2.3 — агенты повторяют вызов, ≈ $310 за период',
     action: { label: 'Смотреть ошибки', section: 'analytics' },
+    detail: [
+      { label: 'Фронт', value: '14%' },
+      { label: 'Бэкенд', value: '9%' },
+      { label: 'Дизайн', value: '3%' },
+      { label: 'Пользуются', value: '18 человек' },
+    ],
   },
   {
     id: 's-tests',
@@ -252,6 +225,11 @@ const SIGNALS: Signal[] = [
     title: 'Тесты идут через пайп без pipefail',
     text: '66% прогонов — агент видит зелёный там, где тесты упали; 23 красных изменения ушли в MR',
     action: { label: 'Включить «Ворота по коду возврата»', section: 'analytics' },
+    detail: [
+      { label: 'Прогонов', value: '9 800' },
+      { label: 'Через пайп', value: '6 470' },
+      { label: 'Упали, но «зелёные»', value: '≈ 410' },
+    ],
   },
   {
     id: 's-design',
@@ -259,6 +237,11 @@ const SIGNALS: Signal[] = [
     title: 'Дизайн отвечает агенту за 1 ч 40 мин',
     text: 'вдвое дольше, чем в тенанте — агент всё это время стоит',
     action: { label: 'Смотреть людей', section: 'teams' },
+    detail: [
+      { label: 'Дизайн', value: '1 ч 40 мин' },
+      { label: 'Среднее по тенанту', value: '50 мин' },
+      { label: 'Вопросов от агентов', value: '212' },
+    ],
   },
   {
     id: 's-sub',
@@ -266,6 +249,11 @@ const SIGNALS: Signal[] = [
     title: '10% запусков субагентов падают',
     text: 'упираются в лимит вложенности — работа идёт заново, больше всего у Фронта',
     action: { label: 'Смотреть сессии', section: 'machines' },
+    detail: [
+      { label: 'Запусков', value: '1 400' },
+      { label: 'Упали', value: '140' },
+      { label: 'Из них лимит вложенности', value: '62%' },
+    ],
   },
 ];
 
@@ -336,6 +324,13 @@ const CHANGES: Change[] = [
   },
 ];
 
+/** What a change looks like on the chart: a written edit, a new version of something, a switch of the model. */
+const CHANGE_ICON: Record<Change['kind'], 'edit' | 'announce' | 'rocket'> = {
+  plugins: 'edit',
+  model: 'announce',
+  tool: 'rocket',
+};
+
 const WASTE: Waste = {
   wasteUsd: 1080,
   totalUsd: 3450,
@@ -346,6 +341,11 @@ const WASTE: Waste = {
       text: 'сессии без MR и без вывода: 36% таких — во «Фронте»',
       usd: 370,
       tone: 'violet',
+      detail: [
+        { label: 'Сессий', value: '462' },
+        { label: 'Средняя цена', value: '$0,80' },
+        { label: 'Чаще всего', value: 'Фронт, Без команды' },
+      ],
     },
     {
       id: 'w-retry',
@@ -353,6 +353,12 @@ const WASTE: Waste = {
       text: 'сломанный вызов → агент повторяет. С поправкой на охват: ошибка у 18 человек весит больше, чем у трёх',
       usd: 310,
       tone: 'rose',
+      detail: [
+        { label: '«Трекер задач»', value: '$190 · 18 человек' },
+        { label: 'Субагенты', value: '$70 · 9 человек' },
+        { label: 'Браузер', value: '$30 · 7 человек' },
+        { label: 'Прочее', value: '$20' },
+      ],
     },
     {
       id: 'w-long',
@@ -360,6 +366,10 @@ const WASTE: Waste = {
       text: 'каждый шаг перечитывает весь разговор — новая сессия обошлась бы в 3–4 раза дешевле',
       usd: 260,
       tone: 'amber',
+      detail: [
+        { label: 'Сессий длиннее 250K', value: '118' },
+        { label: 'Чаще всего', value: 'Бэкенд — 27% денег' },
+      ],
     },
     {
       id: 'w-skills',
@@ -367,9 +377,21 @@ const WASTE: Waste = {
       text: '41 скилл ни разу не загружался, но его описание едет в каждую сессию',
       usd: 140,
       tone: 'teal',
+      detail: [
+        { label: 'Токенов на сессию', value: '≈ 9K' },
+        { label: 'Плагинов целиком лишних', value: '6' },
+      ],
     },
   ],
 };
+
+/** The tenant's own level of each column, as the cell's bubble shows it. */
+const TENANT_MEAN = ['$18,5', '64%', '2 ч 10', '38 мин', '3,4%', '50 мин', '31%', '88%'];
+
+const withMean = (
+  cells: { text: string; score: number }[],
+): { text: string; score: number; mean: string }[] =>
+  cells.map((c, i) => ({ ...c, mean: TENANT_MEAN[i] ?? '—' }));
 
 const TEAM_PEERS: Peers = {
   title: 'Команды рядом',
@@ -388,7 +410,7 @@ const TEAM_PEERS: Peers = {
     {
       id: 'back',
       name: 'Бэкенд',
-      cells: [
+      cells: withMean([
         { text: '$14,2', score: 1 },
         { text: '74%', score: 1 },
         { text: '1 ч 48', score: 0.5 },
@@ -397,12 +419,12 @@ const TEAM_PEERS: Peers = {
         { text: '35 мин', score: 0.5 },
         { text: '29%', score: 0.5 },
         { text: '91%', score: 0.5 },
-      ],
+      ]),
     },
     {
       id: 'front',
       name: 'Фронт',
-      cells: [
+      cells: withMean([
         { text: '$19,8', score: 0 },
         { text: '61%', score: 0 },
         { text: '2 ч 20', score: 0 },
@@ -411,12 +433,12 @@ const TEAM_PEERS: Peers = {
         { text: '41 мин', score: 0 },
         { text: '34%', score: -0.5 },
         { text: '87%', score: 0 },
-      ],
+      ]),
     },
     {
       id: 'design',
       name: 'Дизайн',
-      cells: [
+      cells: withMean([
         { text: '$23,1', score: -0.5 },
         { text: '81%', score: 1 },
         { text: '2 ч 50', score: -0.5 },
@@ -425,97 +447,64 @@ const TEAM_PEERS: Peers = {
         { text: '1 ч 40', score: -1 },
         { text: '27%', score: 0.5 },
         { text: '85%', score: -0.5 },
-      ],
+      ]),
     },
     {
       id: 'none',
       name: 'Без команды',
-      cells: [
+      cells: withMean([
         { text: '$27,4', score: -1 },
         { text: '52%', score: -1 },
         { text: '3 ч 05', score: -1 },
         { text: '29 мин', score: -0.5 },
         { text: '3,8%', score: -0.5 },
         { text: '52 мин', score: -0.5 },
-        { text: '36%', score: -1 },
-        { text: '83%', score: -1 },
-      ],
+        { text: '36%', score: -0.5 },
+        { text: '83%', score: -0.5 },
+      ]),
     },
   ],
 };
 
-const PEOPLE_PEERS: Peers = {
-  title: 'Люди рядом',
-  sub: 'Каждая клетка — сравнение человека со средним по команде за период',
-  columns: TEAM_PEERS.columns,
-  rows: [
-    ['Аня', 1],
-    ['Глеб', 0],
-    ['Олег', -1],
-    ['Паша', 0.5],
-    ['Глеб', -0.5],
-  ].map(([name, s], i) => ({
-    id: String(name),
-    name: String(name),
-    cells: (TEAM_PEERS.rows[0]?.cells ?? []).map((c, j) => ({
-      text: c.text,
-      score: Math.max(-1, Math.min(1, Number(s) * (j % 2 === 0 ? 1 : -0.5) + (i % 2 ? 0 : 0.0))),
-    })),
-  })),
-};
+/** Order of the team lines in the board's data. */
+const TEAM_LINES = [
+  { id: 'front', name: 'Фронт' },
+  { id: 'back', name: 'Бэкенд' },
+  { id: 'design', name: 'Дизайн' },
+  { id: 'none', name: 'Без команды' },
+] as const;
 
-const LINES: { id: string; name: string; share: number }[] = [
-  { id: 'front', name: 'Фронт', share: 0.38 },
-  { id: 'back', name: 'Бэкенд', share: 0.31 },
-  { id: 'design', name: 'Дизайн', share: 0.2 },
-  { id: 'none', name: 'Без команды', share: 0.11 },
-];
-const PEOPLE_LINES = [
-  { id: 'anya', name: 'Аня', share: 0.3 },
-  { id: 'vika', name: 'Вика', share: 0.25 },
-  { id: 'oleg', name: 'Олег', share: 0.25 },
-  { id: 'pasha', name: 'Паша', share: 0.2 },
-];
-
-/** Ten weeks ending with the period, so the pickers' ranges and the minimap have something to show. */
-const CHART_DAYS = 70;
+/** The big chart shows 30 days: 1–30 Oct. */
+const CHART_FIRST = '2026-10-01';
+const CHART_DAYS = 30;
 
 const chartFor = (ctx: MockCtx, q: AnalyticsQuery, kpiId: KpiId): KpiChart => {
-  const seed = KPI_SEEDS.find((k) => k.id === kpiId);
-  const first = addDays(q.period.to, -(CHART_DAYS - 1));
-  const days = Array.from({ length: CHART_DAYS }, (_, i) => addDays(first, i));
-  const base = seed?.value ?? 1;
-  const trend = seed?.trend ?? 0;
-  const amp = seed?.amp ?? 0.1;
-  const spec =
-    ctx.role === 'admin' ? LINES : ctx.role === 'lead' ? PEOPLE_LINES : [{ id: 'me', name: 'Мои', share: 1 }];
-  // The lines add up to the KPI's level for the stacked view: each is its share of it.
-  const lines: SeriesLine[] = spec.map((l) => ({
-    id: l.id,
-    name: l.name,
-    values: wave(`${kpiId}:${l.id}`, CHART_DAYS, base * l.share, trend, amp).map(
-      (v) => Math.round(v * 100) / 100,
-    ),
-  }));
+  const curves = BOARD_CURVES[kpiId];
+  const days = Array.from({ length: CHART_DAYS }, (_, i) => addDays(CHART_FIRST, i));
+  const lines: SeriesLine[] =
+    ctx.role === 'member'
+      ? [{ id: 'me', name: 'Мои', values: curves.now }]
+      : TEAM_LINES.map((l, i) => ({ id: l.id, name: l.name, values: curves.teams[i] ?? [] }));
   const len = daysBetween(q.period.from, q.period.to) + 1;
-  const periodFrom = days.indexOf(q.period.from);
-  const compareLine = wave(`${kpiId}:cmp:${q.compare.from}`, len, seed?.prev ?? base, 0, amp).map(
-    (v) => Math.round(v * 100) / 100,
-  );
+  const periodFrom = Math.max(0, days.indexOf(q.period.from));
   const markers = CHANGES.map((c) => ({
     id: c.id,
     kind: c.kind,
     title: c.title,
     index: days.indexOf(c.at),
+    icon: CHANGE_ICON[c.kind],
+    detail: c.meta,
   })).filter((m) => m.index >= 0);
   return {
     kpi: kpiId,
     days,
     lines,
-    compareLine,
-    periodFrom: Math.max(0, periodFrom),
+    compareLine: curves.prev.slice(0, len),
+    periodFrom,
     periodTo: CHART_DAYS - 1,
     markers,
+    total: curves.now,
+    previous: curves.prev,
   };
 };
 
@@ -523,28 +512,20 @@ export const analyticsMock = (ctx: MockCtx): AnalyticsApi => ({
   analyticsFrame: () => {
     const all = weeks();
     const defaultPeriod = all[all.length - 2] ?? weekOf(CURRENT_MONDAY);
-    const frame: AnalyticsFrame = { weeks: all, defaultPeriod, lastChange: LAST_CHANGE };
+    const frame: AnalyticsFrame = { weeks: all, today: TODAY, defaultPeriod, lastChange: LAST_CHANGE };
     return later(frame);
   },
-  analytics: (q) => {
+  analytics: () => {
     const member = ctx.role === 'member';
     const lead = ctx.role === 'lead';
     const data: AnalyticsData = {
-      scopeLabel: member ? 'Только твоя работа' : lead ? 'Команда Фронт' : 'Все команды тенанта',
-      summary: member
-        ? { spendUsd: 118, sessions: 25, mrs: 5 }
-        : lead
-          ? { spendUsd: 310, sessions: 96, mrs: 14 }
-          : { spendUsd: 810, sessions: 302, mrs: 44 },
-      kpis: kpisFor(q),
-      signals: member ? [] : lead ? SIGNALS.slice(0, 3) : SIGNALS,
+      scopeLabel: member ? 'Только твои чаты' : lead ? 'Команда Фронт' : 'Все команды тенанта',
+      summary: member ? { spendUsd: 96, sessions: 41, mrs: 6 } : { spendUsd: 810, sessions: 302, mrs: 44 },
+      kpis: kpisFor(),
+      signals: member ? [] : SIGNALS,
       changes: CHANGES,
-      waste: member
-        ? null
-        : lead
-          ? { ...WASTE, wasteUsd: 360, totalUsd: 1180, items: WASTE.items.slice(0, 3) }
-          : WASTE,
-      peers: member ? null : lead ? PEOPLE_PEERS : TEAM_PEERS,
+      waste: member ? null : WASTE,
+      peers: member ? null : TEAM_PEERS,
     };
     return later(data, 400);
   },

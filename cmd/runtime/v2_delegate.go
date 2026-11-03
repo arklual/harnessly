@@ -90,7 +90,7 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		if _, walled := v.d.CLI.AgentOf(r); walled {
 			return toolsets{hand, pics, place}
 		}
-		// Only a chat that works in a video project carries the video's tools (HRN-580).
+		// Only a chat that works in a video project carries the video's tools.
 		video := design.VideoTools{L: designAPI(v.d).L}
 		if rec, ok := v.rt.Record(id); ok {
 			video.Project = video.L.VideoProjectOf(rec.Cwd)

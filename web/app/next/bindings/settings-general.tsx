@@ -310,6 +310,7 @@ export const AppsPage = ({ machine }: { machine: MachineId }) => {
       error={error}
       onOpen={() => goTo({ kind: ROUTE.tasks })}
       onRetry={feed.retry}
+      onConnections={() => goTo({ kind: ROUTE.settings, section: 'connections' })}
     />
   );
 };

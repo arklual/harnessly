@@ -1,4 +1,4 @@
-// «Добавить машину» (HRN-625): the old setup step as a sheet over the machines of a tenant. The person picks the tenant
+// «Добавить машину»: the old setup step as a sheet over the machines of a tenant. The person picks the tenant
 // (when the screen shows the whole organization), the access of the agents, gets the one-time code and the command the
 // hub built, and the sheet waits until that machine dials in, then closes and the list refreshes.
 import { useEffect, useRef, useState } from 'react';

@@ -3,6 +3,7 @@ package analytics
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"maps"
 	"math"
 	"net/http"
@@ -34,6 +35,7 @@ func (s *Service) mountOrg(mux *http.ServeMux) {
 	mux.Handle("GET /api/orgs/{org}/kpis", s.gate(s.orgKPIs))
 	mux.Handle("GET /api/orgs/{org}/kpis/{kpi}/series", s.gate(s.kpiSeries))
 	s.mountChanges(mux)
+	s.mountPeople(mux)
 	s.mountSignals(mux)
 	mux.Handle("GET /api/orgs/{org}/waste", s.gate(s.waste))
 	s.mountSubscriptions(mux)
@@ -51,6 +53,8 @@ type LimitBar struct {
 
 // Tokens are a row's tokens.
 type Tokens struct {
+	// Total is the four kinds added up, for the «Токены» unit of the breakdowns.
+	Total      int64 `json:"total"`
 	Input      int64 `json:"input"`
 	Output     int64 `json:"output"`
 	CacheRead  int64 `json:"cacheRead"`
@@ -69,6 +73,13 @@ type SpendRow struct {
 	Limit         *LimitBar `json:"limit"`
 	Forecast      *Money    `json:"forecast"`
 	GuessedShare  float64   `json:"guessedShare"`
+}
+
+// SpendSum is the money and tokens of all rows of a breakdown: the base its shares are taken of, in any of the units.
+type SpendSum struct {
+	List   Money `json:"list"`
+	Paid   Money `json:"paid"`
+	Tokens int64 `json:"tokens"`
 }
 
 // SpendTotal is the sum of the rows with the scope's own limit.
@@ -104,12 +115,62 @@ type SignalSubject struct {
 	Label string `json:"label"`
 }
 
-// SignalAction is the one button of a signal.
+// SignalAction is the one button of a signal. Which fields it carries depends on Kind (the variants of SignalAction in
+// web/app/hub-api/analytics.ts); Target is the id of the object the button leads to, for every kind.
 type SignalAction struct {
-	Kind   string         `json:"kind"`
-	Label  string         `json:"label"`
-	Scope  orgs.ScopeView `json:"scope"`
-	UserID *string        `json:"userId"`
+	Kind   string `json:"kind"`
+	Label  string `json:"label"`
+	Target string `json:"target,omitempty"`
+	// raise_limit, open_kpi
+	Scope orgs.ScopeView `json:"scope"`
+	// raise_limit
+	UserID *string `json:"userId"`
+	// move_account
+	FromAccountID string `json:"fromAccountId,omitempty"`
+	ToAccountID   string `json:"toAccountId,omitempty"`
+	// open_machine, open_chat
+	MachineID string `json:"machineId,omitempty"`
+	// resend_invite
+	InviteID string `json:"inviteId,omitempty"`
+	TenantID string `json:"tenantId,omitempty"`
+	// register_account
+	AccountID string `json:"accountId,omitempty"`
+	// open_kpi
+	KPI string `json:"kpi,omitempty"`
+	// open_chat
+	SessionKey string `json:"sessionKey,omitempty"`
+	// open_prices
+	Model string `json:"model,omitempty"`
+}
+
+// MarshalJSON writes the fields of the kind's variant only.
+func (a SignalAction) MarshalJSON() ([]byte, error) {
+	m := map[string]any{"kind": a.Kind, "label": a.Label, "target": a.Target}
+	switch a.Kind {
+	case "raise_limit":
+		m["scope"], m["userId"] = a.Scope, a.UserID
+		if a.Target == "" {
+			m["target"] = a.Scope.Kind + ":" + a.Scope.ID
+			if a.UserID != nil {
+				m["target"] = *a.UserID
+			}
+		}
+	case "move_account":
+		m["fromAccountId"], m["toAccountId"] = a.FromAccountID, a.ToAccountID
+	case "open_machine":
+		m["machineId"] = a.MachineID
+	case "resend_invite":
+		m["inviteId"], m["tenantId"] = a.InviteID, a.TenantID
+	case "register_account":
+		m["accountId"] = a.AccountID
+	case "open_kpi":
+		m["kpi"], m["scope"] = a.KPI, a.Scope
+	case "open_chat":
+		m["machineId"], m["sessionKey"] = a.MachineID, a.SessionKey
+	case "open_prices":
+		m["model"] = a.Model
+	}
+	return json.Marshal(m)
 }
 
 // Signal is one line of «Требует внимания».
@@ -141,9 +202,14 @@ type OverviewResponse struct {
 		MoneyPerMR   Tile `json:"moneyPerMr"`
 	} `json:"tiles"`
 	Attention []Signal `json:"attention"`
-	SpendBy   struct {
-		By   string     `json:"by"`
-		Rows []SpendRow `json:"rows"`
+	// Today is the day's numbers with their 14-day strips, Efficiency the closed tasks per person and the chats that
+	// reached a result.
+	Today      Today      `json:"today"`
+	Efficiency Efficiency `json:"efficiency"`
+	SpendBy    struct {
+		By     string     `json:"by"`
+		Rows   []SpendRow `json:"rows"`
+		Totals SpendSum   `json:"totals"`
 	} `json:"spendBy"`
 	Subscriptions  []Subscription `json:"subscriptions"`
 	AccountedUntil *string        `json:"accountedUntil"`
@@ -156,6 +222,9 @@ type orgScope struct {
 	loc   *time.Location
 	now   time.Time
 	space string // the tenant of a tenant scope
+	// full is set by the background checker, which has looked at the whole organization and so may resolve what it no
+	// longer finds (the rules of orgRules).
+	full  bool
 	teams map[string]store.Team
 	// tenants are the tenants under the scope (a team's own tenant for a team).
 	tenants map[string]store.Space
@@ -428,7 +497,7 @@ func (m *money) breakdown(ctx context.Context, st store.Store, by string) ([]Spe
 	out := make([]SpendRow, 0, len(m.rows))
 	for k, a := range m.rows {
 		row := SpendRow{Key: k, List: m.cur.Micros(a.list), Paid: m.cur.Micros(a.paid), Calls: a.calls, UnpricedCalls: a.unpriced,
-			Tokens: Tokens{Input: a.in, Output: a.out, CacheRead: a.cr, CacheWrite: a.cw}, Forecast: m.forecast(*a)}
+			Tokens: Tokens{Total: a.in + a.out + a.cr + a.cw, Input: a.in, Output: a.out, CacheRead: a.cr, CacheWrite: a.cw}, Forecast: m.forecast(*a)}
 		var pick func(r store.LimitRule) bool
 		switch by {
 		case "team":
@@ -620,6 +689,13 @@ func (s *Service) overview(w http.ResponseWriter, r *http.Request, p *auth.Princ
 	}
 	out.SpendBy.By = by
 	if out.SpendBy.Rows, err = m.breakdown(ctx, st, by); err != nil {
+		return err
+	}
+	out.SpendBy.Totals = SpendSum{List: m.cur.Micros(m.sum.list), Paid: m.cur.Micros(m.sum.paid), Tokens: m.sum.in + m.sum.out + m.sum.cr + m.sum.cw}
+	if out.Today, err = s.today(ctx, st, x, m.cur); err != nil {
+		return err
+	}
+	if out.Efficiency, err = s.efficiency(ctx, st, x, sp); err != nil {
 		return err
 	}
 	cur, err := s.tilesOf(ctx, st, x, sp)

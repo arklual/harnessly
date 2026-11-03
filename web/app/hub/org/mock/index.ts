@@ -5,6 +5,7 @@ import { onboardingMock } from './onboarding';
 import { memberMock } from './member';
 import { overviewMock } from './overview';
 import { analyticsMock } from './analytics';
+import { envMock } from './env';
 import { machinesMock } from './machines';
 import { shellMock } from './shell';
 import { teamsMock } from './teams';
@@ -20,4 +21,5 @@ export const mockOrgApi = (ctx: MockCtx): OrgApi => ({
   ...machinesMock(ctx),
   ...teamsMock(ctx),
   ...tenantMock(ctx),
+  ...envMock(ctx),
 });

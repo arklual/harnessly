@@ -159,6 +159,11 @@ type Hello struct {
 	Policy       Policy   `json:"policy"`
 	// BudgetVersion is the version of the last budget.set the agent holds (0: none); only with the "budget" feature.
 	BudgetVersion int64 `json:"budgetVersion,omitempty"`
+	// EnvRev and EnvHash are the revision and the hash of the last env.set the agent holds; only with the "environment" feature.
+	EnvRev  int64  `json:"envRev,omitempty"`
+	EnvHash string `json:"envHash,omitempty"`
+	// Hardware is what the machine is made of; absent from an agent that does not read it.
+	Hardware *Hardware `json:"hardware,omitempty"`
 }
 
 // Policy is what the machine's own policy file allows. The hub reads it and cannot change it.

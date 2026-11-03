@@ -12,7 +12,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
 )
 
-// VideoTools are the agent's tools for the video open beside its chat (HRN-580): they exist only in a chat that works in a
+// VideoTools are the agent's tools for the video open beside its chat: they exist only in a chat that works in a
 // video project, so no other chat carries them. The player's words and the scene's are data, not instructions.
 type VideoTools struct {
 	L *Library

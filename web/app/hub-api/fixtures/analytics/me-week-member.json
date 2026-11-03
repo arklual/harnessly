@@ -1,0 +1,15 @@
+{
+  "week": {
+    "from": "2026-10-25",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "chats": {
+    "n": 25,
+    "running": 3
+  },
+  "mrs": {
+    "n": 5,
+    "merged": 4
+  }
+}

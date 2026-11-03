@@ -1,0 +1,612 @@
+/* Connections: Settings → Connections. The connections as rows of one card (the name above everything else; rename and
+   «disconnect?» open under the row, removal folds it with .hx-reveal, a new row slides in), the paste field under them,
+   and the card of what a pasted link turned out to be, which slides in and fades out. */
+
+/* The product's mark: its letters on its own colour */
+.hx-conn-glyph {
+  --hx-conn-c: var(--hx-fg-2);
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--hx-conn-c);
+  color: #fff;
+  font-size: 12px;
+  font-weight: var(--hx-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.hx-conn-glyph[data-size='md'] {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.hx-conn-glyph[data-kind='jira'] {
+  --hx-conn-c: #0c66e4;
+}
+.hx-conn-glyph[data-kind='confluence'] {
+  --hx-conn-c: #1868db;
+}
+.hx-conn-glyph[data-kind='youtrack'] {
+  --hx-conn-c: #e8336d;
+}
+.hx-conn-glyph[data-kind='linear'] {
+  --hx-conn-c: #5e6ad2;
+}
+.hx-conn-glyph[data-kind='gitlab'] {
+  --hx-conn-c: #e24329;
+}
+.hx-conn-glyph[data-kind='github'],
+.hx-conn-glyph[data-kind='notion'],
+.hx-conn-glyph[data-kind='outline'] {
+  --hx-conn-c: #24292f;
+}
+.hx-conn-glyph[data-kind='gitea'] {
+  --hx-conn-c: #609926;
+}
+.hx-conn-glyph[data-kind='bitbucket'] {
+  --hx-conn-c: #2684ff;
+}
+.hx-conn-glyph[data-kind='redmine'] {
+  --hx-conn-c: #b32024;
+}
+.hx-conn-glyph[data-kind='yandex-tracker'] {
+  --hx-conn-c: #fc3f1d;
+}
+.hx-conn-glyph[data-kind='azure-devops'] {
+  --hx-conn-c: #0078d4;
+}
+.hx-conn-glyph[data-kind='mediawiki'] {
+  --hx-conn-c: #3366cc;
+}
+.hx-conn-glyph[data-kind='bookstack'] {
+  --hx-conn-c: #0288d1;
+}
+.hx-conn-glyph[data-kind='wikijs'] {
+  --hx-conn-c: #1976d2;
+}
+html[data-theme='dark'] .hx-conn-glyph[data-kind='github'],
+html[data-theme='dark'] .hx-conn-glyph[data-kind='notion'],
+html[data-theme='dark'] .hx-conn-glyph[data-kind='outline'] {
+  --hx-conn-c: #e6e8eb;
+  color: #16181d;
+}
+
+.hx-conn-glyph[data-mcp='atlassian'] {
+  --hx-conn-c: #0c66e4;
+}
+.hx-conn-glyph[data-mcp='linear'] {
+  --hx-conn-c: #5e6ad2;
+}
+.hx-conn-glyph[data-mcp='sentry'] {
+  --hx-conn-c: #362d59;
+}
+.hx-conn-glyph[data-mcp='asana'] {
+  --hx-conn-c: #f06a6a;
+}
+.hx-conn-glyph[data-mcp='stripe'] {
+  --hx-conn-c: #635bff;
+}
+.hx-conn-glyph[data-mcp='supabase'] {
+  --hx-conn-c: #3ecf8e;
+}
+.hx-conn-glyph[data-mcp='cloudflare-docs'] {
+  --hx-conn-c: #f38020;
+}
+.hx-conn-glyph[data-mcp='context7'] {
+  --hx-conn-c: #0f766e;
+}
+.hx-conn-glyph[data-mcp='huggingface'] {
+  --hx-conn-c: #ff9d00;
+}
+.hx-conn-glyph[data-mcp='figma'] {
+  --hx-conn-c: #a259ff;
+}
+.hx-conn-glyph[data-mcp='intercom'] {
+  --hx-conn-c: #1f8ded;
+}
+.hx-conn-glyph[data-mcp='monday'] {
+  --hx-conn-c: #ff3d57;
+}
+.hx-conn-glyph[data-mcp='webflow'] {
+  --hx-conn-c: #146ef5;
+}
+.hx-conn-glyph[data-mcp='paypal'] {
+  --hx-conn-c: #003087;
+}
+.hx-conn-glyph[data-mcp='github'],
+.hx-conn-glyph[data-mcp='notion'],
+.hx-conn-glyph[data-mcp='vercel'],
+.hx-conn-glyph[data-mcp='square'] {
+  --hx-conn-c: #24292f;
+}
+html[data-theme='dark'] .hx-conn-glyph[data-mcp='github'],
+html[data-theme='dark'] .hx-conn-glyph[data-mcp='notion'],
+html[data-theme='dark'] .hx-conn-glyph[data-mcp='vercel'],
+html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
+  --hx-conn-c: #e6e8eb;
+  color: #16181d;
+}
+
+/* The list */
+.hx-conn-wrap {
+  animation: hx-conn-in 320ms var(--hx-ease-out) backwards;
+}
+.hx-conn-wrap + .hx-conn-wrap .hx-conn-row {
+  border-top: 1px solid var(--hx-border);
+}
+@keyframes hx-conn-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.hx-conn-row__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 8px 10px 16px;
+}
+.hx-conn-row__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-conn-row__name {
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-conn-row__sub {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-conn-row__state,
+.hx-conn-row__ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+}
+.hx-conn-row__state {
+  color: var(--hx-danger);
+}
+.hx-conn-row__ok {
+  color: var(--hx-success);
+  animation: hx-conn-in 240ms var(--hx-ease-out) backwards;
+}
+.hx-conn-row__primary {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-conn-row__spin {
+  flex: none;
+  color: var(--hx-fg-3);
+  animation: hx-spin 800ms linear infinite;
+}
+.hx-conn-row__more {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+  transition: background-color var(--hx-dur-xs) ease;
+}
+.hx-conn-row__more:hover,
+.hx-conn-row__more[data-popup-open] {
+  background: var(--hx-bg-hover);
+}
+.hx-conn-row__more:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hx-conn-row__panel {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px 16px 64px;
+}
+.hx-conn-row__confirm {
+  margin: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+.hx-conn-row__buttons,
+.hx-conn-found__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hx-conn-row__err {
+  padding: 0 16px 14px 64px;
+}
+
+/* Loading */
+.hx-conn-sk {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+.hx-conn-sk__row {
+  height: 40px;
+}
+
+/* The paste field and the found card */
+.hx-conn-empty {
+  margin: 0;
+  padding: 16px 16px 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  line-height: 1.5;
+}
+.hx-conn-form {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+.hx-conn-form__paste,
+.hx-conn-form__field {
+  display: grid;
+  gap: 6px;
+}
+.hx-conn-form__label {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-conn-form__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hx-conn-form__line .hx-set__input {
+  flex: 1;
+  min-width: 0;
+}
+.hx-conn-found {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 14px;
+  background: var(--hx-bg-window);
+  transform-origin: 50% 0;
+  animation: hx-conn-found-in 320ms var(--hx-ease-out) backwards;
+}
+.hx-conn-found[data-state='closing'] {
+  animation: hx-conn-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes hx-conn-found-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+}
+@keyframes hx-conn-out {
+  to {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+}
+.hx-conn-found__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.hx-conn-found__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-conn-found__name {
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
+}
+.hx-conn-found__sub {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+}
+.hx-conn-found__addr {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-conn-found .hx-segmented {
+  justify-self: start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.hx-conn-found__note {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+.hx-conn-found__token {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  color: var(--hx-accent);
+  font-size: var(--hx-text-sm);
+  text-decoration: none;
+}
+.hx-conn-found__token:hover {
+  text-decoration: underline;
+}
+
+/* Apps' foot leads here */
+.hx-set__foot-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-accent);
+  font: inherit;
+  cursor: pointer;
+}
+.hx-set__foot-link:hover {
+  text-decoration: underline;
+}
+
+/* MCP servers: the part under trackers and wikis. The rows are .hx-conn-row's; a server turned off for agents is
+   muted; its tools fold out under its name. The catalog is a grid of compact cards (two columns, one on the phone),
+   a card's token form folds out in it, and a connected entry fades out of the grid. */
+.hx-mcp {
+  display: grid;
+  gap: 16px;
+  margin-top: 8px;
+}
+.hx-mcp > .hx-set__group {
+  margin: 0;
+}
+.hx-mcp__head {
+  display: grid;
+  gap: 2px;
+  padding: 0 4px;
+}
+.hx-mcp__title {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-mcp__lead {
+  margin: 0;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.5;
+}
+
+/* A connected server */
+.hx-mcp-row .hx-conn-glyph,
+.hx-mcp-row .hx-conn-row__name,
+.hx-mcp-row .hx-conn-row__sub {
+  transition: opacity var(--hx-dur-xs) ease;
+}
+.hx-mcp-row[data-off] .hx-conn-glyph,
+.hx-mcp-row[data-off] .hx-conn-row__name,
+.hx-mcp-row[data-off] .hx-conn-row__sub {
+  opacity: 0.5;
+}
+.hx-mcp-row__flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+  animation: hx-conn-in 240ms var(--hx-ease-out) backwards;
+}
+.hx-mcp-row__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-accent);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.hx-mcp-row__link:hover {
+  text-decoration: underline;
+}
+
+/* Its tools */
+.hx-mcp-tools__toggle {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+  cursor: pointer;
+  transition: color var(--hx-dur-xs) ease;
+}
+.hx-mcp-tools__toggle:hover {
+  color: var(--hx-fg-1);
+}
+.hx-mcp-tools__chev {
+  transition: transform 240ms var(--hx-ease-out);
+}
+.hx-mcp-tools__toggle[aria-expanded='true'] .hx-mcp-tools__chev {
+  transform: rotate(180deg);
+}
+.hx-mcp-tools__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 0 2px;
+  list-style: none;
+}
+.hx-mcp-tools__item {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.hx-mcp-tools__name {
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-family: var(--hx-font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-mcp-tools__desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* The catalog */
+.hx-mcp-cat {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.hx-mcp-card {
+  display: grid;
+  align-content: start;
+  border: 1px solid var(--hx-border);
+  border-radius: 14px;
+  background: var(--hx-bg-window);
+  animation: hx-conn-in 320ms var(--hx-ease-out) backwards;
+}
+.hx-mcp-card[data-open] {
+  grid-column: 1 / -1;
+}
+.hx-mcp-card[data-leaving] {
+  animation: hx-conn-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-mcp-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 10px 10px 12px;
+}
+.hx-mcp-card__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-mcp-card__name {
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  font-weight: var(--hx-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-mcp-card__blurb {
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-mcp-card__form {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+.hx-mcp-card__err {
+  padding: 0 12px;
+}
+.hx-mcp-card__err .hx-reveal[data-open='true'] {
+  padding-bottom: 12px;
+}
+
+/* A token: the header it goes in, and the token */
+.hx-mcp-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .hx-mcp-cat,
+  .hx-mcp-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hx-mcp-row .hx-conn-row__head {
+    flex-wrap: wrap;
+  }
+  .hx-mcp-row .hx-conn-row__head .hx-set__btn {
+    order: 3;
+    margin-left: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-mcp-row__flow,
+  .hx-mcp-card,
+  .hx-mcp-card[data-leaving],
+  .hx-mcp-tools__chev {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .hx-conn-row__head {
+    padding-left: 12px;
+  }
+  .hx-conn-row__panel,
+  .hx-conn-row__err {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .hx-conn-form {
+    padding: 12px;
+  }
+  .hx-conn-form__line {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-conn-wrap,
+  .hx-conn-row__ok,
+  .hx-conn-found,
+  .hx-conn-found[data-state='closing'] {
+    animation: none;
+  }
+}

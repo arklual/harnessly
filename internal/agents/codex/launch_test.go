@@ -378,3 +378,28 @@ func TestHookFlagsWithTheBudgetScript(t *testing.T) {
 		}
 	}
 }
+
+// The person's MCP servers follow the runtime's own, each with the same token header and variable.
+func TestRuntimeArgsExtraMCP(t *testing.T) {
+	c := LaunchConfig{MCP: testMCP}
+	args, _, err := c.RuntimeArgs("", "", nil)
+	if err != nil || slices.ContainsFunc(args, func(a string) bool { return strings.HasPrefix(a, "mcp_servers.mcp-") }) {
+		t.Fatalf("no servers: %q %v", args, err)
+	}
+	c.ExtraMCP = func() []MCP {
+		return []MCP{{Server: "mcp-linear", URL: MCPURL(8022, "/api/cli/mcp-proxy/abc"), TokenHeader: testMCP.TokenHeader, TokenEnv: testMCP.TokenEnv},
+			{Server: testMCP.Server, URL: "http://127.0.0.1:1/x"}}
+	}
+	args, _, err = c.RuntimeArgs("", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.Index(args, `mcp_servers.mcp-linear.url="http://127.0.0.1:8022/api/cli/mcp-proxy/abc"`)
+	if i < 0 || args[i+2] != `mcp_servers.mcp-linear.env_http_headers={"x-rt-token"="RT_PREVIEW_TOKEN"}` ||
+		slices.Index(args, `mcp_servers.rt-preview.url="http://127.0.0.1:8022/api/cli/preview/mcp"`) > i {
+		t.Fatalf("%q", args)
+	}
+	if slices.Contains(args, `mcp_servers.rt-preview.url="http://127.0.0.1:1/x"`) {
+		t.Fatalf("a server under the runtime's own name: %q", args)
+	}
+}

@@ -23,6 +23,9 @@ export interface IAppConfig {
   trackerIssueUrl: string | null;
   /** Hosts whose `/issue/<KEY>` links are tasks of the tracker. */
   trackerHosts: string[];
+  /** Lower-case host[:port] of every connection that has issues or pages (Settings → Connections): their links are
+   *  read through link-meta. */
+  connectionHosts: string[];
   /** Task keys the page turns into chips, as a regular expression source (RUNTIME_TASK_KEY_RE). */
   taskKeyPattern: string;
   /** GitLab hosts whose merge requests and commits open in the pane (RUNTIME_GITLAB_HOSTS). */
@@ -78,6 +81,7 @@ const DEFAULTS: IAppConfig = {
   githubHost: 'github.com',
   trackerIssueUrl: null,
   trackerHosts: [],
+  connectionHosts: [],
   taskKeyPattern: '[A-Z][A-Z0-9]{1,9}-\\d{1,6}',
   gitlabHosts: ['gitlab.com'],
   productName: 'harnessly',

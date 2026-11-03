@@ -33,7 +33,7 @@ const textOf = (node: ReactNode): string =>
 /** A link that stands alone in a paragraph or list item becomes a card, like link unfurls in chat apps. */
 export const LinkCard = ({ href, label }: { href: string; label: string }) => {
   const link = presentLink(href);
-  const meta = useLinkMeta(hasLinkMeta(link.kind) ? href : null);
+  const meta = useLinkMeta(hasLinkMeta(link) ? href : null);
   const labelIsUrl =
     !label ||
     label.replace(/^https?:\/\//, '').replace(/\/$/, '') ===
@@ -43,7 +43,7 @@ export const LinkCard = ({ href, label }: { href: string; label: string }) => {
       ? meta.title
       : meta?.kind === 'mr'
         ? meta.title
-        : meta?.kind === 'artifact'
+        : meta?.kind === 'artifact' || meta?.kind === 'page'
           ? meta.title
           : labelIsUrl
             ? link.label

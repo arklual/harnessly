@@ -54,6 +54,24 @@ type ToolRow struct {
 	Error float64
 }
 
+// The kinds of a ToolCall.
+const (
+	ToolSkill = "skill"
+	ToolMCP   = "mcp"
+	ToolBash  = "bash"
+	ToolOther = "other"
+)
+
+// ToolCall is a finished call of a tool, named: Kind is skill, mcp, bash or other; Name is the skill's name, the MCP
+// server's name or the tool's own name. It lives only while a transcript is parsed: it is not in the facts cache (that
+// file's format is fixed), so facts read back from the cache have none.
+type ToolCall struct {
+	Ts    float64
+	Kind  string
+	Name  string
+	Error bool
+}
+
 // EventRow is an interrupt, a denied tool or a compaction: key and time.
 type EventRow struct {
 	Key any
@@ -69,15 +87,18 @@ type Facts struct {
 	Title, FirstPrompt *string
 	// Models are strings, except where a transcript named a model with another JSON value (the report then fails, as
 	// the previous runtime's did).
-	Models      []any
-	Projects    []string
-	Tasks, PRs  []string
-	FirstTs     float64
-	LastTs      float64
-	Messages    []MsgRow
-	Prompts     []PromptRow
-	Turns       []TurnRow
-	Tools       []ToolRow
+	Models     []any
+	Projects   []string
+	Tasks, PRs []string
+	FirstTs    float64
+	LastTs     float64
+	Messages   []MsgRow
+	Prompts    []PromptRow
+	Turns      []TurnRow
+	Tools      []ToolRow
+	// ToolCalls are the named calls of this parse, never cached; denied calls are left out, and so are calls whose
+	// result is missing.
+	ToolCalls   []ToolCall
 	Interrupts  []EventRow
 	Denials     []EventRow
 	Compactions []EventRow
@@ -486,6 +507,8 @@ func (p *Projects) ParseClaude(path string) (*Facts, error) {
 	// Streamed chunks of one response share (requestId, message.id); the largest value of each field is kept, the final
 	// chunk carries the full output count.
 	msgIndex := map[string]int{}
+	// tool_use blocks wait here for their result (the result names no tool).
+	uses := map[string]toolUse{}
 	sessionSet := false
 	err := eachLine(path, func(line []byte) error {
 		if bytes.Contains(line, fileHistoryMark) || bytes.Contains(line, progressMark) {
@@ -524,6 +547,7 @@ func (p *Projects) ParseClaude(path string) (*Facts, error) {
 		switch typ {
 		case "assistant":
 			msg := objectOf(e.raw("message"))
+			noteToolUses(msg.raw("content"), uses)
 			usage := objectOf(msg.raw("usage"))
 			model, _ := msg.value("model")
 			if !msg.truthy("usage") || !jscompat.Truthy(model) || model == "<synthetic>" || e.isTrue("isApiErrorMessage") {
@@ -611,8 +635,15 @@ func (p *Projects) ParseClaude(path string) (*Facts, error) {
 				if !ok {
 					text = textOf(o.raw("content"))
 				}
-				if strings.HasPrefix(text, denialText) {
+				denied := strings.HasPrefix(text, denialText)
+				if denied {
 					facts.Denials = append(facts.Denials, EventRow{Key: id, Ts: ts})
+				}
+				if useID, isText := id.(string); isText && !denied {
+					if u, found := uses[useID]; found {
+						facts.ToolCalls = append(facts.ToolCalls, ToolCall{Ts: ts, Kind: u.kind, Name: u.name, Error: isErr == 1})
+						delete(uses, useID)
+					}
 				}
 			}
 		}
@@ -791,4 +822,40 @@ func (p *Projects) ParseCodex(path string) (*Facts, error) {
 	facts.Projects = projectStrings(projects)
 	facts.Tasks = tasks.values()
 	return facts, nil
+}
+
+type toolUse struct{ kind, name string }
+
+// noteToolUses remembers the tool_use blocks of an assistant message by their id. A streamed message repeats its blocks;
+// the id keeps them one.
+func noteToolUses(content []byte, uses map[string]toolUse) {
+	if len(content) == 0 || content[0] != '[' {
+		return
+	}
+	for _, b := range elements(content) {
+		o := objectOf(b)
+		if o == nil || !o.is("type", "tool_use") {
+			continue
+		}
+		id, ok := o.str("id")
+		name, named := o.str("name")
+		if !ok || id == "" || !named || name == "" {
+			continue
+		}
+		kind, label := ToolOther, name
+		switch {
+		case name == "Skill":
+			if skill, ok := objectOf(o.raw("input")).str("skill"); ok && skill != "" {
+				kind, label = ToolSkill, skill
+			}
+		case name == "Bash":
+			kind = ToolBash
+		case strings.HasPrefix(name, "mcp__"):
+			server, _, _ := strings.Cut(strings.TrimPrefix(name, "mcp__"), "__")
+			if server != "" {
+				kind, label = ToolMCP, server
+			}
+		}
+		uses[id] = toolUse{kind: kind, name: label}
+	}
 }

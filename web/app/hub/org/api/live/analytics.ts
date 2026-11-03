@@ -12,10 +12,11 @@ import type {
   OverviewResponse,
   Signal as ApiSignal,
   SignalsResponse,
+  WasteItem as ApiWasteItem,
   WasteResponse,
 } from '../../../../hub-api/analytics';
 import type { Scope as ApiScope } from '../../../../hub-api/orgs';
-import { addDays } from '../../dates';
+import { addDays, daysBetween, isoDay } from '../../dates';
 import type { Role } from '../../types';
 import { OrgApiError } from '../errors';
 import type {
@@ -23,6 +24,7 @@ import type {
   AnalyticsData,
   Change,
   ChangeKind,
+  DetailRow,
   Effect,
   DeltaKind,
   Kpi,
@@ -30,6 +32,7 @@ import type {
   KpiFormat,
   KpiGroup,
   KpiId,
+  Marker,
   Peers,
   Signal,
   Week,
@@ -208,6 +211,8 @@ export const peersOf = (r: KpisResponse): Peers | null => {
         return {
           text: formatValue(KPI[k].format, v ? scaled(k, v.value) : null),
           score: peerScore(v, whole),
+          // What the cell is measured against, for its bubble: the scope's own number.
+          mean: formatValue(KPI[k].format, whole ? scaled(k, whole.value) : null),
         };
       }),
     })),
@@ -222,6 +227,7 @@ const CHANGE_KIND: Record<ApiChange['kind'], ChangeKind> = {
   default_model: 'model',
   skills: 'plugins',
   plugins: 'plugins',
+  env: 'plugins', // the environment's skills, MCP servers, repositories and documents show with the plugins
 };
 
 /** A card keeps to what moved: the changes the hub tells from noise first, at most this many. */
@@ -246,12 +252,15 @@ export const effectsOf = (r: EffectResponse): Effect[] => {
   return (moved.length > 0 ? moved : known).slice(0, EFFECTS_SHOWN);
 };
 
+/** Who made the change; the hub's answer does not say which layer of the environment it sits in. */
+export const metaOf = (c: Pick<ApiChange, 'author'>): string => c.author?.name ?? 'хаб заметил сам';
+
 export const changeOf = (c: ApiChange, effect: EffectResponse | null): Change => ({
   id: c.id,
   kind: CHANGE_KIND[c.kind],
   title: c.title,
   at: c.at.slice(0, 10),
-  meta: c.author?.name ?? 'хаб заметил сам',
+  meta: metaOf(c),
   effects: effect ? effectsOf(effect) : [],
 });
 
@@ -266,15 +275,29 @@ const SIGNAL_SECTION: Record<NonNullable<ApiSignal['action']>['kind'], Signal['a
   open_prices: 'overview',
 };
 
+/** The numbers the hub keeps behind a signal, for its bubble; nothing is made up when it has none. */
+export const signalDetail = (s: ApiSignal): DetailRow[] => [
+  { label: 'О чём', value: s.subject.label },
+  { label: 'Видно с', value: s.firstAt.slice(0, 10).split('-').reverse().join('.') },
+  ...(s.escalated ? [{ label: 'Уровень', value: 'поднят выше: никто не среагировал 48 ч' }] : []),
+];
+
 const signalOf = (s: ApiSignal): Signal => ({
   id: s.id,
   tone: s.severity === 'critical' ? 'high' : 'mid',
   title: s.title,
   text: s.detail,
+  detail: signalDetail(s),
   action: s.action
     ? { label: s.action.label, section: SIGNAL_SECTION[s.action.kind] }
     : { label: 'Открыть', section: 'overview' },
 });
+
+/** Where a waste number comes from: the sessions behind it and its part of the list spend. */
+export const wasteDetail = (w: ApiWasteItem): DetailRow[] => [
+  { label: 'Сессий', value: String(w.sessions) },
+  { label: 'Доля расхода', value: `${Math.round(w.share * 100)}%` },
+];
 
 const WASTE_TONES = ['violet', 'rose', 'amber', 'teal'] as const;
 
@@ -301,6 +324,12 @@ export const weeksUpTo = (now: Date): Week[] => {
 /** The screen's weeks end on a Sunday; the contract's `to` is exclusive. */
 const range = (w: Week) => ({ from: w.from, to: addDays(w.to, 1) });
 
+/** The days the big chart draws: a month ending a week after the period, never past today. */
+export const chartWindow = (period: Week, today: string): { from: string; to: string } => {
+  const to = [addDays(period.to, 8), addDays(today, 1)].sort()[0] ?? addDays(today, 1);
+  return { from: addDays(to, -30), to };
+};
+
 export interface AnalyticsCtx {
   org: string;
   scope: ApiScope;
@@ -325,7 +354,14 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
       const last = [...changes].sort((x, y) => x.at.localeCompare(y.at)).pop();
       lastChange = last ? { id: last.id, title: last.title, at: last.at.slice(0, 10) } : null;
     }
-    return { weeks, defaultPeriod, lastChange };
+    // The strip's bars need the money of every week and the hub has no such answer: they stay at the minimum.
+    const last = weeks.length - 1;
+    return {
+      weeks: weeks.map((w, i) => (i === last ? { ...w, current: true } : w)),
+      today: isoDay(new Date()),
+      defaultPeriod,
+      lastChange,
+    };
   },
   analytics: async ({ period, compare }): Promise<AnalyticsData> => {
     const c = ctx();
@@ -370,6 +406,7 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
       text: w.hint,
       usd: w.amount.usd,
       tone: WASTE_TONES[i % WASTE_TONES.length] ?? 'violet',
+      detail: wasteDetail(w),
     }));
     return {
       scopeLabel: c.label,
@@ -393,9 +430,13 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
     const api = apiIdOf(kpi);
     const path = orgPath(c.org, `/kpis/${api}/series`);
     const scope = scopeParam(c);
-    const [now, was] = await Promise.all([
-      contractGet<KpiSeriesResponse>(path, { scope, ...range(period), by: 'day', split: 'team' }),
-      contractGet<KpiSeriesResponse>(path, { scope, ...range(compare), by: 'day' }),
+    const win = chartWindow(period, isoDay(new Date()));
+    const shift = daysBetween(period.from, compare.from);
+    const before = { from: addDays(win.from, shift), to: addDays(win.to, shift) };
+    const [now, was, changes] = await Promise.all([
+      contractGet<KpiSeriesResponse>(path, { scope, ...win, by: 'day', split: 'team' }),
+      contractGet<KpiSeriesResponse>(path, { scope, ...before, by: 'day' }),
+      contractGet<ChangesResponse>(orgPath(c.org, '/changes'), { scope, ...win }),
     ]);
     const days = now.points.map((p) => p.day);
     // A bucket of too few sessions is a gap in the line, never a zero.
@@ -405,16 +446,33 @@ export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
       name: s.label,
       values: s.points.map((p) => value(p.value)),
     }));
+    const periodFrom = Math.max(0, days.indexOf(period.from));
+    const at = days.indexOf(period.to);
+    const periodTo = at < 0 ? Math.max(0, days.length - 1) : at;
+    const previous = was.points.map((p) => value(p.value));
+    const byId = new Map(changes.changes.map((ch) => [ch.id, ch]));
     return {
       kpi,
       days,
       lines,
-      compareLine: was.points.map((p) => value(p.value)),
-      periodFrom: 0,
-      periodTo: Math.max(0, days.length - 1),
-      markers: now.markers.flatMap((m) => {
+      total: now.points.map((p) => value(p.value)),
+      previous,
+      compareLine: previous.slice(periodFrom, periodTo + 1),
+      periodFrom,
+      periodTo,
+      markers: now.markers.flatMap((m): Marker[] => {
         const index = days.indexOf(m.at.slice(0, 10));
-        return index < 0 ? [] : [{ id: m.changeId, kind: 'tool' as const, title: m.title, index }];
+        if (index < 0) return [];
+        const ch = byId.get(m.changeId);
+        return [
+          {
+            id: m.changeId,
+            kind: ch ? CHANGE_KIND[ch.kind] : 'tool',
+            title: m.title,
+            index,
+            detail: ch ? metaOf(ch) : undefined,
+          },
+        ];
       }),
     };
   },

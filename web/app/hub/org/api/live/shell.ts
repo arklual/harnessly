@@ -74,6 +74,7 @@ export const liveShell = (remember: (view: OrgView, scope: ApiScope) => void): S
       tenants: view.tenants.map((t) => ({ id: t.id, slug: t.slug, name: t.name })),
       teams,
       orgs: list.orgs.map((o) => ({ slug: o.slug, name: o.name, roleLabel: ROLE_WORD[o.role] })),
+      features: view.features ?? [],
     };
   },
   looseSpaces: async () => {

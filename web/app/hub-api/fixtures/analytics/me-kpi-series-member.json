@@ -1,0 +1,42 @@
+{
+  "kpi": "completion",
+  "unit": "share",
+  "by": "week",
+  "points": [
+    {
+      "day": "2026-10-05",
+      "value": 0.6,
+      "n": 8
+    },
+    {
+      "day": "2026-10-12",
+      "value": 0.75,
+      "n": 8
+    },
+    {
+      "day": "2026-10-19",
+      "value": null,
+      "n": 3
+    },
+    {
+      "day": "2026-10-26",
+      "value": 0.8,
+      "n": 10
+    }
+  ],
+  "splits": null,
+  "markers": [
+    {
+      "changeId": "c2subagentsaaaaaaaaa",
+      "at": "2026-10-15T09:00:00Z",
+      "title": "Субагенты на Sonnet",
+      "layer": "org",
+      "author": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "icon": "edit",
+      "verdict": "better"
+    }
+  ]
+}

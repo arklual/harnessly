@@ -49,6 +49,12 @@ type DialogGrower interface {
 	GrowForDialog() bool
 }
 
+// TallCapturer is a pane with a terminal attached, whose size it may change only for a moment: CaptureTall is the styled
+// screen at a size a dialog fits in. short is the screen now, as the look read it; false leaves that as it is.
+type TallCapturer interface {
+	CaptureTall(short string) (string, bool)
+}
+
 var (
 	locksMu sync.Mutex
 	locks   = map[string]*sync.Mutex{}

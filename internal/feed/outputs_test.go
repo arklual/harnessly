@@ -146,7 +146,7 @@ func TestAHandedOverFileIsACard(t *testing.T) {
 	}
 }
 
-// HRN-630: the feed vouches for a handed-over file by the sha256 of its latest hand-over, and for nothing it only wrote.
+// the feed vouches for a handed-over file by the sha256 of its latest hand-over, and for nothing it only wrote.
 func TestDeliveredIsTheLatestHandOver(t *testing.T) {
 	first := delivery.Info{Path: "/tmp/r.md", Name: "r.md", Mime: "text/markdown", Size: 1, SHA256: "aa"}
 	second := first

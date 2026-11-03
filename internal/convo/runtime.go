@@ -318,6 +318,7 @@ func (r *Runtime) loop(a *actor) {
 	// The actor looks only after its first message, the one its maker sends: that one reads the transcript as history,
 	// and a look before it would take the history for news (a turn a resumed session left open would be running).
 	told := false
+	looked := next // when the clock last looked
 	for {
 		now := r.d.Clock.Now()
 		wake := c.wake(now)
@@ -329,12 +330,17 @@ func (r *Runtime) loop(a *actor) {
 			f()
 			told = true
 			a.publish()
+			// The message may have changed the pace (a launch or resume makes the agent starting): the next look is
+			// due by the new one, not one the state before set (10 s for a stopped chat).
+			if due := looked.Add(c.lookEvery()); due.Before(next) {
+				next = due
+			}
 		case <-r.d.Clock.After(wake.Sub(now)):
 			now = r.d.Clock.Now()
 			if told && !now.Before(next) {
 				c.read(now)
 				c.observe(now)
-				next = now.Add(c.lookEvery())
+				looked, next = now, now.Add(c.lookEvery())
 			}
 			c.tick(now)
 			c.save(now, false)
@@ -438,6 +444,26 @@ func (r *Runtime) Advance() {
 
 // --- the agent's signals ---
 
+// PermissionRequest opens the person's card for what the agent's hook asks and waits for the decision. false, at any
+// time, leaves it to the agent's own dialog: the gate ended some other way, the hook went, nothing is to be asked here.
+func (r *Runtime) PermissionRequest(ctx context.Context, id string, ask PermissionAsk) (PermissionReply, bool) {
+	a := r.actor(id)
+	if a == nil || !ask.asksThePerson() {
+		return PermissionReply{}, false
+	}
+	reply := make(chan PermissionReply, 1)
+	if err := r.on(a, func(c *conv, now time.Time) { c.askPermission(ask, reply, now) }); err != nil {
+		return PermissionReply{}, false
+	}
+	select {
+	case answer, ok := <-reply:
+		return answer, ok
+	case <-ctx.Done():
+		_ = r.on(a, func(c *conv, now time.Time) { c.hookGone(reply, now) })
+		return PermissionReply{}, false
+	}
+}
+
 // Hook is one of the agent's hooks, as POST /api/status/hook carries it.
 type Hook struct {
 	// Kind: session-start, prompt-submit, notification, stop, stop-failure, pre-compact, post-compact.
@@ -475,7 +501,9 @@ func (r *Runtime) Hook(id string, h Hook) error {
 			in.K = agentstate.PostCompact
 		case "notification":
 			if h.Notification == "permission_prompt" {
-				// The prompt itself is read off the screen: its options and the call it is about.
+				// The prompt itself is read off the screen: its options and the call it is about. The agent has said it
+				// waits, so if the screen cannot be read as any menu the card still comes (promptUnseen).
+				c.promptAsked = now
 				c.observe(now)
 			}
 			return

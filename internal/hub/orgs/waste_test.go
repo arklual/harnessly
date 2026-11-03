@@ -2,7 +2,10 @@ package orgs_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -41,11 +44,17 @@ func TestOrgWaste(t *testing.T) {
 		}
 	}
 	// $100: 30% of the input is carried, 2 of 10 tool calls fail, ended after 5 turns with no MR.
-	put(v.boris.ID, store.FundingOrg, true, 100, `{"turns":5,"mrs":0,"carryTokens":300,"inputTokens":100,"cacheReadTokens":600,"cacheWriteTokens":300,"toolCalls":10,"toolErrors":2}`)
+	put(v.boris.ID, store.FundingOrg, true, 100, `{"turns":5,"mrs":0,"carryTokens":300,"inputTokens":100,"cacheReadTokens":600,"cacheWriteTokens":300,"toolCalls":10,"toolErrors":2,"firstCtx":20,"skillsListed":10,"skillsLoaded":5}`)
 	// $50: more carried than read (capped at all of it), 1 of 4 tool calls fails, but it made an MR.
 	put(v.vera.ID, store.FundingOrg, true, 50, `{"turns":4,"mrs":1,"carryTokens":1500,"inputTokens":1000,"toolCalls":4,"toolErrors":1}`)
 	// $40 still running with no MR: not abandoned, and nothing else to count.
 	put(v.boris.ID, store.FundingOrg, false, 40, `{"turns":10,"mrs":0}`)
+	// A long call of the running session: $10 of the $40 are spent at a context of 300 000 tokens, which makes it $50.
+	big := int64(10e6)
+	if _, err := st.AddCall(ctx, store.UsageCall{OrgKey: v.org, Provider: "claude", MsgKey: "wdbig", SessionKey: "wd", Ts: time.Date(2026, 10, 20, 12, 30, 0, 0, time.UTC).UnixMilli(),
+		Model: "claude-sonnet-4-6", Input: 200000, CacheRead: 100000, ListCostMicros: &big, ReceivedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
 	// vera's own account: not the organization's money, in no total and no item.
 	put(v.vera.ID, store.FundingPersonal, true, 500, `{"turns":9,"mrs":0,"carryTokens":900,"inputTokens":1000,"toolCalls":2,"toolErrors":2}`)
 
@@ -58,7 +67,7 @@ func TestOrgWaste(t *testing.T) {
 	if w.Scope.Kind != "org" || w.Scope.ID != v.org || w.Period.From != "2026-10-01" || w.Period.To != "2026-11-01" || w.Currency.Source != "none" {
 		t.Errorf("scope %+v period %+v currency %+v", w.Scope, w.Period, w.Currency)
 	}
-	// The organization's list spend is 1190 + 100 + 50 + 40 = 1380.
+	// The organization's list spend is 1190 + 100 + 50 + 50 = 1390.
 	want := []struct {
 		kind     analytics.WasteKind
 		usd      float64
@@ -66,8 +75,9 @@ func TestOrgWaste(t *testing.T) {
 		sessions int
 	}{
 		{analytics.WasteAbandonedSessions, 100, 0.072, 1},
-		{analytics.WasteRereadContext, 80, 0.058, 2},
-		{analytics.WasteFailedTools, 32.5, 0.024, 2},
+		{analytics.WasteRetriesAfterError, 32.5, 0.023, 2},
+		{analytics.WasteLongContext, 10, 0.007, 1},
+		{analytics.WasteExtraSkills, 5, 0.004, 1}, // 20 × 0.5 × 5 turns ÷ 1000 input tokens = 5% of $100
 	}
 	if len(w.Items) != len(want) {
 		t.Fatalf("items = %+v", w.Items)
@@ -75,12 +85,35 @@ func TestOrgWaste(t *testing.T) {
 	for i, c := range want {
 		it := w.Items[i]
 		if it.Kind != c.kind || it.Amount.USD != c.usd || it.Amount.Shown != c.usd || it.Share != c.share || it.Sessions != c.sessions ||
-			it.Title == "" || it.Hint == "" {
+			it.Title == "" || it.Hint == "" || it.Explain == "" || it.Money != it.Amount {
 			t.Errorf("item %d = %+v, want %+v", i, it, c)
 		}
 	}
-	if w.Items[0].Title != "Брошенные сессии" || w.Items[1].Title != "Перечитывание контекста" {
+	if w.Items[0].Title != "Брошенные сессии" || w.Items[1].Title != "Повторы после ошибок" {
 		t.Errorf("titles = %q %q", w.Items[0].Title, w.Items[1].Title)
+	}
+
+	// The answer has the keys of the web fixture, at the top and in every item.
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "web", "app", "hub-api", "fixtures", "analytics", "waste-admin.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fx, got map[string]any
+	if err := json.Unmarshal(raw, &fx); err != nil {
+		t.Fatal(err)
+	}
+	r.JSON(&got)
+	if keys(fx) != keys(got) {
+		t.Errorf("waste keys: fixture %s, answer %s", keys(fx), keys(got))
+	}
+	fi, gi := fx["items"].([]any), got["items"].([]any)
+	if len(fi) != 4 || len(gi) != 4 {
+		t.Fatalf("items: fixture %d, answer %d", len(fi), len(gi))
+	}
+	for i := range fi {
+		if keys(fi[i].(map[string]any)) != keys(gi[i].(map[string]any)) {
+			t.Errorf("item %d keys: fixture %s, answer %s", i, keys(fi[i].(map[string]any)), keys(gi[i].(map[string]any)))
+		}
 	}
 
 	// A period without sessions: an empty list, not null; so is a tenant without any.
@@ -98,7 +131,7 @@ func TestOrgWaste(t *testing.T) {
 		t.Fatalf("lead waste: %s", r)
 	}
 	r.JSON(&lead)
-	if lead.Scope.Kind != "team" || lead.Scope.ID != v.team.ID || len(lead.Items) != 3 || lead.Items[0].Amount.USD != 100 {
+	if lead.Scope.Kind != "team" || lead.Scope.ID != v.team.ID || len(lead.Items) != 4 || lead.Items[0].Amount.USD != 100 {
 		t.Errorf("lead waste = %+v", lead)
 	}
 	for _, c := range []struct {

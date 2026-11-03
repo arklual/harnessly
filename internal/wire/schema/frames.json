@@ -260,7 +260,7 @@
     },
     "PauseReason": {"enum": ["interrupted", "user", "launch-failed", "agent-gone", "limited", "needs-target"]},
     "GateKind": {"enum": ["question", "permission", "plan"]},
-    "PermissionKind": {"enum": ["tool", "plan"]},
+    "PermissionKind": {"enum": ["tool", "plan", "dialog"]},
     "PermissionScope": {"enum": ["once", "always", "deny", "plan-auto", "plan-ask", "revise"]},
     "GateStateKind": {"enum": ["open", "answering", "answered", "closed"]},
     "GateCloseReason": {"enum": ["agent-moved-on", "chat-about", "turn-ended", "agent-gone"]},

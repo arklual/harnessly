@@ -19,6 +19,13 @@ export class OrgApiError extends Error {
     | 'not_ready'
     | 'network'
     | 'invalid_request'
+    // Environment: the entry is already there, a pinned or foreign row, a taken catalog name, a built-in item; and the
+    // feature being off for the organization.
+    | 'exists'
+    | 'locked'
+    | 'name_taken'
+    | 'built_in'
+    | 'not_enabled'
     // A refusal of the space endpoints (machine codes, invites, members): the message is already the text to show.
     | 'hub'
     | 'internal';
@@ -44,6 +51,11 @@ export const orgErrorText = (e: unknown): string => {
     if (e.code === 'restart_unsupported')
       return 'Раннер на этой машине старый и не умеет перезапускаться отсюда. Сначала обновите его.';
     if (e.code === 'not_found') return 'Такого нет.';
+    if (e.code === 'exists') return 'Это уже есть в окружении.';
+    if (e.code === 'locked') return 'Закреплено выше: здесь это не изменить.';
+    if (e.code === 'name_taken') return 'Такое название в каталоге уже есть.';
+    if (e.code === 'built_in') return 'Встроенное из каталога не изменить.';
+    if (e.code === 'not_enabled') return 'Окружение для этой организации не включено.';
     if (e.code === 'not_ready') return 'Живые данные хаба ещё не подключены.';
     if (e.code === 'network') return 'Нет связи с хабом.';
   }

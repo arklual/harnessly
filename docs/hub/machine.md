@@ -257,11 +257,29 @@ What is not done yet:
   Next: carry the session's subject into the launch and the tab's metadata, and set `Gate.UserOf`.
 - **The account.** Only subscription logins are known (`claude:<uuid>` from `~/.claude.json`, `codex:<id>` from
   `auth.json`); a chat on an API key or another endpoint matches entries for any account only. Replace
-  `budget.Accounts` with the usage collector's record of the chat (HRN-588).
+  `budget.Accounts` with the usage collector's record of the chat.
 - **The model of an Auto launch** is unknown, so an entry that names a model does not match it.
 - **A Codex tab is not paused through tmux** (the table in [limits.md](limits.md)); a Codex chat is refused through its
   hooks only, and the shape of a Codex hook's refusal is not yet checked against a Codex CLI of this version. TODO: pause
   the pane through tmux.
+
+## Load, hardware and restart
+
+Agents of this version announce the features `metrics` and `drain` in `hello` (an older agent does not, and the hub then
+asks for neither; `drain` also covers `runtime.restart.cancel` and the `restart` event). They add to the protocol, all optional, so an older hub or agent keeps working:
+
+- `hello.hardware` `{ cores, ramBytes, diskBytes, model, laptop, os, arch }` — what the machine is made of; a field it
+  could not read is left out.
+- the event `metrics.sample` `{ sample: { cpuPct, ramPct, diskPct, chatsNow, at } }` every 60 seconds, and only to a link that named it in `link.subscribe` (a hub that does not subscribe is never sent it); a value that
+  could not be read is `null`. The agent reads them from the system (the work folder's filesystem for the disk), not from
+  the hub.
+- the operation `runtime.restart` `{ jobId, when: 'now'|'after_chats'|'drain' }` answers at once with
+  `{ state, chatsNow }`; progress is the event `restart` `{ jobId, state: 'waiting'|'restarting'|'done'|'failed'|'cancelled',
+  chatsNow?, error? }`. One restart at a time. `drain` refuses new chats on the machine until none is at work. The
+  operation `runtime.restart.cancel` `{ jobId }` takes back a restart that waits. The runtime restarts by exiting, its
+  service starts it again, and `done` is said when it answers.
+
+What the hub does with them, and the API, is in [machines-resources.md](machines-resources.md).
 
 ## Commands
 

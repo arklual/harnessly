@@ -65,6 +65,10 @@ Every tab the runtime starts or resumes — Claude Code, Codex and plain shells 
 | `ARTIFACTS_AUTHOR` | `RUNTIME_ARTIFACTS_AUTHOR`, else "`<RUNTIME_OWNER_NAME>` (agent)" |
 | `HARNESSLY_DATA_DIR` | the runtime's data folder (the `harnessly` command reads its port and token there); set whether or not a service is configured |
 
+The person's own trackers, wikis and code hosts (Jira, Confluence, YouTrack, Linear, GitLab, GitHub, …) are not in the
+environment: they are connected in Settings → Connections and read with `harnessly issues`, `issue`, `pages` and `page`
+through the runtime, which keeps their credentials in the safe ([connections](connections.md)).
+
 Nothing else of the runtime's environment reaches the panes: a tab's shell starts from an allow-list (`HOME`, `PATH`,
 `LANG`, …) plus these. In front of a previous runtime (gate mode), only tabs the Go runtime starts get them.
 

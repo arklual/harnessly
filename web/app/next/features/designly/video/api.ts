@@ -44,7 +44,7 @@ const must = <T>(v: T | null): T => {
   return v;
 };
 
-// ---- what the person sees and what the agent asks of the player (HRN-580)
+// ---- what the person sees and what the agent asks of the player
 
 export interface IVideoViewCmd {
   seq: number;

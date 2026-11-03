@@ -1,0 +1,29 @@
+{
+  "features": [
+    {
+      "name": "ui.hx",
+      "enabled": true,
+      "forced": false
+    },
+    {
+      "name": "env",
+      "enabled": false,
+      "forced": false
+    },
+    {
+      "name": "catalog",
+      "enabled": false,
+      "forced": false
+    },
+    {
+      "name": "machine.resources",
+      "enabled": false,
+      "forced": false
+    },
+    {
+      "name": "org.events",
+      "enabled": true,
+      "forced": true
+    }
+  ]
+}

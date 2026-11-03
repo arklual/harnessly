@@ -19,6 +19,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/events"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/link"
+	"github.com/ly-solutions/harnessly/internal/hub/machaccess"
+	"github.com/ly-solutions/harnessly/internal/hub/provider"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/spaces"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -45,6 +47,22 @@ type Deps struct {
 	Usage UsageSink
 	// Budget sends the machines their limit lists (HUB_LIMITS_ENFORCE); nil: off.
 	Budget BudgetSink
+	// Env sends the machines their environment lists and keeps what they report (internal/hub/env); nil: off.
+	Env EnvSink
+	// Provider runs the machines' virtual servers (docs/hub/provider.md); nil means provider.None.
+	Provider provider.Provider
+	// Publisher carries machine.op and machine.status to the organization's live channel; nil: they go to the space's
+	// own stream (the broker of Spaces).
+	Publisher Publisher
+	// Features says whether an organization has a feature on. nil: every feature is off, which keeps the resources,
+	// load and operations of a machine dark (docs/hub/machines-resources.md).
+	Features FeatureGate
+}
+
+// EnvSink keeps a machine's environment list current (internal/hub/env).
+type EnvSink interface {
+	Connected(machineID string, hello hubproto.Hello)
+	Reported(machineID string, st hubproto.EnvState)
 }
 
 // BudgetSink is what keeps a machine's limit list current (internal/hub/limits).
@@ -73,6 +91,14 @@ type Service struct {
 	revoked func(machineID string)
 	usage   UsageSink
 	budget  BudgetSink
+	env     EnvSink
+	prov    provider.Provider
+	pub     Publisher
+	gate    FeatureGate
+	acc     *machaccess.Checker
+
+	// res is the state of the resources and operations side (resources.go).
+	res resState
 
 	// infoMu serialises the read-modify-write of a machine's info document: the connect routine and the agent's events
 	// all update it.
@@ -83,9 +109,13 @@ type Service struct {
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, spaces: d.Spaces, reg: d.Reg, events: d.Spaces.Events(), tickets: d.Tickets, lim: d.Limiter, log: d.Log, now: d.Now, revoked: d.OnRevoked, usage: d.Usage, budget: d.Budget, env: d.Env, prov: d.Provider, pub: d.Publisher, gate: d.Features}
+	s.res.init()
 	if s.now == nil {
 		s.now = time.Now
+	}
+	if s.prov == nil {
+		s.prov = provider.None{}
 	}
 	if s.log == nil {
 		s.log = slog.Default()
@@ -96,6 +126,7 @@ func New(d Deps) *Service {
 	if s.tickets == nil {
 		s.tickets = ticket.New(s.now)
 	}
+	s.acc = &machaccess.Checker{Config: s.cfg, DB: s.db, Authz: s.spaces.Authz, IsAdmin: s.auth.IsInstanceAdmin, Log: s.log}
 	return s
 }
 
@@ -431,6 +462,10 @@ func (s *Service) open(w http.ResponseWriter, r *http.Request, p *auth.Principal
 	if m.DisabledAt != nil {
 		return errDisabledMachine
 	}
+	// The machine's access list (HUB_ACCESS_ENFORCE): the same rule the proxy applies to every request after this one.
+	if err := s.acc.Check(ctx, p.User.ID, m); err != nil {
+		return err
+	}
 	// Without HUB_RUNTIME_DOMAIN the page would run on the hub's origin: only a machine an administrator connected may.
 	if err := s.auth.RequireTrustedMachine(ctx, m.CreatedBy); err != nil {
 		return err
@@ -449,7 +484,7 @@ func (s *Service) open(w http.ResponseWriter, r *http.Request, p *auth.Principal
 		if err != nil {
 			return httpx.Invalid("path", "Некорректный адрес")
 		}
-		pub, _ := url.Parse(s.cfg.PublicURL)
+		pub, _ := url.Parse(s.cfg.AgentURL)
 		u.Scheme, u.Host = pub.Scheme, s.cfg.RuntimeHost(m.ID)
 		q := u.Query()
 		q.Set("hl_ticket", s.tickets.Issue(p.User.ID, m.ID))

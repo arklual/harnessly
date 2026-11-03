@@ -22,6 +22,8 @@ const (
 	UsageSession = "session"
 	UsageWindow  = "window"
 	UsageBalance = "balance"
+	// UsageTool counts the calls of one tool of a session on a day (docs/hub/environment.md); an old hub skips it.
+	UsageTool = "tool"
 )
 
 // UsageAvailableEvent is sent after new records were written (at most every 10 s) and once after each connect.
@@ -62,6 +64,7 @@ type UsageRecord struct {
 	Session *UsageSessionFact `json:"session,omitempty"`
 	Window  *UsageWindowFact  `json:"window,omitempty"`
 	Balance *UsageBalanceFact `json:"balance,omitempty"`
+	Tool    *UsageToolFact    `json:"tool,omitempty"`
 }
 
 // UsageCallFact is one model call. MsgKey is the provider's own id of the message (Claude's message id / request id,

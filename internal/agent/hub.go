@@ -51,10 +51,12 @@ type hub struct {
 	env     *agentnet.EnvDir
 	proxies *agentnet.Proxies
 	budget  *budgetKeeper
-	check   *agentnet.Checker
-	shell   *preflight.Checker
-	filter  *routeFilter
-	// observe: the hub only sees the machine (HRN-596). The agent runs its closed cluster's link as before, and the hub
+	// environment is the hub's list of skills, MCP servers, repositories and documents (env.set).
+	environment *envKeeper
+	check       *agentnet.Checker
+	shell       *preflight.Checker
+	filter      *routeFilter
+	// observe: the hub only sees the machine. The agent runs its closed cluster's link as before, and the hub
 	// link answers what can be read (hello, preflight, agents, spend) under a policy that allows nothing: no tunnel to the
 	// runtime, no keys, env, logins or installs, no limits, and nothing of the cluster's tunnels is touched.
 	observe bool
@@ -69,6 +71,9 @@ type hub struct {
 	logins   *agentlogin.Manager
 	// usage is nil when the outbox could not be opened.
 	usage *usage
+	// metrics samples the machine's load for the hub; restarts serves runtime.restart.
+	metrics  *sampler
+	restarts *restarter
 
 	mu      sync.Mutex
 	checks  map[string]hubproto.ProviderCheck // the last provider check of each agent, for its status
@@ -104,6 +109,7 @@ func newHub(a *Agent, m *MachineFile, dir string, observe bool) *hub {
 		audit:         NewAudit(filepath.Join(dir, "agent-audit.log")),
 		env:           agentnet.NewEnvDir(cfg.EnvDir),
 		budget:        newBudgetKeeper(dir),
+		environment:   newEnvKeeper(dir),
 		check:         &agentnet.Checker{},
 		shell:         &preflight.Checker{Home: cfg.Home, Env: os.Environ()},
 		checks:        map[string]hubproto.ProviderCheck{},
@@ -111,6 +117,8 @@ func newHub(a *Agent, m *MachineFile, dir string, observe bool) *hub {
 		state:         LinkState{PID: os.Getpid(), MachineID: m.MachineID, HubURL: m.HubURL, Version: cfg.Version},
 	}
 	h.proxies = agentnet.NewProxies(h.env)
+	h.metrics = &sampler{sys: newSysReader(), path: diskPath(cfg), chats: h.chatsNow, now: time.Now}
+	h.restarts = h.newRestarter()
 	h.policy.OnPolicy = h.onPolicy
 	h.policy.OnSwitch = h.onSwitch
 	return h
@@ -137,6 +145,7 @@ func (h *hub) start(ctx context.Context) error {
 				filepath.Join(h.dir, linkStateFile), h.audit.path, h.audit.path+".1")
 		}
 		h.filter.roots = []string{cfg.Home, cfg.WorkDir}
+		h.filter.draining = h.restarts.Draining
 		port, err := h.filter.Start()
 		if err != nil {
 			return fmt.Errorf("route filter: %w", err)
@@ -179,12 +188,14 @@ func (h *hub) start(ctx context.Context) error {
 	h.goBG(func() { every(ctx, agentsEvery, false, func() { h.refreshAgents(false) }) })
 	h.goBG(func() { every(ctx, preflightEvery, false, h.sendPreflight) })
 	h.startUsage()
+	h.startMetrics()
 	return nil
 }
 
 // stop runs after the link's context is done: the loops have returned or are about to.
 func (h *hub) stop() {
 	h.bg.Wait()
+	h.restarts.Wait()
 	h.stopUsage()
 	_ = os.Remove(LinkStatePath(h.dir))
 	if h.filter != nil {
@@ -275,6 +286,9 @@ func (h *hub) linkUp(l *link) {
 	h.goBG(h.sendPreflight)
 	h.goBG(func() { h.refreshAgents(true) })
 	h.usageAnnounce()
+	if rev, _ := h.environment.Held(); rev > 0 && !h.observe {
+		h.emit(hubproto.EventEnvState, "state", h.environment.State()) // how the held list went, for a hub that lost it
+	}
 }
 
 func (h *hub) linkDown(l *link) {
@@ -368,12 +382,24 @@ func (h *hub) hello() hubproto.Hello {
 		features = append(features, hubproto.FeatureUsage)
 	}
 	if !h.observe {
-		features = append(features, hubproto.FeatureBudget)
+		features = append(features, hubproto.FeatureBudget, hubproto.FeatureEnvironment)
 	}
+	if h.metrics != nil {
+		features = append(features, hubproto.FeatureMetrics)
+	}
+	if a.cfg.RuntimePort != 0 && !h.observe {
+		features = append(features, hubproto.FeatureDrain)
+	}
+	var hw *hubproto.Hardware
+	if h.metrics != nil {
+		hw = h.metrics.hardware(runtime.GOOS, runtime.GOARCH)
+	}
+	envRev, envHash := h.environment.Held()
 	return hubproto.Hello{
 		Protocol: hubproto.Version, AgentVersion: a.hello.AgentVersion, User: a.hello.User, Home: a.hello.Home,
 		Hostname: a.hello.Hostname, Features: features, MachineID: h.machine.MachineID, OS: runtime.GOOS, Arch: runtime.GOARCH,
-		Profile: h.machine.Profile, Policy: h.current(), BudgetVersion: h.budget.Version(),
+		Profile: h.machine.Profile, Policy: h.current(), BudgetVersion: h.budget.Version(), Hardware: hw,
+		EnvRev: envRev, EnvHash: envHash,
 	}
 }
 

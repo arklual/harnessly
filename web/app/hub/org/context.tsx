@@ -44,7 +44,7 @@ export const OrgProvider = ({
   org: string;
   scopeSlug: string;
   section: Section;
-  children: (scope: Scope) => ReactNode;
+  children: (scope: Scope, shell: ShellData) => ReactNode;
 }) => {
   const api = useMemo(() => createOrgApi(dataMode(), mockRole()), []);
   const { data, error, reload, refresh } = useShellLoad(api, org, scopeSlug);
@@ -104,11 +104,11 @@ const Inner = ({
   org: string;
   section: Section;
   refreshShell: () => void;
-  children: (scope: Scope) => ReactNode;
+  children: (scope: Scope, shell: ShellData) => ReactNode;
 }) => {
   const value = useMemo<OrgCtx>(
     () => ({ api, shell, scope, base: `/o/${org}/${scopeSlug}`, section, refreshShell }),
     [api, shell, scope, org, scopeSlug, section, refreshShell],
   );
-  return <Ctx.Provider value={value}>{children(scope)}</Ctx.Provider>;
+  return <Ctx.Provider value={value}>{children(scope, shell)}</Ctx.Provider>;
 };

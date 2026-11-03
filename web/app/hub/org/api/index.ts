@@ -5,6 +5,7 @@ import type { Role } from '../types';
 import { liveOrgApi } from './live';
 import { mockOrgApi } from '../mock';
 import type { AnalyticsApi } from './analytics';
+import type { EnvApi } from './env';
 import type { MachinesApi } from './machines';
 import type { MemberApi } from './member';
 import type { OnboardingApi } from './onboarding';
@@ -16,6 +17,7 @@ import type { TenantApi } from './tenant';
 export type OrgApi = ShellApi &
   OverviewApi &
   AnalyticsApi &
+  EnvApi &
   MachinesApi &
   TeamsApi &
   MemberApi &

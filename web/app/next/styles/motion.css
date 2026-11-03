@@ -264,7 +264,8 @@
       .hx-gtab .hx-gtab__ic--working,
       .hx-gtab[aria-selected='true'] .hx-gtab__ic--working,
       .hx-gtab .hx-gtab__ic--background,
-      .hx-gtab[aria-selected='true'] .hx-gtab__ic--background
+      .hx-gtab[aria-selected='true'] .hx-gtab__ic--background,
+      .hx-conn-row__spin
     ) {
     animation-duration: 2.4s !important;
     animation-iteration-count: infinite !important;

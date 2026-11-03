@@ -1,0 +1,57 @@
+/* harnessly — движение. Токены длительностей и кривых + готовые входы.
+   Вход: класс .hx-enter + data-enter="left|up|down|fade|scale" + --i (порядковый номер для каскада) + --hx-enter-base (задержка группы).
+   Входы играют, пока на предке стоит data-play="1": снять и вернуть атрибут = проиграть заново.
+   В Angular: тот же CSS + директива hxEnter, которая ставит --i по индексу в @for. Уважает prefers-reduced-motion. */
+
+:root {
+  --hx-dur-xs: 120ms;
+  --hx-dur-sm: 200ms;
+  --hx-dur-md: 360ms;
+  --hx-dur-lg: 560ms;
+  --hx-dur-xl: 720ms;
+  --hx-ease-out: cubic-bezier(.16, 1, .3, 1);
+  --hx-ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --hx-ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --hx-stagger: 45ms;
+}
+
+/* ── Входы ─────────────────────────────────────────────── */
+[data-play="1"] .hx-enter {
+  animation: var(--hx-enter-name, hx-in-fade) var(--hx-enter-dur, var(--hx-dur-lg)) var(--hx-ease-out) backwards;
+  animation-delay: calc(var(--hx-enter-base, 0ms) + var(--i, 0) * var(--hx-stagger));
+}
+[data-play="0"] .hx-enter { opacity: 0; }
+.hx-enter[data-enter="left"]  { --hx-enter-name: hx-in-left; }
+.hx-enter[data-enter="up"]    { --hx-enter-name: hx-in-up; }
+.hx-enter[data-enter="down"]  { --hx-enter-name: hx-in-down; }
+.hx-enter[data-enter="scale"] { --hx-enter-name: hx-in-scale; }
+
+@keyframes hx-in-fade  { from { opacity: 0; } }
+@keyframes hx-in-left  { from { opacity: 0; transform: translateX(-24px); } }
+@keyframes hx-in-up    { from { opacity: 0; transform: translateY(14px); } }
+@keyframes hx-in-down  { from { opacity: 0; transform: translateY(-10px); } }
+@keyframes hx-in-scale { from { opacity: 0; transform: scale(.96); } }
+
+/* Появление нового элемента в ленте/списке (без data-play — играет при вставке) */
+.hx-pop { animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards; }
+.hx-pop-right { animation: hx-pop-right var(--hx-dur-md) var(--hx-ease-out) backwards; transform-origin: 100% 100%; }
+@keyframes hx-pop-right { from { opacity: 0; transform: translateY(12px) scale(.96); } }
+.hx-slot-in { animation: hx-slot-in var(--hx-dur-md) var(--hx-ease-out) both; }
+@keyframes hx-slot-in { from { opacity: 0; max-height: 0; transform: translateX(-12px); } to { max-height: 48px; } }
+
+/* Служебные */
+@keyframes hx-spin { to { transform: rotate(360deg); } }
+@keyframes hx-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
+@keyframes hx-check { from { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.15); } }
+@keyframes hx-caret { 50% { opacity: 0; } }
+@keyframes hx-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes hx-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-root *, .hx-root *::before, .hx-root *::after {
+    animation-duration: 1ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important;
+  }
+}
+
+/* Вкладка в фоне — бесконечные анимации стоят (спиннеры, переливы, пульсы) */
+.hx-root[data-hidden] *, .hx-root[data-hidden] *::before, .hx-root[data-hidden] *::after { animation-play-state: paused !important; }

@@ -473,13 +473,31 @@
       "changeId": "c2subagentsaaaaaaaaa",
       "at": "2026-10-15T09:00:00Z",
       "title": "Субагенты на Sonnet",
+      "layer": "team",
+      "author": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      },
+      "icon": "edit",
       "verdict": "better"
     },
     {
       "changeId": "c2claudeversionaaaaa",
       "at": "2026-10-22T03:10:00Z",
       "title": "Claude Code 2.4.1 → 2.5.0",
+      "layer": "org",
+      "author": null,
+      "icon": "rocket",
       "verdict": "noise"
+    },
+    {
+      "changeId": "c2defaultmodelaaaaa",
+      "at": "2026-10-27T08:00:00Z",
+      "title": "Модель по умолчанию",
+      "layer": "tenant",
+      "author": null,
+      "icon": "announce",
+      "verdict": "too_few"
     }
   ]
 }

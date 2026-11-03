@@ -63,8 +63,13 @@ func (s *Service) machinesList(w http.ResponseWriter, r *http.Request, p *auth.P
 	if err != nil {
 		return err
 	}
+	cur := s.currency(ctx, x.org.Currency, span{from: x.now, to: x.now, loc: x.loc})
 	out := make([]machines.HubMachine, 0, len(hs))
 	for _, h := range hs {
+		if w := h.Week; w != nil && w.Calls > w.Unpriced {
+			spend := cur.Micros(w.SpendMicros)
+			w.Spend = &spend
+		}
 		if onlyProblems && len(h.Problems) == 0 {
 			continue
 		}
@@ -84,7 +89,7 @@ func (s *Service) machinesList(w http.ResponseWriter, r *http.Request, p *auth.P
 	})
 	httpx.WriteJSON(w, http.StatusOK, MachinesResponse{
 		Scope:    orgs.ScopeView{Kind: x.sc.Kind, ID: x.sc.ID},
-		Currency: s.currency(ctx, x.org.Currency, span{from: x.now, to: x.now, loc: x.loc}),
+		Currency: cur,
 		Machines: out,
 	})
 	return nil

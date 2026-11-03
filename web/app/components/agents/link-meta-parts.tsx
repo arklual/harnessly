@@ -90,10 +90,12 @@ const PreviewBody = ({ href, meta, link }: { href: string; meta: TLinkMeta; link
         {meta.kind === 'issue' && meta.key}
         {meta.kind === 'mr' && `${meta.project} !${meta.iid}`}
         {meta.kind === 'artifact' && t('agents.linkMetaParts.artifact')}
+        {meta.kind === 'page' && (meta.space || link.detail)}
       </span>
     </div>
     <strong className="tw-link-card-title">{meta.title}</strong>
     {meta.kind === 'artifact' && meta.description && <p className="tw-link-card-text">{meta.description}</p>}
+    {meta.kind === 'page' && meta.excerpt && <p className="tw-link-card-text">{meta.excerpt}</p>}
     <div className="tw-link-card-meta">
       {meta.kind === 'issue' && <IssueState meta={meta} withLabel />}
       {meta.kind === 'issue' && meta.assignee && (

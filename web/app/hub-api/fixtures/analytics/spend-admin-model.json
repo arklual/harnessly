@@ -57,6 +57,7 @@
       "calls": 1200,
       "unpricedCalls": 0,
       "tokens": {
+        "total": 482720000,
         "input": 2240000,
         "output": 10080000,
         "cacheRead": 448000000,
@@ -80,6 +81,7 @@
       "calls": 1200,
       "unpricedCalls": 0,
       "tokens": {
+        "total": 168090000,
         "input": 780000,
         "output": 3510000,
         "cacheRead": 156000000,
@@ -103,6 +105,7 @@
       "calls": 1200,
       "unpricedCalls": 0,
       "tokens": {
+        "total": 43100000,
         "input": 200000,
         "output": 900000,
         "cacheRead": 40000000,
@@ -126,6 +129,7 @@
       "calls": 1970,
       "unpricedCalls": 1970,
       "tokens": {
+        "total": 0,
         "input": 0,
         "output": 0,
         "cacheRead": 0,

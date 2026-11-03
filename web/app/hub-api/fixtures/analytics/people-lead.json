@@ -1,0 +1,132 @@
+{
+  "scope": {
+    "kind": "team",
+    "id": "m2platformteamaaaaaa"
+  },
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "currency": {
+    "code": "RUB",
+    "perUsd": 81.5,
+    "rateDate": "2026-10-01",
+    "source": "cbr"
+  },
+  "total": {
+    "list": {
+      "usd": 1190,
+      "shown": 96985.0
+    },
+    "paid": {
+      "usd": 980,
+      "shown": 79870.0
+    },
+    "limit": {
+      "ruleId": "l2teamplatformaaaaa",
+      "amount": {
+        "usd": 1500,
+        "shown": 122250.0
+      },
+      "pct": 0.653,
+      "status": "ok",
+      "setBy": {
+        "userId": "u2annaaaaaaaaaaaaaaa",
+        "name": "Анна"
+      }
+    },
+    "tone": "ok"
+  },
+  "week": {
+    "from": "2026-10-25",
+    "to": "2026-11-01",
+    "tz": "Europe/Moscow"
+  },
+  "people": [
+    {
+      "userId": "u2annaaaaaaaaaaaaaaa",
+      "name": "Анна",
+      "role": "owner",
+      "list": {
+        "usd": 520,
+        "shown": 42380.0
+      },
+      "paid": {
+        "usd": 430,
+        "shown": 35045.0
+      },
+      "share": 0.287,
+      "limit": null,
+      "hot": false,
+      "chats": {
+        "n": 14,
+        "running": 1
+      },
+      "mrs": {
+        "n": 6,
+        "merged": 5
+      }
+    },
+    {
+      "userId": "u2borisaaaaaaaaaaaaa",
+      "name": "Борис",
+      "role": "member",
+      "list": {
+        "usd": 410,
+        "shown": 33415.0
+      },
+      "paid": {
+        "usd": 330,
+        "shown": 26895.0
+      },
+      "share": 0.22,
+      "limit": null,
+      "hot": false,
+      "chats": {
+        "n": 11,
+        "running": 0
+      },
+      "mrs": {
+        "n": 4,
+        "merged": 4
+      }
+    },
+    {
+      "userId": "u2veraaaaaaaaaaaaaaa",
+      "name": "Вера",
+      "role": "member",
+      "list": {
+        "usd": 260,
+        "shown": 21190.0
+      },
+      "paid": {
+        "usd": 220,
+        "shown": 17930.0
+      },
+      "share": 0.147,
+      "limit": {
+        "ruleId": "l2veralimitaaaaaaaa",
+        "amount": {
+          "usd": 250,
+          "shown": 20375.0
+        },
+        "pct": 0.88,
+        "status": "warn",
+        "setBy": {
+          "userId": "u2annaaaaaaaaaaaaaaa",
+          "name": "Анна"
+        }
+      },
+      "hot": true,
+      "chats": {
+        "n": 9,
+        "running": 2
+      },
+      "mrs": {
+        "n": 3,
+        "merged": 2
+      }
+    }
+  ]
+}

@@ -43,7 +43,10 @@ export const me = obj({
   teams: arr(teamRef),
   scopes: rec(capabilities, /^(org|tenant|team):[a-z2-7]{20}$/),
 });
-export const orgView = obj({ org, tenants: arr(tenant), teams: arr(team), me });
+export const orgView = obj({ org, tenants: arr(tenant), teams: arr(team), me, features: arr(str) });
+
+export const featureView = obj({ name: str, enabled: bool, forced: bool });
+export const featuresResponse = obj({ features: arr(featureView) });
 
 const spaceRef = obj({ id: str, slug: str, name: str, role: lit('owner', 'member') });
 export const orgList = obj({

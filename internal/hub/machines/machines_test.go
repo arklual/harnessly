@@ -1041,3 +1041,35 @@ func TestCloudHasNoLocalMachine(t *testing.T) {
 		t.Error("cloud offers a local machine")
 	}
 }
+
+// HUB_AGENT_URL is the address machines are given and sign their dial for; people's links stay on the public one.
+func TestMachinesGetTheAgentURL(t *testing.T) {
+	const agent = "https://agents.example.test:8443"
+	f := setup(t, hubtest.Env("HUB_AGENT_URL", agent), hubtest.Env("HUB_RUNTIME_DOMAIN", "m.example.test"))
+
+	var code struct{ Code, Command string }
+	f.codes(map[string]any{"profile": "dir"}).JSON(&code)
+	if want := "curl -fsSL " + agent + "/install | sudo sh -s -- --token " + code.Code + " --profile dir"; code.Command != want {
+		t.Errorf("command = %q, want %q", code.Command, want)
+	}
+
+	a := f.s.NewAgent(nil)
+	r := a.Register(code.Code, hubproto.ProfileDir, hubproto.ViaCommand)
+	if r.Code != http.StatusCreated {
+		t.Fatal(r)
+	}
+	var res hubproto.RegisterResponse
+	r.JSON(&res)
+	if res.HubURL != agent || res.DialURL != "wss://agents.example.test:8443/agent/v1" {
+		t.Errorf("registration = %+v", res)
+	}
+	// The dial is signed for the agent's host (the test agent signs with it), so the machine comes online.
+	a.Connect()
+
+	var out struct{ URL string }
+	f.owner.Do("GET", "/api/machines/"+a.MachineID+"/open", nil).JSON(&out)
+	u, err := url.Parse(out.URL)
+	if err != nil || u.Scheme != "https" || u.Host != a.MachineID+".m.example.test:8443" {
+		t.Errorf("runtime url = %q (%v)", out.URL, err)
+	}
+}

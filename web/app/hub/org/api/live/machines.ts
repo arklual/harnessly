@@ -1,5 +1,6 @@
-// Машины on `GET …/machines` and the actions of /api/machines/{id} (docs/hub/analytics.md, «Machines»). The hub holds no
-// load or hardware for a machine and no cloud provider, so those stay empty; a server's resize has nothing to go to.
+// Машины on `GET …/machines` and the actions of /api/machines/{id} (docs/hub/analytics.md, «Machines»). The load, the
+// hardware, the rented server, the week's spend and the operations in flight come with the machine when the hub has
+// them (machine resources); what it does not send stays null and the screen shows «—».
 import type { HubMachine, MachinesResponse, RestartRequest } from '../../../../hub-api/analytics';
 import type { Member, OrgView, Scope as ApiScope } from '../../../../hub-api/orgs';
 import { OrgApiError } from '../errors';
@@ -12,9 +13,21 @@ import type {
   MachinesSummary,
   OrgMachine,
   PersonRef,
+  ResourcePlan,
+  ResourceQuote,
 } from '../machines';
-import { http, orgPath } from './http';
+import { contractGet, http, orgPath } from './http';
 import { capsOf } from './shell';
+import {
+  busyOf,
+  gbOf,
+  hourly,
+  monthRub,
+  rentOf,
+  type WireExtras,
+  type WireMoney,
+  type WirePoint,
+} from './machines-wire';
 
 export interface MachinesCtx {
   org: string;
@@ -28,7 +41,12 @@ const stateOf = (m: HubMachine): OrgMachine['state'] => {
   return m.problems.includes('idle_week') ? 'idle' : 'online';
 };
 
-export const orgMachineOf = (m: HubMachine, view: OrgView): OrgMachine => {
+export const orgMachineOf = (raw: HubMachine, view: OrgView): OrgMachine => {
+  const m = raw;
+  const x = raw as unknown as WireExtras;
+  const rent = rentOf(x.cloud);
+  const hw = x.hardware ?? null;
+  const owner = m.access.length === 1 && m.access[0]?.kind === 'user' ? m.access[0] : null;
   const tenant = view.tenants.find((t) => t.id === m.tenantId);
   const team = view.teams.find((t) => t.id === m.teamId);
   const state = stateOf(m);
@@ -38,9 +56,9 @@ export const orgMachineOf = (m: HubMachine, view: OrgView): OrgMachine => {
   return {
     id: m.id,
     name: m.name,
-    ownerName: null,
+    ownerName: owner?.label ?? null,
     purpose: null,
-    kind: 'shared',
+    kind: owner ? 'personal' : 'shared',
     tenantId: m.tenantId,
     tenantSlug: tenant?.slug ?? '',
     tenantName: tenant?.name ?? '',
@@ -50,17 +68,27 @@ export const orgMachineOf = (m: HubMachine, view: OrgView): OrgMachine => {
     since: state === 'online' ? null : (m.disabledAt ?? m.lastActiveAt ?? m.lastSeenAt),
     disabledBy: null,
     disabledAt: m.disabledAt,
-    busy: null,
+    busy: busyOf(x.activeOps),
     chats: m.status === 'online' ? m.chatsRunning : null,
-    cpu: null,
-    ram: null,
-    disk: null,
-    hw: { cores: 0, ramGb: 0, diskGb: 0, note: m.hostname },
-    cloud: false,
+    cpu: state === 'offline' ? null : (x.load?.cpuPct ?? null),
+    ram: state === 'offline' ? null : (x.load?.ramPct ?? null),
+    disk: state === 'offline' ? null : (x.load?.diskPct ?? null),
+    hw: {
+      cores: hw?.cores || rent?.cpu || 0,
+      ramGb: gbOf(hw?.ramBytes) || rent?.ramGb || 0,
+      diskGb: gbOf(hw?.diskBytes) || rent?.diskGb || 0,
+      note: hw?.laptop ? (hw.model ?? '') : '',
+    },
+    cloud: rent !== null,
     runnerVersion: m.agentVersion,
     runnerOutdated: m.problems.includes('agent_old'),
-    weekCostUsd: null,
-    monthPriceRub: null,
+    weekCostUsd: x.week?.spend?.usd ?? null,
+    monthPriceRub: monthRub(rent?.price ?? null),
+    mine: owner !== null && owner.id === view.me.userId,
+    weekChats: x.week?.chats ?? null,
+    os: hw?.os || null,
+    rent: rent ? { provider: rent.provider, plan: rent.plan, price: rent.price } : null,
+    managed: x.managed ?? null,
     canManage: canAdmin || (teamCaps?.manage ?? false),
     canAdmin,
     needs: canAdmin ? null : 'tenant_admin',
@@ -138,7 +166,23 @@ export const accessBody = (
   throw new OrgApiError('invalid_request', 'Сначала передайте машину команде.');
 };
 
-const notYet = () => Promise.reject(new OrgApiError('not_ready', 'the hub has no cloud provider to ask'));
+interface WirePlan {
+  id: string;
+  name: string;
+  cpu: number;
+  ramGB: number;
+  diskGB: number;
+}
+
+interface WireResources {
+  managed: boolean;
+  provider: { name: string; supported: boolean };
+  providerError?: string | null;
+  plans: WirePlan[];
+  consoleUrl?: string | null;
+}
+
+const money = (m: WireMoney | null | undefined) => (m ? { amount: m.amount, currency: m.currency } : null);
 
 export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
   const list = async (): Promise<HubMachine[]> => {
@@ -147,6 +191,58 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
       scope: `${c.scope.kind}:${c.scope.id}`,
     });
     return r.machines;
+  };
+
+  /** The last day of load; a hub without metrics leaves the three charts empty. */
+  const seriesOf = async (id: string): Promise<MachineDetail['series']> => {
+    try {
+      const r = await contractGet<{ points: WirePoint[] }>(`/api/machines/${id}/metrics`, { range: '24h' });
+      return {
+        cpu: hourly(r.points, 'cpuAvg'),
+        ram: hourly(r.points, 'ramAvg'),
+        disk: hourly(r.points, 'diskAvg'),
+      };
+    } catch {
+      return { cpu: [], ram: [], disk: [] };
+    }
+  };
+
+  /** The sizes the provider offers (the stops of the resize sliders); none while the feature is off or the machine is not a server. */
+  const resourcesOf = async (
+    id: string,
+    machine: OrgMachine,
+  ): Promise<{ plan: ResourcePlan | null; consoleUrl: string | null; providerError: string | null }> => {
+    const none = { plan: null, consoleUrl: null, providerError: null };
+    if (!machine.cloud) return none;
+    try {
+      const r = await contractGet<WireResources>(`/api/machines/${id}/resources`);
+      const sorted = (f: (p: WirePlan) => number) =>
+        [...new Set(r.plans.map(f).filter((n) => n > 0))].sort((a, b) => a - b);
+      const cores = sorted((p) => p.cpu);
+      const ramGb = sorted((p) => p.ramGB);
+      const diskGb = sorted((p) => p.diskGB);
+      const ok =
+        r.managed && r.provider.supported && cores.length > 0 && ramGb.length > 0 && diskGb.length > 0;
+      const used = (pct: number | null, total: number) =>
+        pct === null ? 0 : Math.round((pct / 100) * total);
+      return {
+        plan: ok
+          ? {
+              cores,
+              ramGb,
+              diskGb,
+              price: { core: 0, ramGb: 0, diskGb: 0 },
+              usedRamGb: used(machine.ram, machine.hw.ramGb),
+              usedDiskGb: used(machine.disk, machine.hw.diskGb),
+            }
+          : null,
+        consoleUrl: r.consoleUrl ?? null,
+        providerError: r.providerError ?? null,
+      };
+    } catch (e) {
+      if (e instanceof OrgApiError && e.code === 'not_ready') return none;
+      return { ...none, providerError: e instanceof Error ? e.message : null };
+    }
   };
 
   const detail = async (id: string): Promise<MachineDetail> => {
@@ -168,14 +264,17 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
     const candidates: PersonRef[] = members.map((m) => ({ id: m.userId, name: m.name || m.email }));
     const team = c.view.teams.find((t) => t.id === found.teamId);
     const machine = orgMachineOf(found, c.view);
+    const [series, res] = await Promise.all([seriesOf(id), resourcesOf(id, machine)]);
     return {
       machine,
-      series: { cpu: [], ram: [], disk: [] },
-      plan: null,
+      series,
+      plan: res.plan,
       access: accessOf(found),
       candidates,
       teamLabel: machine.teamName,
       audience: { team: team ? team.memberCount : null, tenant: members.length },
+      consoleUrl: res.consoleUrl,
+      providerError: res.providerError,
     };
   };
 
@@ -187,13 +286,27 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
   return {
     machinesList: async () => buildMachinesList(await list(), ctx()),
     machineDetail: detail,
-    resizeMachine: notYet,
+    resizeMachine: (id, to) => post(id, 'resize', { cpu: to.cores, ramGB: to.ramGb, diskGB: to.diskGb }),
+    quoteResources: async (id, to): Promise<ResourceQuote> => {
+      const r = await http.post<{
+        price: WireMoney | null;
+        current: WireMoney | null;
+        delta: WireMoney | null;
+      }>(`/api/machines/${id}/resources/quote`, { cpu: to.cores, ramGB: to.ramGb, diskGB: to.diskGb });
+      return { price: money(r.price), current: money(r.current), delta: money(r.delta) };
+    },
     restartMachine: (id, what, when) => {
       const body: RestartRequest = { what: what === 'machine' ? 'vm' : 'runner', when };
       return post(id, 'restart', body);
     },
-    // The hub takes a restart and has no way yet to call it back.
-    cancelRestart: notYet,
+    // Calls back the operation that still waits (chats to finish, a restart not yet sent to the provider).
+    cancelRestart: async (id) => {
+      const found = (await list()).find((m) => m.id === id);
+      const opId = found ? busyOf((found as unknown as WireExtras).activeOps)?.opId : undefined;
+      if (!opId) throw new OrgApiError('not_found', 'nothing to cancel');
+      return post(id, `ops/${opId}/cancel`);
+    },
+    openMachine: (id) => contractGet<{ url: string }>(`/api/machines/${id}/open`),
     disableMachine: (id) => post(id, 'disable'),
     enableMachine: (id) => post(id, 'enable'),
     setMachineAccess: async (id, access) => {

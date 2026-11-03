@@ -72,6 +72,9 @@ type hubConsole struct {
 	// ready is how long a new shell is given before the command is typed.
 	ready time.Duration
 	now   func() time.Time
+	// busy is how many chats have an agent at work; exit ends the process (a test replaces it).
+	busy func() int
+	exit func(code int)
 }
 
 // hubRoutes are the routes of a runtime carried by a hub; none for any other.
@@ -80,7 +83,7 @@ func hubRoutes(d deps) []gate.Route {
 		return nil
 	}
 	c := &hubConsole{tm: d.Tmux, cwd: os.Getenv("RUNTIME_WORKSPACE_DIR"), base: appBase(), agent: d.MachineAgent, session: d.SessionOK,
-		guard: chatGuard, ready: shellReady, now: time.Now}
+		guard: chatGuard, ready: shellReady, now: time.Now, busy: d.Busy, exit: os.Exit}
 	return []gate.Route{{Match: c.matches, Handler: http.HandlerFunc(c.serve)}}
 }
 
@@ -113,7 +116,7 @@ func (c *hubConsole) pagePrefix() string { return c.base + "/console/" }
 
 func (c *hubConsole) matches(r *http.Request) bool {
 	if p := apiPath(r.URL.Path); p != "" {
-		return p == "/api/auth/setup" || p == "/api/agent/terminal-tab" || p == "/api/agent/policy" || strings.HasPrefix(p, "/api/console/")
+		return p == "/api/auth/setup" || p == "/api/agent/terminal-tab" || p == "/api/agent/policy" || p == "/api/agent/load" || p == "/api/agent/restart" || strings.HasPrefix(p, "/api/console/")
 	}
 	return strings.HasPrefix(r.URL.Path, c.pagePrefix())
 }
@@ -127,6 +130,10 @@ func (c *hubConsole) serve(w http.ResponseWriter, r *http.Request) {
 		c.open(w, r)
 	case p == "/api/agent/policy":
 		c.policy(w, r)
+	case p == "/api/agent/load":
+		c.load(w, r)
+	case p == "/api/agent/restart":
+		c.restart(w, r)
 	case strings.HasPrefix(p, "/api/console/"):
 		c.api(w, r, strings.TrimPrefix(p, "/api/console/"))
 	default:
@@ -184,6 +191,52 @@ func (c *hubConsole) policy(w http.ResponseWriter, r *http.Request) {
 	}
 	c.guard.Set(off)
 	jsonReply(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// load is the machine agent asking how many chats have an agent at work: {"chatsNow": n}. The hub shows it, the drain of a
+// restart waits for it to reach 0.
+func (c *hubConsole) load(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		w.Header().Set("Allow", "GET, POST")
+		errReply(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	if c.agent == nil || !c.agent(r) {
+		errReply(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	n := 0
+	if c.busy != nil {
+		n = c.busy()
+	}
+	jsonReply(w, http.StatusOK, map[string]int{"chatsNow": n})
+}
+
+// restart is the machine agent asking the runtime to exit so that its service starts it again (the hub's "restart the
+// runner"). The answer goes out first. tmux and the agents in it are not the runtime's children to stop.
+func (c *hubConsole) restart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		errReply(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	if c.agent == nil || !c.agent(r) {
+		errReply(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	jsonReply(w, http.StatusOK, map[string]bool{"ok": true})
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+	agent.Log("info", "hub: the runtime restarts on the hub's request")
+	exit := c.exit
+	if exit == nil {
+		exit = os.Exit
+	}
+	go func() {
+		time.Sleep(time.Second)
+		exit(exitRestart)
+	}()
 }
 
 func (c *hubConsole) sessionName(id string) string { return c.tm.Names().Prefix + consolePrefix + id }

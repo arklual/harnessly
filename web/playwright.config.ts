@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test';
 // They drive the system Chrome unless PW_CHANNEL names another browser.
 export default defineConfig({
   testDir: 'e2e',
+  // The parity checks have a config of their own (e2e/parity/viz/playwright.config.ts) and need no runtime.
+  testIgnore: 'parity/**',
   timeout: 120_000,
   expect: { timeout: 30_000 },
   workers: 1,

@@ -109,6 +109,13 @@ type fakeProvider struct {
 	running  map[int]bool
 	snaps    map[string]agents.Snapshot
 	detected string
+	sessions []string // what the pane's agent goes by (AgentSessions)
+}
+
+func (p *fakeProvider) AgentSessions([]int) []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.sessions
 }
 
 func (p *fakeProvider) ID() string { return p.id }
@@ -434,5 +441,55 @@ func TestPollAddsAndRemovesTabsAndCoalesces(t *testing.T) {
 	e.m.mu.Unlock()
 	if n != 1 {
 		t.Fatalf("a silent tmux removed tabs: %d", n)
+	}
+}
+
+// a Claude started from the tab's terminal (`claude -p` in the agent's Bash) inherits its tmux session and
+// hooks. Its hooks name its own session, which is not the one the pane's agent goes by: they leave the tab as it was.
+// The agent's own hooks move it, a new session of the agent itself after /clear too, and a hook of an older script
+// that names no session is taken as before.
+func TestAHookOfAForeignAgentSessionIsIgnored(t *testing.T) {
+	const own, cleared, nested = "11111111-2222-3333-4444-555555555555", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "99999999-8888-7777-6666-555555555555"
+	e := newEnv(t, claudeTab(Idle), &tmux.PaneInfo{Command: "claude", Path: "/srv/app", PID: 10})
+	e.claude.sessions = []string{own}
+	// What the hook route does (cmd/runtime keeperRef): a foreign hook goes to no one.
+	hook := func(event agents.EventKind, agentSession string) {
+		ev := agents.Event{Kind: event, AgentSession: agentSession}
+		if !e.m.ForeignHook(agents.Claude, session, ev) {
+			e.m.HandleProviderEvent(agents.Claude, session, ev, nil)
+		}
+	}
+	hook(agents.PromptSubmit, own)
+	if got := e.entry().CliState; got != Busy {
+		t.Fatalf("own prompt-submit: %s", got)
+	}
+	hook(agents.SessionStart, nested)
+	hook(agents.Stop, nested)
+	if got := e.entry().CliState; got != Busy {
+		t.Fatalf("a nested Claude's SessionStart and Stop moved the tab: %s", got)
+	}
+	hook(agents.Stop, own)
+	if got := e.entry().CliState; got != ReadyForReview {
+		t.Fatalf("own stop: %s", got)
+	}
+	// /clear: the pid file names the new session before its SessionStart.
+	e.claude.mu.Lock()
+	e.claude.sessions = []string{cleared}
+	e.claude.mu.Unlock()
+	hook(agents.SessionStart, cleared)
+	if got := e.entry().CliState; got != Idle {
+		t.Fatalf("own SessionStart after /clear: %s", got)
+	}
+	hook(agents.PromptSubmit, "")
+	if got := e.entry().CliState; got != Busy {
+		t.Fatalf("a hook naming no session: %s", got)
+	}
+	// No agent session seen in the pane (no pid file yet): taken as before.
+	e.claude.mu.Lock()
+	e.claude.sessions = nil
+	e.claude.mu.Unlock()
+	hook(agents.Stop, nested)
+	if got := e.entry().CliState; got != ReadyForReview {
+		t.Fatalf("a pane that cannot tell: %s", got)
 	}
 }

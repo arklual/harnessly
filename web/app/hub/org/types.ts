@@ -1,8 +1,8 @@
-// Shared shapes of the organization hub (HRN-531): who is looking, at which scope, which sections they get. The data
+// Shared shapes of the organization hub: who is looking, at which scope, which sections they get. The data
 // of each section lives next to its API (org/api/<section>.ts).
 
 export type Role = 'admin' | 'lead' | 'member';
-export type Section = 'overview' | 'analytics' | 'machines' | 'teams';
+export type Section = 'overview' | 'analytics' | 'machines' | 'teams' | 'team' | 'env';
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Админ организации',
@@ -55,6 +55,8 @@ export interface ShellData {
   /** The teams of the current tenant the person may see (a member: their own). */
   teams: TeamRef[];
   orgs: OrgChoice[];
+  /** The organization's switched-on features (`org_features`): `ui.hx`, `env`, `catalog`… Absent on an older hub. */
+  features?: string[];
 }
 
 /** `all` is the whole organization; anything else is a tenant slug. */

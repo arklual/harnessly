@@ -15,7 +15,7 @@ import (
 	"strconv"
 )
 
-// A scene's contact sheet (HRN-579): one picture with a frame per half second and the time written on each, so an agent
+// A scene's contact sheet: one picture with a frame per half second and the time written on each, so an agent
 // sees the whole motion at the price of one image instead of opening a frame at a time.
 
 const (

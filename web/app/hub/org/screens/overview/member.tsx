@@ -1,4 +1,4 @@
-// The participant's Обзор (HRN-541): only their own work. No other people, no team money.
+// The participant's Обзор: only their own work. No other people, no team money.
 import { useState } from 'react';
 import { GitPullRequest, MessagesSquare, Send, Server } from 'lucide-react';
 

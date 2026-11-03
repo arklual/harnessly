@@ -1,0 +1,20 @@
+{
+  "machineId": "h2runneraaaaaaaaaaaa",
+  "op": {
+    "id": "o2resizeaaaaaaaaaaaa",
+    "machineId": "h2runneraaaaaaaaaaaa",
+    "kind": "resize",
+    "status": "running",
+    "params": {
+      "cpu": 8,
+      "ramGB": 32,
+      "diskGB": 160
+    },
+    "error": null,
+    "createdBy": "u2annaaaaaaaaaaaaaaa",
+    "createdAt": "2026-10-30T17:55:00Z",
+    "updatedAt": "2026-10-30T17:56:00Z",
+    "finishedAt": null,
+    "chatsNow": null
+  }
+}

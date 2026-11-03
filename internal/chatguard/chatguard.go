@@ -99,6 +99,20 @@ func (p pane) Keys(keys ...string) error {
 	return p.Pane.Keys(keys...)
 }
 
+// GrowForDialog and CaptureTall only read or size the window, and a guard hides nothing of them.
+func (p pane) GrowForDialog() bool {
+	g, ok := p.Pane.(typist.DialogGrower)
+	return ok && g.GrowForDialog()
+}
+
+func (p pane) CaptureTall(short string) (string, bool) {
+	t, ok := p.Pane.(typist.TallCapturer)
+	if !ok {
+		return "", false
+	}
+	return t.CaptureTall(short)
+}
+
 // Guarded is the pane as the conversations type into it: every write is checked against the pane's foreground program
 // (foreground reads it) while the terminal is off, and refused with ErrTerminalOff when that is a shell. With the
 // terminal on it is the pane itself.

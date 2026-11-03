@@ -1,0 +1,95 @@
+/* The analytics block tokens (--t-*) that board.css reads, with the same values as the design's analytics page.
+   Scoped to the hub root so they never meet the kit's tokens; the theme follows data-hx-theme like the rest. */
+
+.hx-root {
+  --t-font-family-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --t-font-family-display: var(--t-font-family-ui);
+  --t-font-family-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --t-font-offset: 0rem;
+  --t-font-weight-medium: 500;
+  --t-font-weight-semibold: 600;
+  --t-font-weight-bold: 700;
+  --t-letter-spacing-heading: -0.011em;
+  --t-font-h6: var(--t-font-weight-bold) calc(var(--t-font-offset) + 1.25rem) / calc(24 / 20)
+    var(--t-font-family-display);
+  --t-font-ui-m: 1rem / calc(20 / 16) var(--t-font-family-ui);
+  --t-font-ui-s: 0.875rem / calc(16 / 14) var(--t-font-family-ui);
+  --t-font-ui-xs: 0.75rem / calc(15 / 12) var(--t-font-family-ui);
+  --t-font-body-xs: 0.75rem / calc(16 / 12) var(--t-font-family-ui);
+
+  --t-font-weight-regular: 400;
+  --t-font-h3: var(--t-font-weight-bold) calc(var(--t-font-offset) + 2.25rem) / calc(40 / 36)
+    var(--t-font-family-display);
+  --t-font-h4: var(--t-font-weight-bold) calc(var(--t-font-offset) + 1.75rem) / calc(32 / 28)
+    var(--t-font-family-display);
+  --t-font-h5: var(--t-font-weight-bold) calc(var(--t-font-offset) + 1.5rem) / calc(28 / 24)
+    var(--t-font-family-display);
+  --t-font-body-s: var(--t-font-weight-regular) calc(var(--t-font-offset) + 0.875rem) / calc(20 / 14)
+    var(--t-font-family-ui);
+  --t-font-body-m: var(--t-font-weight-regular) calc(var(--t-font-offset) + 1rem) / calc(24 / 16)
+    var(--t-font-family-ui);
+  --t-font-ui-l: var(--t-font-weight-regular) calc(var(--t-font-offset) + 1.0625rem) / calc(24 / 17)
+    var(--t-font-family-ui);
+  --t-font-ui-2xs: var(--t-font-weight-regular) calc(var(--t-font-offset) + 0.6875rem) / calc(12 / 11)
+    var(--t-font-family-ui);
+  --t-space-6: 1.5rem;
+  --t-space-8: 2rem;
+  --t-space-10: 2.5rem;
+  --t-radius-sm: 0.4375rem;
+  --t-radius-lg: 0.75rem;
+  --t-radius-xl: 0.875rem;
+  --t-danger: oklch(0.62 0.22 22);
+  --t-accent-purple-bg: oklch(0.55 0.24 285 / 12%);
+  --t-accent-green-bg: oklch(0.72 0.19 155 / 12%);
+  --t-accent-amber-bg: oklch(0.8 0.16 80 / 12%);
+  --t-accent-rose-bg: oklch(0.64 0.24 15 / 12%);
+  --t-accent-blue-bg: oklch(0.6 0.19 255 / 12%);
+  --t-accent-teal-bg: oklch(0.75 0.12 180 / 12%);
+  --t-space-1: 0.25rem;
+  --t-space-2: 0.5rem;
+  --t-space-3: 0.75rem;
+  --t-space-4: 1rem;
+  --t-space-5: 1.25rem;
+  --t-radius-md: 0.625rem;
+  --t-ease-standard: cubic-bezier(0.2, 0, 0.4, 0.9);
+  --t-duration-state: 150ms;
+  --t-focus-ring: 0 0 0 2px oklch(0.68 0.24 295 / 0.65);
+
+  --t-accent-purple: oklch(0.55 0.24 285);
+  --t-accent-green: oklch(0.72 0.19 155);
+  --t-accent-amber: oklch(0.8 0.16 80);
+  --t-accent-rose: oklch(0.64 0.24 15);
+}
+
+.hx-root,
+.hx-root[data-hx-theme='light'] {
+  --t-bg: oklch(0.992 0.004 95);
+  --t-surface: oklch(1 0 0);
+  --t-surface-raised: oklch(0.98 0 0);
+  --t-surface-hover: oklch(0.985 0.006 260);
+  --t-text: oklch(0.26 0.02 255);
+  --t-text-primary: oklch(0.145 0 0);
+  --t-text-secondary: oklch(0.48 0.015 255);
+  --t-text-muted: oklch(0.62 0.014 255);
+  --t-border-subtle: oklch(0.145 0 0 / 0.08);
+  --t-border-strong: oklch(0.145 0 0 / 0.22);
+  --t-border-default: oklch(0.145 0 0 / 0.14);
+  --t-bg-canvas: var(--t-bg);
+  --t-bg-surface: var(--t-surface);
+  --t-bg-surface-raised: var(--t-surface-raised);
+}
+
+.hx-root[data-hx-theme='dark'] {
+  --t-bg: oklch(0.13 0 0);
+  --t-surface: oklch(0.17 0 0);
+  --t-surface-raised: oklch(0.22 0 0);
+  --t-surface-hover: oklch(0.19 0 0);
+  --t-text: oklch(0.98 0 0);
+  --t-text-primary: oklch(1 0 0);
+  --t-text-secondary: oklch(0.55 0 0);
+  --t-text-muted: oklch(0.42 0 0);
+  --t-border-subtle: oklch(1 0 0 / 0.08);
+  --t-border-strong: oklch(1 0 0 / 0.22);
+  --t-border-default: oklch(1 0 0 / 0.14);
+  --t-danger: oklch(0.72 0.19 22);
+}

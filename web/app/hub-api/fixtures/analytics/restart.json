@@ -1,0 +1,19 @@
+{
+  "jobId": "o2restartaaaaaaaaaaaa",
+  "op": {
+    "id": "o2restartaaaaaaaaaaaa",
+    "machineId": "h2runneraaaaaaaaaaaa",
+    "kind": "restart_runner",
+    "status": "running",
+    "params": {
+      "what": "runner",
+      "when": "now"
+    },
+    "error": null,
+    "createdBy": "u2annaaaaaaaaaaaaaaa",
+    "createdAt": "2026-10-30T17:55:00Z",
+    "updatedAt": "2026-10-30T17:56:00Z",
+    "finishedAt": null,
+    "chatsNow": null
+  }
+}

@@ -423,7 +423,7 @@ func TestWakeUpsAreBounded(t *testing.T) {
 	}
 }
 
-// HRN-621. A message queued for an agent that is starting is delivered: a refusal here made the sender send it again.
+// A message queued for an agent that is starting is delivered: a refusal here made the sender send it again.
 func TestSendQueuedIsDelivered(t *testing.T) {
 	r := newTestRig(t)
 	text, isErr := r.call("tab-root", "delegate_task", map[string]any{"provider": "claude", "prompt": "first"})

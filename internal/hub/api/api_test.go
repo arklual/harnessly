@@ -453,3 +453,18 @@ func TestFirstTenMinutes(t *testing.T) {
 		t.Errorf("errors in the log:\n%s", s.Logs.String())
 	}
 }
+
+func TestInstallScriptCarriesTheAgentURL(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_AGENT_URL", "https://agents.example.test"))
+	s.WriteDist("install.sh", "#!/bin/sh\necho installing\n")
+	b := s.Browser()
+	r := b.Do("GET", "/install", nil)
+	if r.Code != 200 || !strings.Contains(string(r.Body), "HARNESSLY_HUB_URL='https://agents.example.test'") || strings.Contains(string(r.Body), s.URL) {
+		t.Errorf("install: %s", r)
+	}
+	var cfg struct{ PublicURL, AgentURL string }
+	b.Do("GET", "/api/config", nil).JSON(&cfg)
+	if cfg.PublicURL != s.URL || cfg.AgentURL != "https://agents.example.test" {
+		t.Errorf("config = %+v", cfg)
+	}
+}

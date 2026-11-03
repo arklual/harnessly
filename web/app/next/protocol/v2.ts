@@ -237,7 +237,7 @@ export const PAUSE_REASONS = [
 export type PauseReason = (typeof PAUSE_REASONS)[number];
 export const GATE_KINDS = ['question', 'permission', 'plan'] as const;
 export type GateKind = (typeof GATE_KINDS)[number];
-export const PERMISSION_KINDS = ['tool', 'plan'] as const;
+export const PERMISSION_KINDS = ['tool', 'plan', 'dialog'] as const;
 export type PermissionKind = (typeof PERMISSION_KINDS)[number];
 export const PERMISSION_SCOPES = ['once', 'always', 'deny', 'plan-auto', 'plan-ask', 'revise'] as const;
 export type PermissionScope = (typeof PERMISSION_SCOPES)[number];
@@ -3085,7 +3085,7 @@ const convEventKinds = {
   entry_replace: { oldId: entryId, entry },
   now: nowShape,
   question_asked: { question },
-  permission_requested: { permission: permissionOf('tool') },
+  permission_requested: { permission: permissionOf() },
   plan_proposed: { permission: permissionOf('plan') },
   gate_updated: { id: gateId, state: gateState },
   compaction: { phase: oneOf(COMPACTION_PHASES), entry: compactionEntry },

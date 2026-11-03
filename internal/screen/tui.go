@@ -1,6 +1,7 @@
 package screen
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -55,6 +56,8 @@ type Menu struct {
 	Request      *string  `json:"request"`
 	Options      []string `json:"options"`
 	FocusedIndex int      `json:"focusedIndex"`
+	// Cut: the window is too low for the menu, and it shows only the options that fit (Claude scrolls the list).
+	Cut bool `json:"-"`
 }
 
 var (
@@ -62,7 +65,62 @@ var (
 	boxEdgeRE       = re(`^` + sp + `*[│╰╭╮╯┃]`)
 	optionNumberRE  = re(`^\d+\.` + sp + `*`)
 	yesOptionRE     = re(`^1\.` + sp + `*Yes`)
+	// A dialog's last line: an input box never ends on one of these.
+	dialogFooterRE = re(`^` + sp + `*(?:ctrl\+g to edit|Esc to cancel|Enter to (?:select|confirm))`)
+	// An option line with the arrow of a list scrolled in its window.
+	scrolledOptionRE = re(`^` + sp + `*(?:[❯›>]` + sp + `+)?[↓↑]` + sp + `*\d+\.?`)
 )
+
+// cutOptionLines is how many wrapped lines one option may take in cutMenu.
+const cutOptionLines = 3
+
+// cutMenu is the dialog of a window so low that one option fits, the focused one, right above the dialog's footer
+// (Claude at nine lines and fewer: a terminal docked under the chat). nil when the screen does not end that way.
+func cutMenu(lines []string) *Menu {
+	end := len(lines) - 1
+	for end >= 0 && blank(lines[end]) {
+		end--
+	}
+	if end < 1 || !dialogFooterRE.MatchString(lines[end]) {
+		return nil
+	}
+	seen := 0
+	for i := end - 1; i >= 0 && seen < cutOptionLines; i-- {
+		if blank(lines[i]) {
+			continue
+		}
+		seen++
+		m := numberedLineRE.FindStringSubmatch(lines[i])
+		if m == nil || m[1] == "" {
+			continue
+		}
+		rest := trim(m[3])
+		if rest == "" {
+			return nil
+		}
+		for _, more := range lines[i+1 : end] {
+			if !blank(more) {
+				rest += " " + trim(more)
+			}
+		}
+		option := m[2] + ". " + normalizeOption(rest)
+		menu := &Menu{Options: []string{option}, Cut: true}
+		fillHeading(menu, lines, option)
+		return menu
+	}
+	return nil
+}
+
+func fillHeading(menu *Menu, lines []string, firstOption string) {
+	heading := menuHeading(lines, firstOption)
+	if len(heading) > 0 {
+		menu.Title = &heading[0]
+	}
+	if len(heading) > 1 {
+		request := strings.Join(heading[1:], "\n")
+		menu.Request = &request
+	}
+}
 
 // menuHeading is the lines just above the first option, up to a rule, a box edge or unindented text: the menu's title
 // and question. Claude puts blank lines between them, Codex does not.
@@ -94,7 +152,7 @@ func FindMenu(plain string) *Menu {
 	lines := tail(trimEndLines(plain), menuScanLines)
 	parsed := ParseChoiceOptions(strings.Join(lines, "\n"))
 	if len(parsed.Options) < 2 {
-		return nil
+		return cutMenu(lines)
 	}
 	var heading []string
 	if parsed.Title != "" {
@@ -106,7 +164,7 @@ func FindMenu(plain string) *Menu {
 	} else {
 		heading = menuHeading(lines, parsed.Options[0])
 	}
-	menu := &Menu{Options: parsed.Options, FocusedIndex: parsed.FocusedIndex}
+	menu := &Menu{Options: parsed.Options, FocusedIndex: parsed.FocusedIndex, Cut: slices.ContainsFunc(lines, scrolledOptionRE.MatchString)}
 	if len(heading) > 0 {
 		menu.Title = &heading[0]
 	}

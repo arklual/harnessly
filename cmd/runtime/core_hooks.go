@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -57,6 +58,10 @@ type keeperRef struct{ c *core }
 func (k keeperRef) HandleProviderEvent(p, s string, ev agents.Event, at *float64) bool {
 	m := k.c.manager()
 	if m == nil {
+		return false
+	}
+	// A Claude started from the tab's terminal reports into its tmux session too: neither the keeper nor v2 hears it.
+	if m.ForeignHook(p, s, ev) {
 		return false
 	}
 	handled := m.HandleProviderEvent(p, s, ev, at)
@@ -184,8 +189,15 @@ func (c *core) resumeAgents() map[string]coreapi.Agent {
 // newHookAPI builds the route configuration over the core; the token check and the API refusal come from main.
 func (c *core) newHookAPI() *coreapi.Config {
 	return &coreapi.Config{
-		Keeper:        keeperRef{c},
-		Access:        c.access,
+		Keeper: keeperRef{c},
+		Access: c.access,
+		PermissionRequest: func(ctx context.Context, session string, request map[string]any) (any, bool) {
+			v := c.v2.Load()
+			if v == nil {
+				return nil, false
+			}
+			return v.permissionRequest(ctx, session, request)
+		},
 		CodexSessions: codexSink{c},
 		Tabs:          c,
 		Panes:         c.cfg.Tmux,

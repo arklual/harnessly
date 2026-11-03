@@ -32,6 +32,10 @@ var HookEvents = []struct{ Hook, Event string }{
 	{"PostCompact", "post-compact"},
 }
 
+// PermissionHookTimeout is how long, in seconds, Claude lets the permission hook wait for the person: a day. Its dialog
+// stands in the terminal meanwhile and takes an answer there too.
+const PermissionHookTimeout = 24 * 60 * 60
+
 // HookSettingsConfig is what the `--settings` file of a launch points at.
 type HookSettingsConfig struct {
 	// StatusHook and Statusline are the absolute paths of the two scripts the runtime writes.
@@ -39,6 +43,9 @@ type HookSettingsConfig struct {
 	Statusline string
 	// Allow are permissions granted without asking (the runtime's own MCP servers, current and former names).
 	Allow []string
+	// PermissionHook is the absolute path of the script Claude's PermissionRequest runs: it asks the runtime for the
+	// person's decision and prints it. "" registers none, and permissions are read off the screen alone.
+	PermissionHook string
 	// BudgetHook is the absolute path of the hub's limit script (hooksetup); "" leaves the settings as they were. It
 	// runs beside the status hook on UserPromptSubmit and on every PreToolUse, where it can stop the chat.
 	BudgetHook string
@@ -115,6 +122,13 @@ func HookSettings(c HookSettingsConfig) []byte {
 			name  string
 			entry []hookEntry
 		}{e.Hook, []hookEntry{{Matcher: "", Hooks: cmds}}})
+	}
+	if c.PermissionHook != "" {
+		hooks = append(hooks, struct {
+			name  string
+			entry []hookEntry
+		}{"PermissionRequest", []hookEntry{{Matcher: "", Hooks: []hookCommand{
+			{Type: "command", Command: `sh "` + c.PermissionHook + `"`, Timeout: PermissionHookTimeout}}}}})
 	}
 	if c.BudgetHook != "" {
 		hooks = append(hooks, struct {

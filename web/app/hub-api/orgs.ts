@@ -63,7 +63,17 @@ export type Me = {
   scopes: Record<string, Capabilities>; // key: ScopeKey
 };
 
-export type OrgView = { org: Org; tenants: Tenant[]; teams: Team[]; me: Me };
+// features: the flags that are on for the organization (see FeaturesResponse for all of them and who decides).
+export type OrgView = { org: Org; tenants: Tenant[]; teams: Team[]; me: Me; features: string[] };
+
+// GET /api/orgs/{org}/features; PUT .../features/{name} answers { feature: FeatureView }.
+export type FeatureView = {
+  name: string;
+  enabled: boolean;
+  // forced: the instance decides the flag (HUB_FEATURES_FORCE), the organization's choice changes nothing.
+  forced: boolean;
+};
+export type FeaturesResponse = { features: FeatureView[] };
 
 export type OrgListItem = {
   id: string;

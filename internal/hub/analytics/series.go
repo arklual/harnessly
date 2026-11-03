@@ -2,9 +2,11 @@ package analytics
 
 import (
 	"cmp"
+	"context"
 	"maps"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
@@ -30,10 +32,34 @@ type SeriesSplit struct {
 
 // ChangeMarker is a change on the chart, with the KPI's verdict over the change.
 type ChangeMarker struct {
-	ChangeID string  `json:"changeId"`
-	At       string  `json:"at"`
-	Title    string  `json:"title"`
-	Verdict  *string `json:"verdict"`
+	ChangeID string `json:"changeId"`
+	At       string `json:"at"`
+	Title    string `json:"title"`
+	// Layer is the level the change was made at: org, tenant or team.
+	Layer string `json:"layer"`
+	// Author is who made the change; null for a detected one or a person who has gone.
+	Author *orgs.PersonRef `json:"author"`
+	// Icon is the mark to draw: edit (written by a person), rocket (a new version of a tool) or announce (anything else).
+	Icon    string  `json:"icon"`
+	Verdict *string `json:"verdict"`
+}
+
+// Marker icons.
+const (
+	iconEdit     = "edit"
+	iconAnnounce = "announce"
+	iconRocket   = "rocket"
+)
+
+// iconOf is the mark of a change by its kind: manual ones are edits, a new version of a tool a rocket.
+func iconOf(kind string) string {
+	switch {
+	case kind == store.ChangeManual:
+		return iconEdit
+	case strings.HasSuffix(kind, "_version"):
+		return iconRocket
+	}
+	return iconAnnounce
 }
 
 // KpiSeriesResponse is KpiSeriesResponse of web/app/hub-api/analytics.ts.
@@ -150,19 +176,32 @@ func (s *Service) kpiSeries(w http.ResponseWriter, r *http.Request, p *auth.Prin
 			out.Splits = append(out.Splits, SeriesSplit{Key: t.ID, Label: t.Name, Points: seriesOf(d, tk, bs)})
 		}
 	}
+	if out.Markers, err = markersOf(ctx, st, x.loc, x.org.ID, changeScopes(chain), cs, d, ks); err != nil {
+		return err
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
+	return nil
+}
+
+// markersOf are the changes cs on the chart of KPI d, each with the KPI's verdict over it. ks are the sessions the KPI is
+// counted from, which must cover every change's effect spans; scopes are those cs were found on, to find the changes
+// that overlap a change's weeks.
+func markersOf(ctx context.Context, st store.Store, loc *time.Location, orgID string, scopes []store.ChangeScope, cs []store.Change, d kpiDef, ks []kSession) ([]ChangeMarker, error) {
+	out := []ChangeMarker{}
 	// Overlaps need the changes around the period too.
 	var around []store.Change
 	if len(cs) > 0 {
-		b0, _ := effectSpans(cs[0].At, x.loc)
-		_, a1 := effectSpans(cs[len(cs)-1].At, x.loc)
+		b0, _ := effectSpans(cs[0].At, loc)
+		_, a1 := effectSpans(cs[len(cs)-1].At, loc)
 		bf, _ := b0.ms()
 		_, at := a1.ms()
-		if around, err = st.ChangesOn(ctx, x.org.ID, changeScopes(chain), bf, at); err != nil {
-			return err
+		var err error
+		if around, err = st.ChangesOn(ctx, orgID, scopes, bf, at); err != nil {
+			return nil, err
 		}
 	}
 	for _, c := range cs {
-		before, after := effectSpans(c.At, x.loc)
+		before, after := effectSpans(c.At, loc)
 		var v *string
 		for _, k := range kpisFrom(ks, after, before) {
 			if k.Kpi == d.id {
@@ -178,8 +217,12 @@ func (s *Service) kpiSeries(w http.ResponseWriter, r *http.Request, p *auth.Prin
 				v = &mixed
 			}
 		}
-		out.Markers = append(out.Markers, ChangeMarker{ChangeID: c.ID, At: c.At.UTC().Format(time.RFC3339), Title: c.Title, Verdict: v})
+		cv, err := changeView(ctx, st, c)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ChangeMarker{ChangeID: c.ID, At: cv.At, Title: c.Title, Layer: c.ScopeKind, Author: cv.Author,
+			Icon: iconOf(c.Kind), Verdict: v})
 	}
-	httpx.WriteJSON(w, http.StatusOK, out)
-	return nil
+	return out, nil
 }

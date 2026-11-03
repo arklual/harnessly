@@ -18,13 +18,13 @@ type SpaceRef struct {
 
 // Mount registers the sign-in and account endpoints.
 func (s *Service) Mount(mux *http.ServeMux) {
-	mux.Handle("POST /api/auth/email/start", httpx.Handler(s.emailStart))
-	mux.Handle("POST /api/auth/email/verify", httpx.Handler(s.emailVerify))
-	mux.Handle("POST /api/auth/passkey/login/begin", httpx.Handler(s.passkeyLoginBegin))
-	mux.Handle("POST /api/auth/passkey/login/finish", httpx.Handler(s.passkeyLoginFinish))
-	mux.HandleFunc("GET /api/auth/oauth/{provider}/start", s.oauthStart)
-	mux.HandleFunc("GET /api/auth/oauth/{provider}/callback", s.oauthCallback)
-	mux.Handle("POST /api/auth/logout", httpx.Handler(s.logout))
+	mux.Handle("POST /api/auth/email/start", s.direct(httpx.Handler(s.emailStart)))
+	mux.Handle("POST /api/auth/email/verify", s.direct(httpx.Handler(s.emailVerify)))
+	mux.Handle("POST /api/auth/passkey/login/begin", s.direct(httpx.Handler(s.passkeyLoginBegin)))
+	mux.Handle("POST /api/auth/passkey/login/finish", s.direct(httpx.Handler(s.passkeyLoginFinish)))
+	mux.Handle("GET /api/auth/oauth/{provider}/start", s.direct(http.HandlerFunc(s.oauthStart)))
+	mux.Handle("GET /api/auth/oauth/{provider}/callback", s.direct(http.HandlerFunc(s.oauthCallback)))
+	mux.Handle("POST /api/auth/logout", s.direct(httpx.Handler(s.logout)))
 
 	mux.Handle("GET /api/me", s.Require(s.me))
 	mux.Handle("PATCH /api/me", s.Require(s.patchMe))
@@ -34,7 +34,23 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/me/identities/{provider}", s.Require(s.deleteIdentity))
 }
 
+// direct keeps the hub's own sign-in off the gateway's address: there the gateway is the sign-in.
+func (s *Service) direct(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.ProxiedHost(r) {
+			httpx.WriteError(w, r, httpx.New(http.StatusNotFound, "proxied", "Вход на этом адресе — через шлюз"))
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
 func (s *Service) logout(w http.ResponseWriter, r *http.Request) error {
+	// On the gateway's address there is no session of the hub's to end: the person signs out at the gateway.
+	if s.ProxiedHost(r) {
+		httpx.NoContent(w)
+		return nil
+	}
 	if c, err := r.Cookie(s.CookieName()); err == nil && c.Value != "" {
 		if err := s.db.S().DeleteSession(r.Context(), store.HashToken(c.Value)); err != nil {
 			return err

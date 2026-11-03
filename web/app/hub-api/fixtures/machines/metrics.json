@@ -1,0 +1,31 @@
+{
+  "machineId": "h2runneraaaaaaaaaaaa",
+  "range": "1h",
+  "stepSeconds": 300,
+  "from": "2026-10-30T16:58:00Z",
+  "to": "2026-10-30T17:58:00Z",
+  "points": [
+    {
+      "at": "2026-10-30T17:50:00Z",
+      "cpuAvg": 35.2,
+      "cpuMax": 71.0,
+      "ramAvg": 60.1,
+      "ramMax": 63.4,
+      "diskAvg": 48.0,
+      "diskMax": 48.0,
+      "chatsMax": 3,
+      "samples": 5
+    },
+    {
+      "at": "2026-10-30T17:55:00Z",
+      "cpuAvg": 37.5,
+      "cpuMax": 52.8,
+      "ramAvg": 61.2,
+      "ramMax": 62.0,
+      "diskAvg": 48.0,
+      "diskMax": 48.1,
+      "chatsMax": 3,
+      "samples": 5
+    }
+  ]
+}

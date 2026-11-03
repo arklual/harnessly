@@ -1,4 +1,4 @@
-// Машины (HRN-539): the machines of a tenant by team, or of the whole organization by tenant — the ones with trouble
+// Машины: the machines of a tenant by team, or of the whole organization by tenant — the ones with trouble
 // first; a card in a sheet; restart, resources, access and disable on it.
 import '../machines.css';
 

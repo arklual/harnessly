@@ -1,4 +1,4 @@
-/* Аналитика (HRN-538). Classes `an-*`; tokens from the kit. Sizes of data-driven bits are SVG attributes. */
+/* Аналитика. Classes `an-*`; tokens from the kit. Sizes of data-driven bits are SVG attributes. */
 .an-group {
   display: flex;
   flex-direction: column;

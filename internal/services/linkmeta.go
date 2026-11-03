@@ -77,6 +77,7 @@ type linkTarget struct {
 	project string
 	iid     float64
 	url     string
+	conn    string // a connection's issue or page (conn-issue, conn-page): its id
 }
 
 func (t linkTarget) cacheKey() string {
@@ -85,6 +86,8 @@ func (t linkTarget) cacheKey() string {
 		return "issue:" + t.key
 	case "mr":
 		return "mr:" + t.host + "/" + t.project + "!" + jscompat.Number(t.iid)
+	case "conn-issue", "conn-page":
+		return t.kind + ":" + t.conn + ":" + t.key
 	}
 	return "artifact:" + t.url
 }
@@ -502,6 +505,8 @@ func (s *Service) loadMeta(ctx context.Context, t *linkTarget) (any, error) {
 		return s.fetchIssue(ctx, t.key)
 	case "mr":
 		return s.fetchMr(ctx, t)
+	case "conn-issue", "conn-page":
+		return s.connMeta(ctx, t)
 	}
 	return s.fetchArtifact(ctx, t.url)
 }

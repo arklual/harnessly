@@ -1,4 +1,4 @@
-// «Mocks ↔ live» is one setting. Until the backend contracts are in (HRN-531.9) the dev server defaults to mock and a production build to live; `?hubdata=live`
+// «Mocks ↔ live» is one setting. Until the backend contracts are in, the dev server defaults to mock and a production build to live; `?hubdata=live`
 // (remembered) or VITE_HUB_DATA=live switches every screen at once, no screen knows which one it talks to.
 import type { Role } from './types';
 

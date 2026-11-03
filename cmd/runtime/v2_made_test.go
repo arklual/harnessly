@@ -124,7 +124,7 @@ func madeTasksFixture(t *testing.T, lines ...string) v2Made {
 	m, rec := madeFixture(t, lines...)
 	home := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(rec.TranscriptPath))))
 	rt := &sources.Route{Home: home, Links: &sources.Links{
-		TrackerURL: "https://tracker.example.com", TrackerHosts: []string{"tracker.example.com"}, IssueKeys: []string{"HRN"},
+		TrackerURL: "https://tracker.example.com", TrackerHosts: []string{"tracker.example.com"}, IssueKeys: []string{"ABC"},
 	}}
 	m.read = rt.ReadBudget
 	return m
@@ -132,14 +132,14 @@ func madeTasksFixture(t *testing.T, lines ...string) v2Made {
 
 func TestMadeListsTrackerTasksOnlyForAPageThatAsksAndGroupsThemByTheTracker(t *testing.T) {
 	lines := append(
-		pairLines(1, "mcp__plugin_tracker_youtrack__create_issue", `{"project":"HRN","summary":"Epic"}`, `{\"id\":\"HRN-7\",\"url\":\"https://tracker.example.com/issue/HRN-7\"}`),
-		pairLines(2, "mcp__plugin_tracker_youtrack__update_issue", `{"issueId":"HRN-8","summary":"x"}`, "ok")...,
+		pairLines(1, "mcp__plugin_tracker_youtrack__create_issue", `{"project":"ABC","summary":"Epic"}`, `{\"id\":\"ABC-7\",\"url\":\"https://tracker.example.com/issue/ABC-7\"}`),
+		pairLines(2, "mcp__plugin_tracker_youtrack__update_issue", `{"issueId":"ABC-8","summary":"x"}`, "ok")...,
 	)
-	lines = append(lines, pairLines(3, "mcp__plugin_tracker_youtrack__search_issues", `{"query":"HRN-9"}`, "none")...)
+	lines = append(lines, pairLines(3, "mcp__plugin_tracker_youtrack__search_issues", `{"query":"ABC-9"}`, "none")...)
 	m := madeTasksFixture(t, lines...)
 	m.task = func(_ context.Context, key string) (string, wire.MadeTaskInfo, bool) {
-		if key == "HRN-7" {
-			return "Epic", wire.MadeTaskInfo{Key: key, Type: "Epic", Children: []wire.MadeTaskRef{{Key: "HRN-8", Title: "Sub"}}}, true
+		if key == "ABC-7" {
+			return "Epic", wire.MadeTaskInfo{Key: key, Type: "Epic", Children: []wire.MadeTaskRef{{Key: "ABC-8", Title: "Sub"}}}, true
 		}
 		return "", wire.MadeTaskInfo{}, false
 	}
@@ -167,14 +167,14 @@ func TestMadeListsTrackerTasksOnlyForAPageThatAsksAndGroupsThemByTheTracker(t *t
 		}
 		by[it.Ref] = it
 	}
-	epic := by["https://tracker.example.com/issue/HRN-7"]
+	epic := by["https://tracker.example.com/issue/ABC-7"]
 	if epic.Title != "Epic" || epic.Task == nil || epic.Task.Type != "Epic" || epic.Op != wire.OutputCreated {
 		t.Fatalf("epic: %+v", epic)
 	}
-	if epic.Task.Children[0].URL != "https://tracker.example.com/issue/HRN-8" {
+	if epic.Task.Children[0].URL != "https://tracker.example.com/issue/ABC-8" {
 		t.Fatalf("child url: %+v", epic.Task.Children)
 	}
-	if lone := by["https://tracker.example.com/issue/HRN-8"]; lone.Title != "" || lone.Task != nil {
+	if lone := by["https://tracker.example.com/issue/ABC-8"]; lone.Title != "" || lone.Task != nil {
 		t.Fatalf("a task the tracker did not answer keeps only its key: %+v", lone)
 	}
 }

@@ -8,13 +8,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- MCP servers in Settings → Connections: a catalog of well-known remote MCP servers (Atlassian, Linear, Notion, Sentry,
+  GitHub, Stripe, …) and any MCP URL, streamable HTTP or legacy SSE. The runtime finds how a server signs in: the
+  service's own sign-in in a popup (OAuth with dynamic registration and PKCE), a pasted token, or nothing. Every Claude
+  Code and Codex chat started afterwards gets the enabled servers' tools as `mcp-<name>` through the runtime's proxy,
+  which adds the credentials and refreshes them; agents never hold the service's token.
+- Connections: Settings → Connections takes any link of the person's tracker, wiki or code host (Jira and Confluence in
+  the cloud or on Server / Data Center, YouTrack, Linear, GitLab, GitHub, Gitea, Redmine, Yandex Tracker, Notion and
+  self-hosted wikis, on any domain and path), finds the product and its version, checks the credentials and keeps them
+  in the safe. The tracker app, task cards and link previews read the primary connection in the same shapes as the
+  deployment's tracker, which is listed as a connection itself; agents read issues and pages with `harnessly
+  connections`, `issues`, `issue`, `pages` and `page`, never with a token of their own.
 - Sinopia video: scenes run on one time contract. `tkVideo.motion` puts GSAP (with its plugins and `tk.js` presets, served by the library at `/__lib/motion/`) on the scene's time, `tkVideo.register` adds any other engine. The check now finds overlapping tweens, engine and script errors, outside addresses and motion past the scene, walks the scene in time, and compares frames with a tolerance. `design video frame --sheet` gives a contact sheet. Final renders take PNG frames at CRF 16, preset slow, tagged BT.709.
 - Sinopia video: the rules are read on demand with `design video guide [topic]`, and a chat working in a video project gets `sinopia_view_*`, `sinopia_frame`, `sinopia_check` and `sinopia_video_render`; other chats carry none of this. If the person just moved the player, the agent's command becomes a button.
 - Dictation: Settings → Voice input has «My words» (a personal dictionary kept with the account: a word, optionally how it
   is heard; the runtime puts it over every partial and final text of any model, and finds a word by sound when no
   variant is given) and a choice of the recognition model: the machine's own, OpenAI gpt-4o-transcribe (Realtime API) or
   Yandex SpeechKit v3 (streaming). Their keys are saved in Models and keys; a model without a key cannot be picked, and the
-  audio leaves the machine only for the picked cloud model (HRN-562).
+  audio leaves the machine only for the picked cloud model.
 
 - «Сразу» (⌃↵ in the field, ↑ on a queued message) while several messages wait sends them all as one message now, in
   the queue's order, a blank line between them, every attachment kept; the queue is empty after it. Commands («/…»,

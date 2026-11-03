@@ -2,6 +2,7 @@ package status
 
 import (
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
@@ -356,6 +357,39 @@ func (m *Manager) HandleProviderEvent(providerID, session string, ev agents.Even
 		m.mu.Unlock()
 		m.updateFromHook(session, string(ev.Kind), ev.NotificationType)
 	}
+	return true
+}
+
+// ForeignHook tells a hook to drop: one of an agent the tab's agent (or a script in its terminal) started, which
+// inherits the tab's tmux session and its hooks — its SessionStart and Stop would end the turn of the tab's agent
+//. The hook names its agent session; it is the tab's when it is the one the keeper knows, or one the agent
+// running in the pane goes by now (after /clear the pid file names the new session before its SessionStart fires).
+// A hook naming no session, a provider that cannot tell, or a pane with no agent seen: not foreign, as before.
+func (m *Manager) ForeignHook(providerID, session string, ev agents.Event) bool {
+	if ev.AgentSession == "" {
+		return false
+	}
+	m.mu.Lock()
+	_, e := m.findBySession(session)
+	known := e != nil && e.AgentSessionID.Value() == ev.AgentSession
+	m.mu.Unlock()
+	if known {
+		return false
+	}
+	p, ok := m.d.Providers[providerID].(AgentSessions)
+	if !ok {
+		return false
+	}
+	pid := m.d.Tmux.PanePID(session)
+	if pid <= 0 {
+		return false
+	}
+	own := p.AgentSessions(m.d.Procs.Children(pid))
+	if len(own) == 0 || slices.Contains(own, ev.AgentSession) {
+		return false
+	}
+	m.d.Log("info", "hook from a foreign agent session ignored", "session", session, "event", string(ev.Kind),
+		"agentSession", ev.AgentSession, "paneAgentSession", own[0])
 	return true
 }
 

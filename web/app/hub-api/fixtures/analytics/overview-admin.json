@@ -86,6 +86,7 @@
       "action": {
         "kind": "move_account",
         "label": "Перекинуть на №2",
+        "target": "a2claudemaxbbbbbbbbb",
         "fromAccountId": "a2claudemaxaaaaaaaaa",
         "toAccountId": "a2claudemaxbbbbbbbbb"
       }
@@ -112,6 +113,7 @@
       "action": {
         "kind": "raise_limit",
         "label": "Поднять лимит",
+        "target": "team:m2platformteamaaaaaa",
         "scope": {
           "kind": "team",
           "id": "m2platformteamaaaaaa"
@@ -141,6 +143,7 @@
       "action": {
         "kind": "register_account",
         "label": "Зарегистрировать",
+        "target": "a2unknownaaaaaaaaaaa",
         "accountId": "a2unknownaaaaaaaaaaa"
       }
     },
@@ -166,6 +169,7 @@
       "action": {
         "kind": "open_prices",
         "label": "Указать цену",
+        "target": "k3.1-pro",
         "model": "k3.1-pro"
       }
     },
@@ -191,6 +195,7 @@
       "action": {
         "kind": "open_machine",
         "label": "Открыть машину",
+        "target": "h2buildboxaaaaaaaaaa",
         "machineId": "h2buildboxaaaaaaaaaa"
       }
     }
@@ -212,6 +217,7 @@
         "calls": 1200,
         "unpricedCalls": 0,
         "tokens": {
+          "total": 512890000,
           "input": 2380000,
           "output": 10710000,
           "cacheRead": 476000000,
@@ -250,6 +256,7 @@
         "calls": 1200,
         "unpricedCalls": 0,
         "tokens": {
+          "total": 181020000,
           "input": 840000,
           "output": 3780000,
           "cacheRead": 168000000,
@@ -274,7 +281,18 @@
         },
         "guessedShare": 0.0
       }
-    ]
+    ],
+    "totals": {
+      "list": {
+        "usd": 1610,
+        "shown": 131215.0
+      },
+      "paid": {
+        "usd": 1380,
+        "shown": 112470.0
+      },
+      "tokens": 693910000
+    }
   },
   "subscriptions": [
     {
@@ -377,5 +395,233 @@
       ]
     }
   ],
-  "accountedUntil": "2026-10-30T17:58:00Z"
+  "accountedUntil": "2026-10-30T17:58:00Z",
+  "today": {
+    "day": "2026-10-31",
+    "spend": {
+      "paid": {
+        "usd": 86.4,
+        "shown": 7041.6
+      },
+      "list": {
+        "usd": 104.2,
+        "shown": 8492.3
+      },
+      "tokens": 18400000
+    },
+    "active": {
+      "people": 3,
+      "of": 4
+    },
+    "tasks": {
+      "closed": 5,
+      "inWork": 2
+    },
+    "sparks": {
+      "spend": [
+        {
+          "day": "2026-10-18",
+          "value": 52.1
+        },
+        {
+          "day": "2026-10-19",
+          "value": 61.0
+        },
+        {
+          "day": "2026-10-20",
+          "value": 48.3
+        },
+        {
+          "day": "2026-10-21",
+          "value": 0
+        },
+        {
+          "day": "2026-10-22",
+          "value": 0
+        },
+        {
+          "day": "2026-10-23",
+          "value": 35.7
+        },
+        {
+          "day": "2026-10-24",
+          "value": 72.4
+        },
+        {
+          "day": "2026-10-25",
+          "value": 66.9
+        },
+        {
+          "day": "2026-10-26",
+          "value": 58.2
+        },
+        {
+          "day": "2026-10-27",
+          "value": 71.0
+        },
+        {
+          "day": "2026-10-28",
+          "value": 64.4
+        },
+        {
+          "day": "2026-10-29",
+          "value": 80.3
+        },
+        {
+          "day": "2026-10-30",
+          "value": 95.1
+        },
+        {
+          "day": "2026-10-31",
+          "value": 86.4
+        }
+      ],
+      "active": [
+        {
+          "day": "2026-10-18",
+          "value": 3
+        },
+        {
+          "day": "2026-10-19",
+          "value": 4
+        },
+        {
+          "day": "2026-10-20",
+          "value": 4
+        },
+        {
+          "day": "2026-10-21",
+          "value": 0
+        },
+        {
+          "day": "2026-10-22",
+          "value": 0
+        },
+        {
+          "day": "2026-10-23",
+          "value": 2
+        },
+        {
+          "day": "2026-10-24",
+          "value": 4
+        },
+        {
+          "day": "2026-10-25",
+          "value": 4
+        },
+        {
+          "day": "2026-10-26",
+          "value": 3
+        },
+        {
+          "day": "2026-10-27",
+          "value": 4
+        },
+        {
+          "day": "2026-10-28",
+          "value": 4
+        },
+        {
+          "day": "2026-10-29",
+          "value": 4
+        },
+        {
+          "day": "2026-10-30",
+          "value": 4
+        },
+        {
+          "day": "2026-10-31",
+          "value": 3
+        }
+      ],
+      "tasks": [
+        {
+          "day": "2026-10-18",
+          "value": 3
+        },
+        {
+          "day": "2026-10-19",
+          "value": 4
+        },
+        {
+          "day": "2026-10-20",
+          "value": 2
+        },
+        {
+          "day": "2026-10-21",
+          "value": 0
+        },
+        {
+          "day": "2026-10-22",
+          "value": 0
+        },
+        {
+          "day": "2026-10-23",
+          "value": 1
+        },
+        {
+          "day": "2026-10-24",
+          "value": 5
+        },
+        {
+          "day": "2026-10-25",
+          "value": 4
+        },
+        {
+          "day": "2026-10-26",
+          "value": 3
+        },
+        {
+          "day": "2026-10-27",
+          "value": 6
+        },
+        {
+          "day": "2026-10-28",
+          "value": 4
+        },
+        {
+          "day": "2026-10-29",
+          "value": 5
+        },
+        {
+          "day": "2026-10-30",
+          "value": 7
+        },
+        {
+          "day": "2026-10-31",
+          "value": 5
+        }
+      ]
+    }
+  },
+  "efficiency": {
+    "teams": [
+      {
+        "key": "m2platformteamaaaaaa",
+        "label": "Платформа",
+        "people": 3,
+        "closed": 18,
+        "perPersonMonth": 6.0,
+        "reached": {
+          "value": 0.71,
+          "n": 64
+        }
+      },
+      {
+        "key": "m2productteamaaaaaaa",
+        "label": "Продукт",
+        "people": 1,
+        "closed": 3,
+        "perPersonMonth": 3.0,
+        "reached": {
+          "value": null,
+          "n": 4
+        }
+      }
+    ],
+    "reached": {
+      "value": 0.68,
+      "n": 68
+    }
+  }
 }

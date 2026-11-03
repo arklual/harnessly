@@ -823,3 +823,17 @@ func TestMembersDoNotSeeTheInstall(t *testing.T) {
 		t.Errorf("a member received %d job events", len(got))
 	}
 }
+
+// The installer a hub runs on the server fetches from the machines' address, not the people's.
+func TestInstallOverSSHUsesTheAgentURL(t *testing.T) {
+	var su *setup
+	su = newSetup(t, true, installingHandler(func() *setup { return su }, true), hubtest.Env("HUB_AGENT_URL", "http://agents.example.test:8040"))
+	job, _ := su.finished(su.startOK("dir"))
+	if job.State != "done" {
+		t.Fatalf("job = %+v", job)
+	}
+	install := su.srv.commands()[1]
+	if !strings.Contains(install, "curl -fsSL 'http://agents.example.test:8040/install'") || strings.Contains(install, su.s.URL) {
+		t.Errorf("install command:\n%s", install)
+	}
+}

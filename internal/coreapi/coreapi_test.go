@@ -1,6 +1,7 @@
 package coreapi
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -307,6 +308,25 @@ func TestHookAuthAndMethod(t *testing.T) {
 	}
 }
 
+// The permission hook is held until the person decided, and gets the decision; nothing to say is no content.
+func TestPermissionHook(t *testing.T) {
+	r := newRig(t)
+	expect(t, r.post("/api/status/hook?provider=claude-permission&tmuxSession=s1", `{"tool_name":"Bash"}`), 204, "")
+	var asked map[string]any
+	answer := map[string]any{"hookSpecificOutput": map[string]any{"hookEventName": "PermissionRequest"}}
+	r.cfg.PermissionRequest = func(_ context.Context, session string, request map[string]any) (any, bool) {
+		asked = request
+		return answer, session == "s1"
+	}
+	expect(t, r.post("/api/status/hook?provider=claude-permission&tmuxSession=s1", `{"tool_name":"Bash"}`), 200,
+		`{"hookSpecificOutput":{"hookEventName":"PermissionRequest"}}`)
+	if asked["tool_name"] != "Bash" {
+		t.Fatalf("%+v", asked)
+	}
+	expect(t, r.post("/api/status/hook?provider=claude-permission&tmuxSession=s2", `{"tool_name":"Bash"}`), 204, "")
+	expect(t, r.post("/api/status/hook?provider=claude-permission", `{"tool_name":"Bash"}`), 204, "")
+}
+
 func TestClaudeHook(t *testing.T) {
 	r := newRig(t)
 	expect(t, r.post("/api/status/hook", `{"event":"prompt-submit","session":"s1","at":1700000000123}`), 204, "")
@@ -318,8 +338,16 @@ func TestClaudeHook(t *testing.T) {
 	if e := ev[1].args[2].(agents.Event); e.Kind != agents.Notification || e.NotificationType != "permission_prompt" || ev[1].args[3] != nil {
 		t.Fatalf("%+v", ev[1])
 	}
+	if e := ev[0].args[2].(agents.Event); e.AgentSession != "" {
+		t.Fatalf("a hook naming no agent session: %+v", e)
+	}
+	// the agent's own session id goes with the event, for the keeper to tell a foreign agent's hook.
+	expect(t, r.post("/api/status/hook", `{"event":"stop","session":"s1","agentSessionId":"9764fa81-4c34-4673-af5e-6f243c9d8be1"}`), 204, "")
+	if ev = r.keeper.named("event"); len(ev) != 3 || ev[2].args[2].(agents.Event).AgentSession != "9764fa81-4c34-4673-af5e-6f243c9d8be1" {
+		t.Fatalf("%+v", ev)
+	}
 	expect(t, r.post("/api/status/hook", `{"event":"bogus","session":"s1"}`), 204, "")
-	if len(r.keeper.named("event")) != 2 || len(r.keeper.named("poll")) != 0 {
+	if len(r.keeper.named("event")) != 3 || len(r.keeper.named("poll")) != 0 {
 		t.Fatal("an unknown event is ignored")
 	}
 	for _, body := range []string{`{"event":"poll","session":"s1"}`, `{"event":"stop","session":""}`, `{}`, `[1]`} {

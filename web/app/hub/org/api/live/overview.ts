@@ -2,7 +2,14 @@
 import type { OverviewResponse, Signal as ApiSignal, Subscription } from '../../../../hub-api/analytics';
 import { setShownCurrency, spentOf } from '../../money';
 import type { Section } from '../../types';
-import type { OverviewApi, OverviewData, PersonSpend, Signal, SubscriptionUse } from '../overview';
+import type {
+  OverviewApi,
+  OverviewData,
+  PersonSpend,
+  Signal,
+  SubscriptionUse,
+  TeamEfficiency,
+} from '../overview';
 import { contractGet, orgPath } from './http';
 import type { AnalyticsCtx } from './analytics';
 
@@ -44,21 +51,25 @@ const subscriptionOf = (s: Subscription): SubscriptionUse => {
   };
 };
 
+const sumTokens = (t: { input: number; output: number; cacheRead: number; cacheWrite: number }) =>
+  t.input + t.output + t.cacheRead + t.cacheWrite;
+
 export const buildOverview = (r: OverviewResponse, teamName: string | null, people: number): OverviewData => {
   const rows = r.spendBy.rows;
   const spent = spentOf(r.spend);
-  const tokens = rows.reduce(
-    (n, x) => n + x.tokens.input + x.tokens.output + x.tokens.cacheRead + x.tokens.cacheWrite,
-    0,
-  );
+  const total = spentOf(r.spendBy.totals);
+  const today = r.today;
+  const todaySpent = spentOf(today.spend);
   const subscriptions = r.subscriptions.map(subscriptionOf);
   const worst = [...subscriptions].sort((a, b) => b.usedPct - a.usedPct)[0];
+  const bars = (xs: { value: number }[]) => xs.map((x) => x.value);
   const money = (x: (typeof rows)[number]) => ({
     id: x.key,
     name: x.label,
     rub: spentOf(x).shown,
     usd: spentOf(x).usd,
-    tokens: x.tokens.input + x.tokens.output + x.tokens.cacheRead + x.tokens.cacheWrite,
+    tokens: sumTokens(x.tokens),
+    ...(x.key === '' ? { noTeam: true } : {}),
   });
   const byPerson: PersonSpend[] = rows.map((x) => ({
     userId: x.key,
@@ -69,12 +80,25 @@ export const buildOverview = (r: OverviewResponse, teamName: string | null, peop
     spentRub: spentOf(x).shown,
     limitRub: x.limit?.amount.shown ?? null,
   }));
+  const efficiency: TeamEfficiency[] = r.efficiency.teams.map((t) => ({
+    id: t.key,
+    name: t.label,
+    tasksPerPerson: t.perPersonMonth ?? 0,
+    resultPct: t.reached.value === null ? null : Math.round(t.reached.value * 100),
+    ...(t.key === '' ? { noTeam: true } : {}),
+  }));
   return {
     estimated: spent.estimated,
     tiles: {
-      spend: { rub: spent.shown, usd: spent.usd, tokens, bars: [] },
-      active: { now: r.tiles.activePeople.value ?? 0, total: people, bars: [] },
-      tasks: { closed: r.tiles.mrs.value ?? 0, inProgress: r.tiles.sessions.value ?? 0, bars: [] },
+      basis: 'today',
+      spend: {
+        rub: todaySpent.shown,
+        usd: todaySpent.usd,
+        tokens: today.spend.tokens,
+        bars: bars(today.sparks.spend),
+      },
+      active: { now: today.active.people, total: today.active.of || people, bars: bars(today.sparks.active) },
+      tasks: { closed: today.tasks.closed, inProgress: today.tasks.inWork, bars: bars(today.sparks.tasks) },
       subscriptions: {
         accounts: subscriptions.length,
         worstName: worst?.name ?? '',
@@ -87,9 +111,9 @@ export const buildOverview = (r: OverviewResponse, teamName: string | null, peop
       r.spendBy.by === 'person'
         ? null
         : {
-            total: { rub: spent.shown, usd: spent.usd, tokens },
+            total: { rub: total.shown, usd: total.usd, tokens: r.spendBy.totals.tokens },
             teams: rows.map(money),
-            efficiency: [],
+            efficiency,
           },
     byPerson:
       r.spendBy.by === 'person'

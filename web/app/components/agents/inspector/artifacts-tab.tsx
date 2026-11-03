@@ -34,7 +34,7 @@ const ArtifactRow = ({
   onOpenDoc?: (path: string, title: string) => void;
 }) => {
   const presented = presentLink(link.url);
-  const meta = useLinkMeta(hasLinkMeta(presented.kind) ? link.url : null);
+  const meta = useLinkMeta(hasLinkMeta(presented) ? link.url : null);
 
   let title: ReactNode = link.label ?? presented.label;
   let detail: ReactNode = presented.detail;
@@ -63,6 +63,10 @@ const ArtifactRow = ({
       ) : null;
     if (meta?.kind === 'issue' && meta.assignee)
       aside = <AssigneeAvatar assignee={meta.assignee} className="tw-artifact-avatar" />;
+  } else if (presented.connection && (meta?.kind === 'page' || meta?.kind === 'issue')) {
+    // A link on one of the person's connections: its own title once the runtime read it.
+    title = meta.title;
+    detail = meta.kind === 'page' ? (meta.space ?? presented.detail) : `${meta.key} · ${presented.detail}`;
   }
 
   const docPath = onOpenDoc ? paneDocTargetOf(link.url) : null;

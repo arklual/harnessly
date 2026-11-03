@@ -143,7 +143,7 @@ func (a *Agent) Register(code string, profile hubproto.Profile, via hubproto.Via
 // TryConnect dials the hub. On success it returns 101; on a refusal, the HTTP status and body.
 func (a *Agent) TryConnect() (int, string) {
 	a.S.T.Helper()
-	host, err := hubproto.DialHost(a.S.Cfg.PublicURL)
+	host, err := hubproto.DialHost(a.S.Cfg.AgentURL)
 	if err != nil {
 		a.S.T.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func (a *Agent) TryConnect() (int, string) {
 // Unlink asks the hub, signed with the agent's key, to remove the machine (DELETE /agent/v1) and returns the status.
 func (a *Agent) Unlink() int {
 	a.S.T.Helper()
-	host, err := hubproto.DialHost(a.S.Cfg.PublicURL)
+	host, err := hubproto.DialHost(a.S.Cfg.AgentURL)
 	if err != nil {
 		a.S.T.Fatal(err)
 	}

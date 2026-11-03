@@ -2,6 +2,14 @@
 // docs/hub/analytics.md writes them. Days are 'YYYY-MM-DD' in the organization's time zone; times are RFC 3339 UTC.
 
 import type { Currency, Money, Period, PersonRef } from './common';
+import type {
+  MachineCloud,
+  MachineHardware,
+  MachineLoad,
+  MachineManaged,
+  MachineOp,
+  MachineWeek,
+} from './machines';
 import type { Scope } from './orgs';
 
 // ── KPI ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -46,7 +54,15 @@ export type KpisResponse = {
 
 export type SeriesPoint = { day: string; value: number | null; n: number };
 
-export type ChangeMarker = { changeId: string; at: string; title: string; verdict: EffectVerdict | null };
+export type ChangeMarker = {
+  changeId: string;
+  at: string;
+  title: string;
+  layer: 'org' | 'tenant' | 'team'; // the level the change was made at
+  author: PersonRef | null; // null: detected by the hub
+  icon: 'edit' | 'announce' | 'rocket'; // edit: written by a person; rocket: a new version of a tool; announce: the rest
+  verdict: EffectVerdict | null;
+};
 
 export type KpiSeriesResponse = {
   kpi: KpiId;
@@ -73,15 +89,17 @@ export type SignalRule =
   | 'chat_waiting'
   | 'limit_request';
 
+// target is the one thing the action is about (a person, an account, a machine, an invitation, a KPI, a chat, a model):
+// the button can go to it without knowing the variant. The other fields are the variant's own, for its screen.
 export type SignalAction =
-  | { kind: 'raise_limit'; label: string; scope: Scope; userId: string | null }
-  | { kind: 'move_account'; label: string; fromAccountId: string; toAccountId: string }
-  | { kind: 'open_machine'; label: string; machineId: string }
-  | { kind: 'resend_invite'; label: string; inviteId: string; tenantId: string }
-  | { kind: 'register_account'; label: string; accountId: string }
-  | { kind: 'open_kpi'; label: string; kpi: KpiId; scope: Scope }
-  | { kind: 'open_chat'; label: string; machineId: string; sessionKey: string }
-  | { kind: 'open_prices'; label: string; model: string };
+  | { kind: 'raise_limit'; label: string; target: string; scope: Scope; userId: string | null }
+  | { kind: 'move_account'; label: string; target: string; fromAccountId: string; toAccountId: string }
+  | { kind: 'open_machine'; label: string; target: string; machineId: string }
+  | { kind: 'resend_invite'; label: string; target: string; inviteId: string; tenantId: string }
+  | { kind: 'register_account'; label: string; target: string; accountId: string }
+  | { kind: 'open_kpi'; label: string; target: string; kpi: KpiId; scope: Scope }
+  | { kind: 'open_chat'; label: string; target: string; machineId: string; sessionKey: string }
+  | { kind: 'open_prices'; label: string; target: string; model: string };
 
 export type Signal = {
   id: string;
@@ -125,7 +143,7 @@ export type SpendRow = {
   paid: Money; // what it actually costs: the key's price, or the share of the subscription
   calls: number;
   unpricedCalls: number; // calls of models without a price (their cost is not in list)
-  tokens: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  tokens: { total: number; input: number; output: number; cacheRead: number; cacheWrite: number };
   limit: LimitBar | null;
   forecast: Money | null; // at the pace of the last 7 days, to the period's end; null for a closed period
   guessedShare: number; // share of list from sessions with attribution 'guessed'
@@ -177,6 +195,33 @@ export type SubscriptionsResponse = {
 
 export type Tile = { value: number | null; cmpValue: number | null; unit: KpiUnit | 'people' };
 
+export type DayValue = { day: string; value: number }; // a point of a tile's strip
+
+// «Сегодня»: the day of the scope in the organization's time zone, with the strips of the last 14 days (oldest first,
+// today last). spend of a strip is the paid dollars of the day.
+export type TodayView = {
+  day: string;
+  spend: { paid: Money; list: Money; tokens: number };
+  active: { people: number; of: number }; // «Активны сегодня N из M»: people with a live chat today of the scope's people
+  tasks: { closed: number; inWork: number }; // closed: ended today with a merge request; inWork: chats going on now
+  sparks: { spend: DayValue[]; active: DayValue[]; tasks: DayValue[] };
+};
+
+export type Reached = { value: number | null; n: number }; // null below 5 chats
+
+// «Эффективность»: tasks closed per person per month by team, and the share of chats that reached a result.
+export type EfficiencyView = {
+  teams: {
+    key: string; // the team id; '' for people of no team
+    label: string;
+    people: number;
+    closed: number;
+    perPersonMonth: number | null; // null without people
+    reached: Reached;
+  }[];
+  reached: Reached;
+};
+
 export type OverviewResponse = {
   scope: Scope;
   period: Period;
@@ -184,15 +229,49 @@ export type OverviewResponse = {
   spend: { list: Money; paid: Money; limit: LimitBar | null; forecast: Money | null };
   tiles: { activePeople: Tile; sessions: Tile; mrs: Tile; moneyPerMr: Tile };
   attention: Signal[]; // the open, not snoozed signals addressed to the person, most severe first, at most 6
-  spendBy: { by: SpendBy; rows: SpendRow[] }; // teams for an org or tenant, people for a team
+  // teams for an org or tenant, people for a team; totals are the base of the rows' shares in each unit (₽/$/tokens)
+  spendBy: { by: SpendBy; rows: SpendRow[]; totals: { list: Money; paid: Money; tokens: number } };
+  today: TodayView;
+  efficiency: EfficiencyView;
   subscriptions: Subscription[];
   accountedUntil: string | null;
 };
 
+// ── People and the week ──────────────────────────────────────────────────────────────────────────────────────────────
+
+export type Chats = { n: number; running: number };
+export type Mrs = { n: number; merged: number };
+
+// «Расход по людям» of a lead: GET /api/orgs/{org}/people?scope=team:… (tenant: also).
+export type PersonSpend = {
+  userId: string;
+  name: string;
+  role: string; // the role in the tenant of the scope; '' when none
+  list: Money;
+  paid: Money;
+  share: number | null; // paid ÷ the scope's own limit; null without one
+  limit: LimitBar | null; // the person's own monthly limit
+  hot: boolean; // the personal limit is used to 80% or more
+  chats: Chats; // of the last 7 days
+  mrs: Mrs;
+};
+
+export type PeopleResponse = {
+  scope: Scope;
+  period: Period;
+  currency: Currency;
+  total: { list: Money; paid: Money; limit: LimitBar | null; tone: 'ok' | 'warn' | 'risk' | null };
+  week: Period; // the last 7 days the chats and merge requests are of
+  people: PersonSpend[];
+};
+
+// GET /api/me/week: «Чатов за неделю» and «MR за неделю» of the member.
+export type MeWeek = { week: Period; chats: Chats; mrs: Mrs };
+
 // ── Changes and their effect ─────────────────────────────────────────────────────────────────────────────────────────
 
 export type ChangeKind =
-  'manual' | 'claude_version' | 'codex_version' | 'default_model' | 'skills' | 'plugins' | 'policy';
+  'manual' | 'claude_version' | 'codex_version' | 'default_model' | 'skills' | 'plugins' | 'policy' | 'env';
 
 export type Change = {
   id: string;
@@ -232,16 +311,19 @@ export type EffectResponse = {
 
 // ── Waste ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export type WasteKind =
-  'reread_context' | 'failed_tools' | 'abandoned_sessions' | 'long_waits' | 'oversized_model';
+// Four ways money goes to waste. A kind with nothing wasted is left out of items (zero is not shown); a session can be
+// in several kinds, so the amounts are not added up.
+export type WasteKind = 'abandoned_sessions' | 'retries_after_errors' | 'long_context' | 'extra_skills';
 
 export type WasteItem = {
   kind: WasteKind;
   title: string;
-  amount: Money;
+  amount: Money; // the first version's name for money, kept
+  money: Money; // list money of the sessions in this kind
   share: number; // of the scope's list spend
   sessions: number;
-  hint: string;
+  hint: string; // what to do about it
+  explain: string; // how the number was counted, in words; says «оценка» when it is an estimate
 };
 
 export type WasteResponse = { scope: Scope; period: Period; currency: Currency; items: WasteItem[] };
@@ -266,14 +348,14 @@ export type HubMachine = {
   people: PersonRef[]; // who used it in the last 30 days
   access: { kind: 'user' | 'team'; id: string; label: string }[]; // empty: everyone in its tenant
   problems: MachineProblem[];
-  cloud: {
-    provider: 'selectel';
-    flavor: string;
-    vcpus: number;
-    ramGb: number;
-    diskGb: number;
-    priceMonth: Money;
-  } | null;
+  // The rest is filled only for an organization with the `machine.resources` feature on (docs/hub/machines-resources.md);
+  // with it off these are null, and activeOps is empty.
+  cloud: MachineCloud | null; // null: the hub knows no server of the machine
+  hardware: MachineHardware | null;
+  load: MachineLoad | null;
+  week: MachineWeek | null;
+  managed: MachineManaged | null;
+  activeOps: MachineOp[];
 };
 
 export type MachinesResponse = { scope: Scope; currency: Currency; machines: HubMachine[] };
@@ -282,7 +364,10 @@ export type PatchMachineRequest = {
   teamId?: string | null;
   access?: { kind: 'user' | 'team'; id: string }[];
 };
-export type RestartRequest = { what: 'runner' | 'vm'; when: 'now' | 'after_chats' };
+// 'vm' is the old name of 'machine'. Without the `machine.resources` feature only runner/vm and now/after_chats work.
+export type RestartRequest = { what: 'runner' | 'machine' | 'vm'; when?: 'now' | 'drain' | 'after_chats' };
+// `op` is there with the feature on; jobId is the id of that operation.
+export type RestartResponse = { jobId: string; op?: MachineOp };
 
 // ── The person's own view: /api/me/* ─────────────────────────────────────────────────────────────────────────────────
 

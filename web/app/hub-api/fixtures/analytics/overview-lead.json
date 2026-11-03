@@ -86,6 +86,7 @@
       "action": {
         "kind": "raise_limit",
         "label": "Поднять лимит",
+        "target": "u2veraaaaaaaaaaaaaaa",
         "scope": {
           "kind": "team",
           "id": "m2platformteamaaaaaa"
@@ -115,6 +116,7 @@
       "action": {
         "kind": "raise_limit",
         "label": "Поднять лимит",
+        "target": "u2veraaaaaaaaaaaaaaa",
         "scope": {
           "kind": "team",
           "id": "m2platformteamaaaaaa"
@@ -144,6 +146,7 @@
       "action": {
         "kind": "raise_limit",
         "label": "Поднять лимит",
+        "target": "team:m2platformteamaaaaaa",
         "scope": {
           "kind": "team",
           "id": "m2platformteamaaaaaa"
@@ -169,6 +172,7 @@
         "calls": 1200,
         "unpricedCalls": 0,
         "tokens": {
+          "total": 224120000,
           "input": 1040000,
           "output": 4680000,
           "cacheRead": 208000000,
@@ -195,6 +199,7 @@
         "calls": 1200,
         "unpricedCalls": 0,
         "tokens": {
+          "total": 176710000,
           "input": 820000,
           "output": 3690000,
           "cacheRead": 164000000,
@@ -233,6 +238,7 @@
         "calls": 1200,
         "unpricedCalls": 0,
         "tokens": {
+          "total": 112060000,
           "input": 520000,
           "output": 2340000,
           "cacheRead": 104000000,
@@ -257,7 +263,18 @@
         },
         "guessedShare": 0.12
       }
-    ]
+    ],
+    "totals": {
+      "list": {
+        "usd": 1190,
+        "shown": 96985.0
+      },
+      "paid": {
+        "usd": 980,
+        "shown": 79870.0
+      },
+      "tokens": 512890000
+    }
   },
   "subscriptions": [
     {
@@ -322,5 +339,222 @@
       ]
     }
   ],
-  "accountedUntil": "2026-10-30T17:58:00Z"
+  "accountedUntil": "2026-10-30T17:58:00Z",
+  "today": {
+    "day": "2026-10-31",
+    "spend": {
+      "paid": {
+        "usd": 61.0,
+        "shown": 4971.5
+      },
+      "list": {
+        "usd": 74.5,
+        "shown": 6071.8
+      },
+      "tokens": 12900000
+    },
+    "active": {
+      "people": 2,
+      "of": 3
+    },
+    "tasks": {
+      "closed": 4,
+      "inWork": 1
+    },
+    "sparks": {
+      "spend": [
+        {
+          "day": "2026-10-18",
+          "value": 38.0
+        },
+        {
+          "day": "2026-10-19",
+          "value": 44.2
+        },
+        {
+          "day": "2026-10-20",
+          "value": 30.1
+        },
+        {
+          "day": "2026-10-21",
+          "value": 0
+        },
+        {
+          "day": "2026-10-22",
+          "value": 0
+        },
+        {
+          "day": "2026-10-23",
+          "value": 22.5
+        },
+        {
+          "day": "2026-10-24",
+          "value": 51.7
+        },
+        {
+          "day": "2026-10-25",
+          "value": 47.3
+        },
+        {
+          "day": "2026-10-26",
+          "value": 40.6
+        },
+        {
+          "day": "2026-10-27",
+          "value": 49.9
+        },
+        {
+          "day": "2026-10-28",
+          "value": 45.0
+        },
+        {
+          "day": "2026-10-29",
+          "value": 57.2
+        },
+        {
+          "day": "2026-10-30",
+          "value": 66.8
+        },
+        {
+          "day": "2026-10-31",
+          "value": 61.0
+        }
+      ],
+      "active": [
+        {
+          "day": "2026-10-18",
+          "value": 3
+        },
+        {
+          "day": "2026-10-19",
+          "value": 3
+        },
+        {
+          "day": "2026-10-20",
+          "value": 3
+        },
+        {
+          "day": "2026-10-21",
+          "value": 0
+        },
+        {
+          "day": "2026-10-22",
+          "value": 0
+        },
+        {
+          "day": "2026-10-23",
+          "value": 2
+        },
+        {
+          "day": "2026-10-24",
+          "value": 3
+        },
+        {
+          "day": "2026-10-25",
+          "value": 3
+        },
+        {
+          "day": "2026-10-26",
+          "value": 2
+        },
+        {
+          "day": "2026-10-27",
+          "value": 3
+        },
+        {
+          "day": "2026-10-28",
+          "value": 3
+        },
+        {
+          "day": "2026-10-29",
+          "value": 3
+        },
+        {
+          "day": "2026-10-30",
+          "value": 3
+        },
+        {
+          "day": "2026-10-31",
+          "value": 2
+        }
+      ],
+      "tasks": [
+        {
+          "day": "2026-10-18",
+          "value": 2
+        },
+        {
+          "day": "2026-10-19",
+          "value": 3
+        },
+        {
+          "day": "2026-10-20",
+          "value": 1
+        },
+        {
+          "day": "2026-10-21",
+          "value": 0
+        },
+        {
+          "day": "2026-10-22",
+          "value": 0
+        },
+        {
+          "day": "2026-10-23",
+          "value": 1
+        },
+        {
+          "day": "2026-10-24",
+          "value": 4
+        },
+        {
+          "day": "2026-10-25",
+          "value": 3
+        },
+        {
+          "day": "2026-10-26",
+          "value": 2
+        },
+        {
+          "day": "2026-10-27",
+          "value": 4
+        },
+        {
+          "day": "2026-10-28",
+          "value": 3
+        },
+        {
+          "day": "2026-10-29",
+          "value": 4
+        },
+        {
+          "day": "2026-10-30",
+          "value": 5
+        },
+        {
+          "day": "2026-10-31",
+          "value": 4
+        }
+      ]
+    }
+  },
+  "efficiency": {
+    "teams": [
+      {
+        "key": "m2platformteamaaaaaa",
+        "label": "Платформа",
+        "people": 3,
+        "closed": 18,
+        "perPersonMonth": 6.0,
+        "reached": {
+          "value": 0.71,
+          "n": 64
+        }
+      }
+    ],
+    "reached": {
+      "value": 0.71,
+      "n": 64
+    }
+  }
 }

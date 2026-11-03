@@ -11,7 +11,7 @@ import (
 // Only subscription logins are known here: a chat on an API key has no account, so an entry that names an account never
 // matches it (an entry for any account still does).
 //
-// TODO(HRN-588): take the account from the usage collector's record of the chat (usagefeed.Local) once it lands; it
+// TODO: take the account from the usage collector's record of the chat (usagefeed.Local) once it lands; it
 // knows keys and other endpoints too.
 type Accounts struct {
 	// ClaudeJSON is the file Claude Code keeps its account in (~/.claude.json, or $CLAUDE_CONFIG_DIR/.claude.json).

@@ -193,6 +193,17 @@ type SessionCallSum struct {
 // SessionSums sums the calls of these top-level sessions, their subagents' calls included, by model, and counts the
 // subagents of each.
 func (s Store) SessionSums(ctx context.Context, refs []SessionRef) ([]SessionCallSum, map[SessionRef]int, error) {
+	return s.sessionSums(ctx, refs, 0)
+}
+
+// SessionSumsOver is SessionSums over the calls whose context (input, cache read and both cache writes) is at least
+// minContext tokens; with 0 it is every call.
+func (s Store) SessionSumsOver(ctx context.Context, refs []SessionRef, minContext int64) ([]SessionCallSum, error) {
+	sums, _, err := s.sessionSums(ctx, refs, minContext)
+	return sums, err
+}
+
+func (s Store) sessionSums(ctx context.Context, refs []SessionRef, minContext int64) ([]SessionCallSum, map[SessionRef]int, error) {
 	byOrg := map[[2]string][]string{}
 	for _, r := range refs {
 		k := [2]string{r.OrgKey, r.Provider}
@@ -247,8 +258,13 @@ func (s Store) SessionSums(ctx context.Context, refs []SessionRef) ([]SessionCal
 				for _, key := range sub {
 					cargs = append(cargs, key)
 				}
+				over := ""
+				if minContext > 0 {
+					over = ` AND input + cache_read + cache_write_5m + cache_write_1h >= ?`
+					cargs = append(cargs, minContext)
+				}
 				rows, err := s.q.Query(ctx, `SELECT session_key, model, COUNT(*), COALESCE(SUM(list_cost_micros), 0) FROM usage_calls
-					WHERE org_key = ? AND provider = ? AND session_key IN (`+placeholders(len(sub))+`) GROUP BY session_key, model`, cargs...)
+					WHERE org_key = ? AND provider = ? AND session_key IN (`+placeholders(len(sub))+`)`+over+` GROUP BY session_key, model`, cargs...)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -364,6 +380,19 @@ func (s Store) ScopeSessions(ctx context.Context, f ScopeFilter) ([]AgentSession
 	w, args := f.where()
 	q := `SELECT ` + agentSessionCols + ` FROM agent_sessions` + w + ` AND started_at >= ? AND started_at < ?`
 	args = append(args, f.From, f.To)
+	if f.LiveOnly {
+		q += ` AND origin = 'live'`
+	}
+	return s.sessions(ctx, q+` ORDER BY started_at, session_key`, args...)
+}
+
+// ScopeSessionsOverlapping reads the top-level sessions of a scope that were going on at some moment of [from, to): they
+// started before to and ended (or, running, were last updated) at from or later. Oldest start first. It is how the
+// screens of «today» find a chat that began yesterday and is still on.
+func (s Store) ScopeSessionsOverlapping(ctx context.Context, f ScopeFilter, from, to int64) ([]AgentSession, error) {
+	w, args := f.where()
+	q := `SELECT ` + agentSessionCols + ` FROM agent_sessions` + w + ` AND started_at < ? AND COALESCE(ended_at, updated_at) >= ?`
+	args = append(args, to, from)
 	if f.LiveOnly {
 		q += ` AND origin = 'live'`
 	}

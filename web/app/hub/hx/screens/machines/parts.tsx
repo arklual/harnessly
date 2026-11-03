@@ -1,0 +1,262 @@
+// The pieces both lists share: the tiles, the search, the link to ML Core, the row of a machine and the group head.
+import type { CSSProperties, ReactNode } from 'react';
+
+import type { MachineGroup, OrgMachine } from '../../../org/api/machines';
+import { Bars } from '../../charts/bars';
+import { Meter } from '../../charts/meter';
+import { Strip } from '../../charts/strip';
+import { Btn, Icon, initial } from '../../ui';
+import {
+  chatsText,
+  groupWeek,
+  liveLoad,
+  machinesWord,
+  num,
+  rowSt,
+  rowStLabel,
+  rowSub,
+  type RowMode,
+  type Tile,
+  verText,
+  weekText,
+} from './calc';
+
+export const Tiles = ({ tiles }: { tiles: readonly Tile[] }) => (
+  <div className="dash ad-dash mo-tiles">
+    <div className="sx-wrap">
+      <div className="sx-grid">
+        {tiles.map((t, i) => (
+          <div
+            key={t.label}
+            className="sx-tile mo-tile"
+            style={{ '--sx-i': i, '--sx-tone': t.tone } as CSSProperties}
+          >
+            <span className="sx-tile__top">
+              <span className="sx-tile__icon">
+                <Icon i={t.icon} size="sm" />
+              </span>
+            </span>
+            <span className="sx-tile__chart">
+              {t.strip ? <Strip parts={t.strip} /> : <Bars values={t.bars ?? []} />}
+            </span>
+            <span className="sx-tile__label">{t.label}</span>
+            <span className="sx-tile__value">{t.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+/** The skeleton of the whole screen: tiles, the bar and a list, in the boxes of the board. */
+export const ListSkeleton = () => (
+  <div className="mo" role="status" aria-label="Загрузка">
+    <div className="mx-skel-tiles">
+      {[0, 1, 2, 3].map((i) => (
+        <span key={i} className="mx-skel" style={{ animationDelay: `${i * 0.1}s` }} />
+      ))}
+    </div>
+    <div className="mx-skel-bar">
+      <span className="mx-skel" />
+      <span className="mx-skel" />
+    </div>
+    <div className="mx-skel-list">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <span key={i} className="mx-skel" />
+      ))}
+    </div>
+  </div>
+);
+
+/** A failed load: one row with the retry. */
+export const ErrorRow = ({ text, onRetry }: { text: string; onRetry: () => void }) => (
+  <div className="mx-err" role="alert">
+    <span>{text}</span>
+    <Btn variant="outline" size="sm" onClick={onRetry}>
+      Повторить
+    </Btn>
+  </div>
+);
+
+export const SearchBox = ({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) => (
+  <label className="mo-search">
+    <Icon i="search" size="sm" />
+    <input
+      type="search"
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onChange('');
+      }}
+      aria-label={placeholder}
+    />
+    {value !== '' && (
+      <button type="button" className="mo-search__x" onClick={() => onChange('')} aria-label="Очистить">
+        <Icon i="x" size="sm" />
+      </button>
+    )}
+  </label>
+);
+
+/** «Подробнее в ML Core»: shown when the hub knows where the charts and logs of the machines are. */
+export const MlLink = ({ url, text }: { url: string | null; text: string }) =>
+  url ? (
+    <a className="mo-ext" href={url} target="_blank" rel="noopener noreferrer">
+      <span className="md-ext__ic">
+        <Icon i="activity" size="sm" />
+      </span>
+      <span className="mo-ext__t">
+        <b>Подробнее в ML Core</b>
+        <small>{text}</small>
+      </span>
+      <Icon i="arrow-up-right" size="sm" className="md-ext__go" />
+    </a>
+  ) : null;
+
+export interface SegOption<T extends string> {
+  id: T;
+  label: string;
+}
+
+export const Seg = <T extends string>({
+  options,
+  value,
+  onPick,
+  label,
+}: {
+  options: readonly SegOption<T>[];
+  value: T;
+  onPick: (id: T) => void;
+  label: string;
+}) => (
+  <div className="hx-set__seg" role="radiogroup" aria-label={label}>
+    {options.map((o) => (
+      <button
+        key={o.id}
+        type="button"
+        className="hx-set__seg-item"
+        role="radio"
+        aria-checked={value === o.id}
+        onClick={() => onPick(o.id)}
+      >
+        {o.label}
+      </button>
+    ))}
+  </div>
+);
+
+export const TableHead = () => (
+  <div className="mt-row mt-head">
+    <span>Машина</span>
+    <span>Состояние</span>
+    <span>Чаты сейчас</span>
+    <span>Процессор</span>
+    <span>Память</span>
+    <span>Диск</span>
+    <span>Раннер</span>
+    <span>За неделю</span>
+  </div>
+);
+
+export const MachineRow = ({
+  m,
+  mode,
+  now,
+  onOpen,
+}: {
+  m: OrgMachine;
+  mode: RowMode;
+  now: number;
+  onOpen: (id: string) => void;
+}) => {
+  const st = rowSt(m);
+  const off = st === 'off';
+  return (
+    <button type="button" className="mt-row" data-st={st} onClick={() => onOpen(m.id)}>
+      <span className="mt-name">
+        <span className="mo-dot" data-st={st} />
+        <span className="mt-name__t">
+          <b>{m.name}</b>
+          <small>{rowSub(m, mode)}</small>
+        </span>
+      </span>
+      <span className="mt-st" data-st={st}>
+        {rowStLabel(m, now)}
+      </span>
+      <span className="mt-num">{chatsText(m)}</span>
+      <Meter pct={liveLoad(m, m.cpu)} off={off} />
+      <Meter pct={liveLoad(m, m.ram)} off={off} />
+      <Meter pct={m.disk} off={off} />
+      <span className="mt-ver" data-old={m.runnerOutdated ? '1' : '0'}>
+        {verText(m)}
+      </span>
+      <span className="mt-week">{weekText(m)}</span>
+    </button>
+  );
+};
+
+const share = (n: number, total: number): string => `${total > 0 ? ((n / total) * 100).toFixed(1) : '0.0'}%`;
+
+/** One group of a list: the head with the bar and the numbers, and the table that unfolds under it. */
+export const Group = ({
+  group,
+  sub,
+  open,
+  index,
+  onToggle,
+  word,
+  children,
+}: {
+  group: MachineGroup;
+  sub: string;
+  open: boolean;
+  index: number;
+  onToggle: () => void;
+  word?: string;
+  children: ReactNode;
+}) => {
+  const { online, idle, offline, total } = group;
+  const spend = groupWeek(group);
+  return (
+    <div className="mo-g" aria-expanded={open} style={{ '--i': index } as CSSProperties}>
+      <button type="button" className="mo-g__head" onClick={onToggle}>
+        <Icon i="chevron-right" size="sm" className="mo-g__chev" />
+        <span className="ad-dot">{initial(group.name)}</span>
+        <span className="mo-g__t">
+          <b>{group.name}</b>
+          <small>{sub}</small>
+        </span>
+        <span className="mo-g__flag" data-show={offline > 0}>
+          {offline > 0 ? `${offline} не на связи` : ''}
+        </span>
+        <span
+          className="mo-g__bar"
+          title={`${online} на связи · ${idle} простаивает · ${offline} не на связи`}
+        >
+          <i data-st="on" style={{ '--w': share(online, total) } as CSSProperties} />
+          <i data-st="idle" style={{ '--w': share(idle, total) } as CSSProperties} />
+          <i data-st="off" style={{ '--w': share(offline, total) } as CSSProperties} />
+        </span>
+        <span className="mo-g__n">
+          {num(total)} <small>{word ?? machinesWord(total, false)}</small>
+        </span>
+        <span className="mo-g__s">
+          {spend ?? '—'}
+          <small> за неделю</small>
+        </span>
+      </button>
+      <div className="mo-g__body">
+        <div>{children}</div>
+      </div>
+    </div>
+  );
+};

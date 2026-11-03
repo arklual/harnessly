@@ -15,7 +15,17 @@ import type { LimitRule, MeLimitsResponse } from '../../../../hub-api/limits';
 import type { Member, OrgView } from '../../../../hub-api/orgs';
 import { spentOf } from '../../money';
 import { accessBody, accessOf, buildMachinesList } from './machines';
-import { changeOf, effectsOf, kpiOf, peersOf, peerScore, weeksUpTo } from './analytics';
+import {
+  changeOf,
+  chartWindow,
+  effectsOf,
+  kpiOf,
+  metaOf,
+  peersOf,
+  peerScore,
+  wasteDetail,
+  weeksUpTo,
+} from './analytics';
 import { buildMyOverview, forecastOf } from './member';
 import { buildOverview } from './overview';
 import { resolveScope, roleIn, viewerTeam } from './shell';
@@ -265,6 +275,31 @@ describe('analytics', () => {
     expect(peerScore(v(null, 'up'), v(0.5, 'up'))).toBe(0);
   });
 
+  it('draws a month of days ending a week after the period, never past today', () => {
+    const period = { from: '2026-10-19', to: '2026-10-25' };
+    expect(chartWindow(period, '2026-12-01')).toEqual({ from: '2026-10-03', to: '2026-11-02' });
+    expect(chartWindow(period, '2026-10-27')).toEqual({ from: '2026-09-28', to: '2026-10-28' });
+  });
+
+  it('leaves the sources of a number as the hub gave them', () => {
+    expect(
+      wasteDetail({
+        kind: 'retries_after_errors',
+        title: '',
+        hint: '',
+        amount: { usd: 1, shown: 1 },
+        money: { usd: 1, shown: 1 },
+        explain: '',
+        share: 0.114,
+        sessions: 7,
+      }),
+    ).toEqual([
+      { label: 'Сессий', value: '7' },
+      { label: 'Доля расхода', value: '11%' },
+    ]);
+    expect(metaOf({ author: null })).toBe('хаб заметил сам');
+  });
+
   it('offers whole weeks ending with the current one', () => {
     const weeks = weeksUpTo(new Date('2026-11-04T12:00:00Z'));
     expect(weeks[weeks.length - 1]).toEqual({ from: '2026-11-02', to: '2026-11-08' });
@@ -279,6 +314,15 @@ describe('overview', () => {
     const l = buildOverview(overviewLead as unknown as OverviewResponse, 'Платформа', 5);
     expect(l.byPerson?.teamName).toBe('Платформа');
     expect(l.byTeam).toBeNull();
+  });
+  it('counts the head tiles over today and takes efficiency from the hub', () => {
+    const r = overviewAdmin as unknown as OverviewResponse;
+    const a = buildOverview(r, null, 10);
+    expect(a.tiles.basis).toBe('today');
+    expect(a.tiles.spend.bars).toHaveLength(r.today.sparks.spend.length);
+    expect(a.tiles.tasks.closed).toBe(r.today.tasks.closed);
+    expect(a.byTeam?.total.tokens).toBe(r.spendBy.totals.tokens);
+    expect(a.byTeam?.efficiency.map((t) => t.id)).toEqual(r.efficiency.teams.map((t) => t.key));
   });
 });
 
@@ -299,6 +343,11 @@ describe('machines', () => {
     access: [],
     problems: [],
     cloud: null,
+    hardware: null,
+    load: null,
+    week: null,
+    managed: null,
+    activeOps: [],
   };
   const ctx = { org: 'o', view: admin, scope: { kind: 'org', id: admin.org.id } as const };
 

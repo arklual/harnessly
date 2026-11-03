@@ -481,3 +481,106 @@ func TestFeedPausesAtTheByteCap(t *testing.T) {
 		t.Fatalf("last %d then %d", last, r.box.Last())
 	}
 }
+
+// toolUse is an assistant line that calls tools (name, input JSON) with the ids given.
+func toolUse(session string, at time.Time, calls ...[3]string) string {
+	var blocks []string
+	for _, c := range calls {
+		blocks = append(blocks, fmt.Sprintf(`{"type":"tool_use","id":%q,"name":%q,"input":%s}`, c[0], c[1], c[2]))
+	}
+	return fmt.Sprintf(`{"type":"assistant","sessionId":%q,"requestId":"r-%s","timestamp":%q,"message":{"id":"m-%s","model":"claude-opus-4-6","usage":{"input_tokens":1,"output_tokens":1},"content":[%s]}}`,
+		session, calls[0][0], at.UTC().Format("2006-01-02T15:04:05.000Z"), calls[0][0], strings.Join(blocks, ","))
+}
+
+// toolResult is the user line that answers one call.
+func toolResult(session, id string, at time.Time, isErr bool, text string) string {
+	return fmt.Sprintf(`{"type":"user","sessionId":%q,"uuid":"res-%s","timestamp":%q,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":%q,"is_error":%t,"content":%q}]}}`,
+		session, id, at.UTC().Format("2006-01-02T15:04:05.000Z"), id, isErr, text)
+}
+
+func toolFacts(recs []hubproto.UsageRecord) map[string]hubproto.UsageToolFact {
+	out := map[string]hubproto.UsageToolFact{}
+	for _, r := range recs {
+		if r.Kind == hubproto.UsageTool {
+			t := *r.Tool
+			out[t.SessionKey+"|"+t.Day+"|"+t.ToolKind+"|"+t.ToolName] = t
+		}
+	}
+	return out
+}
+
+func TestFeedWritesToolFacts(t *testing.T) {
+	r := newRig(t)
+	base := t0.Add(-30 * time.Hour) // yesterday's evening or the day before, UTC
+	next := base.Add(26 * time.Hour)
+	r.write("-work-app/sess-1.jsonl", t0.Add(-time.Hour),
+		toolUse("sess-1", base, [3]string{"t1", "Skill", `{"skill":"review"}`}, [3]string{"t2", "mcp__grafana__query_prometheus", `{}`},
+			[3]string{"t3", "Bash", `{"command":"ls"}`}, [3]string{"t4", "Read", `{}`}),
+		toolResult("sess-1", "t1", base.Add(time.Second), false, "ok"),
+		toolResult("sess-1", "t2", base.Add(time.Second), true, "boom"),
+		toolResult("sess-1", "t3", base.Add(time.Second), false, "ok"),
+		toolResult("sess-1", "t4", base.Add(time.Second), false, "ok"),
+		// The same skill again on the next day, and a call the person refused: that one is not a call.
+		toolUse("sess-1", next, [3]string{"t5", "Skill", `{"skill":"review"}`}, [3]string{"t6", "Skill", `{"skill":"deploy"}`}),
+		toolResult("sess-1", "t5", next.Add(time.Second), false, "ok"),
+		toolResult("sess-1", "t6", next.Add(time.Second), true, "The user doesn't want to proceed with this tool use. The tool use was rejected."),
+		// A call without a result yet is not counted either.
+		toolUse("sess-1", next, [3]string{"t7", "Skill", `{"skill":"review"}`}),
+	)
+	r.pass()
+	got := toolFacts(r.all())
+	d1, d2 := base.UTC().Format("2006-01-02"), next.UTC().Format("2006-01-02")
+	want := map[string]hubproto.UsageToolFact{
+		"sess-1|" + d1 + "|skill|review": {Provider: "claude", SessionKey: "sess-1", Day: d1, ToolKind: "skill", ToolName: "review", Calls: 1},
+		"sess-1|" + d1 + "|mcp|grafana":  {Provider: "claude", SessionKey: "sess-1", Day: d1, ToolKind: "mcp", ToolName: "grafana", Calls: 1, Errors: 1},
+		"sess-1|" + d1 + "|bash|Bash":    {Provider: "claude", SessionKey: "sess-1", Day: d1, ToolKind: "bash", ToolName: "Bash", Calls: 1},
+		"sess-1|" + d1 + "|other|Read":   {Provider: "claude", SessionKey: "sess-1", Day: d1, ToolKind: "other", ToolName: "Read", Calls: 1},
+		"sess-1|" + d2 + "|skill|review": {Provider: "claude", SessionKey: "sess-1", Day: d2, ToolKind: "skill", ToolName: "review", Calls: 1},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("%d facts: %+v", len(got), got)
+	}
+	for k, w := range want {
+		if got[k] != w {
+			t.Fatalf("%s: %+v, want %+v", k, got[k], w)
+		}
+	}
+	// The session total of tool errors leaves the refusal out, as before.
+	if _, sessions := kinds(r.all()); len(sessions) != 1 || sessions[0].Metrics["toolErrors"] != 1 {
+		t.Fatalf("%+v", sessions)
+	}
+
+	// Nothing changed: nothing is written, also after a restart.
+	before := r.box.Last()
+	r.pass()
+	r.open()
+	r.pass()
+	if r.box.Last() != before {
+		t.Fatalf("wrote %d more records", r.box.Last()-before)
+	}
+
+	// One more call on the same day: the day's fact is written again with the new total.
+	r.write("-work-app/sess-1.jsonl", t0.Add(-time.Minute),
+		toolResult("sess-1", "t7", next.Add(time.Minute), false, "ok"))
+	r.clock.t = t0.Add(time.Minute)
+	r.pass()
+	recs := r.all()[before:]
+	facts := toolFacts(recs)
+	if f := facts["sess-1|"+d2+"|skill|review"]; f.Calls != 2 || len(facts) != 1 {
+		t.Fatalf("%+v", recs)
+	}
+}
+
+// The fact holds names and numbers only; a transcript's text and tool input stay on the machine.
+func TestToolFactsCarryNoText(t *testing.T) {
+	r := newRig(t)
+	base := t0.Add(-2 * time.Hour)
+	r.write("-work-app/sess-1.jsonl", t0.Add(-time.Hour),
+		toolUse("sess-1", base, [3]string{"t1", "Bash", `{"command":"echo SECRET-INPUT"}`}),
+		toolResult("sess-1", "t1", base.Add(time.Second), false, "SECRET-OUTPUT"))
+	r.pass()
+	raw, _ := json.Marshal(r.all())
+	if strings.Contains(string(raw), "SECRET") || len(toolFacts(r.all())) != 1 {
+		t.Fatalf("%s", raw)
+	}
+}

@@ -22,6 +22,7 @@
       "action": {
         "kind": "raise_limit",
         "label": "Поднять лимит",
+        "target": "u2veraaaaaaaaaaaaaaa",
         "scope": {
           "kind": "team",
           "id": "m2platformteamaaaaaa"
@@ -51,6 +52,7 @@
       "action": {
         "kind": "raise_limit",
         "label": "Поднять лимит",
+        "target": "u2veraaaaaaaaaaaaaaa",
         "scope": {
           "kind": "team",
           "id": "m2platformteamaaaaaa"
@@ -80,6 +82,7 @@
       "action": {
         "kind": "raise_limit",
         "label": "Поднять лимит",
+        "target": "team:m2platformteamaaaaaa",
         "scope": {
           "kind": "team",
           "id": "m2platformteamaaaaaa"

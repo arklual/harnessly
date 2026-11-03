@@ -29,7 +29,7 @@ func videoInitOf(c wire.DesignlyCreate) design.VideoInit {
 	return design.VideoInit{Formats: d.Formats, Seconds: d.Seconds, Subs: d.Subs}
 }
 
-// videoKindLine is the kind line of a video: what a scene is. The rest is read on demand (HRN-577).
+// videoKindLine is the kind line of a video: what a scene is. The rest is read on demand.
 func videoKindLine() string {
 	return locale.Pick("The project is a video: every board is one scene, a page of the video in the order of the pages, adaptive for 16:9 and 9:16. "+
 		"A frame depends only on the time: no setTimeout, setInterval or own frame loops.",

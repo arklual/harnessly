@@ -389,6 +389,10 @@ func (s *Service) trackerRow(i trackerIssue, me trackerMe) (row wire.AppRow, epi
 }
 
 func (s *Service) trackerFeed(ctx context.Context) wire.AppFeed {
+	// A tracker the person connected and made primary is read through its connection; the deployment's own stays here.
+	if c, ok := s.personalIssues(); ok {
+		return s.connFeed(ctx, c)
+	}
 	if s.cfg.TrackerURL == "" {
 		return appOff(wire.AppTracker, wire.AppNotConfigured, nil)
 	}

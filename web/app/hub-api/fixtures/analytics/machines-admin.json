@@ -30,7 +30,17 @@
       ],
       "access": [],
       "problems": ["offline"],
-      "cloud": null
+      "cloud": null,
+      "hardware": null,
+      "load": null,
+      "week": null,
+      "managed": {
+        "budget": false,
+        "env": false,
+        "resources": false,
+        "access": false
+      },
+      "activeOps": []
     },
     {
       "id": "h2oldboxaaaaaaaaaaaa",
@@ -47,7 +57,12 @@
       "people": [],
       "access": [],
       "problems": ["disabled"],
-      "cloud": null
+      "cloud": null,
+      "hardware": null,
+      "load": null,
+      "week": null,
+      "managed": null,
+      "activeOps": []
     },
     {
       "id": "h2runneraaaaaaaaaaaa",
@@ -80,16 +95,68 @@
       ],
       "problems": [],
       "cloud": {
-        "provider": "selectel",
-        "flavor": "SL1.4-16384",
-        "vcpus": 4,
-        "ramGb": 16,
-        "diskGb": 100,
-        "priceMonth": {
-          "usd": 48,
-          "shown": 3912.0
+        "provider": "example-cloud",
+        "plan": "4 / 16",
+        "cpu": 4,
+        "ramGB": 16,
+        "diskGB": 100,
+        "price": {
+          "amount": 1900000,
+          "currency": "RUB",
+          "period": "month"
+        },
+        "externalId": "srv-1042"
+      },
+      "hardware": {
+        "cores": 4,
+        "ramBytes": 17179869184,
+        "diskBytes": 107374182400,
+        "model": "Example CPU",
+        "laptop": false,
+        "os": "linux",
+        "arch": "amd64",
+        "updatedAt": "2026-10-30T17:50:00Z"
+      },
+      "load": {
+        "cpuPct": 37.5,
+        "ramPct": 61.2,
+        "diskPct": 48.0,
+        "at": "2026-10-30T17:58:00Z"
+      },
+      "week": {
+        "chats": 42,
+        "calls": 1860,
+        "unpriced": 12,
+        "spend": {
+          "usd": 48.3,
+          "shown": 3936.5
         }
-      }
+      },
+      "managed": {
+        "budget": true,
+        "env": false,
+        "resources": true,
+        "access": true
+      },
+      "activeOps": [
+        {
+          "id": "o2resizeaaaaaaaaaaaa",
+          "machineId": "h2runneraaaaaaaaaaaa",
+          "kind": "resize",
+          "status": "running",
+          "params": {
+            "cpu": 8,
+            "ramGB": 32,
+            "diskGB": 160
+          },
+          "error": null,
+          "createdBy": "u2annaaaaaaaaaaaaaaa",
+          "createdAt": "2026-10-30T17:55:00Z",
+          "updatedAt": "2026-10-30T17:56:00Z",
+          "finishedAt": null,
+          "chatsNow": null
+        }
+      ]
     },
     {
       "id": "h2productaaaaaaaaaaa",
@@ -117,7 +184,36 @@
         }
       ],
       "problems": [],
-      "cloud": null
+      "cloud": null,
+      "hardware": {
+        "cores": 2,
+        "ramBytes": 8589934592,
+        "diskBytes": 85899345920,
+        "model": "Example CPU",
+        "laptop": false,
+        "os": "linux",
+        "arch": "amd64",
+        "updatedAt": "2026-10-30T17:50:00Z"
+      },
+      "load": {
+        "cpuPct": null,
+        "ramPct": 22.0,
+        "diskPct": null,
+        "at": "2026-10-30T17:58:00Z"
+      },
+      "week": {
+        "chats": 9,
+        "calls": 240,
+        "unpriced": 0,
+        "spend": null
+      },
+      "managed": {
+        "budget": false,
+        "env": false,
+        "resources": false,
+        "access": false
+      },
+      "activeOps": []
     }
   ]
 }

@@ -150,6 +150,11 @@ func TestStandaloneStartWritesThePreviousRuntimesFiles(t *testing.T) {
 		t.Error("the Codex launcher is the release's")
 	}
 	delete(got, "codex-launcher.js")
+	// the script Claude's PermissionRequest runs, new in this runtime.
+	if !strings.Contains(got["permission-hook.sh"], "provider=claude-permission") {
+		t.Error("the permission hook script")
+	}
+	delete(got, "permission-hook.sh")
 	for name := range got {
 		t.Errorf("written beyond the previous runtime's start: %s", name)
 	}

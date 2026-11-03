@@ -123,7 +123,7 @@ func TestWriteRules(t *testing.T) {
 		Permissions map[string][]string `json:"permissions"`
 	}
 	_ = json.Unmarshal([]byte(read(t, w.HooksPath())), &settings)
-	if !slices.Equal(settings.Permissions["allow"], []string{"mcp__acme-preview", "mcp__oldmux-preview"}) || len(settings.Hooks) != 7 {
+	if !slices.Equal(settings.Permissions["allow"], []string{"mcp__acme-preview", "mcp__oldmux-preview"}) || len(settings.Hooks) != 8 {
 		t.Fatalf("%+v", settings)
 	}
 	past := time.Now().Add(-time.Hour)
@@ -316,7 +316,7 @@ func TestStatusHookScriptPosts(t *testing.T) {
 	before := time.Now().UnixMilli()
 	cmd := exec.Command("sh", w.StatusHookPath(), "notification")
 	cmd.Env = append(os.Environ(), "HOME="+home, "PATH="+bin+":"+os.Getenv("PATH"))
-	cmd.Stdin = strings.NewReader(`{"hook_event_name":"Notification","notification_type":"permission_prompt"}`)
+	cmd.Stdin = strings.NewReader(`{"session_id":"9764fa81-4c34-4673-af5e-6f243c9d8be1","transcript_path":"/h/.claude/projects/-w/9764fa81-4c34-4673-af5e-6f243c9d8be1.jsonl","hook_event_name":"Notification","notification_type":"permission_prompt"}`)
 	start := time.Now()
 	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
@@ -325,8 +325,8 @@ func TestStatusHookScriptPosts(t *testing.T) {
 		t.Fatal("the hook must return at once")
 	}
 	var body struct {
-		Event, Session, NotificationType string
-		At                               int64
+		Event, Session, NotificationType, AgentSessionID string
+		At                                               int64
 	}
 	select {
 	case raw := <-got:
@@ -336,11 +336,28 @@ func TestStatusHookScriptPosts(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("nothing posted")
 	}
-	if body.Event != "notification" || body.Session != "tab-session" || body.NotificationType != "permission_prompt" || body.At < before-1000 || body.At > time.Now().UnixMilli() {
+	if body.Event != "notification" || body.Session != "tab-session" || body.NotificationType != "permission_prompt" ||
+		body.AgentSessionID != "9764fa81-4c34-4673-af5e-6f243c9d8be1" || body.At < before-1000 || body.At > time.Now().UnixMilli() {
 		t.Fatalf("%+v", body)
 	}
 	if srv.headers.Get("x-acme-token") != token || srv.headers.Get("x-omux-token") != token {
 		t.Fatalf("headers %v", srv.headers)
+	}
+
+	// A stop whose JSON names no session (or something that is not an id) posts none: the runtime takes it as before.
+	cmd = exec.Command("sh", w.StatusHookPath(), "stop")
+	cmd.Env = append(os.Environ(), "HOME="+home, "PATH="+bin+":"+os.Getenv("PATH"))
+	cmd.Stdin = strings.NewReader(`{"session_id":"x\",\"event\":\"stop","hook_event_name":"Stop"}`)
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case raw := <-got:
+		if strings.Contains(raw, "agentSessionId") || !strings.Contains(raw, `"event":"stop"`) {
+			t.Fatalf("%q", raw)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("nothing posted")
 	}
 }
 

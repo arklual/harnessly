@@ -30,6 +30,9 @@ export const VIEWERS: Record<'admin' | 'lead' | 'member', Viewer> = {
   member: { id: 'u-andrey-m', name: 'Андрей', role: 'member', teamId: 'tm-front' },
 };
 
+/** The mock organization has every feature on, so the gallery shows the whole new hub. */
+export const MOCK_FEATURES = ['ui.hx', 'env', 'catalog', 'machine.resources', 'org.events'];
+
 export const shellMock = (ctx: MockCtx): ShellApi => ({
   shell: async (org, tenant) => {
     const known = ORGS.find((o) => o.slug === org);
@@ -47,6 +50,7 @@ export const shellMock = (ctx: MockCtx): ShellApi => ({
       })),
       teams: ctx.role === 'member' ? TEAMS.filter((t) => t.id === viewer.teamId) : TEAMS,
       orgs: ORGS,
+      features: MOCK_FEATURES,
     });
   },
 });

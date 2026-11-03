@@ -81,7 +81,7 @@ describe('QuestionCard', () => {
   });
 });
 
-// HRN-600: the card folded for an answer in the chat. Enter in the field does what the card's button does.
+// the card folded for an answer in the chat. Enter in the field does what the card's button does.
 describe('Enter in the field', () => {
   const one: Question = { ...question, items: [question.items[0]] };
 

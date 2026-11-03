@@ -110,6 +110,7 @@
   "next.gate.planAuto": "Edit without asking",
   "next.gate.planModeLabel": "How to work by the plan",
   "next.gate.planTitle": "Plan",
+  "next.gate.dialogTitle": "The agent is waiting for an answer",
   "next.gate.retry": "Retry",
   "next.gate.revise": "Revise",
   "next.gate.slow": "The agent takes longer than usual…",

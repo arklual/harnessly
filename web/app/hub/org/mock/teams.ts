@@ -13,6 +13,7 @@ import type {
   Needs,
   Person,
   TeamBlock,
+  TeamExtras,
   TeamsApi,
   TeamsView,
 } from '../api/teams';
@@ -317,6 +318,12 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
   const selfId = role === 'lead' ? 'p-anya' : 'p-andrey';
   const leadTeam = 'tm-front';
   let tenantLimit = TENANT_LIMIT;
+  // The team «Фронт» also works in the tenant «Платформа»: its limit and environment are its own there.
+  const platformState = { tenantLimit: 200_000, teamLimit: 40_000, teamSpent: 16_000 };
+  const machinesPer = new Map<string, number>([
+    ['product:tm-front', 2],
+    ['platform:tm-front', 1],
+  ]);
   const teams = TEAMS.map((t) => ({ ...t }));
   const people = SEED.map((p) => ({ ...p }));
   const limitSetAt = new Map<string, number>();
@@ -426,6 +433,7 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
       effective: eff,
       chatsWeek: p.chats ?? null,
       mrsWeek: p.mrs ?? null,
+      machines: p.invited ? null : (p.chats ?? 0) > 30 ? 2 : (p.chats ?? 0) > 0 ? 1 : 0,
       self: isSelf,
       can: {
         limit: canLimit,
@@ -460,8 +468,38 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
     needs: role === 'admin' ? null : 'tenant_admin',
   });
 
-  const view = (): TeamsView => {
-    const blocks: TeamBlock[] = [
+  const extrasOf = (t: T, slug: string): TeamExtras => {
+    const inPlatform = t.id === 'tm-front';
+    const isPlatform = slug === 'platform';
+    const members = people.filter((p) => p.team === t.id);
+    const now = members.reduce((n, p) => n + (personRow(p).machines ?? 0), 0);
+    const per = machinesPer.get(`${slug}:${t.id}`) ?? 2;
+    const tenantLimitRub = isPlatform ? platformState.tenantLimit : tenantLimit;
+    const tenantSpentRub = isPlatform
+      ? platformState.tenantLimit - 140_000
+      : people.reduce((n, p) => n + p.spent, 0);
+    return {
+      tenants: inPlatform
+        ? [
+            { slug: 'product', name: 'Продукт' },
+            { slug: 'platform', name: 'Платформа' },
+          ]
+        : [{ slug: 'product', name: 'Продукт' }],
+      tenantName: isPlatform ? 'Платформа' : 'Продукт',
+      tenantLimitRub,
+      tenantSpentRub,
+      machinesPerPerson: per,
+      machinesNow: isPlatform ? 3 : now,
+      machinesFree: 6,
+      accounts: isPlatform ? 'Claude Max ×1' : 'Claude Max ×2, Codex ×1',
+      secrets: isPlatform ? 3 : 7,
+      env: isPlatform ? { skills: 2, mcp: 2, repos: 1, docs: 1 } : { skills: 3, mcp: 3, repos: 1, docs: 1 },
+    };
+  };
+
+  const view = (slug = 'product'): TeamsView => {
+    const platform = slug === 'platform';
+    const productBlocks: TeamBlock[] = [
       ...teams.map((t): TeamBlock => {
         const members = people.filter((p) => p.team === t.id);
         const handed = members.reduce((n, p) => n + (p.limit ?? 0), 0);
@@ -479,6 +517,7 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
           needs: { limit: canTeamLimit ? null : 'tenant_admin' },
           people: members.map(personRow),
           rules: (rules.get(t.id) ?? []).map(ruleRow),
+          extras: extrasOf(t, slug),
         };
       }),
       ...(role === 'admin'
@@ -500,6 +539,16 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
           ]
         : []),
     ].filter((b) => role !== 'lead' || b.id === leadTeam);
+    const blocks: TeamBlock[] = platform
+      ? productBlocks
+          .filter((b) => b.id === 'tm-front')
+          .map((b) => ({
+            ...b,
+            spentRub: platformState.teamSpent,
+            limitRub: platformState.teamLimit,
+            siblingsLimitRub: 0,
+          }))
+      : productBlocks;
     const all = people.filter(visible);
     const spent = all.reduce((n, p) => n + p.spent, 0);
     const mine = teamOf(leadTeam);
@@ -515,9 +564,9 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
               needs: 'tenant_admin',
             }
           : {
-              label: 'Тенант Продукт',
-              limitRub: tenantLimit,
-              spentRub: spent,
+              label: platform ? 'Тенант Платформа' : 'Тенант Продукт',
+              limitRub: platform ? platformState.tenantLimit : tenantLimit,
+              spentRub: platform ? platformState.tenantLimit - 140_000 : spent,
               setBy: 'Андрей',
               can: { limit: role === 'admin' },
               needs: role === 'admin' ? null : 'org_admin',
@@ -545,8 +594,8 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
   };
 
   return {
-    teamsView: () => later(view()),
-    setLimit: async (_o, _s, on: LimitScope, amount) => {
+    teamsView: (_o, slug) => later(view(slug)),
+    setLimit: async (_o, s, on: LimitScope, amount) => {
       if (on.kind === 'user') {
         const p = find(on.id);
         forbid(p, 'limit');
@@ -566,13 +615,15 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
         if (!t) throw new OrgApiError('not_found', 'team not found');
         if (role !== 'admin') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
         if (amount === null) throw new OrgApiError('invalid_request', 'У команды лимит есть всегда.');
+        const inPlatform = s === 'platform';
         log(
           'limit.set',
           { kind: 'team', id: t.id, label: t.name },
-          { limitRub: t.limit },
+          { limitRub: inPlatform ? platformState.teamLimit : t.limit },
           { limitRub: amount },
         );
-        t.limit = amount;
+        if (inPlatform) platformState.teamLimit = amount;
+        else t.limit = amount;
       } else {
         if (role !== 'admin') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
         if (amount === null) throw new OrgApiError('invalid_request', 'У тенанта лимит есть всегда.');
@@ -584,17 +635,24 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
         );
         tenantLimit = amount;
       }
-      return later(view(), 500);
+      return later(view(s), 500);
     },
-    setRuleAmount: async (_o, _s, ruleId, amount) => {
+    setMachinesPerPerson: async (_o, s, teamId, n) => {
+      if (role === 'member') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
+      if (!Number.isInteger(n) || n < 1 || n > 3)
+        throw new OrgApiError('invalid_request', 'Машин на человека — от 1 до 3.');
+      machinesPer.set(`${s}:${teamId}`, n);
+      return later(view(s), 400);
+    },
+    setRuleAmount: async (_o, s, ruleId, amount) => {
       if (role !== 'admin') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
       for (const list of rules.values()) {
         const r = list.find((x) => x.id === ruleId);
         if (r) r.amount = amount;
       }
-      return later(view(), 400);
+      return later(view(s), 400);
     },
-    setRole: async (_o, _s, personId, next) => {
+    setRole: async (_o, s, personId, next) => {
       const p = find(personId);
       forbid(p, 'role');
       log(
@@ -604,9 +662,9 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
         { role: next },
       );
       p.role = next;
-      return later(view(), 500);
+      return later(view(s), 500);
     },
-    moveToTeam: async (_o, _s, personId, teamId) => {
+    moveToTeam: async (_o, s, personId, teamId) => {
       const p = find(personId);
       forbid(p, 'team');
       log(
@@ -616,9 +674,9 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
         { team: teamOf(teamId)?.name ?? null },
       );
       p.team = teamId;
-      return later(view(), 500);
+      return later(view(s), 500);
     },
-    removeFromTenant: async (_o, _s, personId) => {
+    removeFromTenant: async (_o, s, personId) => {
       const p = find(personId);
       forbid(p, 'remove');
       log(
@@ -628,16 +686,16 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
         null,
       );
       people.splice(people.indexOf(p), 1);
-      return later(view(), 500);
+      return later(view(s), 500);
     },
-    createTeam: async (_o, _s, name) => {
+    createTeam: async (_o, s, name) => {
       if (role !== 'admin') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
       const trimmed = name.trim();
       if (trimmed.length < 1 || trimmed.length > 60)
         throw new OrgApiError('invalid_request', 'Название — от 1 до 60 знаков.');
       teams.push({ id: `tm-${seq++}`, name: trimmed, lead: '', limit: 50_000 });
       log('team.create', { kind: 'team', id: trimmed, label: trimmed }, null, { name: trimmed });
-      return later(view(), 500);
+      return later(view(s), 500);
     },
     teamsAudit: async (_o, _s, before): Promise<AuditPage> => {
       const list =

@@ -345,3 +345,43 @@ func unwrapped(line string) string {
 	inner, _ := agents.UnwrapAnyShell(line)
 	return inner
 }
+
+func TestHubLoadAndRestartRoutes(t *testing.T) {
+	exited := make(chan int, 1)
+	c := &hubConsole{base: "", now: time.Now, busy: func() int { return 3 }, exit: func(code int) { exited <- code },
+		agent: func(r *http.Request) bool { return r.Header.Get("X-Test-Agent") == "yes" }}
+
+	if rec := c.do("POST", "/api/agent/load", "{}", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("load without the agent's session: %d", rec.Code)
+	}
+	rec := c.do("POST", "/api/agent/load", "{}", asAgent)
+	var got struct {
+		ChatsNow int `json:"chatsNow"`
+	}
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &got) != nil || got.ChatsNow != 3 {
+		t.Fatalf("load: %d %s", rec.Code, rec.Body)
+	}
+
+	if rec := c.do("POST", "/api/agent/restart", "{}", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("restart without the agent's session: %d", rec.Code)
+	}
+	select {
+	case <-exited:
+		t.Fatal("the runtime exited for a caller that is not the agent")
+	case <-time.After(1500 * time.Millisecond):
+	}
+	if rec := c.do("GET", "/api/agent/restart", "", asAgent); rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("restart by GET: %d", rec.Code)
+	}
+	if rec := c.do("POST", "/api/agent/restart", "{}", asAgent); rec.Code != http.StatusOK {
+		t.Fatalf("restart: %d", rec.Code)
+	}
+	select {
+	case code := <-exited:
+		if code != exitRestart {
+			t.Fatalf("exit code %d, want %d", code, exitRestart)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the runtime did not exit")
+	}
+}

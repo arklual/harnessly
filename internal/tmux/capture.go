@@ -55,6 +55,31 @@ func (t *Tmux) GrowDetached(name string, cols, rows int) bool {
 	return true
 }
 
+// CaptureStyledTall is the styled screen at no less than cols×rows with the page's terminal attached: it is paused, made
+// that large, captured and given its size back, about 0.6 s the person can see. false with no such terminal, or one
+// that large already.
+func (t *Tmux) CaptureStyledTall(term Terminal, name string, cols, rows int) (string, bool) {
+	if term == nil {
+		return "", false
+	}
+	curCols, curRows, known := term.Size(name)
+	if !known || curCols >= cols && curRows >= rows {
+		return "", false
+	}
+	origCols, origRows, ok := term.Pause(name)
+	if !ok {
+		return "", false
+	}
+	defer func() {
+		term.Resize(name, origCols, origRows)
+		t.sleep(resizeSettle)
+		term.Resume(name)
+	}()
+	term.Resize(name, max(curCols, cols), max(curRows, rows))
+	t.sleep(resizeSettle)
+	return t.CaptureStyled(name)
+}
+
 // Terminal is the page's terminal attached to a session (internal/terminal's Server is one).
 type Terminal interface {
 	// Size is the size the page gave the terminal; false when no page has it open.

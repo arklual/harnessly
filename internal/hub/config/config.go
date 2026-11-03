@@ -38,6 +38,18 @@ type Config struct {
 	// Secure is whether the public URL is https: cookies carry Secure and the __Host- prefix.
 	Secure bool
 
+	// AgentURL (HUB_AGENT_URL) is the address machines reach the hub at, without a trailing slash; the default is
+	// PublicURL. Every URL built for a machine (installer, manifest, registration, ssh install, runtime domain) and the
+	// host a machine signs its dial for come from it; people's links, cookies and sign-in come from PublicURL.
+	AgentURL string
+	// AgentHost is the agent URL's host (with :port when not default), lower-case.
+	AgentHost string
+	// AgentSecure is whether the agent URL is https.
+	AgentSecure bool
+
+	// Features (HUB_FEATURES_FORCE, HUB_FEATURES_DEFAULT) are the instance's say over the organizations' flags.
+	Features Features
+
 	DatabaseURL string
 	DataDir     string
 
@@ -61,6 +73,9 @@ type Config struct {
 	GitHub GitHub
 	Yandex Yandex
 	OIDC   []OIDC
+	// ProxyJWT signs people in on the address of a gateway in front of the hub that vouches for them with a signed
+	// assertion of its own (Teleport application access); off when JWKSURL is empty.
+	ProxyJWT ProxyJWT
 
 	RuntimeDomain string
 	// AllowSameSiteRuntime (HUB_ALLOW_SAME_SITE_RUNTIME) lets the cloud edition run machines on a domain that shares its
@@ -104,12 +119,26 @@ type Config struct {
 	// LimitsEnforce (HUB_LIMITS_ENFORCE) is what the machines do with the limits (docs/hub/limits.md): off sends them
 	// nothing (the hub still shows the limits), warn makes a stop only a notice, stop stops new chats.
 	LimitsEnforce string
+	// EnvFeatures (HUB_ENV_FEATURES) are the parts of the environment section that are on for every organization: "env"
+	// (the layers and the machines' lists), "catalog" (the catalog of skills, MCP servers, repositories and documents);
+	// empty: off, the endpoints answer 404 not_enabled (docs/hub/environment.md).
+	EnvFeatures []string
+	// Machines holds the settings of the machine resources and access (machines.go).
+	Machines MachinesConfig
 	// RatesURL (HUB_RATES_URL) is where the Central Bank's daily rates are read; "" is cbr.ru, "off" never fetches (money
 	// is then shown in dollars).
 	RatesURL string
 	TermsURL string
 	WebDir   string
 	LogLevel string
+}
+
+// Features is the instance level of the organizations' flags (internal/hub/features). A name in Force is decided by the
+// instance, on or off, whatever an organization chose (`name` forces it on, `-name` off); a name in Default is what an
+// organization without a choice gets (`name` on, `-name` off). Without either a flag is off.
+type Features struct {
+	Force   map[string]bool
+	Default map[string]bool
 }
 
 // SitesS3 is an S3-compatible bucket for the sites' files (MinIO, Selectel). Endpoint empty: a folder.
@@ -148,6 +177,20 @@ type GitHub struct{ ClientID, ClientSecret, URL string }
 // Yandex is the Yandex ID app.
 type Yandex struct{ ClientID, ClientSecret string }
 
+// ProxyJWT is a gateway that answers for its people with a JWT on every request (HUB_PROXY_JWT_*). The hub
+// believes the assertion only on Host, the address people reach the gateway by, and sets no cookie there.
+type ProxyJWT struct {
+	JWKSURL    string
+	Issuer     string // empty: any issuer the keys sign for
+	Audience   string
+	Header     string
+	EmailClaim string
+	Host       string // lower-case host[:port]
+}
+
+// On says whether the hub takes the assertions.
+func (p ProxyJWT) On() bool { return p.JWKSURL != "" }
+
 // OIDC is one generic OpenID Connect provider. Scopes is empty for the default `openid email profile`.
 type OIDC struct {
 	ID, Name, Issuer, ClientID, ClientSecret string
@@ -180,7 +223,7 @@ func (c *Config) SubdomainMode() bool { return c.RuntimeDomain != "" }
 // port when it has one (development).
 func (c *Config) RuntimeHost(machineID string) string {
 	h := machineID + "." + c.RuntimeDomain
-	if _, port, ok := strings.Cut(c.Host, ":"); ok && port != "" {
+	if _, port, ok := strings.Cut(c.AgentHost, ":"); ok && port != "" {
 		h += ":" + port
 	}
 	return h
@@ -202,7 +245,7 @@ func (c *Config) MachineIDFromHost(host string) string {
 		return ""
 	}
 	h := hostName(host)
-	if h == hostName(c.Host) {
+	if h == hostName(c.Host) || h == hostName(c.AgentHost) {
 		return ""
 	}
 	id, ok := strings.CutSuffix(h, "."+c.RuntimeDomain)
@@ -299,6 +342,19 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		}
 	}
 
+	// The machines' address: the public one unless HUB_AGENT_URL says otherwise.
+	c.AgentURL, c.AgentHost, c.AgentSecure = c.PublicURL, c.Host, c.Secure
+	if raw := strings.TrimRight(get("HUB_AGENT_URL"), "/"); raw != "" {
+		switch u, err := url.Parse(raw); {
+		case err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil:
+			bad("HUB_AGENT_URL must be http(s)://host[:port] without a path, got %q", raw)
+		default:
+			c.AgentURL, c.AgentHost, c.AgentSecure = raw, strings.ToLower(u.Host), u.Scheme == "https"
+		}
+	}
+	c.Features.Force = featureList(get("HUB_FEATURES_FORCE"), "HUB_FEATURES_FORCE", bad)
+	c.Features.Default = featureList(get("HUB_FEATURES_DEFAULT"), "HUB_FEATURES_DEFAULT", bad)
+
 	if c.Edition != EditionSelfHosted && c.Edition != EditionCloud {
 		bad("HUB_EDITION must be self-hosted or cloud, got %q", c.Edition)
 	}
@@ -324,6 +380,16 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	default:
 		bad("HUB_ORGS must be off, shadow or on, got %q", c.Orgs)
 	}
+	for _, f := range strings.FieldsFunc(strings.ToLower(def("HUB_ENV_FEATURES", "")), func(r rune) bool { return r == ',' || r == ' ' }) {
+		switch f {
+		case "env", "catalog":
+			c.EnvFeatures = append(c.EnvFeatures, f)
+		case "all":
+			c.EnvFeatures = append(c.EnvFeatures, "env", "catalog")
+		default:
+			bad("HUB_ENV_FEATURES takes env, catalog or all, got %q", f)
+		}
+	}
 	switch strings.ToLower(def("HUB_USAGE_INGEST", "off")) {
 	case "on", "true", "1", "yes":
 		c.UsageIngest = true
@@ -337,6 +403,7 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 		bad("HUB_LIMITS_ENFORCE must be off, warn or stop, got %q", c.LimitsEnforce)
 	}
 	c.RatesURL = get("HUB_RATES_URL")
+	c.Machines = loadMachines(lookup, def, bad)
 	switch strings.ToLower(def("HUB_SSH_ALLOW_PRIVATE", "off")) {
 	case "on", "true", "1", "yes":
 		c.SSHAllowPrivate = true
@@ -457,6 +524,23 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	}
 	sort.Slice(c.OIDC, func(i, j int) bool { return c.OIDC[i].ID < c.OIDC[j].ID })
 
+	c.ProxyJWT = ProxyJWT{
+		JWKSURL: get("HUB_PROXY_JWT_JWKS_URL"), Issuer: get("HUB_PROXY_JWT_ISSUER"), Audience: get("HUB_PROXY_JWT_AUDIENCE"),
+		Header: def("HUB_PROXY_JWT_HEADER", "Teleport-Jwt-Assertion"), EmailClaim: def("HUB_PROXY_JWT_EMAIL_CLAIM", "sub"),
+		Host: strings.ToLower(strings.TrimSpace(get("HUB_PROXY_JWT_HOST"))),
+	}
+	if c.ProxyJWT.On() {
+		if u, err := url.Parse(c.ProxyJWT.JWKSURL); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			bad("HUB_PROXY_JWT_JWKS_URL must be an http(s) URL")
+		}
+		if c.ProxyJWT.Audience == "" || c.ProxyJWT.Host == "" {
+			bad("HUB_PROXY_JWT_JWKS_URL needs HUB_PROXY_JWT_AUDIENCE and HUB_PROXY_JWT_HOST")
+		}
+		if c.ProxyJWT.Host == c.Host {
+			bad("HUB_PROXY_JWT_HOST must be the gateway's address, not the hub's own %q", c.Host)
+		}
+	}
+
 	switch strings.ToLower(def("HUB_ALLOW_SAME_SITE_RUNTIME", "0")) {
 	case "1", "on", "true", "yes":
 		c.AllowSameSiteRuntime = true
@@ -507,6 +591,7 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	if c.Edition == EditionCloud {
 		// The cloud runs no OIDC and no machine next to the hub (docs/hub/architecture.md, OSS and cloud).
 		c.OIDC = nil
+		c.ProxyJWT = ProxyJWT{}
 		c.LocalCodeFile = ""
 		c.SSHAllowPrivate = false
 	}
@@ -599,4 +684,27 @@ func (c *Config) loadSites(get func(string) string, def func(string, string) str
 			c.Warnings = append(c.Warnings, msg)
 		}
 	}
+}
+
+var featureName = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,63}$`)
+
+// featureList reads `a,b,-c` into a→true, b→true, c→false.
+func featureList(raw, env string, bad func(string, ...any)) map[string]bool {
+	out := map[string]bool{}
+	for _, f := range strings.Split(raw, ",") {
+		f = strings.ToLower(strings.TrimSpace(f))
+		if f == "" {
+			continue
+		}
+		on := true
+		if rest, ok := strings.CutPrefix(f, "-"); ok {
+			f, on = rest, false
+		}
+		if !featureName.MatchString(f) {
+			bad("%s: %q is not a feature name", env, f)
+			continue
+		}
+		out[f] = on
+	}
+	return out
 }

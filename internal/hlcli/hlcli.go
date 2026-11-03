@@ -223,6 +223,16 @@ func (c *cli) run(args []string) error {
 		return c.site(rest)
 	case "app", "apps":
 		return c.app(rest)
+	case "connections", "connection":
+		return c.connections(rest)
+	case "issues":
+		return c.issues(rest)
+	case "issue":
+		return c.issue(rest)
+	case "pages":
+		return c.pages(rest)
+	case "page":
+		return c.page(rest)
 	}
 	return usageErr("unknown command %q", cmd)
 }

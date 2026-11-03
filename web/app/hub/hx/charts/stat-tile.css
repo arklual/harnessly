@@ -1,0 +1,124 @@
+/* The stat tiles of the board's pages (strip, bars): the design keeps these rules in its chart library, so they are
+   written here once for the hub. The tile, the strip and the bars animate with transform and opacity only. */
+.sx-wrap {
+  position: relative;
+}
+.sx-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--t-space-3, 0.75rem);
+}
+@media (max-width: 767px) {
+  .sx-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .sx-grid > .sx-tile {
+    flex: 0 0 10.5rem;
+    scroll-snap-align: start;
+  }
+}
+@keyframes sx-in {
+  0% {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+@keyframes sx-grow {
+  0% {
+    transform: scaleX(0);
+  }
+}
+@keyframes sx-rise {
+  0% {
+    transform: scaleY(0);
+  }
+}
+.sx-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-inline-size: 0;
+  padding: 0.875rem 0.875rem 1rem;
+  border: 0;
+  border-radius: 1.125rem;
+  background: color-mix(in srgb, var(--t-text-primary) 3%, var(--t-bg-canvas));
+  color: var(--t-text-primary);
+  font: inherit;
+  text-align: start;
+  animation: sx-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--sx-i, 0) * 50ms + 80ms);
+}
+.sx-tile__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.sx-tile__icon {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sx-tone, #7c5cff) 22%, transparent);
+  color: var(--sx-tone, #a08bff);
+}
+.sx-tile__chart {
+  display: flex;
+  align-items: flex-end;
+  block-size: 1.75rem;
+  margin-block: 0.875rem 0.75rem;
+}
+.sx-tile__label {
+  font-size: 0.9375rem;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--t-text-primary);
+}
+.sx-tile__value {
+  margin-block-start: 0.25rem;
+  font: var(--t-font-ui-s);
+  color: var(--t-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sx-strip {
+  display: flex;
+  gap: 2px;
+  inline-size: 100%;
+  block-size: 0.375rem;
+}
+.sx-strip__part {
+  flex: var(--sx-w, 1) 1 0;
+  min-inline-size: 2px;
+  border-radius: 999px;
+  background: var(--sx-c, #7c5cff);
+  transform-origin: left;
+  animation: sx-grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--sx-i, 0) * 50ms + 0.22s);
+}
+.sx-strip__part--muted {
+  background: color-mix(in srgb, var(--t-text-primary) 14%, transparent);
+}
+.sx-bars {
+  inline-size: 100%;
+  block-size: 1.75rem;
+}
+.sx-bars rect {
+  fill: color-mix(in srgb, var(--sx-tone, #7c5cff) 35%, transparent);
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: sx-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: 0.24s;
+}
+.sx-bars rect[data-recent] {
+  fill: var(--sx-tone, #7c5cff);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sx-tile,
+  .sx-strip__part,
+  .sx-bars rect {
+    animation: none;
+  }
+}

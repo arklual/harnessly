@@ -57,7 +57,7 @@ func PriceProvider(cli, baseURLHost string) string {
 }
 
 // PriceKey is the price list's key of a model at a provider; "" when the model names none. A Claude model whose family
-// key is not in the list gets no price here, never a neighbour family's (HRN-550).
+// key is not in the list gets no price here, never a neighbour family's.
 func PriceKey(provider, model string) string {
 	switch provider {
 	case ProviderAnthropic:

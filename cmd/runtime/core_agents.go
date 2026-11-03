@@ -128,6 +128,8 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 	// The Telegram bots and the safe go into the prompt of every agent that starts (internal/notifybots, internal/secrets).
 	bots, promptDir := notifybots.Open(c.DataDir), filepath.Join(c.DataDir, "launch-prompts")
 	shared := notifySharedFor(c.DataDir)
+	// The person's MCP servers (Settings → Connections) go to every agent that starts, through the runtime's proxy.
+	mcpEnabled := mcpEnabledOf(c.DataDir)
 	return &coreAgents{
 		profiles: profiles,
 		gpt:      gpt,
@@ -149,13 +151,15 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			Profiles:        launcher,
 			Apps: &apps.Launcher{Registry: apps.Open(c.DataDir), GuardCommand: appGuardCommand(), MCPConfigPath: filepath.Join(c.DataDir, "preview-mcp.json"),
 				Boundary: appBoundary(), AgentToken: (&gate.CLIToken{DataDir: c.DataDir}).IssueAgent},
+			ExtraMCP: mcpClaudeConfig(mcpEnabled, filepath.Join(c.DataDir, "preview-mcp.json"), filepath.Join(c.DataDir, "mcp")),
 		},
 		codexLauncher:  filepath.Join(c.DataDir, "codex-launcher.js"),
 		launcherScript: launcherScriptConfig(c),
 		codexArgs: codex.LaunchConfig{
 			Hooks: &codex.HookConfig{Script: filepath.Join(c.DataDir, "codex-hook.sh"), UserConfig: filepath.Join(c.Home, ".codex", "config.toml"),
 				BudgetScript: budgetScript(c.DataDir)},
-			MCP: codexMCP(c),
+			MCP:      codexMCP(c),
+			ExtraMCP: mcpCodexServers(mcpEnabled, codexMCP(c), c.Port),
 			WorkspacePrompt: withNotifyBots(bots, shared, promptDir,
 				withSafe(c.SafePrompt, promptDir, func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "codex-prompt.md") })),
 			SkipPermissions:  skipPermissions(c.ConfigFile),

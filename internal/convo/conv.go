@@ -2,6 +2,8 @@ package convo
 
 import (
 	"math"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -22,8 +24,15 @@ import (
 const (
 	// LookEvery is how often an actor looks at its pane and reads its transcript when nothing told it to.
 	LookEvery = time.Second
+	// LookStarting is how often a starting agent's pane is looked at: the moment it can take the first message is
+	// noticed by its screen (BootSettle) when the SessionStart hook is late or lost, so a look a second apart made the
+	// first message wait up to a second more for nothing. A look is two tmux calls (pane info, capture) off the actor and
+	// never two at once (observe), and only the few conversations that are starting look this often.
+	LookStarting = 250 * time.Millisecond
 	// BootSettle is how long a freshly started agent's screen must stand unchanged, its input box drawn, before it
-	// counts as ready for the first message.
+	// counts as ready for the first message. Kept at 1.5 s on purpose: Claude 2.1.317 on a loaded machine was
+	// seen not showing keys typed up to two seconds after its box was drawn, and a lost first Enter costs more (a retry
+	// backing off from 1.5 s) than the settle does. What made the launch slow was the look a second apart, not this.
 	BootSettle = 1500 * time.Millisecond
 	// QuietAfter is how long a working or unknown agent must look quiet — not busy, its prompt box up, no menu, the
 	// transcript not growing — before the actor takes it as done.
@@ -60,6 +69,8 @@ const (
 // whether its session came back. Every look is a few tmux calls, and a runtime holds many conversations.
 func (c *conv) lookEvery() time.Duration {
 	switch c.rec.State.K {
+	case wire.StateStarting:
+		return LookStarting
 	case wire.StateIdle, wire.StateReady:
 		return 3 * LookEvery
 	case wire.StateStopped, wire.StateGone, wire.StateLaunchFailed:
@@ -94,8 +105,13 @@ type conv struct {
 	bootFirst time.Time
 	probe     Probe
 
-	quietSince time.Time
-	quietSize  int64
+	// promptAsked is when the agent's hook said it waits on a person, until a card stands for that.
+	promptAsked time.Time
+	// dialogPlain and dialogSince: the menu no tool call named, as it stands on the screen, and since when.
+	dialogPlain string
+	dialogSince time.Time
+	quietSince  time.Time
+	quietSize   int64
 	// quietTurn: the turn ended on silence, not by the transcript; the agent seen at work again opens it again.
 	quietTurn string
 	// compactAt: when the agent's state took compacting (see CompactHold).
@@ -198,6 +214,19 @@ type gate struct {
 	q        *wire.Question
 	p        *wire.Permission
 	closedAt time.Time
+	// reply is the agent's permission hook, waiting for the person's decision: it takes the answer, no key is pressed.
+	// Closed with no answer once the gate ends some other way. nil: the answer goes to the menu on the screen.
+	reply chan PermissionReply
+	// ask is what the hook asked.
+	ask PermissionAsk
+}
+
+// optionsOnMenu are the options that must stand on the screen for the card to work: none while the hook takes the answer.
+func (g *gate) optionsOnMenu() []wire.PermissionOption {
+	if g.reply != nil {
+		return nil
+	}
+	return g.p.Options
 }
 
 func (g *gate) id() string {
@@ -554,6 +583,10 @@ func (c *conv) setGateState(g *gate, st wire.GateState, now time.Time) {
 	*g.state() = st
 	if st.K == wire.GateStateAnswered || st.K == wire.GateStateClosed {
 		g.closedAt = now
+		if g.reply != nil {
+			close(g.reply)
+			g.reply = nil
+		}
 		if c.rec.Gate != nil && c.rec.Gate.ID == g.id() {
 			c.setGate(nil)
 		}
@@ -789,6 +822,10 @@ func (c *conv) signal(s feed.Signal, now time.Time) {
 		}
 	case feed.SignalPlan:
 		p := *s.Permission
+		if c.screenPlanOf(p.TurnID) {
+			// Claude writes the call only once the menu is answered: the card the screen opened stood for it.
+			return
+		}
 		if c.look != nil && c.look.Menu == typist.MenuPlan {
 			p.Options = permissionOptions(c.look.Options, true)
 		}
@@ -991,14 +1028,14 @@ func (c *conv) seeing(s seen, now time.Time) {
 	case typist.MenuPermission:
 		c.permissionOnScreen(look, now)
 	case typist.MenuPlan:
-		if id := c.rec.State.PermissionID; id != "" {
-			if g := c.openGate(id); g != nil && g.p != nil && len(g.p.Options) == 0 {
-				g.p.Options = permissionOptions(look.Options, true)
-				c.dirty = true
-			}
-		}
+		c.planOnScreen(look, now)
+	case typist.MenuOther:
+		c.dialogOnScreen(look, now)
 	}
-	if look.Menu == typist.NoMenu && k == wire.StateWaitingPermission && (look.Busy || look.InputLine && c.fd.OpenTurn() == "") {
+	if look.Menu != typist.MenuOther {
+		c.dialogPlain, c.dialogSince = "", time.Time{}
+	}
+	if look.Menu == typist.NoMenu && k == wire.StateWaitingPermission && (look.Busy || look.InputLine && (c.fd.OpenTurn() == "" || c.onDialog())) {
 		// The prompt left and the agent works: it went past the permission. A prompt asked after the turn (a background
 		// agent's) leaves the input box behind, with no spinner of the chat's own.
 		c.input(agentstate.Input{K: agentstate.GateResolved}, now)
@@ -1027,6 +1064,8 @@ func (c *conv) seeing(s seen, now time.Time) {
 	if look.PromptReady() && look.Menu == typist.NoMenu {
 		c.limitOnScreen(look.Plain, now)
 	}
+	c.promptUnseen(look, now)
+	c.resumeHookGates(now)
 	c.updateNow(now)
 }
 
@@ -1057,6 +1096,7 @@ var screenGateFrom = map[wire.AgentStateKind]bool{wire.StateWorking: true, wire.
 // permissionOnScreen: Claude's permission prompt is up. Its gate is the pending tool call's; the hook said so first,
 // or the screen does now.
 func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
+	c.leaveDialog(now)
 	if c.rec.State.PermissionID == "" {
 		if _, ok := c.fd.PendingTool(); !ok {
 			// The menu is drawn after the call is written, and the read that came before the look may be older than
@@ -1066,7 +1106,7 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 	}
 	if id := c.rec.State.PermissionID; id != "" {
 		if g := c.openGate(id); g != nil && g.p != nil {
-			if len(g.p.Options) == 0 {
+			if g.reply == nil && len(look.Options) > len(g.p.Options) {
 				g.p.Options = permissionOptions(look.Options, false)
 				c.dirty = true
 			}
@@ -1112,6 +1152,156 @@ func (c *conv) permissionOnScreen(look typist.Screen, now time.Time) {
 	c.gateOnScreen(g, look, now)
 }
 
+// planOnScreen: Claude's plan approval is up. Claude writes the ExitPlanMode call only once the menu is answered, so the
+// screen opens the card when the transcript has not.
+func (c *conv) planOnScreen(look typist.Screen, now time.Time) {
+	c.leaveDialog(now)
+	if c.rec.State.PermissionID == "" {
+		c.read(now)
+	}
+	if id := c.rec.State.PermissionID; id != "" {
+		if g := c.openGate(id); g != nil && g.p != nil && g.reply == nil && len(look.Options) > len(g.p.Options) {
+			g.p.Options = permissionOptions(look.Options, true)
+			c.dirty = true
+		}
+		return
+	}
+	if k := c.rec.State.K; k != wire.StateWorking && k != wire.StateUnknown {
+		return
+	}
+	md := planText(look.Plain)
+	p := wire.Permission{ID: c.screenGateID(), ConversationID: c.rec.ID, Kind: wire.PermPlan, AskedAt: ms(now), PlanMD: &md,
+		Options: permissionOptions(look.Options, true), State: wire.GateState{K: wire.GateStateOpen}}
+	c.placeScreenGate(&p)
+	if c.addGate(&gate{p: &p}) {
+		c.input(agentstate.Input{K: agentstate.PlanProposed, GateID: p.ID}, now)
+	}
+}
+
+// planFileMax is the most of a plan file a card carries.
+const planFileMax = 256 << 10
+
+// planText is the plan the dialog stands for: its file, which holds it whole, else as far as the screen draws it.
+func planText(plain string) string {
+	if name := typist.DrawnPlanFile(plain); name != "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			if raw, err := os.ReadFile(filepath.Join(home, ".claude", "plans", name)); err == nil && len(raw) <= planFileMax {
+				return string(raw)
+			}
+		}
+	}
+	return typist.DrawnPlan(plain)
+}
+
+// screenGateID is the id of a gate no tool call named.
+func (c *conv) screenGateID() string { return wire.PermissionID(c.rec.ID + ":" + itoa(c.seq+1)) }
+
+// placeScreenGate puts the card in its turn: the open one, else the last.
+func (c *conv) placeScreenGate(p *wire.Permission) {
+	if open := c.fd.OpenTurn(); open != "" {
+		p.TurnID = &open
+	} else if last := c.fd.LastTurn(); last != nil {
+		id := last.ID
+		p.TurnID = &id
+	}
+}
+
+// screenPlanOf: the screen opened a plan's card in this turn.
+func (c *conv) screenPlanOf(turn *string) bool {
+	prefix := wire.PermissionID(c.rec.ID + ":")
+	for _, id := range c.order {
+		g := c.gates[id]
+		if g == nil || g.p == nil || g.p.Kind != wire.PermPlan || !strings.HasPrefix(id, prefix) {
+			continue
+		}
+		if turn == nil || g.p.TurnID == nil || *turn == *g.p.TurnID {
+			return true
+		}
+	}
+	return false
+}
+
+// DialogHold is how long a menu nobody announced stands on the screen before the chat asks the person about it: the
+// typist's own dialogs and the menus that go by themselves are gone by then.
+const DialogHold = 5 * time.Second
+
+// dialogOnScreen: a menu no tool call named stands on the screen, in place of the input box, during a turn. The agent
+// waits on it, and whatever it is, the person gets the card; a picker the person opened between turns gets none.
+func (c *conv) dialogOnScreen(look typist.Screen, now time.Time) {
+	if id := c.rec.State.PermissionID; id != "" {
+		// A card keeps the options it opened with: what it approves does not change under the person.
+		if g := c.openGate(id); g != nil && g.p != nil && g.p.Kind != wire.PermPlan {
+			c.gateOnScreen(g, look, now)
+		}
+		return
+	}
+	if c.rec.State.K != wire.StateWorking || c.typing || look.Busy || look.InputLine || c.fd.OpenTurn() == "" {
+		c.dialogPlain, c.dialogSince = "", time.Time{}
+		return
+	}
+	if c.dialogPlain != look.Plain || c.dialogSince.IsZero() {
+		c.dialogPlain, c.dialogSince = look.Plain, now
+		return
+	}
+	if now.Sub(c.dialogSince) < DialogHold {
+		return
+	}
+	c.dialogPlain, c.dialogSince = "", time.Time{}
+	if look.Cut() {
+		// Not all of it is drawn and it may be a permission: the person reads it in the terminal.
+		look.Options = nil
+	}
+	c.openDialog(look, now)
+}
+
+// openDialog opens the card of a wait no tool call named, with what the screen shows of it.
+func (c *conv) openDialog(look typist.Screen, now time.Time) {
+	request := look.Request
+	p := wire.Permission{ID: c.screenGateID(), ConversationID: c.rec.ID, Kind: wire.PermDialog, AskedAt: ms(now), PlanMD: &request,
+		Options: permissionOptions(look.Options, false), State: wire.GateState{K: wire.GateStateOpen}}
+	c.placeScreenGate(&p)
+	g := &gate{p: &p}
+	if c.addGate(g) {
+		c.input(agentstate.Input{K: agentstate.PermissionPrompt, GateID: p.ID}, now)
+		c.gateOnScreen(g, look, now)
+	}
+}
+
+// promptUnseen: the hook said the agent waits on a person, and after DialogHold no card stands for it and the agent is
+// neither at work nor at its input box. Whatever is on the screen, the person is told: with no options to offer, the
+// card sends them to the terminal.
+func (c *conv) promptUnseen(look typist.Screen, now time.Time) {
+	if c.promptAsked.IsZero() {
+		return
+	}
+	st := c.rec.State
+	known := look.Menu == typist.MenuPermission || look.Menu == typist.MenuPlan || look.Menu == typist.MenuQuestion
+	if st.PermissionID != "" || st.QuestionID != "" || look.Busy || look.PromptReady() || known || c.typing || !screenGateFrom[st.K] {
+		c.promptAsked = time.Time{}
+		return
+	}
+	if now.Sub(c.promptAsked) < DialogHold {
+		return
+	}
+	c.promptAsked = time.Time{}
+	// Nothing ties this wait to what the screen shows, so the card offers no option: only the terminal.
+	look.Options = nil
+	c.openDialog(look, now)
+}
+
+// leaveDialog: a card for a menu no tool call named gives way to the permission or the plan now read off the screen.
+func (c *conv) leaveDialog(now time.Time) {
+	if c.onDialog() {
+		c.input(agentstate.Input{K: agentstate.GateResolved}, now)
+	}
+}
+
+// onDialog: the chat waits on a menu no tool call named: nothing in the transcript will say it went.
+func (c *conv) onDialog() bool {
+	g := c.openGate(c.rec.State.PermissionID)
+	return g != nil && g.p != nil && g.p.Kind == wire.PermDialog
+}
+
 // autoDenyDrift is how far the countdown on the screen may differ from the one the gate carries before it is said again.
 const autoDenyDrift = 3 * time.Second
 
@@ -1120,12 +1310,20 @@ const autoDenyDrift = 3 * time.Second
 // itself when its prompt says so.
 func (c *conv) gateOnScreen(g *gate, look typist.Screen, now time.Time) {
 	st := *g.state()
-	if st.K != wire.GateStateOpen || g.p == nil || g.p.Kind != wire.PermTool {
+	if st.K != wire.GateStateOpen || g.p == nil || g.p.Kind == wire.PermPlan {
 		return
 	}
 	next := wire.GateState{K: wire.GateStateOpen}
-	for i, o := range g.p.Options {
-		want := typist.PickWant{N: i + 1, Label: o.Label, Cwd: c.rec.Cwd}
+	if len(g.p.Options) == 0 {
+		refused := wire.GateRefusedMenuUnmatched
+		next.Refused = &refused
+	}
+	// The hook takes the answer: whatever the screen shows, the card's options work.
+	for i, o := range g.optionsOnMenu() {
+		want := typist.PickWant{N: i + 1, Label: o.Label, Cwd: c.rec.Cwd, Dialog: g.p.Kind == wire.PermDialog}
+		if want.Dialog && g.p.PlanMD != nil {
+			want.Request = *g.p.PlanMD
+		}
 		if n, err := strconv.Atoi(o.ID); err == nil {
 			want.N = n
 		}

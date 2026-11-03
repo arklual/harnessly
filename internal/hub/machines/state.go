@@ -85,9 +85,25 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	s.setPolicy(ctx, m, hello.Policy)
 	s.Publish(ctx, m)
 
-	events := subscribed
+	events := slices.Clone(subscribed)
 	if s.usage != nil && slices.Contains(hello.Features, hubproto.FeatureUsage) {
-		events = append(slices.Clone(subscribed), hubproto.EventUsageAvailable)
+		events = append(events, hubproto.EventUsageAvailable)
+	}
+	if s.gate != nil {
+		// The load and the progress of a restart are asked for only by a hub that has the resources side wired.
+		s.res.mu.Lock()
+		s.res.features[m.ID] = slices.Clone(hello.Features)
+		s.res.mu.Unlock()
+		if slices.Contains(hello.Features, hubproto.FeatureMetrics) {
+			events = append(events, hubproto.EventMetricsSample)
+		}
+		if slices.Contains(hello.Features, hubproto.FeatureDrain) {
+			events = append(events, hubproto.EventRestart)
+		}
+		s.saveHardware(ctx, m, hello.Hardware)
+	}
+	if s.env != nil && slices.Contains(hello.Features, hubproto.FeatureEnvironment) {
+		events = append(slices.Clone(events), hubproto.EventEnvState)
 	}
 	if _, err := s.reg.Do(ctx, m.ID, hubproto.OpLinkSubscribe, map[string]any{"events": events}, callTimeout); err != nil {
 		s.log.Warn("events not subscribed", "machine", m.ID, "error", err)
@@ -97,6 +113,9 @@ func (s *Service) connected(l *link.Link, m store.Machine) {
 	}
 	if s.budget != nil {
 		s.budget.Connected(m.ID, hello)
+	}
+	if s.env != nil {
+		s.env.Connected(m.ID, hello)
 	}
 	if _, err := s.RunPreflight(ctx, m); err != nil {
 		s.log.Info("first preflight failed", "machine", m.ID, "error", err)
@@ -117,6 +136,10 @@ func (s *Service) disconnected(_ *link.Link, m store.Machine, current bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = s.db.S().TouchMachine(ctx, m.ID, s.now().UTC())
+	s.res.mu.Lock()
+	delete(s.res.features, m.ID)
+	delete(s.res.latest, m.ID)
+	s.res.mu.Unlock()
 	s.Publish(ctx, m)
 }
 
@@ -163,9 +186,24 @@ func (s *Service) onEvent(_ *link.Link, m store.Machine, ev link.Event) {
 		if json.Unmarshal(ev.Raw, &e) == nil {
 			s.setPolicy(ctx, m, e.Policy)
 		}
+	case hubproto.EventEnvState:
+		var e struct{ State hubproto.EnvState }
+		if s.env != nil && json.Unmarshal(ev.Raw, &e) == nil {
+			s.env.Reported(m.ID, e.State)
+		}
 	case hubproto.EventUsageAvailable:
 		if s.usage != nil {
 			s.usage.Trigger(m.ID)
+		}
+	case hubproto.EventMetricsSample:
+		var e struct{ Sample hubproto.MetricsSample }
+		if s.gate != nil && json.Unmarshal(ev.Raw, &e) == nil {
+			s.onSample(ctx, m, e.Sample)
+		}
+	case hubproto.EventRestart:
+		var e struct{ Restart hubproto.RestartEvent }
+		if s.gate != nil && json.Unmarshal(ev.Raw, &e) == nil {
+			s.onRestart(ctx, m, e.Restart)
 		}
 	}
 }
@@ -318,4 +356,16 @@ func (s *Service) RunPreflight(ctx context.Context, m store.Machine) (json.RawMe
 		return nil, err
 	}
 	return s.setPreflight(ctx, m, report), nil
+}
+
+// saveHardware remembers what the machine said it is made of, for an organization that has the resources feature on.
+func (s *Service) saveHardware(ctx context.Context, m store.Machine, hw *hubproto.Hardware) {
+	if hw == nil || !s.on(ctx, m.SpaceID) {
+		return
+	}
+	h := store.MachineHW{MachineID: m.ID, Cores: max(hw.Cores, 0), RAMTotal: max(hw.RAMBytes, 0), DiskTotal: max(hw.DiskBytes, 0),
+		OS: clamp(hw.OS, 32), Arch: clamp(hw.Arch, 32), Model: clamp(hw.Model, 200), Laptop: hw.Laptop, UpdatedAt: s.now().UTC()}
+	if err := s.db.S().PutHW(ctx, h); err != nil {
+		s.log.Warn("hardware not saved", "machine", m.ID, "error", err)
+	}
 }

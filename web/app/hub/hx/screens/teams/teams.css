@@ -1,0 +1,170 @@
+/* «Команды» и «Команда»: only what the board's own classes do not cover. */
+.ad .tm-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+.ad .tm-sk__tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.ad .tm-sk__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+@media (max-width: 760px) {
+  .ad .tm-sk__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.ad .tm-fail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, #d9534a 8%, transparent);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+}
+.ad .tm-fail > .hx-icon {
+  flex: none;
+  color: #c4372f;
+}
+.ad .tm-fail > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.ad .tm-err {
+  color: #c4372f;
+}
+.ad .tm-first {
+  margin-top: 0;
+}
+.ad .tm-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ad .tm-inline .hx-set__input {
+  flex: 1;
+  min-width: 0;
+}
+.ad .tm-copy {
+  margin-top: 12px;
+}
+.ad .tm-invites {
+  margin-top: 4px;
+}
+.ad .tm-actions {
+  flex: none;
+}
+
+/* A seg and a slider that the person may look at but not change. */
+.ad .hx-set__seg[data-off='true'] {
+  opacity: 0.55;
+}
+.ad .hx-set__seg[data-off='true'] .hx-set__seg-item {
+  cursor: default;
+}
+.ad .md-sl[aria-disabled='true'] {
+  opacity: 0.55;
+}
+.ad .md-sl[aria-disabled='true'] .md-sl__track {
+  cursor: default;
+}
+
+/* Parts of a row of the team page that open a person. */
+.ad .tm-hit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ad .tm-hit:focus-visible {
+  outline: 2px solid var(--hx-primary);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.ad .tm-row {
+  cursor: default;
+}
+.ad .tm-lim-btn {
+  cursor: pointer;
+}
+
+/* A phone: the board draws no narrower step than 980, so the head and the group row get theirs here. */
+@container (max-width: 560px) {
+  .ad .ad-head {
+    flex-wrap: wrap;
+  }
+  .ad .ad-head .hx-set__titles {
+    flex: 1 1 100%;
+  }
+  .ad .ad-tools {
+    padding-top: 0;
+  }
+  .ad .tg-head {
+    grid-template-columns: 16px 28px minmax(0, 1fr) 32px;
+    row-gap: 0;
+  }
+  .ad .tg-head > .mo-g__chev,
+  .ad .tg-head > .tg-dot,
+  .ad .tg-head > .tg-gear {
+    grid-row: 1 / span 2;
+  }
+  .ad .tg-head > .mo-g__chev {
+    grid-column: 1;
+  }
+  .ad .tg-head > .tg-dot {
+    grid-column: 2;
+  }
+  .ad .tg-head > .tg-gear {
+    grid-column: 4;
+  }
+  .ad .tg-head > .tg-bar {
+    display: none;
+  }
+  .ad .tg-head > .tg-sum {
+    grid-column: 3;
+    grid-row: 2;
+    text-align: left;
+    font-size: var(--hx-text-xs);
+    font-weight: 400;
+    color: var(--hx-fg-3);
+  }
+  .ad .tg-head > .mo-g__t {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .ad .pt-row,
+  .ad .tg .pt-row {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 10px;
+    padding-left: 16px;
+  }
+  .ad .pt-row > :nth-child(2),
+  .ad .pt-lim i,
+  .ad .pt-row.mt-head {
+    display: none;
+  }
+  .ad .pt-lim {
+    grid-template-columns: auto;
+  }
+}

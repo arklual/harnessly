@@ -10,6 +10,7 @@ import type {
   MachinesSummary,
   OrgMachine,
   PersonRef,
+  ResourceQuote,
   RestartWhat,
   RestartWhen,
   ResourcePlan,
@@ -111,26 +112,24 @@ const SEEDS: Seed[] = [
   },
   {
     id: 'm5',
-    name: 'lena-02',
-    owner: 'Лена',
+    name: 'andrey-gpu',
+    owner: 'Андрей',
     tenant: PRODUCT,
     team: BACK,
     state: 'offline',
     sinceH: 5,
-    hw: [16, 64, 500, 'Лена'],
+    hw: [8, 32, 250, 'Ubuntu 22.04'],
     runner: ['0.16.28', true],
     week: 14,
   },
   {
     id: 'm6',
-    name: 'dima-03',
-    owner: 'Дима',
+    name: 'migrate-01',
     purpose: 'миграции',
     tenant: PRODUCT,
-    team: BACK,
     chats: 0,
     load: [9, 31, 33],
-    hw: [8, 32, 250, 'Дима'],
+    hw: [8, 32, 250, 'Ubuntu 24.04'],
     runner: ['0.16.30', false],
     week: 9,
   },
@@ -151,6 +150,7 @@ const SEEDS: Seed[] = [
     name: 'pasha-05',
     owner: 'Паша',
     tenant: PRODUCT,
+    team: BACK,
     state: 'idle',
     sinceH: 9 * 24,
     chats: 0,
@@ -243,9 +243,12 @@ const SUBS: Record<string, string> = {
 /** A smooth deterministic curve around `base`, so the same machine always draws the same picture. */
 const curve = (seed: number, base: number): number[] =>
   Array.from({ length: 24 }, (_, i) => {
+    if (i === 23) return base; // the last point is the current reading, as in the list
     const v = base + Math.sin(i * 0.9 + seed) * 6 + Math.cos(i * 0.37 + seed * 2) * 4;
     return Math.max(1, Math.min(100, Math.round(v)));
   });
+
+const COUNTS_PER_USD = 0.55;
 
 const build = (s: Seed, role: MockCtx['role'], now: number): OrgMachine => {
   const state = s.state ?? 'online';
@@ -272,12 +275,24 @@ const build = (s: Seed, role: MockCtx['role'], now: number): OrgMachine => {
     cpu: reach ? (s.load?.[0] ?? 5) : null,
     ram: reach ? (s.load?.[1] ?? 20) : null,
     disk: reach ? (s.load?.[2] ?? 30) : null,
-    hw: { cores, ramGb, diskGb, note },
+    hw: { cores, ramGb, diskGb, note: s.cloud === false ? note : '' },
     cloud: s.cloud ?? true,
     runnerVersion: s.runner?.[0] ?? '0.16.30',
     runnerOutdated: s.runner?.[1] ?? false,
     weekCostUsd: role === 'member' ? null : (s.week ?? 0),
     monthPriceRub: (s.cloud ?? true) ? 450 * cores + 120 * ramGb + 8 * diskGb : null,
+    mine: s.owner !== undefined && s.owner === VIEWERS[role].name,
+    weekChats: role === 'member' ? null : Math.round((s.week ?? 0) * COUNTS_PER_USD),
+    os: s.cloud === false ? 'macOS 15' : s.hw?.[3] && s.hw[3].startsWith('Ubuntu') ? s.hw[3] : 'Ubuntu 24.04',
+    rent:
+      (s.cloud ?? true)
+        ? {
+            provider: 'Selectel',
+            plan: `${cores} vCPU · ${ramGb} ГБ`,
+            price: { amount: (450 * cores + 120 * ramGb + 8 * diskGb) * 100, currency: 'RUB' },
+          }
+        : null,
+    managed: { budget: true, env: true, resources: true, access: true },
     canManage: role === 'admin' || (role === 'lead' && ownTeam),
     canAdmin: role === 'admin',
     needs: role === 'admin' ? null : 'tenant_admin',
@@ -344,6 +359,7 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
     access: access.get(m.id) ?? { mode: 'owner', people: [] },
     candidates: PEOPLE,
     teamLabel: m.teamName,
+    consoleUrl: m.cloud ? 'https://console.example.invalid/servers' : null,
     audience: { team: m.teamId ? 9 : null, tenant: 28 },
   });
   const need = (m: OrgMachine, admin: boolean) => {
@@ -356,7 +372,7 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
     ms: number,
     done: (m: OrgMachine) => OrgMachine,
   ) => {
-    put({ ...m, busy: { kind, chats: m.chats ?? 0 } });
+    put({ ...m, busy: { kind, chats: m.chats ?? 0, opId: `op-${m.id}`, cancellable: kind === 'drain' } });
     await later(null, ms);
     const cur = get(m.id);
     put({ ...done(cur), busy: null });
@@ -365,7 +381,8 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
 
   return {
     machinesList: async (_org, { scope }) => {
-      const all = [...store.values()].filter((m) => ctx.role !== 'lead' || m.teamId === VIEWERS.lead.teamId);
+      // a lead sees the whole tenant (acts only on the own team: `canManage`), a member only their own
+      const all = [...store.values()].filter((m) => ctx.role !== 'member' || m.mine === true);
       const inScope = scope === 'all' ? all : all.filter((m) => m.tenantSlug === scope);
       const byKey = new Map<string, OrgMachine[]>();
       for (const m of inScope) {
@@ -381,6 +398,7 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
           name,
           sub: SUBS[key] ?? '',
           tenantSlug: scope === 'all' ? key : null,
+          pinned: scope === 'all' && key === 'platform',
           total: ms.length,
           offline: ms.filter((m) => m.state === 'offline').length,
           idle: ms.filter((m) => m.state === 'idle').length,
@@ -389,7 +407,9 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
           machines: sorted.slice(0, 5),
         };
       });
-      groups.sort((a, b) => b.offline - a.offline || b.idle - a.idle || a.name.localeCompare(b.name));
+      // The organization lists the tenants where something is wrong first; a tenant keeps its teams in their order.
+      if (scope === 'all')
+        groups.sort((a, b) => b.offline - a.offline || b.idle - a.idle || a.name.localeCompare(b.name));
       const tenants =
         scope === 'all'
           ? [...new Map(all.map((m) => [m.tenantSlug, m.tenantName])).entries()].map(([slug, name]) => ({
@@ -414,11 +434,25 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
         monthPriceRub: 450 * to.cores + 120 * to.ramGb + 8 * to.diskGb,
       }));
     },
+    quoteResources: async (id, to): Promise<ResourceQuote> => {
+      const m = get(id);
+      const price = (c: number, r: number, d: number) => ({
+        amount: (450 * c + 120 * r + 8 * d) * 100,
+        currency: 'RUB',
+      });
+      const next = price(to.cores, to.ramGb, to.diskGb);
+      const current = price(m.hw.cores, m.hw.ramGb, m.hw.diskGb);
+      return later(
+        { price: next, current, delta: { amount: next.amount - current.amount, currency: 'RUB' } },
+        160,
+      );
+    },
+    openMachine: async (id) => later({ url: `#machine-${get(id).id}` }, 200),
     restartMachine: async (id, what: RestartWhat, when: RestartWhen) => {
       const m = get(id);
       need(m, false);
       if (when === 'after_chats' && (m.chats ?? 0) > 0) {
-        put({ ...m, busy: { kind: 'drain', chats: m.chats ?? 0 } });
+        put({ ...m, busy: { kind: 'drain', chats: m.chats ?? 0, opId: `op-${id}`, cancellable: true } });
         timers.set(
           id,
           setTimeout(() => put({ ...get(id), busy: null, chats: 0 }), 9000),

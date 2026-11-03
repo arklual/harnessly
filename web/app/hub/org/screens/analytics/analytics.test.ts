@@ -83,10 +83,12 @@ describe('what each role gets', () => {
     expect(d.peers?.title).toBe('Команды рядом');
     expect(d.waste?.items.length).toBeGreaterThan(0);
   });
-  it('draws a lead their people, an admin their teams', async () => {
+  it('draws a lead the same team lines as the board, a member only their own', async () => {
     const lead = await createOrgApi('mock', 'lead').analyticsChart(q, 'moneyPerMr');
     const admin = await createOrgApi('mock', 'admin').analyticsChart(q, 'moneyPerMr');
     expect(admin.lines.map((l) => l.name)).toContain('Фронт');
-    expect(lead.lines.map((l) => l.name)).not.toContain('Фронт');
+    expect(lead.lines.map((l) => l.name)).toContain('Фронт');
+    const member = await createOrgApi('mock', 'member').analyticsChart(q, 'moneyPerMr');
+    expect(member.lines.map((l) => l.name)).toEqual(['Мои']);
   });
 });

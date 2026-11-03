@@ -1,0 +1,174 @@
+{
+  "summary": {
+    "total": 3,
+    "byKind": {
+      "skill": 2,
+      "mcp": 1,
+      "repo": 0,
+      "doc": 0
+    },
+    "callsWeek": 4,
+    "top": [
+      {
+        "id": "item-review",
+        "name": "Ревью кода"
+      }
+    ],
+    "unused": 0,
+    "pinnedByOrg": 1
+  },
+  "layers": [
+    {
+      "layer": "org",
+      "scopeId": "org-acme",
+      "tenantId": "",
+      "title": "Организация Acme",
+      "subtitle": "есть во всех тенантах",
+      "locked": false,
+      "callsWeek": 4,
+      "counts": {
+        "skill": 1,
+        "mcp": 0,
+        "repo": 0,
+        "doc": 0
+      },
+      "items": [
+        {
+          "entryId": "entry-org-review",
+          "itemId": "item-review",
+          "kind": "skill",
+          "name": "Ревью кода",
+          "hint": "Ревью кода для работы",
+          "audience": {
+            "mode": "tenant",
+            "teams": []
+          },
+          "pinned": true,
+          "locked": false,
+          "lockedReason": null,
+          "enabled": true,
+          "callsWeek": 4,
+          "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
+          "lastUsedAt": "2026-11-01T14:20:00Z",
+          "unused": false
+        }
+      ]
+    },
+    {
+      "layer": "tenant",
+      "scopeId": "tenant-product",
+      "tenantId": "tenant-product",
+      "title": "Тенант Продукт",
+      "subtitle": "для всех команд тенанта",
+      "locked": false,
+      "callsWeek": 0,
+      "counts": {
+        "skill": 0,
+        "mcp": 0,
+        "repo": 0,
+        "doc": 0
+      },
+      "items": []
+    },
+    {
+      "layer": "tenant",
+      "scopeId": "tenant-platform",
+      "tenantId": "tenant-platform",
+      "title": "Тенант Платформа",
+      "subtitle": "для всех команд тенанта",
+      "locked": false,
+      "callsWeek": 0,
+      "counts": {
+        "skill": 0,
+        "mcp": 1,
+        "repo": 0,
+        "doc": 0
+      },
+      "items": [
+        {
+          "entryId": "entry-tenant-tracker",
+          "itemId": "item-tracker",
+          "kind": "mcp",
+          "name": "Трекер",
+          "hint": "Трекер для работы",
+          "audience": {
+            "mode": "tenant",
+            "teams": []
+          },
+          "pinned": false,
+          "locked": false,
+          "lockedReason": null,
+          "enabled": true,
+          "callsWeek": 0,
+          "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "lastUsedAt": null,
+          "unused": false
+        }
+      ]
+    },
+    {
+      "layer": "team",
+      "scopeId": "team-core",
+      "tenantId": "tenant-platform",
+      "title": "Команда Ядро",
+      "subtitle": "только людям команды · лид boris@example.com",
+      "locked": false,
+      "callsWeek": 4,
+      "counts": {
+        "skill": 1,
+        "mcp": 0,
+        "repo": 0,
+        "doc": 0
+      },
+      "items": [
+        {
+          "entryId": "entry-team-review",
+          "itemId": "item-review",
+          "kind": "skill",
+          "name": "Ревью кода",
+          "hint": "Ревью кода для работы",
+          "audience": {
+            "mode": "tenant",
+            "teams": []
+          },
+          "pinned": false,
+          "locked": true,
+          "lockedReason": "pinned_by_org",
+          "enabled": true,
+          "callsWeek": 4,
+          "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
+          "lastUsedAt": "2026-11-01T14:20:00Z",
+          "unused": false
+        }
+      ]
+    },
+    {
+      "layer": "team",
+      "scopeId": "team-side",
+      "tenantId": "tenant-platform",
+      "title": "Команда Сайд",
+      "subtitle": "только людям команды",
+      "locked": false,
+      "callsWeek": 0,
+      "counts": {
+        "skill": 0,
+        "mcp": 0,
+        "repo": 0,
+        "doc": 0
+      },
+      "items": []
+    }
+  ],
+  "teams": [
+    {
+      "id": "team-core",
+      "name": "Ядро",
+      "tenantId": "tenant-platform"
+    },
+    {
+      "id": "team-side",
+      "name": "Сайд",
+      "tenantId": "tenant-platform"
+    }
+  ]
+}

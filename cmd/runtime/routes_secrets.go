@@ -105,7 +105,7 @@ type cliSecret struct {
 }
 
 func secretRoutes(d deps, c *core) []gate.Route {
-	sf := newSafe(d)
+	sf := safeFor(d)
 	return sf.routes(d, func(session string) (string, string) { return convOf(c, session) })
 }
 

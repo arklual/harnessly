@@ -1,0 +1,9 @@
+{
+  "machineId": "h2runneraaaaaaaaaaaa",
+  "managed": {
+    "budget": true,
+    "env": false,
+    "resources": true,
+    "access": true
+  }
+}

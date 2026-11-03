@@ -15,6 +15,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
 	"github.com/ly-solutions/harnessly/internal/hub/authz"
 	"github.com/ly-solutions/harnessly/internal/hub/config"
+	"github.com/ly-solutions/harnessly/internal/hub/events"
+	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/ratelimit"
 	"github.com/ly-solutions/harnessly/internal/hub/rates"
@@ -41,6 +43,10 @@ type Deps struct {
 	LimitsChanged func()
 	// Rates is the exchange rate money is shown in; nil shows dollars.
 	Rates *rates.Book
+	// Features are the organizations' flags; nil: every flag is off.
+	Features *features.Store
+	// Events is the bus of the organizations' live stream; nil: there is none.
+	Events events.OrgBus
 }
 
 // Service is the organizations side of the hub.
@@ -54,11 +60,13 @@ type Service struct {
 
 	onLimits func()
 	rates    *rates.Book
+	features *features.Store
+	bus      events.OrgBus
 }
 
 // New makes the service.
 func New(d Deps) *Service {
-	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, lim: d.Limiter, log: d.Log, now: d.Now, onLimits: d.LimitsChanged, rates: d.Rates}
+	s := &Service{cfg: d.Config, db: d.DB, auth: d.Auth, lim: d.Limiter, log: d.Log, now: d.Now, onLimits: d.LimitsChanged, rates: d.Rates, features: d.Features, bus: d.Events}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -99,6 +107,8 @@ func (s *Service) Mount(mux *http.ServeMux) {
 	mux.Handle("POST /api/orgs/{org}/tenants/move", s.Gate(s.move))
 	s.mountTeams(mux)
 	s.mountLimits(mux)
+	s.mountFeatures(mux)
+	s.mountEvents(mux)
 }
 
 // Principal is the person as the rights module sees them.
@@ -237,7 +247,7 @@ func (s *Service) create(w http.ResponseWriter, r *http.Request, p *auth.Princip
 			return err
 		}
 	}
-	v, err := buildView(ctx, s.db.S(), Principal(p), o)
+	v, err := s.view(ctx, s.db.S(), p, o)
 	if err != nil {
 		return err
 	}
@@ -298,7 +308,7 @@ func (s *Service) get(w http.ResponseWriter, r *http.Request, p *auth.Principal)
 	if err != nil {
 		return err
 	}
-	v, err := buildView(ctx, st, Principal(p), o)
+	v, err := s.view(ctx, st, p, o)
 	if err != nil {
 		return err
 	}

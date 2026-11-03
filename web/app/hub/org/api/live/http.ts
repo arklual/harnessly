@@ -11,6 +11,11 @@ const CODES: Record<string, OrgApiError['code']> = {
   invalid_request: 'invalid_request',
   no_recipient: 'no_recipient',
   restart_unsupported: 'restart_unsupported',
+  exists: 'exists',
+  locked: 'locked',
+  name_taken: 'name_taken',
+  built_in: 'built_in',
+  not_enabled: 'not_enabled',
 };
 
 export type Query = Record<string, string | number | undefined>;

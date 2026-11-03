@@ -14,6 +14,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -81,6 +82,13 @@ type state struct {
 	Files    map[string]fileState  `json:"files"`
 	Sessions map[string]sessState  `json:"sessions"`
 	Idents   map[string]identState `json:"idents"`
+	// Tools are the tool facts written, by a hash of (session, day, kind, name): the totals as last written.
+	Tools map[string]toolState `json:"tools,omitempty"`
+}
+
+type toolState struct {
+	Calls  int64 `json:"calls"`
+	Errors int64 `json:"errors"`
 }
 
 // fileState: the first N rows of a transcript are written; Last is the key of row N-1, to notice a file that was
@@ -136,6 +144,9 @@ func New(cfg Config) (*Feed, error) {
 	if f.st.Idents == nil {
 		f.st.Idents = map[string]identState{}
 	}
+	if f.st.Tools == nil {
+		f.st.Tools = map[string]toolState{}
+	}
 	return f, nil
 }
 
@@ -170,6 +181,7 @@ type session struct {
 	first, last           float64 // epoch seconds
 	calls                 int
 	m                     metrics
+	tools                 map[toolDay]toolState
 }
 
 // sessionOf names the session a transcript belongs to. A Claude subagent's transcript carries its parent's session id
@@ -188,6 +200,61 @@ func sessionOf(e usagereport.Entry) (key, parent string) {
 		return f.SessionID, ""
 	}
 	return file, ""
+}
+
+// toolDay is one tool on one UTC day of a session.
+type toolDay struct{ day, kind, name string }
+
+// toolKey is a hash of the session, then a hash of the day, kind and name, so that the entries of a session that is gone
+// can be told by their start.
+func toolKey(sid string, td toolDay) string {
+	return toolSessionKey(sid) + sha256Hex(td.day+"\x00"+td.kind+"\x00"+td.name)
+}
+
+func toolSessionKey(sid string) string { return sha256Hex(sid) }
+
+func sha256Hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:8])
+}
+
+// addTools sums the named tool calls of a transcript by UTC day, tool kind and name. Calls older than the cutoff (epoch
+// ms) are left out, as are calls of no known time.
+func (s *session) addTools(fa *usagereport.Facts, cutoff int64) {
+	for _, c := range fa.ToolCalls {
+		if c.Ts <= 0 || c.Name == "" || ms(c.Ts) < cutoff {
+			continue
+		}
+		if s.tools == nil {
+			s.tools = map[toolDay]toolState{}
+		}
+		td := toolDay{day: time.UnixMilli(ms(c.Ts)).UTC().Format("2006-01-02"), kind: c.Kind, name: c.Name}
+		t := s.tools[td]
+		t.Calls++
+		if c.Error {
+			t.Errors++
+		}
+		s.tools[td] = t
+	}
+}
+
+// toolOrder is the session's tool days in a fixed order.
+func (s *session) toolOrder() []toolDay {
+	out := make([]toolDay, 0, len(s.tools))
+	for td := range s.tools {
+		out = append(out, td)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.day != b.day {
+			return a.day < b.day
+		}
+		if a.kind != b.kind {
+			return a.kind < b.kind
+		}
+		return a.name < b.name
+	})
+	return out
 }
 
 func ms(sec float64) int64 { return int64(math.Round(sec * 1000)) }
@@ -270,6 +337,7 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 		}
 		s.calls += len(fa.Messages)
 		s.m.add(fa)
+		s.addTools(fa, cutoff)
 		if fa.FirstTs > 0 && (s.first == 0 || fa.FirstTs < s.first) {
 			s.first = fa.FirstTs
 		}
@@ -375,6 +443,34 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 			}
 		}
 	}
+	// Tools after the sessions: the hub finds the session a tool fact belongs to.
+	for _, sid := range order {
+		s := sessions[sid]
+		for _, td := range s.toolOrder() {
+			cur := s.tools[td]
+			tk := toolKey(sid, td)
+			// A total never goes down: facts read back from the cache have no tool calls, and a session spread over
+			// several transcripts may be seen in part.
+			if prev, ok := f.st.Tools[tk]; ok && cur.Calls <= prev.Calls && (cur.Calls < prev.Calls || cur.Errors <= prev.Errors) {
+				continue
+			}
+			if f.full(len(batch)) {
+				if err := flush(); err != nil {
+					return written, err
+				}
+				return written, f.save()
+			}
+			f.st.Tools[tk] = cur
+			batch = append(batch, hubproto.UsageRecord{Kind: hubproto.UsageTool, Tool: &hubproto.UsageToolFact{
+				Provider: s.provider, SessionKey: s.key, Day: td.day, ToolKind: td.kind, ToolName: td.name, Calls: cur.Calls, Errors: cur.Errors,
+			}})
+			if len(batch) >= flushEvery {
+				if err := flush(); err != nil {
+					return written, err
+				}
+			}
+		}
+	}
 	if err := flush(); err != nil {
 		return written, err
 	}
@@ -382,6 +478,17 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 	for sid := range f.st.Sessions {
 		if sessions[sid] == nil {
 			delete(f.st.Sessions, sid)
+		}
+	}
+	// What was written of a session that is no longer in any transcript is forgotten with it. A session whose facts came
+	// from the cache keeps its entries, though they hold no tool calls.
+	liveTools := make(map[string]bool, len(sessions))
+	for sid := range sessions {
+		liveTools[toolSessionKey(sid)] = true
+	}
+	for k := range f.st.Tools {
+		if !liveTools[k[:16]] {
+			delete(f.st.Tools, k)
 		}
 	}
 	return written, f.save()

@@ -48,7 +48,7 @@ const RichLabel = ({ meta, custom }: { meta: TLinkMeta; custom: ReactNode | null
 
 const MessageLink = ({ href = '', children }: AnchorHTMLAttributes<HTMLAnchorElement>) => {
   const link = presentLink(href);
-  const meta = useLinkMeta(hasLinkMeta(link.kind) ? href : null);
+  const meta = useLinkMeta(hasLinkMeta(link) ? href : null);
   const raw = isRawText(href, children);
   const [viewing, setViewing] = useState<IAttachmentView | null>(null);
 

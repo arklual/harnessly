@@ -31,7 +31,7 @@ export type PermissionScope = 'once' | 'always' | 'deny' | 'plan-auto' | 'plan-a
 
 export interface Permission {
   id: string;
-  kind: 'tool' | 'plan';
+  kind: 'tool' | 'plan' | 'dialog';
   askedAt: Ms;
   tool: string | null;
   command: string | null;

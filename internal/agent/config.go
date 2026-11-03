@@ -32,7 +32,7 @@ type Config struct {
 	RuntimePort int
 	FilesPort   int
 
-	// UsageFeed builds what fills the usage outbox for a hub (HRN-588). It is a function handed in by cmd/agent because
+	// UsageFeed builds what fills the usage outbox for a hub. It is a function handed in by cmd/agent because
 	// the usage report that reads the transcripts imports this package. nil: the machine reports no spend.
 	UsageFeed func(UsageDeps) (UsageFeed, error)
 
@@ -69,7 +69,7 @@ type Config struct {
 	Machine     *MachineFile
 	MachineFile string
 	// ObserveMachine is the machine.json of a hub that only sees this machine while the agent keeps its closed cluster's
-	// link (AGENT_HUB_OBSERVE_FILE, HRN-596); nil when there is none, or when the agent is a hub's machine already.
+	// link (AGENT_HUB_OBSERVE_FILE); nil when there is none, or when the agent is a hub's machine already.
 	ObserveMachine     *MachineFile
 	ObserveMachineFile string
 	// PolicyFile is AGENT_POLICY_FILE ("": /etc/harnessly/policy.toml if there is one, else the account's).

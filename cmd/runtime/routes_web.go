@@ -21,8 +21,11 @@ type webConfig struct {
 	files fs.FS
 	// base is where the page lives ("" for the root); api is the prefix its API calls take.
 	base, api string
-	// meta is the page config written into <meta name="hl-config"> (web_config.go).
-	meta string
+	// meta is the page config written into <meta name="hl-config"> (web_config.go); pc is that config, and connHosts,
+	// when set, fills its connectionHosts on every load (the person connects trackers while the runtime runs).
+	meta      string
+	pc        pageConfig
+	connHosts func() []string
 	// name and mark are the product name and the URL of its mark (RUNTIME_APP_NAME, RUNTIME_APP_MARK_URL) for the
 	// browser's own tags: the tab icon and the name an installed app takes.
 	name, mark string
@@ -60,7 +63,7 @@ func webConfigFromEnv(standalone bool) *webConfig {
 func newWebConfig(files fs.FS) *webConfig {
 	base := appBase()
 	pc := pageConfigFromEnv()
-	c := &webConfig{files: files, base: base, api: base, meta: pageConfigMeta(pc), name: pc.ProductName}
+	c := &webConfig{files: files, base: base, api: base, meta: pageConfigMeta(pc), pc: pc, name: pc.ProductName}
 	if pc.MarkURL != nil {
 		c.mark = *pc.MarkURL
 	}
@@ -159,8 +162,14 @@ func (c *webConfig) page() ([]byte, error) {
 		[]byte(`<meta name="api-base" content="`+html.EscapeString(c.api)+`" />`), 1)
 	raw = bytes.Replace(raw, []byte(`<meta name="platform-api" content="/api/platform" />`),
 		[]byte(`<meta name="platform-api" content="`+html.EscapeString(platformAPI)+`" />`), 1)
-	if c.meta != "" {
-		raw = bytes.Replace(raw, []byte(`<meta name="hl-config" content="{}" />`), []byte(`<meta name="hl-config" content="`+c.meta+`" />`), 1)
+	meta := c.meta
+	if c.connHosts != nil {
+		pc := c.pc
+		pc.ConnectionHosts = list(c.connHosts())
+		meta = pageConfigMeta(pc)
+	}
+	if meta != "" {
+		raw = bytes.Replace(raw, []byte(`<meta name="hl-config" content="{}" />`), []byte(`<meta name="hl-config" content="`+meta+`" />`), 1)
 	}
 	if c.mark != "" {
 		raw = bytes.Replace(raw, []byte(`<link rel="icon" href="./logo.svg" type="image/svg+xml" />`),

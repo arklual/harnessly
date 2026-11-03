@@ -1,4 +1,4 @@
-import { artifactsOrigin, isArtifactsUrl, isBoardsUrl, isTrackerHost } from '@/lib/site';
+import { artifactsOrigin, isArtifactsUrl, isBoardsUrl, isConnectionUrl, isTrackerHost } from '@/lib/site';
 import { isGitlabHost, type TGitlabHost } from '@/lib/gitlab-hosts';
 import { docSlugOf, isDocReaderUrl } from '@/lib/hl-doc-path';
 import { t } from '@/lib/i18n';
@@ -32,7 +32,16 @@ export interface IArtifactMeta {
   description: string | null;
 }
 
-export type TLinkMeta = IIssueMeta | IMrMeta | IArtifactMeta;
+/** A wiki page of a connection (Confluence, MediaWiki, …). */
+export interface IPageMeta {
+  kind: 'page';
+  id: string;
+  title: string;
+  space?: string | null;
+  excerpt?: string | null;
+}
+
+export type TLinkMeta = IIssueMeta | IMrMeta | IArtifactMeta | IPageMeta;
 
 export type TIssueTone = 'done' | 'progress' | 'review' | 'open';
 
@@ -69,7 +78,15 @@ const MR_URL = /^\/((?:[\w.-]{1,100}\/){1,6}[\w.-]{1,100})\/-\/merge_requests\/(
 export type TLinkTarget =
   | { kind: 'issue'; key: string }
   | { kind: 'mr'; host: TGitlabHost; project: string; iid: number }
-  | { kind: 'artifact'; url: string };
+  | { kind: 'artifact'; url: string }
+  /** A link on a connection's instance: the runtime says whether it is an issue or a page. */
+  | { kind: 'connection'; url: string };
+
+/** A connection's link without its fragment: the runtime reads the issue or page it names. */
+const connectionTarget = (url: URL): TLinkTarget | null => {
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  return { kind: 'connection', url: `${url.origin}${url.pathname}${url.search}` };
+};
 
 /**
  * Strict allowlist of URLs the server may fetch metadata for; everything else is rejected. The tracker and the GitLab
@@ -87,7 +104,8 @@ export const parseLinkTarget = (raw: string): TLinkTarget | null => {
   const plainHttps = url.protocol === 'https:' && !url.port;
   if (plainHttps && isTrackerHost(url.hostname)) {
     const key = url.pathname.match(ISSUE_URL)?.[1];
-    return key ? { kind: 'issue', key } : null;
+    if (key) return { kind: 'issue', key };
+    return isConnectionUrl(url) ? connectionTarget(url) : null;
   }
   if (plainHttps && isGitlabHost(url.hostname)) {
     const mr = url.pathname.match(MR_URL);
@@ -104,13 +122,14 @@ export const parseLinkTarget = (raw: string): TLinkTarget | null => {
     if (k !== null && !/^[\w-]{1,64}$/.test(k)) return null;
     return { kind: 'artifact', url: `${url.origin}${url.pathname}${k ? `?k=${k}` : ''}` };
   }
+  if (isConnectionUrl(url)) return connectionTarget(url);
   return null;
 };
 
 /** Cache key that ignores fragments and irrelevant query parameters. */
-export const linkTargetKey = (target: TLinkTarget) =>
-  target.kind === 'issue'
-    ? `issue:${target.key}`
-    : target.kind === 'mr'
-      ? `mr:${target.host}/${target.project}!${target.iid}`
-      : `artifact:${target.url}`;
+export const linkTargetKey = (target: TLinkTarget): string => {
+  if (target.kind === 'issue') return `issue:${target.key}`;
+  if (target.kind === 'mr') return `mr:${target.host}/${target.project}!${target.iid}`;
+  if (target.kind === 'connection') return `connection:${target.url}`;
+  return `artifact:${target.url}`;
+};

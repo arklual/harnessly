@@ -78,8 +78,18 @@ type HubMachine struct {
 	People       []orgs.PersonRef `json:"people"`
 	Access       []AccessView     `json:"access"`
 	Problems     []string         `json:"problems"`
-	// Cloud is null: the hub does not know what the machine runs on (no cloud provider is connected to it).
-	Cloud any `json:"cloud"`
+	// Cloud is what the machine runs on, as its provider says; null when the hub knows no server of it.
+	Cloud *CloudView `json:"cloud"`
+	// Hardware is what the machine said it is made of; null when it said nothing.
+	Hardware *HardwareView `json:"hardware"`
+	// Load is the machine's load now; null when it is not connected or sent no reading.
+	Load *LoadView `json:"load"`
+	// Week is the machine's calls over the last seven days; null when it made none.
+	Week *WeekView `json:"week"`
+	// Managed says which parts of the machine the hub controls; null while the resources feature is off.
+	Managed *ManagedView `json:"managed"`
+	// ActiveOps are the operations running on the machine.
+	ActiveOps []OpView `json:"activeOps"`
 }
 
 // orgsOn says whether the person gets the organizations' API (HUB_ORGS: off is nobody, shadow instance administrators).
@@ -108,6 +118,7 @@ func (s *Service) mountOrg(mux *http.ServeMux) {
 	mux.Handle("POST /api/machines/{machineId}/disable", s.orgHandler(s.disable))
 	mux.Handle("POST /api/machines/{machineId}/enable", s.orgHandler(s.enable))
 	mux.Handle("POST /api/machines/{machineId}/restart", s.orgHandler(s.restart))
+	s.mountResources(mux)
 }
 
 // machineOf finds a live machine that sits in a tenant. An id that is no machine and a machine of no tenant are the same
@@ -141,6 +152,11 @@ func manage(ctx context.Context, st store.Store, p *auth.Principal, m store.Mach
 
 // journal writes the machine's change into the journal: at its team when it has one, else at its tenant.
 func (s *Service) journal(ctx context.Context, st store.Store, p *auth.Principal, m store.Machine, action string, before, after any) error {
+	return s.journalBy(ctx, st, p.User.ID, m, action, before, after)
+}
+
+// journalBy is journal for a change made by the person with the id.
+func (s *Service) journalBy(ctx context.Context, st store.Store, userID string, m store.Machine, action string, before, after any) error {
 	sc := tenantOf(m)
 	if m.TeamID != "" {
 		sc = authz.Scope{Kind: store.ScopeTeam, ID: m.TeamID}
@@ -149,7 +165,7 @@ func (s *Service) journal(ctx context.Context, st store.Store, p *auth.Principal
 	if err != nil {
 		return err
 	}
-	return st.AddAudit(ctx, orgs.Journal(chain, p.User.ID, action, "machine", m.ID, before, after, s.now().UTC()))
+	return st.AddAudit(ctx, orgs.Journal(chain, userID, action, "machine", m.ID, before, after, s.now().UTC()))
 }
 
 // HubMachines builds the organization's form of the machines, in the order given.
@@ -215,7 +231,11 @@ func (s *Service) HubMachines(ctx context.Context, st store.Store, ms []store.Ma
 			h.Access = append(h.Access, AccessView{Kind: e.Kind, ID: e.RefID, Label: label})
 		}
 		h.Problems = s.problems(m, h.Status, last, now)
+		h.ActiveOps = []OpView{}
 		out = append(out, h)
+	}
+	if err := s.enrich(ctx, st, ms, out, now); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -522,6 +542,7 @@ func (s *Service) enable(w http.ResponseWriter, r *http.Request, p *auth.Princip
 func (s *Service) setDisabled(w http.ResponseWriter, r *http.Request, p *auth.Principal, off bool) error {
 	ctx := r.Context()
 	id := r.PathValue("machineId")
+	changed := false
 	err := s.db.Tx(ctx, func(st store.Store) error {
 		m, err := machineOf(ctx, st, id)
 		if err != nil {
@@ -533,6 +554,7 @@ func (s *Service) setDisabled(w http.ResponseWriter, r *http.Request, p *auth.Pr
 		if (m.DisabledAt != nil) == off {
 			return nil
 		}
+		changed = true
 		action := "machine.enable"
 		var at *time.Time
 		if off {
@@ -555,24 +577,44 @@ func (s *Service) setDisabled(w http.ResponseWriter, r *http.Request, p *auth.Pr
 	if err != nil {
 		return err
 	}
+	// With the resources feature on and the server managed by the hub, switching the machine off or on also switches its
+	// server (the provider's power operations).
+	var power *store.MachineOp
+	if changed {
+		power = s.powerOp(ctx, m, p.User.ID, off)
+	}
 	h, err := s.hubMachine(ctx, st, id)
 	if err != nil {
 		return err
 	}
 	s.Publish(ctx, m)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"machine": h})
+	out := map[string]any{"machine": h}
+	if power != nil {
+		out["op"] = s.opView(*power)
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
 	return nil
 }
 
-// restart restarts the runner of a machine (the agent's runtime.restart) now or when its chats are done. A restart of
-// the virtual machine itself needs the cloud provider, which the hub is not connected to.
+// restart restarts a machine. For an organization without the resources feature that is the runner (the agent's
+// runtime.restart) now or when its chats are done; a restart of the server needs the provider, which that organization
+// does not have. With the feature on the restart is an operation (restartOn): the runner or the whole machine, now or
+// after a drain.
 func (s *Service) restart(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	var req struct {
-		What string `json:"what"`
-		When string `json:"when"`
-	}
+	var req restartRequest
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
+	}
+	ctx := r.Context()
+	m, err := machineOf(ctx, s.db.S(), r.PathValue("machineId"))
+	if err != nil {
+		return err
+	}
+	if err := manage(ctx, s.db.S(), p, m); err != nil {
+		return err
+	}
+	if s.on(ctx, m.SpaceID) {
+		return s.restartOn(w, r, p, m, req)
 	}
 	if req.What != "runner" && req.What != "vm" {
 		return httpx.Invalid("what", "what — runner или vm")
@@ -582,14 +624,6 @@ func (s *Service) restart(w http.ResponseWriter, r *http.Request, p *auth.Princi
 	}
 	if req.When != "now" && req.When != "after_chats" {
 		return httpx.Invalid("when", "when — now или after_chats")
-	}
-	ctx := r.Context()
-	m, err := machineOf(ctx, s.db.S(), r.PathValue("machineId"))
-	if err != nil {
-		return err
-	}
-	if err := manage(ctx, s.db.S(), p, m); err != nil {
-		return err
 	}
 	if req.What == "vm" {
 		return errRestartVM

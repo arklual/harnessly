@@ -78,6 +78,9 @@ type LaunchConfig struct {
 	Hooks           *HookConfig
 	// MCP is the runtime's MCP server; its URL needs the port the runtime listens on.
 	MCP MCP
+	// ExtraMCP gives, at every launch, more servers reached through the runtime with the same token (the person's MCP
+	// servers from Settings → Connections); nil adds none.
+	ExtraMCP func() []MCP
 	// WorkspacePrompt is a workspace's developer-instructions file; nil when workspaces have none.
 	WorkspacePrompt func(workspaceID string) string
 	// SkipPermissions adds --yolo when it says so.
@@ -164,6 +167,13 @@ func (c LaunchConfig) runtimeArgs(workspaceID, verb, session string, launch *age
 	}
 	args = append(args, hookArgs...)
 	args = append(args, MCPArgs(c.MCP)...)
+	if c.ExtraMCP != nil {
+		for _, m := range c.ExtraMCP() {
+			if m.Server != "" && m.URL != "" && m.Server != c.MCP.Server {
+				args = append(args, MCPArgs(m)...)
+			}
+		}
+	}
 	args = append(args, "--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false")
 	args = append(args, devArgs...)
 	args = append(args, c.shellEnvArgs(prof.KeyEnv)...)

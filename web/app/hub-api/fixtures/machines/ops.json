@@ -1,0 +1,51 @@
+{
+  "machineId": "h2runneraaaaaaaaaaaa",
+  "ops": [
+    {
+      "id": "o2resizeaaaaaaaaaaaa",
+      "machineId": "h2runneraaaaaaaaaaaa",
+      "kind": "resize",
+      "status": "running",
+      "params": {
+        "cpu": 8,
+        "ramGB": 32,
+        "diskGB": 160
+      },
+      "error": null,
+      "createdBy": "u2annaaaaaaaaaaaaaaa",
+      "createdAt": "2026-10-30T17:55:00Z",
+      "updatedAt": "2026-10-30T17:56:00Z",
+      "finishedAt": null,
+      "chatsNow": null
+    },
+    {
+      "id": "o2rebootaaaaaaaaaaaaa",
+      "machineId": "h2runneraaaaaaaaaaaa",
+      "kind": "reboot",
+      "status": "done",
+      "params": {},
+      "error": null,
+      "createdBy": "u2annaaaaaaaaaaaaaaa",
+      "createdAt": "2026-10-29T09:00:00Z",
+      "updatedAt": "2026-10-29T09:01:00Z",
+      "finishedAt": "2026-10-29T09:01:00Z",
+      "chatsNow": null
+    },
+    {
+      "id": "o2restartaaaaaaaaaaaa",
+      "machineId": "h2runneraaaaaaaaaaaa",
+      "kind": "restart_runner",
+      "status": "running",
+      "params": {
+        "what": "runner",
+        "when": "after_chats"
+      },
+      "error": null,
+      "createdBy": "u2annaaaaaaaaaaaaaaa",
+      "createdAt": "2026-10-30T17:55:00Z",
+      "updatedAt": "2026-10-30T17:56:00Z",
+      "finishedAt": null,
+      "chatsNow": 2
+    }
+  ]
+}

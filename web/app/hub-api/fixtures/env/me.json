@@ -1,0 +1,39 @@
+{
+  "space": {
+    "id": "tenant-platform",
+    "slug": "platforma",
+    "name": "Платформа"
+  },
+  "org": {
+    "id": "org-acme",
+    "name": "Acme"
+  },
+  "items": [
+    {
+      "itemId": "item-tracker",
+      "entryId": "entry-tenant-tracker",
+      "kind": "mcp",
+      "name": "Трекер",
+      "hint": "Трекер для работы",
+      "layer": "tenant",
+      "scopeId": "tenant-platform",
+      "layerTitle": "Тенант Платформа",
+      "pinned": false,
+      "off": false,
+      "canToggle": true
+    },
+    {
+      "itemId": "item-review",
+      "entryId": "entry-org-review",
+      "kind": "skill",
+      "name": "Ревью кода",
+      "hint": "Ревью кода для работы",
+      "layer": "org",
+      "scopeId": "org-acme",
+      "layerTitle": "Организация Acme",
+      "pinned": true,
+      "off": false,
+      "canToggle": false
+    }
+  ]
+}

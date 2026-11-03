@@ -213,6 +213,30 @@ func (d *Detector) Detect(children []int) (agents.SessionInfo, error) {
 	return agents.Info(agents.NotRunning), nil
 }
 
+// SessionIDs are the sessions the Claude a pane runs goes by, nil when no Claude with a pid file runs among the shell's
+// children and grandchildren: the one its pid file names (Claude 2.1 rewrites the file on /clear before the
+// SessionStart hook of the new session fires) and the one its `--resume` names (a fork keeps writing there until its
+// own transcript exists). A Claude started from inside it (a `claude -p` of the agent's Bash, a script) runs deeper
+// and is not looked at: its hooks name a session not among these.
+func (d *Detector) SessionIDs(children []int) []string {
+	for _, rec := range d.pidFiles(d.Procs.WithGrandchildren(d.throughSandbox(children))) {
+		if !d.Match.Is(d.Procs, rec.pid, Binary) {
+			continue
+		}
+		var ids []string
+		if id := jscompat.String(rec.sessionID); id != "" {
+			ids = append(ids, id)
+		}
+		if args, ok := d.Procs.ArgsOf(rec.pid); ok {
+			if m := resumeArg.FindStringSubmatch(args); m != nil {
+				ids = append(ids, m[1])
+			}
+		}
+		return ids
+	}
+	return nil
+}
+
 var settingsArg = regexp.MustCompile(`--settings(?:=|` + jscompat.SpaceClass + `)+([^` + jscompat.SpaceClass[1:] + `+)`)
 
 // RunsWithHooks tells whether a Claude among the pane's children and grandchildren was given the runtime's hooks: a

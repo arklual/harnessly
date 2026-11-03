@@ -1,0 +1,25 @@
+{
+  "machineId": "h2productaaaaaaaaaaa",
+  "managed": false,
+  "provider": {
+    "name": "none",
+    "supported": false
+  },
+  "providerError": null,
+  "current": null,
+  "price": null,
+  "plans": [],
+  "hardware": {
+    "cores": 2,
+    "ramBytes": 8589934592,
+    "diskBytes": 85899345920,
+    "model": "Example CPU",
+    "laptop": false,
+    "os": "linux",
+    "arch": "amd64",
+    "updatedAt": "2026-10-30T17:50:00Z"
+  },
+  "consoleUrl": null,
+  "activeOps": [],
+  "updatedAt": null
+}

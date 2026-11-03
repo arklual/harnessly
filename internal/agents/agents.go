@@ -166,6 +166,10 @@ type Event struct {
 	// Summary of a summary-update (nil clears it); Message of a last-user-message.
 	Summary *string `json:"summary,omitempty"`
 	Message string  `json:"message,omitempty"`
+	// AgentSession is the agent's own session id a hook named, "" when it named none (a hook script of an older
+	// runtime). A Claude run from the tab's terminal (a script, or the agent itself calling `claude -p`) inherits the
+	// tab's tmux session and hooks: only this tells its hooks from those of the tab's agent.
+	AgentSession string `json:"-"`
 }
 
 // NotificationNeedsInput: only a notification asking for permission (or one without a type) needs the person; the

@@ -23,6 +23,13 @@ export const isTrackerHost = (host: string): boolean => {
   return trackerHosts.includes(host) || hostOf(trackerIssueUrl) === host;
 };
 
+/** A link on the instance of one of the person's connections (Settings → Connections). */
+export const isConnectionUrl = (url: URL): boolean => {
+  const hosts = appConfig().connectionHosts;
+  if (hosts.length === 0) return false;
+  return hosts.includes(url.host.toLowerCase());
+};
+
 export const taskKeyRe = (): RegExp => new RegExp(`^(?:${appConfig().taskKeyPattern})$`);
 
 export const gitlabHosts = (): string[] => appConfig().gitlabHosts;

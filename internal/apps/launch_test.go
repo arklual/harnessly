@@ -170,7 +170,15 @@ func TestLaunchMCPConfigsCarryTheAgentToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range []string{host, rt} {
+	extraSrc := filepath.Join(data, "mcp-servers.json")
+	if err := os.WriteFile(extraSrc, []byte(`{"mcpServers":{"mcp-linear":{"type":"http","url":"http://127.0.0.1:1/api/cli/mcp-proxy/a","headers":{"x-cli-token":"person-token"}}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	extra, err := retokenMCP(dir, "xmcp", extraSrc, token)
+	if err != nil || filepath.Dir(extra) != dir {
+		t.Fatal(extra, err)
+	}
+	for _, f := range []string{host, rt, extra} {
 		raw, _ := os.ReadFile(f)
 		if strings.Contains(string(raw), "person-token") || !strings.Contains(string(raw), token) {
 			t.Fatalf("%s: %s", f, raw)

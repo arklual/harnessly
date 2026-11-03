@@ -9,9 +9,12 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/auth"
+	"github.com/ly-solutions/harnessly/internal/hub/events"
+	"github.com/ly-solutions/harnessly/internal/hub/features"
 	"github.com/ly-solutions/harnessly/internal/hub/httpx"
 	"github.com/ly-solutions/harnessly/internal/hub/machines"
 	"github.com/ly-solutions/harnessly/internal/hub/orgs"
@@ -51,6 +54,12 @@ type Service struct {
 	rates *rates.Book
 	// machines build the rows of the organization's machine list (UseMachines).
 	machines *machines.Service
+	// bus gets the live events (UseEvents); flags switch the signal checker on per organization (UseFeatures).
+	bus   events.Publisher
+	flags features.Gate
+	// trig carries Trigger calls to RunLive.
+	trigMu sync.Mutex
+	trig   chan string
 }
 
 // New makes the service.
