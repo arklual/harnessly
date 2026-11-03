@@ -27,6 +27,7 @@ func docsFixture() fs.FS {
 		"build-apps/README.md":         file("# Overview\n"),
 		"build-apps/02-views.md":       file("text\n# Views\nbody\n"),
 		"apps/demo/harnessly/app.json": file("{}\n"),
+		"ru/build-apps/README.md":      file("# Обзор\n"),
 	}
 }
 
@@ -62,7 +63,7 @@ func TestDocsExportKeepsTheLayoutAndWritesOverNothing(t *testing.T) {
 	if err := c.appDocsFrom(docsFixture(), []string{"export", dir}); err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range []string{"apps.md", "build-apps/02-views.md", "apps/demo/harnessly/app.json"} {
+	for _, f := range []string{"apps.md", "build-apps/02-views.md", "apps/demo/harnessly/app.json", "ru/build-apps/README.md"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
 			t.Errorf("%s: %v", f, err)
 		}

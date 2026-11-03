@@ -94,4 +94,13 @@ test('no notice on the design page; Settings says which engine and copies the co
   await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(FETCH);
   if (process.env.E2E_SHOT) await page.screenshot({ path: process.env.E2E_SHOT });
+
+  // A machine whose enforced settings refuse making a canvas: the engine is named, the command that cannot work is not.
+  await page.route('**/design/engine*', async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), fetch: '' } });
+  });
+  await page.reload();
+  await expect(page.getByText('Built-in', { exact: true })).toBeVisible();
+  await expect(page.locator('.hx-set__command-text')).toHaveCount(0);
 });

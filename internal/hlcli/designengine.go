@@ -17,6 +17,7 @@ import (
 
 const engineHelp = `harnessly design engine fetch [--canvas URL] [--claude PATH] [--model MODEL] [--dir DIR]
 harnessly design engine status [--dir DIR]
+harnessly design engine check [--claude PATH] [--model MODEL]
 
 Designs work out of the box on the engine built into harnessly. This command is optional: it adds the vendor's engine
 (Anthropic's), which belongs to its vendor and is not shipped with harnessly. fetch gets the current release with your
@@ -25,7 +26,10 @@ model whose only tool is Artifact, allowed to read (and, the first time, to make
 design type on your account, which it remembers). The files are checked against their checksums and kept as a release
 in the engine folder; new projects start on the newest one, existing ones stay on theirs until you upgrade them.
 
-  --canvas URL   read from this canvas of the design type instead of the remembered one (or a new one)
+check only names the vendor's current release: it needs no canvas and saves nothing.
+
+  --canvas URL   read from this canvas of the design type instead of the remembered one (or a new one), and remember
+                 it; for a machine whose policy refuses making a canvas: make one in your browser
   --claude PATH  the Claude Code binary (default: claude on PATH)
   --model MODEL  the session's model (default: haiku)
   --dir DIR      the engine folder (default: $RUNTIME_DESIGN_ENGINE_DIR, else design-engine in the runtime's data folder)
@@ -74,6 +78,8 @@ func (c *cli) designEngine(args []string) error {
 		return c.engineFetch(opt)
 	case "status":
 		return c.engineStatus(opt.Dir)
+	case "check":
+		return c.engineCheck(opt)
 	}
 	return usageErr("unknown design engine command %q", sub)
 }
@@ -109,6 +115,27 @@ func (c *cli) engineFetch(opt design.FetchOptions) error {
 	} else {
 		c.out("Release %s is already here (%s), nothing to fetch\n", res.Release, opt.Dir)
 	}
+	return nil
+}
+
+func (c *cli) engineCheck(opt design.FetchOptions) error {
+	self, err := os.Executable()
+	if err != nil {
+		return fail("cannot find this program: %v", err)
+	}
+	opt.Hook = shellQuote(self) + " design engine hook"
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	release, err := design.CheckEngine(ctx, opt)
+	if err != nil {
+		return fail("%v", err)
+	}
+	if c.json {
+		raw, _ := json.Marshal(map[string]string{"release": release})
+		c.out("%s\n", raw)
+		return nil
+	}
+	c.out("%s\n", release)
 	return nil
 }
 

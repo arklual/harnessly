@@ -65,7 +65,7 @@ export const DesignPage = ({ machine }: { machine: MachineId }) => {
             <Row type="link" label={t(ENGINE_LABEL[engine.source])} hint={engineHint(engine)}>
               {null}
             </Row>
-            {engine.source !== 'file' && (
+            {engine.source !== 'file' && engine.fetch && (
               <>
                 <Row
                   type="link"

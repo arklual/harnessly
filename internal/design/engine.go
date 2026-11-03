@@ -2,9 +2,11 @@ package design
 
 import (
 	_ "embed"
+	"encoding/json"
 	"net/http"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 )
 
 // The board engine. Boards of the design tool's format load an engine as ./support.js. A new project gets, in order: the
@@ -46,7 +48,7 @@ type EngineStatus struct {
 	// Chrome: a headless browser for checks, pictures and deck exports; Ffmpeg: video exports and recordings.
 	Chrome bool `json:"chrome"`
 	Ffmpeg bool `json:"ffmpeg"`
-	// Fetch is the command that fetches the vendor's engine with the owner's account (optional).
+	// Fetch is the command that fetches the vendor's engine with the owner's account (optional), "" where it cannot work.
 	Fetch string `json:"fetch"`
 }
 
@@ -89,6 +91,9 @@ func (l *Library) EngineFetchCommand() string {
 // Engine says what this machine has for the design tool.
 func (l *Library) Engine() EngineStatus {
 	s := EngineStatus{Ready: true, Source: EngineSourceOwn, Chrome: l.findChrome() != "", Ffmpeg: DeckFFmpeg() != "", Fetch: l.EngineFetchCommand()}
+	if readCanvas(l.ReleasesDir()) == "" && artifactRestricted() {
+		s.Fetch = ""
+	}
 	if r := l.NewProjectsRelease(); r != "" && l.newProjectsEngine() != "" {
 		s.Release, s.Source = &r, EngineSourceVendor
 	}
@@ -96,6 +101,36 @@ func (l *Library) Engine() EngineStatus {
 		s.Source, s.Release = EngineSourceFile, nil
 	}
 	return s
+}
+
+// managedSettingsFiles are where Claude Code reads the settings a machine's owner enforces.
+var managedSettingsFiles = []string{"/etc/claude-code/managed-settings.json", "/Library/Application Support/ClaudeCode/managed-settings.json"}
+
+// artifactRestricted says a machine's enforced settings hook the Artifact tool. A fetch that has no canvas yet must make
+// one with that tool, and such a hook is there to refuse it, so the command is not offered. The hook is not run.
+func artifactRestricted() bool {
+	for _, file := range managedSettingsFiles {
+		raw, err := readFileLimited(file, 1<<20)
+		if err != nil {
+			continue
+		}
+		var doc struct {
+			Hooks struct {
+				PreToolUse []struct {
+					Matcher string `json:"matcher"`
+				} `json:"PreToolUse"`
+			} `json:"hooks"`
+		}
+		if json.Unmarshal(raw, &doc) != nil {
+			continue
+		}
+		for _, h := range doc.Hooks.PreToolUse {
+			if re, err := regexp.Compile("^(" + h.Matcher + ")$"); h.Matcher == "*" || h.Matcher == "" || (err == nil && re.MatchString("Artifact")) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // lookPathOr is exec.LookPath that answers "" when the name is not found.

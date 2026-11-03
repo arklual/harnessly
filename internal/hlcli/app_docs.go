@@ -82,15 +82,17 @@ func (c *cli) appDocsExport(guide fs.FS, pages []docsPage, dir string) error {
 			return fail("%v", err)
 		}
 	}
-	err := fs.WalkDir(guide, "apps", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
+	for _, root := range []string{"apps", "ru"} {
+		err := fs.WalkDir(guide, root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			return write(p, p)
+		})
+		if err != nil {
+			return fail("%v", err)
 		}
-		return write(p, p)
-	})
-	if err != nil {
-		return fail("%v", err)
 	}
-	c.out("wrote the guide (build-apps/, apps.md) and the example packages (apps/) to %s\n", dir)
+	c.out("wrote the guide (build-apps/, apps.md, ru/) and the example packages (apps/) to %s\n", dir)
 	return nil
 }

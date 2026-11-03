@@ -69,11 +69,8 @@ type FetchResult struct {
 	Files   int    `json:"files"`
 }
 
-// FetchEngine fetches the type's current release into the engine folder, unless it is there already.
-func FetchEngine(ctx context.Context, o FetchOptions) (FetchResult, error) {
-	if o.Dir == "" {
-		return FetchResult{}, errors.New("no engine folder")
-	}
+// prepare fills in the defaults and the session, and returns the session's working folder, which the caller removes.
+func (o *FetchOptions) prepare() (string, error) {
 	if o.TypeURL == "" {
 		o.TypeURL = DefaultEngineTypeURL
 	}
@@ -86,34 +83,61 @@ func FetchEngine(ctx context.Context, o FetchOptions) (FetchResult, error) {
 	if o.Log == nil {
 		o.Log = func(string) {}
 	}
+	work, err := os.MkdirTemp("", "design-engine-")
+	if err != nil {
+		return "", err
+	}
+	if o.session != nil {
+		return work, nil
+	}
+	if o.Claude == "" {
+		o.Claude = "claude"
+	}
+	bin, err := exec.LookPath(o.Claude)
+	if err != nil {
+		os.RemoveAll(work)
+		return "", fmt.Errorf("Claude Code is not installed here (%s): install it and log in with your account first", o.Claude)
+	}
+	if o.Hook == "" {
+		os.RemoveAll(work)
+		return "", errors.New("no hook command")
+	}
+	settings := filepath.Join(work, "settings.json")
+	hooks := map[string]any{"hooks": map[string]any{"PreToolUse": []any{map[string]any{"matcher": "*",
+		"hooks": []any{map[string]any{"type": "command", "command": o.Hook}}}}}}
+	raw, _ := json.Marshal(hooks)
+	if err := os.WriteFile(settings, raw, 0o600); err != nil {
+		os.RemoveAll(work)
+		return "", err
+	}
+	o.session = claudeSession(bin, o.Model, o.Budget, settings, work)
+	return work, nil
+}
+
+// CheckEngine is the type's current release. It reads the release's name only, so it needs no canvas and saves nothing.
+func CheckEngine(ctx context.Context, o FetchOptions) (string, error) {
+	work, err := o.prepare()
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(work)
+	release, _, err := engineCheck(ctx, o)
+	return release, err
+}
+
+// FetchEngine fetches the type's current release into the engine folder, unless it is there already.
+func FetchEngine(ctx context.Context, o FetchOptions) (FetchResult, error) {
+	if o.Dir == "" {
+		return FetchResult{}, errors.New("no engine folder")
+	}
 	if err := os.MkdirAll(o.Dir, 0o755); err != nil {
 		return FetchResult{}, err
 	}
-	work, err := os.MkdirTemp("", "design-engine-")
+	work, err := o.prepare()
 	if err != nil {
 		return FetchResult{}, err
 	}
 	defer os.RemoveAll(work)
-	if o.session == nil {
-		if o.Claude == "" {
-			o.Claude = "claude"
-		}
-		bin, err := exec.LookPath(o.Claude)
-		if err != nil {
-			return FetchResult{}, fmt.Errorf("Claude Code is not installed here (%s): install it and log in with your account first", o.Claude)
-		}
-		if o.Hook == "" {
-			return FetchResult{}, errors.New("no hook command")
-		}
-		settings := filepath.Join(work, "settings.json")
-		hooks := map[string]any{"hooks": map[string]any{"PreToolUse": []any{map[string]any{"matcher": "*",
-			"hooks": []any{map[string]any{"type": "command", "command": o.Hook}}}}}}
-		raw, _ := json.Marshal(hooks)
-		if err := os.WriteFile(settings, raw, 0o600); err != nil {
-			return FetchResult{}, err
-		}
-		o.session = claudeSession(bin, o.Model, o.Budget, settings, work)
-	}
 
 	o.Log("Reading the current release of the design type with your Claude account")
 	release, files, err := engineCheck(ctx, o)
@@ -133,7 +157,7 @@ func FetchEngine(ctx context.Context, o FetchOptions) (FetchResult, error) {
 	if canvas == "" {
 		o.Log("Making a private canvas of the design type on your account (once)")
 		if canvas, err = engineCreateCanvas(ctx, o); err != nil {
-			return FetchResult{}, err
+			return FetchResult{}, canvasFailure(o, "cannot make the canvas the engine is read from", err)
 		}
 		writeCanvas(o.Dir, canvas)
 	}
@@ -145,8 +169,12 @@ func FetchEngine(ctx context.Context, o FetchOptions) (FetchResult, error) {
 	}
 	sums, version, err := engineDownload(ctx, o, canvas, staging, files)
 	if err != nil {
+		if errors.Is(err, errCanvasRead) {
+			return FetchResult{}, canvasFailure(o, "cannot read the canvas "+canvas, err)
+		}
 		return FetchResult{}, err
 	}
+	writeCanvas(o.Dir, canvas)
 	if after, _, err := engineCheck(ctx, o); err != nil {
 		return FetchResult{}, err
 	} else if after != release {
@@ -220,9 +248,21 @@ type sessionAnswer struct {
 	IsError bool   `json:"is_error"`
 }
 
-// sessionFailure says why the fetch cannot go on. Fetching is optional, so it says that designs work without it.
+// worksWithout: fetching is optional, so a failure says that designs work without it.
+const worksWithout = "Designs keep working on the built-in engine; this command is only needed for the vendor's engine."
+
+// errCanvasRead: the session could not read the canvas, as opposed to a file that came out wrong.
+var errCanvasRead = errors.New("the canvas cannot be read")
+
+// canvasFailure says what to do when this account has no canvas to read from and the session cannot make or read one, for
+// example when a machine's policy refuses publishing: a canvas made in the browser needs no session at all.
+func canvasFailure(o FetchOptions, what string, err error) error {
+	return fmt.Errorf("%s: %w\nMake an empty artifact of the design type in your browser (%s) under the account Claude Code uses, then run this command again with --canvas <its URL>; it is remembered.\n%s", what, err, o.TypeURL, worksWithout)
+}
+
+// sessionFailure says why the fetch cannot go on.
 func sessionFailure(detail string, apiKey bool) error {
-	const works = "Designs keep working on the built-in engine; this command is only needed for the vendor's engine."
+	const works = worksWithout
 	if apiKey {
 		return fmt.Errorf("the vendor's engine is only available through a claude.ai account, and this machine's Claude Code uses an API key. %s\nClaude Code said: %s", works, clip(detail, 400))
 	}
@@ -305,7 +345,7 @@ func engineDownload(ctx context.Context, o FetchOptions, canvas, staging string,
 	}
 	v := lines(answer, "VERSION")
 	if len(v) == 0 || len(v[0]) != 1 {
-		return nil, "", answerError(answer)
+		return nil, "", fmt.Errorf("%w: %w", errCanvasRead, answerError(answer))
 	}
 	reported := map[string]string{}
 	for _, f := range lines(answer, "FILE") {

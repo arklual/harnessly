@@ -13,9 +13,17 @@ it with a person.
 ## How a release is noticed
 
 `scripts/design-engine-watch.sh` runs once a day on a machine logged in to claude.ai. It runs
-`harnessly design engine fetch`. When a release is new, it runs the parity check and writes the report to a folder of
-that machine, and prints the report's path. Hook it to the team's tracker with `DESIGN_ENGINE_WATCH_NOTIFY`, a command
-that receives the report's path.
+`harnessly design engine check`, which reads the name of the current release and needs no canvas, and tells the team about
+each release once through `DESIGN_ENGINE_WATCH_NOTIFY`, a command that receives the report's path, the release and the
+comparison's exit code. With no comparison the report's path is empty and the exit code is `skipped`.
+
+The comparison needs the release's engine, and downloading it needs a canvas. Name one with `DESIGN_ENGINE_WATCH_CANVAS`
+and the watcher fetches the release into a folder of its own, so the machine's new projects stay on their engine, and runs
+the parity check. Each run is a short session on a small model of that account.
+
+Where a machine's enforced Claude Code settings hook the `Artifact` tool, a session cannot make a canvas. The settings page
+does not offer the fetch command there unless a canvas is already remembered. To fetch on such a machine, make an empty
+artifact of the design type in the browser and pass it with `--canvas`.
 
 ## What to do with a new release
 

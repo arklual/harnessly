@@ -148,6 +148,94 @@ func TestFetchEngineChecksum(t *testing.T) {
 	}
 }
 
+func TestFetchEngineTellsWhatToDoWithoutACanvas(t *testing.T) {
+	dir := t.TempDir()
+	refused := func(_ context.Context, prompt string, _ []string) (string, error) {
+		if strings.Contains(prompt, `"publish"`) {
+			return "ERROR a hook refused the publish", nil
+		}
+		if strings.Contains(prompt, `"out_dir"`) {
+			return "ERROR artifact not found", nil
+		}
+		return "RELEASE 1\nFILE artifact-type/dc-runtime.js", nil
+	}
+	for _, canvas := range []string{"", "https://claude.ai/artifact/gone"} {
+		_, err := FetchEngine(context.Background(), FetchOptions{Dir: dir, Canvas: canvas, session: refused})
+		if err == nil || !strings.Contains(err.Error(), "--canvas") || !strings.Contains(err.Error(), "built-in engine") {
+			t.Fatalf("canvas %q: the failure says what to do: %v", canvas, err)
+		}
+		if readCanvas(dir) != "" {
+			t.Fatalf("canvas %q: a canvas that failed is not remembered", canvas)
+		}
+	}
+}
+
+func TestFetchEngineRemembersTheCanvasItWasGiven(t *testing.T) {
+	dir := t.TempDir()
+	engine := "/* engine */"
+	sum := sha256.Sum256([]byte(engine))
+	outDir := regexp.MustCompile(`"out_dir":"([^"]+)"`)
+	session := func(_ context.Context, prompt string, _ []string) (string, error) {
+		if strings.Contains(prompt, `"type_url"`) {
+			return "RELEASE 100-ab\nFILE artifact-type/dc-runtime.js", nil
+		}
+		to := outDir.FindStringSubmatch(prompt)[1]
+		_ = os.MkdirAll(filepath.Join(to, "artifact-type"), 0o755)
+		_ = os.WriteFile(filepath.Join(to, "artifact-type", "dc-runtime.js"), []byte(engine), 0o644)
+		return "VERSION 2\nFILE artifact-type/dc-runtime.js 12 " + hex.EncodeToString(sum[:]), nil
+	}
+	if _, err := FetchEngine(context.Background(), FetchOptions{Dir: dir, Canvas: "https://claude.ai/artifact/mine", session: session}); err != nil {
+		t.Fatal(err)
+	}
+	if readCanvas(dir) != "https://claude.ai/artifact/mine" {
+		t.Fatalf("remembered: %q", readCanvas(dir))
+	}
+}
+
+func TestCheckEngineNeedsNoCanvas(t *testing.T) {
+	session := func(_ context.Context, prompt string, _ []string) (string, error) {
+		if !strings.Contains(prompt, `"type_url"`) || strings.Contains(prompt, `"publish"`) {
+			t.Fatalf("only the type is read: %s", prompt)
+		}
+		return "RELEASE 100-ab\nFILE artifact-type/dc-runtime.js", nil
+	}
+	release, err := CheckEngine(context.Background(), FetchOptions{session: session})
+	if err != nil || release != "100-ab" {
+		t.Fatalf("release %q, %v", release, err)
+	}
+}
+
+func TestFetchIsNotOfferedWhereTheMachineRestrictsArtifact(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "managed-settings.json")
+	old := managedSettingsFiles
+	managedSettingsFiles = []string{file}
+	t.Cleanup(func() { managedSettingsFiles = old })
+	status := func(dir string) string {
+		l := New(Config{LibraryDir: t.TempDir(), ReleasesDir: dir, Texts: Texts{CLI: "acme"}})
+		defer l.StopWatching()
+		return l.Engine().Fetch
+	}
+	dir := t.TempDir()
+	if got := status(dir); got == "" {
+		t.Fatal("no enforced settings: the command is offered")
+	}
+	for matcher, offered := range map[string]bool{"Artifact": false, "Artifact|Bash": false, "*": false, "Bash": true} {
+		if err := os.WriteFile(file, []byte(`{"hooks":{"PreToolUse":[{"matcher":"`+matcher+`"}]}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got := status(dir); (got != "") != offered {
+			t.Fatalf("matcher %q: command %q", matcher, got)
+		}
+	}
+	if err := os.WriteFile(file, []byte(`{"hooks":{"PreToolUse":[{"matcher":"Artifact"}]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeCanvas(dir, "https://claude.ai/artifact/mine")
+	if got := status(dir); got == "" {
+		t.Fatal("a remembered canvas needs no publishing: the command is offered")
+	}
+}
+
 func TestNewProjectGetsOwnEngineWithoutFetching(t *testing.T) {
 	root := t.TempDir()
 	l := New(Config{LibraryDir: root, Texts: Texts{CLI: "acme"}})
