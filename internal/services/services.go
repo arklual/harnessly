@@ -137,6 +137,15 @@ func (s *Service) trackerToken() string {
 	return s.secret("YOUTRACK_TOKEN", "youtrack-token")
 }
 
+// AgentEnv is what an agent tab's shell gets of the tracker, as KEY=VALUE: its token, read at each launch so a rotated
+// token reaches the next tab. Nothing without a tracker or a token.
+func (s *Service) AgentEnv() []string {
+	if token := s.trackerToken(); token != "" {
+		return []string{"YOUTRACK_TOKEN=" + token}
+	}
+	return nil
+}
+
 // gitlabToken: each GitLab gets only its own token, the public one never sees the self-hosted one's.
 func (s *Service) gitlabToken(host string) string {
 	if len(s.cfg.GitLabHosts) > 0 && host == s.cfg.GitLabHosts[0] {

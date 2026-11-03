@@ -25,6 +25,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/preflight"
 	"github.com/ly-solutions/harnessly/internal/providers"
 	"github.com/ly-solutions/harnessly/internal/selfupdate"
+	"github.com/ly-solutions/harnessly/internal/services"
 	"github.com/ly-solutions/harnessly/internal/terminal"
 	"github.com/ly-solutions/harnessly/internal/tmux"
 	"github.com/ly-solutions/harnessly/internal/updatecheck"
@@ -138,14 +139,17 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	home, _ := os.UserHomeDir()
 	nice, niceSet := os.LookupEnv("RUNTIME_AGENT_NICE")
 	integ := integrations.FromEnv(os.Getenv)
+	tracker := services.New(services.Config{Home: home, TrackerURL: os.Getenv("RUNTIME_TRACKER_URL"),
+		SecretDirs: splitList(os.Getenv("RUNTIME_SECRET_CONFIG_DIRS"))})
 	// Every pane learns where the runtime keeps its files (the harnessly command finds the runtime there); the services'
-	// addresses and tokens come with them when boards or artifacts are configured.
+	// addresses and tokens come with them when boards or artifacts are configured, and the tracker's token when it is
+	// (the tracker's MCP server reads it, for Codex through bearer_token_env_var).
 	paneEnv := func(conversation string) []string {
 		env := []string{"HARNESSLY_DATA_DIR=" + cfg.DataDir}
 		if integ.Enabled() {
 			env = append(env, integ.AgentEnv(conversation)...)
 		}
-		return env
+		return append(env, tracker.AgentEnv()...)
 	}
 	tm := tmux.NewConfig(tmux.Config{
 		Names: tmux.Names{
