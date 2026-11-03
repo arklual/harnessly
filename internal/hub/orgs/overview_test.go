@@ -55,6 +55,10 @@ func TestOverviewOfTheOrganization(t *testing.T) {
 	if o.Spend.Paid.USD != 1260 || o.Spend.Forecast == nil || !near(o.Spend.Forecast.USD, 1262.08) {
 		t.Errorf("spend = %+v forecast %+v", o.Spend, o.Spend.Forecast)
 	}
+	// The same pace at API prices: the screens put it next to the list spend. API keys pay the list, so it is the same.
+	if o.Spend.ForecastList == nil || !near(o.Spend.ForecastList.USD, o.Spend.List.USD+2.08) {
+		t.Errorf("forecast at list = %+v, list %+v", o.Spend.ForecastList, o.Spend.List)
+	}
 	if o.Spend.Limit == nil || o.Spend.Limit.RuleID != orgRule || o.Spend.Limit.SetBy == nil || o.Spend.Limit.SetBy.UserID != v.anna.ID {
 		t.Errorf("limit = %+v", o.Spend.Limit)
 	}
@@ -90,7 +94,7 @@ func TestOverviewOfTheOrganization(t *testing.T) {
 	// A closed month: no forecast, September's $500. Signals are about now, not about the period shown: the same four.
 	var sep analytics.OverviewResponse
 	v.anna.Do("GET", v.url("/overview?from=2026-09-01&to=2026-10-01"), nil).JSON(&sep)
-	if sep.Spend.Paid.USD != 500 || sep.Spend.Forecast != nil || len(sep.Attention) != 4 {
+	if sep.Spend.Paid.USD != 500 || sep.Spend.Forecast != nil || sep.Spend.ForecastList != nil || len(sep.Attention) != 4 {
 		t.Errorf("september = %+v attention %d", sep.Spend, len(sep.Attention))
 	}
 }

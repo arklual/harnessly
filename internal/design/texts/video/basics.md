@@ -31,4 +31,4 @@ video editor with a player, a time line and comments pinned to a moment. It is a
   format it names.
 - The video has no sound in this version: do not add audio.
 
-More: `{{cli}} design video guide director` (how to run the work), `motion`, `engines`, `check`.
+More: `{{cli}} design video guide director` (how to run the work), `motion`, `engines`, `overlays` (titles, callouts and highlights over a scene or a recording; the person edits them in the player), `check`.

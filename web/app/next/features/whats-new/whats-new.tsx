@@ -1,4 +1,4 @@
-// «Что нового»: a card at the top of the window, once per release, after the page comes up. It waits for the page to
+// «Что нового»: a card at the top of the window, once per release, after the page comes up; several went out meanwhile, it tells of them together. It waits for the page to
 // settle, stays out of the way of «Вышла новая версия» (a reload brings the newer card anyway) and never comes back
 // once put away. What was seen is remembered in this browser; with storage blocked the card shows once per page.
 import { useEffect, useState } from 'react';
@@ -7,7 +7,7 @@ import Icon from '@/next/ui/icon';
 import { usePortalContainer } from '@/next/ui/portal';
 import { usePresence } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
-import { RELEASES, unseenRelease, type IRelease } from './releases';
+import { RELEASES, unseenNews, type INews, type IRelease } from './releases';
 import '@/next/styles/whats-new.css';
 
 const SEEN_KEY = 'hx:whats-new';
@@ -40,19 +40,19 @@ interface IWhatsNewProps {
 
 const WhatsNew = ({ ready, updating, releases = RELEASES }: IWhatsNewProps) => {
   const container = usePortalContainer();
-  const [release, setRelease] = useState<IRelease | null>(null);
+  const [news, setNews] = useState<INews | null>(null);
   const [closed, setClosed] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
-    const next = unseenRelease(releases, readSeen());
+    const next = unseenNews(releases, readSeen());
     if (!next) return;
-    const timer = window.setTimeout(() => setRelease(next), SETTLE_MS);
+    const timer = window.setTimeout(() => setNews(next), SETTLE_MS);
     return () => window.clearTimeout(timer);
   }, [ready, releases]);
 
-  const open = release !== null && !closed && !updating;
-  const { value, state } = usePresence(open ? release : null, EXIT_MS);
+  const open = news !== null && !closed && !updating;
+  const { value, state } = usePresence(open ? news : null, EXIT_MS);
   const host = container?.current;
   if (!value || !host) return null;
 
@@ -84,13 +84,13 @@ const WhatsNew = ({ ready, updating, releases = RELEASES }: IWhatsNewProps) => {
       </header>
       <ul className="hx-news__list">
         {value.items.map((item) => (
-          <li key={item.key} className="hx-news__item">
+          <li key={`${item.release}.${item.key}`} className="hx-news__item">
             <span className="hx-news__icon">
               <Icon name={item.icon} size="sm" />
             </span>
             <span className="hx-news__body">
-              <span className="hx-news__name">{t(`next.whatsNew.${value.id}.${item.key}.title`)}</span>
-              <span className="hx-news__text">{t(`next.whatsNew.${value.id}.${item.key}.text`)}</span>
+              <span className="hx-news__name">{t(`next.whatsNew.${item.release}.${item.key}.title`)}</span>
+              <span className="hx-news__text">{t(`next.whatsNew.${item.release}.${item.key}.text`)}</span>
             </span>
           </li>
         ))}

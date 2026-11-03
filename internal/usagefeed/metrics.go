@@ -1,11 +1,13 @@
 package usagefeed
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
 
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"github.com/ly-solutions/harnessly/internal/usagereport"
 )
 
@@ -19,7 +21,9 @@ type metrics struct {
 	toolCalls, toolErrors                    float64
 	input, cacheRead, cacheWrite, carry      float64
 	firstTs, firstCtx                        float64
-	prs                                      map[string]bool
+	// prs are the merge requests of the session: the pr-link ones and the ones its Bash and MCP calls created or pushed
+	// to, by key (hubproto.MRKey); an address that is not a GitLab merge request stays as it is.
+	prs map[string]bool
 }
 
 // add takes one transcript's facts.
@@ -74,13 +78,33 @@ func (m *metrics) add(fa *usagereport.Facts) {
 			prev = ctx
 		}
 	}
-	for _, pr := range fa.PRs {
+	keys, other := usagereport.PRKeys(fa.PRs)
+	for _, pr := range append(append(keys, other...), fa.MRKeys...) {
 		if m.prs == nil {
 			m.prs = map[string]bool{}
 		}
 		m.prs[pr] = true
 	}
 }
+
+// mrKeys are the session's merge request keys, sorted; what is not a key (a pr-link to another host's pull request) is
+// counted in `mrs` but not told to the hub.
+func (m *metrics) mrKeys() []string {
+	var out []string
+	for k := range m.prs {
+		if hubproto.IsMRKey(k) {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	if len(out) > maxMRKeys {
+		out = out[:maxMRKeys]
+	}
+	return out
+}
+
+// maxMRKeys bounds the keys one session tells the hub.
+const maxMRKeys = 200
 
 // values are the hub's metrics keys; the fields the facts do not carry (skills, merged MRs, time to MR) are left out.
 func (m *metrics) values() map[string]float64 {
@@ -93,8 +117,10 @@ func (m *metrics) values() map[string]float64 {
 	}
 }
 
-// signature says whether the metrics changed since the session was last written.
-func signature(v map[string]float64) string {
+// signature says whether the metrics (and the merge request keys, when there are any) changed since the session was
+// last written. A session with no keys has the signature it had before keys existed, so only sessions that have some are
+// written once more.
+func signature(v map[string]float64, mrKeys []string) string {
 	keys := make([]string, 0, len(v))
 	for k := range v {
 		keys = append(keys, k)
@@ -103,6 +129,10 @@ func signature(v map[string]float64) string {
 	var b strings.Builder
 	for _, k := range keys {
 		fmt.Fprintf(&b, "%s=%g;", k, v[k])
+	}
+	if len(mrKeys) > 0 {
+		sum := sha256.Sum256([]byte(strings.Join(mrKeys, "\n")))
+		fmt.Fprintf(&b, "mrk=%x;", sum[:8])
 	}
 	return b.String()
 }

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><script src="./support.js"></script>
+<script src="/__lib/motion/gsap.min.js"></script>
+<script src="/__lib/motion/DrawSVGPlugin.min.js"></script>
+<script src="/__lib/motion/MorphSVGPlugin.min.js"></script>
+<script src="/__lib/motion/tk.js"></script>
+<script src="/__lib/motion/art/art.js"></script>
+<script src="/__lib/motion/art/heroes.js"></script>
+<script src="/__lib/motion/art/props.js"></script>
+<script src="/__lib/motion/art/backdrops.js"></script>
+<script src="/__lib/motion/rig.js"></script>
+<script>
+tk.sceneLength(9);
+tkVideo.motion(function () {
+  var hero = tk.rig('.hero');
+  hero.alive();
+
+  // The hero first: it measures its target where the board put it, before anything moves.
+  hero.walk('-48vw', '0vw', 1.7, { at: 0.2 });
+  hero.wave({ at: 2.1 });
+  hero.talk(1.3, { at: 2.1, text: 'Привет!' });
+  hero.point('.chart', { at: 3.7, hold: 1.9 });
+  hero.talk(1.6, { at: 3.8, text: 'Смотрите, как растут продажи' });
+  hero.emotion('surprised', { at: 5.5 });
+  hero.cheer({ at: 6.5 });
+
+  // Confetti measures its origin the same way: made before the chart is moved.
+  tk.particles('.fx', { at: 6.0, kind: 'sparks', from: '.chart [data-part=arrow]', count: 22, seed: 'peak' });
+  tk.particles('.fx', { at: 6.5, kind: 'confetti', x: '25%', y: '30%', angle: -90, spread: 170, count: 80, dur: 2.2, power: 70, gravity: 80, drag: 0.9, seed: 'party-hero' });
+  tk.particles('.fx', { at: 6.7, kind: 'confetti', x: '68%', y: '22%', angle: -90, spread: 150, count: 50, dur: 2.1, power: 55, gravity: 80, drag: 0.9, seed: 'party-chart' });
+
+  tk.pivots('.chart');
+  tk.inertia('.chart', { at: 3.4, from: { autoAlpha: 0, scale: 0.7, y: 40 }, autoAlpha: 1, scale: 1, y: 0, dur: 0.9, overshoot: 1.5 });
+  var bars = tk.part('.chart', 'bar');
+  tk.start(bars, { scaleY: 0 });
+  tk.tl.to(bars, { scaleY: 1, duration: 0.55, stagger: 0.12, ease: 'back.out(1.6)' }, 4.1);
+  tk.drawHand('.chart [data-part=line]', { at: 4.7, dur: 1.3, jitter: 0.8 });
+  tk.tl.fromTo(tk.part('.chart', 'dot'), { scale: 0 }, { scale: 1, duration: 0.35, stagger: 0.28, ease: 'back.out(2.5)' }, 5.0);
+  tk.tl.fromTo(tk.part('.chart', 'arrow'), { opacity: 0, scale: 0.2 }, { opacity: 1, scale: 1, duration: 0.3, ease: 'back.out(3)' }, 6.0);
+  tk.squash('.chart', { at: 6.05, amount: 0.05, dur: 0.5 });
+
+  tk.parallax('.bg [data-layer]', { at: 0, dur: 9, amount: 70 });
+  tk.camera.drift('.world', { at: 0, dur: 9, amount: 0.8 });
+  tk.camera('.world', { at: 5.2, dur: 2.2, zoom: 1.06, ease: 'power2.inOut' });
+  tk.camera.shake('.shake', { at: 6.5, dur: 0.35, amount: 0.5, seed: 'land' });
+});
+</script></head>
+<body>
+<x-dc>
+<helmet><style>
+html,body{margin:0;background:var(--deck-bg)}
+.slide{position:relative;width:100vw;height:100vh;overflow:hidden;background:var(--deck-bg);container-type:size}
+.world,.shake{position:absolute;inset:0}
+.bg{position:absolute;inset:0;width:100%;height:100%}
+.hero{position:absolute;left:12vw;bottom:13vh;height:70vh;width:calc(70vh * 400 / 600)}
+.chart{position:absolute;right:8vw;top:14vh;width:40vw;height:calc(40vw * 290 / 380)}
+.fx{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+</style></helmet>
+<main class="board"><section class="slide" data-block="Slide"><div class="world"><div class="shake">
+<svg class="bg" data-tk-art="bg-office"></svg>
+<svg class="hero" data-tk-art="hero-person"></svg>
+<svg class="chart" data-tk-art="prop-chart"></svg>
+<div class="fx"></div>
+</div></div></section></main>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic { renderVals() { return {}; } }
+</script>
+</body></html>

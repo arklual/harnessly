@@ -39,8 +39,28 @@ a.hx-brand__name {
   color: inherit;
   text-decoration: none;
 }
-a.hx-brand__name:hover {
-  text-decoration: underline;
+/* The name as the product switcher's trigger: a quiet button with a chevron. */
+.hx-brand__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hx-space-1, 4px);
+  min-width: 0;
+  padding: 0 var(--hx-space-1, 4px);
+  margin-left: calc(-1 * var(--hx-space-1, 4px));
+  border: 0;
+  border-radius: var(--hx-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.hx-brand__switch:hover,
+.hx-brand__switch[data-popup-open] {
+  background: var(--hx-bg-hover);
+}
+.hx-brand__chev {
+  color: var(--hx-fg-3);
 }
 .hx-nav {
   display: flex;
@@ -1237,6 +1257,24 @@ button.hx-nav__add {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.hx-cmenu--switch {
+  width: 248px;
+}
+.hx-cmenu__item--two {
+  height: auto;
+  min-height: 44px;
+  padding-block: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.hx-cmenu__hint {
+  display: block;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .hx-cmenu__chev {
   margin-left: auto;
   color: var(--hx-fg-3);
@@ -1246,7 +1284,8 @@ button.hx-nav__add {
   color: var(--hx-accent);
   opacity: 0;
 }
-.hx-cmenu__item[aria-checked='true'] .hx-cmenu__check {
+.hx-cmenu__item[aria-checked='true'] .hx-cmenu__check,
+.hx-cmenu__item[aria-current='page'] .hx-cmenu__check {
   opacity: 1;
 }
 /* The machine a chat lives on, at the top of its menu: a quiet line, not a choice. */

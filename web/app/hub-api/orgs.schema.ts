@@ -1,6 +1,6 @@
 // Runtime schemas of orgs.ts, for the fixture test. contracts.test.ts asserts each one infers exactly its type.
 
-import { arr, bool, lit, nullable, num, obj, rec, str, time, unknownValue } from './schema';
+import { arr, bool, lit, nullable, num, obj, opt, rec, str, time, unknownValue } from './schema';
 
 const scopeKind = lit('org', 'tenant', 'team');
 export const scope = obj({ kind: scopeKind, id: str });
@@ -70,7 +70,10 @@ export const member = obj({
   name: str,
   joinedAt: time,
   lastActiveAt: nullable(time),
+  signedInAt: opt(nullable(time)),
   invited: bool,
+  chatsWeek: opt(num),
+  mrsWeek: opt(num),
   grants: arr(grant),
   teams: arr(teamRef),
   tenantRole: nullable(lit('owner', 'member')),

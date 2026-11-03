@@ -2919,3 +2919,7 @@ input.hx-tbrowser__url:focus { text-align: left; color: var(--hx-fg-1); box-shad
 :is(.hx-hs__track, .hx-ask__tabs, .hx-strip__tabs)[data-hs-r] { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
 :is(.hx-hs__track, .hx-ask__tabs, .hx-strip__tabs)[data-hs-l] { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px); mask-image: linear-gradient(90deg, transparent, #000 36px); }
 :is(.hx-hs__track, .hx-ask__tabs, .hx-strip__tabs)[data-hs-l][data-hs-r] { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+
+/* «Рабочее пространство» above the person: the way back from the hub to the agents */
+.hx-wsnav { flex: none; margin-bottom: var(--hx-space-2); }
+.hx-wsnav .hx-nav__label { flex: 1; overflow: hidden; text-overflow: ellipsis; }

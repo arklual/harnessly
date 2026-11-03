@@ -103,8 +103,11 @@
   align-items: center;
   gap: 6px;
   margin: 8px 0 0 var(--l);
+  /* Pulled back by its own width times the start's share of the track: it stays inside the track at either end. */
+  translate: calc(var(--f) * -100%) 0;
   width: max-content;
   max-width: 100%;
+  flex-wrap: wrap;
   padding: 6px;
   border-radius: 12px;
   background: var(--hx-bg-raised);

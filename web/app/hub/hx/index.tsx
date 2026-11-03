@@ -17,6 +17,7 @@ const SCREENS: Record<Section, ReturnType<typeof lazy>> = {
   teams: lazy(() => import('./screens/teams')),
   team: lazy(() => import('./screens/team')),
   env: lazy(() => import('./screens/env')),
+  accounts: lazy(() => import('./screens/accounts')),
 };
 
 const Screen = () => {

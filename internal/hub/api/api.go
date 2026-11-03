@@ -26,6 +26,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/link"
 	"github.com/ly-solutions/harnessly/internal/hub/machines"
 	"github.com/ly-solutions/harnessly/internal/hub/mail"
+	"github.com/ly-solutions/harnessly/internal/hub/mrsource"
 	"github.com/ly-solutions/harnessly/internal/hub/orgs"
 	"github.com/ly-solutions/harnessly/internal/hub/provider"
 	"github.com/ly-solutions/harnessly/internal/hub/proxy"
@@ -346,6 +347,9 @@ func (h *Hub) Run(ctx context.Context) {
 	go h.Analytics.RunLive(ctx, h.OrgEvents.Active)
 	if h.Sites != nil {
 		go h.Sites.Run(ctx)
+	}
+	if p := mrsource.New(h.cfg.MRSourceURL, h.cfg.MRSourceGroups, h.cfg.MRSourceToken, h.db.S(), h.log); p != nil {
+		go p.Run(ctx)
 	}
 	go func() { _, _ = h.Dist.Manifest() }() // warm the sums of the binaries before the first machine asks
 	tick := time.NewTicker(10 * time.Minute)

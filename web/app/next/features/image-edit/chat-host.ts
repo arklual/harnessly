@@ -62,6 +62,8 @@ const decodeSnapshot = (
 };
 
 export const chatImageHost = (chat: IChatImages): IImageEditHost => ({
+  opensLatest: true,
+
   start: async (edit: IImageEdit) => {
     const body = {
       source: edit.from.id,

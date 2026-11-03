@@ -28,6 +28,8 @@ beforeAll(() => {
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia;
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+  // A catalog card scrolls the form into view; jsdom draws nothing to scroll.
+  Element.prototype.scrollIntoView = () => {};
 });
 afterEach(() => {
   cleanup();
@@ -89,8 +91,8 @@ const catalog = [readMcpCatalogEntry(linear), readMcpCatalogEntry(github)];
 
 const props = (over: Partial<IMcpSectionProps> = {}): IMcpSectionProps => ({
   mcp: { servers: [], catalog },
-  onProbe: vi.fn(async () => ({
-    probe: readMcpProbe({ url: 'https://mcp.acme.dev/mcp', transport: 'http', auth: 'oauth', name: 'Acme' }),
+  onProbe: vi.fn(async (url: string) => ({
+    probe: readMcpProbe({ url, transport: 'http', auth: 'oauth', name: 'Acme' }),
   })),
   onAdd: vi.fn(async () => ({
     server: readMcpServer(server({ state: 'signin', tools: [], me: '' })),
@@ -108,6 +110,9 @@ const props = (over: Partial<IMcpSectionProps> = {}): IMcpSectionProps => ({
 
 /** A popup as window.open gives it: blank at first, sent to the sign-in later. */
 const fakePopup = () => ({ closed: false, close: vi.fn(), location: { href: 'about:blank' } });
+
+/** A catalog card: a button named by its service. */
+const card = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -135,7 +140,25 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
     expect(screen.getByText('MCP servers')).toBeTruthy();
     expect(screen.getByText('Agents in new chats get the tools of these servers')).toBeTruthy();
     expect(screen.getByText('Issues, projects and cycles')).toBeTruthy();
-    expect(screen.getByLabelText('Add your own server')).toBeTruthy();
+    expect(screen.getByLabelText('MCP server address')).toBeTruthy();
+  });
+
+  it('a catalog card only fills the address: nothing is kept and no window opens', async () => {
+    const open = vi.spyOn(window, 'open');
+    const p = props();
+    render(<McpSection {...p} />);
+    fireEvent.click(card('Linear'));
+    expect(await screen.findByText('Sign in with Linear')).toBeTruthy();
+    expect((screen.getByLabelText('MCP server address') as HTMLInputElement).value).toBe(linear.url);
+    expect(p.onProbe).toHaveBeenCalledWith(linear.url);
+    expect(p.onAdd).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    // Another address typed: the card lets go, and the service is looked at anew.
+    fireEvent.change(screen.getByLabelText('MCP server address'), {
+      target: { value: 'https://linear.acme.dev/mcp' },
+    });
+    expect(screen.queryByText('Sign in with Linear')).toBeNull();
+    expect(card('Linear').getAttribute('aria-pressed')).toBe('false');
   });
 
   it('opens the popup in the click, then sends it to the sign-in and waits for its word', async () => {
@@ -143,7 +166,8 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
     const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
     const p = props();
     render(<McpSection {...p} />);
-    fireEvent.click(screen.getAllByText('Connect')[0] as HTMLElement);
+    fireEvent.click(card('Linear'));
+    fireEvent.click(await screen.findByText('Sign in with Linear'));
     // Before any answer of the machine: a window opened later would be blocked.
     expect(open).toHaveBeenCalledWith('about:blank', 'harnessly-mcp', 'popup,width=520,height=720');
     await waitFor(() => expect(p.onSignIn).toHaveBeenCalledWith('m1'));
@@ -179,29 +203,30 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
     vi.spyOn(window, 'open').mockReturnValue(null);
     const signin = readMcpServer(server({ state: 'signin', tools: [], me: '' }));
     render(<McpSection {...props({ mcp: { servers: [signin], catalog } })} />);
-    expect(screen.getByText('Agents cannot use it until you sign in')).toBeTruthy();
+    expect(screen.getByText('Sign-in not finished')).toBeTruthy();
     fireEvent.click(screen.getByText('Sign in'));
     const link = (await screen.findByText('Open sign-in')).closest('a');
     expect(link?.getAttribute('href')).toBe(AUTH_URL);
     expect(screen.getByText('The browser blocked the sign-in window')).toBeTruthy();
   });
 
-  it('asks for a token right in the card of a server that takes one', async () => {
+  it('asks for a token in the form for a service that takes one', async () => {
     const open = vi.spyOn(window, 'open');
     const p = props({
+      onProbe: vi.fn(async (url: string) => ({ probe: readMcpProbe({ url, auth: 'header' }) })),
       onAdd: vi.fn(async () => ({
         server: readMcpServer(server({ id: 'g1', auth: 'header' })),
         authStart: null,
       })),
     });
     render(<McpSection {...p} />);
-    fireEvent.click(screen.getAllByText('Connect')[1] as HTMLElement);
-    expect((screen.getByLabelText('Header') as HTMLInputElement).value).toBe('Authorization');
+    fireEvent.click(card('GitHub'));
+    expect(((await screen.findByLabelText('Header')) as HTMLInputElement).value).toBe('Authorization');
     expect(screen.getByText('Create a token').closest('a')?.getAttribute('href')).toBe(github.tokenUrl);
     const field = screen.getByLabelText('Token') as HTMLInputElement;
     expect(field.type).toBe('password');
     fireEvent.change(field, { target: { value: TOKEN } });
-    fireEvent.click(screen.getAllByText('Connect').at(-1) as HTMLElement);
+    fireEvent.click(screen.getByText('Connect'));
     await waitFor(() => expect(p.onAdd).toHaveBeenCalled());
     expect(vi.mocked(p.onAdd).mock.calls[0]?.[0].header).toEqual({
       name: 'Authorization',
@@ -238,13 +263,12 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
       })),
     });
     const { rerender } = render(<McpSection {...p} />);
-    fireEvent.change(screen.getByLabelText('Add your own server'), {
+    fireEvent.change(screen.getByLabelText('MCP server address'), {
       target: { value: 'https://mcp.acme.dev/mcp' },
     });
     fireEvent.click(screen.getByText('Find'));
     fireEvent.change(await screen.findByLabelText('Token'), { target: { value: 'k1' } });
-    // Catalog cards have their own "Connect"; the own-server form is the last one.
-    fireEvent.click(screen.getAllByText('Connect').at(-1) as HTMLElement);
+    fireEvent.click(screen.getByText('Connect'));
     await waitFor(() => expect(p.onAdd).toHaveBeenCalled());
     // The binding takes the kept server into the list.
     rerender(<McpSection {...p} mcp={{ servers: [kept], catalog }} />);
@@ -281,7 +305,7 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
   it('says how a pasted server signs in', async () => {
     const p = props();
     render(<McpSection {...p} />);
-    fireEvent.change(screen.getByLabelText('Add your own server'), {
+    fireEvent.change(screen.getByLabelText('MCP server address'), {
       target: { value: 'https://mcp.acme.dev/mcp' },
     });
     fireEvent.click(screen.getByText('Find'));
@@ -297,6 +321,8 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
       const method = init.method ?? 'GET';
       calls.push({ url, method, body: String(init.body ?? '') });
       if (pathOf(url).endsWith('/mcp/m1/signin')) return json(200, { authUrl: AUTH_URL });
+      if (pathOf(url).endsWith('/mcp/probe'))
+        return json(200, { probe: { url: linear.url, transport: 'http', auth: 'oauth' } });
       if (method === 'POST' && pathOf(url).endsWith('/mcp'))
         return json(200, {
           server: server({ state: 'signin', tools: [], me: '' }),
@@ -306,7 +332,8 @@ describe('Settings → Connections → MCP servers', { timeout: 20_000 }, () => 
       return json(200, { connections: [] });
     });
     render(<ConnectionsPage machine={MACHINE} />);
-    fireEvent.click(await screen.findByText('Connect'));
+    fireEvent.click(await screen.findByRole('button', { name: /^Linear/ }));
+    fireEvent.click(await screen.findByText('Sign in with Linear'));
     await waitFor(() => expect(popup.location.href).toBe(AUTH_URL));
     const add = calls.find((c) => c.method === 'POST' && pathOf(c.url).endsWith('/mcp'));
     expect(add?.url).toContain('/api/platform/mcp');

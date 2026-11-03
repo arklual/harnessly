@@ -16,7 +16,15 @@ import { rememberOrg } from './step';
 import { OrgShell } from './shell';
 import { ALL_SCOPE, type Section } from './types';
 
-const SECTIONS: readonly Section[] = ['overview', 'analytics', 'machines', 'teams', 'team', 'env'];
+const SECTIONS: readonly Section[] = [
+  'overview',
+  'analytics',
+  'machines',
+  'teams',
+  'team',
+  'env',
+  'accounts',
+];
 
 // The new hub of the board «Хаб» behind the organization's `ui.hx` feature; its code and styles load only then.
 const HxApp = lazy(() => import('../hx'));

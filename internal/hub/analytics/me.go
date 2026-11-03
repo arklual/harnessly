@@ -497,7 +497,16 @@ func kpisOf(ctx context.Context, st store.Store, loc *time.Location, ss []store.
 	if err != nil {
 		return nil, err
 	}
-	return kpisFrom(ks, sp, cmp), nil
+	out := kpisFrom(ks, sp, cmp)
+	by := "day"
+	if sp.days() > 45 {
+		by = "week"
+	}
+	cur, prev := buckets(sp, by), buckets(cmp, by)
+	for i, d := range kpis {
+		out[i].Spark, out[i].CmpSpark = sparkOf(d, ks, cur), sparkOf(d, ks, prev)
+	}
+	return out, nil
 }
 
 // kSessionsOf turns sessions into what the KPI see, with their money.
@@ -517,7 +526,7 @@ func kSessionsOf(ctx context.Context, st store.Store, loc *time.Location, ss []s
 			end = *x.EndedAt
 		}
 		m := money[store.SessionRef{OrgKey: x.OrgKey, Provider: x.Provider, SessionKey: x.SessionKey}]
-		ks[i] = kSession{UserID: x.UserID, Start: x.StartedAt, End: end, M: metricsOf(x.Metrics), PaidMicros: m.paid,
+		ks[i] = kSession{UserID: x.UserID, Start: x.StartedAt, End: end, M: metricsOf(x.Metrics), PaidMicros: m.paid, ListMicros: m.list,
 			NoMoney: orgMoney && x.Funding != store.FundingOrg}
 	}
 	return ks, nil
@@ -542,4 +551,13 @@ func kpisFrom(ks []kSession, sp, cmp span) []KpiValue {
 		weeks[i] = startedIn(ks, end.AddDate(0, 0, -7), end)
 	}
 	return computeKPIs(startedIn(ks, sp.from, sp.to), sp.days(), startedIn(ks, cmp.from, cmp.to), cmp.days(), weeks)
+}
+
+// sparkOf is the values of d by bucket, null where a bucket has too few sessions.
+func sparkOf(d kpiDef, ks []kSession, bs []span) []*float64 {
+	out := make([]*float64, len(bs))
+	for i, b := range bs {
+		out[i] = value(d, startedIn(ks, b.from, b.to), b.days())
+	}
+	return out
 }

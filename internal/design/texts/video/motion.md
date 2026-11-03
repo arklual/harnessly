@@ -24,7 +24,7 @@ tkVideo.motion(function (root) {
   sought with the scene's time. Build everything in fn, never at the top of a script: the elements are not there yet.
 - Do not play, pause or seek yourself, do not use `gsap.ticker`, `ScrollTrigger`, `onUpdate` with memory or `Math.random` at draw time. Random
   values chosen once in fn are fine: the runtime seeds them.
-- `/__lib/motion/` has: `gsap.min.js`, `tk.js`, `CustomEase`, `CustomBounce`, `CustomWiggle`, `EasePack`, `DrawSVGPlugin`, `MorphSVGPlugin`,
+- `/__lib/motion/` has: `gsap.min.js`, `tk.js`, `rig.js` and `art/` (heroes, things, backdrops: `{{cli}} design video guide characters`), `CustomEase`, `CustomBounce`, `CustomWiggle`, `EasePack`, `DrawSVGPlugin`, `MorphSVGPlugin`,
   `MotionPathPlugin`, `SplitText`, `Physics2DPlugin`, `PhysicsPropsPlugin`, `ScrambleTextPlugin`, `TextPlugin`, `Flip` (all `.min.js`).
 - Do not mix on one element: `data-build-in`/`data-tk-at` and GSAP both write its opacity and transform.
 - Mark the beats for the time line: `data-tk-mark="1.0"` (seconds) on a `data-block` gives the person a moment to pin comments to and does
@@ -33,7 +33,9 @@ tkVideo.motion(function (root) {
 
 ## Presets
 
-`tk.enter`, `tk.exit`, `tk.accent`, `tk.camera`, `tk.draw`, `tk.text`, `tk.physical.drop`, `tk.physical.hop`. Each takes `at` in seconds, adds
+`tk.enter`, `tk.exit`, `tk.accent`, `tk.camera` (`.drift`, `.shake`), `tk.draw`, `tk.text`, `tk.physical.drop`, `tk.physical.hop`, and the living ones: `tk.morph`,
+`tk.drawHand`, `tk.squash`, `tk.inertia`, `tk.parallax`, `tk.particles`. A scene with a character is written as the hero's actions with `tk.rig`:
+`{{cli}} design video guide characters`. Each takes `at` in seconds, adds
 to `tk.tl` and returns it. Read the head of `/__lib/motion/tk.js` for options. Use them for the common moves and write plain tweens on
 `tk.tl` for what makes the scene its own: presets alone look like presets.
 

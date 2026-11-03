@@ -91,8 +91,15 @@ export type Member = {
   email: string;
   name: string;
   joinedAt: string;
+  /** The latest of the sign-in to the hub and the work through a machine; null: never. */
   lastActiveAt: string | null;
+  /** The last sign-in to the hub itself; null: works only through a machine so far. */
+  signedInAt?: string | null;
+  /** Always false for a member: they joined. Pending invitations are listed apart. */
   invited: boolean;
+  /** Chats of the last seven days and the merge requests they ended with. */
+  chatsWeek?: number;
+  mrsWeek?: number;
   grants: Grant[];
   teams: { teamId: string; isPrimary: boolean }[];
   tenantRole: 'owner' | 'member' | null;

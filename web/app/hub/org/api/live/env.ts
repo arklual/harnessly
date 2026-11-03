@@ -1,6 +1,7 @@
 // «Окружение» on the hub's endpoints (docs/hub/environment.md): the layers and their entries, the catalog, and a person's
 // own switches. The answers are the wire types as they are; the screen reads them without a second shape in between.
 import type {
+  CatalogItemResponse,
   CatalogResponse,
   EnvCard,
   EnvEntryRow,
@@ -18,7 +19,11 @@ export const scopeQuery = (scope: string): Query => ({ scope: scope === ALL_SCOP
 const entry = (org: string, id: string): string => orgPath(org, `/env/entries/${encodeURIComponent(id)}`);
 
 export const liveEnv = (): EnvApi => ({
-  envView: (org, scope) => http.get<EnvResponse>(orgPath(org, '/env'), scopeQuery(scope)),
+  envView: async (org, scope) => {
+    const v = await http.get<EnvResponse>(orgPath(org, '/env'), scopeQuery(scope));
+    // A hub older than the list of what the machines call answers without it.
+    return { ...v, observed: v.observed ?? [] };
+  },
   envCard: (org, entryId) => http.get<EnvCard>(orgPath(org, `/env/items/${encodeURIComponent(entryId)}`)),
   envAdd: (org, req) => http.post<EnvEntryRow>(orgPath(org, '/env/entries'), req),
   envPatch: (org, entryId, req) => http.patch<EnvEntryRow>(entry(org, entryId), req),
@@ -33,6 +38,7 @@ export const liveEnv = (): EnvApi => ({
     });
     return res.items;
   },
+  catalogAdd: async (org, req) => (await http.post<CatalogItemResponse>(orgPath(org, '/catalog'), req)).item,
   envMine: (space) => http.get<MeEnvResponse>('/api/me/env', { space }),
   envMineSet: (itemId, off, space) =>
     http.put<MeEnvItem>(`/api/me/env/${encodeURIComponent(itemId)}`, { off, space }),

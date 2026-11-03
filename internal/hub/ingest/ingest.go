@@ -324,6 +324,19 @@ func (b *batch) session(ctx context.Context, seq, at int64, x hubproto.UsageSess
 	changed, err := b.tx.PutSession(ctx, row)
 	if err == nil && changed {
 		b.changed = append(b.changed, x.SessionKey)
+		if len(x.MRKeys) > 0 {
+			owner := x.ParentKey
+			if owner == "" {
+				owner = x.SessionKey
+			}
+			keys := make([]string, 0, len(x.MRKeys))
+			for _, k := range x.MRKeys {
+				if hubproto.IsMRKey(k) {
+					keys = append(keys, k)
+				}
+			}
+			err = b.tx.ReplaceSessionMRs(ctx, b.orgKey, x.Provider, x.SessionKey, owner, keys)
+		}
 	}
 	return err
 }

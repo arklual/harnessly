@@ -4,6 +4,7 @@ import type { DataMode } from '../mode';
 import type { Role } from '../types';
 import { liveOrgApi } from './live';
 import { mockOrgApi } from '../mock';
+import type { AccountsApi } from './accounts';
 import type { AnalyticsApi } from './analytics';
 import type { EnvApi } from './env';
 import type { MachinesApi } from './machines';
@@ -22,7 +23,8 @@ export type OrgApi = ShellApi &
   TeamsApi &
   MemberApi &
   OnboardingApi &
-  TenantApi;
+  TenantApi &
+  AccountsApi;
 
 export const createOrgApi = (mode: DataMode, role: Role): OrgApi =>
   import.meta.env.DEV && mode === 'mock' ? mockOrgApi({ role }) : liveOrgApi();

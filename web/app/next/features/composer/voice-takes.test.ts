@@ -19,7 +19,7 @@ describe('a take on its way to the cluster', () => {
     meStore.set({ k: 'ready', me: { email: 'a@test' } } as never);
   });
 
-  it('goes again when an upload failed, without a reload of the page', async () => {
+  it('goes again when an upload failed, without a reload of the page (HRN-574)', async () => {
     const take = startTake('m' as MachineId, 'audio/webm');
     recordTake(take.id, [new Blob(['speech'], { type: 'audio/webm' })]);
     put.mockResolvedValueOnce(false);

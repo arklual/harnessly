@@ -17,6 +17,7 @@ type kSession struct {
 	Start, End int64 // epoch ms; End is the end, or the last update of a running session
 	M          map[string]float64
 	PaidMicros int64 // its money and its subagents'
+	ListMicros int64 // the same work at API prices: what «Деньги на MR» counts
 	NoMoney    bool  // its money is not the scope's (a personal account in an organization's KPI): not in money_per_mr
 }
 
@@ -32,6 +33,10 @@ type KpiValue struct {
 	Delta      *float64 `json:"delta"`
 	Noise      *float64 `json:"noise"`
 	Verdict    string   `json:"verdict"`
+	// Spark is the value by day of the period (by week past 45 days), CmpSpark the same of the comparison; a bucket with
+	// too few sessions is null. They draw the small charts of the KPI cards.
+	Spark    []*float64 `json:"spark,omitempty"`
+	CmpSpark []*float64 `json:"cmpSpark,omitempty"`
 }
 
 type kpiDef struct {
@@ -98,15 +103,15 @@ var input = []string{"inputTokens", "cacheReadTokens", "cacheWriteTokens"}
 
 var kpis = []kpiDef{
 	{"money_per_mr", "usd", "down", func(ss []kSession, _ float64) *float64 {
-		var paid int64
+		var list int64
 		var mrs float64
 		for _, s := range ss {
 			if !s.NoMoney {
-				paid += s.PaidMicros
+				list += s.ListMicros
 				mrs += s.M["mrsMerged"]
 			}
 		}
-		return ratio(float64(paid)/1e6, mrs)
+		return ratio(float64(list)/1e6, mrs)
 	}},
 	{"completion", "share", "up", func(ss []kSession, _ float64) *float64 {
 		var done, all float64

@@ -11,6 +11,7 @@ import type {
   TeamEfficiency,
 } from '../../../org/api/overview';
 import { navigate } from '../../../lib/router';
+import { goSignal } from '../../go';
 import { Btn, Icon, initial } from '../../ui';
 import {
   barRects,
@@ -191,10 +192,16 @@ export const HeadTiles = ({
   data,
   period,
   base,
+  onSpend,
+  onActive,
 }: {
   data: OverviewData;
   period: OverviewPeriod;
   base: string;
+  /** Opens the spend detail over the screen. */
+  onSpend: () => void;
+  /** Opens «Кто сегодня в работе» over the screen. */
+  onActive: () => void;
 }) => {
   const t = data.tiles;
   const names = tileLabels(t.basis ?? 'today', period);
@@ -210,7 +217,7 @@ export const HeadTiles = ({
           label={names.spend}
           value={spendLine(t.spend, data.estimated)}
           chart={<Bars values={t.spend.bars} />}
-          onClick={go('teams')}
+          onClick={onSpend}
         />
         <SxTile
           i={1}
@@ -219,7 +226,7 @@ export const HeadTiles = ({
           label={names.active}
           value={activeLine(t.active.now, t.active.total)}
           chart={<Bars values={t.active.bars} />}
-          onClick={go('teams')}
+          onClick={onActive}
         />
         <SxTile
           i={2}
@@ -228,7 +235,7 @@ export const HeadTiles = ({
           label={names.tasks}
           value={tasksLine(t.tasks.closed, t.tasks.inProgress)}
           chart={<Bars values={t.tasks.bars} />}
-          onClick={go('teams')}
+          onClick={go('analytics?k=mrPerPerson')}
         />
         <SxTile
           i={3}
@@ -243,7 +250,7 @@ export const HeadTiles = ({
               <Strip used={subs.worstPct} whole={100} color={TONE.subs} />
             )
           }
-          onClick={go('teams')}
+          onClick={go('accounts')}
         />
       </nav>
     </div>
@@ -281,7 +288,7 @@ export const Attention = ({ signals, base }: { signals: Signal[]; base: string }
             className="at-cell"
             data-tone={toneOfSignal(s)}
             style={css({ '--i': i, '--at-span': 1, '--j': 0, '--jr': 0 })}
-            onClick={() => navigate(`${base}/${s.action.section}`)}
+            onClick={() => goSignal(base, s.action)}
           >
             <span className="at-cell__dot" aria-hidden="true" />
             <span className="at-cell__text">
@@ -308,10 +315,12 @@ export const SpendDonut = ({
   data,
   period,
   base,
+  onSpend,
 }: {
   data: NonNullable<OverviewData['byTeam']>;
   period: OverviewPeriod;
   base: string;
+  onSpend: () => void;
 }) => {
   const units = unitsOf();
   const [picked, setPicked] = useState<Unit | null>(null);
@@ -328,7 +337,7 @@ export const SpendDonut = ({
   ) as Record<Unit, ReturnType<typeof donutSlices>>;
   const ring = rings[unit];
   const open = (id: string, noTeam?: boolean) =>
-    navigate(noTeam ? `${base}/analytics` : `${base}/teams?t=${encodeURIComponent(id)}`);
+    navigate(noTeam ? `${base}/teams` : `${base}/team?t=${encodeURIComponent(id)}`);
   const hot = hov === null ? null : teams.findIndex((t) => t.id === hov);
   const big = hot === null || hot < 0 ? unitValue(unit, data.total) : unitValue(unit, teams[hot]!);
   const cap =
@@ -344,7 +353,7 @@ export const SpendDonut = ({
     <Card
       label="Расход по командам"
       className="dash-span-12"
-      title={<TitleLink onClick={() => navigate(`${base}/teams`)}>Расход по командам</TitleLink>}
+      title={<TitleLink onClick={onSpend}>Расход по командам</TitleLink>}
       actions={
         <div className="hx-set__seg ad-unit" role="radiogroup" aria-label="В чём считать">
           {units.map((u) => (
@@ -467,7 +476,7 @@ export const Efficiency = ({
                   type="button"
                   className="dash-bar__hit"
                   onClick={() =>
-                    navigate(r.noTeam ? `${base}/analytics` : `${base}/teams?t=${encodeURIComponent(r.id)}`)
+                    navigate(r.noTeam ? `${base}/teams` : `${base}/team?t=${encodeURIComponent(r.id)}`)
                   }
                 >
                   <span
@@ -497,7 +506,8 @@ export const Efficiency = ({
 export const Subscriptions = ({ items, base }: { items: SubscriptionUse[]; base: string }) => {
   const order = rankDesc(items.map((s) => s.usedPct));
   const widths = relativeWidths(order.map((i) => items[i]!.usedPct));
-  const go = () => navigate(`${base}/teams`);
+  const go = () => navigate(`${base}/accounts`);
+  const one = (id: string) => () => navigate(`${base}/accounts?a=${encodeURIComponent(id)}`);
   return (
     <div className="ad-one">
       <Card
@@ -522,7 +532,7 @@ export const Subscriptions = ({ items, base }: { items: SubscriptionUse[]; base:
                   className={windowIsHot(s.usedPct) ? 'dash-bar dash-bar--rose' : 'dash-bar'}
                   data-action="true"
                 >
-                  <button type="button" className="dash-bar__hit" onClick={go}>
+                  <button type="button" className="dash-bar__hit" onClick={one(s.id)}>
                     <span
                       className="dash-bar__fill"
                       aria-hidden="true"

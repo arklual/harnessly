@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AnalyticsFrame, KpiId } from '../../org/api/analytics';
 import { orgErrorText } from '../../org/api/errors';
 import { useOrg } from '../../org/context';
+import { useLocation } from '../../lib/router';
 import { Btn } from '../ui';
 import { Titles } from '../shell';
 import { Attention, Changes, PeersCard, WasteCard } from './analytics/cards';
@@ -91,6 +92,15 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
   const staff = shell.viewer.role !== 'member';
   const store = useMemo(() => createStore(api), [api]);
   const [picked, setPicked] = useState<Picked>(() => fromUrl(frame, staff));
+  // A link into the open screen (a signal's «Смотреть») changes the address with a new entry: take its KPI.
+  const { search } = useLocation();
+  const [seenSearch, setSeenSearch] = useState(search);
+  if (search !== seenSearch) {
+    setSeenSearch(search);
+    const k = new URLSearchParams(search).get('k');
+    const id = KPI_IDS.find((x) => x === k);
+    if (id && id !== picked.kpi) setPicked((p) => ({ ...p, kpi: id }));
+  }
   const { picker, kpi: kpiId, mode } = picked;
   const teamOrder = useMemo(() => shell.teams.map((t) => t.name), [shell.teams]);
 

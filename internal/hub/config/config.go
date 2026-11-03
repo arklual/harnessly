@@ -116,6 +116,11 @@ type Config struct {
 	// UsageIngest (HUB_USAGE_INGEST=on) lets the hub pull the machines' spend facts (docs/hub/usage.md); off: it never
 	// asks, and the spend tables stay empty.
 	UsageIngest bool
+	// MRSourceURL, MRSourceGroups and MRSourceToken (HUB_MR_SOURCE_GITLAB_URL, _GROUPS, _TOKEN) name the GitLab whose merged
+	// merge requests the hub polls for the KPI of docs/hub/analytics.md; no URL: it polls nothing. The token needs read_api.
+	MRSourceURL    string
+	MRSourceGroups []string
+	MRSourceToken  string
 	// LimitsEnforce (HUB_LIMITS_ENFORCE) is what the machines do with the limits (docs/hub/limits.md): off sends them
 	// nothing (the hub still shows the limits), warn makes a stop only a notice, stop stops new chats.
 	LimitsEnforce string
@@ -396,6 +401,24 @@ func Load(lookup func(string) (string, bool)) (*Config, error) {
 	case "off", "false", "0", "no":
 	default:
 		bad("HUB_USAGE_INGEST must be on or off")
+	}
+	if u := get("HUB_MR_SOURCE_GITLAB_URL"); u != "" {
+		pu, err := url.Parse(u)
+		if err != nil || (pu.Scheme != "http" && pu.Scheme != "https") || pu.Host == "" {
+			bad("HUB_MR_SOURCE_GITLAB_URL must be an http(s) URL")
+		}
+		c.MRSourceURL = strings.TrimRight(u, "/")
+		for _, g := range strings.Split(get("HUB_MR_SOURCE_GITLAB_GROUPS"), ",") {
+			if g = strings.Trim(strings.TrimSpace(g), "/"); g != "" {
+				c.MRSourceGroups = append(c.MRSourceGroups, g)
+			}
+		}
+		if len(c.MRSourceGroups) == 0 {
+			bad("HUB_MR_SOURCE_GITLAB_GROUPS must list at least one group when HUB_MR_SOURCE_GITLAB_URL is set")
+		}
+		if c.MRSourceToken = get("HUB_MR_SOURCE_GITLAB_TOKEN"); c.MRSourceToken == "" {
+			bad("HUB_MR_SOURCE_GITLAB_TOKEN is required when HUB_MR_SOURCE_GITLAB_URL is set")
+		}
 	}
 	switch c.LimitsEnforce = strings.ToLower(def("HUB_LIMITS_ENFORCE", "off")); c.LimitsEnforce {
 	case "off", "warn", "stop":

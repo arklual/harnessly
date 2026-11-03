@@ -88,21 +88,24 @@ func TestLoadErrors(t *testing.T) {
 		env  map[string]string
 		want string
 	}{
-		"no public url":      {map[string]string{}, "HUB_PUBLIC_URL is required"},
-		"public url path":    {map[string]string{"HUB_PUBLIC_URL": "https://h.example.com/app"}, "without a path"},
-		"public url scheme":  {map[string]string{"HUB_PUBLIC_URL": "ftp://h.example.com"}, "without a path"},
-		"edition":            {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_EDITION": "saas"}, "HUB_EDITION"},
-		"signup":             {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SIGNUP": "closed"}, "HUB_SIGNUP"},
-		"database":           {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_DATABASE_URL": "mysql://x"}, "HUB_DATABASE_URL"},
-		"half github":        {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_GITHUB_CLIENT_ID": "x"}, "go together"},
-		"half yandex":        {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_YANDEX_CLIENT_SECRET": "x"}, "go together"},
-		"oidc incomplete":    {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_OIDC_PROVIDERS": "kc"}, "HUB_OIDC_KC_ISSUER"},
-		"oidc id":            {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_OIDC_PROVIDERS": "my-kc"}, "[a-z0-9]+"},
-		"proxies":            {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_TRUSTED_PROXIES": "banana"}, "HUB_TRUSTED_PROXIES"},
-		"smtp":               {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SMTP_URL": "http://mail"}, "HUB_SMTP_URL"},
-		"runtime domain":     {map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_RUNTIME_DOMAIN": "hub.example.com"}, "differ"},
-		"runtime domain bad": {map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_RUNTIME_DOMAIN": "not a domain"}, "HUB_RUNTIME_DOMAIN"},
-		"missing file":       {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SMTP_URL_FILE": "/nonexistent/x"}, "HUB_SMTP_URL_FILE"},
+		"no public url":       {map[string]string{}, "HUB_PUBLIC_URL is required"},
+		"public url path":     {map[string]string{"HUB_PUBLIC_URL": "https://h.example.com/app"}, "without a path"},
+		"public url scheme":   {map[string]string{"HUB_PUBLIC_URL": "ftp://h.example.com"}, "without a path"},
+		"edition":             {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_EDITION": "saas"}, "HUB_EDITION"},
+		"signup":              {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SIGNUP": "closed"}, "HUB_SIGNUP"},
+		"database":            {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_DATABASE_URL": "mysql://x"}, "HUB_DATABASE_URL"},
+		"half github":         {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_GITHUB_CLIENT_ID": "x"}, "go together"},
+		"half yandex":         {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_YANDEX_CLIENT_SECRET": "x"}, "go together"},
+		"oidc incomplete":     {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_OIDC_PROVIDERS": "kc"}, "HUB_OIDC_KC_ISSUER"},
+		"oidc id":             {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_OIDC_PROVIDERS": "my-kc"}, "[a-z0-9]+"},
+		"proxies":             {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_TRUSTED_PROXIES": "banana"}, "HUB_TRUSTED_PROXIES"},
+		"smtp":                {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SMTP_URL": "http://mail"}, "HUB_SMTP_URL"},
+		"runtime domain":      {map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_RUNTIME_DOMAIN": "hub.example.com"}, "differ"},
+		"runtime domain bad":  {map[string]string{"HUB_PUBLIC_URL": "https://hub.example.com", "HUB_RUNTIME_DOMAIN": "not a domain"}, "HUB_RUNTIME_DOMAIN"},
+		"mr source no groups": {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MR_SOURCE_GITLAB_URL": "https://git.example.com", "HUB_MR_SOURCE_GITLAB_TOKEN": "t"}, "HUB_MR_SOURCE_GITLAB_GROUPS"},
+		"mr source no token":  {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MR_SOURCE_GITLAB_URL": "https://git.example.com", "HUB_MR_SOURCE_GITLAB_GROUPS": "g"}, "HUB_MR_SOURCE_GITLAB_TOKEN"},
+		"mr source bad url":   {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MR_SOURCE_GITLAB_URL": "git.example.com"}, "HUB_MR_SOURCE_GITLAB_URL"},
+		"missing file":        {map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_SMTP_URL_FILE": "/nonexistent/x"}, "HUB_SMTP_URL_FILE"},
 	} {
 		_, err := Load(env(tc.env))
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
@@ -445,5 +448,24 @@ func TestFeatureLists(t *testing.T) {
 		if _, err := Load(env(tc.env)); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: %v, want %q", name, err, tc.want)
 		}
+	}
+}
+
+func TestLoadMRSource(t *testing.T) {
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "tok")
+	if err := os.WriteFile(tok, []byte("glpat-x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "http://h", "HUB_MR_SOURCE_GITLAB_URL": "https://git.example.com/",
+		"HUB_MR_SOURCE_GITLAB_GROUPS": " a/b, c ,,", "HUB_MR_SOURCE_GITLAB_TOKEN_FILE": tok}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.MRSourceURL != "https://git.example.com" || len(c.MRSourceGroups) != 2 || c.MRSourceGroups[0] != "a/b" || c.MRSourceGroups[1] != "c" || c.MRSourceToken != "glpat-x" {
+		t.Errorf("%+v", c)
+	}
+	if c, err := Load(env(map[string]string{"HUB_PUBLIC_URL": "http://h"})); err != nil || c.MRSourceURL != "" {
+		t.Errorf("off by default: %v %+v", err, c)
 	}
 }

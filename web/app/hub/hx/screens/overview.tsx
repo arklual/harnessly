@@ -19,6 +19,8 @@ import {
   Subscriptions,
 } from './overview/parts';
 import { MemberView } from './overview/member';
+import { ActiveDrawer, useOpenActive } from './overview/active';
+import { SpendDrawer, useOpenSpend } from './overview/spend';
 import { overviewLead, PERIODS } from './overview/fmt';
 import '../styles/overview.css';
 
@@ -97,6 +99,9 @@ const StaffView = ({
   const { base } = useOrg();
   const { data, error, reload } = useLoad((api) => api.overview(slug, period), [slug, period]);
   const shown = useKept<OverviewData>(data);
+  const openSpend = useOpenSpend();
+  const openActive = useOpenActive();
+  const spanOf = shown?.tiles.basis === 'period' ? period : 'day';
   const head = (
     <Head
       role={role}
@@ -111,6 +116,7 @@ const StaffView = ({
       <>
         {head}
         {error ? <LoadFailed error={error} retry={reload} /> : <Skeleton member={false} />}
+        <SpendDrawer lead={role === 'lead'} defaultSpan={spanOf} />
       </>
     );
   return (
@@ -120,14 +126,25 @@ const StaffView = ({
         {error ? <LoadFailed error={error} retry={reload} /> : null}
         <div className="an-stage">
           <div className="mx">
-            <HeadTiles data={shown} period={period} base={base} />
+            <HeadTiles
+              data={shown}
+              period={period}
+              base={base}
+              onSpend={() => openSpend()}
+              onActive={openActive}
+            />
             <Attention signals={shown.signals} base={base} />
             {role === 'lead' && shown.byPerson && (
               <PeopleSpend data={shown.byPerson} base={base} period={period} />
             )}
             {role === 'admin' && shown.byTeam && (
               <div className="mx-split">
-                <SpendDonut data={shown.byTeam} period={period} base={base} />
+                <SpendDonut
+                  data={shown.byTeam}
+                  period={period}
+                  base={base}
+                  onSpend={() => openSpend('team')}
+                />
                 <Efficiency rows={shown.byTeam.efficiency} base={base} period={period} />
               </div>
             )}
@@ -135,6 +152,8 @@ const StaffView = ({
           </div>
         </div>
       </div>
+      <SpendDrawer lead={role === 'lead'} defaultSpan={spanOf} />
+      <ActiveDrawer who={shown.tiles.active.who} total={shown.tiles.active.total} />
     </>
   );
 };

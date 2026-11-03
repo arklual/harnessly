@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -130,9 +131,13 @@ func (t *deckTab) videoOpen(artifact string, sc VideoScene, f VideoFormat, draft
 	return nil
 }
 
-// videoSceneConfig is the scene's settings for the runtime: its transition as the video has it.
+// videoSceneConfig is the scene's settings for the runtime: its transition as the video has it and its overlays.
 func videoSceneConfig(sc VideoScene) string {
-	return `{transition: {kind: ` + jsString(string(sc.Transition.Kind)) + `, ms: ` + strconv.Itoa(sc.Transition.Ms) + `}}`
+	over, err := json.Marshal(sc.Overlays)
+	if err != nil || len(sc.Overlays) == 0 {
+		over = []byte("[]")
+	}
+	return `{transition: {kind: ` + jsString(string(sc.Transition.Kind)) + `, ms: ` + strconv.Itoa(sc.Transition.Ms) + `}, overlays: ` + string(over) + `}`
 }
 
 // evalWithin is eval bounded by wait.

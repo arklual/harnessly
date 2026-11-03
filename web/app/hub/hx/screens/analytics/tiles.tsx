@@ -13,6 +13,12 @@ const GROUPS: { id: KpiGroup; title: string }[] = [
 
 const NOW_HEX = '#8968f4';
 
+/** Why a tile has no number: the MR ones wait for merged MRs, the rest for five sessions. */
+const emptyText = (id: KpiId): string =>
+  id === 'moneyPerMr' || id === 'mrPerPerson' || id === 'timeToMr'
+    ? 'нет смёрженных MR за период'
+    : 'мало сессий — нужно от пяти';
+
 interface TileProps {
   kpi: Kpi;
   index: number;
@@ -58,7 +64,7 @@ const Tile = memo(({ kpi, index, selected, nowLabel, prevLabel, onPick, onHover 
         <path d={paths.area} className="anm-area" />
         <path d={paths.now} className="anm-now" />
       </svg>
-      <span className="anm__was">{wasText(kpi)}</span>
+      <span className="anm__was">{none ? emptyText(kpi.id) : wasText(kpi)}</span>
       <span className="anx-pop">
         <span className="viz-tip">
           <span className="viz-tip__title">{kpi.title}</span>

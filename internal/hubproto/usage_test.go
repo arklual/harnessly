@@ -108,7 +108,7 @@ func TestUsageGolden(t *testing.T) {
 func TestUsageFactsCarryNoText(t *testing.T) {
 	want := map[string]string{
 		"UsageCallFact":    "baseUrlHost cacheRead cacheWrite1h cacheWrite5m input model msgKey output provider sessionKey ts",
-		"UsageSessionFact": "accountRef attribution authMode baseUrlHost endedAt metrics origin parentKey provider sessionKey startedAt subject",
+		"UsageSessionFact": "accountRef attribution authMode baseUrlHost endedAt metrics mrKeys origin parentKey provider sessionKey startedAt subject",
 		"UsageWindowFact":  "accountRef confidence lengthSec limit measuredAt name provider resetsAt scope source unit used usedPct",
 		"UsageBalanceFact": "accountRef available currency measuredAt provider source spendCap spentInPeriod",
 	}

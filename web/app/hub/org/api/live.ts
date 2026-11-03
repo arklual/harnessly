@@ -3,6 +3,7 @@
 import type { OrgView, Scope as ApiScope } from '../../../hub-api/orgs';
 import { OrgApiError } from './errors';
 import type { OrgApi } from './index';
+import { liveAccounts } from './live/accounts';
 import { liveAnalytics } from './live/analytics';
 import { liveEnv } from './live/env';
 import { liveMachines } from './live/machines';
@@ -54,5 +55,10 @@ export const liveOrgApi = (): OrgApi => {
     ...liveTeams(),
     ...liveEnv(),
     ...liveTenant(),
+    ...liveAccounts(() => {
+      const { view, scope } = place();
+      const team = roleIn(view, scope) === 'lead' ? viewerTeam(view, scope) : null;
+      return { org: view.org.slug, scope: team ? { kind: 'team', id: team } : scope };
+    }),
   };
 };

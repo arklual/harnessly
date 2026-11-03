@@ -70,8 +70,8 @@
   "next.connections.kind.wikijs": "Wiki.js",
   "next.connections.mcp.title": "MCP-серверы",
   "next.connections.mcp.lead": "Агенты в новых чатах получают инструменты этих серверов",
-  "next.connections.mcp.own": "Добавить свой сервер",
-  "next.connections.mcp.own.placeholder": "Его MCP-адрес, например https://example.com/mcp",
+  "next.connections.mcp.address": "Адрес MCP-сервера",
+  "next.connections.mcp.address.placeholder": "https://…/mcp — или выберите сервис ниже",
   "next.connections.mcp.signs.oauth": "Вход на своей странице",
   "next.connections.mcp.signs.header": "Нужен токен",
   "next.connections.mcp.signs.none": "Открыт: входить не нужно",
@@ -87,7 +87,7 @@
     "other": "{n} инструмента"
   },
   "next.connections.mcp.toolsOf": "Инструменты «{name}»",
-  "next.connections.mcp.state.signin": "Агенты не смогут им пользоваться, пока вы не войдёте",
+  "next.connections.mcp.state.signin": "Вход не завершён",
   "next.connections.mcp.state.token": "Сервер не принимает токен: введите новый",
   "next.connections.mcp.state.unreachable": "Сервер не ответил при последней проверке",
   "next.connections.mcp.signIn": "Войти",
@@ -107,5 +107,7 @@
   "next.connections.mcp.reason.signin-required": "Сначала нужно войти на сервере",
   "next.connections.mcp.reason.oauth-failed": "Сервис не завершил вход. Попробуйте ещё раз.",
   "next.connections.mcp.reason.other": "Машина не приняла это ({code})",
-  "next.connections.mcp.state.oauthUnavailable": "Этому сервису нужен токен: новым приложениям он не даёт входить самим"
+  "next.connections.mcp.state.oauthUnavailable": "Этому сервису нужен токен: новым приложениям он не даёт входить самим",
+  "next.connections.mcp.signInWith": "Войти через {name}",
+  "next.connections.mcp.more": "Показать все"
 }

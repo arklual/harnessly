@@ -1,0 +1,205 @@
+/* «Аккаунты»: the table of accounts, the group of found ones and the register form in the drawer. */
+.ad .ac-head {
+  margin-bottom: 20px;
+}
+.ad .ac-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ad .ac-group__t {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0 0 8px;
+  font-size: var(--hx-text-sm);
+  font-weight: 600;
+}
+.ad .ac-group__t small {
+  flex-basis: 100%;
+  font-size: var(--hx-text-xs);
+  font-weight: 400;
+  color: var(--hx-fg-3);
+}
+.ad .pt-row.ac-row {
+  grid-template-columns: minmax(220px, 1.7fr) 110px minmax(140px, 1fr) 100px 120px 130px;
+}
+.ad .ac-row .ac-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ad .ac-row.mt-head > :nth-child(4),
+.ad .ac-row.mt-head > :nth-child(5) {
+  text-align: right;
+}
+.ad .ac-row .ac-who,
+.ad .ac-row .ac-pay {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--hx-fg-2);
+}
+.ad .ac-row .ac-go {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--hx-fg-3);
+}
+.ad .ac-row[data-found='1'] .ad-ic {
+  color: #c8830b;
+}
+.ad .ac-cta {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--hx-accent, #8968f4);
+  color: #fff;
+  font-size: var(--hx-text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ad .ac-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #1f9d55 12%, transparent);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+}
+
+/* the drawer */
+.ad .ac .ac-line {
+  margin: 6px 0 4px;
+  font-size: var(--hx-text-sm);
+}
+.ad .ac .ac-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ad .ac .ac-people button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+.ad .ac .ac-people button:hover {
+  background: var(--hx-bg-hover);
+}
+.ad .ac .ac-av {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+.ad .ac .ac-found {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #c8830b 12%, transparent);
+  font-size: var(--hx-text-sm);
+  line-height: 1.45;
+}
+.ad .ac .ac-found .hx-icon {
+  flex: none;
+  margin-top: 2px;
+  color: #c8830b;
+}
+.ad .ac .ac-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.ad .ac .ac-chip {
+  padding: 6px 12px;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+.ad .ac .ac-chip:hover {
+  background: var(--hx-bg-hover);
+}
+.ad .ac .ac-chip[aria-pressed='true'],
+.ad .ac .ac-chip[aria-checked='true'] {
+  border-color: var(--hx-accent, #8968f4);
+  background: color-mix(in srgb, var(--hx-accent, #8968f4) 12%, transparent);
+}
+.ad .ac .hx-set__input {
+  width: 100%;
+  margin-top: 8px;
+}
+.ad .ac .hx-set__seg {
+  margin-top: 8px;
+}
+.ad .ac .ac-fee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+.ad .ac .ac-fee .hx-set__input {
+  width: 96px;
+  margin-top: 0;
+}
+.ad .ac .ac-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.ad .ac .ac-check input {
+  margin-top: 3px;
+}
+.ad .ac .ac-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--hx-bg-raised, #fff);
+}
+
+@container (max-width: 980px) {
+  .ad .pt-row.ac-row {
+    grid-template-columns: minmax(0, 1fr) 110px 120px auto;
+  }
+  .ad .ac-row > :nth-child(3),
+  .ad .ac-row > :nth-child(4) {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .ad .pt-row.ac-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+  .ad .ac-row > :nth-child(2),
+  .ad .ac-row > :nth-child(5) {
+    display: none;
+  }
+  .ad .ac-row.mt-head {
+    display: none;
+  }
+}

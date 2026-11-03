@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"math"
 	"strings"
 )
 
@@ -144,7 +146,11 @@ func (s Store) sessions(ctx context.Context, q string, args ...any) ([]AgentSess
 		}
 		out = append(out, x)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	return s.withMergedMRs(ctx, out)
 }
 
 // SessionFilter picks a person's top-level sessions (subagents are inside their parent).
@@ -412,4 +418,65 @@ func (s Store) ScopeAccountedUntil(ctx context.Context, f ScopeFilter, stream st
 		return nil, nil
 	}
 	return &v.Int64, nil
+}
+
+// LastWorked is when each person last had a session of these organizations going: the latest update of any of their
+// sessions, subagents included. A person who never worked through a machine is not in the map.
+func (s Store) LastWorked(ctx context.Context, orgKeys []string) (map[string]int64, error) {
+	out := map[string]int64{}
+	for _, org := range orgKeys {
+		rows, err := s.q.Query(ctx, `SELECT user_id, MAX(updated_at) FROM agent_sessions WHERE org_key = ? AND user_id IS NOT NULL AND user_id <> '' GROUP BY user_id`, org)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var id string
+			var at int64
+			if err := rows.Scan(&id, &at); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out[id] = max(out[id], at)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+	}
+	return out, nil
+}
+
+// Work is what a person did through machines over a span: their chats (top-level live sessions started in it) and the
+// merge requests those chats ended with.
+type Work struct {
+	Chats int
+	MRs   int
+}
+
+// WorkSince is each person's work in these organizations since a moment (unix ms). A person with no chat is not in the
+// map.
+func (s Store) WorkSince(ctx context.Context, orgKeys []string, from int64) (map[string]Work, error) {
+	out := map[string]Work{}
+	for _, org := range orgKeys {
+		ss, err := s.ScopeSessions(ctx, ScopeFilter{OrgKey: org, From: from, To: math.MaxInt64, LiveOnly: true})
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range ss {
+			if x.UserID == "" {
+				continue
+			}
+			w := out[x.UserID]
+			w.Chats++
+			var m map[string]any
+			if json.Unmarshal([]byte(x.Metrics), &m) == nil {
+				if n, ok := m["mrsMerged"].(float64); ok && n > 0 {
+					w.MRs += int(n)
+				}
+			}
+			out[x.UserID] = w
+		}
+	}
+	return out, nil
 }

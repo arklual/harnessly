@@ -38,13 +38,15 @@ type Today struct {
 		// People had a live session going on today; Of is the people of the scope.
 		People int `json:"people"`
 		Of     int `json:"of"`
+		// Who are all the people of the scope with their day, the working first, then by the last time they worked.
+		Who []TodayPerson `json:"who"`
 	} `json:"active"`
 	Tasks struct {
 		// Closed are the sessions that ended today with a merge request; InWork the chats going on now.
 		Closed int `json:"closed"`
 		InWork int `json:"inWork"`
 	} `json:"tasks"`
-	// Sparks are the last sparkDays days, oldest first, today included. spend is the paid dollars of the day.
+	// Sparks are the last sparkDays days, oldest first, today included. spend is the day's dollars at API prices.
 	Sparks struct {
 		Spend  []DayValue `json:"spend"`
 		Active []DayValue `json:"active"`
@@ -79,8 +81,41 @@ type EfficiencyRow struct {
 	Reached        Reached  `json:"reached"`
 }
 
-// dayAgg is the money and tokens of one day.
-type dayAgg struct{ paid, list, tokens int64 }
+// TodayPerson is one person's day: the «Активны сегодня» tile opens the list of them.
+type TodayPerson struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	// Working: a chat of theirs was heard from in the last minutes; Chats are their chats going on at some moment of today.
+	Working bool `json:"working"`
+	Chats   int  `json:"chats"`
+	// Closed are their chats that ended today with a merge request.
+	Closed int `json:"closed"`
+	// LastAt is when they last worked through a machine (any day; RFC 3339), null when never.
+	LastAt *string `json:"lastAt"`
+	// Paid and List are today's money of the organization's accounts by them; Tokens of all their funding.
+	Paid   Money `json:"paid"`
+	List   Money `json:"list"`
+	Tokens int64 `json:"tokens"`
+}
+
+// dayAgg is the money and tokens of one day, and the same by person.
+type dayAgg struct {
+	paid, list, tokens int64
+	people             map[string]*dayAgg
+}
+
+func (a *dayAgg) person(id string) *dayAgg {
+	if a.people == nil {
+		a.people = map[string]*dayAgg{}
+	}
+	p := a.people[id]
+	if p == nil {
+		p = &dayAgg{}
+		a.people[id] = p
+	}
+	return p
+}
 
 // peopleOf are the people of the scope: the members of the team, or of the tenants under the scope.
 func peopleOf(ctx context.Context, st store.Store, x *orgScope) ([]string, error) {
@@ -142,7 +177,10 @@ func (s *Service) spendByDay(ctx context.Context, st store.Store, x *orgScope, f
 			a = &dayAgg{}
 			out[d] = a
 		}
-		a.tokens += r.Input + r.Output + r.CacheRead + r.CacheWrite
+		tokens := r.Input + r.Output + r.CacheRead + r.CacheWrite
+		u := a.person(r.UserID)
+		a.tokens += tokens
+		u.tokens += tokens
 		if r.Funding != store.FundingOrg {
 			continue
 		}
@@ -152,6 +190,8 @@ func (s *Service) spendByDay(ctx context.Context, st store.Store, x *orgScope, f
 		}
 		a.paid += p
 		a.list += r.ListCostMicros
+		u.paid += p
+		u.list += r.ListCostMicros
 	}
 	return out, nil
 }
@@ -208,11 +248,11 @@ func (s *Service) today(ctx context.Context, st store.Store, x *orgScope, cur Cu
 			}
 		}
 		key := d.Format(day)
-		var paid int64
+		var list int64
 		if g := spend[key]; g != nil {
-			paid = g.paid
+			list = g.list
 		}
-		t.Sparks.Spend = append(t.Sparks.Spend, DayValue{Day: key, Value: math.Round(float64(paid)/1e6*10000) / 10000})
+		t.Sparks.Spend = append(t.Sparks.Spend, DayValue{Day: key, Value: math.Round(float64(list)/1e6*10000) / 10000})
 		t.Sparks.Active = append(t.Sparks.Active, DayValue{Day: key, Value: float64(len(people))})
 		t.Sparks.Tasks = append(t.Sparks.Tasks, DayValue{Day: key, Value: float64(closed)})
 		if d.Equal(today) {
@@ -230,7 +270,68 @@ func (s *Service) today(ctx context.Context, st store.Store, x *orgScope, cur Cu
 			t.Tasks.InWork++
 		}
 	}
+	if t.Active.Who, err = whoToday(ctx, st, x, members, ss, g, today, cur); err != nil {
+		return t, err
+	}
 	return t, nil
+}
+
+// whoToday is the day of each person of the scope: the sessions are those of the strips, g today's money.
+func whoToday(ctx context.Context, st store.Store, x *orgScope, members []string, ss []store.AgentSession, g *dayAgg,
+	today time.Time, cur Currency) ([]TodayPerson, error) {
+	a, b := today.UnixMilli(), today.AddDate(0, 0, 1).UnixMilli()
+	since := x.now.Add(-activeWindow).UnixMilli()
+	worked, err := st.LastWorked(ctx, []string{x.org.ID})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TodayPerson, 0, len(members))
+	at := map[string]int64{}
+	for _, id := range members {
+		p := TodayPerson{UserID: id, Name: id}
+		if u, err := st.UserByID(ctx, id); err == nil {
+			p.Name, p.Email = cmp.Or(u.Name, u.Email), u.Email
+		} else if !store.IsNotFound(err) {
+			return nil, err
+		}
+		for _, v := range ss {
+			if v.UserID != id {
+				continue
+			}
+			e := endOf(v)
+			if v.StartedAt < b && e >= a {
+				p.Chats++
+				if v.EndedAt == nil && v.UpdatedAt >= since {
+					p.Working = true
+				}
+			}
+			if closedTask(v) && e >= a && e < b {
+				p.Closed++
+			}
+		}
+		if w, ok := worked[id]; ok {
+			at[id] = w
+			s := time.UnixMilli(w).UTC().Format(time.RFC3339)
+			p.LastAt = &s
+		}
+		if d := g.people[id]; d != nil {
+			p.Paid, p.List, p.Tokens = cur.Micros(d.paid), cur.Micros(d.list), d.tokens
+		}
+		out = append(out, p)
+	}
+	slices.SortStableFunc(out, func(l, r TodayPerson) int {
+		if l.Working != r.Working {
+			if l.Working {
+				return -1
+			}
+			return 1
+		}
+		if c := cmp.Compare(at[r.UserID], at[l.UserID]); c != 0 {
+			return c
+		}
+		return cmp.Compare(l.Name, r.Name)
+	})
+	return out, nil
 }
 
 // plainK is a session as the KPI that need no money see it.

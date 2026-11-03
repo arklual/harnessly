@@ -255,8 +255,11 @@ func (l *Library) sceneMetaFile(id, page string) string {
 
 // ValidateVideoSceneMeta checks a scene's meta against the contract's bounds.
 func ValidateVideoSceneMeta(m VideoSceneMeta) error {
-	if m.V != 1 {
-		return deckErr(http400, "scene.v must be 1", "scene.v должен быть 1")
+	if m.V != 1 && m.V != VideoSceneMetaV {
+		return deckErr(http400, "scene.v must be 1 or 2", "scene.v должен быть 1 или 2")
+	}
+	if err := ValidateVideoOverlays(m.Overlays); err != nil {
+		return err
 	}
 	if m.Dur != nil && (*m.Dur < VideoSceneDurMin || *m.Dur > VideoSceneDurMax) {
 		return deckErr(http400, "dur: from 1000 to 60000 ms, or null for automatic", "dur: от 1000 до 60000 мс или null — по тексту")
@@ -281,7 +284,7 @@ func ValidateVideoSceneMeta(m VideoSceneMeta) error {
 func (l *Library) ReadVideoSceneMeta(id, page string) (VideoSceneMeta, error) {
 	raw, err := readFileLimited(l.sceneMetaFile(id, page), maxDeckFileBytes)
 	if errors.Is(err, os.ErrNotExist) {
-		return VideoSceneMeta{V: 1}, nil
+		return VideoSceneMeta{V: VideoSceneMetaV}, nil
 	}
 	if err != nil {
 		return VideoSceneMeta{}, err
@@ -301,8 +304,12 @@ func (l *Library) writeVideoSceneMeta(id, page string, m VideoSceneMeta) error {
 	if err := ValidateVideoSceneMeta(m); err != nil {
 		return err
 	}
+	m.V = VideoSceneMetaV
+	if len(m.Overlays) == 0 {
+		m.Overlays = nil
+	}
 	file := l.sceneMetaFile(id, page)
-	if m.Dur == nil && m.Transition == nil {
+	if m.Dur == nil && m.Transition == nil && len(m.Overlays) == 0 {
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -338,12 +345,16 @@ func (l *Library) videoSceneOf(id string, p Page) (VideoScene, error) {
 		board = ParseVideoBoard(string(src))
 	}
 	sc.Moments = board.Moments
+	sc.Overlays = []VideoOverlay{}
 	if sc.Moments == nil {
 		sc.Moments = []VideoMoment{}
 	}
 	meta, err := l.ReadVideoSceneMeta(id, p.ID)
 	if err != nil {
 		return VideoScene{}, err
+	}
+	if meta.Overlays != nil {
+		sc.Overlays = meta.Overlays
 	}
 	sc.Dur, sc.Auto = VideoAutoDur(lastMomentEnd(sc.Moments), sc.Words), true
 	if meta.Dur != nil {

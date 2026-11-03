@@ -354,7 +354,8 @@ func (s Store) ToolUsageOf(ctx context.Context, orgKey, from string) ([]ToolUsag
 }
 
 // ItemForTool is the catalog item a tool call belongs to: a skill by its name (a plugin-qualified «plugin:skill» also
-// matches the bare name), an MCP server by its name. Names are compared without regard to case. The organization's own
+// matches the bare name), an MCP server by its name (a plugin's or a connector's server also by its short name, see
+// MCPShortName). Names are compared without regard to case, an underscore standing for a space. The organization's own
 // item beats a built-in one, a live item beats an archived one. "" when the call is of no item: Bash and the built-in
 // tools have none.
 func ItemForTool(items []CatalogItem, toolKind, toolName string) string {
@@ -371,13 +372,16 @@ func ItemForTool(items []CatalogItem, toolKind, toolName string) string {
 	if i := strings.LastIndex(toolName, ":"); kind == CatalogSkill && i >= 0 && i+1 < len(toolName) {
 		names = append(names, toolName[i+1:])
 	}
+	if short := MCPShortName(toolName); kind == CatalogMCP && short != toolName {
+		names = append(names, short)
+	}
 	best, bestRank := "", -1
 	for _, c := range items {
 		if c.Kind != kind {
 			continue
 		}
 		for i, n := range names {
-			if !strings.EqualFold(c.Name, n) {
+			if !sameToolName(c.Name, n) {
 				continue
 			}
 			rank := 4 - 2*i // the full name beats the bare one
@@ -394,4 +398,26 @@ func ItemForTool(items []CatalogItem, toolKind, toolName string) string {
 		}
 	}
 	return best
+}
+
+// MCPShortName is the name of an MCP server without the prefix Claude Code gives a plugin's server ("plugin_<plugin>_")
+// or a claude.ai connector ("claude_ai_"), underscores as spaces: "plugin_tools_grafana" is "grafana",
+// "claude_ai_Claude_Docs" is "Claude Docs". Any other name is as it is.
+func MCPShortName(name string) string {
+	rest := ""
+	if r, ok := strings.CutPrefix(name, "plugin_"); ok {
+		if _, after, found := strings.Cut(r, "_"); found {
+			rest = after
+		}
+	} else if r, ok := strings.CutPrefix(name, "claude_ai_"); ok {
+		rest = r
+	}
+	if rest == "" {
+		return name
+	}
+	return strings.ReplaceAll(rest, "_", " ")
+}
+
+func sameToolName(a, b string) bool {
+	return strings.EqualFold(strings.ReplaceAll(a, "_", " "), strings.ReplaceAll(b, "_", " "))
 }

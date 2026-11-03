@@ -24,7 +24,7 @@ tkVideo.motion(function (root) {
   перематываются временем сцены. Всё строй внутри fn, а не сверху скрипта: элементов ещё нет.
 - Не запускай, не останавливай и не перематывай сам, не трогай `gsap.ticker`, `ScrollTrigger`, `onUpdate` с памятью и `Math.random` во время
   отрисовки. Случайные значения, выбранные один раз в fn, можно: рантайм задаёт зерно.
-- В `/__lib/motion/` лежат: `gsap.min.js`, `tk.js`, `CustomEase`, `CustomBounce`, `CustomWiggle`, `EasePack`, `DrawSVGPlugin`, `MorphSVGPlugin`,
+- В `/__lib/motion/` лежат: `gsap.min.js`, `tk.js`, `rig.js` и `art/` (герои, предметы, фоны: `{{cli}} design video guide characters`), `CustomEase`, `CustomBounce`, `CustomWiggle`, `EasePack`, `DrawSVGPlugin`, `MorphSVGPlugin`,
   `MotionPathPlugin`, `SplitText`, `Physics2DPlugin`, `PhysicsPropsPlugin`, `ScrambleTextPlugin`, `TextPlugin`, `Flip` (все `.min.js`).
 - На одном элементе не смешивай `data-build-in`/`data-tk-at` и GSAP: оба пишут его прозрачность и трансформацию.
 - Отмечай биты для таймлайна: `data-tk-mark="1.0"` (секунды) на `data-block` даёт человеку момент для комментария и ничего не двигает. Задай
@@ -33,7 +33,9 @@ tkVideo.motion(function (root) {
 
 ## Пресеты
 
-`tk.enter`, `tk.exit`, `tk.accent`, `tk.camera`, `tk.draw`, `tk.text`, `tk.physical.drop`, `tk.physical.hop`. Каждый принимает `at` в секундах,
+`tk.enter`, `tk.exit`, `tk.accent`, `tk.camera` (`.drift`, `.shake`), `tk.draw`, `tk.text`, `tk.physical.drop`, `tk.physical.hop` и живые: `tk.morph`,
+`tk.drawHand`, `tk.squash`, `tk.inertia`, `tk.parallax`, `tk.particles`. Сцена с героем пишется как действия героя через `tk.rig`:
+`{{cli}} design video guide characters`. Каждый принимает `at` в секундах,
 добавляет в `tk.tl` и возвращает его. Параметры — в начале `/__lib/motion/tk.js`. Пресеты — для обычных движений, а то, что делает сцену её
 собственной, пиши твинами на `tk.tl`: одни пресеты выглядят как пресеты.
 

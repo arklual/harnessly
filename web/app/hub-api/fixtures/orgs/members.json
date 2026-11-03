@@ -6,6 +6,9 @@
       "name": "Анна",
       "joinedAt": "2026-10-01T09:00:00Z",
       "lastActiveAt": "2026-10-30T18:12:00Z",
+      "signedInAt": "2026-10-30T18:12:00Z",
+      "chatsWeek": 14,
+      "mrsWeek": 3,
       "invited": false,
       "grants": [
         {
@@ -33,6 +36,9 @@
       "name": "Борис",
       "joinedAt": "2026-10-01T09:00:00Z",
       "lastActiveAt": "2026-10-30T18:12:00Z",
+      "signedInAt": "2026-10-30T18:12:00Z",
+      "chatsWeek": 9,
+      "mrsWeek": 2,
       "invited": false,
       "grants": [
         {
@@ -64,6 +70,9 @@
       "name": "Вера",
       "joinedAt": "2026-10-01T09:00:00Z",
       "lastActiveAt": "2026-10-30T18:12:00Z",
+      "signedInAt": "2026-10-30T18:12:00Z",
+      "chatsWeek": 6,
+      "mrsWeek": 1,
       "invited": false,
       "grants": [],
       "teams": [
@@ -80,7 +89,10 @@
       "name": "",
       "joinedAt": "2026-10-01T09:00:00Z",
       "lastActiveAt": null,
-      "invited": true,
+      "signedInAt": null,
+      "chatsWeek": 0,
+      "mrsWeek": 0,
+      "invited": false,
       "grants": [],
       "teams": [
         {

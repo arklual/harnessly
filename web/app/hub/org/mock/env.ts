@@ -3,6 +3,7 @@
 // docs/hub/environment.md: a lead edits their own team's layer only, a row pinned by the organization is locked for
 // whoever looks at it from a tenant, an entry is in a layer once, and 404 `not_enabled` is the feature being off.
 import type {
+  AddCatalogRequest,
   AddEntryRequest,
   Audience,
   CatalogItem,
@@ -15,6 +16,7 @@ import type {
   LockedReason,
   MeEnvItem,
   MeEnvResponse,
+  ObservedTool,
   PatchEntryRequest,
 } from '../../../hub-api/env';
 import { OrgApiError } from '../api/errors';
@@ -374,6 +376,63 @@ const CATALOG_ORDER = [
   'Тесты перед коммитом',
 ];
 
+// What the machines call that the catalog does not know yet: the list «Уже используют на машинах» starts with these.
+const MACHINE_TOOLS: {
+  kind: 'skill' | 'mcp';
+  name: string;
+  calls: number;
+  week: number;
+  people: number;
+  ago: number;
+}[] = [
+  { kind: 'mcp', name: 'plugin_tools_sentry', calls: 41, week: 12, people: 3, ago: 90 },
+  { kind: 'skill', name: 'tools:release', calls: 17, week: 6, people: 2, ago: 300 },
+  { kind: 'mcp', name: 'claude_ai_Claude_Docs', calls: 5, week: 0, people: 1, ago: 9 * DAYS },
+];
+
+/** The catalog item a tool's calls are counted for, as the hub matches it: the name, a skill also by its bare name. */
+const itemForTool = (kind: 'skill' | 'mcp', name: string): Item | undefined => {
+  const bare = kind === 'skill' && name.includes(':') ? name.slice(name.lastIndexOf(':') + 1) : name;
+  const list = [...items.values()].filter((i) => i.kind === kind);
+  const low = (s: string) => s.toLowerCase();
+  return list.find((i) => low(i.name) === low(name)) ?? list.find((i) => low(i.name) === low(bare));
+};
+
+const observedOf = (): ObservedTool[] => {
+  const on = (itemId: string) => entries.some((e) => e.itemId === itemId && e.enabled);
+  const fromEntries = new Map<string, ObservedTool>();
+  for (const e of entries) {
+    const it = items.get(e.itemId);
+    if (!it || (it.kind !== 'skill' && it.kind !== 'mcp') || e.calls <= 0 || fromEntries.has(it.id)) continue;
+    fromEntries.set(it.id, {
+      kind: it.kind,
+      name: it.name,
+      itemId: it.id,
+      inEnv: on(it.id),
+      calls: e.calls * 4,
+      callsWeek: e.calls,
+      errors: 0,
+      people: e.people,
+      lastUsedAt: lastIso(e.ago),
+    });
+  }
+  const loose = MACHINE_TOOLS.map((t): ObservedTool => {
+    const it = itemForTool(t.kind, t.name);
+    return {
+      kind: t.kind,
+      name: t.name,
+      itemId: it?.id ?? null,
+      inEnv: it ? on(it.id) : false,
+      calls: t.calls,
+      callsWeek: t.week,
+      errors: 0,
+      people: t.people,
+      lastUsedAt: lastIso(t.ago),
+    };
+  });
+  return [...fromEntries.values(), ...loose].sort((a, b) => b.calls - a.calls);
+};
+
 const items = new Map<string, Item>();
 let entries: Stored[] = [];
 // The member's own switches, by item id. The board starts with the repo of the tenant switched off.
@@ -500,6 +559,7 @@ const view = (ctx: MockCtx, scope: string): EnvResponse => {
     },
     layers,
     teams: TEAMS.map((t) => ({ id: t.id, name: t.name, tenantId: TENANT_ID })),
+    observed: observedOf(),
   };
   return recount(base);
 };
@@ -648,6 +708,31 @@ export const envMock = (ctx: MockCtx): EnvApi => ({
         createdAt: '2026-09-01T09:00:00Z',
       }));
     return later(list, 240);
+  },
+
+  catalogAdd: async (_org, req: AddCatalogRequest) => {
+    if (ctx.role !== 'admin') throw new OrgApiError('forbidden', 'forbidden', 'org_admin');
+    const name = req.name.trim();
+    if ([...items.values()].some((i) => i.kind === req.kind && i.name.toLowerCase() === name.toLowerCase())) {
+      throw new OrgApiError('name_taken', 'Такое название уже есть в каталоге');
+    }
+    serial += 1;
+    const it: Item = { id: `i-n${serial}`, kind: req.kind, name, hint: req.hint ?? '' };
+    items.set(it.id, it);
+    return later(
+      {
+        id: it.id,
+        kind: it.kind,
+        name: it.name,
+        hint: it.hint,
+        source: req.source,
+        builtIn: false,
+        archived: false,
+        added: false,
+        createdAt: new Date().toISOString(),
+      },
+      300,
+    );
   },
 
   envMine: async (): Promise<MeEnvResponse> => {

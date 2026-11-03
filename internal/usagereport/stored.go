@@ -18,6 +18,7 @@ type Stored struct {
 	mu      sync.Mutex
 	size    int64
 	mtime   time.Time
+	mrTime  time.Time
 	entries []Entry
 }
 
@@ -33,8 +34,14 @@ func (s *Stored) Refresh() {
 	if err != nil {
 		return
 	}
+	// The merge request keys are a file of their own: a change of it is a change of the facts.
+	mrSt, mrErr := os.Stat(s.Path + MRSuffix)
+	mrTime := time.Time{}
+	if mrErr == nil {
+		mrTime = mrSt.ModTime()
+	}
 	s.mu.Lock()
-	same := st.Size() == s.size && st.ModTime().Equal(s.mtime)
+	same := st.Size() == s.size && st.ModTime().Equal(s.mtime) && mrTime.Equal(s.mrTime)
 	s.mu.Unlock()
 	if same {
 		return
@@ -45,13 +52,14 @@ func (s *Stored) Refresh() {
 	if files == nil {
 		return
 	}
+	applyMRs(files, readMRs(s.Path))
 	entries := make([]Entry, 0, len(order))
 	for _, name := range order {
 		f := files[name]
 		entries = append(entries, Entry{Path: name, MtimeMs: f.mtimeMs, Facts: f.facts})
 	}
 	s.mu.Lock()
-	s.size, s.mtime, s.entries = st.Size(), st.ModTime(), entries
+	s.size, s.mtime, s.mrTime, s.entries = st.Size(), st.ModTime(), mrTime, entries
 	s.mu.Unlock()
 }
 
@@ -65,7 +73,7 @@ func (s *Stored) Entries() []Entry {
 // Forget drops what was read, so its memory is free while another source is used.
 func (s *Stored) Forget() {
 	s.mu.Lock()
-	s.size, s.mtime, s.entries = 0, time.Time{}, nil
+	s.size, s.mtime, s.mrTime, s.entries = 0, time.Time{}, time.Time{}, nil
 	s.mu.Unlock()
 }
 

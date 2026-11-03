@@ -148,17 +148,21 @@ func TestItemForTool(t *testing.T) {
 		{ID: "live", Kind: CatalogSkill, Name: "deploy"},
 		{ID: "srv", OrgID: "org1", Kind: CatalogMCP, Name: "grafana"},
 		{ID: "repo", OrgID: "org1", Kind: CatalogRepo, Name: "grafana"},
+		{ID: "docs", OrgID: "org1", Kind: CatalogMCP, Name: "docs"},
 	}
 	for _, c := range []struct{ kind, name, want string }{
-		{"skill", "review", "own"},      // the organization's beats the built-in, whatever the case
-		{"skill", "acme:review", "own"}, // plugin-qualified
-		{"skill", "deploy", "live"},     // live beats archived
-		{"mcp", "grafana", "srv"},       // by kind
-		{"skill", "grafana", ""},        // another kind's name is not a match
-		{"bash", "Bash", ""},            // no item
-		{"other", "Read", ""},           //
-		{"skill", "unknown", ""},        //
-		{"skill", "acme:", ""},          // nothing after the colon
+		{"skill", "review", "own"},             // the organization's beats the built-in, whatever the case
+		{"skill", "acme:review", "own"},        // plugin-qualified
+		{"skill", "deploy", "live"},            // live beats archived
+		{"mcp", "grafana", "srv"},              // by kind
+		{"mcp", "plugin_tools_grafana", "srv"}, // a plugin's server by its short name
+		{"mcp", "claude_ai_Docs", "docs"},      // a connector's
+		{"mcp", "plugin_tools", ""},            // a prefix and nothing after it
+		{"skill", "grafana", ""},               // another kind's name is not a match
+		{"bash", "Bash", ""},                   // no item
+		{"other", "Read", ""},                  //
+		{"skill", "unknown", ""},               //
+		{"skill", "acme:", ""},                 // nothing after the colon
 	} {
 		if got := ItemForTool(items, c.kind, c.name); got != c.want {
 			t.Errorf("%s %q = %q, want %q", c.kind, c.name, got, c.want)

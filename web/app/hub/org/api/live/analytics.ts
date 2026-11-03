@@ -40,6 +40,7 @@ import type {
 import { formatValue } from '../../screens/analytics/format';
 import { spentOf } from '../../money';
 import { contractGet, http, orgPath } from './http';
+import { signalGo } from './signal-go';
 import { allSessions } from './member';
 
 interface KpiMeta {
@@ -57,7 +58,7 @@ export const KPI: Record<ApiKpi, KpiMeta> = {
     id: 'moneyPerMr',
     group: 'result',
     title: 'Деньги на MR',
-    hint: 'Сколько стоил один смёрженный MR.',
+    hint: 'Сколько стоил один смёрженный MR по прайсу API: токены чатов, где он сделан, по цене модели.',
     format: 'usd',
     delta: 'rel',
   },
@@ -168,8 +169,8 @@ export const kpiOf = (v: KpiValue): Kpi => {
     noise: v.verdict === 'noise' || v.verdict === 'too_few' ? Number.POSITIVE_INFINITY : 0,
     value: scaled(v.kpi, v.value),
     prev: scaled(v.kpi, v.cmpValue),
-    series: [],
-    prevSeries: [],
+    series: (v.spark ?? []).map((x) => scaled(v.kpi, x)),
+    prevSeries: (v.cmpSpark ?? []).map((x) => scaled(v.kpi, x)),
   };
 };
 
@@ -264,17 +265,6 @@ export const changeOf = (c: ApiChange, effect: EffectResponse | null): Change =>
   effects: effect ? effectsOf(effect) : [],
 });
 
-const SIGNAL_SECTION: Record<NonNullable<ApiSignal['action']>['kind'], Signal['action']['section']> = {
-  raise_limit: 'teams',
-  move_account: 'teams',
-  open_machine: 'machines',
-  resend_invite: 'teams',
-  register_account: 'teams',
-  open_kpi: 'analytics',
-  open_chat: 'overview',
-  open_prices: 'overview',
-};
-
 /** The numbers the hub keeps behind a signal, for its bubble; nothing is made up when it has none. */
 export const signalDetail = (s: ApiSignal): DetailRow[] => [
   { label: 'О чём', value: s.subject.label },
@@ -288,9 +278,7 @@ const signalOf = (s: ApiSignal): Signal => ({
   title: s.title,
   text: s.detail,
   detail: signalDetail(s),
-  action: s.action
-    ? { label: s.action.label, section: SIGNAL_SECTION[s.action.kind] }
-    : { label: 'Открыть', section: 'overview' },
+  action: signalGo(s.action),
 });
 
 /** Where a waste number comes from: the sessions behind it and its part of the list spend. */

@@ -20,7 +20,12 @@ export type TVideoHostMessage =
   /** Which block is at a point (scene px); answered by `tk:video-hit` with the same `id`. */
   | { type: 'tk:video-hit'; id: number; x: number; y: number }
   /** The scene's transition as the runtime has it (it wins over the board's own); null: the board's own. */
-  | { type: 'tk:video-scene'; transition: IVideoTransition | null };
+  | {
+      type: 'tk:video-scene';
+      transition: IVideoTransition | null;
+      /** The scene's overlay layer as the runtime draws it (omitted: left as it is). */
+      overlays?: readonly Record<string, unknown>[];
+    };
 
 /** A moment as the scene's script tells it (ms from the scene's start). */
 export interface IVideoBoardMoment {

@@ -7,6 +7,7 @@ import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import {
   readVideoComment,
+  readVideoOverlays,
   readVideoRenderJob,
   readVideoScene,
   readVideoSettings,
@@ -15,6 +16,7 @@ import {
 import type {
   IVideoComment,
   IVideoCommentDraft,
+  IVideoOverlay,
   IVideoRenderJob,
   IVideoScene,
   IVideoSettings,
@@ -176,3 +178,26 @@ export const videoRenderJob = async (
 /** Where a format's published MP4 downloads from (an attachment), or plays in a `<video>` (served with Range). */
 export const videoFileHref = (m: MachineId, artifact: string, format: TVideoFormat) =>
   runtimePath(video(`/file?${q({ artifact, format })}`), m);
+
+// ---- the overlay layer
+
+/** What a call to the overlay route may name: the overlay's fields (a null clears an optional one). */
+export type TVideoOverlayPatch = Record<string, unknown>;
+
+/** Adds (`add`, with a kind in the patch), changes (`set`) or removes (`rm`) an overlay as a person; the answer is the scene's list. */
+export const postVideoOverlay = async (
+  m: MachineId,
+  artifact: string,
+  page: string,
+  action: 'add' | 'set' | 'rm',
+  id: string | null,
+  patch: TVideoOverlayPatch,
+): Promise<{ id: string | null; overlays: IVideoOverlay[] }> => {
+  const answer = await runtimeJson<{ overlay?: { id?: unknown } | null; overlays?: unknown }>(
+    m,
+    video('/overlay'),
+    postJson({ artifact, page, action, ...(id !== null ? { id } : {}), ...patch }),
+  );
+  const made = typeof answer.overlay?.id === 'string' ? answer.overlay.id : id;
+  return { id: made, overlays: readVideoOverlays(answer.overlays) };
+};

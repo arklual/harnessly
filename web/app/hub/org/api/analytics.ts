@@ -1,6 +1,7 @@
 // The Аналитика section's contract. `…/kpis`, `…/kpis/{kpi}/series`, `…/changes`, `…/waste` of
 // docs/hub (analytics) map onto these shapes; until those contracts land the mock (../mock/analytics.ts) is the
 // reference and live answers `not_ready`.
+import type { SignalGo } from './overview';
 
 export type KpiId =
   | 'moneyPerMr'
@@ -37,8 +38,9 @@ export interface Kpi {
   /** Null: too few sessions for a number. */
   value: number | null;
   prev: number | null;
-  series: number[];
-  prevSeries: number[];
+  /** The small chart of the tile: by day of the period, null where there was too little to count. */
+  series: (number | null)[];
+  prevSeries: (number | null)[];
 }
 
 /** A calendar week, Monday to Sunday, as `YYYY-MM-DD`. */
@@ -94,7 +96,7 @@ export interface Signal {
   tone: SignalTone;
   title: string;
   text: string;
-  action: { label: string; section: 'machines' | 'teams' | 'analytics' | 'overview' };
+  action: SignalGo;
   /** The numbers behind the card, for its hover bubble. Absent: the bubble is not drawn. */
   detail?: DetailRow[];
 }

@@ -189,6 +189,12 @@
   /* Over the phone's keyboard (composer/use-keyboard-inset.ts sets --hx-kb on this element). */
   margin-bottom: var(--hx-kb, 0px);
 }
+/* With the keyboard up the dock rises to the middle of the screen, where the side arrows are; a swipe still steps. */
+.hx-imgview:has(.hx-imgview__dock[data-keyboard='open']) .hx-imgview__step {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 .hx-ie {
   display: flex;
   flex-direction: column;
@@ -512,6 +518,10 @@
   }
   .hx-imgview[data-versions] .hx-imgview__wrap {
     padding-left: 60px;
+  }
+  /* The side arrows would lie over the versions and the tools; a swipe steps. */
+  .hx-imgview[data-edit] .hx-imgview__step {
+    display: none;
   }
   .hx-imgview__dock {
     flex: none;

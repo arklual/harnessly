@@ -42,7 +42,23 @@ export const envLayer = obj({
   items: arr(envEntryRow),
 });
 export const teamRef = obj({ id: str, name: str, tenantId: str });
-export const envResponse = obj({ summary: envSummary, layers: arr(envLayer), teams: arr(teamRef) });
+export const observedTool = obj({
+  kind: lit('skill', 'mcp'),
+  name: str,
+  itemId: nullable(str),
+  inEnv: bool,
+  calls: num,
+  callsWeek: num,
+  errors: num,
+  people: num,
+  lastUsedAt: nullable(str),
+});
+export const envResponse = obj({
+  summary: envSummary,
+  layers: arr(envLayer),
+  teams: arr(teamRef),
+  observed: arr(observedTool),
+});
 export const envCard = obj({
   entryId: str,
   itemId: str,

@@ -4,7 +4,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 
 import type { Change, DetailRow, Peers, Signal, Waste } from '../../../org/api/analytics';
-import { navigate } from '../../../lib/router';
+import { goSignal } from '../../go';
 import { Icon } from '../../ui';
 import {
   barWidths,
@@ -152,7 +152,7 @@ export const Attention = ({ signals, base }: { signals: readonly Signal[]; base:
             className="at-cell anx-hov"
             data-tone={s.tone === 'high' ? 'risk' : 'warn'}
             style={{ '--i': n, '--at-span': 1, '--j': 0, '--jr': 0 } as CSSProperties}
-            onClick={() => navigate(`${base}/${s.action.section}`)}
+            onClick={() => goSignal(base, s.action)}
           >
             <span className="at-cell__dot" aria-hidden="true" />
             <span className="at-cell__text">

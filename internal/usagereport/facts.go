@@ -63,13 +63,27 @@ const (
 )
 
 // ToolCall is a finished call of a tool, named: Kind is skill, mcp, bash or other; Name is the skill's name, the MCP
-// server's name or the tool's own name. It lives only while a transcript is parsed: it is not in the facts cache (that
-// file's format is fixed), so facts read back from the cache have none.
+// server's name or the tool's own name. The facts cache does not hold them (that file's format is fixed): they are kept
+// beside it, summed by UTC day, kind and name (mrs.go), and read back as one ToolCall per sum with N and Errs set.
 type ToolCall struct {
 	Ts    float64
 	Kind  string
 	Name  string
 	Error bool
+	// N is how many calls this one stands for (a sum read back from the side file); zero is one call, Error its
+	// outcome. Errs is how many of the N failed.
+	N, Errs int
+}
+
+// Count is how many calls this one stands for and how many of them failed.
+func (c ToolCall) Count() (calls, errors int) {
+	if c.N > 0 {
+		return c.N, min(max(c.Errs, 0), c.N)
+	}
+	if c.Error {
+		return 1, 1
+	}
+	return 1, 0
 }
 
 // EventRow is an interrupt, a denied tool or a compaction: key and time.
@@ -90,12 +104,15 @@ type Facts struct {
 	Models     []any
 	Projects   []string
 	Tasks, PRs []string
-	FirstTs    float64
-	LastTs     float64
-	Messages   []MsgRow
-	Prompts    []PromptRow
-	Turns      []TurnRow
-	Tools      []ToolRow
+	// MRKeys are the merge requests Bash and MCP calls created or pushed to (hubproto.MRKey), beside the pr-link ones
+	// in PRs. nil: not looked for (facts from a file that had none); they are kept in a file of their own (mrs.go).
+	MRKeys   []string
+	FirstTs  float64
+	LastTs   float64
+	Messages []MsgRow
+	Prompts  []PromptRow
+	Turns    []TurnRow
+	Tools    []ToolRow
 	// ToolCalls are the named calls of this parse, never cached; denied calls are left out, and so are calls whose
 	// result is missing.
 	ToolCalls   []ToolCall
@@ -503,7 +520,7 @@ func (p *Projects) ParseClaude(path string) (*Facts, error) {
 	sidechainFile := strings.Contains(path, "/subagents/")
 	facts := newFacts("claude", jscompat.Basename(path, ".jsonl"), sidechainFile)
 	models, projects := &interner{}, &interner{}
-	var tasks, prs ordered
+	var tasks, prs, mrKeys ordered
 	// Streamed chunks of one response share (requestId, message.id); the largest value of each field is kept, the final
 	// chunk carries the full output count.
 	msgIndex := map[string]int{}
@@ -642,6 +659,11 @@ func (p *Projects) ParseClaude(path string) (*Facts, error) {
 				if useID, isText := id.(string); isText && !denied {
 					if u, found := uses[useID]; found {
 						facts.ToolCalls = append(facts.ToolCalls, ToolCall{Ts: ts, Kind: u.kind, Name: u.name, Error: isErr == 1})
+						if isErr == 0 && (u.kind == ToolBash || u.kind == ToolMCP) {
+							for _, k := range mrKeysOfUse(u, text) {
+								mrKeys.add(k)
+							}
+						}
 						delete(uses, useID)
 					}
 				}
@@ -676,7 +698,7 @@ func (p *Projects) ParseClaude(path string) (*Facts, error) {
 		facts.Models = []any{}
 	}
 	facts.Projects = projectStrings(projects)
-	facts.Tasks, facts.PRs = tasks.values(), prs.values()
+	facts.Tasks, facts.PRs, facts.MRKeys = tasks.values(), prs.values(), mrKeys.values()
 	return facts, nil
 }
 
@@ -691,6 +713,7 @@ func tsKey(uuid any, present bool, ts float64) string {
 // ParseCodex reduces a Codex rollout.
 func (p *Projects) ParseCodex(path string) (*Facts, error) {
 	facts := newFacts("codex", jscompat.Basename(path, ".jsonl"), false)
+	facts.MRKeys = []string{} // Codex's rollouts are not read for merge requests
 	models, projects := &interner{}, &interner{}
 	var tasks ordered
 	turnStarts := map[string]float64{}
@@ -824,7 +847,11 @@ func (p *Projects) ParseCodex(path string) (*Facts, error) {
 	return facts, nil
 }
 
-type toolUse struct{ kind, name string }
+type toolUse struct {
+	kind, name string
+	// command is a Bash call's command, verb an MCP call's tool: what the merge requests of its result are read with.
+	command, verb string
+}
 
 // noteToolUses remembers the tool_use blocks of an assistant message by their id. A streamed message repeats its blocks;
 // the id keeps them one.
@@ -856,6 +883,13 @@ func noteToolUses(content []byte, uses map[string]toolUse) {
 				kind, label = ToolMCP, server
 			}
 		}
-		uses[id] = toolUse{kind: kind, name: label}
+		use := toolUse{kind: kind, name: label}
+		switch kind {
+		case ToolBash:
+			use.command = bashCommand(o.raw("input"))
+		case ToolMCP:
+			use.verb = mcpVerb(name)
+		}
+		uses[id] = use
 	}
 }

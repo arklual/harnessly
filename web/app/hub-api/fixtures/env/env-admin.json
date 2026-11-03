@@ -170,5 +170,29 @@
       "name": "Сайд",
       "tenantId": "tenant-platform"
     }
+  ],
+  "observed": [
+    {
+      "kind": "mcp",
+      "name": "plugin_tools_grafana",
+      "itemId": null,
+      "inEnv": false,
+      "calls": 12,
+      "callsWeek": 7,
+      "errors": 1,
+      "people": 2,
+      "lastUsedAt": "2026-05-14T08:00:00Z"
+    },
+    {
+      "kind": "skill",
+      "name": "review",
+      "itemId": "item-review",
+      "inEnv": true,
+      "calls": 4,
+      "callsWeek": 4,
+      "errors": 0,
+      "people": 1,
+      "lastUsedAt": "2026-11-01T14:20:00Z"
+    }
   ]
 }

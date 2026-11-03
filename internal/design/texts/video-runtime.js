@@ -9,18 +9,20 @@
 //     on the document and in open shadow roots; a CSS transition is finished at once.
 //   - performance.now, Date.now / new Date(), requestAnimationFrame give the scene's time; Math.random is seeded.
 //     The library's own client.js keeps the wall clock.
+//   - The scene's overlay layer (titles, callouts, highlights, key caps, counters, badges: scene({overlays}), from
+//     meta/scenes/<id>.json) is drawn over the board as a pure function of t, in the live player and in the render.
 //   - The scene comes in with a fade from --deck-bg (data-transition on <main>, or what the host sets).
 //
 // Player (window.parent) ↔ scene, by postMessage:
 //   host → scene  {type:'tk:video-seek', t}  {type:'tk:video-play', t, rate}  {type:'tk:video-pause'}
-//                 {type:'tk:video-hit', id, x, y}  {type:'tk:video-scene', transition:{kind, ms}|null}
+//                 {type:'tk:video-hit', id, x, y}  {type:'tk:video-scene', transition:{kind, ms}|null, overlays:[...]}
 //   scene → host  {type:'tk:video-ready', moments:[{block, at, out|null}]}  {type:'tk:video-time', t} (≤ 4 a second)
 //                 {type:'tk:video-hit', id, block|null, rect:[x, y, w, h]|null}  {type:'tk:video-error', msg}
 // A message is taken only from window.parent.
 //
 // Headless (the render and the check, through the DevTools protocol):
-//   window.tkVideo = {v: 2, ready(): Promise, seek(ms): Promise<{same}>, audit(opts?): Promise<issue[]>, moments(),
-//                     scene({transition}), problems(): problem[], info(): {engines, motionDur}}
+//   window.tkVideo = {v: 3, ready(): Promise, seek(ms): Promise<{same}>, audit(opts?): Promise<issue[]>, moments(),
+//                     scene({transition, overlays}), problems(): problem[], info(): {engines, motionDur}}
 //
 // The board's motion engines. All of them hang on one time:
 //   tkVideo.motion(build)  build(root) runs once the board is drawn and the fonts and images are in. With GSAP on the page
@@ -385,6 +387,542 @@
     return changed;
   }
 
+  // ---- the overlay layer ----
+  //
+  // Titles, lower thirds, callouts, highlights, key caps, counters and badges that the host or the render hands over in
+  // the scene's config ({overlays: [...]}, internal/design/video_overlays.go). They are drawn over the board as a pure
+  // function of t: nothing remembers the previous frame, the hash for the scramble is of (char, time step), so a seek
+  // draws the same frame as playing through. Positions are fractions of the frame; the 9:16 frame uses an overlay's own
+  // portrait place, else the base place moved into the safe zone (placeFor, the same rule as VideoOverlayPlaceIn in Go).
+
+  var OV_OUT_MS = 320;
+  var OV_COUNT_MS = 1400;
+  var OV_STYLE = [
+    '[data-tk-overlays]{position:fixed;inset:0;z-index:2147483000;pointer-events:none;overflow:hidden;font-family:var(--deck-font,system-ui,-apple-system,"Segoe UI",sans-serif);}',
+    '[data-tk-overlays] *{box-sizing:border-box;}',
+    '.tko-g{position:absolute;inset:0;opacity:0;visibility:hidden;}',
+    '.tko{position:absolute;}',
+    '.tko[data-theme=auto]{--fg:var(--deck-ink,#101114);--bg:var(--deck-panel,#fff);--ac:var(--deck-acc,#3b6cff);}',
+    '.tko[data-theme=accent]{--fg:var(--deck-on-acc,#fff);--bg:var(--deck-acc,#3b6cff);--ac:var(--deck-on-acc,#fff);}',
+    '.tko[data-theme=dark]{--fg:#f5f6f8;--bg:#15171c;--ac:var(--deck-acc,#3b6cff);}',
+    '.tko[data-theme=light]{--fg:#101114;--bg:#fff;--ac:var(--deck-acc,#3b6cff);}',
+    '.tko-in{position:absolute;inset:0;display:flex;align-items:center;color:var(--fg);}',
+    '.tko[data-anchor=left] .tko-in{justify-content:flex-start;text-align:left;}',
+    '.tko[data-anchor=center] .tko-in{justify-content:center;text-align:center;}',
+    '.tko[data-anchor=right] .tko-in{justify-content:flex-end;text-align:right;}',
+    '.tko-t{display:block;max-width:100%;line-height:1.14;white-space:pre-wrap;overflow-wrap:normal;}',
+    '.tko-w,.tko-wd{white-space:nowrap;}',
+    '.tko-wd{display:inline-block;}',
+    '.tko-c{display:inline-block;}',
+    '.tko-c[data-cur]{box-shadow:0.09em 0 0 0 currentColor;}',
+    '.tko-plate .tko-in{background:var(--bg);border-radius:0.26em;padding:0 0.55em;box-shadow:0 0.12em 0.5em rgba(0,0,0,.28);}',
+    '.tko-title .tko-t{font-weight:800;letter-spacing:-0.02em;}',
+    '.tko-title[data-theme=auto] .tko-in{background:none;box-shadow:none;padding:0;text-shadow:0 0.04em 0.4em rgba(0,0,0,.18);}',
+    '.tko-caption .tko-in{background:var(--bg);border-radius:0.2em;padding:0 0.7em 0 0.9em;box-shadow:0 0.12em 0.5em rgba(0,0,0,.28);overflow:hidden;}',
+    '.tko-caption .tko-in::before{content:"";position:absolute;left:0;top:0;bottom:0;width:0.28em;background:var(--ac);}',
+    '.tko-caption .tko-t{font-weight:650;}',
+    '.tko-callout .tko-in{background:var(--bg);border-radius:0.3em;padding:0 0.6em;box-shadow:0 0.12em 0.5em rgba(0,0,0,.3);}',
+    '.tko-callout .tko-t{font-weight:600;}',
+    '.tko-svg{position:absolute;left:0;top:0;overflow:visible;}',
+    '.tko-dim{position:absolute;inset:0;border-radius:0.9vmin;box-shadow:0 0 0 200vmax rgba(8,10,14,.45);filter:blur(1.1vmin);}',
+    '.tko-ring{position:absolute;inset:0;border-style:solid;border-color:var(--ac);}',
+    '.tko-label{position:absolute;left:0;background:var(--bg);color:var(--fg);font-weight:650;padding:0.2em 0.6em;border-radius:0.3em;white-space:nowrap;box-shadow:0 0.1em 0.4em rgba(0,0,0,.3);}',
+    '.tko-keys{display:flex;align-items:center;justify-content:center;gap:0.35em;}',
+    '.tko-k{background:var(--bg);color:var(--fg);border:0.06em solid rgba(128,128,128,.45);border-bottom-width:0.14em;border-radius:0.28em;padding:0.12em 0.6em;font-weight:650;white-space:nowrap;box-shadow:0 0.1em 0.4em rgba(0,0,0,.25);}',
+    '.tko-p{opacity:.7;font-weight:600;}',
+    '.tko-counter .tko-t{font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;}',
+    '.tko-counter[data-theme=auto] .tko-num{color:var(--ac);}',
+    '.tko-lab{font-weight:600;opacity:.82;font-size:0.5em;}',
+    '.tko-badge .tko-in{background:var(--bg);border-radius:0.4em;padding:0 0.6em;box-shadow:0 0.14em 0.5em rgba(0,0,0,.35);transform:rotate(-3deg);}',
+    '.tko-badge .tko-t{font-weight:800;}',
+  ].join('\n');
+
+  var ov = { list: [], items: [], root: null, key: '', styleEl: null, W: 0, H: 0 };
+
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function easeOut(p) { return 1 - Math.pow(1 - p, 3); }
+  function easeBack(p) { var c = 1.70158; var q = p - 1; return 1 + (c + 1) * q * q * q + c * q * q; }
+
+  function ovHash(i, k) {
+    var x = (Math.imul(i + 1, 374761393) + Math.imul(k + 1, 668265263)) | 0;
+    x = Math.imul(x ^ (x >>> 13), 1274126177);
+    return ((x ^ (x >>> 16)) >>> 0);
+  }
+
+  // The safe zone of a format: margins as fractions. 9:16 keeps its bottom clear of the players' own buttons.
+  function safeZone(portrait) {
+    return portrait ? { l: 0.06, t: 0.08, r: 0.06, b: 0.17 } : { l: 0.04, t: 0.06, r: 0.04, b: 0.06 };
+  }
+
+  // placeFor: where the overlay stands in this frame. Equals VideoOverlayPlaceIn in Go.
+  function placeFor(o, portrait) {
+    var base = { x: o.x, y: o.y, w: o.w, h: o.h, tx: o.tx, ty: o.ty };
+    if (!portrait) return base;
+    if (o.portrait) return o.portrait;
+    if (o.kind === 'highlight') return base;
+    var z = safeZone(true);
+    var w = Math.min(base.w, 1 - z.l - z.r);
+    var h = Math.min(base.h, 1 - z.t - z.b);
+    base.w = w;
+    base.h = h;
+    base.x = Math.min(Math.max(base.x, z.l), 1 - z.r - w);
+    base.y = Math.min(Math.max(base.y, z.t), 1 - z.b - h);
+    return base;
+  }
+
+  function fmtNum(n, decimals) {
+    var neg = n < 0;
+    var s = Math.abs(n).toFixed(decimals);
+    var parts = s.split('.');
+    var ip = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return (neg ? '−' : '') + ip + (parts.length > 1 ? ',' + parts[1] : '');
+  }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function wordsOf(text) { return text.split(/(\s+)/); }
+
+  function enterMs(o) {
+    var len = Array.from(o.text || '').length;
+    switch (o.enter) {
+      case 'rise': return 620;
+      case 'pop': return 460;
+      case 'mask': return 720;
+      case 'typewriter': return Math.min(2000, Math.max(500, len * 45));
+      case 'words': return Math.min(1800, Math.max(600, (o.text || '').split(/\s+/).length * 110 + 350));
+      case 'scramble': return Math.min(1600, Math.max(700, len * 35 + 400));
+    }
+    return 460;
+  }
+
+  function leaveMs(o) { return o.leave === 'fall' ? 420 : o.leave === 'shrink' ? 360 : o.leave === 'fade' ? OV_OUT_MS : 0; }
+
+  // The text of an overlay as nodes inside `t`: plain, or split into words / characters for the styles that act on them.
+  function fillText(t, o, item) {
+    var text = o.text || '';
+    item.chars = [];
+    item.words = [];
+    if (o.kind === 'counter') return;
+    if (o.enter === 'typewriter' || o.enter === 'scramble') {
+      var parts = wordsOf(text);
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i] === '') continue;
+        if (/^\s+$/.test(parts[i])) { t.appendChild(document.createTextNode(parts[i])); continue; }
+        var w = el('span', 'tko-w');
+        var cs = Array.from(parts[i]);
+        for (var j = 0; j < cs.length; j++) {
+          var c = el('span', 'tko-c', cs[j]);
+          c.setAttribute('data-ch', cs[j]);
+          w.appendChild(c);
+          item.chars.push(c);
+        }
+        t.appendChild(w);
+      }
+      return;
+    }
+    if (o.enter === 'words') {
+      var ps = wordsOf(text);
+      for (var k = 0; k < ps.length; k++) {
+        if (ps[k] === '') continue;
+        if (/^\s+$/.test(ps[k])) { t.appendChild(document.createTextNode(ps[k])); continue; }
+        var wd = el('span', 'tko-wd', ps[k]);
+        t.appendChild(wd);
+        item.words.push(wd);
+      }
+      return;
+    }
+    t.textContent = text;
+  }
+
+  function buildItem(o) {
+    var item = { o: o, g: el('div', 'tko-g'), last: '', chars: [], words: [] };
+    var box = el('div', 'tko tko-' + o.kind);
+    box.setAttribute('data-theme', o.theme || 'auto');
+    box.setAttribute('data-anchor', o.anchor || 'center');
+    if (o.kind === 'badge' || o.kind === 'counter' && o.theme !== 'auto') box.classList.add('tko-plate');
+    var inner = el('div', 'tko-in');
+    box.appendChild(inner);
+    item.box = box;
+    item.inner = inner;
+    item.g.appendChild(box);
+    if (o.kind === 'highlight') {
+      inner.style.display = 'block';
+      var ring = el('div', 'tko-ring');
+      item.ring = ring;
+      inner.appendChild(el('div', 'tko-dim'));
+      inner.appendChild(ring);
+      if ((o.text || '').trim() !== '') {
+        item.label = el('div', 'tko-label', o.text);
+        box.appendChild(item.label);
+      }
+      return item;
+    }
+    if (o.kind === 'key') {
+      var keys = el('div', 'tko-keys');
+      var bits = (o.text || '').split('+');
+      item.keys = [];
+      for (var i = 0; i < bits.length; i++) {
+        if (i > 0) keys.appendChild(el('span', 'tko-p', '+'));
+        var k = el('span', 'tko-k', bits[i].trim());
+        keys.appendChild(k);
+        item.keys.push(k);
+      }
+      inner.appendChild(keys);
+      item.text = keys;
+      return item;
+    }
+    var t = el('span', 'tko-t');
+    if (o.kind === 'counter') {
+      item.num = el('span', 'tko-num', '');
+      item.lab = null;
+      var tpl = o.text || '';
+      var at = tpl.indexOf('{n}');
+      if (at >= 0) {
+        if (at > 0) t.appendChild(el('span', 'tko-lab', tpl.slice(0, at)));
+        t.appendChild(item.num);
+        if (at + 3 < tpl.length) t.appendChild(el('span', 'tko-lab', tpl.slice(at + 3)));
+      } else {
+        t.appendChild(item.num);
+        if (tpl.trim() !== '') {
+          t.appendChild(document.createTextNode(' '));
+          t.appendChild(el('span', 'tko-lab', tpl));
+        }
+      }
+    } else {
+      fillText(t, o, item);
+    }
+    inner.appendChild(t);
+    item.text = t;
+    if (o.kind === 'callout' && o.tx !== undefined && o.tx !== null) {
+      var ns = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('class', 'tko-svg');
+      var path = document.createElementNS(ns, 'path');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-linecap', 'round');
+      var head = document.createElementNS(ns, 'path');
+      var ring2 = document.createElementNS(ns, 'circle');
+      ring2.setAttribute('fill', 'none');
+      var dot = document.createElementNS(ns, 'circle');
+      svg.appendChild(path); svg.appendChild(head); svg.appendChild(ring2); svg.appendChild(dot);
+      item.svg = svg; item.path = path; item.head = head; item.ring2 = ring2; item.dot = dot;
+      item.g.appendChild(svg);
+    }
+    return item;
+  }
+
+  // fitText: the largest font (px) the text takes inside its box, starting from a size of the box's height. offsetWidth and
+  // offsetHeight are layout sizes: a transform on the way (a pop in progress) does not change them.
+  function fitText(item, boxH) {
+    var o = item.o;
+    var f = { title: 0.62, caption: 0.5, callout: 0.4, key: 0.5, counter: 0.72, badge: 0.52 }[o.kind] || 0.5;
+    var size = Math.max(14, boxH * f);
+    var target = item.text;
+    if (!target) return size;
+    var inn = item.inner;
+    var guard = 0;
+    item.box.style.fontSize = size + 'px';
+    while (guard < 40 && size > 14) {
+      var padL = parseFloat(getComputedStyle(inn).paddingLeft) + parseFloat(getComputedStyle(inn).paddingRight);
+      var over = target.offsetHeight > inn.clientHeight + 1 || target.scrollWidth > inn.clientWidth - padL + 1;
+      if (!over) break;
+      size = size * 0.93;
+      item.box.style.fontSize = size + 'px';
+      guard++;
+    }
+    return size;
+  }
+
+  // Text on a plate keeps a contrast of at least 4.5:1: when the theme's text color fails on its plate, the text takes
+  // white or near-black, whichever reads better. Reads computed colors only, so a frame stays a function of t.
+  function rgbOf(c) {
+    var m = /rgba?\(([^)]+)\)/.exec(c || '');
+    if (!m) return null;
+    var v = m[1].split(/[ ,\/]+/).map(parseFloat);
+    return v.length >= 3 && !isNaN(v[0]) ? v : null;
+  }
+  function lum(v) {
+    var f = function (x) { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(v[0]) + 0.7152 * f(v[1]) + 0.0722 * f(v[2]);
+  }
+  function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  function ensureContrast(item) {
+    var o = item.o;
+    if (o.kind === 'highlight' || o.kind === 'title' && o.theme === 'auto') return;
+    var cs = getComputedStyle(item.inner);
+    var bg = rgbOf(cs.backgroundColor);
+    var fg = rgbOf(cs.color);
+    if (!bg || !fg || (bg.length > 3 && bg[3] === 0)) return;
+    if (ratio(bg, fg) >= 4.5) return;
+    var white = [255, 255, 255], ink = [11, 13, 18];
+    item.box.style.setProperty('--fg', ratio(bg, white) >= ratio(bg, ink) ? '#fff' : '#0b0d12');
+  }
+
+  function layoutItem(item, W, H, portrait) {
+    var o = item.o;
+    var p = placeFor(o, portrait);
+    var bx = p.x * W, by = p.y * H, bw = p.w * W, bh = p.h * H;
+    item.rect = [bx, by, bw, bh];
+    var s = item.box.style;
+    s.left = bx + 'px'; s.top = by + 'px'; s.width = bw + 'px'; s.height = bh + 'px';
+    item.g.style.transformOrigin = (bx + bw / 2) + 'px ' + (by + bh / 2) + 'px';
+    item.px = Math.max(2, H * 0.0045);
+    if (o.kind === 'highlight') {
+      var r = Math.max(8, H * 0.012);
+      item.ring.style.borderWidth = Math.max(3, H * 0.0055) + 'px';
+      item.ring.style.borderRadius = r + 'px';
+      if (item.label) {
+        var fs = Math.max(18, H * 0.026);
+        item.label.style.fontSize = fs + 'px';
+        if (by > H * 0.1) item.label.style.top = (-fs * 1.9) + 'px';
+        else item.label.style.top = (bh + fs * 0.5) + 'px';
+      }
+    } else {
+      if (o.kind === 'counter') {
+        var tmp = fmtNum(o.value === undefined || o.value === null ? 0 : o.value, o.decimals || 0);
+        var from = fmtNum(o.from || 0, o.decimals || 0);
+        item.num.textContent = tmp.length >= from.length ? tmp : from;
+      }
+      ensureContrast(item);
+      var size = fitText(item, bh);
+      item.size = size;
+      if (item.chars.length && o.enter === 'scramble') {
+        for (var i = 0; i < item.chars.length; i++) {
+          var c = item.chars[i];
+          c.style.width = '';
+          var cw = c.getBoundingClientRect().width;
+          c.style.width = cw + 'px';
+          c.style.textAlign = 'center';
+        }
+      }
+    }
+    if (item.svg) {
+      var tx = p.tx === undefined || p.tx === null ? 0.5 : p.tx;
+      var ty = p.ty === undefined || p.ty === null ? 0.5 : p.ty;
+      item.svg.setAttribute('width', W);
+      item.svg.setAttribute('height', H);
+      item.svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      var cx = bx + bw / 2, cy = by + bh / 2;
+      var ex = tx * W, ey = ty * H;
+      // The arrow leaves the box at the point of its edge that faces the target.
+      var dx = ex - cx, dy = ey - cy;
+      var sx = Math.abs(dx) / (bw / 2 || 1), sy = Math.abs(dy) / (bh / 2 || 1);
+      var k = Math.max(sx, sy) || 1;
+      var ax = cx + dx / k, ay = cy + dy / k;
+      var len = Math.hypot(ex - ax, ey - ay);
+      var bend = Math.min(len * 0.18, H * 0.08);
+      var mx = (ax + ex) / 2 + (-(ey - ay) / (len || 1)) * bend;
+      var my = (ay + ey) / 2 + ((ex - ax) / (len || 1)) * bend;
+      // The head sits at the end of the curve, turned along its last stretch.
+      var ang = Math.atan2(ey - my, ex - mx);
+      var hs = Math.max(14, H * 0.028);
+      item.stroke = Math.max(3, H * 0.0055);
+      item.cur = { ax: ax, ay: ay, mx: mx, my: my, ex: ex, ey: ey, hs: hs, ang: ang };
+      item.path.setAttribute('d', 'M' + ax + ' ' + ay + ' Q' + mx + ' ' + my + ' ' + ex + ' ' + ey);
+      item.path.setAttribute('stroke-width', item.stroke);
+      item.pathLen = 0;
+      try { item.pathLen = item.path.getTotalLength(); } catch (err) { item.pathLen = len * 1.05; }
+      var a1 = ang + Math.PI * 0.86, a2 = ang - Math.PI * 0.86;
+      item.head.setAttribute('d', 'M' + ex + ' ' + ey + ' L' + (ex + Math.cos(a1) * hs) + ' ' + (ey + Math.sin(a1) * hs) + ' L' + (ex + Math.cos(a2) * hs) + ' ' + (ey + Math.sin(a2) * hs) + ' Z');
+      item.ring2.setAttribute('cx', ex); item.ring2.setAttribute('cy', ey);
+      item.ring2.setAttribute('stroke-width', Math.max(2, H * 0.0035));
+      item.dot.setAttribute('cx', ex); item.dot.setAttribute('cy', ey);
+      item.dot.setAttribute('r', Math.max(5, H * 0.009));
+      // The arrow is the plate's color on an accent callout, else the accent.
+      var cs = getComputedStyle(item.box);
+      var sc = (o.theme === 'accent' ? cs.getPropertyValue('--bg') : cs.getPropertyValue('--ac')).trim() || '#3b6cff';
+      item.path.setAttribute('stroke', sc);
+      item.head.setAttribute('fill', sc);
+      item.ring2.setAttribute('stroke', sc);
+      item.dot.setAttribute('fill', sc);
+    }
+    item.last = '';
+  }
+
+  function ovPortrait() { return window.innerHeight > window.innerWidth; }
+
+  function layoutOverlays() {
+    if (!ov.root) return;
+    var W = window.innerWidth, H = window.innerHeight;
+    ov.W = W; ov.H = H;
+    var portrait = ovPortrait();
+    for (var i = 0; i < ov.items.length; i++) layoutItem(ov.items[i], W, H, portrait);
+    dirty = true;
+  }
+
+  function setOverlays(list) {
+    var key = JSON.stringify(list);
+    if (key === ov.key) return;
+    ov.key = key;
+    if (!ov.root) {
+      if (!list.length) return;
+      ov.root = el('div', '');
+      ov.root.setAttribute('data-tk-overlays', '');
+      ov.root.setAttribute('aria-hidden', 'true');
+      ov.styleEl = el('style', '', OV_STYLE);
+      ov.root.appendChild(ov.styleEl);
+      document.documentElement.appendChild(ov.root);
+      window.addEventListener('resize', layoutOverlays);
+      if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', layoutOverlays);
+    }
+    for (var j = ov.items.length - 1; j >= 0; j--) ov.root.removeChild(ov.items[j].g);
+    ov.items = [];
+    ov.list = list;
+    // A highlight dims what lies under it: it goes to the bottom of the layer, so no other overlay is dimmed.
+    var order = list.filter(function (o) { return o && o.kind === 'highlight'; })
+      .concat(list.filter(function (o) { return o && typeof o === 'object' && typeof o.kind === 'string' && o.kind !== 'highlight'; }));
+    for (var i = 0; i < order.length; i++) {
+      var item = buildItem(order[i]);
+      ov.items.push(item);
+      ov.root.appendChild(item.g);
+    }
+    layoutOverlays();
+  }
+
+  // style writes: only what changed since the last frame of this item.
+  function drawItem(item, t) {
+    var o = item.o;
+    var at = o.at || 0;
+    var inMs = enterMs(o);
+    var outMs = o.out === null || o.out === undefined ? null : o.out;
+    var lv = leaveMs(o);
+    var H = ov.H || window.innerHeight;
+    var visible = t >= at && (outMs === null || t < outMs + lv && (lv > 0 || t < outMs));
+    if (!visible) {
+      var hidden = 'hidden';
+      if (item.last === hidden) return false;
+      item.last = hidden;
+      item.g.style.visibility = 'hidden';
+      item.g.style.opacity = '0';
+      return true;
+    }
+    var p = clamp01((t - at) / inMs);
+    var q = outMs !== null && t >= outMs && lv > 0 ? clamp01((t - outMs) / lv) : 0;
+    var opacity = 1, ty = 0, scale = 1, clip = '';
+    var textEffect = o.enter === 'typewriter' || o.enter === 'words' || o.enter === 'scramble';
+    var e = easeOut(p);
+    switch (o.enter) {
+      case 'rise': opacity = e; ty = (1 - e) * H * 0.045; break;
+      case 'pop': opacity = clamp01(p * 3); scale = 0.82 + 0.18 * easeBack(p); break;
+      case 'mask': opacity = p > 0 ? 1 : 0; clip = 'inset(0 ' + ((1 - e) * 100).toFixed(2) + '% 0 0)'; break;
+      case 'typewriter': case 'words': case 'scramble': opacity = clamp01(p * 8); break;
+      default: opacity = e;
+    }
+    if (o.kind === 'highlight' && o.enter !== 'fade') {
+      // The area is not text: the text styles play as a fade.
+      if (textEffect || o.enter === 'mask') { opacity = e; clip = ''; }
+    }
+    if (q > 0) {
+      var eq = q * q;
+      switch (o.leave) {
+        case 'fall': opacity *= 1 - eq; ty += eq * H * 0.05; break;
+        case 'shrink': opacity *= 1 - eq; scale *= 1 - 0.18 * eq; break;
+        default: opacity *= 1 - q;
+      }
+    }
+    // text and number state
+    var detail = '';
+    if (item.chars.length && o.enter === 'typewriter') {
+      var shown = Math.floor(p * item.chars.length + (p >= 1 ? 1 : 0));
+      var live = p < 1 || t - at - inMs < 700;
+      var cur = live && Math.floor(t / 400) % 2 === 0 ? Math.min(shown, item.chars.length) - 1 : -2;
+      detail = shown + ':' + cur;
+      if (detail !== item.detail) {
+        for (var i = 0; i < item.chars.length; i++) {
+          item.chars[i].style.opacity = i < shown ? '1' : '0';
+          if (i === cur) item.chars[i].setAttribute('data-cur', ''); else item.chars[i].removeAttribute('data-cur');
+        }
+      }
+    } else if (item.chars.length && o.enter === 'scramble') {
+      var n = item.chars.length;
+      var step = Math.floor(t / 55);
+      var done = p >= 1 ? n : Math.floor(p * (n + 4)) - 3;
+      detail = done + ':' + (done < n ? step : 0);
+      if (detail !== item.detail) {
+        for (var s = 0; s < n; s++) {
+          var c = item.chars[s];
+          var real = c.getAttribute('data-ch');
+          if (s < done || p >= 1) { if (c.textContent !== real) c.textContent = real; c.style.opacity = '1'; continue; }
+          if (p <= 0) { c.style.opacity = '0'; continue; }
+          var pool = /[Ѐ-ӿ]/.test(real) ? 'АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЭЮЯ' : 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=?';
+          c.textContent = pool.charAt(ovHash(s, step) % pool.length);
+          c.style.opacity = '0.85';
+        }
+      }
+    } else if (item.words.length && o.enter === 'words') {
+      var nw = item.words.length;
+      var wDur = Math.min(0.6, 2 / Math.max(2, nw));
+      var gap = nw > 1 ? (1 - wDur) / (nw - 1) : 0;
+      detail = String(Math.round(p * 1000));
+      if (detail !== item.detail) {
+        for (var w = 0; w < nw; w++) {
+          var wp = easeOut(clamp01((p - w * gap) / wDur));
+          item.words[w].style.opacity = wp.toFixed(3);
+          item.words[w].style.transform = 'translateY(' + ((1 - wp) * 0.5).toFixed(3) + 'em)';
+        }
+      }
+    } else if (item.num) {
+      var cp = easeOut(clamp01((t - at) / OV_COUNT_MS));
+      var from = o.from || 0;
+      var val = o.value === undefined || o.value === null ? 0 : o.value;
+      var now = from + (val - from) * cp;
+      var d = o.decimals || 0;
+      var txt = fmtNum(Math.round(now * Math.pow(10, d)) / Math.pow(10, d), d);
+      detail = txt;
+      if (txt !== item.num.textContent) item.num.textContent = txt;
+    } else if (item.keys) {
+      // The caps are pressed once they are in: a short dip.
+      var pt = t - at - inMs - 250;
+      var press = pt > 0 && pt < 220 ? Math.sin((pt / 220) * Math.PI) : 0;
+      detail = press.toFixed(2);
+      if (detail !== item.detail) {
+        for (var kk = 0; kk < item.keys.length; kk++) item.keys[kk].style.transform = press > 0 ? 'translateY(' + (press * 0.07).toFixed(3) + 'em)' : '';
+      }
+    }
+    var arrow = '';
+    if (item.svg) {
+      var ap = clamp01((p - 0.2) / 0.7);
+      var phase = ((t - at) % 1300) / 1300;
+      if (t - at < 0) phase = 0;
+      var ringR = Math.max(10, H * 0.02) * (1 + phase * 1.1);
+      var ringA = (1 - phase) * 0.8 * clamp01(p * 2);
+      arrow = ap.toFixed(3) + ':' + phase.toFixed(3);
+      if (arrow !== item.arrow) {
+        var L = item.pathLen || 1;
+        item.path.setAttribute('stroke-dasharray', L);
+        item.path.setAttribute('stroke-dashoffset', (L * (1 - easeOut(ap))).toFixed(2));
+        item.head.setAttribute('opacity', ap > 0.92 ? '1' : '0');
+        item.dot.setAttribute('opacity', clamp01(p * 3).toFixed(3));
+        item.ring2.setAttribute('r', ringR.toFixed(2));
+        item.ring2.setAttribute('opacity', ap > 0.5 ? ringA.toFixed(3) : '0');
+      }
+    }
+    var key = [opacity.toFixed(3), ty.toFixed(1), scale.toFixed(3), clip, detail, arrow].join('|');
+    if (key === item.last) return false;
+    item.last = key;
+    item.detail = detail;
+    item.arrow = arrow;
+    var g = item.g.style;
+    g.visibility = opacity > 0.001 ? 'visible' : 'hidden';
+    g.opacity = opacity.toFixed(3);
+    g.transform = ty !== 0 || scale !== 1 ? 'translateY(' + ty.toFixed(1) + 'px) scale(' + scale.toFixed(4) + ')' : '';
+    item.inner.style.clipPath = clip;
+    return true;
+  }
+
+  function drawOverlays(t) {
+    var changed = false;
+    for (var i = 0; i < ov.items.length; i++) {
+      if (drawItem(ov.items[i], t)) changed = true;
+    }
+    return changed;
+  }
+
   // ---- drawing at t ----
 
   var observer = null;
@@ -399,6 +937,7 @@
       if (draw(els[i], t)) changed = true;
     }
     if (drawVeil(t)) changed = true;
+    if (drawOverlays(t)) changed = true;
     if (seekAnimations(t)) changed = true;
     if (observer) observer.takeRecords(); // our own writes
     return changed;
@@ -669,6 +1208,7 @@
     } else {
       transition = null;
     }
+    if (cfg && Array.isArray(cfg.overlays)) setOverlays(cfg.overlays);
     dirty = true;
   }
 
@@ -748,7 +1288,7 @@
   }
 
   window.tkVideo = {
-    v: 2,
+    v: 3,
     ready: ready,
     seek: function (ms) { return ready().then(function () { playing = null; return seekTo(ms); }); },
     audit: function (opts) { return ready().then(function () { return audit(opts); }); },
@@ -758,7 +1298,7 @@
     register: register,
     problems: allProblems,
     info: function () {
-      return { engines: engines.map(function (e) { return e.name; }), motionDur: Math.round(motionEnd() * 1000) };
+      return { engines: engines.map(function (e) { return e.name; }), motionDur: Math.round(motionEnd() * 1000), overlays: ov.items.length };
     },
   };
 

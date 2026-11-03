@@ -13,6 +13,25 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-03g',
+    items: [
+      { key: 'pictureEdit', icon: 'pencil' },
+      { key: 'sinopiaHover', icon: 'presentation' },
+    ],
+  },
+  {
+    id: '2026-11-03f',
+    items: [
+      { key: 'characters', icon: 'sparkles' },
+      { key: 'record', icon: 'mouse-pointer' },
+      { key: 'overlays', icon: 'text-quote' },
+    ],
+  },
+  {
+    id: '2026-11-03e',
+    items: [{ key: 'mcpFlow', icon: 'blocks' }],
+  },
+  {
     id: '2026-11-03d',
     items: [
       { key: 'connections', icon: 'plug' },
@@ -127,13 +146,6 @@ export const RELEASES = [
     items: [
       { key: 'motion', icon: 'play' },
       { key: 'show', icon: 'eye' },
-    ],
-  },
-  {
-    id: '2026-11-02b',
-    items: [
-      { key: 'pictureEdit', icon: 'pencil' },
-      { key: 'sinopiaHover', icon: 'presentation' },
     ],
   },
   {
@@ -295,10 +307,31 @@ export const RELEASES = [
   },
 ] as const satisfies readonly IRelease[];
 
-/** The release to tell about: the newest one, unless this person has already seen it (or a later one). */
-export const unseenRelease = (releases: readonly IRelease[], seen: string | null): IRelease | null => {
+/** What the card has room for; a person who was away for long sees the latest of it. */
+export const MAX_NEWS_ITEMS = 5;
+
+export interface INewsItem extends IReleaseItem {
+  /** The release it came with: its texts are under this id. */
+  release: string;
+}
+
+export interface INews {
+  /** The newest release: remembered as seen when the card is put away. */
+  id: string;
+  items: readonly INewsItem[];
+}
+
+/**
+ * What to tell this person: all the releases newer than the one they saw, newest first, as several go out in a day. Who
+ * has seen none (a new browser) hears of the newest alone, not of the whole history.
+ */
+export const unseenNews = (releases: readonly IRelease[], seen: string | null): INews | null => {
   const latest = releases[0];
-  if (!latest) return null;
+  if (latest === undefined) return null;
   if (seen !== null && seen >= latest.id) return null;
-  return latest;
+  const told = seen === null ? [latest] : releases.filter((release) => release.id > seen);
+  const items = told
+    .flatMap((release) => release.items.map((item) => ({ ...item, release: release.id })))
+    .slice(0, MAX_NEWS_ITEMS);
+  return { id: latest.id, items };
 };

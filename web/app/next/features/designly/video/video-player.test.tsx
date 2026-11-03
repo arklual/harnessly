@@ -2,6 +2,7 @@
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import VideoPlayer, { type IVideoPlayerProps } from '@/next/features/designly/video/video-player';
+import { noOverlays } from '@/next/features/designly/video/test-scene';
 import type { IVideoScene, IVideoState } from '@/next/features/designly/video/types';
 
 const ORIGIN = 'https://slot.test';
@@ -18,6 +19,7 @@ const scene = (n: number, start: number, dur: number): IVideoScene => ({
   auto: false,
   transition: { kind: 'fade', ms: 400 },
   moments: [],
+  overlays: [],
   words: 0,
   notes: 'One. Two.',
   version: `v${n}`,
@@ -40,6 +42,7 @@ const state = (): IVideoState => ({
 });
 
 const props = (over: Partial<IVideoPlayerProps> = {}): IVideoPlayerProps => ({
+  overlays: noOverlays,
   machine: 'm1' as IVideoPlayerProps['machine'],
   id: 'proj',
   video: state(),

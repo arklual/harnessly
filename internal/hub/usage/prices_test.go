@@ -18,8 +18,9 @@ func TestUnknownModelHasNoPrice(t *testing.T) {
 		{ProviderAnthropic, "claude-sonnet-9-9"},
 		{ProviderAnthropic, "claude-haiku-9-9"},
 		{ProviderOpenAI, "gpt-9.9-sol"},
-		// Another vendor's model through Claude Code, before its rows are added.
-		{ProviderKimi, "k3.1-pro"},
+		// Another vendor's model nobody lists.
+		{ProviderKimi, "k9-unknown"},
+		{ProviderAnthropic, "k9-unknown"},
 		{ProviderAnthropic, ""},
 	} {
 		if m, _, _, ok := b.Cost(c.provider, c.model, 1_761_900_000_000, tok); ok {
@@ -43,6 +44,29 @@ func TestCostMatchesTheRuntime(t *testing.T) {
 	wantOAI, _ := pricing.OpenAICost("gpt-5.4-2026-03-05", 10_000, 9000, 500)
 	if !ok || math.Abs(float64(m)-wantOAI*1e6) > 1 {
 		t.Errorf("openai %d, want %.6f $", m, wantOAI)
+	}
+}
+
+// Another vendor's model that ran through Claude Code or Codex is priced by its maker's row.
+func TestVendorModelThroughAnotherCLI(t *testing.T) {
+	b := NewBook(SeedRows())
+	for _, c := range []struct {
+		provider, model string
+		tok             Tokens
+		want            int64
+	}{
+		{ProviderAnthropic, "k3.1-pro", Tokens{Input: 1_000_000, CacheRead: 1_000_000, Output: 1_000_000}, 12_200_000},
+		{ProviderKimi, "k3.1-pro", Tokens{Input: 1_000_000}, 2_000_000},
+		{ProviderAnthropic, "glm-5.3", Tokens{Input: 1_000_000, Output: 1_000_000}, 5_800_000},
+		{ProviderOpenAI, "grok-build-0.1", Tokens{Input: 1_000_000, Output: 1_000_000}, 3_000_000},
+		// Past 200K a Grok 4.7 prompt costs twice.
+		{ProviderOpenAI, "grok-4.7", Tokens{Input: 300_000}, 1_200_000},
+		{ProviderOpenAI, "gpt-6.1-sol", Tokens{Input: 1_000_000, Output: 1_000_000}, 12_000_000},
+	} {
+		m, _, _, ok := b.Cost(c.provider, c.model, 1_761_900_000_000, c.tok)
+		if !ok || m != c.want {
+			t.Errorf("%s %s: %d %v, want %d", c.provider, c.model, m, ok, c.want)
+		}
 	}
 }
 

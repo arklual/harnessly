@@ -161,52 +161,52 @@ const task = (key: string, at: number, over: Partial<MadeItem['task']> = {}): Ma
 
 describe('taskEntries', () => {
   it('is a row for each task while there are few, an epic opening into its tasks', () => {
-    const epic = task('ABC-1', 30, {
+    const epic = task('HRN-1', 30, {
       type: 'Epic',
-      children: [taskRef('ABC-2'), taskRef('ABC-3', { resolved: true })],
+      children: [taskRef('HRN-2'), taskRef('HRN-3', { resolved: true })],
     });
-    const out = taskEntries([epic, task('ABC-9', 10)]);
-    expect(out.map((x) => x.card.title)).toEqual(['Title ABC-1', 'Title ABC-9']);
+    const out = taskEntries([epic, task('HRN-9', 10)]);
+    expect(out.map((x) => x.card.title)).toEqual(['Title HRN-1', 'Title HRN-9']);
     expect(out[0].card).toMatchObject({ icon: 'layers', about: '2 tasks' });
     expect(out[0].card.kids?.map((x) => [x.key, x.done])).toEqual([
-      ['ABC-2', false],
-      ['ABC-3', true],
+      ['HRN-2', false],
+      ['HRN-3', true],
     ]);
-    expect(out[0].targets.map(([id]) => id)).toContain(`task:${TRACKER}/ABC-3`);
+    expect(out[0].targets.map(([id]) => id)).toContain(`task:${TRACKER}/HRN-3`);
     expect(out[1].card.kids).toBeUndefined();
   });
 
   it('tells many tasks by their epic: one row for the epic, the tasks of it inside, the rest alone', () => {
-    const parent = taskRef('ABC-1', { title: 'The epic' });
+    const parent = taskRef('HRN-1', { title: 'The epic' });
     const out = taskEntries([
-      task('ABC-2', 40, { parent }),
-      task('ABC-3', 30, { parent }),
-      task('ABC-4', 20, { parent }),
-      task('ABC-9', 10),
+      task('HRN-2', 40, { parent }),
+      task('HRN-3', 30, { parent }),
+      task('HRN-4', 20, { parent }),
+      task('HRN-9', 10),
     ]);
     expect(out).toHaveLength(2);
     expect(out[0].card).toMatchObject({ title: 'The epic', icon: 'layers', about: '3 tasks' });
-    expect(out[0].card.kids?.map((x) => x.key)).toEqual(['ABC-2', 'ABC-3', 'ABC-4']);
+    expect(out[0].card.kids?.map((x) => x.key)).toEqual(['HRN-2', 'HRN-3', 'HRN-4']);
     // The epic opens by its own address, though the chat never touched it.
-    expect(out[0].targets[0]).toEqual([`task:${TRACKER}/ABC-1`, { kind: 'task', ref: `${TRACKER}/ABC-1` }]);
-    expect(out[1].card.title).toBe('Title ABC-9');
+    expect(out[0].targets[0]).toEqual([`task:${TRACKER}/HRN-1`, { kind: 'task', ref: `${TRACKER}/HRN-1` }]);
+    expect(out[1].card.title).toBe('Title HRN-9');
   });
 
   it("puts all of an epic's tasks in its row when the chat touched the epic itself", () => {
-    const epic = task('ABC-1', 50, { type: 'Epic', children: [taskRef('ABC-2'), taskRef('ABC-5')] });
+    const epic = task('HRN-1', 50, { type: 'Epic', children: [taskRef('HRN-2'), taskRef('HRN-5')] });
     const out = taskEntries([
       epic,
-      task('ABC-2', 40, { parent: taskRef('ABC-1') }),
-      task('ABC-3', 30),
-      task('ABC-4', 20),
+      task('HRN-2', 40, { parent: taskRef('HRN-1') }),
+      task('HRN-3', 30),
+      task('HRN-4', 20),
     ]);
-    const row = out.find((x) => x.card.title === 'Title ABC-1');
-    expect(row?.card.kids?.map((x) => x.key)).toEqual(['ABC-2', 'ABC-5']);
+    const row = out.find((x) => x.card.title === 'Title HRN-1');
+    expect(row?.card.kids?.map((x) => x.key)).toEqual(['HRN-2', 'HRN-5']);
   });
 
   it('names a task the tracker did not answer for by its key', () => {
-    const lone = item({ kind: 'task', ref: `${TRACKER}/ABC-7`, title: '' });
-    expect(taskEntries([lone])[0].card).toMatchObject({ title: 'ABC-7', about: '' });
-    expect(whereOf(lone)).toBe('ABC-7');
+    const lone = item({ kind: 'task', ref: `${TRACKER}/HRN-7`, title: '' });
+    expect(taskEntries([lone])[0].card).toMatchObject({ title: 'HRN-7', about: '' });
+    expect(whereOf(lone)).toBe('HRN-7');
   });
 });

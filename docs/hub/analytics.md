@@ -54,7 +54,24 @@ is `verdict: 'noise'`, shown as «не отличить от шума».
 encoded as a count here and kept as pairs on the machine), `toolCalls`, `toolErrors`, `carryTokens`, `firstCtx`,
 `inputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `skillsListed`, `skillsLoaded`, `mrs`, `mrsMerged`, `firstMrMs`,
 `waitingSince` (optional, epoch ms: since when the agent waits for its person).
-Until the machine's scanner fills the MR fields, an installation may fill them from its own merge-request source.
+
+**Merged MRs (`mrsMerged`, `firstMrMs`).** The machine's scanner sends only the keys of the merge requests a session
+mentioned (`mrKeys`, `host/project/!iid`, host in lower case; found in pr-link records, in `curl`/`glab`/push output of
+Bash calls and in the answer of the MCP `save_merge_request`; `mrs` is their count). The hub does not trust a machine for
+«merged»: it polls GitLab itself (`HUB_MR_SOURCE_GITLAB_*`, [api.md](api.md)) every 10 minutes for merged requests
+(`merged_mrs`: key, merged and created time, title, author, project, link), starting 60 days back and later a day before
+the newest merge, and joins them with the keys of the sessions (`agent_session_mrs`; a subagent's keys count for its
+main session):
+
+- a merged MR counts once, for the earliest-started main session that mentioned it: `mrsMerged` is the number of merged
+  MRs a session owns;
+- `firstMrMs` is the earliest creation time among the merged MRs the session mentioned that were created after the
+  session began, minus its start; left out when there is none;
+- the join is made when a session is read (`Store.sessions`) and replaces what a machine sent as long as the hub holds
+  any merged MR; with no source configured, the fields a machine sends stay as they are.
+
+An MR that was not merged, or is outside the polled groups, does not count. Keys are sent again once after an update of
+the machine; a hub of an older revision ignores them.
 
 ## Signals («Требует внимания»)
 
@@ -483,15 +500,16 @@ As built (machines):
 - **Who.** `…/overview` needs view of the scope, `…/spend` money; both are a manager's (org or tenant admin, the
   team's lead). `scope` is `kind:id`, the organization by default.
 - **Money** counts the hourly rollup of `funding: 'org'` in the scope (a tenant by the session's tenant, a team by its
-  team). `forecast` is `paid` plus the pace of `paid` over the last 7 days for the period's remaining days; `null` for a
+  team). `forecast` is `paid` plus the pace of `paid` over the last 7 days for the period's remaining days (what a limit
+  is checked against); `forecastList` is the same at API prices, shown next to the list spend; both `null` for a
   period that has ended. Rows: `team` («Без команды» for sessions without one), `person`, `model`, `account`, `tenant`;
   sorted by `paid`. `guessedShare` is 0 for now.
 - **Limit bars** are monthly money rules (not `forbid`): the total the scope's own rule (no person, account or model);
   a team or tenant row that scope's own rule; a person the most used personal rule in the scope or under it; an account
   the most used account rule in the scope; a model none. `setBy` is the person who set it.
 - **Tiles** take the live top-level sessions of the scope that started in the period (any funding) and the same for the
-  comparison period: `activePeople` distinct people, `sessions`, `mrs` Σ `mrsMerged`; `moneyPerMr` is Σ `paid` of the
-  organization's sessions ÷ their `mrsMerged`, `null` without MRs.
+  comparison period: `activePeople` distinct people, `sessions`, `mrs` Σ `mrsMerged`; `moneyPerMr` is Σ `list` (API prices) of
+  the organization's sessions ÷ their `mrsMerged`, `null` without MRs.
 - **«Требует внимания» and signals** are kept in `org_signals` (migration 0009, additive), one row per `rule + key`
   (`over_80`: the limit rule's id, `budget_runs_out`: the scope, `limit_request`: person + scope). The overview's
   attention block and `GET …/signals` run the same code: it computes the signals of the scope from the limits as they
@@ -546,7 +564,7 @@ As built (machines):
   share of the account's `list` over that window's hours (percent, «примерно», as `window_pct` in [limits.md](limits.md)),
   `null` with no such window or no use in its hours. The overview fills its `subscriptions` the same way.
 - **`…/kpis`** (view) are the twelve KPI of `/api/me/kpis` over the scope's live top-level sessions (any funding), with
-  `scope` the `{kind, id}` object; `money_per_mr` counts only the organization's sessions, their `paid` ÷ their
+  `scope` the `{kind, id}` object; `money_per_mr` counts only the organization's sessions, their `list` ÷ their
   `mrsMerged`, as `moneyPerMr` does. `series=team` adds them per team of the scope, sorted by name; without it `series`
   is `null`.
 - `GET …/kpis/{kpi}/series` — one KPI by `day` (default) or `week` (7-day buckets from `from`, the last cut at `to`);

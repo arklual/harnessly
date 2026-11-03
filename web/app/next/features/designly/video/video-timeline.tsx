@@ -23,8 +23,16 @@ import {
   tileBoxes,
 } from '@/next/features/designly/video/timeline-model';
 import { useVideoComments } from '@/next/features/designly/video/use-video-comments';
+import { STRIP, stripLanes, stripSpan, type TStrip } from '@/next/features/designly/video/overlays-model';
+import type { IVideoOverlayEditor } from '@/next/features/designly/video/use-video-overlays';
 import { useVars } from '@/next/features/designly/deck/use-vars';
-import type { IVideoRange, IVideoState, TVideoFormat } from '@/next/features/designly/video/types';
+import type {
+  IVideoOverlay,
+  IVideoRange,
+  IVideoScene,
+  IVideoState,
+  TVideoFormat,
+} from '@/next/features/designly/video/types';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
 import Icon from '@/next/ui/icon';
@@ -46,6 +54,8 @@ export interface IVideoTimelineProps {
   onComment: (range: IVideoRange) => void;
   /** «В чат»: the annotation text (`<annotation n kind="video">`) for the chat's context. */
   onSendToChat: (annotation: string) => void;
+  /** The overlay layer's editing: its strips lie under the scene on the playhead. */
+  overlays: IVideoOverlayEditor;
 }
 
 /** The actions leave in 160 ms. */
@@ -106,6 +116,126 @@ const PlacedButton = ({
   );
 };
 
+interface IStripDown {
+  id: string;
+  mode: TStrip;
+  px: number;
+  pointer: number;
+  from: { at: number; out: number | null };
+  moved: boolean;
+}
+
+interface IStripsProps {
+  editor: IVideoOverlayEditor;
+  scene: IVideoScene;
+  total: number;
+  track: { current: HTMLDivElement | null };
+  onSeek: (time: number) => void;
+}
+
+/** The strips of a scene's overlays under it: the edges drag the in and out, the middle moves the whole strip. */
+const OverlayStrips = ({ editor, scene, total, track, onSeek }: IStripsProps) => {
+  const down = useRef<IStripDown | null>(null);
+  const list = editor.overlaysOf(scene);
+  const lanes = stripLanes(list, scene.dur);
+  const count = Math.max(1, ...[...lanes.values()].map((l) => l + 1));
+  const rowRef = useVars<HTMLDivElement>({ '--lanes': String(count) });
+
+  const span = (event: ReactPointerEvent<HTMLElement>, d: IStripDown) => {
+    const rect = track.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return null;
+    return stripSpan(d.from, d.mode, ((event.clientX - d.px) / rect.width) * total, scene.dur);
+  };
+  const onDown = (event: ReactPointerEvent<HTMLElement>, o: IVideoOverlay) => {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    const edge = (event.target as HTMLElement).dataset.edge;
+    const mode: TStrip = edge === 'start' ? STRIP.start : edge === 'end' ? STRIP.end : STRIP.move;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    down.current = {
+      id: o.id,
+      mode,
+      px: event.clientX,
+      pointer: event.pointerId,
+      from: { at: o.at, out: o.out },
+      moved: false,
+    };
+  };
+  const onMove = (event: ReactPointerEvent<HTMLElement>, o: IVideoOverlay) => {
+    const d = down.current;
+    if (!d || d.pointer !== event.pointerId) return;
+    if (!d.moved && Math.abs(event.clientX - d.px) < DRAG_SLOP_PX) return;
+    d.moved = true;
+    const next = span(event, d);
+    if (next) editor.preview(scene.id, { ...o, ...next });
+  };
+  const onUp = (event: ReactPointerEvent<HTMLElement>, o: IVideoOverlay) => {
+    const d = down.current;
+    if (!d || d.pointer !== event.pointerId) return;
+    down.current = null;
+    event.stopPropagation();
+    if (!d.moved) {
+      editor.setOn(true);
+      editor.select(o.id);
+      onSeek(scene.start + o.at);
+      return;
+    }
+    const next = span(event, d);
+    if (next === null || event.type === 'pointercancel') editor.discard(o.id);
+    else void editor.save(scene.id, o.id, { at: next.at, out: next.out });
+  };
+
+  return (
+    <div ref={rowRef} className="hx-video-tl__row" data-row="overlays">
+      {list.map((o) => (
+        <OverlayStrip
+          key={o.id}
+          overlay={o}
+          scene={scene}
+          total={total}
+          lane={lanes.get(o.id) ?? 0}
+          selected={editor.selected === o.id}
+          onDown={onDown}
+          onMove={onMove}
+          onUp={onUp}
+        />
+      ))}
+    </div>
+  );
+};
+
+interface IStripProps {
+  overlay: IVideoOverlay;
+  scene: IVideoScene;
+  total: number;
+  lane: number;
+  selected: boolean;
+  onDown: (event: ReactPointerEvent<HTMLElement>, o: IVideoOverlay) => void;
+  onMove: (event: ReactPointerEvent<HTMLElement>, o: IVideoOverlay) => void;
+  onUp: (event: ReactPointerEvent<HTMLElement>, o: IVideoOverlay) => void;
+}
+
+const OverlayStrip = ({ overlay: o, scene, total, lane, selected, onDown, onMove, onUp }: IStripProps) => {
+  const left = msToFrac(scene.start + o.at, total);
+  const width = msToFrac((o.out ?? scene.dur) - o.at, total);
+  const ref = useVars<HTMLDivElement>({ '--l': pct(left), '--w': pct(width), '--lane': String(lane) });
+  return (
+    <div
+      ref={ref}
+      className="hx-video-tl__strip"
+      data-on={selected ? '1' : '0'}
+      title={o.text}
+      onPointerDown={(event) => onDown(event, o)}
+      onPointerMove={(event) => onMove(event, o)}
+      onPointerUp={(event) => onUp(event, o)}
+      onPointerCancel={(event) => onUp(event, o)}
+    >
+      <i data-edge="start" />
+      <i data-edge="end" />
+    </div>
+  );
+};
+
 interface IDown {
   px: number;
   at: number;
@@ -125,6 +255,7 @@ const VideoTimeline = ({
   onLoop,
   onComment,
   onSendToChat,
+  overlays,
 }: IVideoTimelineProps) => {
   const track = useRef<HTMLDivElement>(null);
   const down = useRef<IDown | null>(null);
@@ -174,7 +305,10 @@ const VideoTimeline = ({
   };
 
   const shown = usePresence(range, ACTIONS_OUT_MS);
-  const actionsRef = useVars<HTMLDivElement>({ '--l': pct(msToFrac(shown.value?.t0 ?? 0, total)) });
+  const actionsRef = useVars<HTMLDivElement>({
+    '--l': pct(msToFrac(shown.value?.t0 ?? 0, total)),
+    '--f': String(msToFrac(shown.value?.t0 ?? 0, total)),
+  });
 
   const send = (r: IVideoRange) => {
     const span = spanOfRange(scenes, r);
@@ -239,6 +373,15 @@ const VideoTimeline = ({
             />
           ))}
         </div>
+        {scenes[current] !== undefined && scenes[current].overlays.length > 0 && (
+          <OverlayStrips
+            editor={overlays}
+            scene={scenes[current]}
+            total={total}
+            track={track}
+            onSeek={onSeek}
+          />
+        )}
         <div className="hx-video-tl__row" data-row="comments">
           {comments.items.map((item) => {
             if (!item.time) return null;

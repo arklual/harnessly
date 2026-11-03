@@ -21,6 +21,8 @@ export interface MyChat {
   id: string;
   title: string;
   machine: string;
+  /** The machine the chat ran on, to open its workspace; null when the hub doesn't know it. */
+  machineId?: string | null;
   end: ChatEnd;
   /** «MR !412»: the result, when there is one. */
   mr: string | null;

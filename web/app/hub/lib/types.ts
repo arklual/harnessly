@@ -177,6 +177,8 @@ export type Config = {
   runtimeMode: 'path' | 'subdomain';
   termsUrl: string | null;
   sites?: { enabled: boolean; scheme?: 'subdomain' | 'path'; domain?: string };
+  /** The page came through a gateway that signs its people in; their workspace is its /agents/. */
+  proxied?: boolean;
 };
 
 export type SiteAccess = 'team' | 'link';

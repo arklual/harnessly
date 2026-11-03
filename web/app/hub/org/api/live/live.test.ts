@@ -13,7 +13,7 @@ import type {
 import type { Currency } from '../../../../hub-api/common';
 import type { LimitRule, MeLimitsResponse } from '../../../../hub-api/limits';
 import type { Member, OrgView } from '../../../../hub-api/orgs';
-import { spentOf } from '../../money';
+import { forecastShown, spentOf } from '../../money';
 import { accessBody, accessOf, buildMachinesList } from './machines';
 import {
   changeOf,
@@ -439,18 +439,25 @@ describe('a change and its effect', () => {
   });
 });
 
-describe('spend of an account with no price', () => {
+describe('spend is counted at API prices', () => {
   const m = (usd: number) => ({ usd, shown: usd * 80 });
 
-  it('is the list amount and says it is an estimate', () => {
-    expect(spentOf({ list: m(10), paid: m(0) })).toEqual({ shown: 800, usd: 10, estimated: true });
+  it('is the list amount whatever the subscription paid', () => {
+    expect(spentOf({ list: m(10), paid: m(0) })).toEqual({ shown: 800, usd: 10, estimated: false });
+    expect(spentOf({ list: m(10), paid: m(4) })).toEqual({ shown: 800, usd: 10, estimated: false });
   });
 
-  it('is what was paid when something was', () => {
-    expect(spentOf({ list: m(10), paid: m(4) })).toEqual({ shown: 320, usd: 4, estimated: false });
+  it('falls back to paid only when there is no list price', () => {
+    expect(spentOf({ list: m(0), paid: m(4) })).toEqual({ shown: 320, usd: 4, estimated: false });
   });
 
   it('is no estimate when nothing was spent', () => {
     expect(spentOf({ list: m(0), paid: m(0) }).estimated).toBe(false);
+  });
+
+  it('forecasts the month in the same money as the spend', () => {
+    expect(forecastShown({ list: m(10), paid: m(1), forecast: m(2), forecastList: m(30) })).toBe(2400);
+    expect(forecastShown({ list: m(0), paid: m(1), forecast: m(2), forecastList: m(0) })).toBe(160);
+    expect(forecastShown({ list: m(10), paid: m(1), forecast: null, forecastList: null })).toBeNull();
   });
 });

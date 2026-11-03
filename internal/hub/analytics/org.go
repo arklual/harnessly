@@ -39,6 +39,7 @@ func (s *Service) mountOrg(mux *http.ServeMux) {
 	s.mountSignals(mux)
 	mux.Handle("GET /api/orgs/{org}/waste", s.gate(s.waste))
 	s.mountSubscriptions(mux)
+	s.mountAccounts(mux)
 	s.mountMachines(mux)
 }
 
@@ -72,6 +73,7 @@ type SpendRow struct {
 	Tokens        Tokens    `json:"tokens"`
 	Limit         *LimitBar `json:"limit"`
 	Forecast      *Money    `json:"forecast"`
+	ForecastList  *Money    `json:"forecastList"`
 	GuessedShare  float64   `json:"guessedShare"`
 }
 
@@ -84,10 +86,11 @@ type SpendSum struct {
 
 // SpendTotal is the sum of the rows with the scope's own limit.
 type SpendTotal struct {
-	List     Money     `json:"list"`
-	Paid     Money     `json:"paid"`
-	Limit    *LimitBar `json:"limit"`
-	Forecast *Money    `json:"forecast"`
+	List         Money     `json:"list"`
+	Paid         Money     `json:"paid"`
+	Limit        *LimitBar `json:"limit"`
+	Forecast     *Money    `json:"forecast"`
+	ForecastList *Money    `json:"forecastList"` // the same pace at API prices: next to the list spend the screens show
 }
 
 // SpendResponse is GET …/spend.
@@ -326,6 +329,7 @@ func (x *orgScope) owns(r store.LimitRule) bool {
 type agg struct {
 	list, paid, calls, unpriced, in, out, cr, cw int64
 	pace                                         int64 // paid in the last paceDays
+	paceList                                     int64 // the same at API prices
 }
 
 // money is the spend of a scope in a period, by one key.
@@ -408,10 +412,12 @@ func (s *Service) money(ctx context.Context, st store.Store, x *orgScope, sp spa
 		if m.open && r.Hour >= store.HourMs(paceFrom) {
 			a.pace += paid
 			m.sum.pace += paid
+			a.paceList += r.ListCostMicros
+			m.sum.paceList += r.ListCostMicros
 		}
 	}
 	for k, a := range m.rows {
-		if a.calls == 0 && a.pace == 0 {
+		if a.calls == 0 && a.pace == 0 && a.paceList == 0 {
 			delete(m.rows, k)
 		}
 	}
@@ -421,13 +427,19 @@ func (s *Service) money(ctx context.Context, st store.Store, x *orgScope, sp spa
 	return m, nil
 }
 
-// forecast is the period's paid at the pace of the last 7 days; nil for a closed period.
-func (m *money) forecast(a agg) *Money {
+// forecast is the period's paid at the pace of the last 7 days (what a limit is checked against); nil for a closed
+// period.
+func (m *money) forecast(a agg) *Money { return m.ahead(a.paid, a.pace) }
+
+// forecastList is the same at API prices: the screens show the spend at list price and the forecast next to it.
+func (m *money) forecastList(a agg) *Money { return m.ahead(a.list, a.paceList) }
+
+func (m *money) ahead(sofar, pace int64) *Money {
 	if !m.open {
 		return nil
 	}
 	left := m.sp.to.Sub(m.x.now).Hours() / 24
-	v := m.cur.Micros(a.paid + int64(math.Round(float64(a.pace)/paceDays*left)))
+	v := m.cur.Micros(sofar + int64(math.Round(float64(pace)/paceDays*left)))
 	return &v
 }
 
@@ -487,7 +499,7 @@ func own(kind, id string) func(r store.LimitRule) bool {
 }
 
 func (m *money) total(ctx context.Context, st store.Store) (SpendTotal, error) {
-	t := SpendTotal{List: m.cur.Micros(m.sum.list), Paid: m.cur.Micros(m.sum.paid), Forecast: m.forecast(m.sum)}
+	t := SpendTotal{List: m.cur.Micros(m.sum.list), Paid: m.cur.Micros(m.sum.paid), Forecast: m.forecast(m.sum), ForecastList: m.forecastList(m.sum)}
 	var err error
 	t.Limit, err = m.bar(ctx, st, own(m.x.sc.Kind, m.x.sc.ID))
 	return t, err
@@ -497,7 +509,7 @@ func (m *money) breakdown(ctx context.Context, st store.Store, by string) ([]Spe
 	out := make([]SpendRow, 0, len(m.rows))
 	for k, a := range m.rows {
 		row := SpendRow{Key: k, List: m.cur.Micros(a.list), Paid: m.cur.Micros(a.paid), Calls: a.calls, UnpricedCalls: a.unpriced,
-			Tokens: Tokens{Total: a.in + a.out + a.cr + a.cw, Input: a.in, Output: a.out, CacheRead: a.cr, CacheWrite: a.cw}, Forecast: m.forecast(*a)}
+			Tokens: Tokens{Total: a.in + a.out + a.cr + a.cw, Input: a.in, Output: a.out, CacheRead: a.cr, CacheWrite: a.cw}, Forecast: m.forecast(*a), ForecastList: m.forecastList(*a)}
 		var pick func(r store.LimitRule) bool
 		switch by {
 		case "team":
@@ -608,8 +620,8 @@ func (s *Service) spend(w http.ResponseWriter, r *http.Request, p *auth.Principa
 	return nil
 }
 
-// tiles are the four numbers of a period: active people, live sessions, merged MRs and the money of an MR (Σ paid of the
-// organization's sessions ÷ their merged MRs).
+// tiles are the four numbers of a period: active people, live sessions, merged MRs and the money of an MR (the
+// organization's sessions at API prices ÷ their merged MRs, as the money_per_mr KPI).
 type tiles struct {
 	people, sessions, mrs float64
 	perMR                 *float64
@@ -645,14 +657,14 @@ func (s *Service) tilesOf(ctx context.Context, st store.Store, x *orgScope, sp s
 	if err != nil {
 		return t, err
 	}
-	var paid int64
+	var list int64
 	var mrs float64
 	for _, v := range org {
-		paid += money[store.SessionRef{OrgKey: v.OrgKey, Provider: v.Provider, SessionKey: v.SessionKey}].paid
+		list += money[store.SessionRef{OrgKey: v.OrgKey, Provider: v.Provider, SessionKey: v.SessionKey}].list
 		mrs += metricsOf(v.Metrics)["mrsMerged"]
 	}
 	if mrs > 0 {
-		v := math.Round(float64(paid)/1e6/mrs*100) / 100
+		v := math.Round(float64(list)/1e6/mrs*100) / 100
 		t.perMR = &v
 	}
 	return t, nil

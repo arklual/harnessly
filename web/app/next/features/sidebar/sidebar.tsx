@@ -52,6 +52,7 @@ import { childrenOf, DAY_GROUP, folderRows, sectionsOf, type TDayGroup } from '@
 import type { IWorkingDesign } from '@/next/features/designly/working';
 import type { DesignKind } from '@/next/protocol/v2';
 import MenuPanel, { useMenuActions } from '@/next/ui/menu-panel';
+import ProductSwitcher from '@/next/features/sidebar/product-switcher';
 import useDrag, { afterTouchClick } from '@/next/ui/use-drag';
 import MachineAlert from '@/next/features/sidebar/machine-alert';
 import MachineCard from '@/next/features/sidebar/machine-card';
@@ -119,8 +120,8 @@ const renameOf = (renaming: { id: string; saving: boolean } | null, id: string):
 export interface ISidebarProps {
   /** The product's name at the top (RUNTIME_APP_NAME). */
   brand: string;
-  /** The hub the machine belongs to: the name at the top then links back to it. */
-  brandHref?: string | null;
+  /** Where the hub is for this person: the name at the top then opens the product switcher (hub / workspace). */
+  hubHref?: string | null;
   /** null while the list loads (a skeleton after 150 ms); [] is an empty list. */
   chats: readonly ISidebarChat[] | null;
   projects: readonly ISidebarProject[] | null;
@@ -166,14 +167,7 @@ export interface ISidebarProps {
   designs?: ISidebarDesigns | null;
   /** The installed apps that are on in the person's chats, under «Приложения»; null shows the item with no rows. */
   apps?: ISidebarApps | null;
-  /** «Документация», quiet under «Приложения»; none where the owner has no documentation. */
-  help?: ISidebarHelp;
   ref?: Ref<HTMLElement>;
-}
-
-export interface ISidebarHelp {
-  current: boolean;
-  onOpen: () => void;
 }
 
 export interface ISidebarApps {
@@ -449,7 +443,7 @@ const ProfileButton = ({
  */
 const Sidebar = ({
   brand,
-  brandHref = null,
+  hubHref = null,
   chats,
   projects,
   favorites = NO_FAVORITES,
@@ -473,7 +467,6 @@ const Sidebar = ({
   onSearch,
   onDesignly,
   apps = null,
-  help,
   onNotifications,
   onToggleRail,
   onCloseDrawer,
@@ -855,10 +848,8 @@ const Sidebar = ({
             <Icon name="panel-left" />
           </button>
         </span>
-        {brandHref ? (
-          <a className="hx-brand__name" href={brandHref} title={t('next.sidebar.backToHub')}>
-            {brand}
-          </a>
+        {hubHref ? (
+          <ProductSwitcher brand={brand} hubHref={hubHref} />
         ) : (
           <span className="hx-brand__name">{brand}</span>
         )}
@@ -936,21 +927,12 @@ const Sidebar = ({
             {apps.rows.length > 0 && <AppRows apps={apps} />}
           </NavItem>
         )}
-        {help && (
-          <NavItem
-            icon="book-open"
-            label={t('next.sidebar.help')}
-            current={help.current}
-            index={4}
-            onClick={help.onOpen}
-          />
-        )}
         <NavItem
           icon="bell"
           label={t('next.sidebar.notifications')}
           current={notificationsOpen}
           dot={unread}
-          index={5}
+          index={4}
           onClick={onNotifications}
         />
         {more.length > 0 && (
@@ -958,7 +940,7 @@ const Sidebar = ({
             icon="layout-grid"
             label={t('next.sidebar.more')}
             expanded={moreOpen}
-            index={6}
+            index={5}
             onClick={(anchor) => {
               if (isRail(anchor)) onToggleRail();
               setMoreOpen((current) => !current);

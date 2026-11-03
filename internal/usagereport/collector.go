@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -56,10 +57,13 @@ type build struct {
 type Collector struct {
 	cfg Config
 
-	mu       sync.Mutex
-	order    []string
-	files    map[string]*cachedFile
-	loaded   bool
+	mu     sync.Mutex
+	order  []string
+	files  map[string]*cachedFile
+	loaded bool
+	// mrKept are the merge request keys kept beside the facts file (mrs.go), by transcript.
+	mrKept   map[string]mrEntry
+	mrDirty  bool
 	report   *Report
 	builtAt  time.Time
 	building *build
@@ -249,6 +253,11 @@ func (c *Collector) loadCache() {
 		}
 		c.files[name] = files[name]
 	}
+	c.mrKept = readMRs(c.cfg.CacheFile)
+	if c.mrKept == nil {
+		c.mrKept = map[string]mrEntry{}
+	}
+	applyMRs(c.files, c.mrKept)
 }
 
 // readFacts reads a facts file: the transcripts in the file's order and their facts. A missing, unreadable or
@@ -320,6 +329,8 @@ func (c *Collector) saveCache() {
 type staleFile struct {
 	transcriptFile
 	size, mtimeMs float64
+	// backfill: the facts are known and only the merge requests are looked for; the facts file is not written for it.
+	backfill bool
 }
 
 // Refresh brings the facts up to date with the transcripts on disk: only files whose size or modification time changed
@@ -344,6 +355,8 @@ func (c *Collector) Refresh() {
 			kept = append(kept, name)
 		} else {
 			delete(c.files, name)
+			delete(c.mrKept, name)
+			c.mrDirty = true
 			dirty = true
 		}
 	}
@@ -362,7 +375,31 @@ func (c *Collector) Refresh() {
 		if f := c.files[t.path]; f != nil && f.size == size && f.mtimeMs == mtime {
 			continue
 		}
-		stale = append(stale, staleFile{t, size, mtime})
+		stale = append(stale, staleFile{transcriptFile: t, size: size, mtimeMs: mtime})
+	}
+	// Transcripts known from before merge requests were looked for are read again a few at a time, newest first.
+	if c.cfg.CacheFile != "" {
+		var old []staleFile
+		inStale := make(map[string]bool, len(stale))
+		for _, s := range stale {
+			inStale[s.path] = true
+		}
+		toolCutoffMs := nowMs(c.now()) - toolBackfillDays*daySec*1000
+		for _, t := range transcripts {
+			f := c.files[t.path]
+			if f == nil || f.facts == nil || inStale[t.path] || f.mtimeMs < cutoffMs {
+				continue
+			}
+			if f.facts.MRKeys != nil && (f.facts.ToolCalls != nil || f.mtimeMs < toolCutoffMs) {
+				continue
+			}
+			old = append(old, staleFile{transcriptFile: t, size: f.size, mtimeMs: f.mtimeMs, backfill: true})
+		}
+		sort.Slice(old, func(i, j int) bool { return old[i].mtimeMs > old[j].mtimeMs })
+		if len(old) > backfillPerPass {
+			old = old[:backfillPerPass]
+		}
+		stale = append(stale, old...)
 	}
 	c.progress = Progress{Total: len(stale)}
 	c.mu.Unlock()
@@ -414,12 +451,44 @@ func (c *Collector) Refresh() {
 		if _, ok := c.files[s.path]; !ok {
 			c.order = append(c.order, s.path)
 		}
-		c.files[s.path] = &cachedFile{size: s.size, mtimeMs: s.mtimeMs, facts: results[i]}
-		dirty = true
+		// The calls are kept summed, as the side file holds them: the same facts whether parsed now or read back.
+		sums := sumTools(results[i].ToolCalls)
+		results[i].ToolCalls = callsOf(sums)
+		if s.backfill {
+			// Only the merge requests and the tool calls are taken; the facts already known stay as they were.
+			if old := c.files[s.path]; old != nil && old.facts != nil {
+				old.facts.MRKeys = results[i].MRKeys
+				old.facts.ToolCalls = results[i].ToolCalls
+				results[i] = old.facts
+			}
+		} else {
+			c.files[s.path] = &cachedFile{size: s.size, mtimeMs: s.mtimeMs, facts: results[i]}
+		}
+		if c.cfg.CacheFile != "" {
+			if results[i].MRKeys == nil {
+				results[i].MRKeys = []string{}
+			}
+			c.mrKept[s.path] = mrEntry{Size: s.size, MtimeMs: s.mtimeMs, Keys: results[i].MRKeys, Tools: sums}
+			c.mrDirty = true
+		}
+		if !s.backfill {
+			dirty = true
+		}
 	}
+	mrDirty := c.mrDirty
+	c.mrDirty = false
 	c.mu.Unlock()
 	if dirty {
 		c.saveCache()
+	}
+	if mrDirty {
+		c.mu.Lock()
+		kept := make(map[string]mrEntry, len(c.mrKept))
+		for k, v := range c.mrKept {
+			kept[k] = v
+		}
+		c.mu.Unlock()
+		writeMRs(c.cfg.CacheFile, kept)
 	}
 }
 

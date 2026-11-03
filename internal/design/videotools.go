@@ -88,6 +88,14 @@ func (t VideoTools) Tools() []any {
 			jsvalue.NewObject("scene", scene, "format", format)),
 		videoTool("sinopia_video_render", "Start a render of the video or one scene: a draft by yourself, a final when the person asked. Answers the job; read it with sinopia_video_job.",
 			jsvalue.NewObject("scene", scene, "format", format, "draft", videoBool("Half size and quick."))),
+		videoTool("sinopia_overlay_list", "The scene's overlay layer (titles, callouts, highlights, key caps, counters, badges): every overlay with its times, place, style and who wrote it last. Read this before changing one.",
+			jsvalue.NewObject("scene", scene), "scene"),
+		videoTool("sinopia_overlay_add", "Add an overlay to a scene's layer. Positions are fractions of the frame (0..1 from the top left), times are seconds from the scene's start. Kinds: "+joinKinds()+". Enter styles: "+joinEnters()+". Read the guide first: `harnessly design video guide overlays`.",
+			videoOverlayProps(scene, true), "scene", "kind"),
+		videoTool("sinopia_overlay_set", "Change an overlay (only the fields you name). An overlay a person edited is left as it is unless force is true, and you should use force only when the person asked for this change.",
+			videoOverlayProps(scene, false), "scene", "id"),
+		videoTool("sinopia_overlay_remove", "Remove an overlay. One a person edited stays unless force is true (only when the person asked).",
+			jsvalue.NewObject("scene", scene, "id", videoStr("The overlay's id."), "force", videoBool("Remove even if a person edited it.")), "scene", "id"),
 		videoTool("sinopia_video_job", "A render's progress and, once done, its file.", jsvalue.NewObject("id", videoStr("The job's id.")), "id"),
 	}
 }
@@ -98,7 +106,8 @@ func (t VideoTools) Has(name string) bool {
 	}
 	switch name {
 	case "sinopia_view_state", "sinopia_view_seek", "sinopia_view_play", "sinopia_view_pause", "sinopia_view_format",
-		"sinopia_frame", "sinopia_check", "sinopia_video_render", "sinopia_video_job":
+		"sinopia_frame", "sinopia_check", "sinopia_video_render", "sinopia_video_job",
+		"sinopia_overlay_list", "sinopia_overlay_add", "sinopia_overlay_set", "sinopia_overlay_remove":
 		return true
 	}
 	return false
@@ -144,6 +153,8 @@ func (t VideoTools) Call(ctx context.Context, name string, args *jsvalue.Object)
 		return t.check(ctx, args)
 	case "sinopia_video_render":
 		return t.render(args)
+	case "sinopia_overlay_list", "sinopia_overlay_add", "sinopia_overlay_set", "sinopia_overlay_remove":
+		return t.overlay(name, args)
 	case "sinopia_video_job":
 		j, ok := t.L.VideoRenderJobOf(t.Project, argStr(args, "id"))
 		if !ok {

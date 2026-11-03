@@ -10,6 +10,7 @@ export const scene = (n: number, start: number, dur: number): IVideoScene => ({
   auto: true,
   transition: { kind: 'fade', ms: 300 },
   moments: [],
+  overlays: [],
   words: 10,
   notes: '',
   version: 'v1',

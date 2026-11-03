@@ -58,10 +58,3 @@ export const manageHub = (): ManageHub | null => {
   const url = appConfig().hubUrl;
   return url ? liveHub(url) : null;
 };
-
-/** Where «Хаб ↗» leads, or null without a hub. */
-export const hubHref = (): string | null => {
-  if (new URLSearchParams(location.search).get('hub') === 'mock') return '#hub';
-  const url = appConfig().hubLink;
-  return url ? `${url}/` : null;
-};

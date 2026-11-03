@@ -1,7 +1,9 @@
 package env
 
 import (
+	"cmp"
 	"context"
+	"slices"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/hub/store"
@@ -20,7 +22,8 @@ const (
 type usageIndex struct {
 	has    bool // the organization has any tool facts at all: without them every number is unknown, not zero
 	byItem map[string][]store.ToolUsageRow
-	days   [sparkDays]string // the last 14 UTC days, the oldest first
+	tools  []store.ToolUsageRow // the skill and MCP calls, matched to an item or not: what the machines use
+	days   [sparkDays]string    // the last 14 UTC days, the oldest first
 	week   map[string]bool
 	month  map[string]bool
 	now    time.Time
@@ -60,8 +63,75 @@ func loadUsage(ctx context.Context, st store.Store, orgID string, now time.Time)
 		if id != "" {
 			u.byItem[id] = append(u.byItem[id], r)
 		}
+		if r.ToolKind == store.CatalogSkill || r.ToolKind == store.CatalogMCP {
+			r.ItemID = id
+			u.tools = append(u.tools, r)
+		}
 	}
 	return u, nil
+}
+
+// observedLimit is how many of the tools the machines call the screen lists.
+const observedLimit = 40
+
+// observed is the skills and MCP servers the machines of a cover called in the last month, the most called first,
+// each with the catalog item it is (nil when the catalog has none yet) and whether the item is in an enabled entry.
+func (u *usageIndex) observed(c cover, inEnv map[string]bool) []ObservedTool {
+	type key struct{ kind, name string }
+	type acc struct {
+		ObservedTool
+		people map[string]bool
+		item   string
+	}
+	by := map[key]*acc{}
+	var order []key
+	for _, r := range u.tools {
+		if !c.has(r) || r.Calls <= 0 || !u.month[r.Day] {
+			continue
+		}
+		k := key{r.ToolKind, r.ToolName}
+		a := by[k]
+		if a == nil {
+			a = &acc{ObservedTool: ObservedTool{Kind: r.ToolKind, Name: r.ToolName}, people: map[string]bool{}}
+			by[k], order = a, append(order, k)
+		}
+		a.Calls += r.Calls
+		a.Errors += r.Errors
+		if u.week[r.Day] {
+			a.CallsWeek += r.Calls
+		}
+		if r.UserID != "" {
+			a.people[r.UserID] = true
+		}
+		if r.ItemID != "" {
+			a.item = r.ItemID
+		}
+		at := r.LastAt
+		if at == 0 {
+			if d, err := time.Parse(dayLayout, r.Day); err == nil {
+				at = d.UnixMilli()
+			}
+		}
+		a.last = max(a.last, at)
+	}
+	out := make([]ObservedTool, 0, len(order))
+	for _, k := range order {
+		a := by[k]
+		a.People = len(a.people)
+		a.LastUsedAt = msStr(a.last)
+		if a.item != "" {
+			a.ItemID = strp(a.item)
+			a.InEnv = inEnv[a.item]
+		}
+		out = append(out, a.ObservedTool)
+	}
+	slices.SortFunc(out, func(a, b ObservedTool) int {
+		return cmp.Or(cmp.Compare(b.Calls, a.Calls), cmp.Compare(a.Kind, b.Kind), cmp.Compare(a.Name, b.Name))
+	})
+	if len(out) > observedLimit {
+		out = out[:observedLimit]
+	}
+	return out
 }
 
 // cover is the part of the organization a layer's calls are counted in: the tenants (nil for any) and a team ("" for

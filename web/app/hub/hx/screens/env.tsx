@@ -19,6 +19,7 @@ import {
 } from './env/helpers';
 import { FlatList, GroupCard } from './env/layers';
 import { MemberEnv } from './env/member';
+import { EnvIntro, ObservedList } from './env/observed';
 import { Empty, EnvSkeleton, isNotEnabled, LoadFailed, Tiles } from './env/parts';
 import { KindSegment, SearchField, Segment } from './env/search';
 import { useEnvView } from './env/state';
@@ -98,7 +99,7 @@ const ManageEnv = () => {
   let body: ReactNode;
   if (error != null) {
     body = isNotEnabled(error) ? (
-      <Empty>Здесь пока ничего нет</Empty>
+      <Empty>Окружение в организации ещё не включено</Empty>
     ) : (
       <LoadFailed error={error} onRetry={reload} />
     );
@@ -107,9 +108,14 @@ const ManageEnv = () => {
   } else {
     body = (
       <div className="mo">
-        <Tiles view={view} />
+        {!empty && <Tiles view={view} />}
         {empty ? (
-          <Empty>Здесь пока ничего нет</Empty>
+          <EnvIntro
+            canAdd={target !== null && catalogOn}
+            hasObserved={view.observed.some((t) => !t.inEnv)}
+            known={view.summary.callsWeek !== null}
+            onCatalog={target && catalogOn ? url.openCatalog : null}
+          />
         ) : (
           <>
             <div className="mo-bar">
@@ -140,6 +146,15 @@ const ManageEnv = () => {
             {!nothing && mode === 'flat' && <FlatList rows={rows} onOpen={url.openEntry} onToggle={flip} />}
           </>
         )}
+        <ObservedList
+          view={view}
+          state={state}
+          target={catalogOn ? target : null}
+          targetTitle={targetTitle}
+          canCreate={role === 'admin'}
+          now={now}
+          onProblem={toast.show}
+        />
       </div>
     );
   }

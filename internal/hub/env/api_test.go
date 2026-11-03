@@ -678,3 +678,39 @@ func TestUsageMatchesACatalogItemAddedLater(t *testing.T) {
 		t.Errorf("org layer = %+v", ol.Items[0])
 	}
 }
+
+// What the machines call is listed whether the catalog has it or not, the most called first, scoped as the layers are.
+func TestObservedTools(t *testing.T) {
+	a := newAcme(t)
+	skill := a.item(t, "skill", "review", map[string]any{"body": "Be brief."})
+	a.entry(t, a.anna, "org", a.org, skill, nil)
+	put := func(space, user, kind, name string, back int, calls int64) {
+		t.Helper()
+		err := a.s.DB.S().UpsertToolUsage(context.Background(), store.ToolUsage{OrgKey: a.org, SpaceID: space, TeamID: a.core, UserID: user, MachineID: "m1",
+			SessionKey: user + name + day(a.s, back), ToolKind: kind, ToolName: name, Day: day(a.s, back), Calls: calls, LastAt: a.s.Clock.Now().UnixMilli()})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	put(a.tenant, a.vera.ID, "skill", "plugin:review", 1, 2)
+	put(a.tenant, a.vera.ID, "mcp", "grafana", 1, 5)
+	put(a.tenant, a.carol.ID, "mcp", "grafana", 10, 4) // in the month, not in the week
+	put(a.tenant, a.carol.ID, "mcp", "old", 40, 9)     // older than the month
+	put(a.other, a.gleb.ID, "skill", "elsewhere", 1, 1)
+	put(a.tenant, a.vera.ID, "bash", "git", 1, 50) // not a tool the environment gives
+
+	all := a.layers(t, a.anna, "?scope="+a.tenant)
+	if len(all.Observed) != 2 {
+		t.Fatalf("observed = %+v", all.Observed)
+	}
+	g, r := all.Observed[0], all.Observed[1]
+	if g.Kind != "mcp" || g.Name != "grafana" || g.Calls != 9 || g.CallsWeek != 5 || g.People != 2 || g.ItemID != nil || g.InEnv || g.LastUsedAt == nil {
+		t.Errorf("grafana = %+v", g)
+	}
+	if r.Name != "plugin:review" || r.ItemID == nil || *r.ItemID != skill || !r.InEnv {
+		t.Errorf("review = %+v", r)
+	}
+	if every := a.layers(t, a.anna, ""); len(every.Observed) != 3 {
+		t.Errorf("all tenants = %+v", every.Observed)
+	}
+}

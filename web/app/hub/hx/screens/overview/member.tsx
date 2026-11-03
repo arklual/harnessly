@@ -219,10 +219,22 @@ const ChatsCard = ({ chats, now }: { chats: MyChat[]; now: number }) => (
     ) : (
       <ul className="me-chatlist">
         {chats.map((c) => (
-          <li key={c.id} className="me-chat">
+          <li key={c.id} className="me-chat" data-link={c.machineId ? '1' : undefined}>
             <span className="me-chat__st" data-st={CHAT_MARK[c.end]} />
             <span className="me-chat__t">
-              <b>{c.title}</b>
+              {c.machineId ? (
+                <a
+                  className="me-chat__a"
+                  href={`/api/machines/${encodeURIComponent(c.machineId)}/open?redirect=1`}
+                  target="_blank"
+                  rel="noopener"
+                  title={`Открыть рабочее пространство ${c.machine}`}
+                >
+                  <b>{c.title}</b>
+                </a>
+              ) : (
+                <b>{c.title}</b>
+              )}
               <small>
                 {c.machine} · {ago(c.endedAt, now)}
               </small>

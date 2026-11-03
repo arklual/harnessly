@@ -230,10 +230,9 @@ func (s *session) addTools(fa *usagereport.Facts, cutoff int64) {
 		}
 		td := toolDay{day: time.UnixMilli(ms(c.Ts)).UTC().Format("2006-01-02"), kind: c.Kind, name: c.Name}
 		t := s.tools[td]
-		t.Calls++
-		if c.Error {
-			t.Errors++
-		}
+		n, errs := c.Count()
+		t.Calls += int64(n)
+		t.Errors += int64(errs)
 		s.tools[td] = t
 	}
 }
@@ -418,7 +417,8 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 		lastMs := ms(s.last)
 		over := nowMs-lastMs >= ended.Milliseconds()
 		met := s.m.values()
-		cur := sessState{Calls: s.calls, LastTs: lastMs, Ended: over, Metrics: signature(met)}
+		mrKeys := s.m.mrKeys()
+		cur := sessState{Calls: s.calls, LastTs: lastMs, Ended: over, Metrics: signature(met, mrKeys)}
 		if prev, ok := f.st.Sessions[sid]; ok && prev == cur {
 			continue
 		}
@@ -427,7 +427,7 @@ func (f *Feed) Pass(ctx context.Context) (int, error) {
 		startedAt := ms(s.first)
 		fact := &hubproto.UsageSessionFact{
 			Provider: s.provider, SessionKey: s.key, ParentKey: s.parent, StartedAt: startedAt,
-			Origin: hubproto.OriginLive, Attribution: hubproto.AttributionGuessed, Metrics: met,
+			Origin: hubproto.OriginLive, Attribution: hubproto.AttributionGuessed, Metrics: met, MRKeys: mrKeys,
 		}
 		if startedAt >= f.st.Idents[s.provider].Since {
 			fact.AccountRef, fact.AuthMode, fact.BaseURLHost = id.AccountRef, id.AuthMode, id.BaseURLHost

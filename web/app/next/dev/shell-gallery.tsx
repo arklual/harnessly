@@ -769,6 +769,7 @@ const Gallery = () => {
   const sidebar = (
     <Sidebar
       brand="harnessly"
+      hubHref="https://hub.example.com/"
       chats={listChats}
       projects={LIST === 'empty' ? [] : projects}
       favorites={favorites}

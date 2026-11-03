@@ -15,10 +15,12 @@ const points = (v: readonly number[], lo: number, hi: number): string =>
 
 /** The line of this period over the dotted line of the compare period; both on one scale. */
 const Spark = ({ kpi, tone }: { kpi: Kpi; tone: string }) => {
-  const all = [...kpi.series, ...kpi.prevSeries];
+  const now = kpi.series.filter((v): v is number => v !== null);
+  const prev = kpi.prevSeries.filter((v): v is number => v !== null);
+  const all = [...now, ...prev];
   const lo = Math.min(...all);
   const hi = Math.max(...all);
-  const line = points(kpi.series, lo, hi);
+  const line = points(now, lo, hi);
   return (
     <svg
       className="an-spark"
@@ -30,7 +32,7 @@ const Spark = ({ kpi, tone }: { kpi: Kpi; tone: string }) => {
       aria-hidden="true"
     >
       <polygon className="an-spark__area" points={`0,${H} ${line} ${W},${H}`} />
-      <polyline className="an-spark__prev" points={points(kpi.prevSeries, lo, hi)} />
+      <polyline className="an-spark__prev" points={points(prev, lo, hi)} />
       <polyline className="an-spark__line" points={line} />
     </svg>
   );

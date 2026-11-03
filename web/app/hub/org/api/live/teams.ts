@@ -121,8 +121,8 @@ export const buildTeamsView = (input: TeamsInput): TeamsView => {
       limitSetBy: personal?.setBy?.name ?? null,
       limitSetAt: personal?.setAt ?? null,
       effective,
-      chatsWeek: null,
-      mrsWeek: null,
+      chatsWeek: m.chatsWeek ?? null,
+      mrsWeek: m.mrsWeek ?? null,
       self,
       can: { limit: canLimit, role: canRole, team: canTeam, remove: canTeam },
       needs: {

@@ -19,7 +19,7 @@ import (
 // for is loaded; a board that asks for nothing costs nothing.
 const motionKitPrefix = "/__lib/motion/"
 
-//go:embed vendor/motion/*.js vendor/motion/*.css vendor/motion/fonts/*.woff2 vendor/motion/fonts/*.txt
+//go:embed vendor/motion/*.js vendor/motion/*.css vendor/motion/fonts/*.woff2 vendor/motion/fonts/*.txt vendor/motion/art/*.js
 var motionKitFS embed.FS
 
 type motionKitFile struct {

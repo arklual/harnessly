@@ -70,8 +70,8 @@
   "next.connections.kind.wikijs": "Wiki.js",
   "next.connections.mcp.title": "MCP servers",
   "next.connections.mcp.lead": "Agents in new chats get the tools of these servers",
-  "next.connections.mcp.own": "Add your own server",
-  "next.connections.mcp.own.placeholder": "Its MCP address, like https://example.com/mcp",
+  "next.connections.mcp.address": "MCP server address",
+  "next.connections.mcp.address.placeholder": "https://…/mcp, or pick a service below",
   "next.connections.mcp.signs.oauth": "Signs in on its own page",
   "next.connections.mcp.signs.header": "Takes a token",
   "next.connections.mcp.signs.none": "Open: no sign-in needed",
@@ -85,7 +85,7 @@
     "other": "{n} tools"
   },
   "next.connections.mcp.toolsOf": "Tools of «{name}»",
-  "next.connections.mcp.state.signin": "Agents cannot use it until you sign in",
+  "next.connections.mcp.state.signin": "Sign-in not finished",
   "next.connections.mcp.state.token": "The server does not accept the token: enter a new one",
   "next.connections.mcp.state.unreachable": "The server did not answer at the last check",
   "next.connections.mcp.signIn": "Sign in",
@@ -105,5 +105,7 @@
   "next.connections.mcp.reason.signin-required": "The server needs you to sign in first",
   "next.connections.mcp.reason.oauth-failed": "The service did not finish the sign-in. Try again.",
   "next.connections.mcp.reason.other": "The machine did not take it ({code})",
-  "next.connections.mcp.state.oauthUnavailable": "This service needs a token here: it does not let new apps sign in by themselves"
+  "next.connections.mcp.state.oauthUnavailable": "This service needs a token here: it does not let new apps sign in by themselves",
+  "next.connections.mcp.signInWith": "Sign in with {name}",
+  "next.connections.mcp.more": "Show all"
 }

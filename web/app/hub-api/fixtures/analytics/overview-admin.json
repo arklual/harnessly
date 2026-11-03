@@ -39,6 +39,10 @@
     "forecast": {
       "usd": 2140,
       "shown": 174410.0
+    },
+    "forecastList": {
+      "usd": 2140,
+      "shown": 174410.0
     }
   },
   "tiles": {
@@ -240,6 +244,10 @@
           "usd": 1580,
           "shown": 128770.0
         },
+        "forecastList": {
+          "usd": 1580,
+          "shown": 128770.0
+        },
         "guessedShare": 0.04
       },
       {
@@ -276,6 +284,10 @@
           }
         },
         "forecast": {
+          "usd": 560,
+          "shown": 45640.0
+        },
+        "forecastList": {
           "usd": 560,
           "shown": 45640.0
         },
@@ -411,7 +423,45 @@
     },
     "active": {
       "people": 3,
-      "of": 4
+      "of": 4,
+      "who": [
+        {
+          "userId": "u_ann",
+          "name": "Ann",
+          "email": "ann@example.org",
+          "working": true,
+          "chats": 3,
+          "closed": 1,
+          "lastAt": "2026-06-15T10:20:00Z",
+          "paid": {
+            "usd": 1.25,
+            "shown": 100.6
+          },
+          "list": {
+            "usd": 12.5,
+            "shown": 1006.97
+          },
+          "tokens": 1834000
+        },
+        {
+          "userId": "u_bob",
+          "name": "Bob",
+          "email": "bob@example.org",
+          "working": false,
+          "chats": 0,
+          "closed": 0,
+          "lastAt": null,
+          "paid": {
+            "usd": 0,
+            "shown": 0
+          },
+          "list": {
+            "usd": 0,
+            "shown": 0
+          },
+          "tokens": 0
+        }
+      ]
     },
     "tasks": {
       "closed": 5,

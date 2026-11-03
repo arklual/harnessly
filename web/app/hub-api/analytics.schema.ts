@@ -39,6 +39,8 @@ export const kpiValue = obj({
   delta: nullable(num),
   noise: nullable(num),
   verdict: lit('better', 'worse', 'noise', 'too_few'),
+  spark: opt(arr(nullable(num))),
+  cmpSpark: opt(arr(nullable(num))),
 });
 
 export const kpisResponse = obj({
@@ -132,9 +134,16 @@ export const spendRow = obj({
   tokens: obj({ total: num, input: num, output: num, cacheRead: num, cacheWrite: num }),
   limit: nullable(limitBar),
   forecast: nullable(money),
+  forecastList: opt(nullable(money)),
   guessedShare: num,
 });
-const spendTotal = obj({ list: money, paid: money, limit: nullable(limitBar), forecast: nullable(money) });
+const spendTotal = obj({
+  list: money,
+  paid: money,
+  limit: nullable(limitBar),
+  forecast: nullable(money),
+  forecastList: opt(nullable(money)),
+});
 export const spendResponse = obj({
   scope,
   by: spendBy,
@@ -173,7 +182,24 @@ const reached = obj({ value: nullable(num), n: num });
 export const todayView = obj({
   day,
   spend: obj({ paid: money, list: money, tokens: num }),
-  active: obj({ people: num, of: num }),
+  active: obj({
+    people: num,
+    of: num,
+    who: arr(
+      obj({
+        userId: str,
+        name: str,
+        email: str,
+        working: bool,
+        chats: num,
+        closed: num,
+        lastAt: nullable(time),
+        paid: money,
+        list: money,
+        tokens: num,
+      }),
+    ),
+  }),
   tasks: obj({ closed: num, inWork: num }),
   sparks: obj({ spend: arr(dayValue), active: arr(dayValue), tasks: arr(dayValue) }),
 });

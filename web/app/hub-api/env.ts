@@ -71,7 +71,26 @@ export type EnvLayer = {
 export type TeamRef = { id: string; name: string; tenantId: string };
 
 // GET /api/orgs/{org}/env?scope=<tenant slug|all>&team=<id>
-export type EnvResponse = { summary: EnvSummary; layers: EnvLayer[]; teams: TeamRef[] };
+// A skill or an MCP server the machines of the screen called in the last 30 days, in the environment or not. `name` is
+// as the chats name it (the skill; the MCP server), `itemId` the catalog item it is (null: the catalog has none yet),
+// `inEnv` whether an enabled entry of the screen gives the item.
+export type ObservedTool = {
+  kind: 'skill' | 'mcp';
+  name: string;
+  itemId: string | null;
+  inEnv: boolean;
+  calls: number; // 30 days
+  callsWeek: number;
+  errors: number;
+  people: number;
+  lastUsedAt: string | null;
+};
+export type EnvResponse = {
+  summary: EnvSummary;
+  layers: EnvLayer[];
+  teams: TeamRef[];
+  observed: ObservedTool[];
+};
 
 export type EnvCard = {
   entryId: string;

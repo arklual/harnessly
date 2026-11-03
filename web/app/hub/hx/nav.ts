@@ -27,7 +27,7 @@ export const navOf = (role: Role, teamName: string | null, features: readonly st
   const overview = item('overview', 'Обзор', 'chart-column', 'overview');
   const analytics = item('analytics', 'Аналитика', 'activity', 'analytics');
   const machines = item('machines', 'Машины', 'server', 'machines');
-  const accounts = item('accounts', 'Аккаунты и секреты', 'key-round');
+  const accounts = item('accounts', 'Аккаунты', 'key-round', 'accounts');
   if (role === 'member') return [{ label: '', items: [overview, analytics, env] }];
   if (role === 'lead') {
     return [
@@ -50,5 +50,5 @@ export const hxSectionsOf = (role: Role, features: readonly string[]): Section[]
   const env: Section[] = features.includes('env') ? ['env'] : [];
   return role === 'member'
     ? ['overview', 'analytics', 'machines', ...env]
-    : ['overview', 'analytics', 'machines', 'teams', 'team', ...env];
+    : ['overview', 'analytics', 'machines', 'teams', 'team', 'accounts', ...env];
 };

@@ -25,7 +25,7 @@ const (
 	VideoRendersDir      = ".media/video/renders"
 	VideoChaptersFile    = DeckPublishedDir + "/chapters.json"
 	VideoPublishedFile   = DeckPublishedDir + "/video.json"
-	VideoRuntimeVersion  = 2
+	VideoRuntimeVersion  = 3
 	VideoRendersKept     = 3
 	VideoCacheMaxBytes   = 2 << 30
 	VideoRenderTabs      = 2
@@ -151,12 +151,17 @@ type VideoTransition struct {
 }
 
 // VideoSceneMeta is meta/scenes/<pageId>.json. Dur nil: automatic (VideoAutoDur); Transition nil: the board's own
-// data-transition, else none.
+// data-transition, else none. Overlays is the scene's layer of titles, callouts and the like (video_overlays.go). V is 2
+// since the overlays; a file of V 1 has none and is read as it is, the next write makes it V 2.
 type VideoSceneMeta struct {
 	V          int              `json:"v"`
 	Dur        *int64           `json:"dur"`
 	Transition *VideoTransition `json:"transition"`
+	Overlays   []VideoOverlay   `json:"overlays,omitempty"`
 }
+
+// VideoSceneMetaV is the current version of a scene's meta file.
+const VideoSceneMetaV = 2
 
 // The build-ins a block may take (data-build-in), applied by video-runtime.js as a pure function of time (D4).
 const (
@@ -193,6 +198,7 @@ type VideoScene struct {
 	Auto       bool                   `json:"auto"`
 	Transition VideoTransition        `json:"transition"`
 	Moments    []VideoMoment          `json:"moments"`
+	Overlays   []VideoOverlay         `json:"overlays"`
 	Words      int                    `json:"words"`
 	Notes      string                 `json:"notes"`
 	Version    string                 `json:"version"`

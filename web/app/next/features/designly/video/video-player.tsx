@@ -30,6 +30,10 @@ import {
   tenthOf,
   type IClock,
 } from '@/next/features/designly/video/video-clock';
+import VideoOverlayLayer from '@/next/features/designly/video/video-overlays';
+import VideoOverlayInspector from '@/next/features/designly/video/video-overlay-inspector';
+import { newCaptionPatch, overlayWire } from '@/next/features/designly/video/overlays-model';
+import type { IVideoOverlayEditor } from '@/next/features/designly/video/use-video-overlays';
 import VideoStage, { type TVideoSlotIndex } from '@/next/features/designly/video/video-stage';
 import { VIDEO_KEY, useVideoKeys, type TVideoKeyAction } from '@/next/features/designly/video/use-video-keys';
 import {
@@ -73,6 +77,8 @@ export interface IVideoPlayerProps {
   command?: IPlayerCommand | null;
   /** Says whether it is playing, for what the agent is told. */
   onPlaying?: (playing: boolean) => void;
+  /** The overlay layer's editing. */
+  overlays: IVideoOverlayEditor;
 }
 
 /** A playhead this far from where the player is (while it plays) is a seek of the view's, ms. */
@@ -104,6 +110,7 @@ const VideoPlayer = ({
   onPick,
   command = null,
   onPlaying,
+  overlays,
 }: IVideoPlayerProps) => {
   const total = video.durMs;
   const scenes = video.scenes;
@@ -202,6 +209,32 @@ const VideoPlayer = ({
   // The same from effects, which must see the latest props.
   const syncNow = useEffectEvent(sync);
 
+  // The scene's words for its frame: the transition and the overlay layer (the one being typed is left out: the field is it).
+  const sceneMessage = (scene: number) => ({
+    type: 'tk:video-scene' as const,
+    transition: scenes[scene].transition,
+    overlays: overlays
+      .overlaysOf(scenes[scene])
+      .filter((o) => o.id !== overlays.editing)
+      .map(overlayWire),
+  });
+  const sendScene = useEffectEvent((slot: TVideoSlotIndex) => {
+    const scene = sceneOf(slot);
+    if (scene === null || !isReady(slot)) return;
+    postVideo(frameRefs[slot].current, slots[slot].src, sceneMessage(scene));
+  });
+  const overlayKey = (slot: TVideoSlotIndex): string => {
+    const scene = sceneOf(slot);
+    return scene === null ? '' : JSON.stringify(sceneMessage(scene).overlays);
+  };
+  const key0 = overlayKey(0);
+  const key1 = overlayKey(1);
+  // A change of the layer (a drag, a typed text, the agent's edit) goes to the frames that hold the scene.
+  useEffect(() => {
+    sendScene(0);
+    sendScene(1);
+  }, [key0, key1]);
+
   const take = useEffectEvent((slot: TVideoSlotIndex, message: TVideoBoardMessage) => {
     const address = slots[slot].src;
     switch (message.k) {
@@ -211,7 +244,7 @@ const VideoPlayer = ({
         const frame = frameRefs[slot].current;
         const scene = sceneOf(slot);
         if (frame === null || scene === null) return;
-        postVideo(frame, address, { type: 'tk:video-scene', transition: scenes[scene].transition });
+        postVideo(frame, address, sceneMessage(scene));
         push(slot, scene);
         return;
       }
@@ -470,6 +503,24 @@ const VideoPlayer = ({
     });
   };
 
+  const addOverlay = async () => {
+    if (current === undefined || at === null) return;
+    pauseNow();
+    const id = await overlays.add(
+      current.id,
+      newCaptionPatch(at.local, current.dur, t('next.video.overlay.newText')),
+    );
+    if (id === null) return;
+    overlays.setOn(true);
+    overlays.select(id);
+    overlays.setEditing(id);
+  };
+  const editing = live && overlays.on && !playing && current !== undefined;
+  const selectedOverlay =
+    editing && overlays.selected !== null
+      ? (overlays.overlaysOf(current).find((o) => o.id === overlays.selected) ?? null)
+      : null;
+
   const sub =
     live && video.settings.subs && current !== undefined && at !== null
       ? subtitleAt(current.notes, at.local, current.dur)
@@ -494,6 +545,9 @@ const VideoPlayer = ({
                 <small>{failure}</small>
               </div>
             )}
+            {editing && at !== null ? (
+              <VideoOverlayLayer editor={overlays} scene={current} local={at.local} format={format} />
+            ) : null}
             <div className="hx-video__hit" data-playing={playing ? '1' : '0'} onClick={onSlideClick} />
           </VideoStage>
         ) : (
@@ -570,7 +624,48 @@ const VideoPlayer = ({
             {formatMs(time)} / {formatMs(total)}
           </span>
         </div>
+        {current !== undefined && (
+          <VideoOverlayInspector
+            editor={overlays}
+            page={current.id}
+            overlay={selectedOverlay}
+            format={format}
+          />
+        )}
         <div className="hx-video__opts">
+          {overlays.error !== null && (
+            <span className="hx-video__fail" role="status">
+              {overlays.error}
+            </span>
+          )}
+          {live && overlays.on && (
+            <button
+              type="button"
+              className="hx-video__btn"
+              data-text="1"
+              disabled={playing}
+              onClick={() => void addOverlay()}
+            >
+              {t('next.video.overlay.add')}
+            </button>
+          )}
+          {live && (
+            <button
+              type="button"
+              className="hx-video__btn"
+              data-on={overlays.on ? '1' : '0'}
+              aria-pressed={overlays.on}
+              aria-label={t('next.video.overlay.mode')}
+              title={t('next.video.overlay.mode')}
+              onClick={() => {
+                if (!overlays.on) pauseNow();
+                overlays.setOn(!overlays.on);
+              }}
+            >
+              <Icon name="text-quote" />
+              <span className="hx-video__btn-text">{t('next.video.overlay.mode')}</span>
+            </button>
+          )}
           <button
             type="button"
             className="hx-video__btn"

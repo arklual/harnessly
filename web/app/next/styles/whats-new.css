@@ -64,8 +64,10 @@
 .hx-news__list {
   display: grid;
   gap: 12px;
+  max-height: 60dvh;
   margin: 0 0 14px;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
 }
 .hx-news__item {

@@ -4,6 +4,7 @@ import type { OrgApi } from '../api';
 import { onboardingMock } from './onboarding';
 import { memberMock } from './member';
 import { overviewMock } from './overview';
+import { accountsMock } from './accounts';
 import { analyticsMock } from './analytics';
 import { envMock } from './env';
 import { machinesMock } from './machines';
@@ -22,4 +23,5 @@ export const mockOrgApi = (ctx: MockCtx): OrgApi => ({
   ...teamsMock(ctx),
   ...tenantMock(ctx),
   ...envMock(ctx),
+  ...accountsMock(ctx),
 });

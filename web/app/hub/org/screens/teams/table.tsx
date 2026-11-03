@@ -33,7 +33,7 @@ const Row = ({
         <span className="ht-row__t">
           <b data-muted={p.invited || undefined}>{p.name}</b>
           <small data-warn={p.invited || quiet || undefined}>
-            {p.invited ? 'приглашен(а)' : p.lastActiveAt ? ago(p.lastActiveAt, now) : 'ещё не заходил(а)'}
+            {p.invited ? 'приглашен(а)' : p.lastActiveAt ? ago(p.lastActiveAt, now) : 'ещё не работал(а)'}
             {teamName ? ` · ${teamName}` : ''}
           </small>
         </span>

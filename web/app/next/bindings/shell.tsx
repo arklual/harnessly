@@ -76,7 +76,7 @@ import {
   type ISidebarProject,
 } from '@/next/features/sidebar/types';
 import Icon from '@/next/ui/icon';
-import { hubHref } from '@/next/features/manage/api';
+import { useHubEntry } from '@/next/features/sidebar/hub-entry';
 import LazyView from '@/next/ui/lazy-view';
 import { usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
@@ -261,6 +261,7 @@ const Shell = ({ owner }: IShellProps) => {
   const login = owner.split('@')[0] ?? '';
   // The tabs over the window: a browser's, on a wide window, unless switched off in Settings.
   const phone = usePhone();
+  const hubEntry = useHubEntry();
   const tabs = useShellTabs(useTabChats(), useTopTabs() && !phone);
   const name = (me.k === 'ready' ? me.me.name : null) ?? appConfig().people[login] ?? null;
 
@@ -445,18 +446,13 @@ const Shell = ({ owner }: IShellProps) => {
       current: route.kind === ROUTE.manage || route.kind === ROUTE.stats || route.kind === ROUTE.efficiency,
       onSelect: () => openScreen({ kind: ROUTE.manage }),
     },
-    ...(hubHref()
-      ? [
-          {
-            id: 'hub',
-            icon: 'layout-dashboard',
-            label: t('next.sidebar.hub'),
-            external: true,
-            current: false,
-            onSelect: () => window.location.assign(hubHref() ?? '/'),
-          } satisfies IMoreItem,
-        ]
-      : []),
+    {
+      id: 'help',
+      icon: 'book-open',
+      label: t('next.sidebar.help'),
+      current: route.kind === ROUTE.help,
+      onSelect: () => openScreen({ kind: ROUTE.help, page: null }),
+    },
   ];
 
   // No machine runs the new runtime: nothing will load, the list is empty rather than a skeleton forever.
@@ -578,7 +574,7 @@ const Shell = ({ owner }: IShellProps) => {
   const sidebar = (
     <Sidebar
       brand={appConfig().productName}
-      brandHref={appConfig().hubUrl ? `${appConfig().hubUrl}/` : null}
+      hubHref={hubEntry}
       chats={noV2 ? NO_CHATS : model.chats}
       projects={noV2 ? NO_PROJECTS : model.projects}
       favorites={model.favorites}
@@ -629,13 +625,6 @@ const Shell = ({ owner }: IShellProps) => {
       onManageMachines={() => openScreen({ kind: ROUTE.settings, section: 'machines' })}
       people={<PeopleBlock machine={noV2 ? null : model.active} />}
       apps={sidebarApps}
-      help={{
-        current: route.kind === ROUTE.help,
-        onOpen: () => {
-          navigate({ kind: ROUTE.help, page: null });
-          setDrawerOpen(false);
-        },
-      }}
       designs={
         workingDesigns && {
           rows: workingDesigns,

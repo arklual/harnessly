@@ -66,6 +66,7 @@ type UsageSessionFact = {
   baseUrlHost: string;
   attribution: 'exact' | 'guessed';
   metrics?: Record<string, number>;   // the machine's scanner (analytics.md, «KPI»); absent until it ran
+  mrKeys?: string[];                  // merge requests the session mentioned, host/project/!iid (host lower case), up to 200; analytics.md, «Merged MRs». The hub ignores unknown fields, so a machine may send it before the hub knows it
 };
 
 type UsageWindowFact = {

@@ -2,7 +2,7 @@
 // in new chats get. A connected server is one row — its name above everything else, then its address and whose account
 // it uses; it speaks of its state only when it needs the person (sign in again, a new token) or did not answer. Its
 // tools fold out under it. Its actions are in a menu: check again, rename, turn off for agents, disconnect. Under the
-// list, the catalog of known servers and «Add your own server».
+// list, one form for a server's address, and the catalog of known services that fills it.
 import { Menu } from '@base-ui/react/menu';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { McpGlyph } from '@/next/features/connections/glyphs';
@@ -18,13 +18,15 @@ import {
 } from '@/next/features/connections/mcp-api';
 import {
   CatalogCard,
+  ConnectForm,
   HeaderFields,
   headerOf,
-  OwnServerForm,
+  type IPicked,
   type TConnectMcp,
   type TProbeResult,
 } from '@/next/features/connections/mcp-catalog';
 import {
+  isQuietState,
   mcpReasonText,
   mcpStateText,
   mcpSubLine,
@@ -48,6 +50,8 @@ import '@/next/styles/connections.css';
 const LEAVE_MS = 280;
 /** «Works» after «Check again» stays this long. */
 const CHECKED_MS = 2500;
+/** The catalog shows this many services until «Show all». */
+const CATALOG_FIRST = 6;
 /** The lists' stand-ins while they are on their way: one array each, so the leaving lists see no change. */
 const NO_SERVERS: readonly IMcpServer[] = [];
 
@@ -363,8 +367,8 @@ const McpRow = ({ server, tokenUrl, ask, leaving, actions, signin }: IRowProps) 
               <span className="hx-conn-row__name">{server.name}</span>
               <span className="hx-conn-row__sub">{mcpSubLine(server)}</span>
               {problem !== null && (
-                <span className="hx-conn-row__state">
-                  <Icon name="triangle-alert" size="sm" />
+                <span className="hx-conn-row__state" data-tone={isQuietState(server) ? 'quiet' : undefined}>
+                  {!isQuietState(server) && <Icon name="triangle-alert" size="sm" />}
                   {problem}
                 </span>
               )}
@@ -531,6 +535,14 @@ const McpSection = ({
   const signin = useMcpSignIn({ servers, onStart: onSignIn, onRefresh, reasonText: mcpReasonText });
   const { prepare, release, start } = signin;
   const [ask, setAsk] = useState<ITokenAsk | null>(null);
+  const [picked, setPicked] = useState<IPicked | null>(null);
+  const [all, setAll] = useState(false);
+  const form = useRef<HTMLDivElement>(null);
+
+  const pick = (entry: IPicked['entry']) => {
+    setPicked({ entry, at: Date.now() });
+    form.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
 
   /** Keeps the server, then signs in to it when it asks for that. Called in the click: the popup opens first. */
   const connect: TConnectMcp = useCallback(
@@ -589,16 +601,35 @@ const McpSection = ({
           ))}
         </Group>
       )}
+      <Group>
+        <ConnectForm
+          ref={form}
+          picked={picked}
+          onProbe={onProbe}
+          onConnect={connect}
+          onUnpick={() => setPicked(null)}
+        />
+      </Group>
       {catalog.length > 0 && (
         <div className="hx-mcp-cat">
-          {catalog.map(({ item, leaving }) => (
-            <CatalogCard key={item.id} entry={item} leaving={leaving} onConnect={connect} />
+          {(all ? catalog : catalog.slice(0, CATALOG_FIRST)).map(({ item, leaving }) => (
+            <CatalogCard
+              key={item.id}
+              entry={item}
+              leaving={leaving}
+              picked={picked !== null && picked.entry.id === item.id}
+              onPick={pick}
+            />
           ))}
         </div>
       )}
-      <Group foot={t('next.connections.mcp.foot')}>
-        <OwnServerForm onProbe={onProbe} onConnect={connect} />
-      </Group>
+      {!all && catalog.length > CATALOG_FIRST && (
+        <button type="button" className="hx-mcp-more" onClick={() => setAll(true)}>
+          {t('next.connections.mcp.more')}
+          <Icon name="chevron-down" size="sm" />
+        </button>
+      )}
+      <p className="hx-set__foot hx-mcp__foot">{t('next.connections.mcp.foot')}</p>
     </div>
   );
 };

@@ -96,6 +96,24 @@ type Response struct {
 	Summary Summary     `json:"summary"`
 	Layers  []LayerView `json:"layers"`
 	Teams   []TeamRef   `json:"teams"`
+	// Observed is what the machines of the screen's tenants (and team) called in the last month, in the environment or
+	// not: the list the environment is filled from.
+	Observed []ObservedTool `json:"observed"`
+}
+
+// ObservedTool is a skill or an MCP server the machines called: Name is as the chats name it (the skill, the MCP
+// server), ItemID the catalog item it is, InEnv whether an enabled entry of the screen has the item.
+type ObservedTool struct {
+	Kind       string  `json:"kind"`
+	Name       string  `json:"name"`
+	ItemID     *string `json:"itemId"`
+	InEnv      bool    `json:"inEnv"`
+	Calls      int64   `json:"calls"`
+	CallsWeek  int64   `json:"callsWeek"`
+	Errors     int64   `json:"errors"`
+	People     int     `json:"people"`
+	LastUsedAt *string `json:"lastUsedAt"`
+	last       int64
 }
 
 // Bar is one day of the card's chart.

@@ -34,6 +34,7 @@ import VideoPanel, {
 } from '@/next/features/designly/video/video-panel';
 import VideoPlayer from '@/next/features/designly/video/video-player';
 import VideoRender from '@/next/features/designly/video/video-render';
+import { useVideoOverlays } from '@/next/features/designly/video/use-video-overlays';
 import VideoTimeline from '@/next/features/designly/video/video-timeline';
 import {
   clock,
@@ -181,6 +182,7 @@ const VideoView = (props: IVideoViewProps) => {
   const [pop, setPop] = useState<TPop | null>(null);
   const shownPop = usePresence(pop, POP_EXIT_MS);
   const [playing, setPlaying] = useState(false);
+  const overlays = useVideoOverlays(machine, id);
   const view = useVideoView({
     machine,
     id,
@@ -319,6 +321,7 @@ const VideoView = (props: IVideoViewProps) => {
         onPick={(pick) => comment(null, pick)}
         command={view.command}
         onPlaying={setPlaying}
+        overlays={overlays}
       />
     );
   };
@@ -431,6 +434,7 @@ const VideoView = (props: IVideoViewProps) => {
               onLoop={setLoop}
               onComment={(r) => comment(r, null)}
               onSendToChat={sendToChat}
+              overlays={overlays}
             />
           </div>
         )}

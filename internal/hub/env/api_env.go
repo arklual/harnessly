@@ -164,6 +164,15 @@ func (s *Service) getEnv(w http.ResponseWriter, r *http.Request, p *auth.Princip
 	}
 	resp.Layers = layers
 	resp.Summary = q.summary(layers, use, spaces, teamFilter)
+	inEnv := map[string]bool{}
+	for _, l := range layers {
+		for _, it := range l.Items {
+			if it.Enabled {
+				inEnv[it.ItemID] = true
+			}
+		}
+	}
+	resp.Observed = use.observed(cover{spaces: spaces, team: teamFilter}, inEnv)
 	httpx.WriteJSON(w, http.StatusOK, resp)
 	return nil
 }

@@ -679,6 +679,18 @@ func (l *Library) serveStatic(w http.ResponseWriter, r *http.Request, file strin
 		w.WriteHeader(304)
 		return
 	}
+	if strings.HasPrefix(typ, "video/") {
+		// a clip is read by seeking (a recording of an interface in a scene): the browser asks for ranges
+		f, err := os.Open(file)
+		if err != nil {
+			w.WriteHeader(404)
+			return
+		}
+		defer f.Close()
+		h.Set("Content-Type", typ)
+		http.ServeContent(w, r, "", st.ModTime(), f)
+		return
+	}
 	if compressible[ext] && st.Size() >= gzipMinBytes && takesGzip(r) {
 		l.mu.Lock()
 		if l.srv == nil {

@@ -211,7 +211,7 @@ const SIGNALS: Signal[] = [
     tone: 'high',
     title: 'MCP «Трекер задач» ломается в 11% вызовов',
     text: 'с 21.10, после обновления до 2.3 — агенты повторяют вызов, ≈ $310 за период',
-    action: { label: 'Смотреть ошибки', section: 'analytics' },
+    action: { label: 'Смотреть ошибки', section: 'analytics', query: 'k=toolErrors' },
     detail: [
       { label: 'Фронт', value: '14%' },
       { label: 'Бэкенд', value: '9%' },
@@ -224,7 +224,7 @@ const SIGNALS: Signal[] = [
     tone: 'high',
     title: 'Тесты идут через пайп без pipefail',
     text: '66% прогонов — агент видит зелёный там, где тесты упали; 23 красных изменения ушли в MR',
-    action: { label: 'Включить «Ворота по коду возврата»', section: 'analytics' },
+    action: { label: 'Включить «Ворота по коду возврата»', section: 'env' },
     detail: [
       { label: 'Прогонов', value: '9 800' },
       { label: 'Через пайп', value: '6 470' },
@@ -236,7 +236,7 @@ const SIGNALS: Signal[] = [
     tone: 'mid',
     title: 'Дизайн отвечает агенту за 1 ч 40 мин',
     text: 'вдвое дольше, чем в тенанте — агент всё это время стоит',
-    action: { label: 'Смотреть людей', section: 'teams' },
+    action: { label: 'Смотреть команду', section: 'team', query: 't=tm-design' },
     detail: [
       { label: 'Дизайн', value: '1 ч 40 мин' },
       { label: 'Среднее по тенанту', value: '50 мин' },
@@ -248,7 +248,7 @@ const SIGNALS: Signal[] = [
     tone: 'mid',
     title: '10% запусков субагентов падают',
     text: 'упираются в лимит вложенности — работа идёт заново, больше всего у Фронта',
-    action: { label: 'Смотреть сессии', section: 'machines' },
+    action: { label: 'Смотреть машины', section: 'machines' },
     detail: [
       { label: 'Запусков', value: '1 400' },
       { label: 'Упали', value: '140' },

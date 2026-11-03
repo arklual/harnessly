@@ -282,15 +282,22 @@ func (s *Service) deleteTeam(w http.ResponseWriter, r *http.Request, p *auth.Pri
 
 // MemberView is Member of the contract.
 type MemberView struct {
-	UserID       string      `json:"userId"`
-	Email        string      `json:"email"`
-	Name         string      `json:"name"`
-	JoinedAt     string      `json:"joinedAt"`
-	LastActiveAt *string     `json:"lastActiveAt"`
-	Invited      bool        `json:"invited"`
-	Grants       []GrantView `json:"grants"`
-	Teams        []TeamRef   `json:"teams"`
-	TenantRole   *string     `json:"tenantRole"`
+	UserID   string `json:"userId"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	JoinedAt string `json:"joinedAt"`
+	// LastActiveAt is the latest of the person's sign-in to the hub and their work through a machine (a session of the
+	// organization); SignedInAt is the sign-in alone. Nil: never.
+	LastActiveAt *string `json:"lastActiveAt"`
+	SignedInAt   *string `json:"signedInAt"`
+	// Invited is always false here: a member has joined. The invitations not taken yet are listed apart.
+	Invited bool `json:"invited"`
+	// ChatsWeek and MRsWeek are the person's chats of the last seven days and the merge requests they ended with.
+	ChatsWeek  int         `json:"chatsWeek"`
+	MRsWeek    int         `json:"mrsWeek"`
+	Grants     []GrantView `json:"grants"`
+	Teams      []TeamRef   `json:"teams"`
+	TenantRole *string     `json:"tenantRole"`
 }
 
 // subtree is the scope and everything under it: the tenants and the teams, by key.
@@ -402,6 +409,30 @@ func members(ctx context.Context, st store.Store, sc authz.Scope) ([]MemberView,
 			}
 		}
 	}
+	var orgKeys []string
+	seenKey := map[string]bool{}
+	addKey := func(sp store.Space) {
+		if k := store.OrgKey(sp); !seenKey[k] {
+			seenKey[k] = true
+			orgKeys = append(orgKeys, k)
+		}
+	}
+	for _, sp := range tree.tenants {
+		addKey(sp)
+	}
+	for _, tm := range tree.teams {
+		if sp, err := st.SpaceByID(ctx, tm.SpaceID); err == nil {
+			addKey(sp)
+		}
+	}
+	worked, err := st.LastWorked(ctx, orgKeys)
+	if err != nil {
+		return nil, err
+	}
+	week, err := st.WorkSince(ctx, orgKeys, time.Now().Add(-7*24*time.Hour).UnixMilli())
+	if err != nil {
+		return nil, err
+	}
 	out := make([]MemberView, 0, len(order))
 	for _, id := range order {
 		u, err := st.UserByID(ctx, id)
@@ -409,8 +440,15 @@ func members(ctx context.Context, st store.Store, sc authz.Scope) ([]MemberView,
 			return nil, err
 		}
 		r := rows[id]
+		last := u.LastLoginAt
+		if at, ok := worked[id]; ok {
+			if w := time.UnixMilli(at).UTC(); last == nil || w.After(*last) {
+				last = &w
+			}
+		}
 		mv := MemberView{UserID: u.ID, Email: u.Email, Name: u.Name, JoinedAt: httpx.Time(r.joined),
-			LastActiveAt: httpx.TimePtr(u.LastLoginAt), Invited: u.LastLoginAt == nil, Grants: []GrantView{}, Teams: []TeamRef{}}
+			LastActiveAt: httpx.TimePtr(last), SignedInAt: httpx.TimePtr(u.LastLoginAt), ChatsWeek: week[id].Chats, MRsWeek: week[id].MRs,
+			Grants: []GrantView{}, Teams: []TeamRef{}}
 		if r.role != "" {
 			role := r.role
 			mv.TenantRole = &role

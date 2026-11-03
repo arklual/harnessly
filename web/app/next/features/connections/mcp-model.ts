@@ -31,6 +31,10 @@ export const needsPerson = (server: IMcpServer): boolean =>
 export const takesToken = (server: IMcpServer): boolean =>
   server.auth === MCP_AUTH.header || server.oauthUnavailable;
 
+/** A sign-in the person has not finished yet: said calmly, it is not a failure. */
+export const isQuietState = (server: IMcpServer): boolean =>
+  server.state === MCP_STATE.signin && !takesToken(server) && server.tools.length === 0;
+
 /** What the server's last answer found, when it is not fine; null when it is (nothing to say then). */
 export const mcpStateText = (server: IMcpServer): string | null => {
   if (server.state === MCP_STATE.ok) return null;

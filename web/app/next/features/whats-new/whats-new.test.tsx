@@ -5,7 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { pinLocale, t } from '@/next/i18n';
 import { PortalContext } from '@/next/ui/portal';
 import WhatsNew from './whats-new';
-import { RELEASES, unseenRelease } from './releases';
+import { MAX_NEWS_ITEMS, RELEASES, unseenNews } from './releases';
 
 beforeAll(() => pinLocale('ru'));
 beforeEach(() => {
@@ -29,18 +29,31 @@ const inRoot = (ui: ReactNode) =>
 const settle = () => act(() => void vi.advanceTimersByTime(1000));
 const latest = RELEASES[0].id;
 
-describe('unseenRelease', () => {
+describe('unseenNews', () => {
+  const item = (key: string) => ({ key, icon: 'pencil' });
   const releases = [
-    { id: '2026-11-02', items: [] },
-    { id: '2026-10-27', items: [] },
+    { id: '2026-11-03', items: [item('c')] },
+    { id: '2026-11-02b', items: [item('b')] },
+    { id: '2026-11-02', items: [item('a')] },
+    { id: '2026-10-27', items: [item('old')] },
   ];
-  it('tells about the newest release to someone who has not seen it', () => {
-    expect(unseenRelease(releases, null)?.id).toBe('2026-11-02');
-    expect(unseenRelease(releases, '2026-10-27')?.id).toBe('2026-11-02');
+  const keys = (seen: string | null) => unseenNews(releases, seen)?.items.map((one) => one.key);
+  it('tells of every release newer than the one seen, newest first', () => {
+    expect(keys('2026-11-02')).toEqual(['c', 'b']);
+    expect(keys('2026-10-27')).toEqual(['c', 'b', 'a']);
+    expect(unseenNews(releases, '2026-10-27')?.id).toBe('2026-11-03');
+    expect(unseenNews(releases, '2026-10-27')?.items[1].release).toBe('2026-11-02b');
+  });
+  it('tells of the newest alone to someone who has seen none', () => {
+    expect(keys(null)).toEqual(['c']);
   });
   it('stays quiet once the newest one is seen', () => {
-    expect(unseenRelease(releases, '2026-11-02')).toBeNull();
-    expect(unseenRelease([], null)).toBeNull();
+    expect(unseenNews(releases, '2026-11-03')).toBeNull();
+    expect(unseenNews([], null)).toBeNull();
+  });
+  it('keeps to what the card has room for', () => {
+    const many = [{ id: '2026-11-03', items: ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(item) }];
+    expect(unseenNews(many, '2026-11-02')?.items).toHaveLength(MAX_NEWS_ITEMS);
   });
 });
 

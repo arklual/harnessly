@@ -61,3 +61,10 @@ export const dropVideo = (artifact: string): void => {
   videoStore.delete(artifact);
   flush();
 };
+
+/** Replaces a scene's overlay layer with the list the runtime answered. */
+export const putVideoOverlays = (artifact: string, page: string, overlays: IVideoScene['overlays']): void =>
+  changeVideo(artifact, (v) => ({
+    ...v,
+    scenes: v.scenes.map((s) => (s.id === page ? { ...s, overlays } : s)),
+  }));

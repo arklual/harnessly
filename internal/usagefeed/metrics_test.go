@@ -39,7 +39,7 @@ func TestSessionMetrics(t *testing.T) {
 			t.Errorf("%s = %v, want %v", k, got[k], v)
 		}
 	}
-	if signature(got) == signature(map[string]float64{}) {
+	if signature(got, nil) == signature(map[string]float64{}, nil) {
 		t.Fatal("signature does not tell metrics apart")
 	}
 }

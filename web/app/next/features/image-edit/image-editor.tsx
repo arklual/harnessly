@@ -145,7 +145,9 @@ const Editor = ({
           const going = runOf(original.id);
           const from = going?.state === RUN_STATE.running ? going.edit.from.id : null;
           const versions = union(list, now.versions);
-          const at = from !== null && versions.some((version) => version.id === from) ? from : now.at;
+          const latest =
+            host.opensLatest && now.at === original.id ? versions[versions.length - 1].id : now.at;
+          const at = from !== null && versions.some((version) => version.id === from) ? from : latest;
           return { ...now, versions, at };
         }),
       )

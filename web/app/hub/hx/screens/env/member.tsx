@@ -67,7 +67,7 @@ export const MemberEnv = () => {
         />
       </div>
       {notEnabled ? (
-        <Empty>Здесь пока ничего нет</Empty>
+        <Empty>Окружение в организации ещё не включено</Empty>
       ) : error != null ? (
         <LoadFailed error={error} onRetry={reload} />
       ) : !data ? (
@@ -78,7 +78,10 @@ export const MemberEnv = () => {
             <KindSegment value={kind} onChange={setKind} />
           </div>
           {data.items.length === 0 ? (
-            <Empty>Здесь пока ничего нет</Empty>
+            <Empty>
+              Организация, тенант и команда пока ничего не дали в окружение. Скиллы, MCP и репозитории сюда
+              кладут админ и лид команды — всё положенное появится в каждом твоём чате.
+            </Empty>
           ) : shown.length === 0 ? (
             <Empty>Ничего не нашлось</Empty>
           ) : (

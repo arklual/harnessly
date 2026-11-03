@@ -40,6 +40,7 @@ const chatOf = (s: MeSession): MyChat => {
     id: s.sessionKey,
     title: s.models[0] ?? s.provider,
     machine: s.machine?.name ?? '—',
+    machineId: s.machine?.id ?? null,
     end,
     mr: hasMr ? String(s.mrs) : null,
     endedAt: s.endedAt,

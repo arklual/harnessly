@@ -34,13 +34,6 @@
   cursor: pointer;
   transition: color var(--hx-dur-sm) var(--hx-ease-out);
 }
-.hx-mg-tab--hub {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--hx-space-1, 4px);
-  margin-left: auto;
-  text-decoration: none;
-}
 .hx-mg-tab:hover,
 .hx-mg-tab[aria-current='page'] {
   color: var(--hx-fg-1);

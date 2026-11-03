@@ -1,6 +1,7 @@
 // «Окружение» and the catalog (docs/hub/environment.md): what a machine gets installed, layer by layer, and a person's own
 // switches. The wire types are the hub's own (hub-api/env.ts); the screens use them as they are.
 import type {
+  AddCatalogRequest,
   AddEntryRequest,
   CatalogItem,
   CatalogKind,
@@ -29,6 +30,8 @@ export interface EnvApi {
   envRemove(org: string, entryId: string): Promise<void>;
   /** The catalog; `added` tells which items the target layer already has. */
   envCatalog(org: string, target: CatalogTarget, kind?: CatalogKind): Promise<CatalogItem[]>;
+  /** A new item of the organization's catalog (an organization admin's right). */
+  catalogAdd(org: string, req: AddCatalogRequest): Promise<CatalogItem>;
   /** A person's own environment in a tenant (its slug; absent: the hub picks the one they are in). */
   envMine(space?: string): Promise<MeEnvResponse>;
   envMineSet(itemId: string, off: boolean, space?: string): Promise<MeEnvItem>;

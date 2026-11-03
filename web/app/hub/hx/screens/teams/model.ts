@@ -37,10 +37,10 @@ const IDLE_DAYS = 7;
 
 export const seenOf = (p: Person, now: number): { text: string; idle: boolean } => {
   if (p.invited) return { text: 'приглашение отправлено', idle: true };
-  if (!p.lastActiveAt) return { text: 'не заходил(а)', idle: true };
+  if (!p.lastActiveAt) return { text: 'ещё не работал(а)', idle: true };
   const ms = Math.max(0, now - Date.parse(p.lastActiveAt));
   const min = Math.floor(ms / 60_000);
-  if (min < 2) return { text: 'сейчас', idle: false };
+  if (min < 2) return { text: 'работает сейчас', idle: false };
   if (min < 60) return { text: `${min} мин назад`, idle: false };
   const h = Math.floor(min / 60);
   if (h < 24) return { text: `${h} ч назад`, idle: false };
@@ -377,7 +377,7 @@ export const machinesHint = (b: TeamBlock): string => {
 
 export const personMeta = (p: Person, now: number): string => {
   const seen = seenOf(p, now);
-  if (p.invited) return 'приглашение отправлено, ещё не заходил(а)';
+  if (p.invited) return 'приглашение отправлено';
   return `${p.machines == null ? 'машин —' : machinesWord(p.machines)} · ${seen.text}`;
 };
 

@@ -50,6 +50,11 @@ export interface IImageEditHost {
   read: (run: string, signal: AbortSignal) => Promise<IEditProgress>;
   /** The versions known so far, the original first; a chat reads them from the machine, so they outlive a reload. */
   versions: (original: IImageVersion, signal: AbortSignal) => Promise<readonly IImageVersion[]>;
+  /**
+   * The viewer opens on the newest version: a chat's picture stays what it was, its changes are beside it. A design's
+   * element shows the chosen version, which is the one to open on.
+   */
+  opensLatest?: boolean;
   /** The person chose a version (a new one is chosen when it arrives). A design writes it into the element. */
   chosen?: (version: IImageVersion) => void;
 }

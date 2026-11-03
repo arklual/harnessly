@@ -7,10 +7,17 @@ import {
   VIDEO_BUILD_IN,
   VIDEO_FORMAT,
   VIDEO_FORMATS,
+  VIDEO_OVERLAY_ANCHORS,
+  VIDEO_OVERLAY_ENTERS,
+  VIDEO_OVERLAY_KINDS,
+  VIDEO_OVERLAY_LEAVES,
+  VIDEO_OVERLAY_THEMES,
   VIDEO_TRANSITION,
   type IVideoComment,
   type IVideoCommentAt,
   type IVideoMoment,
+  type IVideoOverlay,
+  type IVideoOverlayPlace,
   type IVideoRenderInfo,
   type IVideoRenderJob,
   type IVideoScene,
@@ -79,6 +86,50 @@ const readMoment = (r: TRecord): IVideoMoment | null => {
   };
 };
 
+const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const pick = <T extends string>(all: readonly T[], v: unknown): T | null => all.find((x) => x === v) ?? null;
+
+const readOverlayPlace = (v: unknown): IVideoOverlayPlace | null => {
+  if (!isRecord(v)) return null;
+  const x = numOrNull(v.x);
+  const y = numOrNull(v.y);
+  const w = numOrNull(v.w);
+  const h = numOrNull(v.h);
+  if (x === null || y === null || w === null || h === null) return null;
+  return { x, y, w, h, tx: numOrNull(v.tx), ty: numOrNull(v.ty) };
+};
+
+/** An overlay of a scene; a malformed one reads as null and is left out. */
+export const readVideoOverlay = (v: unknown): IVideoOverlay | null => {
+  if (!isRecord(v)) return null;
+  const id = text(v.id, 64);
+  const kind = pick(VIDEO_OVERLAY_KINDS, v.kind);
+  const place = readOverlayPlace(v);
+  const at = int(v.at);
+  if (id === '' || kind === null || place === null || at === null || at < 0) return null;
+  return {
+    id,
+    kind,
+    text: text(v.text, 400),
+    at,
+    out: int(v.out),
+    ...place,
+    portrait: readOverlayPlace(v.portrait),
+    anchor: pick(VIDEO_OVERLAY_ANCHORS, v.anchor) ?? 'center',
+    enter: pick(VIDEO_OVERLAY_ENTERS, v.enter) ?? 'fade',
+    leave: pick(VIDEO_OVERLAY_LEAVES, v.leave) ?? 'fade',
+    theme: pick(VIDEO_OVERLAY_THEMES, v.theme) ?? 'auto',
+    value: numOrNull(v.value),
+    from: num(v.from),
+    decimals: Math.min(3, Math.max(0, num(v.decimals))),
+    author: v.author === 'agent' ? 'agent' : 'human',
+    updatedAt: text(v.updatedAt, 40),
+  };
+};
+
+export const readVideoOverlays = (v: unknown): IVideoOverlay[] =>
+  (Array.isArray(v) ? v : []).flatMap((x) => readVideoOverlay(x) ?? []);
+
 const readKeys = (v: unknown): IVideoScene['keys'] => {
   const out: IVideoScene['keys'] = {};
   if (!isRecord(v)) return out;
@@ -102,6 +153,7 @@ export const readVideoScene = (v: unknown): IVideoScene | null => {
     auto: bool(v.auto),
     transition: readTransition(v.transition),
     moments: records(v.moments).flatMap((x) => readMoment(x) ?? []),
+    overlays: readVideoOverlays(v.overlays),
     words: Math.max(0, num(v.words)),
     notes: text(v.notes),
     version: text(v.version, 80),

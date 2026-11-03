@@ -17,9 +17,9 @@ func TestVideoRoutesAreRegistered(t *testing.T) {
 	json = append(json, designRoutes(d)...)
 	body = append(body, designDeckBodyRoutes(d)...)
 	want := map[string]string{
-		videoPath(""): "json", videoPath("/settings"): "json", videoPath("/view"): "json", videoPath("/scene"): "json", videoPath("/comments"): "json",
+		videoPath(""): "json", videoPath("/settings"): "json", videoPath("/view"): "json", videoPath("/scene"): "json", videoPath("/comments"): "json", videoPath("/overlay"): "json",
 		videoPath("/render"): "json", videoPath("/frame"): "body", videoPath("/file"): "body",
-		videoCLIPath(""): "json", videoCLIPath("/scene"): "json", videoCLIPath("/frame"): "json",
+		videoCLIPath(""): "json", videoCLIPath("/scene"): "json", videoCLIPath("/overlay"): "json", videoCLIPath("/frame"): "json",
 		videoCLIPath("/check"): "json", videoCLIPath("/render"): "json",
 	}
 	for p, kind := range want {

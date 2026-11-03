@@ -90,7 +90,7 @@ func TestVideoToolsExistOnlyInAVideoChat(t *testing.T) {
 		t.Error("a chat outside a video carries the video's tools")
 	}
 	on := VideoTools{L: l, Project: "clip"}
-	if len(on.Tools()) != 9 || !on.Has("sinopia_view_seek") || !strings.Contains(on.Instructions(), "clip") {
+	if len(on.Tools()) != 13 || !on.Has("sinopia_view_seek") || !strings.Contains(on.Instructions(), "clip") {
 		t.Errorf("a video's chat: %d tools", len(on.Tools()))
 	}
 	text, isErr := viewResultText(t, on.Call(context.Background(), "sinopia_view_pause", jsvalue.NewObject()))

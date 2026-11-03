@@ -185,6 +185,9 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
 .hx-conn-row__state {
   color: var(--hx-danger);
 }
+.hx-conn-row__state[data-tone='quiet'] {
+  color: var(--hx-fg-3);
+}
 .hx-conn-row__ok {
   color: var(--hx-success);
   animation: hx-conn-in 240ms var(--hx-ease-out) backwards;
@@ -378,8 +381,8 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
    a card's token form folds out in it, and a connected entry fades out of the grid. */
 .hx-mcp {
   display: grid;
-  gap: 16px;
-  margin-top: 8px;
+  gap: 12px;
+  margin-top: 32px;
 }
 .hx-mcp > .hx-set__group {
   margin: 0;
@@ -390,9 +393,9 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
   padding: 0 4px;
 }
 .hx-mcp__title {
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-medium);
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-semibold);
 }
 .hx-mcp__lead {
   margin: 0;
@@ -491,33 +494,73 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
   -webkit-line-clamp: 2;
 }
 
-/* The catalog */
+/* The catalog: a press on a card puts its service in the form above */
 .hx-mcp-cat {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .hx-mcp-card {
-  display: grid;
-  align-content: start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 10px 12px;
   border: 1px solid var(--hx-border);
   border-radius: 14px;
   background: var(--hx-bg-window);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   animation: hx-conn-in 320ms var(--hx-ease-out) backwards;
+  transition:
+    background-color var(--hx-dur-xs) ease,
+    border-color var(--hx-dur-xs) ease;
 }
-.hx-mcp-card[data-open] {
-  grid-column: 1 / -1;
+.hx-mcp-card:hover {
+  background: var(--hx-bg-hover);
+}
+.hx-mcp-card:focus-visible {
+  outline: 2px solid var(--hx-accent);
+  outline-offset: 2px;
+}
+.hx-mcp-card[aria-pressed='true'] {
+  border-color: var(--hx-fg-3);
 }
 .hx-mcp-card[data-leaving] {
   animation: hx-conn-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
   pointer-events: none;
 }
-.hx-mcp-card__head {
-  display: flex;
+.hx-mcp-card__go {
+  flex-shrink: 0;
+  color: var(--hx-fg-3);
+  opacity: 0;
+  transition: opacity var(--hx-dur-xs) ease;
+}
+.hx-mcp-card:hover .hx-mcp-card__go,
+.hx-mcp-card[aria-pressed='true'] .hx-mcp-card__go {
+  opacity: 1;
+}
+.hx-mcp-more {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 10px 10px 10px 12px;
+  justify-self: start;
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+.hx-mcp-more:hover {
+  color: var(--hx-fg-1);
+}
+.hx-mcp__foot {
+  margin: 0;
 }
 .hx-mcp-card__text {
   display: flex;
@@ -540,17 +583,6 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
   font-size: var(--hx-text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.hx-mcp-card__form {
-  display: grid;
-  gap: 12px;
-  padding: 0 12px 12px;
-}
-.hx-mcp-card__err {
-  padding: 0 12px;
-}
-.hx-mcp-card__err .hx-reveal[data-open='true'] {
-  padding-bottom: 12px;
 }
 
 /* A token: the header it goes in, and the token */
@@ -578,6 +610,7 @@ html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {
   .hx-mcp-row__flow,
   .hx-mcp-card,
   .hx-mcp-card[data-leaving],
+  .hx-mcp-card__go,
   .hx-mcp-tools__chev {
     animation: none;
     transition: none;

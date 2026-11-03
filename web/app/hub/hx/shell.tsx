@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@kit';
 
 import { navigate } from '../lib/router';
+import { useSession } from '../lib/session';
 import { useOrg } from '../org/context';
 import { ROLE_LABEL, type TenantRef } from '../org/types';
 import { navOf } from './nav';
@@ -217,6 +218,32 @@ const GroupItems = ({ label, children }: { label: string; children: ReactNode })
   </>
 );
 
+/**
+ * «Рабочее пространство»: back to where the person works with agents. Through the gateway that is its /agents/; a hub
+ * of its own opens the person's machines, each with «Открыть».
+ */
+const Workspace = ({ onPick }: { onPick: () => void }) => {
+  const { config } = useSession();
+  const { base } = useOrg();
+  const go = () => {
+    onPick();
+    if (config.proxied) window.location.assign('/agents/');
+    else navigate(`${base}/machines`);
+  };
+  return (
+    <div className="hx-nav ad-hubnav hx-wsnav">
+      <div className="hx-nav__group">
+        <button type="button" className="hx-nav__item" onClick={go} title="Перейти к своим агентам и машинам">
+          <span className="hx-nav__ic">
+            <Icon i="square-terminal" />
+          </span>
+          <span className="hx-nav__label">Рабочее пространство</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const User = () => {
   const { shell } = useOrg();
   const { resolved, setMode } = useTheme();
@@ -295,6 +322,7 @@ export const HxShell = ({ children }: { children: ReactNode }) => {
         <Switcher />
         <Nav onPick={() => setSide(false)} />
         <div className="hx-spacer" />
+        <Workspace onPick={() => setSide(false)} />
         <User />
       </aside>
       <main className="hx-main" data-view="settings">

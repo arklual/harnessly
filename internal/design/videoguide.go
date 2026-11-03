@@ -10,7 +10,7 @@ import (
 // embedded with the other texts and read by `design video guide [topic]`.
 
 // VideoGuideTopics are the topics in the order a newcomer needs them.
-var VideoGuideTopics = [...]string{"basics", "director", "motion", "engines", "check"}
+var VideoGuideTopics = [...]string{"basics", "director", "motion", "characters", "engines", "overlays", "check", "record"}
 
 // VideoGuide is a topic's text with the command's name put in; false when there is no such topic.
 func VideoGuide(topic, cli string) (string, bool) {

@@ -149,7 +149,11 @@ export const CatalogDrawer = ({
           ))}
         </div>
       ) : shown.length === 0 ? (
-        <div className="env-empty">{needle ? 'Ничего не нашлось' : 'В каталоге пока пусто'}</div>
+        <div className="env-empty">
+          {needle
+            ? 'Ничего не нашлось'
+            : 'В каталоге пока пусто. То, чем чаты уже пользуются, можно добавить списком «Уже используют на машинах» на экране.'}
+        </div>
       ) : (
         shown.map((i) => (
           <div className="ad-row" key={i.id}>

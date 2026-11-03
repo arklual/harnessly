@@ -22,6 +22,7 @@ const (
 	ProviderOpenRouter = "openrouter"
 	ProviderDeepSeek   = "deepseek"
 	ProviderMiniMax    = "minimax"
+	ProviderXAI        = "xai"
 )
 
 // hostProviders maps the host a call went to onto its provider; a host not listed is its own provider (no price until
@@ -39,6 +40,7 @@ var hostProviders = map[string]string{
 	"api.deepseek.com":  ProviderDeepSeek,
 	"api.minimax.io":    ProviderMiniMax,
 	"api.minimaxi.com":  ProviderMiniMax,
+	"api.x.ai":          ProviderXAI,
 }
 
 // PriceProvider is the provider a call is priced by: the host it went to, else the CLI's own vendor.
@@ -78,13 +80,22 @@ type Tokens struct {
 // Book is the price list in memory, ready to price calls.
 type Book struct {
 	rows map[string][]store.Price // provider + "\x00" + pattern → rows by effective_from
+	// vendors is, for a model id of another vendor, the providers that list it: a Kimi or Grok model that ran through
+	// Claude Code or Codex without its own base URL reaching the hub is still priced by its maker's row.
+	vendors map[string][]string
 }
 
 func NewBook(prices []store.Price) *Book {
-	b := &Book{rows: map[string][]store.Price{}}
+	b := &Book{rows: map[string][]store.Price{}, vendors: map[string][]string{}}
 	for _, p := range prices {
 		k := p.Provider + "\x00" + p.ModelPattern
+		if len(b.rows[k]) == 0 && p.Provider != ProviderAnthropic && p.Provider != ProviderOpenAI {
+			b.vendors[p.ModelPattern] = append(b.vendors[p.ModelPattern], p.Provider)
+		}
 		b.rows[k] = append(b.rows[k], p)
+	}
+	for _, ps := range b.vendors {
+		sort.Strings(ps)
 	}
 	for _, rs := range b.rows {
 		sort.Slice(rs, func(i, j int) bool { return rs[i].EffectiveFrom < rs[j].EffectiveFrom })
@@ -95,10 +106,17 @@ func NewBook(prices []store.Price) *Book {
 // Price is the row in effect at ts (epoch ms) for a model at a provider; false when there is none.
 func (b *Book) Price(provider, model string, ts int64) (store.Price, bool) {
 	key := PriceKey(provider, model)
-	if key == "" {
+	rs := b.rows[provider+"\x00"+key]
+	if key == "" || len(rs) == 0 {
+		// Not a model of the provider the call went to: its maker's row, when exactly one vendor lists the id.
+		id := strings.ToLower(strings.TrimSpace(model))
+		if vs := b.vendors[id]; len(vs) == 1 && vs[0] != provider {
+			rs = b.rows[vs[0]+"\x00"+id]
+		}
+	}
+	if len(rs) == 0 {
 		return store.Price{}, false
 	}
-	rs := b.rows[provider+"\x00"+key]
 	i := sort.Search(len(rs), func(i int) bool { return rs[i].EffectiveFrom > ts }) - 1
 	if i < 0 {
 		return store.Price{}, false
@@ -127,7 +145,7 @@ func (b *Book) Cost(provider, model string, ts int64, t Tokens) (micros int64, v
 // the hub and /api/platform/stats agree), in effect from the beginning. Rows of other providers are added the same way
 // with their own effective_from when their prices are confirmed; a model without a row has no price.
 func SeedRows() []store.Price {
-	var out []store.Price
+	out := append([]store.Price(nil), vendorRows...)
 	for _, r := range pricing.Rows() {
 		out = append(out, store.Price{
 			Provider: r.Provider, ModelPattern: r.Key, EffectiveFrom: 0,
@@ -136,6 +154,20 @@ func SeedRows() []store.Price {
 		})
 	}
 	return out
+}
+
+func i64(v int64) *int64     { return &v }
+func f64(v float64) *float64 { return &v }
+
+// vendorRows are the list prices of the other vendors' models the organizations run, USD per million tokens, as the
+// vendors published them by November 2026; a cached read is the vendor's cache-hit price, there are no cache
+// writes. Grok 4.7 doubles every rate past a 200K-token prompt.
+var vendorRows = []store.Price{
+	{Provider: ProviderKimi, ModelPattern: "k3.1-pro", Input: 2, Output: 10, CacheRead: 0.2, Unit: "usd", Source: "vendor list 2026-11"},
+	{Provider: ProviderZai, ModelPattern: "glm-5.3", Input: 1.4, Output: 4.4, CacheRead: 0.26, Unit: "usd", Source: "vendor list 2026-11"},
+	{Provider: ProviderXAI, ModelPattern: "grok-4.7", Input: 2, Output: 6, CacheRead: 0.5, LongCtxThreshold: i64(200_000),
+		LongCtxFactor: f64(2), Unit: "usd", Source: "vendor list 2026-11"},
+	{Provider: ProviderXAI, ModelPattern: "grok-build-0.1", Input: 1, Output: 2, CacheRead: 0.2, Unit: "usd", Source: "vendor list 2026-11"},
 }
 
 // Seed adds the seed rows that are missing; rows already there (an administrator's correction) are kept. It returns how

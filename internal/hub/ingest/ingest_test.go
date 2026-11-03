@@ -411,3 +411,44 @@ func TestIngestToolFacts(t *testing.T) {
 	a.Emit(map[string]any{"event": hubproto.EventUsageAvailable, "epoch": "e1", "seq": 11})
 	s.Eventually("the empty record acked", func() bool { return o.lastAck().Seq == 11 })
 }
+
+// A session's merge request keys are kept per session, a subagent's count for its parent, and a newer record of the
+// session replaces the set.
+func TestIngestMRKeys(t *testing.T) {
+	s := hubtest.New(t, hubtest.Env("HUB_USAGE_INGEST", "on"))
+	ctx := context.Background()
+	ann := s.SignIn("ann@example.com")
+	bob := s.SignIn("bob@example.com")
+	spaceID, _ := ann.NewSpace("Acme")
+	ann.Join(spaceID, bob)
+	sp, err := s.DB.S().SpaceByID(ctx, spaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgKey := store.OrgKey(sp)
+	now := s.Clock.Now().UnixMilli()
+	main := session("m1", "", "bob@example.com", "", now-60_000)
+	main.Session.MRKeys = []string{"h/a/!1", "h/a/!2", "https://not-a-key"}
+	sub := session("c1", "m1", "bob@example.com", "", now-50_000)
+	sub.Session.MRKeys = []string{"h/a/!3"}
+	o := &outbox{epoch: "e1"}
+	o.add(now, main)
+	o.add(now, sub)
+	usageMachine(t, s, ann, spaceID, o)
+	s.Eventually("the outbox acked", func() bool { return o.lastAck().Seq == 2 })
+
+	count := func(where string, args ...any) int {
+		var n int
+		args = append([]any{orgKey}, args...)
+		if err := s.DB.S().Q().QueryRow(ctx, `SELECT COUNT(*) FROM agent_session_mrs WHERE org_key = ? AND `+where, args...).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if n := count("owner_key = ?", "m1"); n != 3 {
+		t.Errorf("m1 owns %d keys, want 3 (its own two and the subagent's)", n)
+	}
+	if n := count("session_key = ?", "m1"); n != 2 {
+		t.Errorf("m1 mentions %d keys, want 2 (the text that is not a key is dropped)", n)
+	}
+}

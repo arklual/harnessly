@@ -41,6 +41,9 @@ export type KpiValue = {
   delta: number | null; // value − cmpValue
   noise: number | null; // ±2σ of the weekly values of the 8 weeks before the period; null below 4 weeks of data
   verdict: 'better' | 'worse' | 'noise' | 'too_few';
+  // By day of the period (by week past 45 days), null where too few sessions; the comparison's the same way.
+  spark?: (number | null)[];
+  cmpSpark?: (number | null)[];
 };
 
 export type KpisResponse = {
@@ -146,6 +149,7 @@ export type SpendRow = {
   tokens: { total: number; input: number; output: number; cacheRead: number; cacheWrite: number };
   limit: LimitBar | null;
   forecast: Money | null; // at the pace of the last 7 days, to the period's end; null for a closed period
+  forecastList?: Money | null; // the same at API prices
   guessedShare: number; // share of list from sessions with attribution 'guessed'
 };
 
@@ -154,7 +158,13 @@ export type SpendResponse = {
   by: SpendBy;
   period: Period;
   currency: Currency;
-  total: { list: Money; paid: Money; limit: LimitBar | null; forecast: Money | null };
+  total: {
+    list: Money;
+    paid: Money;
+    limit: LimitBar | null;
+    forecast: Money | null;
+    forecastList?: Money | null;
+  };
   rows: SpendRow[];
   accountedUntil: string | null; // the newest fact the hub has from any machine of the scope
 };
@@ -197,12 +207,28 @@ export type Tile = { value: number | null; cmpValue: number | null; unit: KpiUni
 
 export type DayValue = { day: string; value: number }; // a point of a tile's strip
 
+/** One person's day behind «Активны сегодня». */
+export type TodayPerson = {
+  userId: string;
+  name: string;
+  email: string;
+  working: boolean; // a chat of theirs was heard from in the last minutes
+  chats: number; // their chats going on at some moment of today
+  closed: number; // of them, ended today with a merge request
+  lastAt: string | null; // when they last worked through a machine, any day; null: never
+  paid: Money; // today's money of the organization's accounts by them
+  list: Money;
+  tokens: number; // of all their funding
+};
+
 // «Сегодня»: the day of the scope in the organization's time zone, with the strips of the last 14 days (oldest first,
-// today last). spend of a strip is the paid dollars of the day.
+// today last). spend of a strip is the day's dollars at API prices.
 export type TodayView = {
   day: string;
   spend: { paid: Money; list: Money; tokens: number };
-  active: { people: number; of: number }; // «Активны сегодня N из M»: people with a live chat today of the scope's people
+  // «Активны сегодня N из M»: people with a live chat today of the scope's people; who is each of them with their day,
+  // the working first, then by the last time they worked.
+  active: { people: number; of: number; who: TodayPerson[] };
   tasks: { closed: number; inWork: number }; // closed: ended today with a merge request; inWork: chats going on now
   sparks: { spend: DayValue[]; active: DayValue[]; tasks: DayValue[] };
 };
@@ -226,7 +252,13 @@ export type OverviewResponse = {
   scope: Scope;
   period: Period;
   currency: Currency;
-  spend: { list: Money; paid: Money; limit: LimitBar | null; forecast: Money | null };
+  spend: {
+    list: Money;
+    paid: Money;
+    limit: LimitBar | null;
+    forecast: Money | null;
+    forecastList?: Money | null;
+  };
   tiles: { activePeople: Tile; sessions: Tile; mrs: Tile; moneyPerMr: Tile };
   attention: Signal[]; // the open, not snoozed signals addressed to the person, most severe first, at most 6
   // teams for an org or tenant, people for a team; totals are the base of the rows' shares in each unit (₽/$/tokens)

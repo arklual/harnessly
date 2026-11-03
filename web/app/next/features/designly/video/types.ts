@@ -67,6 +67,72 @@ export interface IVideoMoment {
   derived: boolean;
 }
 
+export const VIDEO_OVERLAY_KINDS = [
+  'title',
+  'caption',
+  'callout',
+  'highlight',
+  'key',
+  'counter',
+  'badge',
+] as const;
+export type TVideoOverlayKind = (typeof VIDEO_OVERLAY_KINDS)[number];
+export const VIDEO_OVERLAY_ENTERS = [
+  'fade',
+  'rise',
+  'pop',
+  'typewriter',
+  'mask',
+  'words',
+  'scramble',
+] as const;
+export type TVideoOverlayEnter = (typeof VIDEO_OVERLAY_ENTERS)[number];
+export const VIDEO_OVERLAY_LEAVES = ['none', 'fade', 'fall', 'shrink'] as const;
+export type TVideoOverlayLeave = (typeof VIDEO_OVERLAY_LEAVES)[number];
+export const VIDEO_OVERLAY_THEMES = ['auto', 'accent', 'dark', 'light'] as const;
+export type TVideoOverlayTheme = (typeof VIDEO_OVERLAY_THEMES)[number];
+export const VIDEO_OVERLAY_ANCHORS = ['left', 'center', 'right'] as const;
+export type TVideoOverlayAnchor = (typeof VIDEO_OVERLAY_ANCHORS)[number];
+export const VIDEO_OVERLAY_TEXT_MAX = 200;
+export const VIDEO_OVERLAY_MIN_MS = 100;
+
+/** Where an overlay stands in a format: a box in fractions of the frame (0..1) and, for a callout, its arrow's end. */
+export interface IVideoOverlayPlace {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tx: number | null;
+  ty: number | null;
+}
+
+/** One element of a scene's overlay layer (internal/design/video_overlays.go). at/out: ms from the scene's start. */
+export interface IVideoOverlay {
+  id: string;
+  kind: TVideoOverlayKind;
+  text: string;
+  at: number;
+  /** null: to the scene's end. */
+  out: number | null;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tx: number | null;
+  ty: number | null;
+  /** The 9:16 place of its own; null: the base place moved into the safe zone. */
+  portrait: IVideoOverlayPlace | null;
+  anchor: TVideoOverlayAnchor;
+  enter: TVideoOverlayEnter;
+  leave: TVideoOverlayLeave;
+  theme: TVideoOverlayTheme;
+  value: number | null;
+  from: number;
+  decimals: number;
+  author: 'human' | 'agent';
+  updatedAt: string;
+}
+
 export interface IVideoScene {
   /** The page's id: the key of its notes, comments and meta/scenes file. */
   id: string;
@@ -79,6 +145,7 @@ export interface IVideoScene {
   auto: boolean;
   transition: IVideoTransition;
   moments: IVideoMoment[];
+  overlays: IVideoOverlay[];
   words: number;
   /** The scene's text (meta/notes), which is also the subtitles. */
   notes: string;

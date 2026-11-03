@@ -110,6 +110,10 @@ type UsageSessionFact struct {
 	Attribution string `json:"attribution"`
 	// Metrics are the session's numbers from the machine's scanner (analytics.md, «KPI»); absent until it ran.
 	Metrics map[string]float64 `json:"metrics,omitempty"`
+	// MRKeys are the merge requests the session touched (created, pushed to, linked), as MRKey spells them: host,
+	// project path and iid, no text. The hub joins them with the merge requests its source says were merged. Absent from
+	// a machine that does not look for them.
+	MRKeys []string `json:"mrKeys,omitempty"`
 }
 
 // UsageWindowFact is one measurement of a rate-limit window of an account (provider-limits §3.1).

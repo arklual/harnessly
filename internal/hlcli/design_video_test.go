@@ -92,6 +92,9 @@ func (v *videoFake) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"project":"clip","page":{"id":"S3","title":"Outro","file":"Outro.dc.html"}}`))
 	case r.URL.Path == "/api/cli/design/video/scene":
 		_, _ = w.Write([]byte(`{"project":"clip","scene":{"id":"S3","title":"Outro","start":14000,"dur":4000,"auto":false}}`))
+	case r.URL.Path == "/api/cli/design/video/overlay":
+		_, _ = w.Write([]byte(`{"project":"clip","overlay":{"id":"callout-1","kind":"callout","text":"Тут","at":1200,"out":4000,"x":0.5,"y":0.1,"w":0.3,"h":0.1,"tx":0.4,"ty":0.5,"anchor":"left","enter":"pop","leave":"fade","theme":"accent","author":"human","updatedAt":"2026-11-03T10:00:00Z"},` +
+			`"overlays":[{"id":"callout-1","kind":"callout","text":"Тут","at":1200,"out":4000,"x":0.5,"y":0.1,"w":0.3,"h":0.1,"tx":0.4,"ty":0.5,"anchor":"left","enter":"pop","leave":"fade","theme":"accent","author":"human","updatedAt":"2026-11-03T10:00:00Z"}]}`))
 	case r.URL.Path == "/api/cli/design/video/frame":
 		_, _ = w.Write([]byte(`{"frames":[{"t":0,"path":"/tmp/a.jpg"},{"t":1000,"path":"/tmp/b.jpg"}]}`))
 	case r.URL.Path == "/api/cli/design/video/check":
@@ -248,5 +251,38 @@ func TestDesignVideoHelpGolden(t *testing.T) {
 	}
 	if !strings.Contains(helpText, "harnessly design video get") || !strings.Contains(commandHelp["design"], "design video --help") {
 		t.Error("the main help and the design topic mention the video commands")
+	}
+}
+
+func TestDesignVideoOverlayCommands(t *testing.T) {
+	v, r := videoRun(t, "design", "video", "overlay", "add", "clip", "Intro", "--kind", "callout", "--text", "Тут", "--at", "1.2s", "--out", "4s",
+		"--x", "0.5", "--tx", "0.4", "--ty", "0.5", "--enter", "pop", "--portrait", "0.1,0.2,0.5,0.1,0.3,0.4")
+	b := v.calls[0].Body
+	pt, _ := b["portrait"].(map[string]any)
+	if r.code != 0 || b["action"] != "add" || b["page"] != "Intro" || b["kind"] != "callout" || b["at"] != float64(1200) || b["out"] != float64(4000) ||
+		b["x"] != 0.5 || b["tx"] != 0.4 || pt["h"] != 0.1 || pt["ty"] != 0.4 {
+		t.Fatalf("add: %d %v %s", r.code, b, r.errs)
+	}
+	if !strings.Contains(r.out, "Overlay added: callout-1") || !strings.Contains(r.out, "human (a person edited it: --force") {
+		t.Errorf("the answer says who wrote it:\n%s", r.out)
+	}
+	v, r = videoRun(t, "design", "video", "overlay", "set", "clip", "Intro", "callout-1", "--out", "end", "--portrait", "none", "--force")
+	b = v.calls[0].Body
+	if _, has := b["out"]; r.code != 0 || !has || b["out"] != nil || b["portrait"] != nil || b["force"] != true || b["id"] != "callout-1" || b["action"] != "set" {
+		t.Errorf("set: %d %v %s", r.code, b, r.errs)
+	}
+	v, _ = videoRun(t, "design", "video", "overlay", "rm", "clip", "Intro", "callout-1")
+	if b = v.calls[0].Body; b["action"] != "rm" || b["force"] != false || b["id"] != "callout-1" {
+		t.Errorf("rm: %v", b)
+	}
+	v, r = videoRun(t, "design", "video", "overlay", "ls", "clip", "Intro")
+	if v.calls[0].Body["action"] != "ls" || !strings.Contains(r.out, "callout-1\tcallout\t1.2s-4s") {
+		t.Errorf("ls: %v\n%s", v.calls[0].Body, r.out)
+	}
+	for _, args := range [][]string{{"overlay", "add", "clip", "Intro"}, {"overlay", "set", "clip", "Intro", "x"}, {"overlay", "set", "clip", "Intro", "x", "--at", "soon"},
+		{"overlay", "add", "clip", "Intro", "--kind", "title", "--x", "left"}, {"overlay", "rm", "clip"}, {"overlay", "set", "clip", "Intro", "x", "--portrait", "1,2"}} {
+		if _, r := videoRun(t, append([]string{"design", "video"}, args...)...); r.code != 2 {
+			t.Errorf("%v: exit %d", args, r.code)
+		}
 	}
 }

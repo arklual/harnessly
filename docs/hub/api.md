@@ -184,7 +184,7 @@ pass the provider's signed token in a header and the person needs no hub sign-in
 `type Passkey = { id: string; name: string; createdAt: string; lastUsedAt: string | null }`
 
 The person's numbers are described in [analytics.md](analytics.md#the-person-apime): `GET /api/me/usage`, `/api/me/sessions`,
-`/api/me/kpis`, `/api/me/kpis/{kpi}/series?org=` and `/api/me/week?org=` (chats and MRs of the last 7 days).
+`/api/me/kpis`, `/api/me/kpis/{kpi}/series?org=` and `/api/me/week?org=` (chats and MRs of the last 7 days; HRN-633).
 
 ### Spaces and invites
 
@@ -839,6 +839,9 @@ requests already carry the base path and pass the route filter unchanged, `X-For
 | `HUB_ORGS` | `off` | organizations, tenants and teams ([orgs.md](orgs.md)): `off` — the schema is there, the hub behaves as before; `shadow` — the new endpoints answer instance administrators only (checking, `hub seed`); `on` — everyone |
 | `HUB_ENV_FEATURES` | | environment and catalog ([environment.md](environment.md)): `env`, `catalog` (comma separated) or `all`; empty — off, the endpoints answer 404 `not_enabled` and no machine gets a list. Needs `HUB_ORGS` other than `off`; tool numbers need `HUB_USAGE_INGEST=on` |
 | `HUB_USAGE_INGEST` | `off` | `on`: the hub pulls the machines' spend facts ([usage.md](usage.md)) and keeps the price list; `off`: it never asks |
+| `HUB_MR_SOURCE_GITLAB_URL` | | GitLab (`https://git.example.com`) whose merged merge requests the hub polls for the KPI «деньги на MR», «время до MR», «MR на человека» ([analytics.md](analytics.md)); empty — nothing is polled. Needs the next two |
+| `HUB_MR_SOURCE_GITLAB_GROUPS` | | comma separated group paths to poll (`team,team/sub`), subgroups included |
+| `HUB_MR_SOURCE_GITLAB_TOKEN` | | token with `read_api` (also `_FILE`); never logged |
 | `HUB_LIMITS_ENFORCE` | `off` | limits on machines ([limits.md](limits.md#enforcement)): `off` — computed and shown only; `warn` — machines notify; `stop` — machines do not start chats past a limit |
 | `HUB_RATES_URL` | `https://www.cbr.ru/scripts/XML_daily.asp` | the Central Bank's daily rates the organizations' money is shown in ([analytics.md](analytics.md#money-and-periods)); `off` never fetches: dollars unless an admin put a rate in `currency_rates` |
 | `HUB_AGENT_URL` | `HUB_PUBLIC_URL` | the address machines reach the hub at (`http(s)://host[:port]`, no path), when it differs from the people's one: the install command and script, registration, the signature of a machine's dial, the ssh install and the runtime domain use it; people's links, cookies and sign-in keep `HUB_PUBLIC_URL`; reported as `agentUrl` in `/api/config` |

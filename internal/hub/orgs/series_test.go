@@ -67,6 +67,19 @@ func TestKpiSeries(t *testing.T) {
 	if len(w.Points) != 1 || w.Points[0].Day != "2026-10-13" || w.Points[0].N != 5 || w.Splits != nil || len(w.Markers) != 1 {
 		t.Errorf("weekly = %+v", w)
 	}
+	// The tiles of «Аналитика» draw the same daily line from /kpis: one point a day, the 15th at 0.8.
+	var k analytics.KpisResponse
+	v.anna.Do("GET", v.url("/kpis?from=2026-10-13&to=2026-10-20"), nil).JSON(&k)
+	var c *analytics.KpiValue
+	for i := range k.Kpis {
+		if k.Kpis[i].Kpi == "completion" {
+			c = &k.Kpis[i]
+		}
+	}
+	if c == nil || len(c.Spark) != 7 || c.Spark[2] == nil || *c.Spark[2] != 0.8 || c.Spark[0] != nil ||
+		len(c.CmpSpark) != 7 {
+		t.Errorf("completion spark = %+v", c)
+	}
 	for _, c := range []struct {
 		p    *hubtest.Person
 		url  string

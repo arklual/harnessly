@@ -48,7 +48,7 @@ func TestNoise(t *testing.T) {
 func many(n int, user string, m map[string]float64) []kSession {
 	out := make([]kSession, n)
 	for i := range out {
-		out[i] = kSession{UserID: user, Start: int64(i) * 100, End: int64(i)*100 + 50, M: m, PaidMicros: 1_000_000}
+		out[i] = kSession{UserID: user, Start: int64(i) * 100, End: int64(i)*100 + 50, M: m, PaidMicros: 1_000_000, ListMicros: 1_000_000}
 	}
 	return out
 }

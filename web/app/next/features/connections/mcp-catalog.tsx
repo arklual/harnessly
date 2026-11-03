@@ -1,7 +1,8 @@
-// The ways to connect an MCP server: a catalog card (the product's mark, its name, one line of what it gives,
-// «Connect») and «Add your own server» (paste an address, the machine probes it and says how it signs in). A server
-// that takes a token asks for it right there, in the card; one that signs in on its own page opens it in a popup.
-import { useEffect, useId, useRef, useState } from 'react';
+// Connecting an MCP server is one form: its address (typed, or put there by a catalog card), what the machine found
+// there and how it signs in, and one explicit step — «Sign in with …» opens the service's page in a popup, a server
+// that takes a token asks for it in the form, an open one just connects. A catalog card only fills the form: nothing
+// is kept and no window opens until the person presses that button.
+import { useEffect, useEffectEvent, useId, useRef, useState, type Ref } from 'react';
 import { McpGlyph } from '@/next/features/connections/glyphs';
 import {
   DEFAULT_HEADER,
@@ -16,7 +17,7 @@ import { hostOf } from '@/next/features/connections/model';
 import { FormError, SetButton } from '@/next/features/settings/rows';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
-import { PRESENCE, usePresence, useSeen } from '@/next/ui/presence';
+import { PRESENCE, usePresence } from '@/next/ui/presence';
 import SecretField from '@/next/ui/secret-field';
 
 /** The found card's exit, as long as hx-conn-out in connections.css. */
@@ -136,130 +137,61 @@ export const headerOf = (name: string, value: string): IMcpHeader => {
 interface ICatalogCardProps {
   entry: IMcpCatalogEntry;
   leaving: boolean;
-  onConnect: TConnectMcp;
+  /** This card's service is in the form now. */
+  picked: boolean;
+  onPick: (entry: IMcpCatalogEntry) => void;
 }
 
-export const CatalogCard = ({ entry, leaving, onConnect }: ICatalogCardProps) => {
-  const [open, setOpen] = useState(false);
-  const [header, setHeader] = useState(entry.headerName === '' ? DEFAULT_HEADER : entry.headerName);
-  const [value, setValue] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const alive = useAlive();
-  const takesToken = entry.auth === MCP_AUTH.header;
-  // The form stays mounted after it opened once, so it folds away instead of vanishing.
-  const seen = useSeen(open);
-
-  const connect = async (withHeader: boolean) => {
-    if (busy) return;
-    if (withHeader && value.trim() === '') return;
-    // Called in the click: a popup for the sign-in can open before the await.
-    const pending = onConnect(
-      {
-        url: entry.url,
-        name: '',
-        catalogId: entry.id,
-        transport: entry.transport,
-        header: withHeader ? headerOf(header, value) : null,
-      },
-      entry.auth === MCP_AUTH.oauth,
-    );
-    setValue('');
-    setBusy(true);
-    setError(null);
-    const refused = await pending;
-    if (!alive.current) return;
-    setBusy(false);
-    setError(refused);
-    if (refused === null) setOpen(false);
-  };
-
-  return (
-    <div className="hx-mcp-card" data-open={open || undefined} data-leaving={leaving || undefined}>
-      <div className="hx-mcp-card__head">
-        <McpGlyph id={entry.id} name={entry.name} size="sm" />
-        <span className="hx-mcp-card__text">
-          <span className="hx-mcp-card__name">{entry.name}</span>
-          {blurbOf(entry) !== '' && <span className="hx-mcp-card__blurb">{blurbOf(entry)}</span>}
-        </span>
-        {!open && (
-          <SetButton
-            tone="ghost"
-            busy={busy}
-            disabled={leaving}
-            onClick={() => {
-              if (takesToken) {
-                setError(null);
-                setOpen(true);
-                return;
-              }
-              void connect(false);
-            }}
-          >
-            {t('next.connections.connect')}
-          </SetButton>
-        )}
-      </div>
-      <div className="hx-reveal" data-open={open && !leaving}>
-        <div className="hx-reveal__in" inert={!open || undefined}>
-          {seen && (
-            <div className="hx-mcp-card__form">
-              <HeaderFields
-                name={header}
-                value={value}
-                tokenUrl={entry.tokenUrl}
-                disabled={busy}
-                invalid={error !== null}
-                onName={setHeader}
-                onValue={(next) => {
-                  setValue(next);
-                  setError(null);
-                }}
-                onSubmit={() => void connect(true)}
-              />
-              <div className="hx-conn-found__actions">
-                <SetButton
-                  tone="primary"
-                  busy={busy}
-                  disabled={value.trim() === ''}
-                  onClick={() => void connect(true)}
-                >
-                  {t('next.connections.connect')}
-                </SetButton>
-                <SetButton
-                  tone="ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setOpen(false);
-                    setValue('');
-                    setError(null);
-                  }}
-                >
-                  {t('next.connections.cancel')}
-                </SetButton>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="hx-mcp-card__err">
-        <ErrorLine error={error} />
-      </div>
-    </div>
-  );
-};
+/** A known service: its mark, its name, one line of what it gives. A press puts it in the form above. */
+export const CatalogCard = ({ entry, leaving, picked, onPick }: ICatalogCardProps) => (
+  <button
+    type="button"
+    className="hx-mcp-card"
+    data-leaving={leaving || undefined}
+    aria-pressed={picked}
+    disabled={leaving}
+    onClick={() => onPick(entry)}
+  >
+    <McpGlyph id={entry.id} name={entry.name} size="sm" />
+    <span className="hx-mcp-card__text">
+      <span className="hx-mcp-card__name">{entry.name}</span>
+      {blurbOf(entry) !== '' && <span className="hx-mcp-card__blurb">{blurbOf(entry)}</span>}
+    </span>
+    <Icon name="chevron-right" size="sm" className="hx-mcp-card__go" />
+  </button>
+);
 
 const BUSY = { probe: 'probe', connect: 'connect' } as const;
 type TBusy = (typeof BUSY)[keyof typeof BUSY];
 
-interface IOwnServerProps {
-  onProbe: (url: string) => Promise<TProbeResult>;
-  onConnect: TConnectMcp;
+/** A catalog entry put into the form; `at` tells two presses of the same card apart. */
+export interface IPicked {
+  entry: IMcpCatalogEntry;
+  at: number;
 }
 
-/** «Add your own server»: paste its address, see what it is, connect. */
-export const OwnServerForm = ({ onProbe, onConnect }: IOwnServerProps) => {
+interface IConnectFormProps {
+  picked: IPicked | null;
+  onProbe: (url: string) => Promise<TProbeResult>;
+  onConnect: TConnectMcp;
+  /** The form let its catalog entry go (cancelled, connected, or another address typed). */
+  onUnpick: () => void;
+  ref?: Ref<HTMLDivElement>;
+}
+
+const nameOf = (probe: IMcpProbe, entry: IMcpCatalogEntry | null): string => {
+  if (entry !== null) return entry.name;
+  return probe.name === '' ? hostOf(probe.url) : probe.name;
+};
+
+/** The probed server signs in on its own page (and lets this app register there). */
+const signsInByPage = (probe: IMcpProbe): boolean => probe.auth === MCP_AUTH.oauth && !probe.oauthUnavailable;
+const asksToken = (probe: IMcpProbe): boolean => probe.auth === MCP_AUTH.header || probe.oauthUnavailable;
+
+/** «MCP server address»: type it or pick a service below, see what it is and how it signs in, then connect. */
+export const ConnectForm = ({ picked, onProbe, onConnect, onUnpick, ref }: IConnectFormProps) => {
   const [url, setUrl] = useState('');
+  const [entry, setEntry] = useState<IMcpCatalogEntry | null>(null);
   const [probe, setProbe] = useState<IMcpProbe | null>(null);
   const [name, setName] = useState('');
   const [header, setHeader] = useState(DEFAULT_HEADER);
@@ -271,14 +203,15 @@ export const OwnServerForm = ({ onProbe, onConnect }: IOwnServerProps) => {
   const card = usePresence(probe, CARD_EXIT_MS);
   const shown = card.value;
   const closing = card.state === PRESENCE.closing;
-  const takesToken = shown !== null && shown.auth === MCP_AUTH.header;
+  const token = shown !== null && asksToken(shown);
 
-  const find = async () => {
-    const link = url.trim();
-    if (link === '' || busy !== null) return;
+  const find = async (link: string, from: IMcpCatalogEntry | null) => {
+    const address = link.trim();
+    if (address === '' || busy === BUSY.connect) return;
     setBusy(BUSY.probe);
     setError(null);
-    const got = await onProbe(link);
+    setProbe(null);
+    const got = await onProbe(address);
     if (!alive.current) return;
     setBusy(null);
     if ('error' in got) {
@@ -287,23 +220,48 @@ export const OwnServerForm = ({ onProbe, onConnect }: IOwnServerProps) => {
     }
     setProbe(got.probe);
     setName('');
-    setHeader(got.probe.headerName === '' ? DEFAULT_HEADER : got.probe.headerName);
+    const fromCatalog = from === null ? '' : from.headerName;
+    setHeader(got.probe.headerName === '' ? fromCatalog || DEFAULT_HEADER : got.probe.headerName);
     setValue('');
   };
 
-  const ready = probe !== null && (!takesToken || value.trim() !== '');
+  // A catalog card fills the address and looks at it at once; nothing is kept yet.
+  const lastPick = useRef<number | null>(null);
+  const takePick = useEffectEvent((next: IPicked) => {
+    setUrl(next.entry.url);
+    setEntry(next.entry);
+    void find(next.entry.url, next.entry);
+  });
+  useEffect(() => {
+    if (picked === null || lastPick.current === picked.at) return;
+    lastPick.current = picked.at;
+    takePick(picked);
+  }, [picked]);
+
+  const ready = probe !== null && (!asksToken(probe) || value.trim() !== '');
+
+  const reset = () => {
+    setProbe(null);
+    setUrl('');
+    setEntry(null);
+    setName('');
+    setValue('');
+    setError(null);
+    onUnpick();
+  };
 
   const connect = async () => {
     if (probe === null || busy !== null || !ready) return;
+    // Called in the click: the sign-in popup opens before the await.
     const pending = onConnect(
       {
         url: probe.url,
-        name: name.trim(),
-        catalogId: '',
+        name: entry === null ? name.trim() : '',
+        catalogId: entry === null ? '' : entry.id,
         transport: probe.transport,
-        header: takesToken ? headerOf(header, value) : null,
+        header: asksToken(probe) ? headerOf(header, value) : null,
       },
-      probe.auth === MCP_AUTH.oauth,
+      signsInByPage(probe),
     );
     setValue('');
     setBusy(BUSY.connect);
@@ -315,23 +273,17 @@ export const OwnServerForm = ({ onProbe, onConnect }: IOwnServerProps) => {
       setError(refused);
       return;
     }
-    setProbe(null);
-    setUrl('');
-    setName('');
+    reset();
   };
 
-  const cancel = () => {
-    setProbe(null);
-    setValue('');
-    setName('');
-    setError(null);
-  };
+  const title = shown === null ? '' : nameOf(shown, entry);
+  const tokenUrl = entry === null ? '' : entry.tokenUrl;
 
   return (
-    <div className="hx-conn-form">
+    <div ref={ref} className="hx-conn-form">
       <div className="hx-conn-form__paste">
         <label className="hx-conn-form__label" htmlFor={`${ids}-url`}>
-          {t('next.connections.mcp.own')}
+          {t('next.connections.mcp.address')}
         </label>
         <div className="hx-conn-form__line">
           <input
@@ -343,47 +295,51 @@ export const OwnServerForm = ({ onProbe, onConnect }: IOwnServerProps) => {
             autoComplete="off"
             autoCapitalize="off"
             spellCheck={false}
-            placeholder={t('next.connections.mcp.own.placeholder')}
+            placeholder={t('next.connections.mcp.address.placeholder')}
             aria-invalid={(error !== null && probe === null) || undefined}
             onChange={(event) => {
-              setUrl(event.target.value);
+              const next = event.target.value;
+              setUrl(next);
               setError(null);
               if (probe !== null) setProbe(null);
+              if (entry !== null && next.trim() !== entry.url) {
+                setEntry(null);
+                onUnpick();
+              }
             }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') void find();
+              if (event.key === 'Enter') void find(url, entry);
             }}
           />
-          <SetButton
-            tone={probe === null ? 'primary' : 'ghost'}
-            busy={busy === BUSY.probe}
-            disabled={url.trim() === '' || busy === BUSY.connect}
-            onClick={() => void find()}
-          >
-            {t('next.connections.find')}
-          </SetButton>
+          {probe === null && (
+            <SetButton
+              tone="primary"
+              busy={busy === BUSY.probe}
+              disabled={url.trim() === ''}
+              onClick={() => void find(url, entry)}
+            >
+              {t('next.connections.find')}
+            </SetButton>
+          )}
         </div>
       </div>
       {shown !== null && (
         <div className="hx-conn-found" data-state={card.state} inert={closing || undefined}>
           <div className="hx-conn-found__head">
-            <McpGlyph id="" name={shown.name === '' ? hostOf(shown.url) : shown.name} />
+            <McpGlyph id={entry === null ? '' : entry.id} name={title} />
             <span className="hx-conn-found__text">
-              <span className="hx-conn-found__name">
-                {shown.name === '' ? hostOf(shown.url) : shown.name}
-              </span>
+              <span className="hx-conn-found__name">{title}</span>
               <span className="hx-conn-found__sub">{probeLine(shown)}</span>
-              <span className="hx-conn-found__addr">{hostOf(shown.url)}</span>
             </span>
           </div>
           {shown.oauthUnavailable && (
             <p className="hx-conn-found__note">{t('next.connections.mcp.oauthUnavailable')}</p>
           )}
-          {takesToken && (
+          {token && (
             <HeaderFields
               name={header}
               value={value}
-              tokenUrl=""
+              tokenUrl={tokenUrl}
               disabled={busy !== null}
               invalid={error !== null}
               onName={setHeader}
@@ -394,34 +350,39 @@ export const OwnServerForm = ({ onProbe, onConnect }: IOwnServerProps) => {
               onSubmit={() => void connect()}
             />
           )}
-          <div className="hx-conn-form__field">
-            <label className="hx-conn-form__label" htmlFor={`${ids}-name`}>
-              {t('next.connections.name')}
-            </label>
-            <input
-              id={`${ids}-name`}
-              className="hx-set__input"
-              value={name}
-              maxLength={80}
-              autoComplete="off"
-              disabled={busy !== null}
-              placeholder={shown.name === '' ? hostOf(shown.url) : shown.name}
-              onChange={(event) => setName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') void connect();
-              }}
-            />
-          </div>
+          {entry === null && (
+            <div className="hx-conn-form__field">
+              <label className="hx-conn-form__label" htmlFor={`${ids}-name`}>
+                {t('next.connections.name')}
+              </label>
+              <input
+                id={`${ids}-name`}
+                className="hx-set__input"
+                value={name}
+                maxLength={80}
+                autoComplete="off"
+                disabled={busy !== null}
+                placeholder={title}
+                onChange={(event) => setName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void connect();
+                }}
+              />
+            </div>
+          )}
           <div className="hx-conn-found__actions">
             <SetButton
               tone="primary"
+              icon={signsInByPage(shown) ? 'log-in' : undefined}
               busy={busy === BUSY.connect}
-              disabled={!ready || busy === BUSY.probe}
+              disabled={!ready}
               onClick={() => void connect()}
             >
-              {t('next.connections.connect')}
+              {signsInByPage(shown)
+                ? t('next.connections.mcp.signInWith', { name: title })
+                : t('next.connections.connect')}
             </SetButton>
-            <SetButton tone="ghost" disabled={busy === BUSY.connect} onClick={cancel}>
+            <SetButton tone="ghost" disabled={busy === BUSY.connect} onClick={reset}>
               {t('next.connections.cancel')}
             </SetButton>
           </div>

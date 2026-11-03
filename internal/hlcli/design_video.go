@@ -34,7 +34,7 @@ const (
 // videoPoll is the pause between two looks at a running render; tests shorten it.
 var videoPoll = 2 * time.Second
 
-const videoUsage = "design video needs a subcommand: guide, get, scene, frame, check, render, comments"
+const videoUsage = "design video needs a subcommand: guide, get, scene, overlay, frame, check, render, comments, record"
 
 func (c *cli) designVideo(args []string) error {
 	if len(args) == 0 {
@@ -51,6 +51,8 @@ func (c *cli) designVideo(args []string) error {
 		return c.videoGet(rest)
 	case "scene", "scenes":
 		return c.videoScene(rest)
+	case "overlay", "overlays":
+		return c.videoOverlay(rest)
 	case "frame", "frames":
 		return c.videoFrame(rest)
 	case "check":
@@ -59,6 +61,8 @@ func (c *cli) designVideo(args []string) error {
 		return c.videoRender(rest)
 	case "comments", "comment":
 		return c.videoComments(rest)
+	case "record":
+		return c.videoRecord(rest)
 	}
 	return usageErr("unknown design video command %q (%s)", sub, videoUsage)
 }
@@ -651,12 +655,12 @@ func (c *cli) videoComments(args []string) error {
 	return nil
 }
 
-const videoHelp = `harnessly design video guide|get|scene|frame|check|render|comments
+const videoHelp = `harnessly design video guide|get|scene|overlay|frame|check|render|comments|record
 
 A video project is a deck whose boards are scenes. Lengths are set only with these commands; never edit meta/ by hand.
 Times: 8s, 1.5s, 1500ms, 0:06 (m:ss) or plain seconds. Add --json for the runtime's answer.
 
-  harnessly design video guide [basics|director|motion|engines|check]
+  harnessly design video guide [basics|director|motion|characters|engines|overlays|check|record]
       the rules of video work, read when needed: the basics, how to run the work, animation, other engines, what to verify
   harnessly design video get <project>
       scenes with start, length (set or auto), transition, moments, words, open comments; the renders' freshness
@@ -664,6 +668,12 @@ Times: 8s, 1.5s, 1500ms, 0:06 (m:ss) or plain seconds. Add --json for the runtim
       a new scene at the end (a board from the template), optionally with a length
   harnessly design video scene set <project> <scene> [--dur 8s|auto] [--transition none|fade:400|default]
       a scene's length (auto: counted from its moments and text) and the fade into it
+  harnessly design video overlay ls <project> <scene>
+  harnessly design video overlay add <project> <scene> --kind title|caption|callout|highlight|key|counter|badge --text T [--at 1s] [--out 4s] [--x 0.1 --y 0.4 --w 0.8 --h 0.16] [--enter rise]
+  harnessly design video overlay set <project> <scene> <id> [--text T] [--at 1s] [--out 4s|end] [--force]
+  harnessly design video overlay rm <project> <scene> <id> [--force]
+      the scene's layer of titles, callouts, highlights, key caps, counters and badges (read: guide overlays); an overlay a
+      person edited is changed only with --force
   harnessly design video frame <project> <scene> --at 2.4s [--format 9:16] [--draft]
   harnessly design video frame <project> <scene> --strip 0:6:1s [--format 9:16] [--draft]
       jpg files of the scene at a time (or FROM:TO:STEP, at most 60 frames); open them with Read
@@ -676,6 +686,8 @@ Times: 8s, 1.5s, 1500ms, 0:06 (m:ss) or plain seconds. Add --json for the runtim
       render the mp4 (--scene: only that scene's clip, --draft: half size, never published); --wait shows progress
   harnessly design video comments <project> [--open]
       the comments on moments and stretches, with the frame each was made on
+  harnessly design video record <project> <script.yaml> [--name NAME]
+      record the interface of a site from a script of actions (clip and log in records/); see "design video record --help"
 
 <scene> is a page's id, its board file or its title. Scene text goes through "design notes set" (it is the subtitles).
 `
