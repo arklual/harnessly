@@ -1064,7 +1064,7 @@
   "next.browserProfiles.clear": "Clear data",
   "next.browserProfiles.delete": "Delete",
   "next.browserProfiles.stopTitle": "Stop browser profile?",
-  "next.browserProfiles.stopWarning": "Stop Chrome for “{name}”? Active browser sessions in this profile will be interrupted.",
+  "next.browserProfiles.stopWarning": "Stop Chrome for “{name}”? Sites that keep you signed in only until the browser closes will ask you to sign in again.",
   "next.browserProfiles.clearTitle": "Clear profile data?",
   "next.browserProfiles.clearWarning": "Clear all browser data for “{name}”? This closes its tabs and removes saved logins, cookies and history. This cannot be undone.",
   "next.browserProfiles.deleteTitle": "Delete browser profile?",

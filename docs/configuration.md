@@ -348,7 +348,7 @@ The runtime service must use `KillMode=process` to preserve the host on restart.
 | `RUNTIME_BROWSER_CHROME_URL` | full archive URL for an internal mirror; the pinned SHA-256 is still mandatory |
 | `RUNTIME_BROWSER_MODE` | `auto` (default), `xvfb`, or `headless`; auto uses a private Xvfb when available, otherwise `--headless=new` |
 | `RUNTIME_BROWSER_CHROME_ARGS` | extra whitespace-separated Chrome arguments, also used by the VNC browser; managed agent profiles use the explicit Settings → Browser sandbox preference instead of sandbox flags in this variable |
-| `RUNTIME_BROWSER_IDLE` | opt-in idle shutdown as a Go duration, e.g. `30m`; unset or `0` disables it. A profile with no viewers or calls stops and restores tabs on next use. Ordinary Chrome restart drops session cookies, so idle shutdown is disabled by default |
+| `RUNTIME_BROWSER_IDLE` | opt-in idle shutdown as a Go duration, e.g. `30m`; unset or `0` disables it. A profile with no viewers or calls stops and restores tabs on next use. Sites that keep you signed in only until the browser closes will ask you to sign in again. Idle shutdown is disabled by default |
 
 Profiles and machine-local project/chat permissions are stored atomically in
 `<data>/agent-browser/profiles.json` with mode `0600`. Each project gets its own managed profile on first use.

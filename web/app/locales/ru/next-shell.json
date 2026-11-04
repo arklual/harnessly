@@ -1120,7 +1120,7 @@
   "next.browserProfiles.clear": "Очистить данные",
   "next.browserProfiles.delete": "Удалить",
   "next.browserProfiles.stopTitle": "Остановить профиль браузера?",
-  "next.browserProfiles.stopWarning": "Остановить Chrome профиля «{name}»? Активные сеансы браузера в этом профиле будут прерваны.",
+  "next.browserProfiles.stopWarning": "Остановить Chrome профиля «{name}»? Сайты, которые держат вход только до закрытия браузера, попросят войти снова.",
   "next.browserProfiles.clearTitle": "Очистить данные профиля?",
   "next.browserProfiles.clearWarning": "Очистить все данные профиля «{name}»? Вкладки будут закрыты, сохранённые входы, куки и история удалены. Отменить это действие нельзя.",
   "next.browserProfiles.deleteTitle": "Удалить профиль браузера?",
