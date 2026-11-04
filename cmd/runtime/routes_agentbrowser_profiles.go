@@ -32,9 +32,10 @@ type browserProfileAction struct {
 
 type browserProfileView struct {
 	agentbrowser.Profile
-	Path     string   `json:"path"`
-	Running  bool     `json:"running"`
-	Projects []string `json:"projects"`
+	Path      string   `json:"path"`
+	Running   bool     `json:"running"`
+	Projects  []string `json:"projects"`
+	SizeBytes *int64   `json:"sizeBytes,omitempty"`
 }
 
 func agentBrowserProfileRoutes(d deps, a *agentbrowser.ProfileAccess, projectExists func(string) bool) []gate.Route {
@@ -112,7 +113,7 @@ func browserProfilesRead(w http.ResponseWriter, r *http.Request, d deps, a *agen
 		sort.Strings(used)
 		p.CDP = "" // Endpoint credentials never belong in settings metadata.
 		views = append(views, browserProfileView{Profile: p, Path: filepath.Join(d.DataDir, "agent-browser", "profiles", p.ID, "chrome"),
-			Running: a.Manager.ProfileRunning(p.ID), Projects: used})
+			Running: a.Manager.ProfileRunning(p.ID), Projects: used, SizeBytes: a.Store.SizeBytes(p.ID)})
 	}
 	secretJSON(w, http.StatusOK, map[string]any{"profiles": views, "projects": projects, "asks": a.Asks.Pending(), "noSandbox": a.Store.NoSandbox()})
 }

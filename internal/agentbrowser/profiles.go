@@ -46,11 +46,12 @@ type profileData struct {
 // ProfileStore keeps machine-local permissions separate from portable conversation records.
 // Mutations publish only after an owner-only atomic write succeeds.
 type ProfileStore struct {
-	mu   sync.Mutex
-	path string
-	data profileData
-	err  error
-	cdp  string
+	sizes profileSizes
+	mu    sync.Mutex
+	path  string
+	data  profileData
+	err   error
+	cdp   string
 }
 
 // OpenProfiles reads existing metadata without starting Chrome or changing the legacy common directory.
