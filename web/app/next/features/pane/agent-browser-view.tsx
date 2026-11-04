@@ -189,10 +189,7 @@ export default function AgentBrowserView({ url }: { url: string }) {
   const scale = Math.min(bounds.w / imageSize.w, bounds.h / imageSize.h, 1);
   const screen = { width: Math.max(1, imageSize.w * scale), height: Math.max(1, imageSize.h * scale) };
   const menuWidth = Math.min(bounds.w, Math.max(160, (menu?.w ?? 0) * scale));
-  const menuTop = Math.max(
-    0,
-    Math.min(bounds.h - 120, (bounds.h - screen.height) / 2 + ((menu?.y ?? 0) + (menu?.h ?? 0)) * scale),
-  );
+  const menuTop = Math.max(0, Math.min(bounds.h - 120, ((menu?.y ?? 0) + (menu?.h ?? 0)) * scale));
   const firstOption = menu?.options.findIndex((option, index) => !option.disabled && index === menu.selected);
   const focusOption =
     firstOption !== undefined && firstOption >= 0
