@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/provision"
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/preflight"
@@ -48,9 +49,11 @@ type machineCheck struct {
 
 // machineProbe is what the checks look at; a test puts its own in.
 type machineProbe struct {
-	GOOS    string
-	Home    string
-	DataDir string
+	// AgentBrowser inspects local readiness without starting a download.
+	AgentBrowser func(context.Context) machineCheck
+	GOOS         string
+	Home         string
+	DataDir      string
 	// BinDir is the folder of the runtime's binary.
 	BinDir string
 	Tools  func() preflight.Result
@@ -321,6 +324,10 @@ func (p machineProbe) run(ctx context.Context) []machineCheck {
 		}
 	}
 
+	if p.AgentBrowser != nil {
+		add(p.AgentBrowser(ctx))
+	}
+
 	// Room on the disk of the data folder: 1 GiB, and the model that is still to come.
 	if free, ok := p.Free(p.DataDir); ok {
 		want := uint64(gib)
@@ -493,7 +500,8 @@ func newMachineProbe(d deps, self *selfupdate.Updater) machineProbe {
 	shell := tools.LoginShell()
 	dictation := newVoice(d.DataDir)
 	return machineProbe{
-		GOOS: runtime.GOOS, Home: d.Home, DataDir: d.DataDir, BinDir: binDir, User: name, Shell: shell,
+		AgentBrowser: func(ctx context.Context) machineCheck { return checkAgentBrowser(ctx, d.DataDir) },
+		GOOS:         runtime.GOOS, Home: d.Home, DataDir: d.DataDir, BinDir: binDir, User: name, Shell: shell,
 		Tools: tools.Runtime, ShellPath: tools.ShellPath, HasDecoder: dictation.HasDecoder, Voice: ownVoice(d.DataDir),
 		Update: self, Free: freeBytes, Reach: reach, GitEmail: func() string { return gitEmail(tools.ShellPath())() },
 		LookPath: exec.LookPath, Exists: pathExists, Invalidate: tools.Invalidate, ReadFile: os.ReadFile,
@@ -571,4 +579,41 @@ func machineCheckRoutes(d deps, self *selfupdate.Updater) []gate.Route {
 			}),
 		},
 	}
+}
+
+func checkAgentBrowser(ctx context.Context, data string) machineCheck {
+	check := machineCheck{ID: "agent_browser", Title: "Agent browser", OK: true}
+	if strings.EqualFold(os.Getenv("RUNTIME_BROWSER"), "off") {
+		check.Detail = "Disabled by RUNTIME_BROWSER=off"
+		return check
+	}
+	if os.Getenv("RUNTIME_BROWSER_CDP") != "" {
+		check.Detail = "External CDP browser; display and sandbox are managed externally"
+		return check
+	}
+	cfg := provision.FromEnv(data)
+	path, snap, err := provision.Find(cfg)
+	if err == nil && path == "" && snap != "" {
+		path = snap
+	}
+	if err == nil && path == "" {
+		check.Detail = "Chrome for Testing will be downloaded and verified on first use; mode: " + provision.Mode(os.Getenv("RUNTIME_BROWSER_MODE")) + "; sandbox: not yet checked"
+		if !cfg.Download {
+			err = errors.New("Chrome not found and RUNTIME_BROWSER_DOWNLOAD=off")
+		}
+	}
+	if err == nil && path != "" {
+		var info provision.Inspection
+		info, err = provision.Probe(ctx, path, data)
+		check.Detail = fmt.Sprintf("%s; %s; mode: %s; sandbox: %s", path, info.Version, info.Mode, info.Sandbox)
+	}
+	if err != nil {
+		check.OK = false
+		check.Detail += "; " + err.Error()
+		var diagnostic *provision.Diagnostic
+		if errors.As(err, &diagnostic) {
+			check.FixCommand = diagnostic.Command
+		}
+	}
+	return check
 }

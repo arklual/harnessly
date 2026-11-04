@@ -233,3 +233,25 @@ func TestMachineCheckAppsBoundary(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentBrowserMachineCheck(t *testing.T) {
+	t.Setenv("RUNTIME_BROWSER", "off")
+	check := checkAgentBrowser(t.Context(), t.TempDir())
+	if check.ID != "agent_browser" || !check.OK || !strings.Contains(check.Detail, "Disabled") {
+		t.Fatalf("%+v", check)
+	}
+	t.Setenv("RUNTIME_BROWSER", "")
+	t.Setenv("RUNTIME_BROWSER_CDP", "http://127.0.0.1:1")
+	check = checkAgentBrowser(t.Context(), t.TempDir())
+	if !check.OK || !strings.Contains(check.Detail, "externally") {
+		t.Fatalf("%+v", check)
+	}
+	t.Setenv("RUNTIME_BROWSER_CDP", "")
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("RUNTIME_BROWSER_CHROME", "")
+	t.Setenv("RUNTIME_BROWSER_DOWNLOAD", "off")
+	check = checkAgentBrowser(t.Context(), t.TempDir())
+	if check.OK || !strings.Contains(check.Detail, "DOWNLOAD=off") {
+		t.Fatalf("%+v", check)
+	}
+}
