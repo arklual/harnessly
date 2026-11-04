@@ -232,7 +232,9 @@ func scanHandoffFrame(ctx context.Context, call handoffCall, session, frame stri
 				"functionDeclaration": `function(login) {
  const get = name => Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, name).get.call(this);
  const attr = name => Element.prototype.getAttribute.call(this, name) || '';
- const type = get('type'), value = get('value');
+ const type = get('type');
+ if (type !== 'password' && !['text','email','tel','url','search','number'].includes(type)) return {sealed:false};
+ const value = get('value');
  if (!value) return {sealed:false};
  const secret = type === 'password' || getComputedStyle(this).getPropertyValue('-webkit-text-security') !== 'none' &&
    getComputedStyle(this).getPropertyValue('-webkit-text-security') !== '' ||

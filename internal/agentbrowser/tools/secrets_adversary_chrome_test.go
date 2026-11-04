@@ -465,6 +465,33 @@ document.querySelector('form').onsubmit=e=>{e.preventDefault();fetch('/submit',{
 					}
 				})
 			}
+			run("csrf-false-positive", func(a *secretAttack) {
+				a.open("/login?type=search")
+				i, tab := a.instance(), a.tab()
+				_, err := i.Call(a.t.Context(), tab, "Runtime.evaluate", map[string]any{"expression": `
+const form=document.querySelector('form');
+for(const type of ['hidden','checkbox','radio','submit','button','reset','file','image','range','color','date','datetime-local','month','time','week']) {
+ const input=document.createElement('input'); input.type=type; input.name='authenticity_token';
+ input.id='password-'+type; input.autocomplete='current-password';
+ if(type!=='file') input.value=type==='submit'?'Continue here':'fixture-'+type+'-value';
+ form.append(input);
+}`})
+				must(a.t, err)
+				must(a.t, i.SetControl(tab, "person"))
+				a.personType("pizza near me")
+				must(a.t, i.SetControl(tab, "agent"))
+				if i.Tabs(a.c.chat)[0].Sealed {
+					a.t.Fatal("non-text inputs sealed ordinary search")
+				}
+				if out := a.c.text("snapshot", nil); !strings.Contains(out, "pizza near me") || !strings.Contains(out, "Continue here") {
+					a.t.Fatal("ordinary search snapshot was hidden or masked")
+				}
+				for _, value := range []string{"fixture-hidden-value", "fixture-checkbox-value", "Continue here"} {
+					if i.Redact(value) != value {
+						a.t.Fatal("non-text input entered the mask")
+					}
+				}
+			})
 			run("lazy-person-password", func(a *secretAttack) {
 				a.open("/login")
 				a.personType(a.value)
