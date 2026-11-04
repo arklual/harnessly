@@ -161,7 +161,7 @@ func TestAsksWaitFulfilDecline(t *testing.T) {
 		t.Fatalf("why is not one safe line: %q", first.Why)
 	}
 	// Asking again waits on the same request.
-	again, _, _ := a.Open("github-token", "x", "c2", "", false)
+	again, _, _ := a.Open("github-token", "x", "c1", "", false)
 	if again.ID != first.ID || len(a.Pending()) != 1 {
 		t.Fatal("a repeated ask made a second card")
 	}

@@ -8,13 +8,15 @@ import {
   declineAsk,
   isSafeRefusal,
   loadAsks,
-  putSecret,
+  putAsk,
+  grantAsk,
   type ISecretAsk,
   type TSafeOutcome,
 } from '@/next/features/safe/api';
 import SafeAskDialog from '@/next/features/safe/ask-dialog';
 import { safeReasonText } from '@/next/features/settings/safe-section';
 import type { MachineId } from '@/next/protocol/v2';
+import { useProjects } from '@/next/stores/projects';
 import { toast } from '@/next/ui/toast';
 import { t } from '@/next/i18n';
 
@@ -40,7 +42,7 @@ export const useSecretAsks = (machine: MachineId | null) => {
       const same =
         now?.machine === m &&
         now.asks.length === next.length &&
-        now.asks.every((a, i) => a.id === next[i]?.id);
+        now.asks.every((a, i) => JSON.stringify(a) === JSON.stringify(next[i]));
       return same ? now : { machine: m, asks: next };
     });
   });
@@ -76,6 +78,7 @@ export const useSecretAsks = (machine: MachineId | null) => {
 
 /** The dialog over everything, for the machine on screen. */
 export const SecretAskHost = ({ machine }: { machine: MachineId | null }) => {
+  const projects = useProjects(machine);
   const { open, drop, putAside } = useSecretAsks(machine);
   const ask = open[0] ?? null;
   if (!machine) return null;
@@ -83,16 +86,29 @@ export const SecretAskHost = ({ machine }: { machine: MachineId | null }) => {
     <SafeAskDialog
       ask={ask}
       more={Math.max(open.length - 1, 0)}
+      projectName={projects.find((p) => p.id === ask?.project)?.name}
       onPut={async (a, value) => {
-        const refused = refusalOf(await putSecret(machine, a.name, value));
+        const refused = refusalOf(await putAsk(machine, a.id, value));
         if (refused !== null) return refused;
         drop(a.id);
         toast(t('next.safe.ask.done', { name: a.name }), { tone: 'success' });
         return null;
       }}
+      onGrant={async (a) => {
+        const refused = refusalOf(await grantAsk(machine, a.id));
+        if (refused !== null) return refused;
+        drop(a.id);
+        toast(t('next.safe.ask.granted', { name: a.name }), { tone: 'success' });
+        return null;
+      }}
       onDecline={async (a) => {
         const res = await declineAsk(machine, a.id);
-        if (!('ok' in res)) return pageText(res);
+        const refused = refusalOf(res);
+        if (
+          refused !== null &&
+          !('ok' in res && isSafeRefusal(res.value) && res.value.refused === 'not-found')
+        )
+          return refused;
         // Declined, or gone already (answered on another page, expired): either way it leaves the screen.
         drop(a.id);
         return null;

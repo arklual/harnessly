@@ -238,7 +238,9 @@ commands by name. The person puts a secret in Settings → Safe, or on the card 
   harnessly secret file deploy-key --ttl 10m
 
 ask waits up to 100 seconds (--wait N, 0 to 600) and prints "ready: NAME", "waiting: ..." (run it again to keep
-waiting), or exits 1 with "declined". A name the safe already has is ready at once, unless --replace.
+waiting), or exits 1 with "declined". An accessible name is ready at once, unless --replace or a new --origin needs approval.
+Use --origin https://site for a website; HTTP is allowed only on localhost, 127.0.0.1 and [::1].
+A project-scoped secret requires a verified connection from an allowed project.
 run passes the command's exit code on and masks the values in its output; quote $VAR inside sh -c, never echo it.
 Never print a value, write it into the workspace or a commit, or ask the person to paste it into the chat.
 `,

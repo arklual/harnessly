@@ -17,13 +17,23 @@ export interface ISafeAskDialogProps {
   ask: ISecretAsk | null;
   /** How many more asks wait after this one. */
   more: number;
+  projectName?: string;
   onPut: (ask: ISecretAsk, value: string) => TDone;
+  onGrant: (ask: ISecretAsk) => TDone;
   onDecline: (ask: ISecretAsk) => TDone;
   /** Put aside on this page, unanswered. */
   onLater: (ask: ISecretAsk) => void;
 }
 
-const SafeAskDialog = ({ ask, more, onPut, onDecline, onLater }: ISafeAskDialogProps) => {
+const SafeAskDialog = ({
+  ask,
+  more,
+  projectName,
+  onPut,
+  onGrant,
+  onDecline,
+  onLater,
+}: ISafeAskDialogProps) => {
   const field = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState<'put' | 'decline' | null>(null);
@@ -46,7 +56,11 @@ const SafeAskDialog = ({ ask, more, onPut, onDecline, onLater }: ISafeAskDialogP
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!ask || value.trim() === '' || busy !== null) return;
+    if (!ask || (!ask.grant && value.trim() === '') || busy !== null) return;
+    if (ask.grant) {
+      void run('put', () => onGrant(ask));
+      return;
+    }
     const sent = value;
     // The value leaves the page's state the moment it is sent.
     setValue('');
@@ -62,6 +76,11 @@ const SafeAskDialog = ({ ask, more, onPut, onDecline, onLater }: ISafeAskDialogP
   let title = t('next.safe.ask.title', { name: shown?.name ?? '' });
   if (shown?.replace) title = t('next.safe.ask.titleReplace', { name: shown.name });
 
+  if (shown?.grant) {
+    title = t('next.safe.ask.titleGrant', { project: projectName ?? shown.project ?? '', name: shown.name });
+    lead = t('next.safe.ask.leadGrant');
+  }
+
   return (
     <Modal
       open={ask !== null}
@@ -71,7 +90,7 @@ const SafeAskDialog = ({ ask, more, onPut, onDecline, onLater }: ISafeAskDialogP
       title={title}
       lead={lead}
       boxClass="hx-safe-ask"
-      initialFocus={field}
+      initialFocus={shown?.grant ? undefined : field}
     >
       <form onSubmit={submit}>
         <div className="hx-modal__body hx-safe-ask__body">
@@ -81,21 +100,29 @@ const SafeAskDialog = ({ ask, more, onPut, onDecline, onLater }: ISafeAskDialogP
               <span>{shown.why}</span>
             </p>
           )}
-          <SecretField
-            ref={field}
-            value={value}
-            onChange={(next) => {
-              setValue(next);
-              setError(null);
-            }}
-            label={t('next.safe.value', { name: shown?.name ?? '' })}
-            placeholder={t('next.safe.value.placeholder')}
-            disabled={busy !== null}
-            invalid={error !== null}
-          />
+          {shown?.origin && (
+            <p className="hx-safe-ask__origin">
+              <span>{t('next.safe.origins')}</span>
+              <strong>{shown.origin}</strong>
+            </p>
+          )}
+          {!shown?.grant && (
+            <SecretField
+              ref={field}
+              value={value}
+              onChange={(next) => {
+                setValue(next);
+                setError(null);
+              }}
+              label={t('next.safe.value', { name: shown?.name ?? '' })}
+              placeholder={t('next.safe.value.placeholder')}
+              disabled={busy !== null}
+              invalid={error !== null}
+            />
+          )}
           <p className="hx-safe-ask__note">
             <Icon name="lock" size="sm" />
-            <span>{t('next.safe.ask.note')}</span>
+            <span>{t(shown?.grant ? 'next.safe.ask.noteGrant' : 'next.safe.ask.note')}</span>
           </p>
           {error && (
             <p className="hx-create__err" role="alert">
@@ -110,6 +137,7 @@ const SafeAskDialog = ({ ask, more, onPut, onDecline, onLater }: ISafeAskDialogP
             className="hx-btn"
             data-variant="ghost"
             data-busy={busy === 'decline'}
+            disabled={busy !== null}
             onClick={decline}
           >
             {t('next.safe.ask.decline')}
@@ -119,9 +147,9 @@ const SafeAskDialog = ({ ask, more, onPut, onDecline, onLater }: ISafeAskDialogP
             className="hx-btn hx-create__ok"
             data-variant="primary"
             data-busy={busy === 'put'}
-            disabled={value.trim() === ''}
+            disabled={busy !== null || (!shown?.grant && value.trim() === '')}
           >
-            <span>{t('next.safe.ask.put')}</span>
+            <span>{t(shown?.grant ? 'next.safe.ask.allow' : 'next.safe.ask.put')}</span>
             <span className="hx-gate__spin" aria-hidden="true" />
           </button>
         </div>

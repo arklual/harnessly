@@ -80,5 +80,19 @@ Removing a secret is immediate; a file already handed out lives until its time i
   command uses it, and Settings → Safe shows where each secret lives. The local safe stays the only store of a
   self-hosted runtime.
 - Telegram notification of a waiting ask (the shared bot) when the page is closed.
-- The runtime under its own user with the key readable only by it, and per-secret scopes (which conversations or
-  folders may use a secret), with an approval prompt for a first use.
+- The runtime under its own user with the key readable only by it. Project access checks do not isolate agents
+  that can read the same Unix files.
+
+## Website origins and project access
+
+Each entry can carry public `Origins` and `Projects` lists. Old `safe.json` files remain readable: empty lists retain
+legacy CLI access. A nonempty project list restricts `secret list`, `secret run`, `secret file` and browser filling.
+The runtime resolves the chat from the calling connection and reads its current project; an unknown connection or a
+claimed session belonging to another chat cannot use a scoped entry. A foreign entry and an absent entry have the same
+use refusal. An ask for an existing foreign entry displays an access grant, never a value field. Approving adds access
+without replacing the encrypted value. Settings → Safe edits sites and project IDs independently of value rotation.
+
+Origins are exact scheme/host/port tuples: HTTPS, or HTTP only on `localhost`, `127.0.0.1` and `[::1]`. Default ports and
+host case are canonicalized. Paths, credentials, queries, wildcard domains and HTTP on other hosts are refused. A
+subdomain, another port or another scheme does not inherit permission. Use
+`harnessly secret ask NAME --origin https://example.com --why "sign in"` to request a website entry outside the chat.

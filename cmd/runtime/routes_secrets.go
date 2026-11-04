@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -35,9 +36,10 @@ const (
 
 // safe is the safe of a runtime: its store, the open asks and the short-lived files.
 type safe struct {
-	store *secrets.Store
-	asks  *secrets.Asks
-	files *secrets.Files
+	store    *secrets.Store
+	asks     *secrets.Asks
+	files    *secrets.Files
+	identity func(string) secrets.Use
 }
 
 func newSafe(d deps) *safe {
@@ -106,10 +108,57 @@ type cliSecret struct {
 
 func secretRoutes(d deps, c *core) []gate.Route {
 	sf := safeFor(d)
-	return sf.routes(d, func(session string) (string, string) { return convOf(c, session) })
+	sf.identity = func(id string) secrets.Use { return secretIdentity(c, id) }
+	callers := &callerCache{panes: c.cfg.Tmux, convOf: func(session string) string {
+		id, _ := convOf(c, session)
+		return id
+	}}
+	identity := func(r *http.Request, session string) secrets.Use {
+		actual, _ := callers.of(r)
+		if actual == "" {
+			return secrets.Use{}
+		}
+		if session != "" {
+			claimed, _ := convOf(c, session)
+			if actual != claimed {
+				return secrets.Use{}
+			}
+		}
+		return secretIdentity(c, actual)
+	}
+	return sf.routes(d, func(session string) (string, string) { return convOf(c, session) }, identity)
 }
 
-func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gate.Route {
+func secretIdentity(c *core, id string) secrets.Use {
+	v := c.v2.Load()
+	if v == nil {
+		return secrets.Use{}
+	}
+	rec, ok := v.rt.Record(id)
+	if !ok {
+		return secrets.Use{}
+	}
+	use := secrets.Use{Conv: id, Title: rec.Title}
+	if rec.ProjectID != nil {
+		use.Project = *rec.ProjectID
+	}
+	return use
+}
+
+func (sf *safe) routes(d deps, conv func(session string) (string, string), resolvers ...func(*http.Request, string) secrets.Use) []gate.Route {
+	identity := func(r *http.Request, session string) secrets.Use {
+		if len(resolvers) > 0 {
+			return resolvers[0](r, session)
+		}
+		return secrets.Use{}
+	}
+	useOf := func(r *http.Request, session string) secrets.Use {
+		use := identity(r, session)
+		if use.Conv == "" {
+			use.Conv, use.Title = conv(session)
+		}
+		return use
+	}
 	base, asksBase := platformAPI+"/secrets", platformAPI+"/secret-asks"
 	under := func(r *http.Request, p string) (string, bool) {
 		for _, prefix := range []string{p + "/", "/agents" + p + "/"} {
@@ -186,6 +235,21 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gat
 			sf.asks.Fulfil(name)
 			agent.Log("info", "safe: secret put", agent.F{K: "name", V: name}, agent.F{K: "created", V: created})
 			secretJSON(w, http.StatusOK, map[string]any{"secret": v, "created": created})
+		case http.MethodPatch:
+			var b struct {
+				Origins  []string `json:"origins"`
+				Projects []string `json:"projects"`
+			}
+			if !readSecretBody(r, &b) {
+				badBody(w)
+				return
+			}
+			v, err := sf.store.Metadata(name, b.Origins, b.Projects)
+			if err != nil {
+				secretRefusal(w, err)
+				return
+			}
+			secretJSON(w, http.StatusOK, map[string]any{"secret": v})
 		case http.MethodDelete:
 			if err := sf.store.Remove(name); err != nil {
 				secretRefusal(w, err)
@@ -215,12 +279,50 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gat
 			return
 		}
 		id, action, _ := strings.Cut(rest, "/")
-		if action != "decline" {
+		if action != "decline" && action != "grant" && action != "put" {
 			secretJSON(w, http.StatusNotFound, map[string]string{"error": "not-found"})
 			return
 		}
 		if r.Method != http.MethodPost {
 			notAllowed(w)
+			return
+		}
+		if action != "decline" {
+			a, ok := sf.asks.Get(id)
+			if !ok {
+				secretRefusal(w, &secrets.Refusal{Reason: secrets.ReasonNotFound})
+				return
+			}
+			if sf.identity != nil && a.Conv != "" {
+				current := sf.identity(a.Conv)
+				if current.Conv == "" || current.Project != a.Project {
+					sf.asks.Decline(id)
+					secretRefusal(w, &secrets.Refusal{Reason: secrets.ReasonNotFound})
+					return
+				}
+			}
+			var err error
+			if action == "grant" && a.Grant {
+				err = sf.store.Grant(a.Name, a.Project, a.Origin)
+			} else if action == "put" && !a.Grant {
+				var b struct {
+					Value string `json:"value"`
+				}
+				if !readSecretBody(r, &b) {
+					badBody(w)
+					return
+				}
+				_, _, err = sf.store.PutAsked(a, b.Value)
+			} else {
+				badBody(w)
+				return
+			}
+			if err != nil {
+				secretRefusal(w, err)
+				return
+			}
+			sf.asks.Ready(id)
+			secretJSON(w, http.StatusOK, map[string]any{"ready": id})
 			return
 		}
 		if !sf.asks.Decline(id) {
@@ -242,6 +344,9 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gat
 		}
 		out := make([]cliSecret, 0, len(views))
 		for _, v := range views {
+			if !v.Allowed(identity(r, "").Project) {
+				continue
+			}
 			out = append(out, cliSecret{Name: v.Name, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt, LastUsedAt: v.LastUsedAt})
 		}
 		secretJSON(w, http.StatusOK, map[string]any{"secrets": out})
@@ -256,6 +361,7 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gat
 			Name    string  `json:"name"`
 			Why     string  `json:"why"`
 			Replace bool    `json:"replace"`
+			Origin  string  `json:"origin"`
 			Wait    float64 `json:"wait"`
 		}
 		if !readSecretBody(r, &b) {
@@ -269,12 +375,27 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gat
 		answer := func(status string) {
 			secretJSON(w, http.StatusOK, map[string]any{"name": b.Name, "status": status, "pageOpen": sf.asks.PageOpen()})
 		}
-		if !b.Replace && sf.store.Has(b.Name) {
+		if b.Origin != "" {
+			b.Origin = secrets.Origin(b.Origin)
+			if b.Origin == "" {
+				secretRefusal(w, &secrets.Refusal{Reason: "bad-origin"})
+				return
+			}
+		}
+		use := useOf(r, b.Session)
+		id, title := use.Conv, use.Title
+		existing, lookupErr := sf.store.Lookup(b.Name, use.Project)
+		if !b.Replace && lookupErr == nil && (b.Origin == "" || slices.Contains(existing.Origins, b.Origin)) {
 			answer(secrets.AskReady)
 			return
 		}
-		id, title := conv(b.Session)
-		a, state, err := sf.asks.Open(b.Name, b.Why, id, title, b.Replace)
+		grant := sf.store.Has(b.Name) && lookupErr != nil
+		if grant && use.Project == "" {
+			secretRefusal(w, &secrets.Refusal{Reason: secrets.ReasonNotFound})
+			return
+		}
+		a, state, err := sf.asks.OpenScoped(secrets.Ask{Name: b.Name, Why: b.Why, Conv: id, Title: title,
+			Replace: b.Replace, Origin: b.Origin, Project: use.Project, Grant: grant})
 		if err != nil {
 			secretRefusal(w, err)
 			return
@@ -282,6 +403,13 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gat
 		if state == secrets.AskWaiting {
 			wait := min(time.Duration(b.Wait*float64(time.Second)), secretWaitMax)
 			state = sf.asks.Wait(r.Context(), a.ID, max(wait, 0))
+		}
+		if state == secrets.AskReady {
+			current := useOf(r, b.Session)
+			view, e := sf.store.Lookup(b.Name, current.Project)
+			if e != nil || current.Project != use.Project || b.Origin != "" && !slices.Contains(view.Origins, b.Origin) {
+				state = secrets.AskDeclined
+			}
 		}
 		agent.Log("info", "safe: ask", agent.F{K: "name", V: b.Name}, agent.F{K: "conv", V: id}, agent.F{K: "state", V: state})
 		answer(state)
@@ -305,8 +433,9 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gat
 				return
 			}
 		}
-		id, title := conv(b.Session)
-		values, err := sf.store.Reveal(b.Names, secrets.Use{Conv: id, Title: title})
+		use := useOf(r, b.Session)
+		id := use.Conv
+		values, err := sf.store.Reveal(b.Names, use)
 		if err != nil {
 			secretRefusal(w, err)
 			return
@@ -332,8 +461,9 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string)) []gat
 			secretRefusal(w, &secrets.Refusal{Reason: secrets.ReasonBadName})
 			return
 		}
-		id, title := conv(b.Session)
-		values, err := sf.store.Reveal([]string{b.Name}, secrets.Use{Conv: id, Title: title})
+		use := useOf(r, b.Session)
+		id := use.Conv
+		values, err := sf.store.Reveal([]string{b.Name}, use)
 		if err != nil {
 			secretRefusal(w, err)
 			return

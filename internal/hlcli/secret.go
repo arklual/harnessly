@@ -21,6 +21,8 @@ import (
 
 // secretReasons are the refusals in words an agent can act on.
 var secretReasons = map[string]string{
+	"bad-origin":   "a site must be an HTTPS origin, or HTTP on localhost, 127.0.0.1 or [::1]",
+	"bad-project":  "project identifiers must be nonempty and have no surrounding spaces",
 	"bad-name":     "a name is letters, digits, '.', '_' and '-' (64 at most), e.g. github-token",
 	"not-found":    "the safe has no secret by that name: ask the person for it with harnessly secret ask NAME --why \"...\"",
 	"key-lost":     "the safe's key is gone, its values cannot be read: ask for the secret again with --replace",
@@ -118,7 +120,7 @@ func (c *cli) zone() *time.Location {
 }
 
 func (c *cli) secretAsk(args []string) error {
-	name, why, replace, wait := "", "", false, secretAskWait
+	name, why, origin, replace, wait := "", "", "", false, secretAskWait
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -130,6 +132,14 @@ func (c *cli) secretAsk(args []string) error {
 			why = args[i]
 		case strings.HasPrefix(a, "--why="):
 			why = strings.TrimPrefix(a, "--why=")
+		case a == "--origin":
+			if i+1 >= len(args) {
+				return usageErr("--origin needs a site")
+			}
+			i++
+			origin = args[i]
+		case strings.HasPrefix(a, "--origin="):
+			origin = strings.TrimPrefix(a, "--origin=")
 		case a == "--replace":
 			replace = true
 		case a == "--wait" || strings.HasPrefix(a, "--wait="):
@@ -161,7 +171,7 @@ func (c *cli) secretAsk(args []string) error {
 	for {
 		step := min(time.Until(deadline), secretAskStep)
 		status, raw, err := c.call("POST", "/api/cli/secrets/ask", nil,
-			map[string]any{"session": c.session(), "name": name, "why": why, "replace": replace, "wait": max(step, 0).Seconds()})
+			map[string]any{"session": c.session(), "name": name, "why": why, "replace": replace, "origin": origin, "wait": max(step, 0).Seconds()})
 		if err != nil {
 			return err
 		}

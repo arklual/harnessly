@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -70,18 +71,23 @@ func ReasonOf(err error) string {
 
 // Use is one command's use of a secret: the conversation it ran from (its title as it was then), when.
 type Use struct {
-	Conv  string `json:"conv"`
-	Title string `json:"title"`
-	At    int64  `json:"at"`
+	// Project is verified by the caller and is never taken from agent request data.
+	Project string `json:"-"`
+	Origin  string `json:"origin,omitempty"`
+	Conv    string `json:"conv"`
+	Title   string `json:"title"`
+	At      int64  `json:"at"`
 }
 
 // View is a secret as anyone may see it: everything but the value.
 type View struct {
-	Name       string `json:"name"`
-	CreatedAt  int64  `json:"createdAt"`
-	UpdatedAt  int64  `json:"updatedAt"`
-	LastUsedAt int64  `json:"lastUsedAt"`
-	UsedBy     []Use  `json:"usedBy"`
+	Origins    []string `json:"origins,omitempty"`
+	Projects   []string `json:"projects,omitempty"`
+	Name       string   `json:"name"`
+	CreatedAt  int64    `json:"createdAt"`
+	UpdatedAt  int64    `json:"updatedAt"`
+	LastUsedAt int64    `json:"lastUsedAt"`
+	UsedBy     []Use    `json:"usedBy"`
 }
 
 type entry struct {
@@ -242,6 +248,8 @@ func find(f *file, name string) *entry {
 
 func viewOf(e *entry) View {
 	v := e.View
+	v.Origins = slices.Clone(e.Origins)
+	v.Projects = slices.Clone(e.Projects)
 	v.UsedBy = append([]Use{}, e.UsedBy...)
 	return v
 }
@@ -272,6 +280,15 @@ func (s *Store) Has(name string) bool {
 
 // Put keeps value under name, a new secret or a new value of one (its uses stay); created says which.
 func (s *Store) Put(name, value string) (v View, created bool, err error) {
+	return s.put(name, value, nil)
+}
+
+// PutAsked stores a value from a specific card without overwriting a foreign project entry.
+func (s *Store) PutAsked(a Ask, value string) (View, bool, error) {
+	return s.put(a.Name, value, &a)
+}
+
+func (s *Store) put(name, value string, asked *Ask) (v View, created bool, err error) {
 	if !ValidName(name) {
 		return View{}, false, refuse(ReasonBadName, nil)
 	}
@@ -287,6 +304,14 @@ func (s *Store) Put(name, value string) (v View, created bool, err error) {
 	f, err := s.read()
 	if err != nil {
 		return View{}, false, err
+	}
+	if asked != nil {
+		if asked.Grant {
+			return View{}, false, refuse(ReasonNotFound, nil)
+		}
+		if existing := find(f, name); existing != nil && !existing.Allowed(asked.Project) {
+			return View{}, false, refuse(ReasonNotFound, nil)
+		}
 	}
 	key, err := s.key(true)
 	if err != nil {
@@ -306,6 +331,14 @@ func (s *Store) Put(name, value string) (v View, created bool, err error) {
 		e = &entry{View: View{Name: name, CreatedAt: now, UsedBy: []Use{}}}
 		f.Secrets = append(f.Secrets, e)
 		created = true
+	}
+	if asked != nil {
+		if created && asked.Project != "" {
+			e.Projects = []string{asked.Project}
+		}
+		if asked.Origin != "" && !slices.Contains(e.Origins, asked.Origin) {
+			e.Origins = append(e.Origins, asked.Origin)
+		}
 	}
 	e.UpdatedAt = now
 	e.Nonce = nonce
@@ -352,8 +385,11 @@ func (s *Store) Reveal(names []string, use Use) (map[string]string, error) {
 	entries := make([]*entry, 0, len(names))
 	for _, name := range names {
 		e := find(f, name)
-		if e == nil {
+		if e == nil || !e.Allowed(use.Project) {
 			return nil, refuse(ReasonNotFound, errors.New(name))
+		}
+		if use.Origin != "" && !slices.Contains(e.Origins, use.Origin) {
+			return nil, refuse("origin-denied", nil)
 		}
 		entries = append(entries, e)
 	}
@@ -378,7 +414,7 @@ func (s *Store) Reveal(names []string, use Use) (map[string]string, error) {
 		e.LastUsedAt = use.At
 		users := []Use{use}
 		for _, u := range e.UsedBy {
-			if u.Conv != use.Conv || use.Conv == "" {
+			if u.Conv != use.Conv || u.Origin != use.Origin || use.Conv == "" {
 				users = append(users, u)
 			}
 		}

@@ -6,11 +6,14 @@ import {
   isSafeRefusal,
   loadSafe,
   putSecret,
+  patchSecret,
   removeSecret,
   type ISecret,
   type TSafeOutcome,
 } from '@/next/features/safe/api';
 import SafeSection, { safeReasonText } from '@/next/features/settings/safe-section';
+import { useProjects } from '@/next/stores/projects';
+import { useRouter } from '@/platform/router';
 import type { MachineId } from '@/next/protocol/v2';
 
 type TLoad = { k: 'loading' } | { k: 'failed'; text: string } | { k: 'ready'; secrets: readonly ISecret[] };
@@ -24,7 +27,9 @@ const outcome = <T,>(res: TSafeOutcome<T>): { value: T } | { error: string } => 
 
 const byName = (a: ISecret, b: ISecret) => a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 
-export const SafePage = ({ machine, now }: { machine: MachineId; now: number }) => {
+const SafeMachinePage = ({ machine, now }: { machine: MachineId; now: number }) => {
+  const projects = useProjects(machine);
+  const edit = useRouter().query.secret;
   const [state, setState] = useState<TLoad>({ k: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
@@ -51,6 +56,23 @@ export const SafePage = ({ machine, now }: { machine: MachineId; now: number }) 
       secrets={state.k === 'ready' ? state.secrets : null}
       failed={state.k === 'failed' ? { reason: state.text, onRetry: retry } : null}
       now={now}
+      projects={projects}
+      editName={typeof edit === 'string' ? edit : undefined}
+      onPatch={async (name, metadata) => {
+        const got = outcome(await patchSecret(machine, name, metadata));
+        if ('error' in got) return got.error;
+        setState((cur) =>
+          cur.k === 'ready'
+            ? {
+                k: 'ready',
+                secrets: cur.secrets
+                  .map((secret) => (secret.name === name ? got.value : secret))
+                  .sort(byName),
+              }
+            : cur,
+        );
+        return null;
+      }}
       onPut={async (name, value) => {
         const got = outcome(await putSecret(machine, name, value));
         if ('error' in got) return got.error;
@@ -72,3 +94,8 @@ export const SafePage = ({ machine, now }: { machine: MachineId; now: number }) 
     />
   );
 };
+
+/** Each machine owns its drafts and last successful list. */
+export const SafePage = (props: { machine: MachineId; now: number }) => (
+  <SafeMachinePage key={props.machine} {...props} />
+);
