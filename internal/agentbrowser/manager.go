@@ -18,11 +18,15 @@ import (
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
+// DefaultProfile is the sole profile exposed until profile storage is introduced.
 const DefaultProfile = "common"
 
+// ErrOff reports that the browser was disabled by configuration.
 var ErrOff = errors.New("agent browser is disabled")
+
 var profileID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
+// Config selects managed Chrome or an externally owned CDP endpoint.
 type Config struct {
 	DataDir    string
 	Executable string
@@ -32,8 +36,13 @@ type Config struct {
 	Off        bool
 }
 
+// ConfigFromEnv reads browser settings without starting any processes.
 func ConfigFromEnv(data string) Config {
-	return Config{DataDir: data, Chrome: os.Getenv("RUNTIME_BROWSER_CHROME"), Mode: os.Getenv("RUNTIME_BROWSER_MODE"), CDP: strings.TrimSpace(os.Getenv("RUNTIME_BROWSER_CDP")), Off: strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off")}
+	return Config{
+		DataDir: data, Chrome: os.Getenv("RUNTIME_BROWSER_CHROME"), Mode: os.Getenv("RUNTIME_BROWSER_MODE"),
+		CDP: strings.TrimSpace(os.Getenv("RUNTIME_BROWSER_CDP")),
+		Off: strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off"),
+	}
 }
 
 // FindChrome is the replacement seam for a future managed Chrome installer.
@@ -43,7 +52,10 @@ func FindChrome() (string, error) {
 			return p, nil
 		}
 	}
-	for _, p := range []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"} {
+	for _, p := range []string{
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+		"/Applications/Chromium.app/Contents/MacOS/Chromium",
+	} {
 		if st, e := os.Stat(p); e == nil && !st.IsDir() {
 			return p, nil
 		}
@@ -51,6 +63,7 @@ func FindChrome() (string, error) {
 	return "", errors.New("agent browser needs Chrome or Chromium")
 }
 
+// Manager reconnects independent browser profiles throughout the runtime lifetime.
 type Manager struct {
 	cfg       Config
 	mu        sync.Mutex
@@ -60,14 +73,19 @@ type Manager struct {
 	wg        sync.WaitGroup
 }
 
+// New creates a lazy manager; Instance starts the first connection.
 func New(cfg Config) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Manager{cfg: cfg, instances: make(map[string]*Instance), ctx: ctx, cancel: cancel}
 }
+
+// Enabled reports whether browser access is configured.
 func (m *Manager) Enabled() bool { return !m.cfg.Off }
 
 // Close disconnects clients but deliberately leaves hosts and browsers running.
 func (m *Manager) Close() { m.mu.Lock(); m.cancel(); m.mu.Unlock(); m.wg.Wait() }
+
+// Instance waits for the named profile to become usable, starting its host when necessary.
 func (m *Manager) Instance(ctx context.Context, id string) (*Instance, error) {
 	if m.cfg.Off {
 		return nil, ErrOff
@@ -116,6 +134,7 @@ func (m *Manager) Instance(ctx context.Context, id string) (*Instance, error) {
 		}
 	}
 }
+
 func (i *Instance) connect(ctx context.Context) (*cdp.Conn, error) {
 	cfg := i.manager.cfg
 	if cfg.CDP != "" {
@@ -145,7 +164,8 @@ func (i *Instance) connect(ctx context.Context) (*cdp.Conn, error) {
 	if mode == "" {
 		mode = "auto"
 	}
-	if err = host.Start(executable, host.Config{ProfileDir: i.dir, Socket: socket, Chrome: chrome, Mode: mode}); err != nil {
+	if err = host.Start(executable, host.Config{ProfileDir: i.dir, Socket: socket,
+		Chrome: chrome, Mode: mode}); err != nil {
 		return nil, err
 	}
 	ticker := time.NewTicker(50 * time.Millisecond)

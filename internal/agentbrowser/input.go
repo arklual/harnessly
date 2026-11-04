@@ -51,7 +51,9 @@ func (in Input) modifiers() int {
 }
 
 var mouseTypes = map[string]bool{"mousePressed": true, "mouseReleased": true, "mouseMoved": true}
+
 var buttons = map[string]bool{"none": true, "left": true, "middle": true, "right": true}
+
 var schemeRe = regexp.MustCompile(`(?i)^[a-z][a-z0-9+.-]*:`)
 
 // Calls is what an input asks of Chrome, in order; nothing for one the pane cannot send.
@@ -123,6 +125,7 @@ type Call struct {
 	Params map[string]any
 }
 
+// NormalizeURL supplies HTTPS for addresses without an explicit scheme.
 func NormalizeURL(u string) string {
 	u = strings.TrimSpace(u)
 	if u != "" && !schemeRe.MatchString(u) {

@@ -1,10 +1,12 @@
 package agentbrowser
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"image/jpeg"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -32,12 +34,14 @@ func TestMain(m *testing.M) {
 	}
 	os.Exit(m.Run())
 }
+
 func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
 	}
 }
+
 func eventually(t *testing.T, timeout time.Duration, f func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -49,6 +53,7 @@ func eventually(t *testing.T, timeout time.Duration, f func() bool) {
 	}
 	t.Fatal("condition did not become true")
 }
+
 func pidAt(t *testing.T, dir, name string) int {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(dir, name+".pid"))
@@ -57,6 +62,7 @@ func pidAt(t *testing.T, dir, name string) int {
 	must(t, err)
 	return pid
 }
+
 func cleanupHost(t *testing.T, dir string) {
 	t.Helper()
 	b, e := os.ReadFile(filepath.Join(dir, "host.pid"))
@@ -77,9 +83,11 @@ func cleanupHost(t *testing.T, dir string) {
 		}
 	}
 }
+
 func evaluate(t *testing.T, i *Instance, id, expr string) json.RawMessage {
 	t.Helper()
-	b, e := i.Call(t.Context(), id, "Runtime.evaluate", map[string]any{"expression": expr, "returnByValue": true, "userGesture": true})
+	b, e := i.Call(t.Context(), id, "Runtime.evaluate", map[string]any{"expression": expr,
+		"returnByValue": true, "userGesture": true})
 	must(t, e)
 	var r struct {
 		Result struct {
@@ -93,6 +101,7 @@ func evaluate(t *testing.T, i *Instance, id, expr string) json.RawMessage {
 	}
 	return r.Result.Value
 }
+
 func TestChromeLifecycle(t *testing.T) {
 	chrome, e := FindChrome()
 	if e != nil {
@@ -125,7 +134,11 @@ func TestChromeLifecycle(t *testing.T) {
 			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/html")
-				fmt.Fprint(w, `<meta name="viewport" content="width=device-width,initial-scale=1"><script>let n=0;setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80)</script><body>browser fixture</body>`)
+				fmt.Fprint(w, `<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+let n=0;
+setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
+</script><body>browser fixture</body>`)
 			}))
 			defer server.Close()
 			a, e := i.NewTab(ctx, "chat-a", "agent", server.URL)
@@ -154,13 +167,36 @@ func TestChromeLifecycle(t *testing.T) {
 			})
 			t.Run("viewport", func(t *testing.T) {
 				neighbor := string(evaluate(t, i, b.ID, "[innerWidth,innerHeight,devicePixelRatio]"))
-				for _, v := range []Viewport{{"fixed", 1280, 800, 1}, {"fixed", 2200, 1300, 1}, {"mobile", 390, 844, 1}, {"fixed", 1280, 800, 1}} {
+				for _, v := range []Viewport{{"fixed", 1280, 800, 1}, {"fixed",
+					2200, 1300, 1}, {"mobile", 390, 844, 1}, {"fixed", 1280, 800, 1}} {
 					must(t, i.SetViewport(ctx, a.ID, v))
 					got := string(evaluate(t, i, a.ID, "[innerWidth,innerHeight]"))
 					want := fmt.Sprintf("[%d,%d]", v.W, v.H)
 					t.Logf("%s: inner=%s outer=%s", v.Mode, got, evaluate(t, i, a.ID, "[outerWidth,outerHeight]"))
 					if got != want {
 						t.Fatalf("%s: got %s want %s", v.Mode, got, want)
+					}
+					if v.W == 2200 {
+						viewer, err := i.Watch(ctx, a.ID)
+						must(t, err)
+						for {
+							select {
+							case frame := <-viewer.Frames():
+								if frame.Width != v.W || frame.Height != v.H {
+									continue
+								}
+								size, err := jpeg.DecodeConfig(bytes.NewReader(frame.JPEG))
+								must(t, err)
+								if size.Width > 1920 || size.Height > 1400 {
+									t.Fatalf("uncapped JPEG: %+v", size)
+								}
+								t.Logf("CSS=%dx%d JPEG=%dx%d", frame.Width, frame.Height, size.Width, size.Height)
+							case <-time.After(5 * time.Second):
+								t.Fatal("no capped frame")
+							}
+							break
+						}
+						viewer.Close()
 					}
 					if got = string(evaluate(t, i, b.ID, "[innerWidth,innerHeight,devicePixelRatio]")); got != neighbor {
 						t.Fatalf("neighbor resized: %s != %s", got, neighbor)
@@ -284,9 +320,7 @@ func TestChromeLifecycle(t *testing.T) {
 				})
 			})
 			t.Run("native_last_window_probe", func(t *testing.T) {
-				i.op.Lock()
-				defer i.op.Unlock()
-				c := i.conn
+				c := i.connection()
 				raw, err := c.Call(ctx, "Target.getTargets", nil, "")
 				must(t, err)
 				var r struct {

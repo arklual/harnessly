@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -22,12 +23,31 @@ func TestAttachedChrome(t *testing.T) {
 		t.Skip("drives Chrome")
 	}
 	dir := t.TempDir()
-	args := []string{"--headless=new", "--remote-debugging-port=0", "--user-data-dir=" + filepath.Join(dir, "chrome"), "--no-first-run", "--no-default-browser-check", "--disable-dev-shm-usage"}
+	args := []string{"--headless=new", "--remote-debugging-port=0", "--user-data-dir=" + filepath.Join(dir,
+		"chrome"), "--no-first-run", "--no-default-browser-check", "--disable-dev-shm-usage"}
 	args = append(args, strings.Fields(os.Getenv("RUNTIME_BROWSER_CHROME_ARGS"))...)
 	args = append(args, "about:blank")
 	cmd := exec.Command(chrome, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// This fixture owns its external Chrome too; keep its SingletonSocket below the Unix limit.
+	chromeTemp, err := os.MkdirTemp("/tmp", "agent-browser-test-")
+	must(t, err)
+	defer os.RemoveAll(chromeTemp)
+	cmd.Env = append(os.Environ(), "TMPDIR="+chromeTemp)
 	must(t, cmd.Start())
-	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	defer func() {
+		// Children may still write the profile after an abrupt parent-only kill.
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		done := make(chan struct{})
+		go func() { _ = cmd.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			<-done
+		}
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}()
 	var port string
 	eventually(t, 10*time.Second, func() bool {
 		b, e := os.ReadFile(filepath.Join(dir, "chrome", "DevToolsActivePort"))
@@ -59,10 +79,12 @@ func TestAttachedChrome(t *testing.T) {
 	go func() { _ = c.Run(ctx) }()
 	_, err = c.Call(ctx, "Browser.getVersion", nil, "")
 	must(t, err)
-	if _, err = os.Stat(filepath.Join(dir, "registry", "agent-browser", "profiles", DefaultProfile, "host.pid")); !os.IsNotExist(err) {
+	if _, err = os.Stat(filepath.Join(dir, "registry", "agent-browser",
+		"profiles", DefaultProfile, "host.pid")); !os.IsNotExist(err) {
 		t.Fatal("attached profile launched a host")
 	}
 }
+
 func TestChromeLongDataPath(t *testing.T) {
 	chrome, err := FindChrome()
 	if err != nil {
@@ -97,4 +119,25 @@ func TestChromeLongDataPath(t *testing.T) {
 		t.Fatalf("second host was not refused: %v", err)
 	}
 
+}
+
+func TestChromeStartupFailureStatus(t *testing.T) {
+	dir := t.TempDir()
+	fake := filepath.Join(dir, "chrome-fixture")
+	must(t, os.WriteFile(fake, []byte(`#!/bin/sh
+echo 'FATAL Socket path too long: /private/profile/SingletonSocket' >&2
+exit 1
+`),
+		0700))
+	exe, err := os.Executable()
+	must(t, err)
+	m := New(Config{DataDir: dir, Executable: exe, Chrome: fake, Mode: "headless"})
+	defer m.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	_, err = m.Instance(ctx, DefaultProfile)
+	if err == nil || !strings.Contains(err.Error(), "Socket path too long") || strings.Contains(err.Error(), "/private") {
+		t.Fatalf("startup diagnostic: %v", err)
+	}
+	t.Logf("status: %v", err)
 }

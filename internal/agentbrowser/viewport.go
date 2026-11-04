@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
 type dimensions struct {
@@ -15,8 +17,11 @@ type dimensions struct {
 	OuterH int `json:"outerH"`
 }
 
-func (i *Instance) dimensions(ctx context.Context, p *page) (dimensions, error) {
-	raw, err := i.conn.Call(ctx, "Runtime.evaluate", map[string]any{"expression": "({w:innerWidth,h:innerHeight,outerW:outerWidth,outerH:outerHeight})", "returnByValue": true}, p.session)
+func (i *Instance) dimensions(ctx context.Context, b binding) (dimensions, error) {
+	raw, err := b.conn.Call(ctx, "Runtime.evaluate", map[string]any{
+		"expression":    "({w:innerWidth,h:innerHeight,outerW:outerWidth,outerH:outerHeight})",
+		"returnByValue": true,
+	}, b.session)
 	var r struct {
 		Result struct {
 			Value dimensions `json:"value"`
@@ -27,7 +32,13 @@ func (i *Instance) dimensions(ctx context.Context, p *page) (dimensions, error) 
 	}
 	return r.Result.Value, err
 }
+
+// SetViewport changes the content size without holding the profile registry lock.
 func (i *Instance) SetViewport(ctx context.Context, id string, v Viewport) error {
+	if err := i.beginOperation(); err != nil {
+		return err
+	}
+	defer i.tasks.Done()
 	if v.Mode != "fit" && v.Mode != "fixed" && v.Mode != "mobile" {
 		return errors.New("invalid viewport mode")
 	}
@@ -37,45 +48,51 @@ func (i *Instance) SetViewport(ctx context.Context, id string, v Viewport) error
 	if v.DPR == 0 {
 		v.DPR = 1
 	}
-	i.op.Lock()
-	defer i.op.Unlock()
-	i.mu.Lock()
-	p := i.pages[id]
-	i.mu.Unlock()
-	if p == nil {
-		return errors.New("unknown browser tab")
+	ctx, cancel := cdp.WithTimeout(ctx)
+	defer cancel()
+	p, c, err := i.lookup(id)
+	if err != nil {
+		return err
 	}
-	if err := i.viewport(ctx, p, v); err != nil {
+	if err = lockPage(ctx, p); err != nil {
+		return err
+	}
+	defer unlockPage(p)
+	b, err := i.bind(ctx, p, c)
+	if err != nil {
+		return err
+	}
+	if err = i.viewport(ctx, b, v); err != nil {
 		return err
 	}
 	i.mu.Lock()
 	p.Viewport = v
-	i.notifyLocked()
+	i.changedLocked()
 	i.mu.Unlock()
-	return i.save()
+	return nil
 }
-func (i *Instance) viewport(ctx context.Context, p *page, v Viewport) error {
-	if _, err := i.conn.Call(ctx, "Emulation.clearDeviceMetricsOverride", nil, p.session); err != nil {
+
+func (i *Instance) viewport(ctx context.Context, b binding, v Viewport) error {
+	// Shared-window targets keep stale inner bounds while hidden, even after the native window resizes.
+	if _, err := b.conn.Call(ctx, "Target.activateTarget", map[string]any{"targetId": b.target}, ""); err != nil {
 		return err
 	}
-	raw, err := i.conn.Call(ctx, "Browser.getWindowForTarget", map[string]any{"targetId": p.ID}, "")
+	if _, err := b.conn.Call(ctx, "Emulation.clearDeviceMetricsOverride", nil, b.session); err != nil {
+		return err
+	}
+	_, err := b.conn.Call(ctx, "Browser.setWindowBounds", map[string]any{
+		"windowId": b.window, "bounds": map[string]any{"windowState": "normal"},
+	}, "")
 	if err != nil {
 		return err
 	}
-	var r struct {
-		ID int `json:"windowId"`
+	// A timer also runs for hidden pages; requestAnimationFrame can wait forever there.
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(100 * time.Millisecond):
 	}
-	if err = json.Unmarshal(raw, &r); err != nil {
-		return err
-	}
-	if _, err = i.conn.Call(ctx, "Browser.setWindowBounds", map[string]any{"windowId": r.ID, "bounds": map[string]any{"windowState": "normal"}}, ""); err != nil {
-		return err
-	}
-	// Clearing emulation and restoring window state both schedule a layout; measure after it commits.
-	if _, err = i.conn.Call(ctx, "Runtime.evaluate", map[string]any{"expression": "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))", "awaitPromise": true}, p.session); err != nil {
-		return err
-	}
-	d, err := i.dimensions(ctx, p)
+	d, err := i.dimensions(ctx, b)
 	if err != nil {
 		return err
 	}
@@ -84,16 +101,23 @@ func (i *Instance) viewport(ctx context.Context, p *page, v Viewport) error {
 	if emulated {
 		width = max(width, 500)
 	}
-	if _, err = i.conn.Call(ctx, "Browser.setWindowBounds", map[string]any{"windowId": r.ID, "bounds": map[string]any{"width": width + max(0, d.OuterW-d.W), "height": v.H + max(0, d.OuterH-d.H)}}, ""); err != nil {
+	if _, err = b.conn.Call(ctx, "Browser.setWindowBounds", map[string]any{
+		"windowId": b.window, "bounds": map[string]any{
+			"width": width + max(0, d.OuterW-d.W), "height": v.H + max(0, d.OuterH-d.H),
+		},
+	}, ""); err != nil {
 		return err
 	}
 	if emulated {
-		_, err = i.conn.Call(ctx, "Emulation.setDeviceMetricsOverride", map[string]any{"width": v.W, "height": v.H, "deviceScaleFactor": v.DPR, "mobile": v.Mode == "mobile", "screenWidth": v.W, "screenHeight": v.H}, p.session)
+		_, err = b.conn.Call(ctx, "Emulation.setDeviceMetricsOverride", map[string]any{
+			"width": v.W, "height": v.H, "deviceScaleFactor": v.DPR,
+			"mobile": v.Mode == "mobile", "screenWidth": v.W, "screenHeight": v.H,
+		}, b.session)
 		return err
 	}
 	// Window managers resize asynchronously. Report success only after Chrome sees the requested content bounds.
 	for n := 0; n < 40; n++ {
-		d, err = i.dimensions(ctx, p)
+		d, err = i.dimensions(ctx, b)
 		if err != nil {
 			return err
 		}
