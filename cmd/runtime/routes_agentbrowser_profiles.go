@@ -64,6 +64,10 @@ func agentBrowserProfileRoutes(d deps, a *agentbrowser.ProfileAccess, projectExi
 				secretJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request"})
 				return
 			}
+			if b.Action == "project-preview" {
+				browserProjectPreview(w, a, b, projectExists)
+				return
+			}
 			ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 			defer cancel()
 			warning, err := browserProfilesChange(ctx, a, b, projectExists)
@@ -116,6 +120,19 @@ func browserProfilesRead(w http.ResponseWriter, r *http.Request, d deps, a *agen
 			Running: a.Manager.ProfileRunning(p.ID), Projects: used, SizeBytes: a.Store.SizeBytes(p.ID)})
 	}
 	secretJSON(w, http.StatusOK, map[string]any{"profiles": views, "projects": projects, "asks": a.Asks.Pending(), "noSandbox": a.Store.NoSandbox()})
+}
+
+func browserProjectPreview(w http.ResponseWriter, a *agentbrowser.ProfileAccess, b browserProfileAction, exists func(string) bool) {
+	if !exists(b.Project) {
+		secretJSON(w, http.StatusBadRequest, map[string]string{"error": "Project is unavailable"})
+		return
+	}
+	count, err := a.ProjectAffectedChats(b.Project, agentbrowser.ProjectAccess{Default: b.Default, Granted: b.Granted})
+	if err != nil {
+		secretJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	secretJSON(w, http.StatusOK, map[string]int{"affectedChats": count})
 }
 
 func browserProfilesChange(ctx context.Context, a *agentbrowser.ProfileAccess, b browserProfileAction, exists func(string) bool) (string, error) {

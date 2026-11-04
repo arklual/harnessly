@@ -245,6 +245,24 @@ func (a *ProfileAccess) ConversationChanged(conv, project string, removed bool) 
 	return nil
 }
 
+// ProjectAffectedChats counts chats whose existing tabs would close on applying access.
+// It shares mutation validation but never resolves profiles, starts Chrome or writes metadata.
+func (a *ProfileAccess) ProjectAffectedChats(project string, access ProjectAccess) (int, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	convs, err := a.Store.projectChanges(project, access)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, conv := range convs {
+		if a.Manager != nil && a.Manager.ConversationHasTabs(conv) {
+			count++
+		}
+	}
+	return count, nil
+}
+
 // SetProject closes affected tabs before applying the person's changed project permissions.
 func (a *ProfileAccess) SetProject(ctx context.Context, project string, access ProjectAccess) error {
 	a.mu.Lock()
