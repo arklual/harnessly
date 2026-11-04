@@ -163,6 +163,7 @@ func (c *core) layoutRoutes(f *gate.Gate, d deps) []gate.Route {
 		deps.Agents = nil
 	}
 	access := workspaceAccess(d)
+	deps.Browser = c.browserTool(d)
 	deps.Deliver = func(path, title string) (delivery.Info, *delivery.Refusal) {
 		return delivery.Describe(access, path, title)
 	}

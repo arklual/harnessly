@@ -38,6 +38,15 @@ func (i *Instance) dimensions(ctx context.Context, b binding) (dimensions, error
 
 // SetViewport changes the content size without holding the profile registry lock.
 func (i *Instance) SetViewport(ctx context.Context, id string, v Viewport) error {
+	return i.setViewport(ctx, id, v, func() error { return i.dialogError(id, "Runtime.evaluate") })
+}
+
+// AgentSetViewport rechecks ownership and control after acquiring the tab queue.
+func (i *Instance) AgentSetViewport(ctx context.Context, conv, id string, v Viewport) error {
+	return i.setViewport(ctx, id, v, func() error { return i.agentAllowed(conv, id, "Runtime.evaluate") })
+}
+
+func (i *Instance) setViewport(ctx context.Context, id string, v Viewport, allowed func() error) error {
 	if err := i.beginOperation(); err != nil {
 		return err
 	}
@@ -53,11 +62,14 @@ func (i *Instance) SetViewport(ctx context.Context, id string, v Viewport) error
 	}
 	ctx, cancel := cdp.WithTimeout(ctx)
 	defer cancel()
+	if err := allowed(); err != nil {
+		return err
+	}
 	p, c, err := i.lookup(id)
 	if err != nil {
 		return err
 	}
-	if err := i.dialogError(id, "Runtime.evaluate"); err != nil {
+	if err := allowed(); err != nil {
 		return err
 	}
 	if err = lockPage(ctx, p); err != nil {
@@ -66,6 +78,9 @@ func (i *Instance) SetViewport(ctx context.Context, id string, v Viewport) error
 	defer unlockPage(p)
 	b, err := i.bind(ctx, p, c)
 	if err != nil {
+		return err
+	}
+	if err = allowed(); err != nil {
 		return err
 	}
 	if err = i.viewport(ctx, b, v); err != nil {

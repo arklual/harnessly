@@ -1,0 +1,379 @@
+[
+  {
+    "name": "browser_tabs",
+    "description": "List this chat\u2019s tabs and working tab.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_open",
+    "description": "Open a URL in a new working tab.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_navigate",
+    "description": "Navigate the working or named tab; creates the first tab.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_close_tab",
+    "description": "Close an owned tab.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_resize",
+    "description": "Set the viewport in CSS pixels.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "integer"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_snapshot",
+    "description": "Read a compact accessibility snapshot with element IDs, including frames. For large pages use interactive_only (controls and headings) or follow next_offset with the same options. Offset 0 starts a fresh snapshot; continuation pages retain all earlier IDs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Continue the cached snapshot at next_offset; omit or use 0 to refresh."
+        },
+        "interactive_only": {
+          "type": "boolean",
+          "description": "Show interactive roles and context headings only. Keep the same value for continuation pages."
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000,
+          "default": 30000,
+          "description": "Snapshot time budget; large accessibility trees can take several seconds."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_screenshot",
+    "description": "Return a JPEG image; optional path saves inside the chat folder.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_wait_for",
+    "description": "Wait for rendered text anywhere in the page or its frames, including open shadow roots. Polls every 250 ms in isolated worlds.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "timeout_ms": {
+          "type": "integer"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_evaluate",
+    "description": "Evaluate JavaScript, await promises; output limited to 20 KiB. Default timeout 10 seconds.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string"
+        },
+        "timeout_ms": {
+          "type": "integer"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "expression"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_console",
+    "description": "Read up to 500 recorded console entries; optional clear.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "clear": {
+          "type": "boolean"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_network",
+    "description": "Read up to 500 network entries. Only request_id explicitly retrieves a bounded response body.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string"
+        },
+        "clear": {
+          "type": "boolean"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_click",
+    "description": "Click an element from the latest snapshot.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_hover",
+    "description": "Hover an element from the latest snapshot.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_type",
+    "description": "Focus and replace the text of a snapshot element. Never request passwords.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_press_key",
+    "description": "Press Enter, Tab, Escape, arrows, Backspace, Delete or a character; supports Control/Alt/Shift/Meta+key.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_select",
+    "description": "Select an option by value in a snapshot element.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "id",
+        "value"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_upload",
+    "description": "Set a file input from files inside the chat folder only.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "id",
+        "files"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_dialog",
+    "description": "Accept or dismiss the open dialog; text answers a prompt.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accept": {
+          "type": "boolean"
+        },
+        "text": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        }
+      },
+      "required": [
+        "accept"
+      ],
+      "additionalProperties": false
+    }
+  }
+]

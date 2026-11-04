@@ -6,6 +6,7 @@ import (
 )
 
 func (i *Instance) event(method, session string, raw json.RawMessage) {
+	i.agentEvent(method, session, raw)
 	switch method {
 	case "Target.targetCreated", "Target.targetInfoChanged":
 		var e struct {

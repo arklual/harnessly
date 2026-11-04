@@ -18,6 +18,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
+	browsertools "github.com/ly-solutions/harnessly/internal/agentbrowser/tools"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/browser"
@@ -383,8 +384,9 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			return claims
 		},
 	}
-	ref.c.v2d = &d
 	agentBrowser := agentbrowser.New(agentbrowser.ConfigFromEnv(cfg.DataDir))
+	d.BrowserTools = &browsertools.Service{Manager: agentBrowser}
+	ref.c.v2d = &d
 	f.Add(agentBrowserRoutes(d, agentBrowser, func(id string) bool {
 		v := ref.c.v2.Load()
 		if v == nil {
@@ -536,6 +538,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 	}
 	defer f.browser.Close()
 	defer f.agentBrowser.Close()
+	defer f.core.c.v2d.BrowserTools.Close()
 	if alone != nil {
 		f.tmux.ApplyConfig("")
 		go alone.cleanUp(f.home, env("RUNTIME_UPLOADS_DIR", filepath.Join(cfg.DataDir, "uploads")))
