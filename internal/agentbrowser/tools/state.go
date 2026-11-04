@@ -60,6 +60,9 @@ func (s *Service) state(ctx context.Context, i *agentbrowser.Instance, conv, id 
 	if err != nil {
 		return nil, err
 	}
+	changes, stopChanges := i.Changes()
+	stopEvents := unsubscribe
+	unsubscribe = func() { stopEvents(); stopChanges() }
 	life, cancel := context.WithCancel(context.Background())
 	st := &tabState{refs: map[string]nodeRef{}, requests: map[string]string{}, pending: map[string]bool{}, loading: map[string]bool{},
 		last: time.Now(), cancel: cancel, unsubscribe: unsubscribe}
@@ -72,6 +75,19 @@ func (s *Service) state(ctx context.Context, i *agentbrowser.Instance, conv, id 
 			select {
 			case <-life.Done():
 				return
+			case <-changes:
+				state, _ := i.State()
+				exists := false
+				for _, tab := range i.Tabs(conv) {
+					if tab.ID == id {
+						exists = true
+						break
+					}
+				}
+				if !exists || state != "up" {
+					s.forget(i, conv, id)
+					return
+				}
 			case e := <-events:
 				st.event(e)
 			}
