@@ -11,7 +11,7 @@ import (
 // The panel exchanges status/tabs JSON, generation-tagged JPEG frames and Input
 // commands; internal/agentbrowser/protocol.go is the shared panel contract.
 func agentBrowserRoutes(d deps, m *agentbrowser.Manager, exists func(string) bool) []gate.Route {
-	return []gate.Route{{Match: func(r *http.Request) bool { return pathIs(r, "/api/agent-browser") }, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if sameorigin.Refuse(w, r) {
 			return
 		}
@@ -28,5 +28,9 @@ func agentBrowserRoutes(d deps, m *agentbrowser.Manager, exists func(string) boo
 			return
 		}
 		m.ServeHTTP(w, r)
-	})}}
+	})
+	return []gate.Route{{
+		Match:   func(r *http.Request) bool { return pathIs(r, "/api/agent-browser") },
+		Handler: handler,
+	}}
 }

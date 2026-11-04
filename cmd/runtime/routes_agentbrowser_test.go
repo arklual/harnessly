@@ -27,7 +27,10 @@ func TestAgentBrowserGuards(t *testing.T) {
 	for _, tt := range []struct {
 		name, origin, cookie, conv string
 		status                     int
-	}{{"foreign origin", "https://other.example.org", "session=ok", "known", 403}, {"no session", "", "", "known", 401}, {"unknown conversation", "", "session=ok", "missing", 404}, {"disabled", "", "session=ok", "known", 503}} {
+	}{{"foreign origin", "https://other.example.org", "session=ok", "known",
+		403}, {"no session", "", "", "known", 401}, {"unknown conversation",
+		"", "session=ok", "missing", 404}, {"disabled", "", "session=ok",
+		"known", 503}} {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest("GET", "http://example.org/api/agent-browser?conv="+tt.conv, nil)
 			r.Header.Set("Origin", tt.origin)
@@ -82,15 +85,21 @@ func TestAgentBrowserSocketChrome(t *testing.T) {
 			})
 			page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/html")
-				fmt.Fprint(w, `<meta name="viewport" content="width=device-width"><body><script>let n=0;setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80)</script>fixture</body>`)
+				fmt.Fprint(w, `<meta name="viewport" content="width=device-width"><body><script>
+let n=0;
+setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
+</script>fixture</body>`)
 			}))
 			defer page.Close()
-			handler := agentBrowserRoutes(deps{SessionOK: func(r *http.Request) bool { return r.Header.Get("Cookie") == "session=ok" }}, m, func(id string) bool { return id == "known" })[0].Handler
+			authenticated := deps{SessionOK: func(r *http.Request) bool { return r.Header.Get("Cookie") == "session=ok" }}
+			handler := agentBrowserRoutes(authenticated,
+				m, func(id string) bool { return id == "known" })[0].Handler
 			server := httptest.NewServer(handler)
 			defer server.Close()
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
-			ws, _, err := websocket.Dial(ctx, "ws"+server.URL[4:]+"/api/agent-browser?conv=known", &websocket.DialOptions{HTTPHeader: http.Header{"Cookie": {"session=ok"}}})
+			ws, _, err := websocket.Dial(ctx, "ws"+server.URL[4:]+"/api/agent-browser?conv=known",
+				&websocket.DialOptions{HTTPHeader: http.Header{"Cookie": {"session=ok"}}})
 			if err != nil {
 				t.Fatal(err)
 			}
