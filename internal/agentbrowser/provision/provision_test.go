@@ -187,7 +187,7 @@ func TestDiagnostics(t *testing.T) {
 		}
 	}
 	cfg := testConfig(t)
-	cfg.GOARCH = "arm64"
+	cfg.GOARCH = "riscv64"
 	_, err := platform(cfg)
 	if err == nil || !strings.Contains(err.Error(), "no pinned") || !strings.Contains(err.Error(), "chromium") {
 		t.Fatal(err)
@@ -308,13 +308,23 @@ func TestDownloadSupportReportsRepairWithoutNetwork(t *testing.T) {
 	if err := DownloadSupport(cfg); err != nil {
 		t.Fatal(err)
 	}
-	for _, arch := range []string{"arm64", "amd64"} {
+	for _, arch := range []string{"riscv64", "amd64"} {
 		cfg.GOARCH = arch
-		cfg.Download = arch == "arm64"
+		cfg.Download = arch == "riscv64"
 		var diagnostic *Diagnostic
 		if err := DownloadSupport(cfg); !errors.As(err, &diagnostic) || diagnostic.Command == "" {
 			t.Fatalf("%s: %v", arch, err)
 		}
+	}
+}
+
+func TestLinuxArm64Pin(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.GOARCH = "arm64"
+	a, err := platform(cfg)
+	if err != nil || a.platform != "linux-arm64" || a.binary != "chrome-linux-arm64/chrome" ||
+		a.sha256 != "5517510e61657ff43ee9ab804ecd1a499b3d5bd3caf72f097516bd6565ba5a17" {
+		t.Fatalf("%+v %v", a, err)
 	}
 }
 

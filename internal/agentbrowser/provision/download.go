@@ -28,6 +28,9 @@ func platform(cfg Config) (archive, error) {
 	switch cfg.GOOS + "/" + cfg.GOARCH {
 	case "linux/amd64":
 		return archive{"linux64", "8cdeb344e9b2cefe59f4aea8d1d93d5d93054c03cde217665c16fc1f62e72a66", "chrome-linux64/chrome"}, nil
+	case "linux/arm64":
+		return archive{"linux-arm64", "5517510e61657ff43ee9ab804ecd1a499b3d5bd3caf72f097516bd6565ba5a17",
+			"chrome-linux-arm64/chrome"}, nil
 	case "darwin/arm64":
 		return archive{"mac-arm64", "3406b38b52b7d341d74450eb7b369be038c9fec9894c8b8a9e9e9f97333caf2f",
 			"chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"}, nil
