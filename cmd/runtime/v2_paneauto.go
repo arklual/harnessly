@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/paneauto"
@@ -48,9 +49,11 @@ func (v *v2Live) newPaneWatcher() *paneauto.Watcher {
 	}
 	tmux := c.cfg.Tmux
 	return paneauto.New(paneauto.Env{
-		Targets:  panelTargets(),
-		DesignOf: designAPI(v.d).L.DesignOfPath,
-		Intents:  c.intents,
+		Targets:       panelTargets(),
+		Browser:       !agentbrowser.ConfigFromEnv(v.d.DataDir).Off,
+		BrowserServer: env("RUNTIME_MCP_SERVER", "harnessly"),
+		DesignOf:      designAPI(v.d).L.DesignOfPath,
+		Intents:       c.intents,
 		TabOf: func(conv string) string {
 			if v.rt == nil {
 				return ""
