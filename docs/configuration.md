@@ -329,3 +329,20 @@ tab, issue and pull request links show as chips with their state.
 | `RUNTIME_GITHUB_HOST` | the web host, default `github.com`; for GitHub Enterprise its host (the API is then `https://<host>/api/v3`) |
 | `RUNTIME_GITHUB_API` | the REST API root when it is elsewhere |
 | `RUNTIME_GITHUB_REPOS` | repositories the page may read, `owner/repo` or `owner/*`, comma separated; empty allows any |
+
+### Agent browser
+
+The agent browser starts lazily with profile `common`, separate from the VNC browser.
+Its detached `browser-host` process keeps Chrome alive across runtime restarts. Managed
+profiles live in `<data>/agent-browser/profiles/<id>/chrome`; metadata and the bounded
+`host.log` live beside that directory. Private sockets live in `<data>/agent-browser/run`,
+with a private hashed directory under `/tmp` when the Unix socket path would be too long.
+The runtime service must use `KillMode=process` to preserve the host on restart.
+
+| Variable | Meaning |
+| --- | --- |
+| `RUNTIME_BROWSER` | `off` disables the agent browser; unset enables lazy startup |
+| `RUNTIME_BROWSER_CDP` | external Chrome HTTP debugging address, e.g. `http://127.0.0.1:9333`; uses a WebSocket attached profile without launching or stopping processes; unset uses the private host pipe |
+| `RUNTIME_BROWSER_CHROME` | optional Chrome executable; otherwise searches Chrome/Chromium names on PATH and standard macOS application paths |
+| `RUNTIME_BROWSER_MODE` | `auto` (default), `xvfb`, or `headless`; auto uses a private Xvfb when available, otherwise `--headless=new` |
+| `RUNTIME_BROWSER_CHROME_ARGS` | extra whitespace-separated Chrome arguments, also used by the VNC browser; `--no-sandbox` is never added automatically |

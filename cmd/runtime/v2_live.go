@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/catalog"
 	"github.com/ly-solutions/harnessly/internal/convo"
@@ -86,6 +87,9 @@ func newV2Live(d deps, c *core) *v2Live {
 	}
 	version := env("AGENT_VERSION", agent.BuildVersion)
 	features := slices.Clone(v2Features)
+	if !agentbrowser.ConfigFromEnv(d.DataDir).Off {
+		features = append(features, wire.FeatureAgentBrowser)
+	}
 	if c.cfg.Term != nil && c.cfg.Tmux != nil {
 		features = append(features, wire.FeatureTerminal)
 	}

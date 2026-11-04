@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
 	"github.com/ly-solutions/harnessly/internal/browser"
@@ -113,11 +114,12 @@ func pathIs(r *http.Request, p string) bool {
 // runtimeGate is the assembled gate and what main must stop with it.
 type runtimeGate struct {
 	*gate.Gate
-	terms   *terminal.Server
-	browser *browser.Service
-	core    *coreRef
-	tmux    *tmux.Tmux
-	home    string
+	terms        *terminal.Server
+	browser      *browser.Service
+	agentBrowser *agentbrowser.Manager
+	core         *coreRef
+	tmux         *tmux.Tmux
+	home         string
 	// update looks for a newer release; nil when this runtime does not.
 	update *updatecheck.Checker
 	// self keeps the programs of a machine a hub carries the hub's; nil for any other runtime.
@@ -382,6 +384,15 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		},
 	}
 	ref.c.v2d = &d
+	agentBrowser := agentbrowser.New(agentbrowser.ConfigFromEnv(cfg.DataDir))
+	f.Add(agentBrowserRoutes(d, agentBrowser, func(id string) bool {
+		v := ref.c.v2.Load()
+		if v == nil {
+			return false
+		}
+		_, ok := v.rt.Record(id)
+		return ok
+	})...)
 	f.Add(ref.c.routes(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, cli.OK)...)
 	f.Add(ref.c.promptRoutes(sessionOK, apiRefusal)...)
 	f.Add(ref.c.launchRoutes(f, d, d.MachineAgent)...)
@@ -439,7 +450,7 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 		// The old runtime behind the gate does not get an install socket, or a socket of anyone without a session.
 		f.Add(upstreamGuard(func(r *http.Request) bool { return sessionOK(r) || cli.OK(r) }, previewOf(d).proxy.Matches))
 	}
-	rg := &runtimeGate{Gate: f, terms: terms, browser: remoteBrowser, core: ref, tmux: tm, home: home, self: self}
+	rg := &runtimeGate{Gate: f, terms: terms, browser: remoteBrowser, agentBrowser: agentBrowser, core: ref, tmux: tm, home: home, self: self}
 	if checkOn {
 		rg.update = checker
 	}
@@ -524,6 +535,7 @@ func run(ctx context.Context, cfg gate.Config) error {
 		return err
 	}
 	defer f.browser.Close()
+	defer f.agentBrowser.Close()
 	if alone != nil {
 		f.tmux.ApplyConfig("")
 		go alone.cleanUp(f.home, env("RUNTIME_UPLOADS_DIR", filepath.Join(cfg.DataDir, "uploads")))
