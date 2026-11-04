@@ -1,0 +1,320 @@
+package main
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func installerFunctions(t *testing.T, body string, stubs map[string]string) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	bin := filepath.Join(root, "bin")
+	if err := os.MkdirAll(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for name, script := range stubs {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+script+"\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := os.ReadFile("../../install.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyDir := filepath.Join(root, "apparmor.d")
+	if err = os.MkdirAll(filepath.Join(policyDir, "abi"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(policyDir, "abi", "5.0"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.ReplaceAll(string(raw), "/etc/apparmor.d", policyDir))
+	raw = []byte(strings.ReplaceAll(string(raw), "/proc/sys/kernel/apparmor_restrict_unprivileged_userns",
+		filepath.Join(root, "restricted")))
+	source := strings.TrimSuffix(strings.TrimSpace(string(raw)), `main "$@"`)
+	script := filepath.Join(root, "install.sh")
+	if err = os.WriteFile(script, []byte(source+"\n"+body), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("/bin/sh", script)
+	cmd.Env = append(os.Environ(), "HOME="+root, "XDG_CONFIG_HOME="+filepath.Join(root, "config"),
+		"XDG_STATE_HOME="+filepath.Join(root, "state"), "PATH="+bin+":/usr/bin:/bin", "CALLS="+filepath.Join(root, "calls"), "AGENT_DATA_DIR=")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("installer: %v\n%s", err, out)
+	}
+	calls, _ := os.ReadFile(filepath.Join(root, "calls"))
+	return string(out), string(calls)
+}
+
+func TestRootInstallerBrowserDependencies(t *testing.T) {
+	for _, tc := range []struct {
+		name                             string
+		passwordless, terminal, password bool
+	}{
+		{"passwordless", true, false, false}, {"no_privilege_no_terminal", false, false, false},
+		{"terminal_password", false, true, true}, {"terminal_denied", false, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sudo := `echo "sudo $*" >> "$CALLS"; if [ "$1" = -n ]; then shift; `
+			if tc.passwordless {
+				sudo += `exec "$@"; `
+			} else {
+				sudo += `exit 1; `
+			}
+			sudo += "fi; "
+			if tc.password {
+				sudo += `exec "$@"`
+			} else {
+				sudo += "exit 1"
+			}
+			terminal := "false"
+			if tc.terminal {
+				terminal = "true"
+			}
+			body := `parse_args --no-service
+OS=linux
+browser_system_chrome() { return 1; }
+browser_libraries_present() { return 1; }
+browser_has_tty() { ` + terminal + `; }
+ensure_browser
+echo completed`
+			out, calls := installerFunctions(t, body, map[string]string{
+				"id": "echo 1000", "sudo": sudo, "apt-get": `echo "apt-get $*" >> "$CALLS"`,
+			})
+			if !strings.Contains(out, "completed") || !strings.Contains(calls, "sudo -n") {
+				t.Fatalf("%s\n%s", out, calls)
+			}
+			if tc.passwordless || tc.password {
+				for _, want := range []string{"apt-get install", "xvfb", "fonts-liberation", "fonts-noto-color-emoji", "libnss3"} {
+					if !strings.Contains(calls, want) {
+						t.Errorf("missing %s: %s", want, calls)
+					}
+				}
+			} else if !strings.Contains(out, "Run outside harnessly") || !strings.Contains(out, "sudo sh -c") {
+				t.Fatalf("no repair command: %s", out)
+			}
+			if tc.terminal && !strings.Contains(out, "password is needed once") {
+				t.Fatal(out)
+			}
+			if !tc.terminal && strings.Contains(calls, "sudo sh") {
+				t.Fatalf("interactive sudo without terminal: %s", calls)
+			}
+		})
+	}
+}
+
+func TestRootInstallerDependenciesAllowPassword(t *testing.T) {
+	_, calls := installerFunctions(t, `parse_args
+OS=linux
+have() { [ "$1" != tmux ]; }
+ensure_deps`, map[string]string{
+		"id": "echo 1000", "sudo": `echo "sudo $*" >> "$CALLS"; [ "$1" != -n ] || exit 1; exec "$@"`,
+		"apt-get": `echo "apt-get $*" >> "$CALLS"`,
+	})
+	if !strings.Contains(calls, "install -y -qq tmux") || strings.Contains(calls, "sudo -n") {
+		t.Fatal(calls)
+	}
+}
+
+func TestRootInstallerBrowserAlreadyInstalled(t *testing.T) {
+	for _, native := range []string{"true", "false"} {
+		out, calls := installerFunctions(t, `parse_args
+OS=linux
+browser_system_chrome() { `+native+`; }
+browser_libraries_present() { return 0; }
+ensure_browser
+echo completed`, map[string]string{
+			"Xvfb": "exit 0", "sudo": `echo unexpected >> "$CALLS"; exit 1`,
+			"apt-get": `echo unexpected >> "$CALLS"; exit 1`,
+		})
+		if calls != "" || !strings.Contains(out, "completed") {
+			t.Fatalf("%s\n%s", out, calls)
+		}
+	}
+	_, calls := installerFunctions(t, "parse_args --no-browser\nOS=linux\nensure_browser", map[string]string{
+		"sudo": `echo unexpected >> "$CALLS"; exit 1`, "apt-get": `echo unexpected >> "$CALLS"; exit 1`,
+	})
+	if calls != "" {
+		t.Fatal(calls)
+	}
+}
+
+func TestRootInstallerAppArmor(t *testing.T) {
+	for _, restricted := range []string{"0", "1"} {
+		for _, native := range []string{"true", "false"} {
+			out, calls := installerFunctions(t, `parse_args
+OS=linux
+ARCH=amd64
+printf `+restricted+` > "$HOME/restricted"
+mkdir -p "$(dirname "$ENV_FILE")"
+printf 'AGENT_DATA_DIR="%s/custom data"\n' "$HOME" > "$ENV_FILE"
+browser_system_chrome() { `+native+`; }
+browser_libraries_present() { return 0; }
+ensure_browser
+ensure_browser
+if [ -f "$HOME/apparmor.d/harnessly-browser" ]; then cat "$HOME/apparmor.d/harnessly-browser"; fi`, map[string]string{
+				"Xvfb": "exit 0", "id": "echo 1000", "sudo": `echo "sudo $*" >> "$CALLS"; shift; exec "$@"`,
+				"apparmor_parser": `echo "parser $*" >> "$CALLS"`,
+				"apt-get":         `echo unexpected >> "$CALLS"; exit 1`,
+			})
+			if restricted == "1" && native == "false" {
+				for _, want := range []string{"custom data/agent-browser/chrome/*/chrome-linux64/chrome", "abi <abi/5.0>", "userns,"} {
+					if !strings.Contains(out, want) {
+						t.Fatalf("missing %s: %s", want, out)
+					}
+				}
+				if strings.Count(calls, "\nparser -r") != 1 || strings.Contains(calls, "unexpected") {
+					t.Fatal(calls)
+				}
+			} else if calls != "" {
+				t.Fatal(calls)
+			}
+		}
+	}
+}
+
+func TestRootInstallerRemoveAppArmor(t *testing.T) {
+	for _, allowed := range []bool{false, true} {
+		sudo := `echo "sudo $*" >> "$CALLS"; [ "$1" = -n ] || exit 90; shift; `
+		if allowed {
+			sudo += `exec "$@"`
+		} else {
+			sudo += "exit 1"
+		}
+		out, calls := installerFunctions(t, `parse_args
+OS=linux
+printf profile > "$HOME/apparmor.d/harnessly-browser"
+remove_browser_profile
+if [ -f "$HOME/apparmor.d/harnessly-browser" ]; then echo retained; else echo removed; fi`, map[string]string{
+			"id": "echo 1000", "sudo": sudo, "apparmor_parser": `echo "parser $*" >> "$CALLS"`,
+		})
+		want := "retained"
+		if allowed {
+			want = "removed"
+		}
+		if !strings.Contains(out, want) || !strings.Contains(calls, "sudo -n") {
+			t.Fatalf("%s\n%s", out, calls)
+		}
+		if !allowed && !strings.Contains(out, "outside harnessly") {
+			t.Fatal(out)
+		}
+	}
+}
+
+func TestRootInstallerUnitKeepsBrowserHosts(t *testing.T) {
+	out, _ := installerFunctions(t, `parse_args
+OS=linux
+start_systemd
+cat "$UNIT_DIR/harnessly.service"`, map[string]string{"systemctl": "exit 0", "loginctl": "echo yes"})
+	for _, want := range []string{"KillMode=process", "browser-host processes survive", "NoNewPrivileges=true"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("unit missing %s", want)
+		}
+	}
+}
+
+func TestRootInstallerUninstallValidatesHostPID(t *testing.T) {
+	_, calls := installerFunctions(t, `parse_args
+mkdir -p "$HOME/profiles/one" "$HOME/profiles/stale"
+printf 12345 > "$HOME/profiles/one/host.pid"
+printf 99999 > "$HOME/profiles/stale/host.pid"
+kill() { echo "kill $*" >> "$CALLS"; }
+stop_browser_hosts`, map[string]string{
+		"id": "echo 1000",
+		"ps": `echo "12345 runtime browser-host --profile $HOME/profiles/one --socket /tmp/one --chrome chrome"
+echo "12346 runtime browser-host --profile $HOME/profiles/stale --socket /tmp/two --chrome chrome"
+echo "12347 unrelated --profile $HOME/profiles/one"`,
+	})
+	if strings.TrimSpace(calls) != "kill -TERM 12345" {
+		t.Fatalf("unsafe signals: %s", calls)
+	}
+}
+
+func TestRootInstallerLocalArchive(t *testing.T) {
+	out, _ := installerFunctions(t, `mkdir -p "$HOME/release"
+for program in runtime agent harnessly; do
+ printf '#!/bin/sh\nexit 0\n' > "$HOME/release/$program"
+done
+tar -czf "$HOME/release.tar.gz" -C "$HOME/release" runtime agent harnessly
+parse_args --archive "$HOME/release.tar.gz" --prefix "$HOME/installed" --no-service --no-browser
+resolve_version
+download_and_verify
+install_programs
+for program in harnessly-runtime harnessly-agent harnessly; do test -x "$HOME/installed/bin/$program"; done
+echo local-archive-installed`, nil)
+	if !strings.Contains(out, "local-archive-installed") {
+		t.Fatal(out)
+	}
+}
+
+func TestRootInstallerAppArmorEscapesDataDirectory(t *testing.T) {
+	out, _ := installerFunctions(t, `parse_args
+OS=linux
+AGENT_DATA_DIR="$HOME/custom [data]*"
+ARCH=arm64
+browser_profile
+start_systemd
+cat "$UNIT_DIR/harnessly.service"`, map[string]string{"systemctl": "exit 0", "loginctl": "echo yes"})
+	if !strings.Contains(out, `custom \[data\]\*/agent-browser/chrome/*/chrome-linux-arm64/chrome`) {
+		t.Fatal(out)
+	}
+	if !strings.Contains(out, `Environment="AGENT_DATA_DIR=`) || !strings.Contains(out, `custom [data]*"`) {
+		t.Fatal(out)
+	}
+}
+
+func TestRootInstallerLibraryDetection(t *testing.T) {
+	for _, missing := range []bool{false, true} {
+		cache := `for lib in libnss3 libnspr4 libatk-1.0 libatk-bridge-2.0 libcups libdrm libxkbcommon \
+ libX11 libXcomposite libXdamage libXext libXfixes libXrandr libgbm libasound libpango-1.0 libcairo \
+ libdbus-1 libxcb libexpat libglib-2.0 libgio-2.0 libgobject-2.0; do echo "$lib.so.1"; done`
+		if missing {
+			cache = "echo libnss3.so"
+		}
+		out, _ := installerFunctions(t, `if browser_libraries_present; then echo complete; else echo missing; fi`, map[string]string{"ldconfig": cache})
+		want := "complete"
+		if missing {
+			want = "missing"
+		}
+		if !strings.Contains(out, want) {
+			t.Fatal(out)
+		}
+	}
+}
+
+func TestRootInstallerPreservesCustomDataDirectory(t *testing.T) {
+	out, _ := installerFunctions(t, `parse_args
+AGENT_DATA_DIR="$HOME/custom data"
+write_env_file
+unset AGENT_DATA_DIR
+write_env_file
+browser_data_dir`, nil)
+	if !strings.HasSuffix(strings.TrimSpace(out), "/custom data") {
+		t.Fatal(out)
+	}
+}
+
+func TestRootInstallerAppArmorLoadFailureCanRetry(t *testing.T) {
+	out, _ := installerFunctions(t, `parse_args
+OS=linux
+printf 1 > "$HOME/restricted"
+browser_system_chrome() { return 1; }
+browser_libraries_present() { return 0; }
+browser_has_tty() { return 1; }
+ensure_browser
+test ! -f "$HOME/apparmor.d/harnessly-browser"
+touch "$HOME/allow-profile"
+ensure_browser
+test -f "$HOME/apparmor.d/harnessly-browser"
+echo recovered`, map[string]string{
+		"id": "echo 1000", "Xvfb": "exit 0", "sudo": `shift; exec "$@"`,
+		"apparmor_parser": `test -f "$HOME/allow-profile"`,
+	})
+	if !strings.Contains(out, "recovered") {
+		t.Fatal(out)
+	}
+}

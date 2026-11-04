@@ -696,7 +696,9 @@ done_message() {
 
 # --- browser and design tools (optional) ----------------------------------------------------------------------------
 # The design library drives a headless Chromium; video exports use ffmpeg. The fullscreen remote browser uses the same
-# Chrome plus Xvfb, x11vnc and websockify. Profile dir installs them (best effort: a failure is a warning); the other
+# Chrome plus Xvfb, x11vnc and websockify. The agent browser reuses Chrome and Xvfb with a private pipe;
+# it needs neither VNC nor a public debugging port and keeps the sandbox enabled.
+# Profile dir installs them (best effort: a failure is a warning); the other
 # profiles only say what is missing. HARNESSLY_DESIGN_TOOLS=0 skips both. The board engine is built in; the vendor's
 # optional one is never installed from here: the owner fetches it with their own account (harnessly design engine fetch).
 
