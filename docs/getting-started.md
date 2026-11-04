@@ -172,3 +172,15 @@ rm -rf "$DEMO_HOME"
 
 - [Configuration](configuration.md) lists every variable.
 - [Architecture](architecture.md) explains what runs where.
+
+## Agent browser on a new machine
+
+The installer tries to install Xvfb, Chrome libraries and fonts without prompting for a sudo password. Failure is a
+warning with a command you can run later. `--no-browser` skips this optional step. Chrome itself is downloaded and
+verified by the runtime when you first open the agent browser or call a browser tool, unless a system Chrome already
+exists. During preparation, the panel shows progress and tools ask you to retry in 20 seconds.
+
+No browser configuration is needed on supported machines with an available sandbox. If startup fails, open the machine
+checks and follow the reported library or sandbox repair. Ubuntu's AppArmor policy can block downloaded Chrome; the
+runtime explains the required administrator change instead of disabling security. Without Xvfb it uses headless mode.
+See [browser sandbox](deploy.md#browser-sandbox) and [configuration](configuration.md#browser-preparation-and-diagnostics).

@@ -496,3 +496,32 @@ The page uses WebSockets (terminals, conversations, the status and sync sockets)
 answers under that path too, so one proxy prefix covers both. Boards and artifacts must allow the page's origin in
 their `frame-ancestors`; host all three under one registrable domain so their sign-in cookies reach the panes
 ([integrations](integrations.md)).
+
+## Browser sandbox
+
+The agent browser uses a private debugging pipe and per-profile Unix socket, without a public debugging port.
+The packaged container already provides Chromium, Xvfb and fonts. Its explicit
+`RUNTIME_BROWSER_CHROME_ARGS=--no-sandbox` also applies to the agent browser: container isolation is the deployment's
+chosen boundary. The machine installer supplies Chromium/Xvfb where supported but does **not** disable the sandbox.
+
+On Ubuntu with `kernel.apparmor_restrict_unprivileged_userns=1`, downloaded Chrome for Testing can fail with
+`No usable sandbox`. The `agent_browser` machine check and browser status show an AppArmor profile using the exact
+binary path and the command to load it. Ask an administrator to review that profile. Other choices are a system Google
+Chrome with its packaged policy, or a trusted `chrome-sandbox` helper owned by root with mode 4755. The helper requires
+a filesystem permitting setuid and a service without `NoNewPrivileges=true`; the default user unit intentionally sets
+that restriction. An already installed trusted helper can be selected with `CHROME_DEVEL_SANDBOX`, but it does not
+bypass `NoNewPrivileges` or a kernel namespace denial. Changing the pinned version changes its path: update any
+path-specific AppArmor rule too.
+
+Explicitly setting `RUNTIME_BROWSER_CHROME_ARGS=--no-sandbox` disables Chrome's security sandbox. Do not use this option
+for arbitrary websites on a host. The runtime never retries with it automatically.
+
+The user unit uses `KillMode=process`: runtime upgrades/restarts leave browser hosts and sessions alive. `install.sh
+--uninstall` locates this user's `browser-host` processes, checks each profile's `host.pid` and sends SIGTERM so Chrome
+can flush its state. Browser profiles and downloaded Chrome stay on disk. Uninstallation does not delete data.
+
+Maintainers update the pinned version and hashes using `tools/update-browser-checksums.sh VERSION`. For an offline-built
+runtime, `install.sh --archive FILE --no-service` accepts a **trusted local** tar archive containing `runtime`, `agent`
+and `harnessly`; normal release downloads retain their checksum/signature verification. CI runs this path in clean
+Ubuntu 24.04 and Debian 12 containers, then a real opt-in download/renderer/frame test. Locally, opt in with
+`AGENT_BROWSER_DOWNLOAD_TEST=1 go test -v ./internal/agentbrowser -run '^TestProvisionedChrome$'`.

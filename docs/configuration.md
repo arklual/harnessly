@@ -343,6 +343,24 @@ The runtime service must use `KillMode=process` to preserve the host on restart.
 | --- | --- |
 | `RUNTIME_BROWSER` | `off` disables the agent browser; unset enables lazy startup |
 | `RUNTIME_BROWSER_CDP` | external Chrome HTTP debugging address, e.g. `http://127.0.0.1:9333`; uses a WebSocket attached profile without launching or stopping processes; unset uses the private host pipe |
-| `RUNTIME_BROWSER_CHROME` | optional Chrome executable; otherwise searches Chrome/Chromium names on PATH and standard macOS application paths |
+| `RUNTIME_BROWSER_CHROME` | optional Chrome executable; otherwise searches system Chrome/Chromium, macOS applications, then the pinned cache; downloads on first use. Snap is the last resort and must pass a private-pipe probe |
+| `RUNTIME_BROWSER_DOWNLOAD` | `off` forbids automatic downloads; system browsers and the verified installed cache remain usable |
+| `RUNTIME_BROWSER_CHROME_URL` | full archive URL for an internal mirror; the pinned SHA-256 is still mandatory |
 | `RUNTIME_BROWSER_MODE` | `auto` (default), `xvfb`, or `headless`; auto uses a private Xvfb when available, otherwise `--headless=new` |
 | `RUNTIME_BROWSER_CHROME_ARGS` | extra whitespace-separated Chrome arguments, also used by the VNC browser; `--no-sandbox` is never added automatically |
+
+### Browser preparation and diagnostics
+
+The runtime pins Chrome for Testing 157.0.8103.38 for Linux amd64 and macOS arm64/amd64. Archives install atomically
+under `<data>/agent-browser/chrome/<version>/` after SHA-256 verification. Interrupted downloads restart from zero;
+profiles and runtime processes share a download lock. Linux arm64 has no pinned archive in this release: install your
+distribution's `chromium` package and set `RUNTIME_BROWSER_CHROME=chromium`.
+
+The first request starts preparation. Tools can use `Manager.Ready(ctx)` before `InstanceFor`: `preparing` includes
+`progress` (0–100) and `hint`; retry in 20 seconds. The panel receives the same status until ready. Readiness `up` means
+the executable passed its pipe/renderer probe; a profile still starts through `InstanceFor`. A failed preparation
+reports `error` with a repair command; restart the runtime after changing its environment or system configuration.
+
+Settings → machine checks includes `agent_browser`: executable, version, Xvfb/headless and sandbox. Opening checks
+does not download Chrome. Missing Xvfb selects headless in `auto`; explicitly requesting `xvfb` requires it installed.
+`--no-sandbox` is never silently added. See [deployment](deploy.md#browser-sandbox) for sandbox remedies.
