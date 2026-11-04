@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/provision"
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
@@ -48,32 +48,25 @@ func ConfigFromEnv(data string) Config {
 	}
 }
 
-// FindChrome is the replacement seam for a future managed Chrome installer.
+// FindChrome discovers an installed browser without downloading; Manager.Ready also provisions missing Chrome.
 func FindChrome() (string, error) {
-	for _, name := range []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser"} {
-		if p, e := exec.LookPath(name); e == nil {
-			return p, nil
-		}
+	cfg := provision.FromEnv("")
+	path, _, err := provision.Find(cfg)
+	if err == nil && path == "" {
+		err = errors.New("agent browser needs Chrome or Chromium")
 	}
-	for _, p := range []string{
-		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-		"/Applications/Chromium.app/Contents/MacOS/Chromium",
-	} {
-		if st, e := os.Stat(p); e == nil && !st.IsDir() {
-			return p, nil
-		}
-	}
-	return "", errors.New("agent browser needs Chrome or Chromium")
+	return path, err
 }
 
 // Manager reconnects independent browser profiles throughout the runtime lifetime.
 type Manager struct {
-	cfg       Config
-	mu        sync.Mutex
-	instances map[string]*Instance
-	ctx       context.Context
-	cancel    context.CancelFunc
-	wg        sync.WaitGroup
+	preparation *browserPreparation
+	cfg         Config
+	mu          sync.Mutex
+	instances   map[string]*Instance
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
 }
 
 // New creates a lazy manager; Instance starts the first connection.
@@ -110,6 +103,11 @@ func (m *Manager) Instance(ctx context.Context, id string) (*Instance, error) {
 	}
 	if !profileID.MatchString(id) {
 		return nil, errors.New("invalid browser profile id")
+	}
+	if m.cfg.CDP == "" {
+		if _, err := m.preparedChrome(ctx); err != nil {
+			return nil, err
+		}
 	}
 	m.mu.Lock()
 	if m.ctx.Err() != nil {
@@ -163,13 +161,9 @@ func (i *Instance) connect(ctx context.Context) (*cdp.Conn, error) {
 	if conn, err := dial(); err == nil {
 		return cdp.New(cdp.NewStream(conn), i.event), nil
 	}
-	chrome := cfg.Chrome
-	var err error
-	if chrome == "" {
-		chrome, err = FindChrome()
-		if err != nil {
-			return nil, err
-		}
+	chrome, err := i.manager.preparedChrome(ctx)
+	if err != nil {
+		return nil, err
 	}
 	executable := cfg.Executable
 	if executable == "" {

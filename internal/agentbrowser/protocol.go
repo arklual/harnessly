@@ -19,7 +19,7 @@ import (
 // profile are listed, including other conversations' tabs (owner:"other").
 //
 // Server text messages:
-//   {t:"status",state:"starting|up|down|error",error?,profile:{id,name}}
+//   {t:"status",state:"preparing|starting|up|down|error",error?,profile:{id,name}}
 //     Availability only. A command failure never changes browser status.
 //     Before profile resolution, id and name are empty.
 //   {t:"notice",level:"error",message}
@@ -60,10 +60,14 @@ import (
 
 // Status reports browser availability, never individual command failures.
 type Status struct {
-	T       string  `json:"t"`
-	State   string  `json:"state"`
-	Error   string  `json:"error,omitempty"`
-	Profile Profile `json:"profile"`
+	Progress int     `json:"progress"`
+	Hint     string  `json:"hint,omitempty"`
+	Mode     string  `json:"mode,omitempty"`
+	Sandbox  string  `json:"sandbox,omitempty"`
+	T        string  `json:"t"`
+	State    string  `json:"state"`
+	Error    string  `json:"error,omitempty"`
+	Profile  Profile `json:"profile"`
 }
 
 // Notice reports a recoverable failure without changing browser availability.
@@ -182,6 +186,24 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	conv := r.URL.Query().Get("conv")
+	for {
+		ready := m.Ready(ctx)
+		if ready.State != "preparing" {
+			if ready.State == "error" || ready.State == "down" {
+				_ = write(ready)
+				return
+			}
+			break
+		}
+		if write(ready) != nil {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 	i, err := m.InstanceFor(ctx, conv)
 	if err != nil {
 		_ = write(Status{T: "status", State: "error", Error: err.Error(), Profile: profile})
@@ -218,7 +240,9 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 	syncView := func() error {
 		state, reason := i.State()
-		if e := write(Status{T: "status", State: state, Error: reason, Profile: i.Profile()}); e != nil {
+		status := m.Ready(ctx)
+		status.State, status.Error, status.Profile = state, reason, i.Profile()
+		if e := write(status); e != nil {
 			return e
 		}
 		current, agentTab, following, busy := view.resolve(i, conv)
