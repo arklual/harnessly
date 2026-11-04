@@ -67,6 +67,7 @@ func TestRuntimeArgsOrder(t *testing.T) {
 	}
 	want = append(want,
 		"-c", `mcp_servers.rt-preview.url="http://127.0.0.1:8022/api/cli/preview/mcp"`,
+		"-c", `mcp_servers.rt-preview.default_tools_approval_mode="approve"`,
 		"-c", `mcp_servers.rt-preview.env_http_headers={"x-rt-token"="RT_PREVIEW_TOKEN"}`,
 		"--dangerously-bypass-hook-trust", "-c", "check_for_update_on_startup=false", "-m", "gpt-5.4", "-c", `model_reasoning_effort="xhigh"`)
 	if !slices.Equal(args, want) {
@@ -97,15 +98,18 @@ func TestRuntimeArgsOrder(t *testing.T) {
 // preview-mcp-config: Codex gets the url and the name of a variable for the header, never the token.
 func TestMCPArgsAreTOML(t *testing.T) {
 	args := MCPArgs(testMCP)
-	if len(args) != 4 || args[0] != "-c" || args[2] != "-c" {
+	if len(args) != 6 || args[0] != "-c" || args[2] != "-c" || args[4] != "-c" {
 		t.Fatalf("%q", args)
 	}
 	var a, b map[string]map[string]map[string]any
 	if _, err := toml.Decode(args[1], &a); err != nil || a["mcp_servers"]["rt-preview"]["url"] != "http://127.0.0.1:8022/api/cli/preview/mcp" {
 		t.Fatalf("%v %v", err, a)
 	}
-	if _, err := toml.Decode(args[3], &b); err != nil {
+	if _, err := toml.Decode(args[5], &b); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := toml.Decode(args[3], &a); err != nil || a["mcp_servers"]["rt-preview"]["default_tools_approval_mode"] != "approve" {
+		t.Fatalf("server approval: %v %v", err, a)
 	}
 	if h, _ := b["mcp_servers"]["rt-preview"]["env_http_headers"].(map[string]any); h["x-rt-token"] != "RT_PREVIEW_TOKEN" {
 		t.Fatalf("%v", b)
@@ -395,7 +399,8 @@ func TestRuntimeArgsExtraMCP(t *testing.T) {
 		t.Fatal(err)
 	}
 	i := slices.Index(args, `mcp_servers.mcp-linear.url="http://127.0.0.1:8022/api/cli/mcp-proxy/abc"`)
-	if i < 0 || args[i+2] != `mcp_servers.mcp-linear.env_http_headers={"x-rt-token"="RT_PREVIEW_TOKEN"}` ||
+	if i < 0 || args[i+2] != `mcp_servers.mcp-linear.default_tools_approval_mode="approve"` ||
+		args[i+4] != `mcp_servers.mcp-linear.env_http_headers={"x-rt-token"="RT_PREVIEW_TOKEN"}` ||
 		slices.Index(args, `mcp_servers.rt-preview.url="http://127.0.0.1:8022/api/cli/preview/mcp"`) > i {
 		t.Fatalf("%q", args)
 	}
