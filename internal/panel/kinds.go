@@ -12,7 +12,7 @@ type kind struct {
 var registry = []kind{
 	{"overview", none}, {"tools", none}, {"browser", port}, {"terminal", none}, {"files", path}, {"disk", none},
 	{"changes", path}, {"artifacts", doc}, {"gitlab", gitlab}, {"subagents", none}, {"economics", none}, {"plan", none},
-	{"peers", none}, {"design", designRef}, {"side-chat", none}, {"gallery", none}, {"task", task}, {"app", appRef},
+	{"peers", none}, {"design", designRef}, {"side-chat", none}, {"gallery", none}, {"task", task}, {"app", appRef}, {"agent-browser", none},
 }
 
 // Kinds are the kinds of tab the pane can hold, in the order the pane lists them.

@@ -19,7 +19,7 @@ func (i *Instance) event(method, session string, raw json.RawMessage) {
 		p := i.upsertLocked(e.Target)
 		c := i.conn
 		i.mu.Unlock()
-		if p != nil && c != nil && method == "Target.targetCreated" {
+		if p != nil && c != nil {
 			i.schedulePrepare(p, c)
 		}
 	case "Target.targetDestroyed":

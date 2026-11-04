@@ -37,6 +37,10 @@ func (i *Instance) upsertLocked(t target) *page {
 		if parent.Control != "person" && i.current[parent.Conversation] == parent.ID {
 			i.current[parent.Conversation] = p.ID
 		}
+		if p.By == "agent" && p.Viewport.Mode == "" {
+			p.Viewport = agentViewport()
+			p.defaultsPending = true
+		}
 	}
 	if before != p.Tab {
 		i.changedLocked()
@@ -108,6 +112,10 @@ func (i *Instance) reconcile(ctx context.Context, c *cdp.Conn, initial bool) err
 	for _, t := range r.Targets {
 		if p, parent := i.pages[t.ID], i.pages[t.Opener]; p != nil && parent != nil && p.Conversation == "" {
 			p.Conversation, p.By = parent.Conversation, parent.By
+			if p.By == "agent" && p.Viewport.Mode == "" {
+				p.Viewport = agentViewport()
+				p.defaultsPending = true
+			}
 		}
 	}
 	for id := range i.hidden {
@@ -137,7 +145,7 @@ func (i *Instance) reconcile(ctx context.Context, c *cdp.Conn, initial bool) err
 
 func (i *Instance) schedulePrepare(p *page, c *cdp.Conn) {
 	i.mu.Lock()
-	if p.preparing || (p.binding.conn == c && p.binding.session != "") {
+	if p.preparing || (p.binding.conn == c && p.binding.session != "" && !p.defaultsPending) {
 		i.mu.Unlock()
 		return
 	}

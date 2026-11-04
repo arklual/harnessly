@@ -112,10 +112,22 @@ func (i *Instance) startCast(ctx context.Context, id string, b binding) error {
 	if _, err := b.conn.Call(ctx, "Target.activateTarget", map[string]any{"targetId": id}, ""); err != nil {
 		return err
 	}
-	_, err := b.conn.Call(ctx, "Page.startScreencast", map[string]any{
-		"format": "jpeg", "quality": 75, "maxWidth": 1920, "maxHeight": 1400,
-	}, b.session)
-	return err
+	// Navigation can acknowledge before the replacement page becomes active. The
+	// session remains attached, but startScreencast briefly rejects it during commit.
+	// Retry only that transitional response, within the caller's existing deadline.
+	for {
+		_, err := b.conn.Call(ctx, "Page.startScreencast", map[string]any{
+			"format": "jpeg", "quality": 75, "maxWidth": 1920, "maxHeight": 1400,
+		}, b.session)
+		if err == nil || err.Error() != "Not attached to an active page" {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
 }
 
 type ack struct {

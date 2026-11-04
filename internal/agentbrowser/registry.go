@@ -251,7 +251,13 @@ func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error
 	if c == nil {
 		return Tab{}, cdp.ErrClosed
 	}
-	raw, err := c.Call(ctx, "Target.createTarget", map[string]any{"url": url, "newWindow": true}, "")
+	// Start agent pages blank: native window bounds include browser chrome and do not
+	// guarantee CSS dimensions on Xvfb. Apply the viewport before the first site load.
+	initialURL := url
+	if by == "agent" {
+		initialURL = "about:blank"
+	}
+	raw, err := c.Call(ctx, "Target.createTarget", map[string]any{"url": initialURL, "newWindow": true}, "")
 	if err != nil {
 		return Tab{}, err
 	}
@@ -265,6 +271,9 @@ func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error
 	working := i.currentLocked(conv)
 	p := i.upsertLocked(target{ID: r.ID, Type: "page", URL: url})
 	p.Conversation, p.By = conv, by
+	if by == "person" {
+		p.Viewport = Viewport{Mode: "fit", DPR: 1}
+	}
 	p.provisional = false
 	if by == "agent" || working == "" {
 		i.current[conv] = r.ID
@@ -273,6 +282,16 @@ func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error
 	i.mu.Unlock()
 	if _, err = i.prepare(ctx, p, c); err != nil {
 		return Tab{}, err
+	}
+	if by == "agent" {
+		if err = i.SetViewport(ctx, p.ID, agentViewport()); err != nil {
+			return Tab{}, err
+		}
+		if url != "about:blank" {
+			if _, err = i.Call(ctx, p.ID, "Page.navigate", map[string]any{"url": url}); err != nil {
+				return Tab{}, err
+			}
+		}
 	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
