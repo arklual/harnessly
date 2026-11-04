@@ -36,6 +36,10 @@ func (v veraCase) snooze(p *hubtest.Person, id, until string) hubtest.Resp {
 	return p.Do("POST", v.url("/signals/"+id+"/snooze"), map[string]any{"until": until})
 }
 
+func (v veraCase) unsnooze(p *hubtest.Person, id string) hubtest.Resp {
+	return p.Do("DELETE", v.url("/signals/"+id+"/snooze"), nil)
+}
+
 func (v veraCase) teamQuery() string { return "?scope=team:" + v.team.ID }
 
 func TestSignalsByRole(t *testing.T) {
@@ -201,6 +205,40 @@ func TestSignalsSnooze(t *testing.T) {
 	v.s.Clock.Advance(7 * time.Hour * 24)
 	if g, err := v.s.DB.S().SignalByID(context.Background(), sig.ID); err != nil || snoozedAt(g, v.s.Clock.Now()) {
 		t.Errorf("stored %+v (%v)", g, err)
+	}
+}
+
+func TestSignalsUnsnooze(t *testing.T) {
+	v := newVera(t)
+	v.paced(t)
+	sig := find(v.signals(t, v.anna, ""), "over_80", v.vera.ID)
+	if sig == nil {
+		t.Fatal("no signal")
+	}
+	if r := v.snooze(v.boris, sig.ID, "2026-11-05T09:00:00Z"); r.Code != http.StatusOK {
+		t.Fatalf("snooze: %s", r)
+	}
+	if r := v.unsnooze(v.gleb, sig.ID); r.Code/100 != 4 {
+		t.Errorf("gleb: %s", r)
+	}
+	if r := v.unsnooze(v.boris, "nope"); r.Code != http.StatusNotFound {
+		t.Errorf("unknown: %s", r)
+	}
+	r := v.unsnooze(v.boris, sig.ID)
+	if r.Code != http.StatusOK {
+		t.Fatalf("unsnooze: %s", r)
+	}
+	var out struct{ Signal analytics.Signal }
+	r.JSON(&out)
+	if out.Signal.ID != sig.ID || out.Signal.SnoozedUntil != nil {
+		t.Errorf("unsnoozed = %+v", out.Signal)
+	}
+	if find(v.signals(t, v.boris, v.teamQuery()), "over_80", v.vera.ID) == nil {
+		t.Error("the signal did not come back")
+	}
+	evs, _ := v.audit(t, v.anna, "?scope=team:"+v.team.ID)
+	if n := actions(evs)["signal.unsnooze"]; n != 1 {
+		t.Errorf("%d unsnooze events in %+v", n, actions(evs))
 	}
 }
 

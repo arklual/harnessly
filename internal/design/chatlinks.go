@@ -18,13 +18,16 @@ import (
 
 // Which chats worked on which design, for chats of any folder: the designs whose files a conversation's agent wrote
 // (Write, Edit, MultiEdit, NotebookEdit, apply_patch, a shell command that writes under the design's folder) or that it
-// named to the design CLI (`open design <id>`, `design <cmd> <id>`). It is read from the transcripts, so it holds for
+// named to the design CLI (`open design <id>`, `design <cmd> <id>`). A command of the CLI that only reads (`design check`,
+// `logs`, `list`, `history`…) is no work on the design: a chat that took a screenshot of another design to borrow from
+// it is not that design's chat. It is read from the transcripts, so it holds for
 // the chats that worked on a design before it was kept anywhere. Each transcript is read once: the index keeps how far
 // it got and what it found, grows with the file, and is kept on disk across restarts. A short growth is read when it is
 // asked for; a long one (a chat never read, the first run on a machine) is read behind, slowly, by Run.
 
 const (
-	chatLinksVersion = 1
+	// chatLinksVersion 3: a design counts only for what the chat wrote or created, not for a path in a command.
+	chatLinksVersion = 3
 	// chatLinksSyncBytes is the most a lookup reads itself; the rest is Run's.
 	chatLinksSyncBytes = 512 << 10
 	// chatLinksLineMax is the longest line read whole; a longer one (a huge tool result) is skipped.
@@ -45,6 +48,28 @@ var (
 	cliWords      = regexp.MustCompile(`"[^"]+"|'[^']+'|\S+`)
 	patchFileRe   = regexp.MustCompile(`(?m)^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$`)
 )
+
+// readingCLI are the commands of the design CLI that only look at a design; `page` and `notes` read with `list` and
+// `get` and write with the rest.
+// `panel` (shows a board to the person), `claim` and `release` are no edits either: the chat only looks at the
+// design or takes a turn at it.
+var readingCLI = map[string]bool{"list": true, "state": true, "logs": true, "check": true, "who": true, "history": true,
+	"timeline": true, "moment": true, "guide": true, "help": true, "video": true, "panel": true,
+	"claim": true, "release": true}
+
+var readingCLISub = map[string]map[string]bool{"page": {"list": true, "help": true}, "notes": {"get": true, "help": true}}
+
+// readsOnly is a command of the design CLI, its words after `design`, that only looks at the design.
+func readsOnly(words []string) bool {
+	if len(words) == 0 {
+		return false
+	}
+	if readingCLI[words[0]] {
+		return true
+	}
+	sub, ok := readingCLISub[words[0]]
+	return ok && (len(words) < 2 || sub[words[1]])
+}
 
 type chatLinkFile struct {
 	Ino     uint64   `json:"ino"`
@@ -83,7 +108,7 @@ func NewChatLinks(lib *Library, file string) *ChatLinks {
 	// The words after `open design` or `design` up to a flag or the end of the command: a subcommand or two, then the
 	// design (`design page create <id> --title …`).
 	words := `((?:(?:"[^"]+"|'[^']+'|[^\s;&|<>"'-][^\s;&|<>]*)[ \t]*){1,4})`
-	cli := regexp.MustCompile(`(?:^|[\s;&|(/])(?:` + strings.Join(names, "|") + `)\s+(?:open\s+)?design\s+` + words)
+	cli := regexp.MustCompile(`(?:^|[\s;&|(/])(?:` + strings.Join(names, "|") + `)\s+(open\s+)?design\s+` + words)
 	return &ChatLinks{lib: lib, file: file, cli: cli, queued: map[string]bool{}, reading: map[string]*sync.Mutex{},
 		kick: make(chan struct{}, 1)}
 }
@@ -470,7 +495,12 @@ func (c *ChatLinks) shellDesigns(cmd string, roots []string) []string {
 	var out []string
 	// A subcommand is a word like an id too: only the ids of designs that exist count, and that is the caller's check.
 	for _, m := range c.cli.FindAllStringSubmatch(cmd, -1) {
-		for _, w := range cliWords.FindAllString(m[1], -1) {
+		// `open design <id>` only shows the design to the person.
+		words := cliWords.FindAllString(m[2], -1)
+		if m[1] != "" || readsOnly(words) {
+			continue
+		}
+		for _, w := range words {
 			arg := strings.Trim(w, `"'`)
 			switch {
 			case filepath.IsAbs(arg):
@@ -480,9 +510,100 @@ func (c *ChatLinks) shellDesigns(cmd string, roots []string) []string {
 			}
 		}
 	}
-	if writesShell.MatchString(cmd) {
-		for _, m := range absolutePathRe.FindAllStringSubmatch(cmd, -1) {
-			out = appendNew(out, designUnder(roots, m[1]))
+	// A `cd <abs path>` sets the base the relative targets of the commands after it resolve against.
+	base := ""
+	for _, seg := range shellSegments.Split(cmd, -1) {
+		if dir, ok := cdTarget(seg, base); ok {
+			base = dir
+			continue
+		}
+		for _, p := range writtenPaths(seg, base) {
+			out = appendNew(out, designUnder(roots, p))
+		}
+	}
+	return out
+}
+
+var (
+	shellSegments = regexp.MustCompile(`[;&|\n]+`)
+	// redirectTarget: the path after `>` or `>>`.
+	redirectTarget = regexp.MustCompile(`>>?\s*['"]?([^\s'"<>;&|)&-][^\s'"<>;&|)]*)`)
+	// moveCmd: the commands whose last path is the one written, the others are only read.
+	moveCmd   = regexp.MustCompile(`^(?:cp|mv|rsync|install|ln)$`)
+	changeCmd = regexp.MustCompile(`^(?:tee|touch|mkdir|rm|unzip|tar|patch)$`)
+	// scriptWrites: an inline script that writes a file.
+	scriptWrites = regexp.MustCompile(`\bwrite_text\(|\bwriteFileSync\(|\bopen\([^)]*['"][wa]`)
+)
+
+// cdTarget is the folder a `cd` segment moves to (relative to base when there is one), false for another command.
+func cdTarget(seg, base string) (string, bool) {
+	words := cliWords.FindAllString(seg, -1)
+	if len(words) != 2 || words[0] != "cd" {
+		return "", false
+	}
+	dir := strings.Trim(words[1], `"'`)
+	switch {
+	case filepath.IsAbs(dir):
+		return filepath.Clean(dir), true
+	case base != "" && !strings.HasPrefix(dir, "-"):
+		return filepath.Join(base, dir), true
+	}
+	// A folder it cannot place: what follows resolves against nothing.
+	return "", true
+}
+
+// resolveIn is an absolute path as it is, a relative one under base, "" when it has no place.
+func resolveIn(base, p string) string {
+	switch {
+	case p == "":
+		return ""
+	case filepath.IsAbs(p):
+		return p
+	case base != "":
+		return filepath.Join(base, p)
+	}
+	return ""
+}
+
+// writtenPaths are the absolute paths one simple command may write (relative ones resolve against base): a redirect's
+// target, the destination of a copy, every path of a command that changes what it names. A path that is only read
+// (`cat`, `ls`, the source of `cp`) or the folder a chat stands in is none: it is no work on the design.
+func writtenPaths(seg, base string) []string {
+	if !writesShell.MatchString(seg) {
+		return nil
+	}
+	var out []string
+	for _, m := range redirectTarget.FindAllStringSubmatch(seg, -1) {
+		out = append(out, resolveIn(base, m[1]))
+	}
+	words := cliWords.FindAllString(seg, -1)
+	for len(words) > 0 && (words[0] == "sudo" || words[0] == "nice" || strings.Contains(words[0], "=")) {
+		words = words[1:]
+	}
+	var paths []string
+	for _, w := range words[min(1, len(words)):] {
+		if arg := strings.Trim(w, `"'`); arg != "" && !strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, ">") {
+			paths = append(paths, resolveIn(base, arg))
+		}
+	}
+	switch {
+	case len(words) == 0:
+	case moveCmd.MatchString(words[0]):
+		if len(paths) > 0 {
+			out = append(out, paths[len(paths)-1])
+		}
+	case words[0] == "sed" || words[0] == "perl":
+		// The file is the last word; the ones before are the script.
+		if len(paths) > 0 {
+			out = append(out, paths[len(paths)-1])
+		}
+	case changeCmd.MatchString(words[0]):
+		// tee, touch, mkdir, rm, patch: all that it names may change.
+		out = append(out, paths...)
+	case scriptWrites.MatchString(seg):
+		// An inline script that writes a file: its paths sit inside quotes.
+		for _, m := range absolutePathRe.FindAllStringSubmatch(seg, -1) {
+			out = append(out, m[1])
 		}
 	}
 	return out

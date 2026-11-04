@@ -5,7 +5,10 @@ import {
   encodePeriod,
   hintOf,
   initialState,
+  compareNameOf,
   labelOf,
+  monthRange,
+  nameOf,
   pickPreset,
   pickWeek,
   presetsOf,
@@ -157,5 +160,24 @@ describe('the URL', () => {
       period: { from: '2026-09-28', to: '2026-10-25' },
       compare: { from: '2026-08-31', to: '2026-09-27' },
     });
+  });
+});
+
+describe('period names', () => {
+  it('names the current month, the weeks and any range by its length', () => {
+    // Weeks from 28 Sep belong to October by their Thursday.
+    expect(monthRange(WEEKS)).toEqual([8, 12]);
+    expect(nameOf(WEEKS, [8, 12], { month: true }).title).toBe('Этот месяц');
+    expect(nameOf(WEEKS, [12, 12]).title).toBe('Эта неделя');
+    expect(nameOf(WEEKS, [11, 11]).title).toBe('Прошлая неделя');
+    expect(nameOf(WEEKS, [3, 3]).title).toBe('1 неделя');
+    expect(nameOf(WEEKS, [8, 11]).title).toBe('4 недели');
+    expect(nameOf(WEEKS, [4, 11]).title).toBe('8 недель');
+    expect(nameOf(WEEKS, [0, 0]).dates).toBe(labelOf(WEEKS, [0, 0]));
+  });
+
+  it('calls an automatic comparison the previous period', () => {
+    const s = initialState([8, 12]);
+    expect(compareNameOf(WEEKS, s).title).toBe('Предыдущий период');
   });
 });

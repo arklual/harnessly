@@ -173,6 +173,17 @@ func (s *Service) getEnv(w http.ResponseWriter, r *http.Request, p *auth.Princip
 		}
 	}
 	resp.Observed = use.observed(cover{spaces: spaces, team: teamFilter}, inEnv)
+	var byItem map[string]*ItemDelivery
+	if resp.Delivery, byItem, err = q.delivery(tenants, teamFilter); err != nil {
+		return err
+	}
+	for i := range resp.Layers {
+		for j := range resp.Layers[i].Items {
+			if it := &resp.Layers[i].Items[j]; it.Enabled {
+				it.Delivery = byItem[it.ItemID]
+			}
+		}
+	}
 	httpx.WriteJSON(w, http.StatusOK, resp)
 	return nil
 }

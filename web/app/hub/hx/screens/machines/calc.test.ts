@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { MachineGroup, MachinesList, MachinesSummary, OrgMachine } from '../../../org/api/machines';
 import {
   applyOverlay,
+  canOpen,
+  cleanName,
   cardSub,
   chatsText,
   deltaOf,
@@ -456,5 +458,21 @@ describe('the dialogs of the card', () => {
     expect(
       restartHint('machine', machine({ cloud: true, rent: { provider: 'Hoster', plan: 'p', price: null } })),
     ).toContain('через Hoster');
+  });
+});
+
+describe('rename and open', () => {
+  it('cleans a name the way the hub does', () => {
+    expect(cleanName('  build   box ')).toBe('build box');
+    expect(cleanName('   ')).toBeNull();
+    expect(cleanName('x'.repeat(60))).toHaveLength(60);
+    expect(cleanName('x'.repeat(61))).toBeNull();
+  });
+
+  it('opens only a machine that is on', () => {
+    expect(canOpen(machine({ state: 'online' }))).toBe(true);
+    expect(canOpen(machine({ state: 'idle' }))).toBe(true);
+    expect(canOpen(machine({ state: 'offline' }))).toBe(false);
+    expect(canOpen(machine({ state: 'disabled' }))).toBe(false);
   });
 });

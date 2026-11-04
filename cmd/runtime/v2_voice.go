@@ -10,10 +10,10 @@ import (
 )
 
 // v2Voice is wire.Server.Voice on the machine's dictation: the decoder and the recognition service of the Legacy
-// page's microphone, for a whole recording.
-func v2Voice(s *voice.Server) func(context.Context, io.Reader, string) (string, error) {
-	return func(ctx context.Context, audio io.Reader, lang string) (string, error) {
-		text, err := s.Transcribe(ctx, audio, lang)
+// page's microphone, for a whole recording, with the engine the person picked for dictation.
+func v2Voice(s *voice.Server) func(context.Context, io.Reader, string, string) (string, error) {
+	return func(ctx context.Context, audio io.Reader, lang, engine string) (string, error) {
+		text, err := s.Transcribe(ctx, audio, lang, engine)
 		var verr *voice.Error
 		if errors.As(err, &verr) && verr.Unavailable {
 			return "", wire.ErrVoiceUnavailable

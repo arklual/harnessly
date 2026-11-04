@@ -14,9 +14,9 @@ import (
 // Files the agent produced or read, opened in the viewer or handed over to be saved.
 
 const (
-	MaxPreviewBytes  = 15 * 1024 * 1024
-	MaxVideoBytes    = 500 * 1024 * 1024
-	MaxDownloadBytes = 500 * 1024 * 1024
+	MaxPreviewBytes = 15 * 1024 * 1024
+	// MaxVideoBytes bounds what the viewer plays in place; a download has no bound.
+	MaxVideoBytes = 500 * 1024 * 1024
 )
 
 // VideoTypes are read in ranges: video, sound, and a PDF, whose viewer asks for the pages it draws.
@@ -164,7 +164,7 @@ func (a *Access) Preview(requested string) Target {
 	return Target{OK: true, Real: real, Ext: ext, Size: st.Size()}
 }
 
-// Download resolves a file the agent sent to be saved: any type, the same places, secrets kept out.
+// Download resolves a file the agent sent to be saved: any type and size, the same places, secrets kept out.
 func (a *Access) Download(requested string) Target {
 	real, refused := a.locate(requested)
 	if refused != nil {
@@ -173,9 +173,6 @@ func (a *Access) Download(requested string) Target {
 	st, err := os.Stat(real)
 	if err != nil || !st.Mode().IsRegular() {
 		return refuse(404, locale.Pick("File not found", "Файл не найден"))
-	}
-	if st.Size() > MaxDownloadBytes {
-		return refuse(413, locale.Pick("The file is too large", "Файл слишком большой"))
 	}
 	return Target{OK: true, Real: real, Ext: lastDotExt(real), Size: st.Size()}
 }

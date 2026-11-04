@@ -190,7 +190,7 @@ export const useDesignConv = (machine: MachineId, design: string, fromChat: stri
   const pick = (id: string | null) => {
     setOverridden(fromChat);
     // The address stops naming the chat it came from: a reload shows the pick (the design's last chat), not the old one.
-    if (fromChat !== null) goTo({ kind: ROUTE.site, id: design }, { replace: true });
+    if (fromChat !== null) goTo({ kind: ROUTE.site, id: design, edit: true }, { replace: true });
     bindDesignConv(key, id === null ? null : { id, fresh: false });
   };
   return { picked, pick };

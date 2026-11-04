@@ -187,10 +187,11 @@ const groupPlan = (source: string, target: IDropTarget, view: IFavView): TDropPl
     if (target.id === source) return null;
     before = target.edge === EDGE.after ? after(view.groups, target.id) : target.id;
   } else if (target.kind === DROP.chat && target.id) {
-    // Over a chat of a group: after that group; over a loose one: last.
+    // Over a chat of a group: after that group. Over a loose one: nothing; the groups' own line takes it (the drag
+    // keeps it last among them), so the place shown is the place it lands.
     const groupId = groupOfChat(view, target.id);
-    before = groupId ? after(view.groups, groupId) : null;
-    if (groupId === source) return null;
+    if (!groupId || groupId === source) return null;
+    before = after(view.groups, groupId);
   } else return null;
   const order = view.groups.map((group) => group.id).filter((id) => id !== source);
   const at = before === null ? order.length : order.indexOf(before);

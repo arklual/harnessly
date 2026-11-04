@@ -9,6 +9,15 @@
 .hx-dl__composer {
   container: hx-field / inline-size;
 }
+/* The corners the dock's one unit shares: the field and the sheet of layers over it (the question, the bars, the queue). */
+.hx-dock {
+  --hx-dock-r: 28px;
+}
+/* A chat's dock answers to its own width, not the window's: the same chat is full width, in the right pane and in a
+   design's narrow column — see «A narrow dock» below. */
+.hx-chat > .hx-dock {
+  container: hx-dock / inline-size;
+}
 .hx-dock .hx-composer {
   --hx-composer-h: 124px;
   position: relative;
@@ -16,11 +25,12 @@
   width: auto;
   max-width: none;
   padding: 0;
-  border-radius: 28px;
+  border-radius: var(--hx-dock-r);
   background: var(--hx-bg-raised);
   border: 1px solid var(--hx-border-strong);
   box-shadow: var(--hx-shadow-md);
   transition:
+    border-radius var(--hx-dur-md) var(--hx-ease-out),
     border-color var(--hx-dur-sm),
     background var(--hx-dur-md),
     box-shadow var(--hx-dur-md);
@@ -35,11 +45,9 @@
   transition: opacity var(--hx-dur-md);
   pointer-events: none;
 }
+/* Focus is a quiet hint: the border warms a little, no glow around the field. */
 .hx-dock .hx-composer:focus-within {
-  border-color: var(--hx-focus);
-}
-.hx-dock .hx-composer:focus-within::after {
-  opacity: 1;
+  border-color: color-mix(in srgb, var(--hx-focus) 40%, var(--hx-border-strong));
 }
 /* Files held over the window: the field takes them (design lib/hx components.css, verbatim). */
 .hx-composer[data-mode='drop'] {
@@ -127,10 +135,29 @@
   flex: 1 1 auto;
   width: 100%;
   min-height: 26px;
-  /* Up to 40% of the screen and 320 px, then the text scrolls inside the field; the chips and the bar do not. */
-  max-height: min(40dvh, 320px);
+  /* Up to a third of the screen and 280 px, as on Sinopia's start, then the text scrolls inside the field; the chips and
+     the bar do not. A text that goes on past an edge fades there (use-fit-field.ts marks the edges). */
+  max-height: min(30dvh, 280px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hx-border-strong) transparent;
+  --fade-top: 0px;
+  --fade-bottom: 0px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent
+  );
   padding: 0;
   border: 0;
   outline: 0;
@@ -138,6 +165,12 @@
   background: none;
   color: var(--hx-fg-1);
   font: inherit;
+}
+.hx-dock .hx-composer__input[data-fade-top='true'] {
+  --fade-top: 20px;
+}
+.hx-dock .hx-composer__input[data-fade-bottom='true'] {
+  --fade-bottom: 20px;
 }
 /* Listening: the field's own text is clear and the layer over it shows the same words, the fresh ones fading in. */
 .hx-dock .hx-composer[data-rec='true'] .hx-composer__input {
@@ -192,7 +225,7 @@
   transform: rotate(45deg);
 }
 .hx-plus {
-  width: 248px;
+  width: 296px;
   padding: 4px;
   border-radius: var(--hx-radius-md);
   border: 1px solid var(--hx-border-strong);
@@ -236,8 +269,9 @@
   white-space: nowrap;
 }
 .hx-plus__hint {
-  flex: none;
-  max-width: 40%;
+  /* The quiet words give way first, so a name is not cut while its hint is whole. */
+  flex: 0 100 auto;
+  max-width: 50%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -552,20 +586,16 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 8px;
-  margin: 0 18px;
-  padding: 6px 6px 6px 14px;
+  padding: 6px 8px 6px 20px;
   border: 1px solid var(--hx-border-strong);
   border-bottom: 0;
-  border-radius: 20px 20px 0 0;
+  border-radius: var(--hx-dock-r) var(--hx-dock-r) 0 0;
   background: linear-gradient(var(--hx-bg-hover), var(--hx-bg-hover)), var(--hx-bg-raised);
   animation: hx-dockbar-in 360ms var(--hx-ease-out) backwards;
 }
 .hx-dockbar[data-state='closing'] {
   animation: hx-dockbar-out 240ms var(--hx-ease-out) forwards;
   pointer-events: none;
-}
-.hx-dockbar + .hx-qfold .hx-queue {
-  border-radius: 0;
 }
 .hx-dockbar__line {
   display: flex;
@@ -591,13 +621,16 @@
 }
 .hx-dockbar__text {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  column-gap: 6px;
   min-width: 0;
   font-size: var(--hx-text-sm);
   line-height: 20px;
 }
+/* In a narrow chat the title wraps instead of running past the field's edge. */
 .hx-dockbar__title {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   color: var(--hx-fg-1);
   font-weight: var(--hx-weight-medium);
 }
@@ -628,10 +661,9 @@
 .hx-dockstat {
   display: grid;
   grid-template-rows: 1fr;
-  margin: 0 18px;
   border: 1px solid var(--hx-border-strong);
   border-bottom: 0;
-  border-radius: 20px 20px 0 0;
+  border-radius: var(--hx-dock-r) var(--hx-dock-r) 0 0;
   background: linear-gradient(var(--hx-bg-hover), var(--hx-bg-hover)), var(--hx-bg-raised);
   color: var(--hx-fg-2);
   font-size: var(--hx-text-sm);
@@ -656,7 +688,7 @@
   gap: 8px;
   min-height: 30px;
   margin: 0;
-  padding: 3px 14px;
+  padding: 3px 20px;
   list-style: none;
   line-height: 20px;
 }
@@ -701,16 +733,6 @@
 .hx-dockstat__step[data-state='done'] .hx-dockstat__mark {
   color: var(--hx-success);
 }
-.hx-dockstat + .hx-qfold .hx-queue {
-  border-radius: 0;
-}
-/* Lines stacked over the field read as one card: only the top one keeps its rounded corners. */
-.hx-dockbar + .hx-dockbar,
-.hx-dockbar + .hx-dockstat,
-.hx-dockstat + .hx-dockbar {
-  border-radius: 0;
-  border-top-color: var(--hx-border);
-}
 @keyframes hx-dockstat-in {
   from {
     opacity: 0;
@@ -747,11 +769,10 @@
   z-index: 0;
   display: flex;
   flex-direction: column;
-  margin: 0 18px;
-  padding: 2px 6px 6px;
+  padding: 4px 8px;
   border: 1px solid var(--hx-border-strong);
   border-bottom: 0;
-  border-radius: 20px 20px 0 0;
+  border-radius: var(--hx-dock-r) var(--hx-dock-r) 0 0;
   background: linear-gradient(var(--hx-bg-hover), var(--hx-bg-hover)), var(--hx-bg-raised);
   /* A long queue scrolls inside itself and does not push the chat off the screen. */
   max-height: min(40dvh, 320px);
@@ -784,9 +805,9 @@
   /* A row too narrow for words, reason and button gives the button its own line instead of laying them over each other. */
   flex-wrap: wrap;
   align-items: center;
-  gap: 0 10px;
+  gap: 0 8px;
   min-height: 36px;
-  padding: 0 4px 0 10px;
+  padding: 0 0 0 8px;
   border-radius: 12px;
   animation: hx-queue-in var(--hx-fold-ms) var(--hx-ease-out) backwards;
   transition:
@@ -889,13 +910,17 @@
   bottom: -1px;
 }
 .hx-queue__main {
-  flex: 1 1 15rem;
+  /* Words alone give way on one line in a narrow chat (a deck's panel); a reason beside them needs the room. */
+  flex: 1 1 6rem;
   display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
   /* What does not fit stays inside the cell: the note never reaches the button next to it. */
   overflow: hidden;
+}
+.hx-queue__main:has(.hx-queue__note) {
+  flex-basis: 15rem;
 }
 .hx-queue__text {
   min-width: 0;
@@ -905,7 +930,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--hx-text-sm);
-  color: var(--hx-fg-1);
+  color: var(--hx-fg-2);
 }
 .hx-queue__note {
   flex: 0 1 auto;
@@ -929,14 +954,18 @@
 .hx-queue__files {
   flex: none;
   display: flex;
+  align-items: center;
   gap: 4px;
 }
+.hx-queue__files > span {
+  display: flex;
+}
 .hx-queue__file {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 5px;
   background: var(--hx-bg-raised);
   box-shadow: inset 0 0 0 1px var(--hx-border);
   color: var(--hx-accent);
@@ -1006,11 +1035,16 @@
   height: 12px;
   border-width: 1.5px;
 }
-/* Stacked layers over the field: only the top one keeps its rounded corners. */
-.hx-ask + .hx-dockbar,
-.hx-ask + .hx-qfold .hx-queue,
-.hx-dockbar + .hx-dockbar {
+/* The layers over the field and the field are one unit of one width: the top layer alone keeps its rounded corners, a
+   layer under another meets it with a hairline, and the field under a layer gives up its top corners. */
+.hx-dock :is(.hx-ask, .hx-dockbar, .hx-dockstat, .hx-qfold) + :is(.hx-dockbar, .hx-dockstat),
+.hx-dock :is(.hx-ask, .hx-dockbar, .hx-dockstat) + .hx-qfold .hx-queue {
   border-radius: 0;
+  border-top-color: var(--hx-border);
+}
+.hx-dock :is(.hx-ask, .hx-dockbar, .hx-dockstat, .hx-qfold) + .hx-composer {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 /* A narrow field, on a phone or in a narrow column of a wide window, is the phone's field: lower, with tighter paddings;
@@ -1031,6 +1065,7 @@
   }
   .hx-dock .hx-composer__input {
     min-height: 22px;
+    max-height: min(26dvh, 240px);
   }
   .hx-model {
     height: 32px;
@@ -1044,8 +1079,25 @@
   .hx-dock .hx-composer__bar .hx-round {
     flex: none;
   }
-  .hx-composer__bar .hx-ctx,
-  .hx-composer__bar .hx-lim:not(:has([data-level='low'], [data-level='out'])) {
+  .hx-composer__bar .hx-ctx {
+    display: none;
+  }
+  /* The model keeps its whole name; the limit gives way instead: only the window with the least left («нед 24%»), no icon,
+     and it may shrink to nothing before the pill does. It is never hidden for being healthy: a person who sees no chip
+     takes the machine for one that reports no limits. */
+  .hx-composer__bar .hx-model {
+    flex: none;
+  }
+  .hx-composer__bar .hx-lim {
+    flex: 0 1 auto;
+    overflow: hidden;
+  }
+  .hx-composer__bar .hx-lim__chip {
+    gap: 6px;
+    padding: 0 8px;
+  }
+  .hx-composer__bar .hx-lim__chip > .hx-icon,
+  .hx-composer__bar .hx-lim__win:not([data-least]):not(:only-of-type) {
     display: none;
   }
 }
@@ -1056,14 +1108,13 @@
 }
 /* A phone's box is rounder (a field cannot query its own width for its own corners). */
 @media (max-width: 900px) {
-  .hx-dock .hx-composer {
-    border-radius: 22px;
+  .hx-dock {
+    --hx-dock-r: 22px;
   }
 
   /* On a phone a bar is one line; a tap opens its explanation and actions. */
   .hx-dockbar {
-    margin: 0 14px;
-    padding: 4px 6px 4px 12px;
+    padding: 4px 8px 4px 16px;
   }
   .hx-dockbar__line {
     min-height: 32px;
@@ -1109,11 +1160,7 @@
     padding: 2px 0 6px;
     animation: hx-sk-in 220ms ease backwards;
   }
-  .hx-queue {
-    margin: 0 14px;
-  }
   .hx-queue__main {
-    flex: 1 1 9rem;
     flex-direction: column;
     align-items: stretch;
     gap: 0;
@@ -1122,6 +1169,46 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 16px;
+  }
+}
+
+/* A narrow dock — a phone, a design's chat column, the side chat: the layers keep the field's width and rounder corners,
+   a queued row stays one line (its words give way, its buttons stay small at the right), one picture stands for its
+   files. */
+@container hx-dock (max-width: 480px) {
+  .hx-dock :is(.hx-ask, .hx-dockbar, .hx-dockstat, .hx-qfold, .hx-composer) {
+    --hx-dock-r: 22px;
+  }
+  .hx-queue {
+    padding: 4px 6px;
+  }
+  .hx-queue__row {
+    gap: 0 6px;
+    padding-left: 6px;
+  }
+  .hx-queue__main {
+    flex: 1 1 4rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .hx-queue__main:has(.hx-queue__note) {
+    flex-basis: 8rem;
+  }
+  .hx-queue__note {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 16px;
+  }
+  .hx-queue__files > span + span {
+    display: none;
+  }
+  .hx-queue__del {
+    width: 26px;
+    height: 26px;
+  }
+  .hx-queue__steer {
+    padding: 0 8px;
   }
 }
 
@@ -1224,7 +1311,20 @@
   max-width: calc(var(--hx-feed-max) + 120px);
   margin: 0 auto;
   z-index: 2;
-  transform: translateY(calc(-50cqh + 50% + var(--hx-space-5) + 40px));
+  /* Its top edge stands where a one-line field's does and the field grows down from there, never up over the greeting
+     (Sinopia's start does the same); it stops at the stage's bottom and only then pushes up. */
+  transform: translateY(min(calc(-50cqh + 100% - var(--hx-dock-rest) / 2 + var(--hx-space-5) + 40px), 0px));
+}
+.hx-stage[data-phase='home'] {
+  --hx-dock-rest: 126px;
+}
+/* The greeting stands on the dock's top edge, inside it: the field grows down from there, and when a tall field is
+   pushed up at the stage's bottom the greeting rises with it, so nothing over the field is ever covered. */
+.hx-stage .hx-dock > .hx-hello[data-dock] {
+  top: auto;
+  bottom: calc(100% + var(--hx-space-8));
+  left: 0;
+  right: 0;
 }
 .hx-hello__busy {
   margin-top: 10px;
@@ -1237,6 +1337,9 @@
     left: calc(var(--hx-space-3) + env(safe-area-inset-left));
     right: calc(var(--hx-space-3) + env(safe-area-inset-right));
     bottom: calc(var(--hx-space-2) + max(env(safe-area-inset-bottom), var(--hx-kb, 0px)));
+  }
+  .hx-stage[data-phase='home'] {
+    --hx-dock-rest: 98px;
   }
   /* As in the design, the field stays under the greeting on a phone too, and goes down over the keyboard when it opens */
   .hx-stage[data-phase='home'] > .hx-dock[data-keyboard='open'] {
@@ -1251,7 +1354,9 @@
 }
 @keyframes hx-dock-down {
   from {
-    transform: translateY(calc(-50cqh + 50% + var(--hx-space-5) + 40px));
+    transform: translateY(
+      min(calc(-50cqh + 100% - var(--hx-dock-rest, 126px) / 2 + var(--hx-space-5) + 40px), 0px)
+    );
   }
 }
 /* Only from a chat: from Designly the field flies in and the dock is already in its place (the design's one dock does
@@ -1881,12 +1986,11 @@
   pointer-events: none;
 }
 
-/* Before the chat is known the field is already there, so the page does not jump when it becomes usable. */
-.hx-composer[data-quiet] {
-  opacity: 0.7;
-}
-
-.hx-composer[data-quiet] .hx-composer__bar {
+/* Before the chat is known the field is already there, so the page does not jump when it becomes usable. The field
+   itself stays opaque — the feed never shows through it — and only its buttons are dimmed. A recording going on is never
+   quiet: its stop, cancel and send work whatever the field waits for (HRN-674). */
+.hx-composer[data-quiet] .hx-composer__bar:not(.hx-recbar) {
+  opacity: 0.5;
   pointer-events: none;
 }
 

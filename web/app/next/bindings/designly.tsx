@@ -1,6 +1,8 @@
 // Designly over the machine's library: loads it with the design systems, asks again while a card is drawing (a
 // conversation in its folder works), starts a new project from a brief and waits for the runtime before the field
 // clears — the card comes from the library itself. A pin waits for the machine too.
+import { uploadSrc } from '@/next/commands/uploads';
+import { AttachmentSrc } from '@/next/ui/attachment-thumb';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DesignlyHome, {
   DESIGN_KIND,
@@ -260,8 +262,10 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
       throw failure;
     }
     // The new document opens at once, in the app's editor.
-    goTo({ kind: ROUTE.appDoc, id: created.document });
+    goTo({ kind: ROUTE.appDoc, id: created.document, edit: true });
   };
+
+  const srcOf = useCallback((item: { id: string }) => uploadSrc(machine, item), [machine]);
 
   const onCreate = async ({ brief, kind, designSystem, deck, video, attachmentIds }: IDesignStart) => {
     const title = titleOf(brief);
@@ -292,47 +296,49 @@ const DesignlyView = ({ machine, machines = null, initialKind }: IDesignlyViewPr
     toast(t('next.designly.started', { title }));
     // A deck and a video are made inside their project; a site or a design system draws on its card here.
     if (kind === DESIGN_KIND.slides || kind === DESIGN_KIND.video) {
-      goTo({ kind: ROUTE.site, id });
+      goTo({ kind: ROUTE.site, id, edit: true });
       return;
     }
     await load();
   };
 
   return (
-    <DesignlyHome
-      cards={cards}
-      error={error}
-      now={now}
-      onPin={onPin}
-      onDelete={onDelete}
-      onOpen={(id) => goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id })}
-      onRetry={onRetry}
-      compose={{
-        machine,
-        initialKind,
-        systems,
-        onCreate,
-        brief,
-        onBrief: setBrief,
-        uploads,
-        picker: choice && {
-          value: choice,
-          agents,
-          locked: false,
-          offersUltracode: false,
-          onChange: onPick,
-          machine: machines,
-        },
-        appKinds,
-        onAppKind,
-        voice: {
-          recording: voice.recording,
-          onMic: voice.onMic,
-          onCancel: voice.onCancelRecording,
-          onFinish: voice.onFinishRecording,
-        },
-      }}
-    />
+    <AttachmentSrc.Provider value={srcOf}>
+      <DesignlyHome
+        cards={cards}
+        error={error}
+        now={now}
+        onPin={onPin}
+        onDelete={onDelete}
+        onOpen={(id) => goTo(appDocIds.has(id) ? { kind: ROUTE.appDoc, id } : { kind: ROUTE.site, id })}
+        onRetry={onRetry}
+        compose={{
+          machine,
+          initialKind,
+          systems,
+          onCreate,
+          brief,
+          onBrief: setBrief,
+          uploads,
+          picker: choice && {
+            value: choice,
+            agents,
+            locked: false,
+            offersUltracode: false,
+            onChange: onPick,
+            machine: machines,
+          },
+          appKinds,
+          onAppKind,
+          voice: {
+            recording: voice.recording,
+            onMic: voice.onMic,
+            onCancel: voice.onCancelRecording,
+            onFinish: voice.onFinishRecording,
+          },
+        }}
+      />
+    </AttachmentSrc.Provider>
   );
 };
 

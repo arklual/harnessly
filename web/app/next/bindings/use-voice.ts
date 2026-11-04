@@ -8,7 +8,11 @@
 // A dictation goes in where the caret was when it began. The person may edit the field while it listens: what
 // was recognized so far becomes their text at that moment and is never written over again, the words heard after it
 // are added at the end. Every recording is kept in the browser (voice-takes.ts) while it is made: one that could not be
-// recognized stays over the field as a failed take, recognized again by hand or by itself when the link is back.
+// recognized stays over the field it was recorded in (`scope`: the chat, or the start page) as a failed take, recognized
+// again by hand or by itself when the link is back (voice-retry.ts). A field without a scope shows no failed takes.
+//
+// The microphone is the browser's: stop and cancel never wait for the machine. Without a link no socket is
+// opened, and a stop while the link is down keeps the recording at once («распознаю, когда машина вернётся»).
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { transcribe } from '@/next/features/composer/voice-api';
 import { openDictation, type IDictation } from '@/next/features/composer/voice-socket';
@@ -23,6 +27,9 @@ import {
   useFailedTakes,
   type VoiceTake,
 } from '@/next/features/composer/voice-takes';
+import { forgetRetry, OUTCOME, recognizeTake, RETRY, retryStore } from '@/next/features/composer/voice-retry';
+import { useKey } from '@/next/core/store';
+import { NEW_CHAT } from '@/next/stores/drafts';
 import type { DockNotice, Recording } from '@/next/features/composer/types';
 import { connectionStore, useConnection, useLinkRestored } from '@/next/stores/connection';
 import { WordedError } from '@/next/core/net/worded';
@@ -48,6 +55,7 @@ interface IMeter {
 }
 
 interface ISession {
+  machine: MachineId;
   stream: MediaStream;
   rec: MediaRecorder;
   meter: IMeter | null;
@@ -65,6 +73,8 @@ interface ISession {
   closed: boolean;
   abort: AbortController;
   finalTimer: ReturnType<typeof setTimeout> | null;
+  /** Watches the link from the stop on: a link that drops while the final is awaited keeps the recording. */
+  unwatch: (() => void) | null;
   /** The field before the dictation, and what the dictation put there last. */
   original: string;
   written: string;
@@ -86,6 +96,8 @@ const failureText = (failure: unknown) => {
   if (failure instanceof WordedError) return failure.message;
   return t('next.failure.http');
 };
+
+const isLive = (m: MachineId) => connectionStore.get(m)?.k === 'live';
 
 const canRecord = () => typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 
@@ -115,9 +127,6 @@ const unheard = (spoken: string, taken: string) => {
   return wordsOf(spoken).slice(wordsOf(taken).length).join(' ');
 };
 
-/** Takes being recognized again by some field of this page: two fields of one machine do not both send it. */
-const retrying = new Set<string>();
-
 /** The microphone's loudness as a number read on demand; null where the browser has no audio graph. */
 const openMeter = (stream: MediaStream): IMeter | null => {
   try {
@@ -144,12 +153,14 @@ const openMeter = (stream: MediaStream): IMeter | null => {
 /**
  * `current` reads the field's text where it is kept (a draft in its store): a dictation that outlives its field (the
  * person went to another chat while speaking) still lands in that field's draft, after what was typed there meanwhile.
+ * `scope` names the field (its draft's key): the takes recorded in it that failed wait over it and nowhere else.
  */
 export const useVoice = (
   machine: MachineId | null,
   text: string,
   setText: (value: string) => void,
   current?: () => string,
+  scope: string | null = null,
 ) => {
   useMachine(machine);
   const [recording, setRecording] = useState<Recording | null>(null);
@@ -159,9 +170,9 @@ export const useVoice = (
   const live = useRef<ISession | null>(null);
   const opening = useRef(false);
   const gone = useRef(false);
-  const latest = useRef({ text, setText, current });
+  const latest = useRef({ text, setText, current, scope });
   useLayoutEffect(() => {
-    latest.current = { text, setText, current };
+    latest.current = { text, setText, current, scope };
   });
 
   const fieldNow = () => (latest.current.current ? latest.current.current() : latest.current.text);
@@ -191,6 +202,8 @@ export const useVoice = (
     session.closed = true;
     if (session.finalTimer) clearTimeout(session.finalTimer);
     session.finalTimer = null;
+    session.unwatch?.();
+    session.unwatch = null;
     session.abort.abort();
     session.rec.onstop = null;
     if (session.rec.state !== 'inactive') session.rec.stop();
@@ -233,15 +246,24 @@ export const useVoice = (
     toast(t('next.voice.kept'), { tone: 'error', description: message || undefined });
   };
 
+  /** No link to the machine: the recording waits in the browser and is recognized by itself when the link is back. */
+  const keep = (session: ISession) => {
+    if (session.closed) return;
+    recordTake(session.take, session.chunks);
+    failTake(session.take);
+    close(session);
+    toast(t('next.voice.keptOffline'));
+  };
+
   const recognizeWhole = async (m: MachineId, session: ISession) => {
     // No link to the machine: the recording is kept at once instead of waiting for a request that cannot go.
-    if (connectionStore.get(m)?.k !== 'live') {
-      fail(session, t('next.voice.offline'));
+    if (!isLive(m)) {
+      keep(session);
       return;
     }
     // The link drops while it waits: the same, without waiting for the request's two minutes.
     const watch = connectionStore.subscribeKey(m, () => {
-      if (connectionStore.get(m)?.k === 'offline') fail(session, t('next.voice.offline'));
+      if (connectionStore.get(m)?.k === 'offline') keep(session);
     });
     try {
       const blob = new Blob(session.chunks, { type: session.rec.mimeType });
@@ -257,6 +279,16 @@ export const useVoice = (
   const flush = (session: ISession) => {
     if (!session.dictation?.ready) return;
     while (session.sent < session.chunks.length) session.dictation.send(session.chunks[session.sent++]);
+  };
+
+  /** The socket is no use any more (it went, or the link did): what was heard so far, or the whole recording. */
+  const dropSocket = (session: ISession) => {
+    session.dictation?.abort();
+    session.dictation = null;
+    if (session.finalTimer) clearTimeout(session.finalTimer);
+    session.finalTimer = null;
+    if (session.spoken) commit(session, session.spoken);
+    else void recognizeWhole(session.machine, session);
   };
 
   /** The recording is complete and the socket is ready: the last chunks, then the stop, and the final is awaited. */
@@ -306,6 +338,7 @@ export const useVoice = (
     const caretAt =
       typeof at === 'number' && Number.isFinite(at) ? Math.min(Math.max(at, 0), text.length) : text.length;
     const session: ISession = {
+      machine: m,
       stream,
       rec,
       meter,
@@ -317,6 +350,7 @@ export const useVoice = (
       closed: false,
       abort: new AbortController(),
       finalTimer: null,
+      unwatch: null,
       original: text,
       written: text,
       before: text.slice(0, caretAt),
@@ -324,43 +358,45 @@ export const useVoice = (
       spoken: '',
       taken: '',
       shown: '',
-      take: startTake(m, rec.mimeType || mimeType || 'audio/webm').id,
+      take: startTake(m, rec.mimeType || mimeType || 'audio/webm', latest.current.scope).id,
       keptAt: Date.now(),
     };
-    session.dictation = openDictation(m, dictationLang(), voiceSettings(), {
-      onPreparing: () => {
-        if (session.closed || live.current !== session) return;
-        setRecording((now) => (now && !now.preparing ? { ...now, preparing: true } : now));
-      },
-      onReady: () => {
-        if (session.closed) return;
-        setRecording((now) => (now?.preparing ? { ...now, preparing: false } : now));
-        flush(session);
-        if (session.recorded) askFinal(m, session);
-      },
-      onPartial: (said) => {
-        if (!session.closed) show(session, said);
-      },
-      onFinal: (said) => commit(session, said),
-      onFailure: (failure) => {
-        if (session.closed) return;
-        if (!failure.unavailable) {
-          fail(session, failure.message);
-          return;
-        }
-        session.dictation = null;
-        if (session.recorded) void recognizeWhole(m, session);
-      },
-      onLost: () => {
-        if (session.closed) return;
-        session.dictation = null;
-        if (session.finalTimer) clearTimeout(session.finalTimer);
-        session.finalTimer = null;
-        if (!session.recorded) return;
-        if (session.spoken) commit(session, session.spoken);
-        else void recognizeWhole(m, session);
-      },
-    });
+    // Without a link the socket is not even tried: the recording goes on in the browser and is kept at the stop.
+    session.dictation = !isLive(m)
+      ? null
+      : openDictation(m, dictationLang(), voiceSettings(), {
+          onPreparing: () => {
+            if (session.closed || live.current !== session) return;
+            setRecording((now) => (now && !now.preparing ? { ...now, preparing: true } : now));
+          },
+          onReady: () => {
+            if (session.closed) return;
+            setRecording((now) => (now?.preparing ? { ...now, preparing: false } : now));
+            flush(session);
+            if (session.recorded) askFinal(m, session);
+          },
+          onPartial: (said) => {
+            if (!session.closed) show(session, said);
+          },
+          onFinal: (said) => commit(session, said),
+          onFailure: (failure) => {
+            if (session.closed) return;
+            if (!failure.unavailable) {
+              fail(session, failure.message);
+              return;
+            }
+            session.dictation = null;
+            if (session.recorded) void recognizeWhole(m, session);
+          },
+          onLost: () => {
+            if (session.closed) return;
+            session.dictation = null;
+            if (session.finalTimer) clearTimeout(session.finalTimer);
+            session.finalTimer = null;
+            if (!session.recorded) return;
+            dropSocket(session);
+          },
+        });
     session.rec.ondataavailable = (event) => {
       if (event.data.size === 0 || session.closed) return;
       session.chunks.push(event.data);
@@ -375,7 +411,9 @@ export const useVoice = (
       session.recorded = true;
       if (!session.closed) recordTake(session.take, session.chunks);
       if (session.closed || !session.stopped) return;
-      if (!session.dictation) void recognizeWhole(m, session);
+      // A socket still on its way while the link is down will not come: the recording is not held for it.
+      if (session.dictation && !session.dictation.ready && !isLive(m)) dropSocket(session);
+      else if (!session.dictation) void recognizeWhole(m, session);
       else if (session.dictation.ready) askFinal(m, session);
     };
     live.current = session;
@@ -388,6 +426,11 @@ export const useVoice = (
     if (!session || session.stopped || session.rec.state === 'inactive') return;
     session.stopped = true;
     setRecording((now) => now && { ...now, busy: true });
+    // The machine goes away while its final is awaited (a restart): the recording is kept, not held for it.
+    session.unwatch = connectionStore.subscribeKey(session.machine, () => {
+      if (session.closed || !session.recorded || !session.dictation) return;
+      if (connectionStore.get(session.machine)?.k === 'offline') dropSocket(session);
+    });
     session.rec.stop();
   };
 
@@ -434,30 +477,23 @@ export const useVoice = (
   useEffect(() => {
     void loadTakes();
   }, []);
-  const failed = useFailedTakes(machine);
+  const failed = useFailedTakes(machine, scope, NEW_CHAT);
   const linkLive = useConnection(machine)?.k === 'live';
   const restored = useLinkRestored(machine);
   const tried = useRef(new Set<string>());
 
+  // One request per take: the person's press while the field is already recognizing it by itself joins that request
+  // (it used to return at once, and the button did nothing). The bar shows it busy, then the text is in the
+  // field, or the bar says why not.
   const retry = async (take: VoiceTake, quiet: boolean) => {
-    if (retrying.has(take.id)) return;
-    retrying.add(take.id);
-    try {
-      const said = (
-        await transcribe(take.machine, take.audio, dictationLang(), new AbortController().signal)
-      ).text.trim();
-      if (!said) {
-        dropTake(take.id);
-        if (!quiet) toast(t('next.voice.silence'));
-        return;
-      }
-      latest.current.setText(join(fieldNow(), said));
-      finishTake(take.id, said);
-    } catch (failure) {
-      if (!quiet) toast(t('next.voice.failed'), { tone: 'error', description: failureText(failure) });
-    } finally {
-      retrying.delete(take.id);
-    }
+    const outcome = await recognizeTake(
+      take.id,
+      async () =>
+        (await transcribe(take.machine, take.audio, dictationLang(), new AbortController().signal)).text,
+      (said) => latest.current.setText(join(fieldNow(), said)),
+      failureText,
+    );
+    if (!quiet && outcome.k === OUTCOME.silence) toast(t('next.voice.silence'));
   };
 
   useEffect(() => {
@@ -474,13 +510,20 @@ export const useVoice = (
   });
 
   const first = failed[0];
+  const status = useKey(retryStore, first?.id ?? null);
   const notice: DockNotice | null = first
     ? {
         kind: 'voice',
         ms: first.ms,
         more: failed.length - 1,
-        onRetry: () => retry(first, false),
-        onDrop: async () => dropTake(first.id),
+        waiting: !linkLive,
+        busy: status?.k === RETRY.busy,
+        failure: status?.k === RETRY.failed ? status.reason : null,
+        onRetry: () => void retry(first, false),
+        onDrop: async () => {
+          forgetRetry(first.id);
+          dropTake(first.id);
+        },
       }
     : null;
 

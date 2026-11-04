@@ -8,6 +8,7 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/files"
+	"github.com/ly-solutions/harnessly/internal/locale"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
@@ -22,6 +23,8 @@ type v2Files struct {
 	// delivered is the sha256 of a file the agent handed over in the conversation (deliver_file), which may lie in /tmp:
 	// that one file opens to read, as long as its bytes are the ones handed over. nil for none.
 	delivered func(ctx context.Context, conv, path string) (string, bool, error)
+	// access is the viewer's places and secrets rule: what may be downloaded besides the conversation's folder.
+	access *files.Access
 }
 
 var _ wire.FilesSource = (*v2Files)(nil)
@@ -90,15 +93,25 @@ func (f *v2Files) Dir(_ context.Context, conv, dir string) (wire.DirListing, err
 }
 
 // place is the folder and the name a file is read and saved under: the conversation's folder and the path in it, or,
-// for an absolute path a turn of the conversation touched, the file's own folder and its name.
+// for an absolute path a turn of the conversation touched or one in the workspace's places, the file's own folder and its name.
 func (f *v2Files) place(ctx context.Context, conv, file string) (root, rel string, err error) {
 	root, err = f.root(conv)
 	if err != nil || !strings.HasPrefix(file, "/") || f.touched == nil || filepath.Clean(file) != file {
 		return root, file, err
 	}
 	ok, err := f.touched(ctx, conv, file)
-	if err != nil || !ok {
+	if err != nil {
 		return root, file, err
+	}
+	// Any file of the workspace's places opens too, as the viewer opens it: a file the person was sent to
+	// outside the chat's folder reads here instead of in the old viewer. Secrets stay closed.
+	if !ok && f.access != nil {
+		if real, rerr := files.Realpath(file); rerr == nil && f.access.Allowed(real) && !f.access.Secret(real) {
+			ok = true
+		}
+	}
+	if !ok {
+		return root, file, nil
 	}
 	return filepath.Dir(file), filepath.Base(file), nil
 }
@@ -167,4 +180,108 @@ func fileContent(file string, obj files.Object) wire.FileContent {
 		}
 	}
 	return out
+}
+
+// ServeDownload answers GET .../download?path=…: the paths are the folder's (relative) or absolute ones; a file is
+// handed over when it lies in the conversation's folder or in the workspace's places (the viewer's roots), or a turn
+// of the conversation touched or delivered it, and is no secret. One file goes whole or in ranges, a folder or several
+// paths as one zip.
+func (f *v2Files) ServeDownload(w http.ResponseWriter, r *http.Request, conv string) {
+	fail := func(status int, text string) { files.WriteJSON(w, r, status, files.Error(text)) }
+	root, err := f.root(conv)
+	if err != nil {
+		fail(http.StatusNotFound, locale.Pick("No such conversation", "Такого чата нет"))
+		return
+	}
+	realRoot, _ := files.Realpath(root)
+	q := r.URL.Query()
+	asked := q["path"]
+	if f.access == nil || len(asked) == 0 || len(asked) > 1000 {
+		fail(http.StatusBadRequest, locale.Pick("Nothing to download", "Нечего скачать"))
+		return
+	}
+	allowIn := func(real string) bool {
+		return realRoot != "" && (real == realRoot || strings.HasPrefix(real, realRoot+"/")) || f.access.Allowed(real)
+	}
+	items := make([]files.DownloadItem, 0, len(asked))
+	for _, p := range asked {
+		abs := p
+		if !strings.HasPrefix(p, "/") {
+			abs = filepath.Join(root, p)
+		}
+		allow := allowIn
+		// A file a turn wrote or delivered outside the places opens from its card: that one file, not its folder.
+		if strings.HasPrefix(p, "/") && f.touchedOrDelivered(r.Context(), conv, abs) {
+			allow = func(real string) bool { return allowIn(real) || real == mustReal(abs) }
+		}
+		it, refused := f.access.ResolveDownload(abs, allow)
+		if refused != nil {
+			fail(refused.Status, refused.Text)
+			return
+		}
+		items = append(items, it)
+	}
+	if len(items) == 1 && !items[0].Dir {
+		files.ServeFileDownload(w, r, items[0].Real)
+		return
+	}
+	f.access.ServeZipDownload(w, r, items, files.ZipName(items, q.Get("name")), allowIn)
+}
+
+func mustReal(p string) string {
+	real, err := files.Realpath(p)
+	if err != nil {
+		return "\x00"
+	}
+	return real
+}
+
+func (f *v2Files) touchedOrDelivered(ctx context.Context, conv, abs string) bool {
+	if filepath.Clean(abs) != abs {
+		return false
+	}
+	if f.touched != nil {
+		if ok, err := f.touched(ctx, conv, abs); err == nil && ok {
+			return true
+		}
+	}
+	if f.delivered != nil {
+		if _, ok, err := f.delivered(ctx, conv, abs); err == nil && ok {
+			return true
+		}
+	}
+	return false
+}
+
+// ServeGitSide answers GET .../file-git?path=…[&ref=HEAD]: the file as the revision has it, for the editor's diff
+// The file is placed as File places it (the folder's, or an absolute one it may open); the other side is the
+// editor's own text, unsaved edits too.
+func (f *v2Files) ServeGitSide(w http.ResponseWriter, r *http.Request, conv string) {
+	w.Header().Set("Cache-Control", "no-store")
+	fail := func(status int, text string) { files.WriteJSON(w, r, status, files.Error(text)) }
+	q := r.URL.Query()
+	ref, ok := files.Ref(q["ref"], "HEAD")
+	if !ok || ref == "WORKTREE" || len(q["path"]) != 1 || q.Get("path") == "" {
+		fail(http.StatusBadRequest, locale.Pick("A file and a revision are required", "Нужны файл и ревизия"))
+		return
+	}
+	root, rel, err := f.place(r.Context(), conv, q.Get("path"))
+	if err != nil {
+		fail(http.StatusNotFound, locale.Pick("No such conversation", "Такого чата нет"))
+		return
+	}
+	abs, ee := files.ProjectFilePath(root, rel)
+	if ee != nil {
+		fail(ee.Status, ee.Text)
+		return
+	}
+	if f.access != nil && f.access.Secret(abs) {
+		fail(http.StatusForbidden, locale.Pick("This file cannot be opened from the workspace", "Этот файл нельзя открыть из рабочего пространства"))
+		return
+	}
+	side, inRepo, tracked := files.GitBlob(abs, ref)
+	files.WriteJSON(w, r, http.StatusOK, files.Object{
+		{K: "ref", V: ref}, {K: "inRepo", V: inRepo}, {K: "tracked", V: tracked},
+		{K: "content", V: side.Content}, {K: "truncated", V: side.Truncated}, {K: "binary", V: side.Binary},
+	})
 }

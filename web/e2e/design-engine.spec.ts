@@ -86,6 +86,13 @@ test('no notice on the design page; Settings says which engine and copies the co
   });
   expect(made.status, made.body).toBeLessThan(300);
 
+  // What the machine offers depends on its enforced settings, so the command comes from here, either way.
+  let offered = FETCH;
+  await page.route('**/design/engine*', async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), fetch: offered } });
+  });
+
   await page.goto(`${process.env.E2E_URL}/agents/settings/design`);
   await expect(page.getByText('Built-in', { exact: true })).toBeVisible();
   await expect(page.locator('.hx-set__command-text')).toHaveText(FETCH);
@@ -96,10 +103,7 @@ test('no notice on the design page; Settings says which engine and copies the co
   if (process.env.E2E_SHOT) await page.screenshot({ path: process.env.E2E_SHOT });
 
   // A machine whose enforced settings refuse making a canvas: the engine is named, the command that cannot work is not.
-  await page.route('**/design/engine*', async (route) => {
-    const res = await route.fetch();
-    await route.fulfill({ response: res, json: { ...(await res.json()), fetch: '' } });
-  });
+  offered = '';
   await page.reload();
   await expect(page.getByText('Built-in', { exact: true })).toBeVisible();
   await expect(page.locator('.hx-set__command-text')).toHaveCount(0);

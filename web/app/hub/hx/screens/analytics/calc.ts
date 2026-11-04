@@ -1,6 +1,7 @@
 // The numbers of Аналитика as small pure functions: how a KPI is written, how it moved, what the sparkline and the
 // before/after bars look like, how waste and peers are told. Nothing here knows React or the API client.
 import type { Effect, Kpi, KpiFormat, PeerRow, Verdict, Waste } from '../../../org/api/analytics';
+import { inRubles, shownOfUsd } from '../../../org/money';
 
 const nf = (min: number, max: number): Intl.NumberFormat =>
   new Intl.NumberFormat('ru-RU', { minimumFractionDigits: min, maximumFractionDigits: max });
@@ -17,6 +18,17 @@ export const ru = (v: number, min = 0, max = min): string => {
 };
 
 export const DASH = '—';
+
+/**
+ * Money of the screen, in the hub's currency: the API counts in dollars, the page shows rubles at the hub's rate, so
+ * Аналитика speaks the same ₽ as Обзор and the limits. `min`/`max` are the dollar digits while the rate is
+ * not known yet; rubles are whole.
+ */
+export const cash = (usd: number, min = 0, max = min): string => {
+  const s = shownOfUsd(usd);
+  if (s === null) return `$${ru(usd, min, max)}`;
+  return inRubles() ? `${ru(s, 0)} ₽` : `$${ru(s, min, max)}`;
+};
 const ok = (v: number | null | undefined): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /** «2 ч 10 мин», «50 мин», «3 ч». */
@@ -33,7 +45,7 @@ export const formatKpi = (format: KpiFormat, v: number | null | undefined): stri
   if (!ok(v)) return DASH;
   switch (format) {
     case 'usd':
-      return `$${ru(v, 1)}`;
+      return cash(v, 1);
     case 'pct':
       return `${ru(v, 0, v < 10 ? 1 : 0)}%`;
     case 'minutes':
@@ -57,7 +69,7 @@ export const formatChart = (format: KpiFormat, v: number | null | undefined): st
 /** The value in a «до → после» line: whole dollars stay whole («$19 → $18,5»). */
 export const formatEffect = (format: KpiFormat, v: number | null | undefined): string => {
   if (!ok(v)) return DASH;
-  if (format === 'usd') return `$${ru(v, 0, 1)}`;
+  if (format === 'usd') return cash(v, 0, 1);
   return formatKpi(format, v);
 };
 
@@ -159,6 +171,15 @@ export const VERDICT_WORD: Record<Verdict, string> = {
   worse: 'хуже',
   noise: 'в пределах шума',
 };
+/** What the chip means, on hover: the hub compares the move with the usual weekly spread of the 8 weeks before. */
+export const VERDICT_HINT: Record<Verdict, string> = {
+  better:
+    'Число сдвинулось в лучшую сторону сильнее, чем оно обычно гуляет от недели к неделе (разброс за 8 недель до изменения)',
+  worse:
+    'Число сдвинулось в худшую сторону сильнее, чем оно обычно гуляет от недели к неделе (разброс за 8 недель до изменения)',
+  noise:
+    'Разница меньше обычного разброса этого числа за 8 недель до изменения: сказать, что изменение на него повлияло, пока нельзя',
+};
 export const VERDICT_TONE: Record<Verdict, Tone> = { better: 'good', worse: 'bad', noise: 'flat' };
 
 /** The before/after bars: the larger value is the full width. */
@@ -221,9 +242,9 @@ export const wasteView = (waste: Pick<Waste, 'wasteUsd' | 'totalUsd'>, usd: numb
   share: waste.totalUsd > 0 ? Math.round((usd / waste.totalUsd) * 100) : 0,
 });
 
-export const money = (v: number): string => `$${ru(v, 0)}`;
+export const money = (v: number): string => cash(v, 0);
 
-/** «$1 080 из $3 450 за период — 31% расхода». */
+/** «97 200 ₽ из 310 500 ₽ за период — 31% расхода». */
 export const wasteLead = (waste: Pick<Waste, 'wasteUsd' | 'totalUsd'>): string => {
   const share = waste.totalUsd > 0 ? Math.round((waste.wasteUsd / waste.totalUsd) * 100) : 0;
   return `${money(waste.wasteUsd)} из ${money(waste.totalUsd)} за период — ${share}% расхода`;
@@ -252,7 +273,7 @@ export const HEAT_NOTE: Record<Heat, string> = {
 export const peerCells = (row: PeerRow, columns: readonly string[]): PeerRow['cells'] =>
   columns.map((_, i) => row.cells[i] ?? { text: DASH, score: 0 });
 
-/** The page's lead: «$810 · 302 сессии · 44 MR». */
+/** The page's lead: «72 900 ₽ · 302 сессии · 44 MR». */
 export const totalsText = (s: { spendUsd: number; sessions: number; mrs: number }): string =>
   `${money(s.spendUsd)} · ${s.sessions} ${plural(s.sessions, 'сессия', 'сессии', 'сессий')} · ${s.mrs} MR`;
 

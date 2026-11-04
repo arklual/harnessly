@@ -1,17 +1,16 @@
 // «Сделано в этом чате» (.hx-made): above the tools, what the chat made, opened or changed: documents, boards and designs,
 // newest first, one quiet line each. The first few show, the rest sit behind «ещё N» so the tools stay on the screen.
-// The pictures the agent looked at are the Gallery's. Until the chat has said what there is nothing shows (a skeleton
-// only for a slow answer); with nothing made the block is not there at all, and it leaves with an exit when what it
-// shows goes. It comes in as one piece, never row by row.
-import { useMemo, useState } from 'react';
+// The pictures the agent looked at are the Gallery's. Until the chat has said what there is nothing shows (no skeleton:
+// it would push the tools down and then pull them back); with nothing made the block is not there at all, and it
+// leaves with an exit when what it shows goes. It comes in as one piece, never row by row, growing from zero height
+// so the sections below slide instead of jumping.
+import { useEffect, useMemo, useState } from 'react';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { usePresence } from '@/next/ui/presence';
-import { Skeleton, useDelayed } from '@/next/ui/skeleton';
+import { Skeleton } from '@/next/ui/skeleton';
 
 const EXIT_MS = 300;
-/** The cards a block stands in for while the chat has not said what it made: the slots keep the final size. */
-const SKELETON_CARDS = [0, 1, 2] as const;
 /** How many show before «ещё»: the block and the first tools fit one screen of a usual pane. */
 export const MADE_VISIBLE = 4;
 
@@ -133,34 +132,46 @@ const Content = ({ cards, onOpen }: { cards: readonly IMadeCard[]; onOpen: IMade
   );
 };
 
-const MadeBlock = ({ cards, onOpen }: IMadeBlockProps) => {
-  const loading = cards === null;
-  const has = !loading && cards.length > 0;
-  const content = useMemo<readonly IMadeCard[] | null>(() => (has ? cards : null), [has, cards]);
-  // What is shown stays while the block leaves.
-  const { value, state } = usePresence(content, EXIT_MS);
-  const waited = useDelayed(loading);
-  if (loading ? !waited : !value) return null;
+/** Mounted collapsed and opened two frames later, so the height has something to grow from. */
+const Section = ({
+  cards,
+  state,
+  onOpen,
+}: {
+  cards: readonly IMadeCard[];
+  state: string;
+  onOpen: IMadeBlockProps['onOpen'];
+}) => {
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setEntered(true));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, []);
   return (
-    <section className="hx-made" data-state={state} aria-label={t('next.made.title')}>
+    <section className="hx-made" data-state={entered ? state : 'opening'} aria-label={t('next.made.title')}>
       <div className="hx-made__clip">
         <div className="hx-made__body">
           <h3 className="hx-made__ttl">{t('next.made.title')}</h3>
-          {value ? (
-            <Content cards={value} onOpen={onOpen} />
-          ) : (
-            <ul className="hx-made__list" aria-busy="true">
-              {SKELETON_CARDS.map((i) => (
-                <li key={i}>
-                  <Skeleton className="hx-made__card-sk" />
-                </li>
-              ))}
-            </ul>
-          )}
+          <Content cards={cards} onOpen={onOpen} />
         </div>
       </div>
     </section>
   );
+};
+
+const MadeBlock = ({ cards, onOpen }: IMadeBlockProps) => {
+  const has = cards !== null && cards.length > 0;
+  const content = useMemo<readonly IMadeCard[] | null>(() => (has ? cards : null), [has, cards]);
+  // What is shown stays while the block leaves.
+  const { value, state } = usePresence(content, EXIT_MS);
+  if (!value) return null;
+  return <Section cards={value} state={state} onOpen={onOpen} />;
 };
 
 export default MadeBlock;

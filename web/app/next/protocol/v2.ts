@@ -1926,6 +1926,8 @@ export interface FirstMessage {
   clientId: ClientId;
   text: string;
   attachmentIds: string[];
+  /** The places it points at; the runtime appends their block to the text. */
+  refs?: MessageRef[];
 }
 export type Command = { [K in Op]: { op: K; body: CommandBodies[K] } }[Op];
 
@@ -3171,7 +3173,10 @@ const answerItem: Decoder<{ i: number; choices: number[]; text?: string }> = (v,
   const a = object({ i: int, choices: array(int) }, { text: id })(v, p);
   return (a.text !== undefined) !== a.choices.length > 0 ? a : fail(p, 'either choices or text');
 };
-const firstMessage: Decoder<FirstMessage> = object({ clientId: id, text: str, attachmentIds: array(id) });
+const firstMessage: Decoder<FirstMessage> = object(
+  { clientId: id, text: str, attachmentIds: array(id) },
+  { refs: messageRefs },
+);
 const createBase = { opId: id, provider, model: nullable(model) };
 const commandBodies: { [K in Op]: Decoder<CommandBodies[K]> } = {
   send: (v, p) => {

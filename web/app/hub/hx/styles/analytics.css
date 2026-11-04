@@ -166,3 +166,10 @@
     overscroll-behavior-x: contain;
   }
 }
+
+/* The dates next to the name of a period: «Этот месяц · 2–8 ноя». */
+.ad .anx-per__d {
+  font: var(--t-font-ui-xs);
+  color: var(--t-text-muted);
+  font-weight: 400;
+}

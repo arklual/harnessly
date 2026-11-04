@@ -108,6 +108,13 @@
   /* the design staggers a chat's messages by 70 ms, a turn being a question and its answer, up to 560 ms */
   animation-delay: min(calc(var(--hx-ti, 0) * 140ms + var(--hx-mi, 0) * 70ms), 560ms);
 }
+/* The rest of a turn's row — a background notice, a model switch, the line of an auto message, the «edit and go on
+   from here» under a bubble — rises with the messages instead of standing there before them. */
+.hx-stage[data-entering]:not([data-leaving]) .hx-turnwrap > :not(.hx-msg, .hx-rewindable),
+.hx-stage[data-entering]:not([data-leaving]) .hx-rewindable__acts {
+  animation: hx-msg-in 520ms var(--hx-ease-out) backwards;
+  animation-delay: min(calc(var(--hx-ti, 0) * 140ms + 70ms), 560ms);
+}
 .hx-msg[data-kind='turn'],
 .hx-msg[data-kind='answers'] {
   --hx-mi: 1;
@@ -883,8 +890,15 @@
   text-overflow: ellipsis;
   color: var(--hx-fg-2);
 }
-.hx-now__time {
+/* The word stays whole; a long part after it (a machine's address) gives way first. */
+.hx-now__word {
   flex: none;
+}
+.hx-now__time {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .hx-now__time::before {
   content: '·';
@@ -1307,6 +1321,12 @@
 .hx-ref {
   max-width: 100%;
 }
+/* A link chip or card is an <a>: a held finger opens its menu, not the system's preview of the address. */
+a.hx-ref,
+a.hx-file {
+  text-decoration: none;
+  -webkit-touch-callout: none;
+}
 /* A long address stays inside the column: the chip is never wider than it and the label ends with an ellipsis. */
 .hx-ref__label {
   min-width: 0;
@@ -1597,6 +1617,10 @@ html[data-theme='dark'] .hx-ref[data-type='link'] {
 }
 
 /* The turn's end: «Turn interrupted · reason» with Continue / Retry, or «Stopped by you». */
+/* «Поработал …» takes the live block's place as the turn ends: it comes in softly, like the turn's end under it. */
+.hx-work__head {
+  animation: hx-turnend-in 360ms var(--hx-ease-out) backwards;
+}
 .hx-turnend {
   display: grid;
   grid-template-columns: auto minmax(0, max-content) auto;

@@ -1,5 +1,6 @@
 // Designly in the right pane on made-up data, for the eye and for screenshots: ?dev=panedl with the
-// installation's next-ui feature. &view=library shows the library alone, &view=design (the default) an open design;
+// installation's next-ui feature. &view=library shows the library alone, &view=design (the default) an open design,
+// &view=site the design as its own tab shows it (no pane: the canvas's zoom pill in its corner);
 // &states=0 gives the page no settings, &pages=1 only one page, &pages=many eight of them (the pager's list gets its search), &loading=1 keeps the page loading, &theme=light|dark and &lang=en|ru pick the look.
 // &nav=1 gives the page an app's own bars, a header that sticks to the top and a tab bar fixed to the bottom, to see
 // that the pane's controls leave them free on a phone. &bridge=1 puts the slot's real bridge into the page (its script is
@@ -233,7 +234,9 @@ const Viewer = ({
   loading,
   nav,
   script,
+  site = false,
 }: {
+  site?: boolean;
   states: boolean;
   dark: boolean;
   single: boolean;
@@ -270,7 +273,11 @@ const Viewer = ({
       tabs={[tab]}
       tab={tab.id}
       src={loading ? null : src}
-      error={null}
+      error={
+        new URLSearchParams(window.location.search).has('error')
+          ? 'Превью недоступно: слот не открылся'
+          : null
+      }
       reloadKey={reloadKey}
       onPickTab={() => {}}
       onCloseTab={() => {}}
@@ -288,8 +295,17 @@ const Viewer = ({
       onOpenDrawer={() => {}}
       onToggleMax={() => {}}
       maxed={false}
-      stage={stage}
-      pane={{ onShare: () => {}, chat }}
+      mode={
+        site
+          ? {
+              state: 'Макет',
+              editing: false,
+              action: { label: 'Редактировать', icon: 'pencil', onClick: () => {} },
+            }
+          : undefined
+      }
+      stage={site ? undefined : stage}
+      pane={site ? undefined : { onShare: () => {}, chat }}
       memoryKey={new URLSearchParams(window.location.search).get('design') ?? DESIGN}
     />
   );
@@ -345,6 +361,21 @@ const PanedlGallery = () => {
     root.classList.toggle('dark', dark);
     root.style.colorScheme = dark ? 'dark' : 'light';
   }, [dark]);
+  if (query.view === 'site')
+    return (
+      <div className="hx-root hx-gallery-pd hx-gallery-pd--site">
+        <Viewer
+          site
+          states={query.states !== '0'}
+          dark={dark}
+          single={query.pages === '1'}
+          many={query.pages === 'many'}
+          loading={query.loading === '1'}
+          nav={query.nav === '1'}
+          script={pageScriptOf(query.bridge === '1', query.lib === '1')}
+        />
+      </div>
+    );
   return (
     <div className="hx-root hx-gallery-pd">
       <ChatField />

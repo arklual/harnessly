@@ -11,6 +11,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -26,6 +27,7 @@ import {
   type TDropZone,
 } from '@/next/features/designly/site-drag';
 import { PANE_CHATS, type TPaneChat } from '@/next/features/designly/pane-chat';
+import { ChatTerminalButton } from '@/next/features/terminal/chat-terminal';
 import Icon from '@/next/ui/icon';
 import { RoundButton } from '@/next/ui/button';
 import { plural, t } from '@/next/i18n';
@@ -52,34 +54,6 @@ export const firstFloat = (section: { width: number; height: number }): IFloat =
     w,
     h: Math.max(320, Math.min(560, section.height - 140)),
   };
-};
-
-export const SiteModes = ({ mode, onMode }: { mode: TSiteMode; onMode: (mode: TSiteMode) => void }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    ref.current?.style.setProperty('--seg-i', String(SITE_MODES.indexOf(mode)));
-  }, [mode]);
-  return (
-    <div ref={ref} className="hx-site-modes" role="radiogroup" aria-label={t('next.site.modes')}>
-      <span className="hx-site-modes__glider" />
-      {SITE_MODES.map((id) => (
-        <button
-          key={id}
-          type="button"
-          className="hx-site-modes__item hx-tipped"
-          role="radio"
-          aria-checked={id === mode}
-          aria-label={t(`next.site.mode.${id}`)}
-          onClick={() => onMode(id)}
-        >
-          <Icon name={MODE_ICON[id]} size="sm" />
-          <span className="hx-tip" data-pos="below" data-align="end">
-            {t(`next.site.modeTip.${id}`)}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
 };
 
 const PANE_CHAT_ICON = {
@@ -117,6 +91,163 @@ export const PaneChatModes = ({ mode, onMode }: { mode: TPaneChat; onMode: (mode
   );
 };
 
+/** The menus' exit, as long as hx-dl-pop-out in site.css. */
+const MENU_MS = 190;
+/** How long the pointer may be off the placement before its menu folds: the way from the button to the list. */
+const HOVER_LEAVE_MS = 180;
+
+/** A small menu that folds on a press elsewhere and on Esc. */
+const useMenu = () => {
+  const [open, setOpen] = useState(false);
+  const menu = usePresence(open ? true : null, MENU_MS);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return { open, setOpen, menu, root };
+};
+
+/**
+ * Where the design's chat stands, named in words: the place it is in now, and on hover (or a press) the list of the
+ * places with what each one is.
+ */
+export const ChatPlacement = ({ mode, onMode }: { mode: TSiteMode; onMode: (mode: TSiteMode) => void }) => {
+  const { open, setOpen, menu, root } = useMenu();
+  const leave = useRef(0);
+  const hold = () => window.clearTimeout(leave.current);
+  useEffect(() => () => window.clearTimeout(leave.current), []);
+  const pick = (next: TSiteMode) => {
+    setOpen(false);
+    if (next !== mode) onMode(next);
+  };
+  return (
+    <div
+      className="hx-placement"
+      ref={root}
+      onPointerEnter={(event) => {
+        if (event.pointerType !== 'mouse') return;
+        hold();
+        setOpen(true);
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType !== 'mouse') return;
+        hold();
+        leave.current = window.setTimeout(() => setOpen(false), HOVER_LEAVE_MS);
+      }}
+    >
+      <button
+        type="button"
+        className="hx-placement__btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`${t('next.site.modes')}: ${t(`next.site.placement.${mode}`)}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={() => setOpen((on) => !on)}
+      >
+        <Icon name={MODE_ICON[mode]} size="sm" />
+        <span className="hx-placement__name">{t(`next.site.placement.${mode}`)}</span>
+        <Icon name="chevron-down" size="sm" className="hx-placement__chev" />
+      </button>
+      {menu.value !== null && (
+        <div
+          className="hx-site-menu hx-site-menu--end hx-placement__menu"
+          data-state={menu.state}
+          role="menu"
+          aria-label={t('next.site.modes')}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <div className="hx-dl-pop__label">{t('next.site.modes')}</div>
+          {SITE_MODES.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="menuitemradio"
+              className="hx-option hx-placement__row"
+              aria-checked={id === mode}
+              onClick={() => pick(id)}
+            >
+              <Icon name={MODE_ICON[id]} size="sm" />
+              <span className="hx-option__text">
+                <span className="hx-option__name">{t(`next.site.placement.${id}`)}</span>
+                <span className="hx-option__desc">{t(`next.site.modeTip.${id}`)}</span>
+              </span>
+              {id === mode && <Icon name="check" size="sm" className="hx-placement__check" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export interface IChatMoreItem {
+  id: string;
+  icon: string;
+  label: string;
+  pick: () => void;
+}
+
+/** «⋯» of the design's chat: what the usual chat's menu does with it, to go on in another model or on another machine. */
+const ChatMore = ({ items }: { items: readonly IChatMoreItem[] }) => {
+  const { open, setOpen, menu, root } = useMenu();
+  return (
+    <div className="hx-placement" ref={root}>
+      <button
+        type="button"
+        className="hx-head-btn hx-tipped"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t('next.site.chatMore')}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={() => setOpen((on) => !on)}
+      >
+        <Icon name="ellipsis" />
+        {!open && (
+          <span className="hx-tip" data-pos="below" data-align="end">
+            {t('next.site.chatMore')}
+          </span>
+        )}
+      </button>
+      {menu.value !== null && (
+        <div
+          className="hx-site-menu hx-site-menu--end hx-placement__menu"
+          data-state={menu.state}
+          role="menu"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="menuitem"
+              className="hx-option"
+              onClick={() => {
+                setOpen(false);
+                item.pick();
+              }}
+            >
+              <Icon name={item.icon} size="sm" />
+              <span className="hx-option__name">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export interface ISiteChatProps {
   title: string;
   /** The chat itself (its feed and its field), drawn only while the chat is open and through its exit. */
@@ -136,8 +267,10 @@ export interface ISiteChatProps {
   onZone: TDropZone;
   onHide: () => void;
   onOpenDrawer: () => void;
-  /** The whole conversation on its own page: the steps, the questions, the files. */
-  onOpenChat: (() => void) | null;
+  /** Where the chat stands, picked in its head; `section` is the design's area, a first window's room. */
+  onMode: (mode: TSiteMode, section: { width: number; height: number }) => void;
+  /** The «⋯» of the chat: going on in another model or on another machine; empty without a chat yet. */
+  more: readonly IChatMoreItem[];
   /** On a phone: the site over the chat. */
   onOpenSite: () => void;
 }
@@ -159,7 +292,8 @@ export const SiteChat = ({
   onZone,
   onHide,
   onOpenDrawer,
-  onOpenChat,
+  onMode,
+  more,
   onOpenSite,
 }: ISiteChatProps) => {
   const shown = mode === 'chat' || mode === 'float';
@@ -174,10 +308,15 @@ export const SiteChat = ({
   const growBy = (event: ReactPointerEvent<HTMLElement>) => {
     if (float) dragFloatCorner(event, float, onFloat);
   };
+  const asideRef = useRef<HTMLElement>(null);
+  const place = (next: TSiteMode) => {
+    const rect = asideRef.current?.closest('.hx-site')?.getBoundingClientRect();
+    onMode(next, { width: rect?.width ?? 0, height: rect?.height ?? 0 });
+  };
 
   return (
     <>
-      <aside className="hx-site__chat" aria-hidden={!shown}>
+      <aside className="hx-site__chat" aria-hidden={!shown} ref={asideRef}>
         <div className="hx-site__chat-head" onPointerDown={moveBy}>
           <button
             type="button"
@@ -197,19 +336,9 @@ export const SiteChat = ({
           >
             <Icon name="app-window" />
           </button>
-          {onOpenChat && (
-            <button
-              type="button"
-              className="hx-head-btn hx-tipped"
-              aria-label={t('next.site.openChat')}
-              onClick={onOpenChat}
-            >
-              <Icon name="message-square" />
-              <span className="hx-tip" data-pos="below" data-align="end">
-                {t('next.site.openChat')}
-              </span>
-            </button>
-          )}
+          <ChatPlacement mode={mode} onMode={place} />
+          {more.length > 0 && <ChatMore items={more} />}
+          <ChatTerminalButton />
           <button
             type="button"
             className="hx-head-btn hx-tipped hx-site__chat-x"

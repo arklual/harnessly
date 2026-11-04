@@ -180,3 +180,15 @@ describe('waste and peers', () => {
     expect(totalsText({ spendUsd: 96, sessions: 41, mrs: 6 })).toBe('$96 · 41 сессия · 6 MR');
   });
 });
+
+describe('money in the hub currency (HRN-670)', () => {
+  it('writes dollars as rubles at the rate the hub said', async () => {
+    const { setShownCurrency } = await import('../../../org/money');
+    // The last test of the file: the rate stays set for the module.
+    setShownCurrency('RUB', 90);
+    expect(formatKpi('usd', 18.5).replace(/\s/g, ' ')).toBe('1 665 ₽');
+    expect(totalsText({ spendUsd: 810, sessions: 302, mrs: 44 }).replace(/\s/g, ' ')).toBe(
+      '72 900 ₽ · 302 сессии · 44 MR',
+    );
+  });
+});

@@ -19,6 +19,8 @@ export interface TeamsState {
   view: TeamsView | null;
   error: unknown;
   reload: () => void;
+  /** Fetches the view again behind the screen: what is shown (and an open drawer) stays until the answer comes. */
+  refresh: () => void;
   /** Runs an action; resolves true when the hub accepted it. */
   apply: (op: Op) => Promise<boolean>;
   /** Actions on their way to the hub. */
@@ -50,7 +52,9 @@ export const useTeams = (slug: string): TeamsState => {
     let alive = true;
     api.teamsView(org, slug).then(
       (base) => alive && setState({ key, base, error: null }),
-      (error: unknown) => alive && setState({ key, base: null, error }),
+      // A quiet refresh that fails keeps what is on the screen.
+      (error: unknown) =>
+        alive && setState((s) => (s.key === key && s.base ? s : { key, base: null, error })),
     );
     return () => {
       alive = false;
@@ -93,6 +97,7 @@ export const useTeams = (slug: string): TeamsState => {
     view,
     error: state.key === key ? state.error : null,
     reload,
+    refresh: useCallback(() => setTick((n) => n + 1), []),
     apply,
     busy: ops.length > 0,
     problem,

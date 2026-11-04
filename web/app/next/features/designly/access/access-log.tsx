@@ -2,6 +2,7 @@
 // behind a skeleton that shows after 150 ms, and an empty log is not the same thing as one not yet read.
 import { useEffect, useState } from 'react';
 import { fetchLog, type ILogEntry } from '@/next/features/designly/access/api';
+import { fetchResourceLog, type TResourceKind } from '@/next/features/designly/access/resource-api';
 import { Skeleton, useDelayed } from '@/next/ui/skeleton';
 import { t } from '@/next/i18n';
 
@@ -22,6 +23,9 @@ const LINES = new Set([
   'invite-revoke',
   'invite-accept',
   'expire',
+  'team_grant',
+  'team_change',
+  'team_revoke',
 ]);
 
 const lineOf = (entry: ILogEntry): string => {
@@ -39,18 +43,22 @@ const when = (iso: string): string =>
     minute: '2-digit',
   });
 
-const AccessLog = ({ project }: { project: string }) => {
+/** `kind` reads the log through the one access API; without it, the design's older route. */
+const AccessLog = ({ project, kind }: { project: string; kind?: TResourceKind }) => {
   const [entries, setEntries] = useState<ILogEntry[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const skeleton = useDelayed(entries === null && failed === null);
 
   useEffect(() => {
     const abort = new AbortController();
-    fetchLog(project, abort.signal).then(setEntries, (failure: Error) => {
+    const read = kind
+      ? fetchResourceLog({ kind, id: project }, abort.signal)
+      : fetchLog(project, abort.signal);
+    read.then(setEntries, (failure: Error) => {
       if (!abort.signal.aborted) setFailed(failure.message);
     });
     return () => abort.abort();
-  }, [project]);
+  }, [project, kind]);
 
   return (
     <div className="hx-acc-stack" data-section="log">

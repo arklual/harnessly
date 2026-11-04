@@ -608,7 +608,7 @@ func (a *API) Create(r *http.Request, resolveCwd func(string, []string) (string,
 		}
 		return JSON(r, 500, errorBody(locale.Pick("Could not create the project", "Не удалось создать проект")), h)
 	}
-	a.L.AnnounceNew(project.ID)
+	a.L.AnnounceNewBy(project.ID, a.person(r))
 	res := a.StartProjectDialog(project.ID, brief, a.L.NewProjectPrompt(project.Title, WordsAbove())+"\n\n"+a.L.PagesHint(project.ID), resolveCwd)
 	if res.TabID == "" {
 		return JSON(r, res.Status, struct {

@@ -8,7 +8,7 @@ import { usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
 import '@/next/styles/asks.css';
 
-/** The reply box's exit, as long as hx-ask-box-out in asks.css. */
+/** The reply box's exit, as long as hx-pask-box-out in asks.css. */
 const BOX_EXIT_MS = 160;
 
 export const personLabel = (p: IAskPerson | null): string => {
@@ -72,15 +72,15 @@ const Replies = ({ ask }: { ask: IAsk }) => {
   if (ask.replies.length === 0) return null;
   const agentDone = ask.seenAt > 0;
   return (
-    <ol className="hx-ask__replies">
+    <ol className="hx-pask__replies">
       {ask.replies.map((r, i) => {
         const read = agentDone && i < ask.seenReplies;
         return (
-          <li key={`${r.at}-${i}`} className="hx-ask__reply" data-read={read || undefined}>
-            <span className="hx-ask__reply-who">{personLabel(r.from)}</span>
-            <span className="hx-ask__reply-text">{replyText(r)}</span>
+          <li key={`${r.at}-${i}`} className="hx-pask__reply" data-read={read || undefined}>
+            <span className="hx-pask__reply-who">{personLabel(r.from)}</span>
+            <span className="hx-pask__reply-text">{replyText(r)}</span>
             <span
-              className="hx-ask__reply-mark"
+              className="hx-pask__reply-mark"
               role="img"
               title={read ? t('next.asks.readByAgent') : t('next.asks.notRead')}
               aria-label={read ? t('next.asks.readByAgent') : t('next.asks.notRead')}
@@ -126,13 +126,13 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
     run(actions.onAnswer({ text: text.trim() }));
   };
   return (
-    <div className="hx-ask__answer">
-      <div className="hx-ask__acts">
+    <div className="hx-pask__answer">
+      <div className="hx-pask__acts">
         {ask.kind === 'approval' && (
           <>
             <button
               type="button"
-              className="hx-ask__btn"
+              className="hx-pask__btn"
               data-tone="primary"
               disabled={busy}
               onClick={() => run(actions.onAnswer({ choice: 'approved', text: text.trim() || undefined }))}
@@ -142,7 +142,7 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
             </button>
             <button
               type="button"
-              className="hx-ask__btn"
+              className="hx-pask__btn"
               disabled={busy}
               onClick={() => run(actions.onAnswer({ choice: 'changes', text: text.trim() || undefined }))}
             >
@@ -155,7 +155,7 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
           <button
             key={o}
             type="button"
-            className="hx-ask__btn"
+            className="hx-pask__btn"
             disabled={busy}
             onClick={() => run(actions.onAnswer({ choice: `o${i}` }))}
           >
@@ -165,7 +165,7 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
         {!writing && (
           <button
             type="button"
-            className="hx-ask__btn"
+            className="hx-pask__btn"
             data-tone="ghost"
             disabled={busy}
             onClick={() => setWriting(true)}
@@ -177,7 +177,7 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
         <span className="hx-spacer" />
         <button
           type="button"
-          className="hx-ask__btn"
+          className="hx-pask__btn"
           data-tone="ghost"
           disabled={busy}
           onClick={() => run(actions.onCancel())}
@@ -186,9 +186,9 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
         </button>
       </div>
       {box.mounted && (
-        <div className="hx-ask__box" data-state={box.state}>
+        <div className="hx-pask__box" data-state={box.state}>
           <textarea
-            className="hx-ask__input"
+            className="hx-pask__input"
             rows={2}
             value={text}
             disabled={busy}
@@ -205,7 +205,7 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
           {ask.kind === 'question' && (
             <button
               type="button"
-              className="hx-ask__btn"
+              className="hx-pask__btn"
               data-tone="primary"
               data-busy={busy || undefined}
               disabled={busy || !text.trim()}
@@ -218,7 +218,7 @@ const AnswerBox = ({ ask, actions }: { ask: IAsk; actions: IAskCardActions }) =>
         </div>
       )}
       {error && (
-        <div className="hx-ask__err" role="alert">
+        <div className="hx-pask__err" role="alert">
           <Icon name="circle-alert" size="sm" />
           {error}
         </div>
@@ -235,35 +235,35 @@ export const AskCard = memo(({ ask, actions }: IAskCardProps) => {
   // The words of the answer: a question's (an option's text too) or an approval's comment; a decision is the state line.
   const said = answer && (ask.kind === 'question' || ask.decision === 'comment') ? answer.text : '';
   return (
-    <article className="hx-ask" data-tone={state.tone} data-kind={ask.kind}>
-      <div className="hx-ask__head">
+    <article className="hx-pask" data-tone={state.tone} data-kind={ask.kind}>
+      <div className="hx-pask__head">
         <Icon
           name={ask.kind === 'approval' ? 'shield-check' : 'circle-question-mark'}
           size="sm"
-          className="hx-ask__ic"
+          className="hx-pask__ic"
         />
-        <span className="hx-ask__to">{personLabel(ask.to)}</span>
-        <span className="hx-ask__where">{ask.chat}</span>
+        <span className="hx-pask__to">{personLabel(ask.to)}</span>
+        <span className="hx-pask__where">{ask.chat}</span>
         {actions?.onOpenChat && ask.agent && (
-          <button type="button" className="hx-ask__chat" onClick={actions.onOpenChat}>
+          <button type="button" className="hx-pask__chat" onClick={actions.onOpenChat}>
             {ask.agent}
           </button>
         )}
       </div>
-      <p className="hx-ask__q">{ask.question}</p>
-      {ask.details && <p className="hx-ask__details">{ask.details}</p>}
+      <p className="hx-pask__q">{ask.question}</p>
+      {ask.details && <p className="hx-pask__details">{ask.details}</p>}
       {ask.link && (
-        <a className="hx-ask__link" href={ask.link} target="_blank" rel="noreferrer">
+        <a className="hx-pask__link" href={ask.link} target="_blank" rel="noreferrer">
           <Icon name="external-link" size="sm" />
           {ask.link}
         </a>
       )}
-      <div className="hx-ask__state" role="status">
+      <div className="hx-pask__state" role="status">
         <Icon name={STATE_ICON[state.tone]} size="sm" />
         {state.text}
       </div>
-      {said && <blockquote className="hx-ask__said">{said}</blockquote>}
-      {ask.error && <p className="hx-ask__details">{ask.error}</p>}
+      {said && <blockquote className="hx-pask__said">{said}</blockquote>}
+      {ask.error && <p className="hx-pask__details">{ask.error}</p>}
       {ask.replies.length > 1 && <Replies ask={ask} />}
       {ask.status === 'waiting' && actions && <AnswerBox ask={ask} actions={actions} />}
     </article>
@@ -273,17 +273,17 @@ export const AskCard = memo(({ ask, actions }: IAskCardProps) => {
 /** The card of a `harnessly ask` whose ask the list does not hold (yet, or any more): what the command says. */
 export const AskCallCard = memo(
   ({ kind, to, question, ran }: { kind: IAsk['kind']; to: string; question: string; ran: boolean }) => (
-    <article className="hx-ask" data-tone={ran ? 'run' : 'off'} data-kind={kind}>
-      <div className="hx-ask__head">
+    <article className="hx-pask" data-tone={ran ? 'run' : 'off'} data-kind={kind}>
+      <div className="hx-pask__head">
         <Icon
           name={kind === 'approval' ? 'shield-check' : 'circle-question-mark'}
           size="sm"
-          className="hx-ask__ic"
+          className="hx-pask__ic"
         />
-        <span className="hx-ask__to">{to || t('next.asks.wholeChat')}</span>
+        <span className="hx-pask__to">{to || t('next.asks.wholeChat')}</span>
       </div>
-      {question && <p className="hx-ask__q">{question}</p>}
-      <div className="hx-ask__state" role="status">
+      {question && <p className="hx-pask__q">{question}</p>}
+      <div className="hx-pask__state" role="status">
         <Icon name={ran ? 'clock' : 'circle-x'} size="sm" />
         {ran ? t('next.asks.state.sending') : t('next.asks.state.unknown')}
       </div>

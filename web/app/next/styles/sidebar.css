@@ -800,15 +800,49 @@ a.hx-brand__name {
   font-weight: var(--hx-weight-semibold);
   line-height: 1;
 }
-.hx-pinned > .hx-mono {
-  width: 0;
-  margin-right: calc(-1 * var(--hx-space-2));
+/* A chat's mark for the rail: over the start of its title, out of the flow, so the row is laid out the same folded or open. */
+.hx-item__mark {
+  position: absolute;
+  top: 50%;
+  left: var(--hx-space-2);
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
   opacity: 0;
-  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.hx-item__mark > .hx-mono {
+  transition: opacity var(--hx-dur-sm);
+}
+.hx-item[data-terminal='off'] .hx-item__mark > .hx-mono {
+  opacity: 0.55;
+}
+.hx-item:is(:hover, [aria-current='page']) .hx-item__mark > .hx-mono {
+  opacity: 1;
+}
+.hx-item__badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--hx-bg-rail);
+}
+.hx-item__badge > .hx-chat-status {
+  width: 10px;
+  height: 10px;
+}
+/* The nested lists' indent folds away with the sidebar (the rail sets it to 0), at the sidebar's pace. */
+:is(.hx-nav__kids, .hx-tree__kids) > div,
+.hx-item[data-launch] {
   transition:
-    width var(--hx-side-dur) var(--hx-side-ease),
     margin var(--hx-side-dur) var(--hx-side-ease),
-    opacity 200ms ease;
+    padding var(--hx-side-dur) var(--hx-side-ease),
+    border-color var(--hx-side-dur) ease;
 }
 .hx-project__mark {
   position: relative;
@@ -891,7 +925,9 @@ a.hx-brand__name {
   .hx-brand,
   .hx-user,
   .hx-railtip,
-  .hx-pinned > .hx-mono,
+  .hx-item__mark,
+  :is(.hx-nav__kids, .hx-tree__kids) > div,
+  .hx-item[data-launch],
   .hx-project__mark {
     transition: none;
   }

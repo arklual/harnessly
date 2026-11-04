@@ -3,12 +3,12 @@
 // the chat; if it refuses, they are still there and the reason is on screen.
 import { uploadSrc } from '@/next/commands/uploads';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { uuidv7 } from '@/next/core/ids';
 import { useBeta } from '@/next/stores/beta';
 import type { IModelChoice } from '@/next/features/composer/agents';
 import { choiceKey, launchPrompt, toggleChoice } from '@/next/features/composer/multi-model';
-import { createConversation, type NewConversation } from '@/next/commands';
+import { createConversation, setConversationApps, type NewConversation } from '@/next/commands';
 import { failureText } from '@/next/bindings/outcome';
 import { useAgentLimits } from '@/next/bindings/use-limits';
 import { limitsProviderOf } from '@/next/features/limits/model';
@@ -36,7 +36,18 @@ import { useVoice } from '@/next/bindings/use-voice';
 import { useTakesMenu } from '@/next/bindings/use-takes';
 import DockBar from '@/next/features/composer/dock-bar';
 import { useEnterSends } from '@/next/stores/me';
-import { useDefaultCwd } from '@/next/stores/projects';
+import { useDefaultCwd, useProjects } from '@/next/stores/projects';
+import { addDraftRef, removeDraftRef } from '@/next/stores/drafts';
+import { refKey } from '@/next/features/chat/attached';
+import { designThumb } from '@/next/features/composer/attach-sources';
+import type { IPlusAttach } from '@/next/features/composer/plus-menu';
+import type { IPlusApps } from '@/next/features/composer/apps-pane';
+import ChatAppsRow from '@/next/features/app-main/chat-apps-row';
+import { withApp } from '@/next/features/app-main/chat-apps';
+import { useInstalledApps } from '@/next/features/app-views/api';
+import { ROUTE, goTo } from '@/next/routes/routes';
+import { REFS_MAX } from '@/next/protocol/v2';
+import { settled } from '@/next/bindings/outcome';
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 
@@ -63,9 +74,30 @@ interface IHomeComposerProps {
   onCreated: (id: ConvId) => void;
   /** The machine the chat starts on, picked in the model's popover; its agents are this machine's. */
   machines?: IModelPickerProps['machine'];
+  /** Over the field, inside the dock: the greeting, which stays over the field's top edge however the dock moves. */
+  above?: ReactNode;
+  /** Under the field, inside the dock: what stays below the field however far it grows (the places to open). */
+  below?: ReactNode;
 }
 
 const noChat = () => undefined;
+
+/** The apps picked for the new chat, as the chat's own row shows them; the names are read once there is one. */
+const NewChatApps = ({
+  machine,
+  on,
+  onOff,
+}: {
+  machine: MachineId;
+  on: readonly string[];
+  onOff: (id: string) => void;
+}) => {
+  const installed = useInstalledApps(machine).list;
+  const chips = on.map((id) => ({ id, name: installed?.apps.find((a) => a.id === id)?.name ?? id }));
+  return (
+    <ChatAppsRow apps={chips} busy={null} onOpen={(id) => goTo({ kind: ROUTE.app, id })} onOff={onOff} />
+  );
+};
 
 const HomeComposer = ({
   machine,
@@ -74,15 +106,19 @@ const HomeComposer = ({
   resolveProject,
   onCreated,
   machines = null,
+  above = null,
+  below = null,
 }: IHomeComposerProps) => {
   const enterSends = useEnterSends();
   // Arriving with something taken from the Apps screen, the person goes on in the field.
   const field = useRef<HTMLTextAreaElement>(null);
-  const { text, files, setText, read } = useDraftField(NEW_CHAT, field);
+  const { text, files, refs, setText, read } = useDraftField(NEW_CHAT, field);
+  // The apps picked in «+» for the chat to be: turned on in it as soon as the machine has made it.
+  const [apps, setApps] = useState<string[]>([]);
   const mentions = useMentions(NEW_CHAT);
   const stash = useFieldStash(NEW_CHAT);
   const uploads = useUploads(machine, NEW_CHAT, files);
-  const { notice: voiceNotice, insert, ...voice } = useVoice(machine, text, setText, read);
+  const { notice: voiceNotice, insert, ...voice } = useVoice(machine, text, setText, read, NEW_CHAT);
   const takes = useTakesMenu(insert);
   const [creating, setCreating] = useState(false);
   // Enter pressed before the machine's list arrives waits for it and then sends, instead of being lost.
@@ -166,11 +202,26 @@ const HomeComposer = ({
     }
     send(on, where);
 
+    // The apps picked in «+» go on in the chats the machine has made; a refusal is told, the chat itself is there.
+    function turnOnApps(target: MachineId, ids: readonly ConvId[]) {
+      if (apps.length === 0) return;
+      const list = [...apps];
+      setApps([]);
+      ids.forEach((id) => {
+        settled(setConversationApps(target, id, list)).catch((e: unknown) =>
+          toast(t('next.chatapps.failed'), {
+            tone: 'error',
+            description: e instanceof Error ? e.message : undefined,
+          }),
+        );
+      });
+    }
+
     function send(target: MachineId, place: NewConversation['where']) {
       if (choice && companions.length > 0) {
         // One chat on each model, each in a worktree of its own, grouped under the prompt.
         const launch = { id: uuidv7(), prompt: launchPrompt(text) };
-        const first = { text: withMentions(mentions, text.trim()), attachments: uploads.ready };
+        const first = { text: withMentions(mentions, text.trim()), attachments: uploads.ready, refs };
         const started = [choice, ...companions].map((pick) =>
           createConversation(target, {
             where: place,
@@ -198,6 +249,10 @@ const HomeComposer = ({
           clearDraft(NEW_CHAT);
           clearMentions(NEW_CHAT);
           uploads.reset();
+          turnOnApps(
+            target,
+            ids.filter((id): id is ConvId => !!id),
+          );
           setMore([]);
           setCreating(false);
           onCreated(opened);
@@ -211,7 +266,7 @@ const HomeComposer = ({
         model: choice?.model
           ? { id: choice.model, effort: choice.effort, ultracode: choice.ultracode }
           : null,
-        first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready },
+        first: { text: withMentions(mentions, text.trim()), attachments: uploads.ready, refs },
       });
       void created.done.then((st) => {
         if (st.k === 'failed') {
@@ -227,6 +282,7 @@ const HomeComposer = ({
         clearDraft(NEW_CHAT);
         clearMentions(NEW_CHAT);
         uploads.reset();
+        turnOnApps(target, [id]);
         setCreating(false);
         onCreated(id);
       });
@@ -238,6 +294,8 @@ const HomeComposer = ({
     projectId,
     text,
     mentions,
+    refs,
+    apps,
     uploads,
     onCreated,
     choice,
@@ -256,13 +314,61 @@ const HomeComposer = ({
     if (ready) send?.();
   }, [ready]);
 
+  // What «+» attaches besides files, as in a chat; the folder is the project's of the new chat (the chip over the field),
+  // else where the machine starts chats. A pick only adds a chip: nothing opens before the chat exists.
+  const machineProjects = useProjects(machine);
+  const projectPath = projectId ? machineProjects.find((p) => p.id === projectId)?.path : undefined;
+  const scopeCwd = projectPath ?? cwd;
+  const attachedKeys = useMemo(() => new Set(refs.map(refKey)), [refs]);
+  const attach = useMemo<IPlusAttach | null>(
+    () =>
+      machine
+        ? {
+            scope: { machine, cwd: scopeCwd },
+            attached: attachedKeys,
+            onAttach: (row) => addDraftRef(NEW_CHAT, row.ref, REFS_MAX),
+            projectHint: 'next.attach.projectHintHome',
+          }
+        : null,
+    [machine, scopeCwd, attachedKeys],
+  );
+  const plusApps = useMemo<IPlusApps | null>(
+    () =>
+      // Apps run in Claude Code chats for now.
+      machine && choice?.provider === 'claude'
+        ? {
+            machine,
+            on: apps,
+            onPick: (id) => setApps((on) => withApp(on, id, true)),
+            onAll: () => goTo({ kind: ROUTE.apps }),
+          }
+        : null,
+    [machine, choice?.provider, apps],
+  );
+  const refChips = useMemo(
+    () =>
+      refs.map((r) => ({
+        ...r,
+        thumb: r.kind === 'design' && machine ? designThumb(machine, r.id) : null,
+      })),
+    [refs, machine],
+  );
+
   const srcOf = useCallback((item: { id: string }) => (machine ? uploadSrc(machine, item) : null), [machine]);
 
   return (
     <AttachmentSrc.Provider value={srcOf}>
       <div className="hx-dock" data-creating={creating || undefined}>
+        {above}
         <div className="hx-enter" data-enter="up" data-eb="520" data-ed="700">
           <DockBar notice={voiceNotice} />
+          {machine && (
+            <NewChatApps
+              machine={machine}
+              on={apps}
+              onOff={(id) => setApps((on) => withApp(on, id, false))}
+            />
+          )}
           <Composer
             enterSends={enterSends}
             value={text}
@@ -291,6 +397,10 @@ const HomeComposer = ({
             inputRef={field}
             stash={stash}
             takes={voice.onMic ? takes : null}
+            refs={refChips}
+            onRemoveRef={(ref) => removeDraftRef(NEW_CHAT, ref)}
+            attach={attach}
+            apps={plusApps}
             attachments={uploads.attachments}
             onFiles={uploads.onFiles}
             onRemoveAttachment={uploads.onRemove}
@@ -300,6 +410,7 @@ const HomeComposer = ({
             maxText={machine ? limitsOf(machine).maxText : 0}
           />
         </div>
+        {below}
         {creating && (
           <div className="hx-hello__busy" role="status">
             {t('next.newChat.creating')}

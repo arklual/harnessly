@@ -10,11 +10,14 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent,
   type KeyboardEvent,
   type RefObject,
 } from 'react';
 import Modal from '@/next/features/shell/modal';
 import { Button } from '@/next/ui/button';
+import AttachmentThumb from '@/next/ui/attachment-thumb';
+import { useFileDrop } from '@/next/features/composer/use-file-drop';
 import Icon from '@/next/ui/icon';
 import CreatePanel, { DsChoice } from '@/next/features/designly/create-panel';
 import { DeckFound, deckSettingsLabel, useDeckStart } from '@/next/features/designly/deck/deck-start';
@@ -344,12 +347,25 @@ const Hero = ({
     deck.addFiles([...(event.target.files ?? [])]);
     event.target.value = '';
   };
+  const dropping = useFileDrop(deck.addFiles);
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = [...event.clipboardData.files];
+    if (files.length === 0) return;
+    event.preventDefault();
+    deck.addFiles(files);
+  };
 
   return (
     <div className="hx-dl__hero">
       <div className="hx-dl__title">{t('next.designly.title')}</div>
       <div className="hx-dl__sub">{t('next.designly.sub')}</div>
-      <div className="hx-dl__composer" ref={setBox}>
+      <div className="hx-dl__composer" ref={setBox} data-drop={dropping || undefined}>
+        {dropping && (
+          <div className="hx-drop" aria-hidden="true">
+            <Icon name="upload" />
+            <span>{t('next.composer.dropHere')}</span>
+          </div>
+        )}
         <textarea
           ref={inputRef}
           className="hx-dl__input"
@@ -360,6 +376,7 @@ const Hero = ({
           disabled={sending}
           onChange={(event) => onBrief(event.target.value)}
           onKeyDown={onKey}
+          onPaste={onPaste}
         />
         {uploads.attachments.length > 0 && (
           <div className="hx-deck-files">
@@ -368,10 +385,14 @@ const Hero = ({
               const read = deck.reads.find((r) => r.name === a.name);
               return (
                 <span key={a.id} className="hx-deck-file" data-state={a.status} title={a.error ?? undefined}>
-                  <Icon
-                    name={a.status === 'uploading' ? 'loader-circle' : template ? 'layers' : 'file-text'}
-                    size="sm"
-                  />
+                  {a.kind === 'image' && a.status === 'ready' ? (
+                    <AttachmentThumb item={a} className="hx-deck-file__thumb" />
+                  ) : (
+                    <Icon
+                      name={a.status === 'uploading' ? 'loader-circle' : template ? 'layers' : 'file-text'}
+                      size="sm"
+                    />
+                  )}
                   {a.name}
                   {template && read?.state === 'ok' && <small>{t('next.deck.create.styleChip')}</small>}
                   {a.status === 'error' && (

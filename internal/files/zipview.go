@@ -48,6 +48,10 @@ func (a *Access) ServeZip(w http.ResponseWriter, r *http.Request, q Query) {
 		zipRefuse(w, r, t.Status, t.Text)
 		return
 	}
+	if tarKind(t.Real) != "" {
+		a.serveTar(w, r, q, t.Real)
+		return
+	}
 	zr, err := zip.OpenReader(t.Real)
 	if err != nil {
 		zipRefuse(w, r, http.StatusUnsupportedMediaType, locale.Pick("This is not a zip archive", "Это не zip-архив"))

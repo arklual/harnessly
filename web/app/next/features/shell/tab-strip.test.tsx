@@ -88,6 +88,16 @@ const giveUp = () => act(() => void vi.advanceTimersByTime(2000));
 const release = (x: number, pointerType = 'mouse') =>
   act(() => void window.dispatchEvent(pointer('pointerup', x, { pointerType, isPrimary: true })));
 
+/**
+ * The end of an animation, with its name. jsdom has no AnimationEvent, so React listens for the prefixed event there.
+ */
+const animationEnd = (el: Element, animationName: string) =>
+  act(() => {
+    const event = new Event('webkitAnimationEnd', { bubbles: true });
+    Object.defineProperty(event, 'animationName', { value: animationName });
+    el.dispatchEvent(event);
+  });
+
 /** The wide window: the panels are popovers, not the phone's sheets. */
 const wide = () => {
   window.matchMedia = ((query: string) => ({
@@ -207,6 +217,54 @@ describe('TabStrip: carrying a tab', () => {
     expect(tab('a').style.transform).toBe('');
     expect(tab('b').style.transform).toBe('');
     expect(document.querySelector('[data-dragging]')).toBeNull();
+  });
+
+  it('keeps the frames of the page off the pointer while the tab is carried, and gives it back on the drop', () => {
+    mount();
+    layOut();
+    const root = document.documentElement;
+    press('a', 50);
+    moveTo(80);
+    expect(root.getAttribute('data-hand-drag')).toBe('true');
+    moveTo(275);
+    release(275);
+    expect(root.hasAttribute('data-hand-drag')).toBe(false);
+    settle();
+    giveUp();
+    press('a', 50);
+    moveTo(80);
+    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(root.hasAttribute('data-hand-drag')).toBe(false);
+    release(80);
+  });
+
+  it('grows a tab in once: a tab moved to another place does not play its entrance again', () => {
+    const on = handlers();
+    const { rerender } = render(
+      <Host>
+        <TabStrip tabs={TABS} active="a" {...on} />
+      </Host>,
+    );
+    expect(tab('a').hasAttribute('data-enter')).toBe(true);
+    for (const item of TABS) animationEnd(tab(item.id), 'hx-gtab-in');
+    expect(document.querySelector('[data-enter]')).toBeNull();
+    // An animation inside the tab (the icon of an agent at work) is not its entrance.
+    const added: IStripTab = { ...TABS[0], id: 'e', title: 'Chat e' };
+    rerender(
+      <Host>
+        <TabStrip tabs={[...TABS, added]} active="a" {...on} />
+      </Host>,
+    );
+    animationEnd(tab('e').querySelector('.hx-gtab__ic') as Element, 'hx-spin');
+    expect(tab('e').hasAttribute('data-enter')).toBe(true);
+    // The new order (a drop on c) moves a's very element: it comes without an entrance.
+    const [a, b, c, d] = TABS;
+    rerender(
+      <Host>
+        <TabStrip tabs={[b, c, a, d, added]} active="a" {...on} />
+      </Host>,
+    );
+    expect(tab('a').hasAttribute('data-enter')).toBe(false);
   });
 
   it('drops at the end when the pointer is past the last tab, and at the start before the first', () => {

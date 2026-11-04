@@ -43,15 +43,9 @@ import {
 } from '@/next/features/composer/agents';
 import type { IModelPickerProps } from '@/next/features/composer/model-picker';
 import Composer, { type IComposerQuote, type TSendMode } from '@/next/features/composer/composer';
-import {
-  formatAnnotation,
-  readAnnotated,
-  renumberBlock,
-  withAnnotations,
-} from '@/next/features/designly/annotation';
+import { formatAnnotation, renumberBlock, withAnnotations } from '@/next/features/designly/annotation';
 import {
   CARRIED_PREFIX,
-  carryNotes,
   clearCarriedNotes,
   dropCarriedNote,
   useCarriedNotes,
@@ -78,15 +72,14 @@ import type { ConvId, MachineId, PromoteTo } from '@/next/protocol/v2';
 import { reconnectNow, useConnection } from '@/next/stores/connection';
 import { openGates, useFedClients, useGates, useQueue } from '@/next/stores/conversation';
 import { useConversation } from '@/next/stores/conversations';
-import { addDraftRef, clearDraft, draftsStore, removeDraftRef, setDraft } from '@/next/stores/drafts';
-import { attachedOf, refKey } from '@/next/features/chat/attached';
+import { addDraftRef, clearDraft, removeDraftRef } from '@/next/stores/drafts';
+import { refKey } from '@/next/features/chat/attached';
 import { designThumb } from '@/next/features/composer/attach-sources';
 import type { IPlusAttach } from '@/next/features/composer/plus-menu';
 import type { IPlusApps } from '@/next/features/composer/apps-pane';
 import ChatAppsRow from '@/next/features/app-main/chat-apps-row';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import { useChatApps } from '@/next/bindings/use-chat-apps';
-import { openAttached } from '@/next/features/pane/open-attached';
 import { REFS_MAX, type MessageRef } from '@/next/protocol/v2';
 import { limitPlaceholder } from '@/next/features/chat/limit';
 import { machineNow } from '@/next/core/clock';
@@ -95,12 +88,14 @@ import { useFieldStash } from '@/next/bindings/use-stash';
 import { limitsOf, useMachine } from '@/next/stores/machines';
 import { useVoice } from '@/next/bindings/use-voice';
 import { useTakesMenu } from '@/next/bindings/use-takes';
-import { messagesStore, usePendingMessages, waitsInQueue, type MessageView } from '@/next/stores/messages';
+import { usePendingMessages, waitsInQueue, type MessageView } from '@/next/stores/messages';
 import { useWaitingAgents } from '@/next/bindings/waiting';
 import { t } from '@/next/i18n';
 import { bindLaunch } from '@/next/ui/flight';
 import { toast } from '@/next/ui/toast';
 import { useEnterSends } from '@/next/stores/me';
+import { takeBackMessage } from '@/next/bindings/take-back';
+import { useDelayed } from '@/next/ui/skeleton';
 
 const rowOf = (m: MessageView): QueueRow => ({
   clientId: m.clientId,
@@ -147,6 +142,9 @@ interface IChatDockProps {
  */
 const keepText = (text: string) => text;
 
+/** How long the machine is away before the bar over the field says so; a restart for an update passes unseen. */
+export const OFF_NOTICE_MS = 120_000;
+
 const modelBlocked = (agent: IPickerAgent): string | null =>
   agent.canSwitch ? null : t('next.picker.cantSwitch', { agent: agent.name });
 
@@ -182,13 +180,17 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   const goneVendor = record
     ? removedKeyOf(machineView?.machine.agents ?? [], record.provider, record.model?.profile)
     : null;
-  // the machine is off and the chat is the cluster's copy: nothing can be sent.
+  // the machine is off and the chat is the cluster's copy. The field stays usable: a message waits
+  // in the outbox (kept through F5) and goes when the machine is back, a dictation is kept in the browser. A restart
+  // for an update takes about a minute, so the bar says so only once the machine has been away for a while.
   const central = useCentral();
   const machineOff = central.enabled && central.off.has(machine) && connection?.k !== 'live';
+  const longOff = useDelayed(machineOff, OFF_NOTICE_MS);
+  const machineName = machineView?.machine.name ?? central.names.get(machine) ?? machine;
   const keyNotice = useMemo<DockNotice | null>(
     () =>
-      machineOff
-        ? { kind: 'off' }
+      longOff
+        ? { kind: 'off', machine: machineName }
         : goneVendor === null
           ? null
           : {
@@ -197,7 +199,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
               onOpen: () => goTo({ kind: ROUTE.settings, section: 'accounts' }),
               onContinue: handoff ? () => requestContinue(conv) : null,
             },
-    [machineOff, goneVendor, handoff, conv],
+    [longOff, machineName, goneVendor, handoff, conv],
   );
 
   // Held on the usage limit: the queue waits for the reset by itself, so it is not a pause to resume. The card in the
@@ -223,7 +225,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   );
   const canMove = machineView?.features.includes('queue-move') ?? false;
 
-  const { notice: voiceNotice, insert, ...voice } = useVoice(machine, text, onChange, read);
+  const { notice: voiceNotice, insert, ...voice } = useVoice(machine, text, onChange, read, conv);
   const takes = useTakesMenu(insert);
   const window = useContextWindow(machine, conv, working);
   // The usage meter is Anthropic's (or Codex's) own: a chat on a vendor's profile has none.
@@ -319,35 +321,13 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
   // «Изменить»: the runtime lets the message go (pessimistic), and only then its text is back in the field.
   const onEdit = useCallback(
     async (clientId: string) => {
-      const row = rows.find((r) => r.clientId === clientId);
-      if (!row) return;
-      await settled(cancelMessage(clientId));
-      // A message that was delivered after all (the row was stale) only leaves the queue: its words do not come
-      // back into the field to be sent a second time.
-      const after = messagesStore.get(clientId);
-      if (!after || after.state.k === 'done') return;
-      const have = draftsStore.get(conv);
-      // The words come back into the text, the design's notes and the attached places as chips: nobody edits the
-      // `<annotation>` or `<attached>` markup by hand.
-      const places = attachedOf(row.text, row.refs);
-      const back = readAnnotated(places.text);
-      carryNotes(conv, back.notes);
-      const kept = have?.refs ?? [];
-      const keys = new Set(kept.map(refKey));
-      setDraft(conv, {
-        text: [back.text, have?.text ?? ''].filter(Boolean).join('\n\n'),
-        attachments: [...row.attachments, ...(have?.attachments ?? [])],
-        refs: [
-          ...(row.refs?.length ? row.refs : places.refs).filter((r) => !keys.has(refKey(r))),
-          ...kept,
-        ].slice(0, REFS_MAX),
-      });
+      if (rows.some((r) => r.clientId === clientId)) await takeBackMessage(conv, clientId);
     },
     [rows, conv],
   );
 
-  // What «+» attaches besides files: places of the machine and the team, kept in the draft like the files. A design
-  // opens at once in this chat's pane, so the person sees what the agent is pointed at.
+  // What «+» attaches besides files: places of the machine and the team, kept in the draft like the files. A pick only
+  // adds the chip, a design too: it opens in the pane from the chip, when the person asks.
   const cwd = record?.cwd ?? null;
   const attachedKeys = useMemo(() => new Set(refs.map(refKey)), [refs]);
   const attach = useMemo<IPlusAttach | null>(
@@ -356,10 +336,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         ? {
             scope: { machine, cwd },
             attached: attachedKeys,
-            onAttach: (row) => {
-              addDraftRef(conv, row.ref, REFS_MAX);
-              if (row.ref.kind === 'design') openAttached(row.ref);
-            },
+            onAttach: (row) => addDraftRef(conv, row.ref, REFS_MAX),
           }
         : null,
     [record, machine, cwd, attachedKeys, conv],
@@ -424,7 +401,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
     <>
       <ConnectionBanner
         connection={machineOff ? undefined : connection}
-        machineName={machineView?.machine.name ?? machine}
+        machineName={machineName}
         onRetryNow={() => reconnectNow(machine)}
       />
       <QuestionCard
@@ -472,7 +449,7 @@ const ChatDock = ({ conv, machine, extra = null, handoff = null }: IChatDockProp
         onSubmit={onSubmit}
         mode={mode}
         placeholder={hint ?? extra?.placeholder}
-        quiet={goneVendor !== null || machineOff}
+        quiet={goneVendor !== null}
         onStop={() => settled(interrupt(machine, conv))}
         waiting={waitingAgents.length > 0}
         picker={

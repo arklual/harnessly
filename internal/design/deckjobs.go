@@ -36,6 +36,7 @@ type deckJob struct {
 	DeckExportJob
 	artifact string
 	rec      string
+	board    string
 	publish  bool
 	path     string
 	ext      string
@@ -126,6 +127,11 @@ func (l *Library) deckBinary(need string) error {
 // StartDeckExport makes the job of a format and starts it (or joins the one already queued or running for the same
 // project, format and recording). publish also keeps a finished PDF as the file guests may read.
 func (l *Library) StartDeckExport(artifact string, format DeckExportFormat, rec string, publish bool) (DeckExportJob, error) {
+	return l.StartBoardExport(artifact, format, rec, "", publish)
+}
+
+// StartBoardExport is StartDeckExport of one board ("" for every board).
+func (l *Library) StartBoardExport(artifact string, format DeckExportFormat, rec, board string, publish bool) (DeckExportJob, error) {
 	exp, ok := DeckExporterOf(format)
 	if !ok {
 		return DeckExportJob{}, fmt.Errorf("%s: %s", locale.Pick("This format is not built yet", "Этот формат ещё не готов"), format)
@@ -134,7 +140,7 @@ func (l *Library) StartDeckExport(artifact string, format DeckExportFormat, rec 
 	s.mu.Lock()
 	s.sweepLocked(l)
 	for _, j := range s.jobs {
-		if j.artifact == artifact && j.Format == format && j.rec == rec && (j.State == DeckJobQueued || j.State == DeckJobRunning) {
+		if j.artifact == artifact && j.Format == format && j.rec == rec && j.board == board && (j.State == DeckJobQueued || j.State == DeckJobRunning) {
 			j.publish = j.publish || publish
 			snap := j.snapshot()
 			s.mu.Unlock()
@@ -143,8 +149,8 @@ func (l *Library) StartDeckExport(artifact string, format DeckExportFormat, rec 
 	}
 	id := randomHex(8)
 	j := &deckJob{
-		DeckExportJob: DeckExportJob{ID: id, Format: format, State: DeckJobQueued, At: time.Now().UTC().Format(time.RFC3339)},
-		artifact:      artifact, rec: rec, publish: publish, ext: exp.Ext, made: time.Now(),
+		DeckExportJob: DeckExportJob{ID: id, Format: format, Board: board, State: DeckJobQueued, At: time.Now().UTC().Format(time.RFC3339)},
+		artifact:      artifact, rec: rec, board: board, publish: publish, ext: exp.Ext, made: time.Now(),
 	}
 	for _, need := range exp.Needs {
 		if err := l.deckBinary(need); err != nil {
@@ -161,7 +167,10 @@ func (l *Library) StartDeckExport(artifact string, format DeckExportFormat, rec 
 		s.mu.Unlock()
 		return DeckExportJob{}, err
 	}
-	j.path = filepath.Join(dir, id+"."+exp.Ext)
+	if board != "" && format == DeckExportPNG {
+		j.ext = "png"
+	}
+	j.path = filepath.Join(dir, id+"."+j.ext)
 	s.jobs[jobKey(artifact, id)] = j
 	snap := j.snapshot()
 	s.mu.Unlock()
@@ -204,7 +213,7 @@ func (l *Library) runDeckJob(j *deckJob, exp DeckExporter, turn chan struct{}) {
 			}
 		}()
 		return exp.Run(ctx, DeckExportRun{
-			L: l, Artifact: j.artifact, Rec: j.rec, Out: tmp,
+			L: l, Artifact: j.artifact, Rec: j.rec, Board: j.board, Out: tmp,
 			Progress: func(p float64) {
 				if p < 0 {
 					p = 0
@@ -382,6 +391,19 @@ func (a *API) DeckExport(r *http.Request) Answer {
 	if rec != "" && !deckIDRe.MatchString(rec) {
 		return bad(http.StatusBadRequest, locale.Pick("Unknown recording", "Неизвестная запись"))
 	}
+	board := ""
+	if v, ok := Field(body, "board").(string); ok && v != "" {
+		if !DeckExportOfBoard[format] || !a.L.hasBoard(artifact, v) {
+			return bad(http.StatusBadRequest, locale.Pick("Unknown board", "Неизвестная доска"))
+		}
+		board = v
+	}
+	// An archive hands over the project's files, not what it shows: for those who may change it.
+	if format == DeckExportZip || format == DeckExportBundle {
+		if no := a.gate(r, artifact, RoleEdit); no != nil {
+			return *no
+		}
+	}
 	publish := Field(body, "publish") == true
 	if publish {
 		if format != DeckExportPDF {
@@ -392,7 +414,7 @@ func (a *API) DeckExport(r *http.Request) Answer {
 		}
 	}
 	a.L.SweepDeckExports(artifact)
-	j, err := a.L.StartDeckExport(artifact, format, rec, publish)
+	j, err := a.L.StartBoardExport(artifact, format, rec, board, publish)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if _, ok := DeckExporterOf(format); !ok {
@@ -406,6 +428,7 @@ func (a *API) DeckExport(r *http.Request) Answer {
 // deckTypes are the media types of the files an export makes.
 var deckTypes = map[string]string{
 	"pdf":  "application/pdf",
+	"png":  "image/png",
 	"zip":  "application/zip",
 	"pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 	"html": "text/html; charset=utf-8",
@@ -490,12 +513,21 @@ func (a *API) DeckExportFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ext := strings.TrimPrefix(filepath.Ext(path), ".")
-	if j.Format == DeckExportPNG {
+	if j.Format == DeckExportPNG && j.Board == "" {
 		ext = "zip"
 	}
+
 	title := ""
 	if art := a.L.ReadArtifact(artifact); art != nil {
 		title = art.Title
+		for _, b := range art.Boards {
+			if j.Board != "" && (b.ID == j.Board || b.Path == j.Board) && b.Title != "" {
+				title += " — " + b.Title
+			}
+		}
+	}
+	if j.Format == DeckExportBundle {
+		title += " " + locale.Pick("(all)", "(всё)")
 	}
 	name := deckFileName(title, ext)
 	ctype := deckTypes[ext]

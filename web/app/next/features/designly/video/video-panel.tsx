@@ -13,6 +13,7 @@ import { PANEL_DROP, panelDrop, panelFollow } from '@/next/features/designly/dec
 import { DECK_PANEL, type TDeckPanelMode } from '@/next/features/designly/deck/types';
 import type { ISiteStage } from '@/next/features/designly/site-view';
 import { t } from '@/next/i18n';
+import { ChatTerminalButton } from '@/next/features/terminal/chat-terminal';
 import Icon from '@/next/ui/icon';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
 
@@ -138,6 +139,7 @@ const VideoPanel = ({ mode, tab, onMode, onTab, phone, chat, comments, context, 
             </button>
           ))}
         </div>
+        <ChatTerminalButton />
         <button
           className="hx-btn"
           data-variant="ghost"

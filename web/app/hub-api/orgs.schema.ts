@@ -110,6 +110,7 @@ export const auditEvent = obj({
     'machine.restart',
     'change.create',
     'signal.snooze',
+    'signal.unsnooze',
   ),
   target: nullable(
     obj({

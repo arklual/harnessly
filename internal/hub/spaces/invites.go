@@ -53,9 +53,21 @@ func newToken() string { return store.RandomBase32(16) }
 func (s *Service) inviteURL(token string) string { return s.cfg.PublicURL + "/invite/" + token }
 
 func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	var req struct{ Emails []string }
+	var req struct {
+		Emails []string
+		Role   string
+	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
+	}
+	// The owner may invite a co-owner (a tenant admin) as well as a member; empty keeps the old default.
+	role := store.RoleMember
+	switch req.Role {
+	case "", store.RoleMember:
+	case store.RoleOwner:
+		role = store.RoleOwner
+	default:
+		return httpx.Invalid("role", "Роль приглашённого — участник или админ")
 	}
 	if len(req.Emails) == 0 {
 		return httpx.Invalid("emails", "Укажите хотя бы один адрес")
@@ -120,7 +132,7 @@ func (s *Service) inviteByEmail(w http.ResponseWriter, r *http.Request, p *auth.
 		token := newToken()
 		one := 1
 		iv := store.Invite{
-			SpaceID: spaceID, Kind: "email", Email: email, TokenHash: store.HashToken(token), Role: store.RoleMember,
+			SpaceID: spaceID, Kind: "email", Email: email, TokenHash: store.HashToken(token), Role: role,
 			MaxUses: &one, ExpiresAt: now.Add(inviteDays * 24 * time.Hour), CreatedBy: p.User.ID, CreatedAt: now,
 		}
 		err := s.db.Tx(ctx, func(tx store.Store) error {

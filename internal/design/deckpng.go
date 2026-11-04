@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-// PNG: a picture of every slide at its own size (at least 1920 px wide), in a zip named by the slide's place and title.
+// PNG: a picture of every slide at its own size (at least 1920 px wide), in a zip named by the slide's place and title;
+// one board asked for is one picture.
 
 func init() {
 	RegisterDeckExporter(DeckExportPNG, DeckExporter{Needs: []string{"chrome"}, Ext: "zip", Run: runDeckPNG})
@@ -31,7 +32,7 @@ func deckSlideFile(i int, title, ext string) string {
 }
 
 func runDeckPNG(ctx context.Context, run DeckExportRun) error {
-	slides, err := run.L.deckSlides(run.Artifact)
+	slides, err := run.L.runSlides(run)
 	if err != nil {
 		return err
 	}
@@ -45,6 +46,21 @@ func runDeckPNG(ctx context.Context, run DeckExportRun) error {
 		return err
 	}
 	defer tab.close()
+	// One board is one picture, as tall as its page: no zip around it.
+	if run.Board != "" {
+		if err := measureFluid(ctx, tab, slides); err != nil {
+			return err
+		}
+		sl := slides[0]
+		if err := tab.open(sl, deckScale(sl.W)); err != nil {
+			return fmt.Errorf("%s: %w", sl.Title, err)
+		}
+		pic, err := tab.png()
+		if err != nil {
+			return fmt.Errorf("%s: %w", sl.Title, err)
+		}
+		return os.WriteFile(run.Out, pic, 0o666)
+	}
 	out, err := os.Create(run.Out)
 	if err != nil {
 		return err

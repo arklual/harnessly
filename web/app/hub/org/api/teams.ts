@@ -59,6 +59,11 @@ export interface Person {
   mrsWeek: number | null;
   /** How many machines the person has in this tenant; absent: the hub does not count them yet (shown as «—»). */
   machines?: number | null;
+  /**
+   * Set when the person is in several tenants and none of their teams says which one an action means (all-tenants
+   * view): the limit and removal are hidden and the card points to these tenants instead.
+   */
+  openIn?: { slug: string; name: string }[];
   /** The viewer themself: nobody changes their own role or limit. */
   self: boolean;
   can: { limit: boolean; role: boolean; team: boolean; remove: boolean };
@@ -89,6 +94,8 @@ export interface TeamExtras {
 export interface TeamBlock {
   /** Null: «Без команды». */
   id: string | null;
+  /** The tenant the team belongs to (its id); absent when the hub does not say. */
+  tenantId?: string;
   name: string;
   leadName: string | null;
   spentRub: number;
@@ -125,6 +132,11 @@ export interface TeamsView {
   notAccepted: number;
   notVisiting: number;
   can: { createTeam: boolean; invite: boolean };
+  /** What this hub can do beyond people and limits; a control that needs a missing capability is not shown. */
+  supports: {
+    /** Machines per person, shared accounts and secrets of a team (the rows on the team page). */
+    teamExtras: boolean;
+  };
   /** The hub counts spend per person and team; false: the amounts are only what the limits have seen. */
   spendKnown: boolean;
 }
@@ -158,6 +170,10 @@ export interface TeamsApi {
   setRole(org: string, scope: string, personId: string, role: MemberRole): Promise<TeamsView>;
   moveToTeam(org: string, scope: string, personId: string, teamId: string | null): Promise<TeamsView>;
   removeFromTenant(org: string, scope: string, personId: string): Promise<TeamsView>;
-  createTeam(org: string, scope: string, name: string): Promise<TeamsView>;
+  /** `tenantId` names the tenant when the scope is «all»; in a tenant it is that tenant. */
+  createTeam(org: string, scope: string, name: string, tenantId?: string): Promise<TeamsView>;
+  renameTeam(org: string, scope: string, teamId: string, name: string): Promise<TeamsView>;
+  /** Deletes a team: its people stay in the tenant without a team, its machines keep the tenant. */
+  deleteTeam(org: string, scope: string, teamId: string): Promise<TeamsView>;
   teamsAudit(org: string, scope: string, before: string | null): Promise<AuditPage>;
 }

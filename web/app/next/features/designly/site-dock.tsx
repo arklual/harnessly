@@ -1,5 +1,5 @@
 // The foot of a design opened in the right pane (the Legacy pane's pager): one floating pill under the page with the way
-// through the design's pages — back, «Главная 1/2» with the list of them, forward — the canvas's zoom (−, 72 %, +, the fits, the lock)
+// through the design's pages — back, «Главная 1/2» with the list of them, forward — the canvas's zoom (−, 72 %, +, «Вписать», the lock)
 // and the switch of the page's live settings (the «Состояния» panel). It is only a control: the pages, the canvas and
 // the panel are the view's.
 import { useEffect, useRef, useState } from 'react';
@@ -9,7 +9,6 @@ import { usePresence } from '@/next/ui/presence';
 import { SheetScrim, useSheetDrag } from '@/next/ui/sheet';
 import { usePhone } from '@/next/ui/use-media';
 import PagePicker from '@/next/features/designly/page-picker';
-import { FIT, type TFit } from '@/next/features/designly/site-zoom';
 import { t } from '@/next/i18n';
 
 const MENU_MS = 200;
@@ -22,45 +21,37 @@ export interface IZoomControls {
   canOut: boolean;
   zoomIn: () => void;
   zoomOut: () => void;
+  /** «Вписать»: the standard view of the device, locked or not. */
   fit: () => void;
-  reset: () => void;
+  /** The view is the standard one. */
+  std: boolean;
   zoomTo: (pct: number) => void;
-  /** The fit the view keeps; null once it was moved. */
-  fitMode: TFit | null;
-  fitTo: (mode: TFit) => void;
   locked: boolean;
   onLock: () => void;
 }
 
 /** What the scale's menu offers. */
-const ZOOM_PRESETS = [50, 100, 200] as const;
-/** The fits of the fit's menu, as it lists them. */
-const FITS = [
-  { mode: FIT.width, label: 'next.site.fitWidth' },
-  { mode: FIT.height, label: 'next.site.fitHeight' },
-  { mode: FIT.whole, label: 'next.site.fitWhole' },
-] as const;
+export const ZOOM_PRESETS = [50, 100, 200] as const;
 const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+/** The key of «Вписать» as the menus show it. */
+export const fitKeyText = (): string => `${isMac() ? '⌘' : 'Ctrl'}+0`;
 
-const ZOOM_MENU = { scale: 'scale', fit: 'fit' } as const;
-type TZoomMenu = (typeof ZOOM_MENU)[keyof typeof ZOOM_MENU];
-
-/** −, the scale, +, the fits, the lock: a compact group for the pill, the device menu or the corner of the canvas. The
- *  scale opens a small menu of the usual scales, the fit one of the fits (by width, by height, whole); either ends with
- *  the reset of the view. Locked, the view neither pans nor zooms: only a fit can be picked, and it is kept. */
+/** −, the scale, +, «Вписать», the lock: a compact group for the pill, the device menu or the corner of the canvas. The
+ *  scale opens a small menu of the usual scales and «Вписать»; «Вписать» puts the device back to its standard view
+ *  (a phone or a tablet whole, a computer whole up to its own size, «По окну» filling the window). Locked, the view
+ *  neither pans nor zooms: «Вписать» still works. */
 export const ZoomControls = ({ zoom }: { zoom: IZoomControls }) => {
-  const [open, setOpen] = useState<TZoomMenu | null>(null);
+  const [open, setOpen] = useState(false);
   const root = useRef<HTMLSpanElement>(null);
-  const menu = usePresence(open, MENU_MS);
-  const cmd = isMac() ? '⌘' : 'Ctrl';
+  const menu = usePresence(open ? true : null, MENU_MS);
 
   useEffect(() => {
-    if (open === null) return;
+    if (!open) return;
     const onDown = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(null);
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(null);
+      if (event.key === 'Escape') setOpen(false);
     };
     window.addEventListener('pointerdown', onDown);
     window.addEventListener('keydown', onKey);
@@ -71,14 +62,19 @@ export const ZoomControls = ({ zoom }: { zoom: IZoomControls }) => {
   }, [open]);
 
   const pick = (action: () => void) => {
-    setOpen(null);
+    setOpen(false);
     action();
   };
-  const toggle = (which: TZoomMenu) => setOpen((now) => (now === which ? null : which));
   const lockLabel = zoom.locked ? t('next.site.unlockView') : t('next.site.lockView');
 
   return (
-    <span className="hx-zoomctl" role="group" aria-label={t('next.site.zoom')} ref={root}>
+    <span
+      className="hx-zoomctl"
+      role="group"
+      aria-label={t('next.site.zoom')}
+      data-locked={zoom.locked}
+      ref={root}
+    >
       <button
         type="button"
         className="hx-head-btn hx-tipped hx-zoomctl__step"
@@ -93,11 +89,11 @@ export const ZoomControls = ({ zoom }: { zoom: IZoomControls }) => {
         type="button"
         className="hx-zoomctl__pct"
         aria-haspopup="menu"
-        aria-expanded={open === ZOOM_MENU.scale}
+        aria-expanded={open}
         aria-disabled={zoom.locked}
         aria-label={t('next.site.zoomMenu')}
         aria-live="polite"
-        onClick={() => !zoom.locked && toggle(ZOOM_MENU.scale)}
+        onClick={() => !zoom.locked && setOpen((now) => !now)}
       >
         {zoom.pct}%
       </button>
@@ -114,17 +110,14 @@ export const ZoomControls = ({ zoom }: { zoom: IZoomControls }) => {
       <button
         type="button"
         className="hx-head-btn hx-tipped"
-        aria-haspopup="menu"
-        aria-expanded={open === ZOOM_MENU.fit}
         aria-label={t('next.site.zoomFit')}
-        onClick={() => toggle(ZOOM_MENU.fit)}
+        onClick={() => pick(zoom.fit)}
       >
         <Icon name="maximize-2" size="sm" />
-        {open !== ZOOM_MENU.fit && (
-          <span className="hx-tip" data-align="end">
-            {t('next.site.zoomFit')}
-          </span>
-        )}
+        <span className="hx-tip" data-align="end">
+          {t('next.site.zoomFit')}
+          <kbd>{fitKeyText()}</kbd>
+        </span>
       </button>
       <button
         type="button"
@@ -138,7 +131,7 @@ export const ZoomControls = ({ zoom }: { zoom: IZoomControls }) => {
           {lockLabel}
         </span>
       </button>
-      {menu.value === ZOOM_MENU.scale && (
+      {menu.value !== null && (
         <div className="hx-site-menu hx-zoomctl__menu" data-state={menu.state} role="menu">
           {ZOOM_PRESETS.map((pct) => (
             <button
@@ -153,31 +146,9 @@ export const ZoomControls = ({ zoom }: { zoom: IZoomControls }) => {
             </button>
           ))}
           <div className="hx-zoomctl__sep" role="separator" />
-          <button type="button" role="menuitem" className="hx-zoomctl__item" onClick={() => pick(zoom.reset)}>
-            <span>{t('next.site.zoomReset')}</span>
-            <kbd>{cmd}+0</kbd>
-          </button>
-        </div>
-      )}
-      {menu.value === ZOOM_MENU.fit && (
-        <div className="hx-site-menu hx-zoomctl__menu" data-state={menu.state} role="menu">
-          {FITS.map((item) => (
-            <button
-              key={item.mode}
-              type="button"
-              role="menuitemradio"
-              className="hx-zoomctl__item"
-              aria-checked={zoom.fitMode === item.mode}
-              onClick={() => pick(() => zoom.fitTo(item.mode))}
-            >
-              <span>{t(item.label)}</span>
-              {zoom.fitMode === item.mode && <Icon name="check" size="sm" />}
-            </button>
-          ))}
-          <div className="hx-zoomctl__sep" role="separator" />
-          <button type="button" role="menuitem" className="hx-zoomctl__item" onClick={() => pick(zoom.reset)}>
-            <span>{t('next.site.zoomReset')}</span>
-            <kbd>{cmd}+0</kbd>
+          <button type="button" role="menuitem" className="hx-zoomctl__item" onClick={() => pick(zoom.fit)}>
+            <span>{t('next.site.zoomFit')}</span>
+            <kbd>{fitKeyText()}</kbd>
           </button>
         </div>
       )}

@@ -12,6 +12,10 @@ import { shellMock } from './shell';
 import { teamsMock } from './teams';
 import { tenantMock } from './tenant';
 import type { MockCtx } from './ctx';
+import { setShownCurrency } from '../money';
+
+// The mocks are made in rubles at 90 a dollar (overview.ts).
+setShownCurrency('RUB', 90);
 
 export const mockOrgApi = (ctx: MockCtx): OrgApi => ({
   ...shellMock(ctx),

@@ -13,9 +13,11 @@ import type {
 import { orgErrorText } from '../../../org/api/errors';
 import { useOrg } from '../../../org/context';
 import { Btn, Drawer, Icon } from '../../ui';
+import { ConfirmDialog } from '../teams/confirm';
 import {
   type Draft,
   dayBars,
+  deliveryText,
   draftChanged,
   draftOf,
   draftPatch,
@@ -73,7 +75,6 @@ export const CardDrawer = ({
   state,
   canPin,
   onClose,
-  onProblem,
 }: {
   entryId: string | null;
   view: EnvResponse;
@@ -81,7 +82,6 @@ export const CardDrawer = ({
   /** An admin pins; a lead does not. */
   canPin: boolean;
   onClose: () => void;
-  onProblem: (text: string) => void;
 }) => {
   const { api, shell } = useOrg();
   const org = shell.org.slug;
@@ -114,6 +114,9 @@ export const CardDrawer = ({
   const [draft, setDraft] = useState<Draft>({ mode: 'all', teams: [], pinned: false });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeErr, setRemoveErr] = useState<string | null>(null);
   const [wasOpen, setWasOpen] = useState(false);
   if (open !== wasOpen) {
     setWasOpen(open);
@@ -164,18 +167,22 @@ export const CardDrawer = ({
     else setErr(orgErrorText(res.error));
   };
 
-  const remove = () => {
+  // Asked first, then the hub: the drawer closes when the entry is gone, else the dialog says why not.
+  const remove = async () => {
+    if (removing) return;
     const at = { layer: layer.layer, scopeId: layer.scopeId };
-    onClose();
-    void state
-      .write({
-        apply: (v) => withoutEntry(v, row.entryId),
-        undo: (v) => withAdded(v, at, row),
-        run: () => api.envRemove(org, row.entryId),
-      })
-      .then((res) => {
-        if (!res.ok) onProblem(orgErrorText(res.error));
-      });
+    setRemoving(true);
+    setRemoveErr(null);
+    const res = await state.write({
+      apply: (v) => withoutEntry(v, row.entryId),
+      undo: (v) => withAdded(v, at, row),
+      run: () => api.envRemove(org, row.entryId),
+    });
+    setRemoving(false);
+    if (res.ok) {
+      setAsking(false);
+      onClose();
+    } else setRemoveErr(orgErrorText(res.error));
   };
 
   const stats: [string, string][] = [
@@ -203,6 +210,20 @@ export const CardDrawer = ({
       sub={`${KIND_WORD[row.kind]} · ${row.hint} · ${layer.title}`}
       over={
         <>
+          <ConfirmDialog
+            open={asking}
+            label="Убрать из окружения"
+            title={`Убрать ${row.name}?`}
+            lead={`Агенты слоя «${layer.title}» перестанут его видеть. Вернуть можно из каталога — настройки команд придётся выставить заново.`}
+            yes="Убрать"
+            busy={removing}
+            error={removeErr}
+            onNo={() => {
+              setAsking(false);
+              setRemoveErr(null);
+            }}
+            onYes={() => void remove()}
+          />
           {err && (
             <p className="es-err" role="alert">
               {err}
@@ -210,7 +231,13 @@ export const CardDrawer = ({
           )}
           <div className="md-actions">
             {!locked && (
-              <Btn variant="ghost" size="sm" className="md-danger" onClick={remove} disabled={saving}>
+              <Btn
+                variant="ghost"
+                size="sm"
+                className="md-danger"
+                onClick={() => setAsking(true)}
+                disabled={saving}
+              >
                 Убрать из окружения
               </Btn>
             )}
@@ -275,6 +302,13 @@ export const CardDrawer = ({
           <p className="md-note">Месяц без вызовов. Если не нужно — уберите, агенту меньше читать.</p>
         )}
       </div>
+      {row.enabled && (
+        <div className="md-sec">
+          <div className="md-sec__t">На машинах</div>
+          <p className="md-note">{deliveryText(row.delivery, view.delivery)}</p>
+          {row.delivery?.message && <p className="md-note tm-err">Машина пишет: {row.delivery.message}</p>}
+        </div>
+      )}
       {locked ? (
         <div className="md-sec">
           <div className="md-sec__t">Кому доступно</div>

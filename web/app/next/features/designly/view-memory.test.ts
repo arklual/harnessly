@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FIT, ZOOM, ZOOM_FIT } from '@/next/features/designly/site-zoom';
+import { ZOOM, ZOOM_FIT } from '@/next/features/designly/site-zoom';
 import {
   parseView,
   readView,
@@ -21,7 +21,7 @@ const kept: IViewMemory = {
   rot: false,
   chrome: false,
   browser: 'ios18',
-  fit: null,
+  std: false,
   zoom: { s: 2, x: -30, y: 12 },
   locked: true,
   box: { w: 400, h: 800 },
@@ -56,7 +56,13 @@ describe('what is not valid', () => {
     const view = parseView({ ...kept, v: 1, device: 'no-such', page: 'a' });
     expect(view.device).toBe('fill');
     expect(view.page).toBe('a');
-    expect(view.locked).toBe(false);
+    expect(view.locked).toBe(true);
+  });
+
+  it('locks a view kept before the lock was the default, keeps an unlock made since (HRN-673)', () => {
+    expect(parseView({ v: 1, device: 'fill', locked: false }).locked).toBe(true);
+    expect(parseView({ v: 2, device: 'fill', locked: false }).locked).toBe(false);
+    expect(parseView({ v: 2, device: 'fill' }).locked).toBe(true);
   });
 
   it('drops a kept size under the least of «Резина»', () => {
@@ -70,9 +76,20 @@ describe('what is not valid', () => {
     expect(parseView({ ...kept, v: 1, zoom: { s: 'a', x: 1, y: 2 } }).zoom).toEqual(ZOOM_FIT);
   });
 
-  it('falls back to the auto fit for a fit nobody knows', () => {
-    expect(parseView({ ...kept, v: 1, fit: 'cover' }).fit).toBe(FIT.auto);
-    expect(parseView({ ...kept, v: 1, fit: FIT.whole }).fit).toBe(FIT.whole);
+  it('takes any fit of a record from before «Вписать» as the standard view, a moved one as moved', () => {
+    const { std: _std, ...old } = kept;
+    for (const fit of ['auto', 'width', 'height', 'whole', 'cover'])
+      expect(parseView({ ...old, v: 2, fit }).std).toBe(true);
+    expect(parseView({ ...old, v: 2, fit: null }).std).toBe(false);
+    expect(parseView({ ...old, v: 2 }).std).toBe(true);
+    expect(parseView({ ...kept, v: 2, std: true }).std).toBe(true);
+  });
+
+  it('turns only a phone or a tablet', () => {
+    expect(parseView({ ...kept, v: 2, rot: true }).rot).toBe(true);
+    expect(parseView({ ...kept, v: 2, device: 'ipad', rot: true }).rot).toBe(true);
+    expect(parseView({ ...kept, v: 2, device: 'lap', rot: true }).rot).toBe(false);
+    expect(parseView({ ...kept, v: 2, device: 'fill', rot: true }).rot).toBe(false);
   });
 
   it('ignores junk, another version and broken storage', () => {
@@ -96,19 +113,16 @@ describe('what is not valid', () => {
 });
 
 describe('startView', () => {
-  it('keeps a fit whatever the box is', () => {
-    expect(startView({ ...kept, fit: FIT.width }, { w: 10, h: 10 })).toEqual({
-      fit: FIT.width,
-      zoom: ZOOM_FIT,
-    });
+  it('keeps the standard view whatever the box is', () => {
+    expect(startView({ ...kept, std: true }, { w: 10, h: 10 })).toEqual({ std: true, zoom: ZOOM_FIT });
   });
 
   it('keeps a free view over a box of about the same size', () => {
-    expect(startView(kept, { w: 420, h: 780 })).toEqual({ fit: null, zoom: kept.zoom });
+    expect(startView(kept, { w: 420, h: 780 })).toEqual({ std: false, zoom: kept.zoom });
   });
 
-  it('puts the fit back over a box that changed a lot or was not measured', () => {
-    expect(startView(kept, { w: 900, h: 800 })).toEqual({ fit: FIT.auto, zoom: ZOOM_FIT });
-    expect(startView({ ...kept, box: null }, { w: 400, h: 800 }).fit).toBe(FIT.auto);
+  it('puts the standard view back over a box that changed a lot or was not measured', () => {
+    expect(startView(kept, { w: 900, h: 800 })).toEqual({ std: true, zoom: ZOOM_FIT });
+    expect(startView({ ...kept, box: null }, { w: 400, h: 800 }).std).toBe(true);
   });
 });

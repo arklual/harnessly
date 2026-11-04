@@ -1,5 +1,5 @@
 // One browser tab of the pane: the page in a preview slot of the machine, asked for again on every address and reload.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import BrowserView from '@/next/features/pane/browser-view';
 import { fetchPorts, openPreview, slotNonce, type IListeningPort } from '@/next/core/net/preview';
 import { neighboursOf } from '@/next/features/pane/neighbours';
@@ -14,6 +14,23 @@ import { useLinkRestored } from '@/next/stores/connection';
 import { t } from '@/next/i18n';
 import type { Conversation } from '@/next/protocol/v2';
 import type { TTab } from '@/next/features/pane/pane-tabs';
+import { useFrameBridge } from '@/next/features/pane/use-frame-bridge';
+import { pickedWords, siteUrlOf } from '@/next/features/pane/frame-bridge';
+import { FILL_SCREEN, type IBrowserScreen } from '@/next/features/pane/browser-device';
+import { parseAddress } from '@/next/features/pane/address';
+import { LINK_PLACE, linkPlace, openOutside } from '@/next/features/chat/pane-sites';
+import { paneSitesSnapshot } from '@/next/stores/pane-sites';
+import { followsRedirect, makeHops } from '@/next/features/pane/redirect-hop';
+import { appConfig } from '@/platform/config';
+import { draftsStore, setDraft } from '@/next/stores/drafts';
+import { toast } from '@/next/ui/toast';
+import { fetchSlotTarget, mintFillToken, VaultError } from '@/next/core/net/vault';
+import { useVaultEntries } from '@/next/stores/vault-entries';
+import { sameVaultOrigin } from '@/next/features/pane/vault-origin';
+import { performVaultLogin, VAULT_OUTCOME, type TVaultOutcome } from '@/next/features/pane/vault-login';
+import { useAgentActs } from '@/next/bindings/use-agent-acts';
+import { useDomBridge } from '@/next/features/designly/use-dom-bridge';
+import { DEV_TAB, type TDevTab } from '@/next/features/designly/devtools-data';
 
 interface IBrowserTabProps {
   conv: Conversation;
@@ -29,6 +46,28 @@ const personOf = (me: MeState): string | null => {
 };
 
 /** One browser tab: the page in its slot, asked for again on every address and reload. */
+/** What a login came to, in words. */
+const tellVault = (outcome: TVaultOutcome, login: string): void => {
+  switch (outcome.kind) {
+    case VAULT_OUTCOME.loggedIn:
+      toast(t('next.pane.vault.loggedIn', { login }), { tone: 'success' });
+      return;
+    case VAULT_OUTCOME.stillLogin:
+      toast(t('next.pane.vault.stillLogin'), { tone: 'warning' });
+      return;
+    case VAULT_OUTCOME.unverified:
+      toast(t('next.pane.vault.unverified'));
+      return;
+    case VAULT_OUTCOME.filled:
+      toast(t('next.pane.vault.filled'));
+      return;
+    case VAULT_OUTCOME.refused:
+      toast(t('next.pane.vault.refused', { reason: t(`next.pane.vault.reason.${outcome.reason}`) }), {
+        tone: 'error',
+      });
+  }
+};
+
 const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
   const [reloadKey, setReloadKey] = useState(0);
   // A reload asked from outside the tab (the agent published the page again) is one more press of «Обновить».
@@ -57,6 +96,9 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
   const at = tab.hist[tab.hi] ?? null;
   const frame = useRef<HTMLIFrameElement>(null);
   const key = at ? `${at.text}|${reloadKey}` : '';
+  const [screen, setScreen] = useState<IBrowserScreen>(FILL_SCREEN);
+  const [dev, setDev] = useState(false);
+  const [devTab, setDevTab] = useState<TDevTab>(DEV_TAB.console);
 
   useEffect(() => {
     if (!at) return;
@@ -146,12 +188,140 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
     onReload: () => setReloadKey((n) => n + 1),
   });
 
+  const go = (next: NonNullable<ReturnType<typeof parseAddress>>) => {
+    if (worthRemembering(next)) pins?.visit(next.text);
+    onChange({ ...tab, hist: [...tab.hist.slice(0, tab.hi + 1), next], hi: tab.hi + 1 });
+  };
+
+  const hops = useRef(makeHops());
+  const bridge = useFrameBridge({
+    frame,
+    origin: slot?.origin ?? null,
+    // A redirect to another site: ours opens in this tab, any other in the person's browser.
+    onOpen: (url) => {
+      const next = linkPlace(url, paneSitesSnapshot()) === LINK_PLACE.pane ? parseAddress(url) : null;
+      if (next) go(next);
+      else openOutside(url);
+    },
+    // Between our sites (a sign-in and back) the tab follows by itself, in place of the page that redirected.
+    onRedirect: (url) => {
+      const from = at?.target.kind === 'url' ? at.target.origin : null;
+      if (!followsRedirect(url, from, paneSitesSnapshot(), appConfig().standSignInHosts)) return;
+      const next = parseAddress(url);
+      if (!next || !hops.current(Date.now())) return;
+      onChange({ ...tab, hist: [...tab.hist.slice(0, tab.hi), next], hi: tab.hi });
+    },
+  });
+
+  // The page's own address: the site's origin in place of the slot's, as far as the page has gone; a server of the
+  // machine has none outside.
+  const siteOrigin = at?.target.kind === 'url' ? at.target.origin : null;
+  const slotOrigin = slot?.key === key ? slot.origin : null;
+  // The safe's passwords for this site; a login is the person's pick, and its token is minted for this document only.
+  const vaultAll = useVaultEntries();
+  const [vaultBusy, setVaultBusy] = useState(false);
+  const vaultEntries =
+    siteOrigin !== null && slotOrigin !== null && vaultAll !== null
+      ? vaultAll.filter((entry) => sameVaultOrigin(entry.origin, siteOrigin))
+      : [];
+  const vaultLogin = async (id: string) => {
+    const entry = vaultEntries.find((one) => one.id === id);
+    if (!entry || siteOrigin === null || slotOrigin === null || vaultBusy) return;
+    setVaultBusy(true);
+    try {
+      tellVault(
+        await performVaultLogin(siteOrigin, {
+          target: siteOrigin,
+          slot: slotOrigin,
+          nonce: bridge.nonceNow(),
+          slotTarget: () => fetchSlotTarget(slotOrigin),
+          mint: (fill) => mintFillToken(entry.id, siteOrigin, fill, conv.machineId),
+          send: bridge.post,
+          next: bridge.nextMessage,
+        }),
+        entry.login,
+      );
+    } catch (failure) {
+      toast(failure instanceof VaultError ? failure.message : t('next.pane.vault.noAnswer'), {
+        tone: 'error',
+      });
+    } finally {
+      setVaultBusy(false);
+    }
+  };
+
+  const pageUrl = (from: string | null): string | null => {
+    if (!at) return null;
+    if (from !== null && slotOrigin !== null) {
+      const own = siteUrlOf(from, slotOrigin, siteOrigin ?? `http://${at.text.split('/')[0]}`);
+      if (own !== null) return own;
+    }
+    return siteOrigin !== null ? `${siteOrigin}${at.path}` : `http://${at.text}`;
+  };
+  const outsideUrl = siteOrigin !== null ? pageUrl(bridge.url) : null;
+
+  // DevTools' «Elements»: the page's tree through its bridge, which answers once it is asked to (a design's own script
+  // answers in the design's view instead, so the bridge keeps quiet there).
+  const src = slot?.key === key ? slot.src : null;
+  const wantDom = dev && devTab === DEV_TAB.elements && slotOrigin !== null;
+  const dom = useDomBridge(frame, src, reloadKey, wantDom);
+  const { hellos } = bridge;
+  const domOn = useEffectEvent(() => bridge.post({ type: 'tk:dom-on' }));
+  useEffect(() => {
+    if (wantDom && hellos > 0) domOn();
+  }, [wantDom, hellos]);
+  const toggleInspect = () => {
+    if (dom.inspect) {
+      dom.setInspect(false);
+      return;
+    }
+    if (bridge.picking) bridge.endPick();
+    setDev(true);
+    setDevTab(DEV_TAB.elements);
+    dom.setInspect(true);
+  };
+
+  // The chat's agent acts on the page while the tab is in view.
+  const agent = useAgentActs({
+    machine: conv.machineId,
+    conv: conv.id,
+    pageUrl: () => pageUrl(bridge.url),
+    act: bridge.act,
+    nextHello: bridge.nextHello,
+    back: bridge.back,
+    go,
+  });
+
+  // What goes to the chat lands in its field, after what is typed there.
+  const toChat = (words: string) => {
+    const have = draftsStore.get(conv.id);
+    const text = have?.text ?? '';
+    setDraft(conv.id, {
+      text: text.trim() === '' ? words : `${text.trimEnd()}\n\n${words}`,
+      attachments: have?.attachments ?? [],
+    });
+  };
+
+  // A comment on a picked element lands in the chat's field.
+  const sendPicked = (comment: string) => {
+    const picked = bridge.picked;
+    if (!picked) return;
+    const words = pickedWords(picked, pageUrl(picked.url) ?? picked.url, comment, {
+      element: t('next.pane.pick.words.element'),
+      component: t('next.pane.pick.words.component'),
+      comment: t('next.pane.pick.words.comment'),
+    });
+    toChat(words);
+    bridge.endPick();
+    toast(t('next.pane.pick.sent'));
+  };
+
   return (
     <BrowserView
       address={at?.text ?? ''}
       canBack={tab.hi > 0}
       canForward={tab.hi < tab.hist.length - 1}
-      src={slot?.key === key ? slot.src : null}
+      src={src}
       error={slot?.key === key ? slot.error : null}
       ports={ports}
       portsError={ports === null ? portsError : null}
@@ -168,21 +338,59 @@ const BrowserTab = ({ conv, tab, onChange, onNewTab }: IBrowserTabProps) => {
       reloadKey={reloadKey}
       onFrameLoad={(el) => {
         frame.current = el;
+        bridge.onFrameLoad();
         stand.onFrameLoad();
       }}
       signIn={stand.state}
       onSignIn={stand.start}
       onSignInRefresh={stand.refresh}
       theme={resolvedTheme}
-      onGo={(next) => {
-        if (worthRemembering(next)) pins?.visit(next.text);
-        onChange({ ...tab, hist: [...tab.hist.slice(0, tab.hi + 1), next], hi: tab.hi + 1 });
-      }}
+      onGo={go}
       onHistory={(step) =>
         onChange({ ...tab, hi: Math.max(0, Math.min(tab.hist.length - 1, tab.hi + step)) })
       }
       onReload={() => setReloadKey((n) => n + 1)}
       onNewTab={onNewTab}
+      picking={slotOrigin !== null ? bridge.picking : null}
+      onPick={() => {
+        if (dom.inspect) dom.setInspect(false);
+        bridge.togglePick();
+      }}
+      picked={bridge.picked}
+      onPickSend={sendPicked}
+      onPickCancel={bridge.endPick}
+      screen={screen}
+      onScreen={setScreen}
+      outsideUrl={outsideUrl}
+      vault={
+        vaultEntries.length > 0
+          ? { entries: vaultEntries, busy: vaultBusy, onLogin: (id) => void vaultLogin(id) }
+          : null
+      }
+      devtools={{
+        machine: conv.machineId,
+        slot: slotOrigin,
+        open: dev,
+        onToggle: () => setDev((on) => !on),
+        tab: devTab,
+        onTab: setDevTab,
+        dom,
+        inspect: { on: dom.inspect, disabled: slotOrigin === null, onToggle: toggleInspect },
+        onSend: (words) => {
+          toChat(words);
+          toast(t('next.pane.pick.sent'));
+        },
+      }}
+      agent={{
+        cursor: agent.cursor,
+        asking: agent.asking,
+        working: agent.working,
+        paused: agent.paused,
+        onAllow: agent.allow,
+        onDeny: agent.deny,
+        onStop: agent.stop,
+        onResume: agent.resume,
+      }}
     />
   );
 };

@@ -116,7 +116,7 @@ describe("the design's current chat", () => {
     putList([conv('tab-from', 20)]);
     const { result } = renderHook(() => useDesignConv(M, 'abc', 'tab-from'));
     act(() => result.current.pick(null));
-    expect(goTo).toHaveBeenCalledWith({ kind: 'site', id: 'abc' }, { replace: true });
+    expect(goTo).toHaveBeenCalledWith({ kind: 'site', id: 'abc', edit: true }, { replace: true });
   });
 
   it('leaves the address alone when it names no chat', () => {

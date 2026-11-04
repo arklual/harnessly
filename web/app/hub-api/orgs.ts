@@ -129,7 +129,8 @@ export type AuditAction =
   | 'machine.enable'
   | 'machine.restart'
   | 'change.create'
-  | 'signal.snooze';
+  | 'signal.snooze'
+  | 'signal.unsnooze';
 
 export type AuditTargetKind =
   'user' | 'team' | 'tenant' | 'org' | 'limit' | 'account' | 'machine' | 'change' | 'signal';

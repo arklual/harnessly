@@ -32,6 +32,20 @@ export const forecastOf = (spent: number, now: number): number => {
   return spent / Math.max((now - start) / (end - start), 1 / 31);
 };
 
+/** The machine of the newest chat that has one; «online» when a chat runs on it now. */
+const latestMachine = (live: MeSession[]): MyOverview['tiles']['machine'] => {
+  const last = live.find((s) => s.machine);
+  if (!last?.machine) return null;
+  const m = last.machine;
+  return {
+    id: m.id ?? null,
+    name: m.name,
+    online: live.some((s) => s.endedAt === null && s.machine?.id === m.id),
+    loadPct: null,
+    bars: [],
+  };
+};
+
 const chatOf = (s: MeSession): MyChat => {
   const running = s.endedAt === null;
   const hasMr = s.mrs > 0;
@@ -91,7 +105,8 @@ export const buildMyOverview = ({ limits, usage, sessions, now }: MemberInput): 
       },
       // The hub counts a session's MRs; which of them are merged it tells only in KPI.
       mr: { week: week.reduce((n, s) => n + s.mrs, 0), merged: null, bars: barsBy(live, now, (s) => s.mrs) },
-      machine: null,
+      // The machine of the latest chat; the hub reports no load per machine here.
+      machine: latestMachine(live),
     },
   };
 };

@@ -130,6 +130,31 @@ func (l *Library) Identity() (Identity, error) {
 	return c.v, nil
 }
 
+// IdentityOf is the runtime's identity with another person behind it: the one whose page session or chat asked. The
+// Unix user stays the runtime's (it is what wrote the file); the name comes from the team's people list, else the
+// local part of the address. An empty or unusable address is the runtime's own person.
+func (l *Library) IdentityOf(person string) (Identity, error) {
+	who, err := l.Identity()
+	if err != nil {
+		return who, err
+	}
+	id, ok := CleanText(strings.ToLower(strings.TrimSpace(person)), 128)
+	if !ok || !strings.Contains(id, "@") || id == who.PersonID {
+		return who, nil
+	}
+	local, _, _ := strings.Cut(id, "@")
+	name := l.cfg.Texts.People[local]
+	if name == "" {
+		name = local
+	}
+	if clean, ok := CleanText(name, 64); ok {
+		name = clean
+	} else {
+		name = local
+	}
+	return Identity{Runtime: who.Runtime, Person: name, PersonID: id}, nil
+}
+
 // Caller is the chat a command was typed in.
 type Caller struct{ TabID, ChatTitle, WorkspaceID string }
 

@@ -52,7 +52,7 @@ type Server struct {
 	Terminals TerminalSource
 	// Voice recognizes a recording (lang is ru, en or auto) and returns its text; nil: POST /api/v2/voice is a 404.
 	// ErrVoiceUnavailable: this machine cannot recognize.
-	Voice func(ctx context.Context, audio io.Reader, lang string) (string, error)
+	Voice func(ctx context.Context, audio io.Reader, lang, engine string) (string, error)
 	// SideChat answers a question about a conversation with a stream of server-sent frames (delta, done, error) written
 	// to w, and the refusals of its own (unsupported, no-session, busy); it returns nil once it has written anything.
 	// convo.ErrNotFound: the conversation is not here. nil: POST /api/v2/conversations/{id}/side-chat is a 404.
@@ -75,11 +75,21 @@ type Server struct {
 	MessageStatus func(ctx context.Context, conv string, ids []string) (MessageStatuses, error)
 	// Legacy is the Legacy tab a conversation runs in; nil: .../legacy is a 404.
 	Legacy func(ctx context.Context, conv string) (LegacyTab, error)
+	// Download hands over files of a conversation to be saved: GET .../download?path=<p>[&path=<p>…][&name=<zip>] sends one
+	// file whole or in ranges, a folder or several paths as one zip made while it is sent. It writes the
+	// answer itself, with no time budget: a download may take as long as it takes. nil: a 404.
+	Download func(w http.ResponseWriter, r *http.Request, conv string)
+	// GitSide answers GET .../file-git?path=<p>[&ref=HEAD]: a file as a git revision has it, for the editor's diff
+	// nil: a 404.
+	GitSide func(w http.ResponseWriter, r *http.Request, conv string)
 	// Files reads the folders of the conversations: .../files lists a folder, .../file reads a text file. nil: both are
 	// 404s.
 	Files FilesSource
 	// PaneSelection hears what is selected in a file open in a chat's pane: POST /api/v2/pane-selection. nil: a 404.
 	PaneSelection http.Handler
+	// PaneAct is the agent's hand on the page in a chat's pane: GET /api/v2/pane-act?conversation= is the page's long poll
+	// for the next action, POST /api/v2/pane-act its outcome. nil: a 404.
+	PaneAct http.Handler
 	// FileBytes reads a file's revision and saves a file the viewer edits as bytes (a spreadsheet): GET and PUT
 	// /api/v2/file-bytes?path=. nil: a 404.
 	FileBytes http.Handler

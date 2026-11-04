@@ -230,17 +230,13 @@ describe('resolveDrop', () => {
     expect(resolve(groupSrc('fg-1'), on(DROP.group, 'fg-1', EDGE.after))).toBeNull();
   });
 
-  it('puts a group after the group a chat of which it is dropped over, and last over a loose chat', () => {
+  it('puts a group after the group a chat of which it is dropped over, and nowhere over a loose chat', () => {
     expect(resolve(groupSrc('fg-3'), on(DROP.chat, 'a', EDGE.before))).toEqual({
       op: PLAN.moveGroup,
       id: 'fg-3',
       beforeId: 'fg-2',
     });
-    expect(resolve(groupSrc('fg-1'), on(DROP.chat, 'c', EDGE.before))).toEqual({
-      op: PLAN.moveGroup,
-      id: 'fg-1',
-      beforeId: null,
-    });
+    expect(resolve(groupSrc('fg-1'), on(DROP.chat, 'c', EDGE.before))).toBeNull();
   });
 
   it('does not drop a group on a project or the recent', () => {

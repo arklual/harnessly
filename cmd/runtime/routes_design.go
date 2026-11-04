@@ -105,6 +105,7 @@ func designAPI(d deps) *design.API {
 	a := &design.API{
 		L:            design.New(designConfig(d)),
 		Session:      d.SessionOK,
+		Person:       sessionPerson(d.Claims),
 		MachineAgent: d.MachineAgent,
 		CLIToken:     cliTokenFirst(d.DataDir, d.TokenHeaders),
 		APIRefusal:   d.APIRefusal,
@@ -121,6 +122,22 @@ func designAPI(d deps) *design.API {
 	}
 	designAPIs[d.CLI] = a
 	return a
+}
+
+// sessionPerson is the address a page session was signed for: the hub's runtime.session names the person, the
+// machine agent signs with its name (no address), so only a value with an @ is a person.
+func sessionPerson(claims func(*http.Request) map[string]any) func(*http.Request) string {
+	return func(r *http.Request) string {
+		if claims == nil {
+			return ""
+		}
+		sub, _ := claims(r)["sub"].(string)
+		sub = strings.ToLower(strings.TrimSpace(sub))
+		if !strings.Contains(sub, "@") || len(sub) > 254 {
+			return ""
+		}
+		return sub
+	}
 }
 
 // designRoute is a JSON route of the slice at one path of the platform's API (or the CLI's when cli).

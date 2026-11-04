@@ -89,6 +89,31 @@ const Carry = ({ onDrop, takes = true }: { onDrop: (plan: IPlan) => void; takes?
   );
 };
 
+/** Rows that take a carried row as a whole (no line), with a folded part whose hidden place lies over the first row. */
+const Places = ({ onDrop }: { onDrop: (target: string) => void }) => {
+  const listRef = useRef<HTMLDivElement>(null);
+  useDrag({
+    listRef,
+    dragKinds: KINDS,
+    dropKinds: KINDS,
+    tracked: false,
+    resolve: (_source, target: IDropTarget<typeof ROW>) => target.id ?? null,
+    onDrop,
+  });
+  return (
+    <div ref={listRef} data-testid="list">
+      {['a', 'b', 'c'].map((id) => (
+        <div key={id} data-row={id} data-drag={ROW} data-drag-id={id} data-drop={ROW} data-drop-id={id}>
+          {id}
+        </div>
+      ))}
+      <div inert>
+        <div data-row="hidden" data-drop={ROW} data-drop-id="hidden" />
+      </div>
+    </div>
+  );
+};
+
 const List = ({ onDrop }: { onDrop?: (plan: IPlan) => void }) => (
   <Profiler id="list" onRender={counted}>
     <Rows onDrop={onDrop} />
@@ -247,6 +272,28 @@ describe('useDrag: the row itself is carried', () => {
     expect(onDrop).toHaveBeenCalledExactlyOnceWith({ id: 'c', to: 0 });
     expect(order()).toEqual(['c', 'a', 'b', 'd']);
     expect(row('c').style.transform).toBe('');
+  });
+});
+
+describe('useDrag: places elsewhere in the list', () => {
+  it('never drops on a place inside a folded part, though it is laid out under the pointer', () => {
+    const onDrop = vi.fn();
+    render(
+      <Profiler id="places" onRender={counted}>
+        <Places onDrop={onDrop} />
+      </Profiler>,
+    );
+    layOut();
+    const before = renders;
+    press('c', 100);
+    moveTo(110);
+    moveTo(20);
+    // Not tracked: picking the row up renders nothing.
+    expect(renders).toBe(before);
+    expect(row('a').getAttribute('data-drop-over')).toBe('true');
+    release(20);
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith('a');
+    expect(renders).toBe(before);
   });
 });
 

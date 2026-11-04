@@ -1,7 +1,7 @@
 // A conversation's forks and handoffs on the stores: the line of where it came from, the links to the chats it names,
 // «Ответвить отсюда» under an answer, the handoff a model of another agent starts in the picker, and «Влить обратно»
 // of a fork. Each change waits for the machine's answer; the new chat opens when it is there.
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { forkConversation, handoffConversation, loadHandoffDraft, mergeConversation } from '@/next/commands';
 import { pageText, settled } from '@/next/bindings/outcome';
 import {
@@ -58,6 +58,12 @@ export interface IChatHandoff {
 }
 
 const openChat = (id: string) => goTo({ kind: ROUTE.chat, id });
+
+/**
+ * Where a chat this one gives way to (another model, a fork) opens: its own page, or, for a chat inside a design, the
+ * design's column, so the person stays on the design.
+ */
+export const ChatOpener = createContext<(id: string) => void>(openChat);
 const isConvId = (id: string): id is ConvId => id.startsWith('tab-');
 
 const draftOf = async (m: MachineId, conv: ConvId, req: HandoffDraftRequest): Promise<TDraftOutcome> => {
@@ -66,10 +72,13 @@ const draftOf = async (m: MachineId, conv: ConvId, req: HandoffDraftRequest): Pr
 };
 
 /** A new chat's command settled: the chat opens; a refusal rejects with its reason, for the sheet or the toast. */
-const opened = async (handle: { conversation: Promise<ConvId | null> } & Parameters<typeof settled>[0]) => {
+const opened = async (
+  handle: { conversation: Promise<ConvId | null> } & Parameters<typeof settled>[0],
+  open: (id: string) => void,
+) => {
   await settled(handle);
   const id = await handle.conversation;
-  if (id) openChat(id);
+  if (id) open(id);
 };
 
 export function useChatHandoff(
@@ -77,6 +86,7 @@ export function useChatHandoff(
   conv: ConvId,
   record: Conversation | undefined,
 ): IChatHandoff {
+  const open = useContext(ChatOpener);
   const view = useMachine(machine);
   const agents = view?.machine.agents;
   const [target, setTarget] = useState<ITarget | null>(null);
@@ -121,7 +131,7 @@ export function useChatHandoff(
   const onForkTurn = useCallback(
     async (turnId: string) => {
       try {
-        await opened(forkConversation(machine, conv, turnId));
+        await opened(forkConversation(machine, conv, turnId), open);
       } catch (failure) {
         toast(t('next.handoff.forkFailed'), {
           tone: 'error',
@@ -129,7 +139,7 @@ export function useChatHandoff(
         });
       }
     },
-    [machine, conv],
+    [machine, conv, open],
   );
 
   const canHandoff = hasFeature(machine, 'handoff') && record !== undefined;
@@ -206,6 +216,7 @@ export function useChatHandoff(
                 { provider: target.agent.provider, profile: target.agent.profile ?? undefined, model },
                 context,
               ),
+              open,
             );
           }}
         />

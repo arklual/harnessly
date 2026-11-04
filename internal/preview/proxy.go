@@ -42,7 +42,9 @@ type Config struct {
 	Stands    Stands
 	// SelfIPs are the machine's public addresses no interface carries (behind NAT), comma-separated.
 	SelfIPs string
-	Store   *devtools.Store
+	// PrivateHosts may resolve into a private network (GitLab behind an overlay network): the deployment names them.
+	PrivateHosts []string
+	Store        *devtools.Store
 	// Cache keeps stand assets; nil keeps none.
 	Cache *AssetCache
 	// Bridge is the page bridge's script; with none the request goes to Fallback (the previous runtime, which has it).
@@ -72,6 +74,8 @@ type Proxy struct {
 	cfg       Config
 	resolver  *resolveCache
 	transport *http.Transport
+	// private are the hosts that may resolve into a private network (Config.PrivateHosts).
+	private map[string]bool
 }
 
 type dialKey struct{}
@@ -90,10 +94,16 @@ func New(cfg Config) *Proxy {
 			return (&net.Dialer{Timeout: cfg.Timeouts.Connect}).DialContext(ctx, "tcp", address)
 		}
 	}
-	p := &Proxy{cfg: cfg}
+	p := &Proxy{cfg: cfg, private: PrivateHosts(cfg.PrivateHosts)}
 	resolve := cfg.Resolve
 	if resolve == nil {
-		resolve = func(host string) Resolved { return ResolvePublic(host, nil, SelfAddresses(cfg.SelfIPs)) }
+		private := p.private
+		resolve = func(host string) Resolved {
+			if private[strings.TrimSuffix(strings.ToLower(host), ".")] {
+				return ResolveListed(host, nil, SelfAddresses(cfg.SelfIPs))
+			}
+			return ResolvePublic(host, nil, SelfAddresses(cfg.SelfIPs))
+		}
 	}
 	p.resolver = &resolveCache{entries: map[string]resolveEntry{}, ttl: 5 * time.Second, resolve: resolve}
 	p.transport = &http.Transport{
@@ -412,6 +422,10 @@ func (p *Proxy) admit(r *http.Request) admission {
 	path := p.upstreamPath(r)
 	if c.Target.Kind == "url" {
 		u, _ := weburl.Parse(c.Target.Origin)
+		// A listed private host opens on its scheme's own port only: no other service of that machine.
+		if u.Port != "" && p.private[strings.TrimSuffix(strings.ToLower(u.Hostname), ".")] {
+			return admission{status: 403, text: locale.Pick("The address is in an internal network and cannot be opened", "Адрес во внутренней сети — открыть нельзя")}
+		}
 		res := p.resolver.get(u.Hostname)
 		switch res.Error {
 		case "forbidden":

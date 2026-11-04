@@ -42,6 +42,16 @@ import { toast } from '@/next/ui/toast';
 import { setTopTabs, useTopTabs } from '@/next/stores/tabs';
 import { setBeta, useBeta } from '@/next/stores/beta';
 import { setPaneAuto, usePaneAuto } from '@/next/stores/pane-auto';
+import {
+  addPaneSite,
+  paneSitesChanged,
+  removePaneSite,
+  resetPaneSites,
+  usePaneSites,
+} from '@/next/stores/pane-sites';
+import PaneSitesGroup from '@/next/features/settings/pane-sites-group';
+import BrowserAgentGroup from '@/next/features/settings/browser-agent-group';
+import { setBrowserAgentAsk, setSiteDecision, useBrowserAgent } from '@/next/stores/browser-agent';
 import { setFeedKind, useFeedKinds } from '@/next/stores/feed-kinds';
 import { useTheme } from '@/platform/theme';
 
@@ -200,6 +210,8 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
   const password = useSignIn(machine);
   const topTabs = useTopTabs();
   const paneAuto = usePaneAuto();
+  const paneSites = usePaneSites();
+  const browserAgent = useBrowserAgent();
   const feedKinds = useFeedKinds();
   const runtime = useRuntimeSettings(machine);
   const update = useUpdateInfo(machine);
@@ -216,6 +228,23 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
       enterSends={settings.enterSends}
       topTabs={topTabs}
       paneAuto={paneAuto}
+      links={
+        <>
+          <PaneSitesGroup
+            sites={paneSites}
+            changed={paneSitesChanged()}
+            onAdd={(site) => void addPaneSite(site)}
+            onRemove={removePaneSite}
+            onReset={resetPaneSites}
+          />
+          <BrowserAgentGroup
+            ask={browserAgent.ask}
+            sites={browserAgent.sites}
+            onAsk={setBrowserAgentAsk}
+            onForget={(host) => setSiteDecision(host, null)}
+          />
+        </>
+      }
       feedKinds={feedKinds}
       language={locale()}
       onLanguage={changeLanguage}

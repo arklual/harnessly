@@ -29,6 +29,7 @@ export const envEntryRow = obj({
   spark14: arr(num),
   lastUsedAt: nullable(time),
   unused: nullable(bool),
+  delivery: nullable(obj({ ok: num, pending: num, error: num, message: nullable(str) })),
 });
 export const envLayer = obj({
   layer: layerKind,
@@ -58,6 +59,7 @@ export const envResponse = obj({
   layers: arr(envLayer),
   teams: arr(teamRef),
   observed: arr(observedTool),
+  delivery: obj({ machines: num, reported: num, current: num, lastAt: nullable(time) }),
 });
 export const envCard = obj({
   entryId: str,

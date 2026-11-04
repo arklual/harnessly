@@ -77,3 +77,14 @@ describe('genitive', () => {
     expect(genitive('')).toBeNull();
   });
 });
+
+describe('machineLine', () => {
+  it('shows the load only when it is known', async () => {
+    const { machineLine } = await import('./fmt');
+    expect(machineLine({ name: 'a-main', online: true, loadPct: 41.4 })).toBe(
+      'a-main на связи · загрузка 41%',
+    );
+    expect(machineLine({ name: 'a-main', online: true, loadPct: null })).toBe('a-main на связи');
+    expect(machineLine({ name: 'a-main', online: false, loadPct: 10 })).toBe('a-main не в сети');
+  });
+});

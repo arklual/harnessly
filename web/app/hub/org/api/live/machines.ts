@@ -306,6 +306,13 @@ export const liveMachines = (ctx: () => MachinesCtx): MachinesApi => {
       if (!opId) throw new OrgApiError('not_found', 'nothing to cancel');
       return post(id, `ops/${opId}/cancel`);
     },
+    renameMachine: async (id, name) => {
+      await http.patch(`/api/machines/${id}`, { name });
+      return detail(id);
+    },
+    removeMachine: async (id) => {
+      await http.del(`/api/machines/${id}`);
+    },
     openMachine: (id) => contractGet<{ url: string }>(`/api/machines/${id}/open`),
     disableMachine: (id) => post(id, 'disable'),
     enableMachine: (id) => post(id, 'enable'),

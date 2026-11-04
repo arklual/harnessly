@@ -15,6 +15,7 @@ import {
   heatOf,
   money,
   peerCells,
+  VERDICT_HINT,
   VERDICT_TONE,
   VERDICT_WORD,
   wasteLead,
@@ -124,7 +125,7 @@ export const Changes = ({ changes }: { changes: readonly Change[] }) => (
                         {formatEffect(e.format, e.before)} <span className="anc-e__arr">→</span>{' '}
                         <b>{formatEffect(e.format, e.after)}</b>
                       </span>
-                      <span className="an-chip anc-chip" data-st={tone}>
+                      <span className="an-chip anc-chip" data-st={tone} title={VERDICT_HINT[e.verdict]}>
                         {VERDICT_WORD[e.verdict]}
                       </span>
                     </span>
@@ -145,29 +146,34 @@ export const Attention = ({ signals, base }: { signals: readonly Signal[]; base:
       <p className="an-empty">Сейчас ничего не требует внимания</p>
     ) : (
       <div className="at-grid" style={{ '--at-cols': 1 } as CSSProperties}>
-        {signals.map((s, n) => (
-          <button
-            key={s.id}
-            type="button"
-            className="at-cell anx-hov"
-            data-tone={s.tone === 'high' ? 'risk' : 'warn'}
-            style={{ '--i': n, '--at-span': 1, '--j': 0, '--jr': 0 } as CSSProperties}
-            onClick={() => goSignal(base, s.action)}
-          >
-            <span className="at-cell__dot" aria-hidden="true" />
-            <span className="at-cell__text">
-              <b className="at-cell__title">{s.title}</b>
-              <span className="at-cell__detail">{s.text}</span>
-            </span>
-            <span className="at-cell__action">
-              {s.action.label}
-              <Icon i="arrow-up-right" size="sm" />
-            </span>
-            {s.detail && s.detail.length > 0 && (
-              <Bubble className="anx-pop--att" title={s.title} rows={s.detail} />
-            )}
-          </button>
-        ))}
+        {signals.map((s, n) => {
+          const go = s.action;
+          const Tag = go ? 'button' : 'div'; // no action: a row to read, not a dead click
+          return (
+            <Tag
+              key={s.id}
+              {...(go ? { type: 'button' as const, onClick: () => goSignal(base, go) } : {})}
+              className="at-cell anx-hov"
+              data-tone={s.tone === 'high' ? 'risk' : 'warn'}
+              style={{ '--i': n, '--at-span': 1, '--j': 0, '--jr': 0 } as CSSProperties}
+            >
+              <span className="at-cell__dot" aria-hidden="true" />
+              <span className="at-cell__text">
+                <b className="at-cell__title">{s.title}</b>
+                <span className="at-cell__detail">{s.text}</span>
+              </span>
+              {go && (
+                <span className="at-cell__action">
+                  {go.label}
+                  <Icon i="arrow-up-right" size="sm" />
+                </span>
+              )}
+              {s.detail && s.detail.length > 0 && (
+                <Bubble className="anx-pop--att" title={s.title} rows={s.detail} />
+              )}
+            </Tag>
+          );
+        })}
       </div>
     )}
   </Card>

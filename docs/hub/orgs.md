@@ -150,7 +150,7 @@ type AuditAction =
   | 'limit.set' | 'limit.remove'
   | 'account.create' | 'account.update' | 'account.grant' | 'account.revoke'
   | 'machine.team' | 'machine.access' | 'machine.disable' | 'machine.enable' | 'machine.restart'
-  | 'change.create' | 'signal.snooze';
+  | 'change.create' | 'signal.snooze' | 'signal.unsnooze';
 
 type AuditEvent = {
   id: string;

@@ -24,10 +24,13 @@ const OwnerFile = ".owner.json"
 // person has a runtime, so a different Unix user, on every machine, and several machines share one Unix user name
 // (a self-hosted profile runs everything as "harnessly"). A file without Person (made before the owner file had a person, or by a
 // runtime that does not know its person's address) is compared by the Unix user as it always was.
+//
+// Claimed: the file was written by «take it» over a project nobody owned (not by making it), so the gateway is told
+// design.claim (the team keeps editing), not design.created (personal).
 type Owner struct {
 	User, Name, Person string
 	V                  int
-	Private            bool
+	Private, Claimed   bool
 }
 
 // Mine: the project was made by the person asking; for a file that names no person, by the runtime asking.
@@ -40,7 +43,11 @@ func (o Owner) Mine(id Identity) bool {
 
 // SetOwner records the runtime's person as the owner of a project that has none yet; an existing record stays. A new
 // project is personal: the file says so (v 2, "private").
-func (l *Library) SetOwner(id string) error {
+func (l *Library) SetOwner(id string) error { return l.SetOwnerAs(id, "") }
+
+// SetOwnerAs is SetOwner for the person who made the project: the address of the page session or the chat that asked
+// (the owner is the person who worked, not the one the machine belongs to). An empty person is the runtime's.
+func (l *Library) SetOwnerAs(id, person string) error {
 	file := l.ownerPath(id)
 	if file == "" {
 		return nil
@@ -48,7 +55,7 @@ func (l *Library) SetOwner(id string) error {
 	if _, ok := l.ReadOwner(id); ok {
 		return nil
 	}
-	who, err := l.Identity()
+	who, err := l.IdentityOf(person)
 	if err != nil {
 		return err
 	}
@@ -89,6 +96,7 @@ func (l *Library) ReadOwner(id string) (Owner, bool) {
 	if v, ok := get(o, "v").(float64); ok && v >= 2 {
 		out.V = 2
 		out.Private = get(o, "private") == true
+		out.Claimed = get(o, "claimed") == true
 	}
 	return out, true
 }

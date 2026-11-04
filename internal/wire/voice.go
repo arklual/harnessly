@@ -18,8 +18,9 @@ var ErrVoiceUnavailable = errors.New("voice: not available on this machine")
 // container.
 const VoiceBodyMax = 20 << 20
 
-// VoiceBudget is how long a recording may take to come and to be recognized.
-const VoiceBudget = 2 * time.Minute
+// VoiceBudget is how long a recording may take to come and to be recognized: it is recognized piece by piece, some
+// seconds for each quarter of a minute, so a long one takes minutes on a busy machine.
+const VoiceBudget = 5 * time.Minute
 
 // VoiceLangs are the languages a recording may be recognized in; "" is ru.
 var VoiceLangs = []string{"ru", "en", "auto"}
@@ -61,7 +62,7 @@ func (s *Server) voice(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), VoiceBudget)
 	defer cancel()
 	body := &countingReader{r: http.MaxBytesReader(w, r.Body, VoiceBodyMax)}
-	text, err := s.Voice(ctx, body, lang)
+	text, err := s.Voice(ctx, body, lang, s.voiceEngine())
 	switch {
 	case err == nil && body.n == 0:
 		refuse(w, RefuseBadRequest)
@@ -92,6 +93,19 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
 	c.n += int64(n)
 	return n, err
+}
+
+// voiceEngine is the recognition model the person picked for dictation (Settings → Voice): a recording sent whole is
+// recognized by the same one as the live dictation, "" (the machine's own) without settings to read.
+func (s *Server) voiceEngine() string {
+	if s.Me == nil {
+		return ""
+	}
+	me, err := s.Me.Me()
+	if err != nil {
+		return ""
+	}
+	return me.Settings.Voice.Engine
 }
 
 // inPersonsWords puts the person's own words (Settings → Voice) over what was recognized, as the live dictation does.

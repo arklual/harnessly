@@ -425,10 +425,16 @@ const (
 	DeckExportPPTX DeckExportFormat = "pptx"
 	DeckExportHTML DeckExportFormat = "html"
 	DeckExportMP4  DeckExportFormat = "mp4"
+	// DeckExportZip is the project/ folder; DeckExportBundle the whole project (deckzip.go).
+	DeckExportZip    DeckExportFormat = "zip"
+	DeckExportBundle DeckExportFormat = "bundle"
 )
 
 // DeckExportFormats is every format, in the order of the «Ещё» menu's items.
-var DeckExportFormats = []DeckExportFormat{DeckExportPDF, DeckExportPPTX, DeckExportMP4, DeckExportPNG, DeckExportHTML}
+var DeckExportFormats = []DeckExportFormat{DeckExportPDF, DeckExportPPTX, DeckExportMP4, DeckExportPNG, DeckExportHTML, DeckExportZip, DeckExportBundle}
+
+// DeckExportOfBoard are the formats that can be made of one board (Board in DeckExportRun).
+var DeckExportOfBoard = map[DeckExportFormat]bool{DeckExportPDF: true, DeckExportHTML: true, DeckExportPNG: true}
 
 // DeckJobState is where an export job is.
 type DeckJobState string
@@ -445,6 +451,7 @@ const (
 type DeckExportJob struct {
 	ID       string           `json:"id"`
 	Format   DeckExportFormat `json:"format"`
+	Board    string           `json:"board,omitempty"`
 	State    DeckJobState     `json:"state"`
 	Progress float64          `json:"progress"`
 	File     *string          `json:"file"`
@@ -452,12 +459,13 @@ type DeckExportJob struct {
 	At       string           `json:"at"`
 }
 
-// DeckExportRun is what an exporter is given: the project, the recording (mp4 only), the file to write and where to
-// report progress (0..1).
+// DeckExportRun is what an exporter is given: the project, the recording (mp4 only), the one board to export ("" for
+// all; its id or its path, DeckExportOfBoard), the file to write and where to report progress (0..1).
 type DeckExportRun struct {
 	L        *Library
 	Artifact string
 	Rec      string
+	Board    string
 	Out      string
 	Progress func(float64)
 }

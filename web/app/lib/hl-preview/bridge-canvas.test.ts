@@ -63,4 +63,32 @@ describe('the bridge on a canvas', () => {
     expect(core.parseParentMessage({ type: 'tk:canvas', on: true })).toEqual({ type: 'tk:canvas', on: true });
     expect(core.parseParentMessage({ type: 'tk:canvas', on: 'yes' })).toBeNull();
   });
+
+  it('reads the parent scrolling the screens together', () => {
+    expect(core.parseParentMessage({ type: 'tk:scroll-sync', on: true })).toEqual({
+      type: 'tk:scroll-sync',
+      on: true,
+    });
+    expect(core.parseParentMessage({ type: 'tk:scroll-to', y: 240 })).toEqual({
+      type: 'tk:scroll-to',
+      y: 240,
+    });
+    expect(core.parseParentMessage({ type: 'tk:scroll-to', y: -1 })).toBeNull();
+    expect(core.parseParentMessage({ type: 'tk:scroll-to', y: Number.NaN })).toBeNull();
+    expect(core.parseParentMessage({ type: 'tk:scroll-to', y: '240' })).toBeNull();
+  });
+});
+
+describe('the pick and the design runtime', () => {
+  it("leaves the runtime's own card and bar to their buttons", () => {
+    const host = document.createElement('div');
+    host.setAttribute('data-tk-library-bar', '');
+    const root = host.attachShadow({ mode: 'open' });
+    const button = document.createElement('button');
+    root.appendChild(button);
+    const page = document.createElement('main');
+    expect(core.isRuntimeUi([button, root, host, document.documentElement, document, window])).toBe(true);
+    expect(core.isRuntimeUi([page, document.body, document.documentElement, document, window])).toBe(false);
+    expect(core.isRuntimeUi([])).toBe(false);
+  });
 });

@@ -84,13 +84,7 @@ func (a *Access) ServePreview(w http.ResponseWriter, r *http.Request, q Query) {
 			WriteJSON(w, r, t.Status, Error(t.Text))
 			return
 		}
-		name := BaseName(t.Real)
-		h := w.Header()
-		h.Set("Content-Type", "application/octet-stream")
-		h.Set("Content-Length", strconv.FormatInt(t.Size, 10))
-		h.Set("Content-Disposition", `attachment; filename="`+ASCIIName(name)+`"; filename*=UTF-8''`+EncodeURIComponent(name))
-		h.Set("X-Content-Type-Options", "nosniff")
-		sendFile(w, http.StatusOK, t.Real, 0, t.Size)
+		ServeFileDownload(w, r, t.Real)
 		return
 	}
 	t := a.Preview(requested)

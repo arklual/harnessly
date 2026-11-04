@@ -204,10 +204,20 @@ export interface IDeckState {
   published: IDeckPublished;
 }
 
-export const DECK_EXPORT = { pdf: 'pdf', pptx: 'pptx', mp4: 'mp4', png: 'png', html: 'html' } as const;
+export const DECK_EXPORT = {
+  pdf: 'pdf',
+  pptx: 'pptx',
+  mp4: 'mp4',
+  png: 'png',
+  html: 'html',
+  /** The whole project: the boards, pages, notes and comments. */
+  bundle: 'bundle',
+} as const;
 export type TDeckExport = (typeof DECK_EXPORT)[keyof typeof DECK_EXPORT];
 /** The «Ещё» menu's order. */
-export const DECK_EXPORTS: readonly TDeckExport[] = ['pdf', 'pptx', 'mp4', 'png', 'html'];
+export const DECK_EXPORTS: readonly TDeckExport[] = ['pdf', 'pptx', 'mp4', 'png', 'html', 'bundle'];
+/** The archive hands over the project's files: only for those who may change it, and built without a browser. */
+export const DECK_ARCHIVES: ReadonlySet<TDeckExport> = new Set([DECK_EXPORT.bundle]);
 
 export const DECK_JOB = { queued: 'queued', running: 'running', done: 'done', failed: 'failed' } as const;
 export type TDeckJobState = (typeof DECK_JOB)[keyof typeof DECK_JOB];

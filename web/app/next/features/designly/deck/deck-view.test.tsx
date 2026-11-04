@@ -167,7 +167,7 @@ describe('deck shell', () => {
     const keys = [...document.querySelectorAll('.hx-deck__bar [data-k]')].map((el) =>
       el.getAttribute('data-k'),
     );
-    expect(keys).toEqual(['back', 'panel', 'comment', 'style', 'show', 'rec', 'share', 'more']);
+    expect(keys).toEqual(['back', 'panel', 'comment', 'style', 'show', 'rec', 'download', 'share', 'more']);
     // Without access to share, the share button is there but cannot be pressed.
     expect(document.querySelector<HTMLButtonElement>('[data-k="share"]')?.disabled).toBe(true);
   });
@@ -184,7 +184,7 @@ describe('deck shell', () => {
     const keys = [...document.querySelectorAll('.hx-deck__bar [data-k]')].map((el) =>
       el.getAttribute('data-k'),
     );
-    expect(keys).toEqual(['back', 'comment', 'full', 'more']);
+    expect(keys).toEqual(['back', 'comment', 'download', 'full', 'more']);
     expect(document.querySelector('.hx-deck__lmode')).not.toBeNull();
     key('f');
     expect(root().dataset.full).toBe('1');

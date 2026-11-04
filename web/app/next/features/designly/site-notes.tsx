@@ -1,7 +1,7 @@
 // The person's edits on the page of a design: a note opens at the block they picked (the card .hx-note.hx-ann), a pin
 // with its number stays on the block, the notes ride over the island's field as a strip «N annotations» with a list, or,
 // in «Правки», in the bar at the foot (.hx-notesbar) that sends them to the agent in one message.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 import { AnnotateQuote } from '@/next/ui/annotate/parts';
 import Icon from '@/next/ui/icon';
 import Sheet from '@/next/ui/sheet';
@@ -335,8 +335,16 @@ export const NotePopover = ({
     setClosing(true);
     window.setTimeout(then, NOTE_OUT_MS);
   };
+  // «Приложить» while the voice is still being written down: it finishes, and the card goes once the words are in.
+  const [okAfterVoice, setOkAfterVoice] = useState(false);
   const ok = () => {
-    if (wants || sending) return;
+    // The card is on its way out: a second press would attach the note twice.
+    if (closing || wants || sending) return;
+    if (mic?.recording) {
+      setOkAfterVoice(true);
+      mic.onToggle();
+      return;
+    }
     if (!guest) {
       leave(() => onOk(text.trim()));
       return;
@@ -347,6 +355,18 @@ export const NotePopover = ({
       if (taken) leave(onCancel);
     });
   };
+
+  const voiceDone = okAfterVoice && !mic?.recording;
+  const okAfterWords = useEffectEvent(() => {
+    setOkAfterVoice(false);
+    ok();
+  });
+  // The words land with the recording's end; the card goes on the next tick, with them in it.
+  useEffect(() => {
+    if (!voiceDone) return;
+    const timer = window.setTimeout(okAfterWords, 0);
+    return () => window.clearTimeout(timer);
+  }, [voiceDone]);
 
   return (
     <div

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/ly-solutions/harnessly/internal/apps"
+	"github.com/ly-solutions/harnessly/internal/browseract"
 	"github.com/ly-solutions/harnessly/internal/fileplace"
 	"github.com/ly-solutions/harnessly/internal/history"
 	"net/http"
@@ -53,6 +54,7 @@ var v2Features = []wire.Feature{wire.FeatureQueue, wire.FeatureSteer, wire.Featu
 // and the pages answer from the actors and the hub; the sync below runs on a goroutine of its own.
 type v2Live struct {
 	selections *fileplace.Store
+	browser    *browseract.Hub
 	c          *core
 	d          deps
 	hub        *wire.Hub
@@ -191,7 +193,10 @@ func newV2Live(d deps, c *core) *v2Live {
 		}
 	}
 	v.srv.HandoffDraft = (&v2Handoff{rt: v.rt, runtimeFile: os.Getenv("RUNTIME_SIDE_CHAT_CONFIG")}).Draft
-	v.srv.Files = &v2Files{record: v.rt.Record, touched: v.rt.Touched, delivered: v.rt.Delivered}
+	v2f := &v2Files{record: v.rt.Record, touched: v.rt.Touched, delivered: v.rt.Delivered, access: workspaceAccess(d)}
+	v.srv.Files = v2f
+	v.srv.Download = v2f.ServeDownload
+	v.srv.GitSide = v2f.ServeGitSide
 	v.srv.Tasks = v.rt.Tasks
 	if terminals != nil {
 		v.srv.Rewind = v.rt
@@ -239,6 +244,8 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.FileBytes = http.HandlerFunc(workspaceAccess(v.d).ServeFileBytes)
 	v.selections = fileplace.NewStore()
 	v.srv.PaneSelection = v.selections
+	v.browser = browseract.NewHub()
+	v.srv.PaneAct = v.browser
 	v.srv.Shot = func(ctx context.Context, conv, id string) (wire.ShotFile, error) {
 		var f shots.File
 		path, err := v.rt.ShotPath(ctx, conv, id)

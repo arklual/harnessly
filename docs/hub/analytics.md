@@ -403,6 +403,7 @@ Markers (here and in the organization's series) carry what the chart draws:
 | `GET …/overview?scope=&period=` | view (money parts need money) | | `OverviewResponse`: spend against the limit with the forecast, four tiles, «Требует внимания», spend by teams (org, tenant) or by people (team), subscriptions |
 | `GET …/signals?scope=&all=1` | view | | `SignalsResponse` — the person's open signals in the scope; `all=1` adds the snoozed |
 | `POST …/signals/{id}/snooze` | the addressee or above | `{ until }` (≤ 30 days) | `{ signal: Signal }`; journal `signal.snooze` |
+| `DELETE …/signals/{id}/snooze` | the addressee or above | | `{ signal: Signal }` back in the list; journal `signal.unsnooze` |
 | `GET …/spend?scope=&by=team\|person\|model\|account\|tenant&period=` | money | | `SpendResponse` — each row with its limit and forecast; sums of rows equal the total |
 | `GET …/subscriptions?scope=` | money | | `SubscriptionsResponse` — each subscription's fee split between people, its windows |
 | `GET …/kpis?scope=&from=&to=&cmpFrom=&cmpTo=&series=team` | view | | `KpisResponse` — all twelve with the comparison; `series=team` adds them per team («Команды рядом») |
@@ -538,6 +539,9 @@ As built (machines):
     `details.field = 'until'`. It returns `{ signal }` and journals `signal.snooze` (target kind `signal`, labeled by the
     signal's title; before `snoozedUntil`, after the rule, title and the new `snoozedUntil`) in the signal's scope. A
     resolved signal is 404.
+  - **`DELETE …/signals/{id}/snooze`** (the same people) takes the snooze back: `snoozedUntil` becomes null, the signal
+    is listed again and the journal gets `signal.unsnooze` (before the old `snoozedUntil`, after null). The screen
+    offers it as «Вернуть» right after a snooze.
   - **`POST /api/me/limit-requests`** (`{ amountUsd, reason, scope }`; the person must belong to the scope: be in the
     team, in the tenant, in the organization) takes `amountUsd` > 0 and a `reason` of 1–500 characters (400 otherwise),
     makes (or renews, one per person and scope: the new sum and reason, `firstAt` kept, the snooze lifted) a `limit_request`

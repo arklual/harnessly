@@ -59,5 +59,9 @@ export const orgErrorText = (e: unknown): string => {
     if (e.code === 'not_ready') return 'Живые данные хаба ещё не подключены.';
     if (e.code === 'network') return 'Нет связи с хабом.';
   }
-  return e instanceof Error && e.message ? e.message : 'Не получилось. Попробуйте ещё раз.';
+  // A message of the hub is Russian; a raw English one (a client-side throw, a library) is never shown as it is.
+  if (e instanceof Error && /[а-яё]/i.test(e.message)) return e.message;
+  if (e instanceof OrgApiError && e.code === 'internal')
+    return 'Хаб не ответил как надо. Попробуйте ещё раз.';
+  return 'Не получилось. Попробуйте ещё раз.';
 };

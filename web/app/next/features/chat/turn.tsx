@@ -38,6 +38,8 @@ export interface ITurnHandlers {
   onRetryTurn: (turnId: string) => Promise<unknown>;
   onRetryMessage: (clientId: string) => Promise<unknown>;
   onDeleteMessage: (clientId: string) => Promise<unknown>;
+  /** A message that waits for the machine taken back into the field, to be changed and sent again. */
+  onEditMessage?: (clientId: string) => Promise<unknown>;
   /** A refused message sent again, as a new one; the refused one goes. */
   onResendMessage?: (clientId: string) => Promise<unknown>;
   renderGate?: (permissionId: string) => ReactNode;

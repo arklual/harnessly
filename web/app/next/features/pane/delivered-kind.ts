@@ -9,11 +9,16 @@ export const DELIVERED_VIEW = {
   sheet: 'sheet',
   docx: 'docx',
   pptx: 'pptx',
+  font: 'font',
   save: 'save',
 } as const;
 export type DeliveredView = (typeof DELIVERED_VIEW)[keyof typeof DELIVERED_VIEW];
 
-const IMAGES = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'ico']);
+// An svg is text: it opens in the editor as a picture with its code a click away.
+const IMAGES = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico']);
+const FONTS = new Set(['ttf', 'otf', 'woff', 'woff2']);
+/** Archives whose contents the pane lists: zip, and tar plain or gzipped. */
+const ARCHIVES = new Set(['zip', 'tar', 'tgz']);
 const VIDEOS = new Set(['mp4', 'm4v', 'webm', 'mov', 'mkv', 'ogv']);
 const SHEETS = new Set(['xlsx', 'xlsm', 'csv', 'tsv']);
 const DOCUMENTS = new Set(['docx', 'docm']);
@@ -27,8 +32,6 @@ const SAVED = new Set([
   'odt',
   'ods',
   'gz',
-  'tgz',
-  'tar',
   '7z',
   'rar',
   'avi',
@@ -47,7 +50,8 @@ const extOf = (path: string) => {
 /** How the pane shows this file when it is not text; null for a file the editor opens (md, html, code, text). */
 export const deliveredViewOf = (path: string): DeliveredView | null => {
   const ext = extOf(path);
-  if (ext === 'zip') return DELIVERED_VIEW.zip;
+  if (ARCHIVES.has(ext) || /\.tar\.gz$/i.test(path)) return DELIVERED_VIEW.zip;
+  if (FONTS.has(ext)) return DELIVERED_VIEW.font;
   if (ext === 'pdf') return DELIVERED_VIEW.pdf;
   if (IMAGES.has(ext)) return DELIVERED_VIEW.image;
   if (VIDEOS.has(ext)) return DELIVERED_VIEW.video;

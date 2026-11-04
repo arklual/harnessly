@@ -1744,6 +1744,8 @@ type FirstMessage struct {
 	ClientID      string   `json:"clientId"`
 	Text          string   `json:"text"`
 	AttachmentIDs []string `json:"attachmentIds"`
+	// Refs are the places the first message points at (as SendCmd.Refs); absent when none.
+	Refs []MessageRef `json:"refs,omitempty"`
 }
 
 // ConversationRenameCmd sets a conversation's title.

@@ -11,7 +11,8 @@ export type TTab =
   | { id: string; kind: 'machine' }
   | { id: string; kind: 'designly'; design: string | null }
   | { id: string; kind: 'subagent'; focus: string | null }
-  | { id: string; kind: 'files'; path: string; file: boolean }
+  /** `against`: the file is shown against another state of it — 'git:<ref>' or the path of another file. */
+  | { id: string; kind: 'files'; path: string; file: boolean; against?: string }
   | { id: string; kind: 'shell'; terminal: string }
   /** An installed app's view; `view` null: the app's first view for the pane. */
   | { id: string; kind: 'app'; app: string; view: string | null }
@@ -105,8 +106,10 @@ const placeBrowser = (
 
 const placeFiles = (state: IPaneTabs, target: string | null, ctx: IPlaceContext): IPlaced => {
   const rel = target === null ? '' : inFolder(ctx.cwd, target);
-  // A file the agent handed over lies where it was made, maybe outside the chat's folder: it has its own view here.
-  if (rel === null && target !== null && deliveredViewOf(target) !== null) {
+  // A file outside the chat's folder opens here too: one the agent handed over or made in a worktree beside it is read,
+  // saved and downloaded as any other. A folder outside it is Legacy's to show: the pane's own files tab
+  // lists only the chat's folder.
+  if (rel === null && target !== null && (deliveredViewOf(target) !== null || isFilePath(target))) {
     const have = state.tabs.find((x) => x.kind === 'files' && x.path === target);
     if (have) return { next: front(state, have.id, ctx.busy), effect: null, show: true };
     return {
@@ -115,7 +118,6 @@ const placeFiles = (state: IPaneTabs, target: string | null, ctx: IPlaceContext)
       show: true,
     };
   }
-  // A file outside the chat's folder is Legacy's to show: the pane's own files tab reads only the folder.
   if (rel === null)
     return {
       next: state,

@@ -38,7 +38,13 @@ export const Row = ({
       </span>
       <span className="mt-name__t">
         <b>{r.name}</b>
-        <small>{r.sub}</small>
+        {r.issue ? (
+          <small data-warn="1" title={r.why ?? undefined}>
+            {r.issue}
+          </small>
+        ) : (
+          <small>{r.sub}</small>
+        )}
       </span>
     </span>
     <span className="en-who">{r.who}</span>

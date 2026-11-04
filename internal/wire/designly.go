@@ -387,7 +387,7 @@ func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 		if !readDesignly(w, r, &body) {
 			return
 		}
-		out, err := s.Designly.Create(ctx, body)
+		out, err := s.Designly.Create(WithRequest(ctx, r), body)
 		if err != nil {
 			s.designlyRefusal(w, r, err)
 			return

@@ -3,6 +3,7 @@
 // the machine keeps until the tab closes it) or a browser tab with its own history. Only tools the machine really has are offered; the rest of the design's list waits for its API.
 import { requestFilePlace } from '@/next/features/pane/file-place';
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useMemo,
@@ -21,6 +22,8 @@ import { heldTools, quietTools, toolOfRequest } from '@/next/features/pane/tools
 import { useChatMade } from '@/next/bindings/chat-made';
 import BrowserTab from '@/next/bindings/browser-tab';
 import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
+import { downloadHref, saveFrom } from '@/next/features/pane/download';
+import FileMenu from '@/next/features/pane/file-menu';
 import SideChat from '@/next/features/pane/side-chat';
 import { SideFloat } from '@/next/features/pane/side-float';
 import { onOpenSubagent, openSubagent } from '@/next/features/subagents/open';
@@ -36,7 +39,9 @@ import { goTo, ROUTE } from '@/next/routes/routes';
 import { useSubagents } from '@/next/bindings/subagents';
 import { setPaneOpen } from '@/next/bindings/pane-open';
 import LazyFileEditor from '@/next/features/pane/editor/lazy';
-import { listFolder, readFile, saveFile } from '@/next/features/pane/chat-files-api';
+import { listFolder, readFile, readGitSide, saveFile } from '@/next/features/pane/chat-files-api';
+import type { ICompare } from '@/next/features/pane/editor/file-editor';
+import { addQuote } from '@/next/stores/quotes';
 import { useFileEdits, type IFileEdits } from '@/next/bindings/file-edits';
 import Modal from '@/next/features/shell/modal';
 import { Button } from '@/next/ui/button';
@@ -68,6 +73,7 @@ import { isLegacyTab, useLegacyPane, type ILegacyPane, type TLegacyHandoff } fro
 import { browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
 import { requestOf, type IPaneIntent, type IPaneRequest } from '@/next/features/pane/intents';
 import { usePaneIntents } from '@/next/bindings/pane-intents';
+import { foldRailForDesign } from '@/next/bindings/rail';
 import { usePhone } from '@/next/ui/use-media';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeys } from '@/next/features/keys/use-keys';
@@ -88,10 +94,11 @@ const DesignlyPane = later(() => import('@/next/bindings/designly-pane'));
 /** A design opened beside the chat, full screen: Sinopia Design with this chat; a document of an app's type, its own page. */
 const openDesignFull = async (machine: MachineId, design: string, chat: ConvId) => {
   const docs = await loadKindDocs(machine).catch(() => []);
+  foldRailForDesign();
   goTo(
     docs.some((d) => d.document === design)
-      ? { kind: ROUTE.appDoc, id: design }
-      : { kind: ROUTE.site, id: design, chat },
+      ? { kind: ROUTE.appDoc, id: design, chat }
+      : { kind: ROUTE.site, id: design, chat, machine },
   );
 };
 const FilesView = later(() => import('@/next/features/pane/files-view'));
@@ -241,6 +248,10 @@ const SubagentTab = ({ conv, focus }: { conv: Conversation; focus: string | null
   return <SubagentView agents={useSubagents(conv.id)} workflows={workflows} focus={focus} />;
 };
 
+/** A path of the chat's folder made absolute; an absolute one stays. */
+const absIn = (cwd: string, path: string) =>
+  path.startsWith('/') ? path : `${cwd.replace(/\/+$/, '')}/${path}`;
+
 interface IShownFile {
   key: string;
   listing: DirListing | null;
@@ -316,6 +327,47 @@ const FilesTab = ({
   }, [conv.machineId, conv.id, tab.id, tab.path, tab.file, epoch, draftOf, listingAgain, delivered]);
   const now = shown?.key === key ? shown : null;
 
+  // The state the file is shown against: git's revision or another file, read when the tab asks for it.
+  const [compare, setCompare] = useState<{ key: string; value: ICompare } | null>(null);
+  const against = tab.file ? (tab.against ?? null) : null;
+  useEffect(() => {
+    if (against === null) return undefined;
+    const abort = new AbortController();
+    const key = `${tab.path}|${against}`;
+    const git = against.startsWith('git:') ? against.slice(4) : null;
+    const label = git
+      ? t('next.editor.diffGit', { ref: git })
+      : t('next.editor.diffFile', { name: against.slice(against.lastIndexOf('/') + 1) });
+    const put = (value: ICompare) => {
+      if (!abort.signal.aborted) setCompare({ key, value });
+    };
+    put({ label, text: null, failure: null });
+    const failed = (failure: Error) => put({ label, text: null, failure: failure.message });
+    if (git)
+      readGitSide(conv.machineId, conv.id, tab.path, git, abort.signal).then((side) => {
+        if (!side.inRepo) put({ label, text: null, failure: t('next.editor.diffNoRepo') });
+        else if (!side.tracked) put({ label, text: '', failure: null });
+        else if (side.binary || side.truncated)
+          put({ label, text: null, failure: t('next.editor.diffTooBig') });
+        else put({ label, text: side.content, failure: null });
+      }, failed);
+    else
+      readFile(conv.machineId, conv.id, against, abort.signal).then(
+        (other) => put({ label, text: other.content, failure: null }),
+        failed,
+      );
+    return () => abort.abort();
+  }, [conv.machineId, conv.id, tab.path, against]);
+  const shownCompare = against !== null && compare?.key === `${tab.path}|${against}` ? compare.value : null;
+
+  // A page's neighbours (styles, scripts, pictures) read the way a download does: the same places, no secrets.
+  const readAsset = useCallback(
+    async (path: string) => {
+      const res = await fetch(downloadHref(conv.machineId, conv.id, [path]), { credentials: 'same-origin' });
+      return res.ok ? res.blob() : null;
+    },
+    [conv.machineId, conv.id],
+  );
   const save = async (text: string, revision: string, over: boolean) => {
     // Over whatever the disk has now: the revision it has now is the one the save names.
     const current = over ? (await readFile(conv.machineId, conv.id, tab.path)).revision : revision;
@@ -335,6 +387,13 @@ const FilesTab = ({
         }}
         onLeave={(draft) => edits.onLeave(tab.id, tab.path, draft)}
         onState={(state) => edits.onState(tab.id, state)}
+        readAsset={readAsset}
+        compare={shownCompare}
+        onCloseCompare={() => onChange({ ...tab, against: undefined })}
+        onAsk={(quote, note) => {
+          addQuote(conv.id, quote, note);
+          toast(t('next.editor.asked'), { tone: 'success' });
+        }}
       />
     ) : null;
   if (delivered)
@@ -356,7 +415,21 @@ const FilesTab = ({
       error={now?.error ?? null}
       opening={tab.file ? 'file' : 'folder'}
       onRetry={() => setEpoch((n) => n + 1)}
-      onOpen={(path, kind) => guard([tab.id], () => onChange({ ...tab, path, file: kind === 'file' }))}
+      onOpen={(path, kind) =>
+        guard([tab.id], () => onChange({ ...tab, path, file: kind === 'file', against: undefined }))
+      }
+      onCompare={(a, b) => guard([tab.id], () => onChange({ ...tab, path: a, file: true, against: b }))}
+      onDownload={(paths) => saveFrom(downloadHref(conv.machineId, conv.id, paths))}
+      menuOf={(path, kind, trigger) => (
+        <FileMenu
+          trigger={trigger}
+          machine={conv.machineId}
+          conv={conv.id}
+          path={path}
+          abs={absIn(conv.cwd, path)}
+          kind={kind}
+        />
+      )}
     />
   );
 };
@@ -685,10 +758,54 @@ const PaneBody = (props: IPaneBodyProps) => {
     const share = tab.file && isShareable(tab.path) && (
       <FileShareButton key={tab.path} machine={conv.machineId} conv={conv.id} path={tab.path} />
     );
-    if (!saveButton) return share || null;
+    // «Скачать» of a file open as text; a file shown its own way has the button in its view.
+    const download = tab.file && deliveredViewOf(tab.path) === null && (
+      <a
+        className="hx-head-btn hx-tipped"
+        href={downloadHref(conv.machineId, conv.id, [tab.path])}
+        download
+        aria-label={t('next.files.downloadFile')}
+      >
+        <Icon name="download" size="sm" />
+        <span className="hx-tip" data-pos="below" data-align="end">
+          {t('next.files.downloadFile')}
+        </span>
+      </a>
+    );
+    const menu = tab.file && (
+      <FileMenu
+        key={`menu:${tab.path}`}
+        trigger={
+          <button type="button" className="hx-head-btn" aria-label={t('next.fileMenu.label')}>
+            <Icon name="ellipsis" size="sm" />
+          </button>
+        }
+        machine={conv.machineId}
+        conv={conv.id}
+        path={tab.path}
+        abs={absIn(conv.cwd, tab.path)}
+        kind="file"
+        onCompare={
+          deliveredViewOf(tab.path) === null
+            ? () =>
+                setTabs((list) => list.map((x) => (x.id === tab.id ? { ...tab, against: 'git:HEAD' } : x)))
+            : undefined
+        }
+      />
+    );
+    if (!saveButton)
+      return share || download || menu ? (
+        <>
+          {download}
+          {share}
+          {menu}
+        </>
+      ) : null;
     return (
       <>
+        {download}
         {share}
+        {menu}
         <Button
           variant="primary"
           size="sm"
@@ -857,7 +974,11 @@ export const useRightPane = (
   const machineId = conv?.machineId ?? null;
   // The chat's pane is read as the chat is: the first frame of another chat already draws its own pane.
   const state = useChatPane(convId);
-  const { open, maxed } = state;
+  const { open } = state;
+  // Beside a design the pane opens at its side, never over it: the chat's own «wide» is for the chat's page (a pane
+  // widened there must not cover the design opened from it). Widened here, it stays so only while the design is open.
+  const [wideBeside, setWideBeside] = useState(false);
+  const maxed = besideDesign ? wideBeside : state.maxed;
   const setState = (change: (pane: IChatPane) => IChatPane) => {
     if (convId) chatPanes.update(convId, machineId, change);
   };
@@ -922,7 +1043,10 @@ export const useRightPane = (
   };
 
   const setTabs = (change: (list: TTab[]) => TTab[]) => setState((s) => ({ ...s, tabs: change(s.tabs) }));
-  const setMaxed = (next: boolean) => setState((s) => (s.maxed === next ? s : { ...s, maxed: next }));
+  const setMaxed = (next: boolean) => {
+    if (besideDesign) setWideBeside(next);
+    else setState((s) => (s.maxed === next ? s : { ...s, maxed: next }));
+  };
   const setActive = (id: string) =>
     setState((s) => ({ ...s, active: id, unread: s.unread.filter((x) => x !== id) }));
 

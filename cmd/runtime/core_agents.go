@@ -6,6 +6,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/apps"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/hooksetup"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -143,6 +144,7 @@ func newCoreAgents(c coreAgentsConfig) *coreAgents {
 			WorkspacePrompt: withNotifyBots(bots, shared, promptDir,
 				withSafe(c.SafePrompt, promptDir, func(ws string) string { return filepath.Join(c.DataDir, "workspaces", ws, "claude-prompt.md") })),
 			PluginDir:       pluginDirOnce(c.SkillsPluginDir),
+			EnvPluginDirs:   hubEnvPluginDirs(c.DataDir, os.Getenv("AGENT_HUB_OBSERVE_FILE")),
 			JoinDir:         filepath.Join(c.DataDir, "launch-prompts"),
 			Launcher:        c.Launcher,
 			SkipPermissions: skipPermissions(c.ConfigFile),
@@ -182,6 +184,32 @@ func pluginDirOnce(dir string) func() string {
 			return ""
 		}
 		return dir
+	}
+}
+
+// hubEnvPluginDirs are the hub's environment plugins the machine agent applied (docs/hub/environment.md): the one of a
+// hub's machine, in the data folder, and the one of an observe link, in that link's folder (<data>/hub by default).
+// Only folders the agent has written a plugin into count, looked at on every launch: a list that came after the
+// runtime started reaches the next chat.
+func hubEnvPluginDirs(dataDir, observeFile string) func() []string {
+	links := []string{dataDir, filepath.Join(dataDir, "hub")}
+	if observeFile != "" {
+		links = append(links, filepath.Dir(observeFile))
+	}
+	var dirs []string
+	for _, l := range links {
+		if d := filepath.Join(l, hubproto.EnvPluginDir); !slices.Contains(dirs, d) {
+			dirs = append(dirs, d)
+		}
+	}
+	return func() []string {
+		var out []string
+		for _, d := range dirs {
+			if _, err := os.Stat(filepath.Join(d, ".claude-plugin", "plugin.json")); err == nil {
+				out = append(out, d)
+			}
+		}
+		return out
 	}
 }
 

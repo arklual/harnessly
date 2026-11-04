@@ -743,3 +743,14 @@ event (`prompt_state`, `message_upsert`); the page never decides that a message 
     tracker calls (create, update, comment, read of one task) read with the person's own token. `title` and `task` are
     from the tracker and left off when it could not be read; `type` is `Epic` for an epic, whose subtasks are
     `children` (at most 50), a task's epic is `parent`. A page leaves out a kind it does not know.
+68. **The agent's hand on the pane's browser.** `GET /api/v2/pane-act?conversation=<chat>` is the page's long poll: it
+    answers `200` with one action `{id, op, ref, element, text, key, value, url, dy, ms, submit}` (every field present;
+    `op` one of snapshot, click, type, press, hover, select, scroll, wait, navigate, back) or `204` after 25 s with
+    nothing. While a poll is open, and for 35 s after the last one ended, the chat's page counts as present; without a
+    present page the agent's `browser_*` tools fail at once. At most 4 polls are open per chat (the fifth is a `429`); an
+    action goes to one poll, and waits for the next one when the page is between two. `POST /api/v2/pane-act`
+    `{conversation, id, state: done|failed|asking, text}` (body ≤ 96 KiB, text ≤ 64 KiB) answers `204`, `404` for an id
+    that is not the chat's action in flight, `400` for a bad body. `asking` (the person is being asked) settles nothing
+    and extends the agent's wait to 120 s from now; `done` and `failed` end the action with `text`. A chat has one action
+    in flight, and at most 120 a minute. Both are same-origin only. A runtime that serves it leaves `PaneAct` set; without
+    it the route is a 404.

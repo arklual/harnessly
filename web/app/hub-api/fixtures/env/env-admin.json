@@ -50,7 +50,13 @@
           "callsWeek": 4,
           "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
           "lastUsedAt": "2026-11-01T14:20:00Z",
-          "unused": false
+          "unused": false,
+          "delivery": {
+            "ok": 1,
+            "pending": 0,
+            "error": 0,
+            "message": null
+          }
         }
       ]
     },
@@ -102,7 +108,8 @@
           "callsWeek": 0,
           "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           "lastUsedAt": null,
-          "unused": false
+          "unused": false,
+          "delivery": null
         }
       ]
     },
@@ -138,7 +145,13 @@
           "callsWeek": 4,
           "spark14": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
           "lastUsedAt": "2026-11-01T14:20:00Z",
-          "unused": false
+          "unused": false,
+          "delivery": {
+            "ok": 1,
+            "pending": 0,
+            "error": 0,
+            "message": null
+          }
         }
       ]
     },
@@ -194,5 +207,11 @@
       "people": 1,
       "lastUsedAt": "2026-11-01T14:20:00Z"
     }
-  ]
+  ],
+  "delivery": {
+    "machines": 1,
+    "reported": 1,
+    "current": 1,
+    "lastAt": "2026-11-04T09:00:00Z"
+  }
 }

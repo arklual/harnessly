@@ -14,6 +14,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/hub/env"
 	"github.com/ly-solutions/harnessly/internal/hub/hubtest"
 	"github.com/ly-solutions/harnessly/internal/hub/store"
+	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // acme: anna owns both tenants and made the organization (its admin); dina is a tenant admin of «Платформа», boris
@@ -712,5 +713,70 @@ func TestObservedTools(t *testing.T) {
 	}
 	if every := a.layers(t, a.anna, ""); len(every.Observed) != 3 {
 		t.Errorf("all tenants = %+v", every.Observed)
+	}
+}
+
+// The screen says how many of its machines hold the current list and what they said about each item; a report of an
+// older list is not counted per item, a revoked machine not at all.
+func TestDeliveryOnTheScreen(t *testing.T) {
+	a := newAcme(t)
+	ctx := context.Background()
+	skill := a.item(t, "skill", "Ревью кода", map[string]any{"body": "Пиши коротко."})
+	mcp := a.item(t, "mcp", "Трекер", map[string]any{"transport": "http", "url": "https://tracker.example.org/mcp", "secretRefs": []string{"TRACKER_TOKEN"}})
+	a.entry(t, a.anna, "org", a.org, skill, nil)
+	a.entry(t, a.dina, "tenant", a.tenant, mcp, nil)
+
+	fresh := a.anna.Machine(a.tenant, nil)
+	old := a.anna.Machine(a.tenant, nil)
+	silent := a.anna.Machine(a.tenant, nil)
+	gone := a.anna.Machine(a.tenant, nil)
+	if _, err := a.s.DB.Exec(ctx, `UPDATE machines SET revoked_at = ? WHERE id = ?`, a.s.Clock.Now(), gone.MachineID); err != nil {
+		t.Fatal(err)
+	}
+	_ = silent
+
+	// What the pusher sends a machine of the tenant without a team is the current list.
+	link := &fakeLink{id: fresh.MachineID, status: "ok"}
+	p := env.NewPusher(env.PushDeps{DB: a.s.DB, Reg: link, Features: env.StaticFeatures([]string{"env"}), Now: a.s.Clock.Now, Every: time.Hour})
+	defer p.Close()
+	p.Connected(fresh.MachineID, hubproto.Hello{Features: []string{hubproto.FeatureEnvironment}})
+	if err := p.Push(ctx); err != nil || link.count() != 1 {
+		t.Fatalf("push: %v, sent %d", err, link.count())
+	}
+	// The agent says the server waits for its secret.
+	p.Reported(fresh.MachineID, hubproto.EnvState{Rev: 1, Hash: link.sent[0].Hash, Applied: []hubproto.EnvApplied{
+		{ItemID: skill, Status: "ok"}, {ItemID: mcp, Status: "pending", Message: "the secret TRACKER_TOKEN is not on this machine"}}})
+	// Another machine holds an older list.
+	p.Reported(old.MachineID, hubproto.EnvState{Rev: 1, Hash: "older", Applied: []hubproto.EnvApplied{{ItemID: skill, Status: "error", Message: "broken"}}})
+
+	rs := a.layers(t, a.anna, "?scope="+a.tenant)
+	if d := rs.Delivery; d.Machines != 3 || d.Reported != 2 || d.Current != 1 || d.LastAt == nil {
+		t.Errorf("delivery = %+v", d)
+	}
+	sk := layer(rs, "org", a.org).Items[0]
+	if sk.Delivery == nil || sk.Delivery.OK != 1 || sk.Delivery.Error != 0 {
+		t.Errorf("skill = %+v", sk.Delivery)
+	}
+	mc := layer(rs, "tenant", a.tenant).Items[0]
+	if mc.Delivery == nil || mc.Delivery.Pending != 1 || mc.Delivery.Message == nil || !strings.Contains(*mc.Delivery.Message, "TRACKER_TOKEN") {
+		t.Errorf("mcp = %+v", mc.Delivery)
+	}
+	// The other tenant has no machines.
+	if d := a.layers(t, a.anna, "?scope="+a.other).Delivery; d.Machines != 0 || d.Current != 0 {
+		t.Errorf("other tenant = %+v", d)
+	}
+	// A team filter keeps only the team's machines.
+	if d := a.layers(t, a.anna, "?scope="+a.tenant+"&team="+a.core).Delivery; d.Machines != 0 {
+		t.Errorf("team = %+v", d)
+	}
+}
+
+// With nothing in the environment a machine holds what it should without ever reporting: the hub sends no first
+// empty list.
+func TestDeliveryOfAnEmptyEnvironment(t *testing.T) {
+	a := newAcme(t)
+	a.anna.Machine(a.tenant, nil)
+	if d := a.layers(t, a.anna, "?scope="+a.tenant).Delivery; d.Machines != 1 || d.Reported != 0 || d.Current != 1 {
+		t.Errorf("delivery = %+v", d)
 	}
 }

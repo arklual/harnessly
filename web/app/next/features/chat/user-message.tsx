@@ -99,10 +99,11 @@ interface IOutgoingStateProps {
   onRetry: (clientId: string) => Promise<unknown>;
   onResend?: (clientId: string) => Promise<unknown>;
   onDelete: (clientId: string) => Promise<unknown>;
+  onEdit?: (clientId: string) => Promise<unknown>;
 }
 
-const OutgoingState = ({ message, phase, onRetry, onResend, onDelete }: IOutgoingStateProps) => {
-  const action = usePending<'retry' | 'resend' | 'delete'>();
+const OutgoingState = ({ message, phase, onRetry, onResend, onDelete, onEdit }: IOutgoingStateProps) => {
+  const action = usePending<'retry' | 'resend' | 'delete' | 'edit'>();
   const busy = isBusy(action.phase);
   if (phase === MESSAGE_PHASE.handed && message.state.k === 'accepted') {
     return (
@@ -133,10 +134,22 @@ const OutgoingState = ({ message, phase, onRetry, onResend, onDelete }: IOutgoin
       <div className="hx-msg-user__state" role="status">
         <Icon name="wifi-off" size="sm" />
         {t(phase === MESSAGE_PHASE.waitingNet ? 'next.message.waitingNet' : 'next.message.waitingMachine')}
+        {onEdit && (
+          <button
+            type="button"
+            className="hx-msg-user__act"
+            data-busy={(busy && action.key === 'edit') || undefined}
+            disabled={busy}
+            onClick={() => action.run('edit', () => onEdit(message.clientId))}
+          >
+            {t('next.message.edit')}
+            <span className="hx-spin" aria-hidden="true" />
+          </button>
+        )}
         <button
           type="button"
           className="hx-msg-user__act"
-          data-busy={busy || undefined}
+          data-busy={(busy && action.key === 'delete') || undefined}
           disabled={busy}
           onClick={() => action.run('delete', () => onDelete(message.clientId))}
         >
@@ -206,6 +219,8 @@ interface IUserMessageProps {
   /** Sends a refused message again as a new one (only for a refusal whose cause may have passed). */
   onResend?: (clientId: string) => Promise<unknown>;
   onDelete: (clientId: string) => Promise<unknown>;
+  /** Takes a message that waits for the machine back into the field. */
+  onEdit?: (clientId: string) => Promise<unknown>;
 }
 
 const SENT_STATE = { k: 'done', turnId: '' } as const;
@@ -228,6 +243,7 @@ const UserMessage = ({
   onRetry,
   onResend,
   onDelete,
+  onEdit,
 }: IUserMessageProps) => {
   const phase = useMessagePhase(
     outgoing?.state ?? SENT_STATE,
@@ -307,6 +323,7 @@ const UserMessage = ({
             onRetry={onRetry}
             onResend={onResend}
             onDelete={onDelete}
+            onEdit={onEdit}
           />
         )}
       </div>

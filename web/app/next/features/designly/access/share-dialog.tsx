@@ -72,8 +72,11 @@ const VIEW_TITLE: Record<TSubView, string> = {
   transfer: 'next.access.transferTitle',
 };
 
-interface IFrameProps {
+export interface IFrameProps {
   open: boolean;
+  /** the one dialog of every kind — at most 600px tall on a wide window; on the phone the head stays and
+   *  only the body scrolls. */
+  fixedHead?: boolean;
   /** The first focus on a wide window (the add field); the phone's sheet keeps it on itself, no keyboard pops up. */
   initialFocus?: RefObject<HTMLElement | null>;
   onClose: () => void;
@@ -83,7 +86,15 @@ interface IFrameProps {
 }
 
 /** The dialog on a wide window, the bottom sheet on the phone; the same head, body and foot in both. */
-const Frame = ({ open, initialFocus, onClose, title, actions, children }: IFrameProps) => {
+export const Frame = ({
+  open,
+  fixedHead = false,
+  initialFocus,
+  onClose,
+  title,
+  actions,
+  children,
+}: IFrameProps) => {
   const phone = usePhone();
   if (!phone)
     return (
@@ -91,7 +102,7 @@ const Frame = ({ open, initialFocus, onClose, title, actions, children }: IFrame
         open={open}
         onClose={onClose}
         title={title}
-        boxClass="hx-acc"
+        boxClass={fixedHead ? 'hx-acc hx-acc--one' : 'hx-acc'}
         actions={actions}
         initialFocus={initialFocus}
       >
@@ -99,7 +110,12 @@ const Frame = ({ open, initialFocus, onClose, title, actions, children }: IFrame
       </Modal>
     );
   return (
-    <Sheet open={open} onClose={onClose} label={title} className="hx-acc-sheet">
+    <Sheet
+      open={open}
+      onClose={onClose}
+      label={title}
+      className={fixedHead ? 'hx-acc-sheet hx-acc-sheet--one' : 'hx-acc-sheet'}
+    >
       <div className="hx-modal__head">
         <div>
           <h2 className="hx-modal__title">{title}</h2>

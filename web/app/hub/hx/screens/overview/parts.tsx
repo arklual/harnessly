@@ -3,10 +3,12 @@
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useMemo, useState } from 'react';
 
 import { orgErrorText } from '../../../org/api/errors';
+import { useOrg } from '../../../org/context';
 import type {
   OverviewData,
   PersonSpend,
   Signal,
+  SnoozeFor,
   SubscriptionUse,
   TeamEfficiency,
 } from '../../../org/api/overview';
@@ -152,6 +154,7 @@ export const SxTile = ({
   chart,
   onClick,
   member,
+  hint,
 }: {
   i: number;
   tone: string;
@@ -161,6 +164,8 @@ export const SxTile = ({
   chart: ReactNode;
   onClick?: () => void;
   member?: boolean;
+  /** How the number is counted; shown on hover. */
+  hint?: string;
 }) => {
   const body = (
     <>
@@ -177,11 +182,11 @@ export const SxTile = ({
   );
   const style = css({ '--sx-i': i, '--sx-tone': tone });
   return onClick ? (
-    <button type="button" className="sx-tile" style={style} onClick={onClick}>
+    <button type="button" className="sx-tile" style={style} onClick={onClick} title={hint}>
       {body}
     </button>
   ) : (
-    <div className={member ? 'sx-tile mo-tile' : 'sx-tile'} style={style}>
+    <div className={member ? 'sx-tile mo-tile' : 'sx-tile'} style={style} title={hint}>
       {body}
     </div>
   );
@@ -217,6 +222,7 @@ export const HeadTiles = ({
           label={names.spend}
           value={spendLine(t.spend, data.estimated)}
           chart={<Bars values={t.spend.bars} />}
+          hint={`Сколько потрачено в рублях по прайс-листу провайдеров. ${names.scope}`}
           onClick={onSpend}
         />
         <SxTile
@@ -226,6 +232,7 @@ export const HeadTiles = ({
           label={names.active}
           value={activeLine(t.active.now, t.active.total)}
           chart={<Bars values={t.active.bars} />}
+          hint={`Сколько людей запускали агентов. ${names.scope}`}
           onClick={onActive}
         />
         <SxTile
@@ -235,6 +242,7 @@ export const HeadTiles = ({
           label={names.tasks}
           value={tasksLine(t.tasks.closed, t.tasks.inProgress)}
           chart={<Bars values={t.tasks.bars} />}
+          hint={`Задачи агентов, дошедшие до готового MR, и те, что ещё в работе. ${names.scope}`}
           onClick={go('analytics?k=mrPerPerson')}
         />
         <SxTile
@@ -250,6 +258,7 @@ export const HeadTiles = ({
               <Strip used={subs.worstPct} whole={100} color={TONE.subs} />
             )
           }
+          hint="Подключённые подписки на агентов; в скобках самая заполненная по лимиту окна."
           onClick={go('accounts')}
         />
       </nav>
@@ -261,50 +270,143 @@ export const HeadTiles = ({
 
 const toneOfSignal = (s: Signal): 'risk' | 'warn' => (s.severity === 'critical' ? 'risk' : 'warn');
 
-export const Attention = ({ signals, base }: { signals: Signal[]; base: string }) => (
-  <Card
-    label="Требует внимания"
-    className="dash-span-12 mx-attention"
-    title={
-      <span className="at-title">
-        Требует внимания
-        {signals.length > 0 && (
-          <>
-            {' '}
-            <span className="at-title__count">{signals.length}</span>
-          </>
-        )}
-      </span>
-    }
-  >
-    {signals.length === 0 ? (
-      <p className="ov-empty">Всё спокойно: сейчас ничего не требует внимания.</p>
-    ) : (
-      <div className="at-grid" style={css({ '--at-cols': 1 })}>
-        {signals.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            className="at-cell"
-            data-tone={toneOfSignal(s)}
-            style={css({ '--i': i, '--at-span': 1, '--j': 0, '--jr': 0 })}
-            onClick={() => goSignal(base, s.action)}
-          >
-            <span className="at-cell__dot" aria-hidden="true" />
-            <span className="at-cell__text">
-              <b className="at-cell__title">{s.title}</b>
-              <span className="at-cell__detail">{s.detail}</span>
-            </span>
-            <span className="at-cell__action">
-              {s.action.label}
-              <Icon i="arrow-up-right" size="sm" />
-            </span>
+/** «Отложить»: the signal goes at once; if the hub refuses it comes back with the reason. */
+const SNOOZE: { span: SnoozeFor; label: string; hint: string }[] = [
+  { span: 'day', label: 'на день', hint: 'Скрыть сигнал на сутки. Если станет хуже, он вернётся раньше' },
+  { span: 'week', label: 'на неделю', hint: 'Скрыть сигнал на 7 дней. Если станет хуже, он вернётся раньше' },
+];
+
+export const Attention = ({ signals, base }: { signals: Signal[]; base: string }) => {
+  const { api } = useOrg();
+  // The ids put off here: they leave the list before the hub answers.
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const [failed, setFailed] = useState<{ id: string; text: string } | null>(null);
+  // The last put off, so a wrong click is taken back on the spot.
+  const [last, setLast] = useState<{ s: Signal; span: SnoozeFor; busy: boolean } | null>(null);
+  const shown = signals.filter((s) => !gone.has(s.id));
+  const back = (id: string) =>
+    setGone((g) => {
+      const n = new Set(g);
+      n.delete(id);
+      return n;
+    });
+  const put = (s: Signal, span: SnoozeFor) => {
+    setFailed(null);
+    setGone((g) => new Set(g).add(s.id));
+    setLast({ s, span, busy: false });
+    api.snoozeSignal(s.id, span).catch((e: unknown) => {
+      back(s.id);
+      setLast((l) => (l?.s.id === s.id ? null : l));
+      setFailed({ id: s.id, text: `Не удалось отложить «${s.title}»: ${orgErrorText(e)}` });
+    });
+  };
+  const undo = () => {
+    if (!last || last.busy) return;
+    const { s } = last;
+    setFailed(null);
+    setLast({ ...last, busy: true });
+    api.unsnoozeSignal(s.id).then(
+      () => {
+        back(s.id);
+        setLast(null);
+      },
+      (e: unknown) => {
+        setLast((l) => (l ? { ...l, busy: false } : l));
+        setFailed({ id: s.id, text: `Не удалось вернуть «${s.title}»: ${orgErrorText(e)}` });
+      },
+    );
+  };
+  return (
+    <Card
+      label="Требует внимания"
+      className="dash-span-12 mx-attention"
+      title={
+        <span className="at-title">
+          Требует внимания
+          {shown.length > 0 && (
+            <>
+              {' '}
+              <span className="at-title__count">{shown.length}</span>
+            </>
+          )}
+        </span>
+      }
+      description="Что требует решения сегодня: кнопка ведёт к исправлению, «Отложить» прячет сигнал на время"
+    >
+      {last && (
+        <p className="at-undo" role="status">
+          <span>
+            Сигнал «{last.s.title}» отложен {last.span === 'week' ? 'на неделю' : 'на день'}
+          </span>
+          <button type="button" className="at-undo__btn" disabled={last.busy} onClick={undo}>
+            {last.busy ? 'Возвращаем' : 'Вернуть'}
           </button>
-        ))}
-      </div>
-    )}
-  </Card>
-);
+          <button type="button" className="at-undo__x" aria-label="Скрыть" onClick={() => setLast(null)}>
+            <Icon i="x" size="sm" />
+          </button>
+        </p>
+      )}
+      {failed && (
+        <p className="ov-error-line" role="alert">
+          {failed.text}
+        </p>
+      )}
+      {shown.length === 0 ? (
+        <p className="ov-empty">Всё спокойно: сейчас ничего не требует внимания.</p>
+      ) : (
+        <div className="at-grid" style={css({ '--at-cols': 1 })}>
+          {shown.map((s, i) => (
+            <div
+              key={s.id}
+              className="at-cell"
+              data-tone={toneOfSignal(s)}
+              data-link={s.action ? '1' : undefined}
+              style={css({ '--i': i, '--at-span': 1, '--j': 0, '--jr': 0 })}
+              onClick={s.action ? () => goSignal(base, s.action!) : undefined}
+            >
+              <span className="at-cell__dot" aria-hidden="true" />
+              <span className="at-cell__text">
+                <b className="at-cell__title">{s.title}</b>
+                <span className="at-cell__detail">{s.detail}</span>
+              </span>
+              <span className="at-cell__acts">
+                {s.action && (
+                  <button
+                    type="button"
+                    className="at-cell__action"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goSignal(base, s.action!);
+                    }}
+                  >
+                    {s.action.label}
+                    <Icon i="arrow-up-right" size="sm" />
+                  </button>
+                )}
+                <span className="at-cell__snooze" role="group" aria-label="Отложить">
+                  <span>Отложить</span>
+                  {SNOOZE.map((o) => (
+                    <button
+                      key={o.span}
+                      type="button"
+                      title={o.hint}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        put(s, o.span);
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+};
 
 // ── The donut «Расход по командам» ──────────────────────────────────────────────────────────────────────────────────
 
@@ -410,6 +512,7 @@ export const SpendDonut = ({
                 key={t.id}
                 className="viz-sheet-summary__row viz-donut__row"
                 data-st={st(t.id)}
+                title={`${t.name}: ${ring[i]?.pct ?? 0}% всего расхода по прайс-листу провайдеров. Нажмите, чтобы открыть команду.`}
                 role="button"
                 tabIndex={0}
                 onPointerEnter={() => setHov(t.id)}
@@ -475,6 +578,7 @@ export const Efficiency = ({
                 <button
                   type="button"
                   className="dash-bar__hit"
+                  title={`Закрытые задачи, делённые на число людей команды ${forPeriod(period)}. Процент у названия: сколько из задуманного команда закрыла. Нажмите, чтобы открыть команду.`}
                   onClick={() =>
                     navigate(r.noTeam ? `${base}/teams` : `${base}/team?t=${encodeURIComponent(r.id)}`)
                   }
@@ -532,7 +636,12 @@ export const Subscriptions = ({ items, base }: { items: SubscriptionUse[]; base:
                   className={windowIsHot(s.usedPct) ? 'dash-bar dash-bar--rose' : 'dash-bar'}
                   data-action="true"
                 >
-                  <button type="button" className="dash-bar__hit" onClick={one(s.id)}>
+                  <button
+                    type="button"
+                    className="dash-bar__hit"
+                    title="Какая часть недельного окна подписки уже израсходована всеми, кто ею пользуется. Нажмите, чтобы открыть аккаунт."
+                    onClick={one(s.id)}
+                  >
                     <span
                       className="dash-bar__fill"
                       aria-hidden="true"
@@ -614,6 +723,7 @@ export const PeopleSpend = ({
                 <button
                   type="button"
                   className="ld-row"
+                  title="Потрачено за период по прайс-листу провайдеров и личный лимит на месяц. Нажмите, чтобы открыть человека и поменять лимит."
                   data-idle={b.idle ? '1' : '0'}
                   onClick={() => navigate(`${base}/teams?p=${encodeURIComponent(p.userId)}`)}
                 >

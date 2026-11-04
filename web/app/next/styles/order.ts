@@ -34,6 +34,7 @@ import '@/next/styles/designly.css';
 import '@/next/styles/annotate.css';
 import '@/next/styles/questions.css';
 import '@/next/styles/site.css';
+import '@/next/styles/mode.css';
 import '@/next/styles/notes.css';
 import '@/next/styles/island.css';
 import '@/next/styles/vendor-devices.css';

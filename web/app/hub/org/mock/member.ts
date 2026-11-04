@@ -96,6 +96,7 @@ export const memberMock = (_ctx: MockCtx): MemberApi => ({
         chats: { week: 25, running: 3, bars: [3, 4, 5, 2, 0, 1, 4, 5, 3, 6, 4, 1, 0, 5] },
         mr: { week: 5, merged: 4, bars: [1, 0, 1, 0, 0, 0, 1, 1, 0, 2, 1, 0, 0, 1] },
         machine: {
+          id: 'm-andrey',
           name: 'andrey-main',
           online: true,
           loadPct: 41,

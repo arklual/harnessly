@@ -208,6 +208,7 @@ const Row = memo(({ item, open, enter, offline, machineName, handlers, modelLabe
               onRetry={handlers.onRetryMessage}
               onResend={handlers.onResendMessage}
               onDelete={handlers.onDeleteMessage}
+              onEdit={handlers.onEditMessage}
             />
           )
         : item.kind === 'turn' &&

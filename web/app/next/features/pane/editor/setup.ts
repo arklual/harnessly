@@ -290,3 +290,17 @@ export const extensions = ({ eol, text, markdown, wrap, onUpdate }: IEditorOptio
   EditorView.contentAttributes.of({ 'aria-label': t('next.editor.label') }),
   EditorView.updateListener.of(onUpdate),
 ];
+
+/** A text only to read (a side of a diff): numbered, highlighted, in the app's look, never edited. */
+export const readOnlyLook = (): Extension[] => [
+  phrases(),
+  lineNumbers(),
+  highlightSpecialChars(),
+  drawSelection(),
+  syntaxHighlighting(highlight),
+  theme,
+  language.of([]),
+  EditorView.lineWrapping,
+  EditorState.readOnly.of(true),
+  EditorView.editable.of(false),
+];

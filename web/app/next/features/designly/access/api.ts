@@ -171,7 +171,7 @@ export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TIMEOUT_MS = 15_000;
 const BASE = '/design/access';
 
-const send = async (
+export const send = async (
   method: string,
   path: `/${string}`,
   body?: unknown,

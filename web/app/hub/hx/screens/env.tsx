@@ -180,7 +180,6 @@ const ManageEnv = () => {
             state={state}
             canPin={role === 'admin'}
             onClose={url.close}
-            onProblem={toast.show}
           />
           <CatalogDrawer
             open={url.catalog && target !== null}

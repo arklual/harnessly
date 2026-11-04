@@ -19,12 +19,18 @@ const CARDS: IMadeCard[] = [
 ];
 
 describe('MadeBlock', () => {
-  it('draws nothing before the chat has said, a skeleton only when it is slow', () => {
+  it('draws nothing before the chat has said, not even a skeleton that would move the tools', () => {
     const { container } = render(<MadeBlock cards={null} onOpen={vi.fn()} />);
+    act(() => void vi.advanceTimersByTime(2000));
     expect(container.querySelector('.hx-made')).toBeNull();
-    act(() => void vi.advanceTimersByTime(200));
-    expect(container.querySelectorAll('.hx-sk')).toHaveLength(3);
-    expect(screen.getByText('Made in this chat')).toBeTruthy();
+    expect(container.querySelectorAll('.hx-sk')).toHaveLength(0);
+  });
+
+  it('comes in collapsed and opens a couple of frames later, so the height grows', () => {
+    const { container } = render(<MadeBlock cards={CARDS} onOpen={vi.fn()} />);
+    expect(container.querySelector('.hx-made')?.getAttribute('data-state')).toBe('opening');
+    act(() => void vi.advanceTimersByTime(100));
+    expect(container.querySelector('.hx-made')?.getAttribute('data-state')).toBe('open');
   });
 
   it('is not there when nothing was made', () => {
@@ -68,6 +74,7 @@ describe('MadeBlock', () => {
 
   it('leaves with an exit when what it shows goes', () => {
     const { container, rerender } = render(<MadeBlock cards={CARDS} onOpen={vi.fn()} />);
+    act(() => void vi.advanceTimersByTime(100));
     expect(container.querySelector('.hx-made')?.getAttribute('data-state')).toBe('open');
     rerender(<MadeBlock cards={[]} onOpen={vi.fn()} />);
     expect(container.querySelector('.hx-made')?.getAttribute('data-state')).toBe('closing');

@@ -22,6 +22,8 @@ import {
   layerInitial,
   mineFiltered,
   mineSource,
+  deliveryIssue,
+  deliveryTile,
   plural,
   tilesOf,
   withAdded,
@@ -52,6 +54,7 @@ const row = (over: Partial<EnvEntryRow> = {}): EnvEntryRow => ({
   spark14: [],
   lastUsedAt: null,
   unused: false,
+  delivery: null,
   ...over,
 });
 
@@ -97,7 +100,7 @@ describe('tilesOf', () => {
       'В окружении',
       'Вызовов за неделю',
       'Не используются',
-      'Закреплено организацией',
+      'Доехало до машин',
     ]);
     expect(tiles[0]!.value.startsWith(`${admin.summary.total}:`)).toBe(true);
   });
@@ -293,5 +296,25 @@ describe('the member list', () => {
     expect(mineSource(item({ layer: 'org' }))).toBe('Организация');
     expect(mineSource(item({ layer: 'team' }))).toBe('Команда');
     expect(mineSource(item({ layer: 'tenant', layerTitle: 'Тенант Продукт' }))).toBe('Тенант Продукт');
+  });
+});
+
+describe('delivery', () => {
+  it('says how far the list got and what did not go in', () => {
+    expect(deliveryTile({ machines: 0, reported: 0, current: 0, lastAt: null }, 3).value).toBe(
+      'машин пока нет',
+    );
+    expect(deliveryTile({ machines: 4, reported: 4, current: 4, lastAt: null }, 3).value).toContain('4 из 4');
+    expect(deliveryTile({ machines: 4, reported: 0, current: 0, lastAt: null }, 3).value).toContain(
+      'ещё не отвечали',
+    );
+    expect(deliveryTile({ machines: 6, reported: 0, current: 6, lastAt: null }, 0).value).toBe(
+      'доставлять пока нечего · 6 машин',
+    );
+    expect(deliveryIssue({ ok: 2, pending: 1, error: 0, message: null })).toContain(
+      'не полностью на 1 машине',
+    );
+    expect(deliveryIssue({ ok: 1, pending: 0, error: 2, message: null })).toContain('не встало на 2 машинах');
+    expect(deliveryIssue({ ok: 3, pending: 0, error: 0, message: null })).toBeNull();
   });
 });

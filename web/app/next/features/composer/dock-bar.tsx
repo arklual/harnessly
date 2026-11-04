@@ -23,6 +23,8 @@ interface IAction {
   label: string;
   variant?: 'ghost';
   run: () => Promise<unknown>;
+  /** Busy by the notice's own state (a recognition that outlasts the press), not by the press's promise. */
+  busy?: boolean;
 }
 
 const DockBar = ({ notice }: { notice: DockNotice | null }) => {
@@ -35,9 +37,12 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
   let title = '';
   let sub: string | null = null;
   let quiet = false;
+  /** The notice runs something of its own: every action waits for it. */
+  let held = false;
   let actions: IAction[] = [];
   if (value.kind === 'off') {
-    title = t('next.dockBar.off');
+    title = t('next.dockBar.off', { machine: value.machine });
+    sub = t('next.dockBar.offSub');
     quiet = true;
   } else if (value.kind === 'machine') {
     title = t('next.dockBar.machine', { machine: value.machine });
@@ -45,12 +50,30 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
     actions = [{ key: 'stop', label: t('next.dockBar.stop'), variant: 'ghost', run: value.onStop }];
   } else if (value.kind === 'voice') {
     icon = 'mic';
-    title = t('next.dockBar.voice', { length: duration(value.ms) });
-    sub = value.more > 0 ? t('next.dockBar.voiceMore', { n: value.more }) : null;
-    actions = [
-      { key: 'retry', label: t('next.dockBar.voiceRetry'), run: value.onRetry },
-      { key: 'drop', label: t('next.dockBar.voiceDrop'), variant: 'ghost', run: value.onDrop },
-    ];
+    held = value.busy;
+    const drop: IAction = {
+      key: 'drop',
+      label: t('next.dockBar.voiceDrop'),
+      variant: 'ghost',
+      run: value.onDrop,
+    };
+    if (value.waiting && !value.busy) {
+      // Nothing to press but «Удалить»: the take is recognized by itself when the machine is back.
+      title = t('next.dockBar.voiceKept', { length: duration(value.ms) });
+      sub = t('next.dockBar.voiceWaiting');
+      quiet = true;
+      actions = [drop];
+    } else {
+      title = t('next.dockBar.voice', { length: duration(value.ms) });
+      if (value.busy) sub = t('next.voice.recognizing');
+      else if (value.failure) sub = value.failure;
+      else if (value.more > 0) sub = t('next.dockBar.voiceMore', { n: value.more });
+      const onRetry = value.onRetry;
+      actions = [
+        { key: 'retry', label: t('next.dockBar.voiceRetry'), busy: value.busy, run: async () => onRetry() },
+        drop,
+      ];
+    }
   } else if (value.kind === 'key') {
     icon = 'key-round';
     title = t('next.dockBar.keyGone', { vendor: value.vendor });
@@ -119,8 +142,8 @@ const DockBar = ({ notice }: { notice: DockNotice | null }) => {
               className="hx-btn"
               data-size="sm"
               data-variant={item.variant}
-              data-busy={(busy && action.key === item.key) || undefined}
-              disabled={busy}
+              data-busy={(busy && action.key === item.key) || item.busy || undefined}
+              disabled={busy || held}
               onClick={() => action.run(item.key, item.run)}
             >
               <span>{item.label}</span>

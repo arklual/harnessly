@@ -2,6 +2,7 @@
 // design tool. The view is a scale and a shift of the box from where the layout put it (transform-origin at its corner);
 // zooming keeps the point under the cursor in place. Pure: the hook in use-canvas-zoom.ts applies it.
 import type { IPoint } from '@/next/features/designly/site-drag';
+import { DEVICE_GROUP, VP_KIND, type TDeviceGroup, type TVpKind } from '@/next/features/designly/devices';
 
 export interface IZoom {
   /** The scale over the fit the layout chose. */
@@ -70,7 +71,7 @@ export const keptInView = (
   };
 };
 
-/** The keys of the canvas: ⌘/Ctrl with «+», «−» or «0», and Shift+1 (fit), as a design tool has them. */
+/** The keys of the canvas: ⌘/Ctrl with «+», «−» or «0», and Shift+1 (the standard view), as a design tool has them. */
 export const ZOOM_KEY = { in: 'in', out: 'out', reset: 'reset' } as const;
 export type TZoomKey = (typeof ZOOM_KEY)[keyof typeof ZOOM_KEY];
 
@@ -105,12 +106,21 @@ export const gestureOf = (event: Event): { scale: number; at: IPoint } => {
 };
 
 /**
- * How the view fits the box into the area, kept as the area or the device changes until the person moves the view:
- * `auto` is the layout's own fit (never larger than the page's size), `width` and `height` fill one side of the area,
- * `whole` is the largest view that shows all of the box.
+ * How the standard view («Вписать», ⌘0) fits the box into the area: `auto` is the layout's own fit (the page that fills
+ * the window, «Все экраны»), `whole` the largest view that shows all of the box (a phone or a tablet: by its height
+ * standing, by its width lying where the area is narrower than it), `shrink` the same but never larger than the page's
+ * own size (a computer's screen, a size typed for «По окну»). It is kept as the area or the device changes until the
+ * person moves the view.
  */
-export const FIT = { auto: 'auto', width: 'width', height: 'height', whole: 'whole' } as const;
+export const FIT = { auto: 'auto', whole: 'whole', shrink: 'shrink' } as const;
 export type TFit = (typeof FIT)[keyof typeof FIT];
+
+/** The standard view of what is on the canvas. */
+export const standardFit = (kind: TVpKind, group: TDeviceGroup): TFit => {
+  if (kind === VP_KIND.fill || kind === VP_KIND.overview) return FIT.auto;
+  if (group === DEVICE_GROUP.phones || group === DEVICE_GROUP.tablets) return FIT.whole;
+  return FIT.shrink;
+};
 
 /** The area's padding, the room the layout keeps around the box (and under it for the pill). */
 export interface IInset {
@@ -121,26 +131,37 @@ export interface IInset {
 }
 
 /**
- * The view of a fit: `box` is the box's size at the layout's fit, which the layout puts in the middle of the area's
- * padded inside. Fitted by its width a page taller than the area shows its top; otherwise the box stands in the middle.
+ * Where the layout puts the box (its size at the layout's fit): in the middle of the area's padded inside, or at the
+ * inside's start on a side where the box is larger than it (site.css, `.hx-vparea { place-items: safe center }`). A view
+ * counts from there: a box taller than the inside (the room the island keeps under it) is not in its middle.
+ */
+export const layoutCorner = (
+  box: { w: number; h: number },
+  area: { w: number; h: number },
+  pad: IInset,
+): IPoint => ({
+  x: pad.l + Math.max(0, (area.w - pad.l - pad.r - box.w) / 2),
+  y: pad.t + Math.max(0, (area.h - pad.t - pad.b - box.h) / 2),
+});
+
+/**
+ * The view of a fit: the box (its size at the layout's `fit`) scaled and set in the middle of the area's padded inside,
+ * with the same room on either side, wherever the view was before.
  */
 export const fitView = (
   mode: TFit,
   box: { w: number; h: number },
   area: { w: number; h: number },
   pad: IInset,
+  fit = 1,
 ): IZoom => {
   if (mode === FIT.auto || box.w <= 0 || box.h <= 0) return ZOOM_FIT;
   const iw = Math.max(1, area.w - pad.l - pad.r);
   const ih = Math.max(1, area.h - pad.t - pad.b);
-  const scales = { width: iw / box.w, height: ih / box.h, whole: Math.min(iw / box.w, ih / box.h) } as const;
-  const s = clamp(ZOOM.min, ZOOM.max, scales[mode]);
-  const w = box.w * s;
-  const h = box.h * s;
-  const left = pad.l + (iw - box.w) / 2;
-  const top = pad.t + (ih - box.h) / 2;
-  const toTop = mode === FIT.width && h > ih;
-  return { s, x: pad.l + (iw - w) / 2 - left, y: (toTop ? pad.t : pad.t + (ih - h) / 2) - top };
+  const whole = Math.min(iw / box.w, ih / box.h);
+  const s = clamp(ZOOM.min, ZOOM.max, mode === FIT.shrink ? Math.min(whole, 1 / fit) : whole);
+  const corner = layoutCorner(box, area, pad);
+  return { s, x: pad.l + (iw - box.w * s) / 2 - corner.x, y: pad.t + (ih - box.h * s) / 2 - corner.y };
 };
 
 /**

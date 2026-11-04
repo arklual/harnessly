@@ -10,6 +10,8 @@ import { useOrg } from '../../org/context';
 import { useLoad } from '../../org/hooks';
 import { Titles } from '../shell';
 import { Btn, Drawer, Icon, initial } from '../ui';
+import { inRubles, shownOfUsd } from '../../org/money';
+import { fromUsdExact } from '../../org/screens/overview/format';
 import { plural, rub, usd } from './overview/fmt';
 import { useUrl } from './teams/url';
 import '../styles/accounts.css';
@@ -33,6 +35,10 @@ const PLANS: { provider: string; plan: string; label: string; fee: number }[] = 
   { provider: 'openai', plan: 'pro', label: 'ChatGPT Pro · $200', fee: 200 },
 ];
 
+/** A dollar price with what it comes to in the shown money, «$100 ≈ 9 200 ₽»; just «$100» while there is no rate. */
+const usdAndShown = (n: number): string =>
+  inRubles() && shownOfUsd(n) !== null ? `${usd(n)} ≈ ${fromUsdExact(n)}` : usd(n);
+
 const providerName = (p: string): string => PROVIDER[p] ?? p;
 
 const planName = (a: Pick<Account, 'provider' | 'plan'>): string =>
@@ -42,6 +48,13 @@ const subOf = (a: Account, tenantName: (id: string | null) => string): string =>
   [providerName(a.provider), planName(a) || null, KIND[a.kind], tenantName(a.tenantId)]
     .filter(Boolean)
     .join(' · ');
+
+/** A found account has only the hub's technical label: name it by the provider and whom it was seen with. */
+const titleOf = (a: Account): string => {
+  if (!a.discovered) return a.label;
+  const who = a.owner?.name ?? a.people[0]?.name;
+  return `${providerName(a.provider)}${who ? ` у ${who}` : ''}: не зарегистрирован`;
+};
 
 const peopleLine = (a: Account): string => {
   if (a.people.length === 0) return 'никто в этом месяце';
@@ -93,13 +106,18 @@ const Row = ({ a, sub, onOpen }: { a: Account; sub: string; onOpen: () => void }
         <Icon i={a.discovered ? 'circle-alert' : a.kind === 'api_key' ? 'key-round' : 'coins'} size="sm" />
       </span>
       <span className="mt-name__t">
-        <b>{a.label}</b>
+        <b title={a.discovered ? a.label : undefined}>{titleOf(a)}</b>
         <small>{sub}</small>
       </span>
     </span>
     <span className="ac-pay">{a.discovered ? 'не указано' : FUNDING[a.funding]}</span>
     <span className="ac-who">{peopleLine(a)}</span>
-    <span className="ac-num">{a.kind === 'subscription' && a.feeUsd > 0 ? `${usd(a.feeUsd)}/мес` : '—'}</span>
+    <span
+      className="ac-num"
+      title={a.kind === 'subscription' && a.feeUsd > 0 ? `${usd(a.feeUsd)} в месяц` : undefined}
+    >
+      {a.kind === 'subscription' && a.feeUsd > 0 ? `${fromUsdExact(a.feeUsd)}/мес` : '—'}
+    </span>
     <span className="ac-num">
       <b>{rub(a.monthRub)}</b>
     </span>
@@ -142,8 +160,12 @@ const Card = ({
         <small>в этом месяце по прайсу API</small>
       </div>
       <div>
-        <b>{a.kind === 'subscription' && a.feeUsd > 0 ? usd(a.feeUsd) : '—'}</b>
-        <small>абонентская плата в месяц</small>
+        <b>{a.kind === 'subscription' && a.feeUsd > 0 ? fromUsdExact(a.feeUsd) : '—'}</b>
+        <small>
+          {a.kind === 'subscription' && a.feeUsd > 0
+            ? `абонентская плата в месяц · ${usd(a.feeUsd)}`
+            : 'абонентская плата в месяц'}
+        </small>
       </div>
       <div>
         <b>{a.people.length}</b>
@@ -297,7 +319,7 @@ const Form = ({
                 aria-pressed={plan === p.plan && kind === 'subscription'}
                 onClick={() => pickPlan(p)}
               >
-                {p.label}
+                {p.label.split(' · ')[0]} · {usdAndShown(p.fee)}
               </button>
             ))}
           </div>
@@ -339,7 +361,17 @@ const Form = ({
             <span>$ в месяц</span>
           </label>
         )}
-        {feeBad && <p className="md-note tm-err">Плата — число от 0 до 100 000 $</p>}
+        {feeBad ? (
+          <p className="md-note tm-err">Плата — число от 0 до 100 000 $</p>
+        ) : (
+          kind === 'subscription' && (
+            <p className="md-note">
+              {feeNum !== null && feeNum > 0 && inRubles() && shownOfUsd(feeNum) !== null
+                ? `Это ${fromUsdExact(feeNum)} в месяц по курсу хаба. Провайдеры берут плату в долларах, поэтому её вводят в $.`
+                : 'Провайдеры берут плату в долларах, поэтому её вводят в $; в списке она пересчитана в рубли.'}
+            </p>
+          )
+        )}
       </div>
       <div className="md-sec">
         <div className="md-sec__t">Кто платит</div>
@@ -452,7 +484,7 @@ const Screen = () => {
           title="Аккаунты"
           lead={
             data
-              ? `${list.length} ${plural(list.length, 'аккаунт', 'аккаунта', 'аккаунтов')} · ${rub(totalRub)} по прайсу в этом месяце${feesUsd > 0 ? ` · абонентская ${usd(feesUsd)} в месяц` : ''}`
+              ? `${list.length} ${plural(list.length, 'аккаунт', 'аккаунта', 'аккаунтов')} · ${rub(totalRub)} по прайсу в этом месяце${feesUsd > 0 ? ` · абонентская ${fromUsdExact(feesUsd)} в месяц` : ''}`
               : 'Подписки и ключи, на которых работают агенты'
           }
         />

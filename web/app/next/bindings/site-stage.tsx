@@ -39,9 +39,13 @@ import {
   SiteChat,
   SiteIsland,
   type ISiteChatProps,
+  type IChatMoreItem,
   type TIslandStatus,
   type TSiteMode,
 } from '@/next/features/designly/site-chat';
+import { ChatOpener } from '@/next/bindings/chat-handoff';
+import { requestContinue } from '@/next/stores/ui-requests';
+import { requestMoveVm, useMoveEnabled } from '@/next/stores/chat-move';
 import type { IFloat, TDock, TZone } from '@/next/features/designly/site-drag';
 import type { ISiteStage } from '@/next/features/designly/site-view';
 import { formatAnnotation, withAnnotations } from '@/next/features/designly/annotation';
@@ -151,10 +155,20 @@ export const NoteCard = ({
 } & Omit<INotePopoverProps, 'text' | 'onText' | 'mic' | 'image'>) => {
   const file = design !== undefined && pageUrl !== undefined ? boardFileOf(design, pageUrl) : null;
   const [text, setTextHere] = useState(props.draft.text);
+  // Words that come after the card was attached, cancelled or deleted (the voice written down late) are not the
+  // card's any more: they would open it again and let it be attached twice.
+  const settled = useRef(false);
   const setText = (value: string) => {
+    if (settled.current || props.hidden) return;
     setTextHere(value);
     onTextChange?.(value);
   };
+  const settle =
+    <A extends unknown[]>(then: (...args: A) => void) =>
+    (...args: A) => {
+      settled.current = true;
+      then(...args);
+    };
   const voice = useVoice(machine, text, setText);
   const start = voice.onMic;
   const mic = start && {
@@ -167,6 +181,9 @@ export const NoteCard = ({
   return (
     <NotePopover
       {...props}
+      onOk={settle(props.onOk)}
+      onCancel={settle(props.onCancel)}
+      onDelete={settle(props.onDelete)}
       text={text}
       onText={setText}
       mic={mic ?? null}
@@ -288,10 +305,12 @@ interface IDesignChatProps extends Omit<INewChatProps, 'draftKey'> {
   picked: TDesignConv;
   designDraft: DraftKey;
   onOpenChat: () => void;
+  /** A chat this one gave way to (another model, a fork) comes into the design's column. */
+  onPickChat: (id: string) => void;
 }
 
 /** The open chat's body: the design's current chat as it is anywhere, or a new one for the design. */
-const DesignChat = ({ picked, designDraft, onOpenChat, ...rest }: IDesignChatProps) => {
+const DesignChat = ({ picked, designDraft, onOpenChat, onPickChat, ...rest }: IDesignChatProps) => {
   const { machine, creating, extra } = rest;
   const first = useMessage(creating?.clientId ?? null);
   const id = picked.k === DESIGN_CONV.conv ? (picked.id as ConvId) : null;
@@ -302,15 +321,17 @@ const DesignChat = ({ picked, designDraft, onOpenChat, ...rest }: IDesignChatPro
   );
   if (id)
     return (
-      <ChatView
-        key={id}
-        conv={id}
-        machine={machine}
-        onRetryLoad={() => hub.client(machine)?.reconnectNow()}
-        onShowBackground={onOpenChat}
-        dockExtra={extra}
-        pendingItems={pendingItems}
-      />
+      <ChatOpener.Provider value={onPickChat}>
+        <ChatView
+          key={id}
+          conv={id}
+          machine={machine}
+          onRetryLoad={() => hub.client(machine)?.reconnectNow()}
+          onShowBackground={onOpenChat}
+          dockExtra={extra}
+          pendingItems={pendingItems}
+        />
+      </ChatOpener.Provider>
     );
   return <NewDesignChat draftKey={designDraft} {...rest} />;
 };
@@ -379,6 +400,7 @@ export const useSiteStage = ({
   const { picked } = current;
   const list = useConversationList(machine);
   const connection = useConnection(machine);
+  const moveOn = useMoveEnabled(machine);
   const seen = useDesignSeen(key);
   // A pick in the switch: the chat on screen gives way, the next one comes in.
   const [epoch, setEpoch] = useState(0);
@@ -576,6 +598,10 @@ export const useSiteStage = ({
     tools: pickTool,
   };
 
+  const pickChat = (id: string | null) => {
+    current.pick(id);
+    setEpoch((n) => n + 1);
+  };
   const online = connection === undefined || connection.k === 'live';
   const rows = designChats({ list, dir, seen, touched, current: convId }).map((c) => ({
     id: c.id,
@@ -583,6 +609,33 @@ export const useSiteStage = ({
     status: chatStatusOf(c, online),
     at: c.lastActivityAt,
   }));
+  const changeMode = (next: TSiteMode, section: { width: number; height: number }) => {
+    if (next === mode) return;
+    if (next === 'float' && !float) setFloat(firstFloat(section));
+    leaveTo(next);
+    setMin(next === 'island' && empty);
+  };
+  // The usual chat's «Продолжить в другой модели» and «… на другой ВМ», for the design's chat too.
+  const more: IChatMoreItem[] = convId
+    ? [
+        {
+          id: 'model',
+          icon: 'arrow-left-right',
+          label: t('next.site.continueModel'),
+          pick: () => requestContinue(convId),
+        },
+        ...(moveOn
+          ? [
+              {
+                id: 'vm',
+                icon: 'server',
+                label: t('next.site.continueMachine'),
+                pick: () => requestMoveVm(convId),
+              },
+            ]
+          : []),
+      ]
+    : [];
   const chat: ISiteChatProps = {
     title,
     heading: (
@@ -590,10 +643,7 @@ export const useSiteStage = ({
         current={convId}
         title={conv?.title ?? (convId ? title : t('next.site.newDesignChat'))}
         rows={rows}
-        onPick={(id) => {
-          current.pick(id);
-          setEpoch((n) => n + 1);
-        }}
+        onPick={pickChat}
       />
     ),
     swapping: swap.leaving,
@@ -609,19 +659,15 @@ export const useSiteStage = ({
       setMin(empty);
     },
     onOpenDrawer,
-    onOpenChat: convId ? openChatPage : null,
+    onMode: changeMode,
+    more,
     onOpenSite: () => setSview(true),
   };
 
   return {
     conv: convId,
     mode,
-    onMode: (next, section) => {
-      if (next === mode) return;
-      if (next === 'float' && !float) setFloat(firstFloat(section));
-      leaveTo(next);
-      setMin(next === 'island' && empty);
-    },
+    onMode: changeMode,
     min: mode === 'island' && min,
     run: runOf(status),
     busy: status?.k === ISLAND_STATUS.run,
@@ -724,6 +770,7 @@ export const useSiteStage = ({
         extra={extra}
         onFirst={sendFirst}
         onOpenChat={openChatPage}
+        onPickChat={pickChat}
       />
     ),
     chat: (
@@ -737,6 +784,7 @@ export const useSiteStage = ({
           extra={extra}
           onFirst={sendFirst}
           onOpenChat={openChatPage}
+          onPickChat={pickChat}
         />
       </SiteChat>
     ),

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import type { MachinesList, OrgMachine } from '../../../org/api/machines';
 import { useNow } from '../../../lib/hooks';
 import { flatRows, machinesWord, searchGroups, tenantTiles } from './calc';
-import { Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles } from './parts';
+import { AddCta, Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles } from './parts';
 
 type View = 'team' | 'flat';
 
@@ -13,7 +13,15 @@ const VIEWS = [
   { id: 'flat', label: 'Списком' },
 ] as const;
 
-export const TenantView = ({ list, onOpen }: { list: MachinesList; onOpen: (id: string) => void }) => {
+export const TenantView = ({
+  list,
+  onOpen,
+  onAdd,
+}: {
+  list: MachinesList;
+  onOpen: (id: string) => void;
+  onAdd?: () => void;
+}) => {
   const now = useNow(60_000);
   const [q, setQ] = useState('');
   const [view, setView] = useState<View>('team');
@@ -67,7 +75,12 @@ export const TenantView = ({ list, onOpen }: { list: MachinesList; onOpen: (id: 
           ))}
         </div>
       )}
-      {!searching && list.groups.length === 0 && <div className="mo-empty">В тенанте пока нет машин</div>}
+      {!searching && list.groups.length === 0 && (
+        <div className="mo-empty">
+          В тенанте пока нет машин
+          <AddCta onAdd={onAdd} lead />
+        </div>
+      )}
     </div>
   );
 };

@@ -54,10 +54,20 @@ export type TRoute =
   | { kind: typeof ROUTE.designlyNew }
   /** The create screen of a video: `/designly/new/video` (the Video tile of Designly's start). */
   | { kind: typeof ROUTE.videoNew }
-  /** A design of the library opened: `/designly/:id`, `?chat=` the chat it was opened from (its column shows it). */
-  | { kind: typeof ROUTE.site; id: string; chat?: string; access?: TAccessFocus }
-  /** A document of a type an installed app adds, opened in the app's editor: `/designly/doc/:id`. */
-  | { kind: typeof ROUTE.appDoc; id: string }
+  /** A design of the library opened: `/designly/:id`, `?chat=` the chat it was opened from (its column shows it),
+      `?m=` the machine it lives on (a reload opens it there, not on whichever machine is active),
+      `?edit=1` the editing mode (without it the design is looked at). */
+  | {
+      kind: typeof ROUTE.site;
+      id: string;
+      chat?: string;
+      machine?: string;
+      access?: TAccessFocus;
+      edit?: boolean;
+    }
+  /** A document of a type an installed app adds, opened in the app's editor: `/designly/doc/:id`, `?chat=` the chat
+      it was opened from (its mode is that chat's), `?edit=1` the editing mode. */
+  | { kind: typeof ROUTE.appDoc; id: string; chat?: string; edit?: boolean }
   /** A link-invitation to a design, `/designly/invite/:token` (a push or a letter says `/design/invite/:token`). */
   | { kind: typeof ROUTE.invite; token: string }
   /** The screens of «More»: `/manage` (personal history, with Statistics and Efficiency as its tabs), `/apps`. */
@@ -145,18 +155,29 @@ export const parseRoute = (path: string): TRoute => {
     return section ? { kind: ROUTE.settings, section } : HOME;
   }
   const appDoc = APP_DOC_RE.exec(pathname);
-  if (appDoc?.[1]) return { kind: ROUTE.appDoc, id: appDoc[1] };
+  if (appDoc?.[1]) {
+    const chat = queryParam(path, 'chat');
+    return {
+      kind: ROUTE.appDoc,
+      id: appDoc[1],
+      ...(chat ? { chat } : {}),
+      ...(queryParam(path, 'edit') === '1' ? { edit: true } : {}),
+    };
+  }
   const invite = INVITE_RE.exec(pathname);
   if (invite?.[1]) return { kind: ROUTE.invite, token: invite[1] };
   const site = SITE_RE.exec(pathname);
   if (site?.[1]) {
     const chat = queryParam(path, 'chat');
+    const machine = queryParam(path, 'm');
     const focus = ACCESS_FOCUS.find((x) => x === queryParam(path, 'access'));
     return {
       kind: ROUTE.site,
       id: site[1],
       ...(chat ? { chat } : {}),
+      ...(machine ? { machine } : {}),
       ...(focus ? { access: focus } : {}),
+      ...(queryParam(path, 'edit') === '1' ? { edit: true } : {}),
     };
   }
   const match = CHAT_RE.exec(pathname);
@@ -182,11 +203,17 @@ export const routePath = (route: TRoute): string => {
     case ROUTE.site: {
       const query = new URLSearchParams();
       if (route.chat) query.set('chat', route.chat);
+      if (route.machine) query.set('m', route.machine);
       if (route.access) query.set('access', route.access);
+      if (route.edit) query.set('edit', '1');
       return query.size > 0 ? `/designly/${route.id}?${query}` : `/designly/${route.id}`;
     }
-    case ROUTE.appDoc:
-      return `/designly/doc/${route.id}`;
+    case ROUTE.appDoc: {
+      const query = new URLSearchParams();
+      if (route.chat) query.set('chat', route.chat);
+      if (route.edit) query.set('edit', '1');
+      return query.size > 0 ? `/designly/doc/${route.id}?${query}` : `/designly/doc/${route.id}`;
+    }
     case ROUTE.invite:
       return `/designly/invite/${route.token}`;
     case ROUTE.manage:

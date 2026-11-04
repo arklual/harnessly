@@ -182,7 +182,12 @@ html:has(.hx-app) body {
     .hx-nav__chev,
     .hx-nav__fold,
     .hx-item__end,
-    .hx-nav__add
+    .hx-item__fold,
+    .hx-nav__add,
+    .hx-snote,
+    .hx-launch,
+    .hx-folder-more,
+    .hx-people__text
   ) {
   opacity: 0;
   pointer-events: none;
@@ -191,39 +196,60 @@ html:has(.hx-app) body {
 .hx-app[data-side='closed'] .hx-group__label {
   color: transparent;
   pointer-events: none;
+  transition: color 160ms ease;
 }
 .hx-app[data-side='closed'] .hx-group__label::before {
   opacity: 1;
   transition: opacity 260ms ease 200ms;
 }
-.hx-app[data-side='closed'] :is(.hx-group, .hx-nav__kids) {
-  content-visibility: hidden;
-  contain-intrinsic-size: 0 0;
+/* The rail is the open sidebar with its words faded: every row keeps its height and place (nothing is hidden or swapped),
+   so folding and opening move nothing up or down and the row under the pointer stays the same row. The nested lists
+   lose their indent, so their marks stand in the rail's column. */
+.hx-app[data-side='closed'] :is(.hx-nav__kids, .hx-tree__kids) > div {
+  margin-left: 0;
+  padding-left: 0;
+  /* No line and no room for it: a folder's chats stand in the same column as the rest. */
+  border-left-width: 0;
 }
-/* No projects yet: the rail has nothing under their line, so the line goes too. */
-.hx-app[data-side='closed'] section[data-empty='true'] {
-  display: none;
+.hx-app[data-side='closed'] .hx-item[data-launch] {
+  margin-left: 0;
+}
+/* A note narrowed to the rail would wrap to more lines and push the rows under it down. */
+.hx-app[data-side='closed'] :is(.hx-snote, .hx-group__label) {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.hx-app[data-side='closed'] .hx-item__mark {
+  opacity: 1;
+  /* In the rail the mark stands in the middle of its row, so the row's light (open, pointed at) sits evenly round it. */
+  left: 50%;
+  margin-left: -9px;
+}
+/* The badge stays inside the rail's list, which clips at its edge. */
+.hx-app[data-side='closed'] .hx-item__badge {
+  right: -4px;
+  bottom: -4px;
+}
+/* The folded sidebar's empty space opens it (sidebar.tsx): the cursor says so. */
+@media not all and (max-width: 900px) {
+  .hx-app:is([data-side='closed'], [data-peek]) > .hx-sidebar {
+    cursor: e-resize;
+  }
 }
 .hx-app[data-side='closed'] .hx-brand {
   padding-left: 5px;
 }
-.hx-app[data-side='closed'] .hx-brand__open {
+/* The logo turns into «open» under the pointer, and stays so when the sidebar peeks open under that same pointer: the
+   button the person aimed at does not turn back into the logo before the click. */
+.hx-app:is([data-side='closed'], [data-peek]) .hx-brand__open {
   pointer-events: auto;
 }
-.hx-app[data-side='closed'] .hx-brand:is(:hover, :focus-within) .hx-brand__open {
+.hx-app:is([data-side='closed'], [data-peek]) .hx-brand:is(:hover, :focus-within) .hx-brand__open {
   opacity: 1;
 }
-.hx-app[data-side='closed'] .hx-brand:is(:hover, :focus-within) .hx-orb {
+.hx-app:is([data-side='closed'], [data-peek]) .hx-brand:is(:hover, :focus-within) .hx-orb {
   opacity: 0;
-}
-.hx-app[data-side='closed'] .hx-pinned > .hx-mono {
-  width: 18px;
-  margin-right: 0;
-  opacity: 1;
-  transition:
-    width var(--hx-side-dur) var(--hx-side-ease),
-    margin var(--hx-side-dur) var(--hx-side-ease),
-    opacity 260ms ease 160ms;
 }
 .hx-app[data-side='closed'] .hx-project__mark {
   width: 18px;
@@ -234,9 +260,6 @@ html:has(.hx-app) body {
 .hx-app[data-side='closed'] .hx-project__mark > .hx-mono {
   opacity: 1;
   transition: opacity 260ms ease 120ms;
-}
-.hx-app[data-side='closed'] .hx-item {
-  min-height: 32px;
 }
 .hx-app[data-side='closed'] .hx-user {
   padding-left: 1px;

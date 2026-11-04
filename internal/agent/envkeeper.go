@@ -6,19 +6,24 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/ly-solutions/harnessly/internal/hubproto"
 )
 
 // The hub's environment list (docs/hub/environment.md): env.set brings the whole list of catalog items this machine's
-// chats are to have. The agent keeps it in environment.json of the data folder (atomically, so a crash leaves the old
-// list or the new one), then applies what it has a place for and tells the hub how each item went. Not to be mixed with
-// env.deliver, which carries environment variables.
+// chats are to have. The agent keeps it in environment.json of the link's folder (atomically, so a crash leaves the old
+// list or the new one), then applies it and tells the hub how each item went. Not to be mixed with env.deliver, which
+// carries environment variables.
 //
-// Only what the agent owns is written: <data folder>/environment/claude-plugin, a Claude Code plugin folder with the
-// skills of the list. The runtime does not pass that folder to the chat yet, so an item written there is reported
-// "pending" with the reason, not "ok": the hub never shows an item as in effect that no chat can see.
+// Everything is applied into one folder the agent owns, <link folder>/environment/claude-plugin: a Claude Code plugin
+// ("hub-environment") the runtime loads into every new chat with --plugin-dir. A skill with a body is its SKILL.md; a
+// skill by a reference, a document and a repository become short skills telling the agent where the thing is and when
+// to use it; MCP servers go to the plugin's .mcp.json, their secrets referenced by name from the machine's environment
+// (${NAME}), never written. The folder is rewritten as a whole on every list, so an item that left the list leaves the
+// chats too.
 
 const (
 	envMaxItems  = 500
@@ -40,14 +45,16 @@ type envHeld struct {
 // envKeeper is the list the agent holds.
 type envKeeper struct {
 	path   string
-	plugin string // the folder the skills are written to
+	plugin string // the plugin folder the list is applied into
+	// hasSecret says whether a secret an MCP server names is on this machine; nil knows none.
+	hasSecret func(name string) bool
 
 	mu   sync.Mutex
 	held envHeld
 }
 
 func newEnvKeeper(dataDir string) *envKeeper {
-	k := &envKeeper{path: filepath.Join(dataDir, envFile), plugin: filepath.Join(dataDir, "environment", "claude-plugin")}
+	k := &envKeeper{path: filepath.Join(dataDir, envFile), plugin: filepath.Join(dataDir, hubproto.EnvPluginDir)}
 	raw, err := os.ReadFile(k.path)
 	switch {
 	case os.IsNotExist(err):
@@ -115,6 +122,25 @@ func (k *envKeeper) Set(set hubproto.EnvSet) (hubproto.EnvState, error) {
 	return k.stateLocked(), nil
 }
 
+// Reapply applies the held list again (a secret it names came or went) and says whether any item's outcome changed;
+// the hub is told then.
+func (k *envKeeper) Reapply() bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.held.Rev == 0 {
+		return false
+	}
+	now := k.apply(k.held.Items)
+	if slices.Equal(now, k.held.Applied) {
+		return false
+	}
+	k.held.Applied = now
+	if err := k.saveLocked(); err != nil {
+		Log("warn", "the environment file was not saved", F{"error", err.Error()})
+	}
+	return true
+}
+
 func (k *envKeeper) saveLocked() error {
 	raw, err := json.Marshal(k.held)
 	if err != nil {
@@ -137,66 +163,222 @@ func (k *envKeeper) saveLocked() error {
 // apply puts each item where it belongs on this machine and says how it went, in the order of items.
 func (k *envKeeper) apply(items []hubproto.EnvItem) []hubproto.EnvApplied {
 	out := make([]hubproto.EnvApplied, 0, len(items))
-	keep := map[string]bool{}
+	skills := map[string]string{} // item id → SKILL.md
+	servers := map[string]any{}   // server name → its .mcp.json entry
+	kindOf := map[string]string{} // item id → kind
 	for _, it := range items {
-		a := hubproto.EnvApplied{ItemID: it.ItemID}
+		a := hubproto.EnvApplied{ItemID: it.ItemID, Status: hubproto.EnvOK}
+		var src envSource
 		switch {
 		case !envItemID.MatchString(it.ItemID):
 			a.Status, a.Message = hubproto.EnvError, "the item id is not a plain name"
 		case len(it.Source) > envMaxSource:
 			a.Status, a.Message = hubproto.EnvError, "the source is too large"
+		case json.Unmarshal(it.Source, &src) != nil:
+			a.Status, a.Message = hubproto.EnvError, "the source is not a JSON object"
 		case it.Kind == hubproto.EnvKindSkill:
-			a.Status, a.Message = k.writeSkill(it, keep)
-		case it.Kind == hubproto.EnvKindMCP:
-			a.Status, a.Message = hubproto.EnvPending, "kept; the runtime has no way to start an MCP server for a chat yet"
-		case it.Kind == hubproto.EnvKindRepo:
-			a.Status, a.Message = hubproto.EnvPending, "kept; the runtime does not clone repositories for a chat yet"
+			a.Status, a.Message = putSkill(skills, it, src)
 		case it.Kind == hubproto.EnvKindDoc:
-			a.Status, a.Message = hubproto.EnvPending, "kept; the runtime does not hand documents to a chat yet"
+			a.Status, a.Message = putDoc(skills, it, src)
+		case it.Kind == hubproto.EnvKindRepo:
+			a.Status, a.Message = putRepo(skills, it, src)
+		case it.Kind == hubproto.EnvKindMCP:
+			a.Status, a.Message = k.putMCP(servers, it, src)
 		default:
 			a.Status, a.Message = hubproto.EnvError, "unknown kind "+it.Kind
 		}
+		kindOf[it.ItemID] = it.Kind
 		out = append(out, a)
 	}
-	k.prune(keep)
+	skillErr, mcpErr := k.write(skills, servers)
+	for i, a := range out {
+		err := skillErr[a.ItemID]
+		if kindOf[a.ItemID] == hubproto.EnvKindMCP && a.Status != hubproto.EnvError {
+			err = mcpErr
+		}
+		if err != nil {
+			out[i].Status, out[i].Message = hubproto.EnvError, "not written: "+err.Error()
+		}
+	}
 	return out
 }
 
-// writeSkill writes a skill's body as <plugin>/skills/<id>/SKILL.md.
-func (k *envKeeper) writeSkill(it hubproto.EnvItem, keep map[string]bool) (string, string) {
-	var src struct {
-		Body string `json:"body"`
-		Ref  string `json:"ref"`
+// envSource is what any kind's source may hold (internal/hub/env/validate.go).
+type envSource struct {
+	Body       string   `json:"body"`
+	Ref        string   `json:"ref"`
+	URL        string   `json:"url"`
+	Text       string   `json:"text"`
+	Branch     string   `json:"branch"`
+	Transport  string   `json:"transport"`
+	Command    string   `json:"command"`
+	Args       []string `json:"args"`
+	SecretRefs []string `json:"secretRefs"`
+}
+
+// envSecretRef is how a secret is named; anything else would not be a variable of the environment.
+var envSecretRef = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
+
+func skillFile(it hubproto.EnvItem, description, body string) string {
+	return fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n%s\n", yamlLine(it.ItemID), yamlLine(description), strings.TrimSpace(body))
+}
+
+func putSkill(skills map[string]string, it hubproto.EnvItem, src envSource) (string, string) {
+	switch {
+	case strings.TrimSpace(src.Body) != "":
+		skills[it.ItemID] = skillFile(it, it.Name, src.Body)
+	case src.Ref != "":
+		skills[it.ItemID] = skillFile(it, it.Name, fmt.Sprintf("The full text of the skill «%s» is at %s. When the task is about it, read that page first and follow it.", it.Name, src.Ref))
+	default:
+		return hubproto.EnvError, "the skill has neither a body nor a reference"
 	}
-	if err := json.Unmarshal(it.Source, &src); err != nil {
-		return hubproto.EnvError, "the source is not a JSON object"
+	return hubproto.EnvOK, ""
+}
+
+func putDoc(skills map[string]string, it hubproto.EnvItem, src envSource) (string, string) {
+	desc := "The team's document «" + it.Name + "»: read it when the task touches it."
+	switch {
+	case strings.TrimSpace(src.Text) != "":
+		skills[it.ItemID] = skillFile(it, desc, "# "+it.Name+"\n\n"+src.Text)
+	case src.URL != "":
+		skills[it.ItemID] = skillFile(it, desc, fmt.Sprintf("The team's document «%s» is at %s. Read it when the task touches what it is about, and follow it.", it.Name, src.URL))
+	default:
+		return hubproto.EnvError, "the document has neither a text nor an address"
 	}
-	if src.Body == "" {
-		return hubproto.EnvPending, "kept; a skill given by a reference is not fetched yet"
+	return hubproto.EnvOK, ""
+}
+
+func putRepo(skills map[string]string, it hubproto.EnvItem, src envSource) (string, string) {
+	if src.URL == "" {
+		return hubproto.EnvError, "the repository has no address"
 	}
-	dir := filepath.Join(k.plugin, "skills", it.ItemID)
-	body := fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n%s\n", yamlLine(it.ItemID), yamlLine(it.Name), src.Body)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return hubproto.EnvError, "the skill was not written: " + err.Error()
+	branch := ""
+	if src.Branch != "" {
+		branch = fmt.Sprintf(", branch %s", src.Branch)
 	}
-	if err := writeFileAtomic(filepath.Join(dir, "SKILL.md"), []byte(body)); err != nil {
-		return hubproto.EnvError, "the skill was not written: " + err.Error()
+	body := fmt.Sprintf("The team's repository «%s» is %s%s. When the task needs its code and it is not in the workspace yet, clone it next to the workspace (`git clone %s`) and work there.",
+		it.Name, src.URL, branch, src.URL)
+	skills[it.ItemID] = skillFile(it, "The team's repository «"+it.Name+"»: where it is and how to get it.", body)
+	return hubproto.EnvOK, ""
+}
+
+func (k *envKeeper) putMCP(servers map[string]any, it hubproto.EnvItem, src envSource) (string, string) {
+	for _, ref := range src.SecretRefs {
+		if !envSecretRef.MatchString(ref) {
+			return hubproto.EnvError, "a secret is not named like a variable: " + ref
+		}
 	}
-	if err := writeFileAtomic(filepath.Join(k.plugin, ".claude-plugin", "plugin.json"), []byte(`{"name":"hub-environment","version":"0.0.0","description":"Skills from the hub's environment list."}`+"\n")); err != nil {
-		return hubproto.EnvError, "the plugin file was not written: " + err.Error()
+	var entry map[string]any
+	switch src.Transport {
+	case "stdio", "":
+		if src.Command == "" {
+			return hubproto.EnvError, "the server has no command"
+		}
+		entry = map[string]any{"command": src.Command}
+		if len(src.Args) > 0 {
+			entry["args"] = src.Args
+		}
+		if len(src.SecretRefs) > 0 {
+			vars := map[string]string{}
+			for _, ref := range src.SecretRefs {
+				vars[ref] = "${" + ref + ":-}"
+			}
+			entry["env"] = vars
+		}
+	case "http", "sse":
+		if src.URL == "" {
+			return hubproto.EnvError, "the server has no address"
+		}
+		entry = map[string]any{"type": src.Transport, "url": src.URL}
+		switch len(src.SecretRefs) {
+		case 0:
+		case 1:
+			entry["headers"] = map[string]string{"Authorization": "Bearer ${" + src.SecretRefs[0] + ":-}"}
+		default:
+			return hubproto.EnvPending, "an HTTP server with more than one secret is not started: which header takes which is not said"
+		}
+	default:
+		return hubproto.EnvError, "unknown transport " + src.Transport
 	}
-	keep[it.ItemID] = true
-	return hubproto.EnvPending, "written to the environment plugin folder; the runtime does not load it into a chat yet"
+	servers[mcpServerName(servers, it)] = entry
+	var missing []string
+	for _, ref := range src.SecretRefs {
+		if k.hasSecret == nil || !k.hasSecret(ref) {
+			missing = append(missing, ref)
+		}
+	}
+	if len(missing) > 0 {
+		return hubproto.EnvPending, "written; the secret " + strings.Join(missing, ", ") + " is not on this machine, so the server starts without it"
+	}
+	return hubproto.EnvOK, ""
+}
+
+// mcpServerName is the server's name in .mcp.json: the item's name made a plain word, or its id when that is taken.
+func mcpServerName(servers map[string]any, it hubproto.EnvItem) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(it.Name) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case b.Len() > 0 && !strings.HasSuffix(b.String(), "-"):
+			b.WriteByte('-')
+		}
+	}
+	name := strings.Trim(b.String(), "-")
+	if len(name) > 40 {
+		name = strings.Trim(name[:40], "-")
+	}
+	if _, taken := servers[name]; name == "" || taken {
+		name = it.ItemID
+	}
+	return name
+}
+
+// envPluginManifest names the plugin; Claude shows its tools as mcp__plugin_hub-environment_<server>__<tool>.
+const envPluginManifest = `{"name":"hub-environment","version":"1.0.0","description":"The team's environment from the hub: skills, documents, repositories and MCP servers."}` + "\n"
+
+// write makes the plugin folder hold exactly skills and servers. It answers the skills it could not write, by id, and
+// the error of .mcp.json; when the plugin's own file fails, everything fails with it.
+func (k *envKeeper) write(skills map[string]string, servers map[string]any) (map[string]error, error) {
+	failed := map[string]error{}
+	if len(skills) == 0 && len(servers) == 0 {
+		_ = os.RemoveAll(k.plugin) // nothing for the chats: no plugin, no empty folder loaded
+		return failed, nil
+	}
+	if err := writeFileAtomic(filepath.Join(k.plugin, ".claude-plugin", "plugin.json"), []byte(envPluginManifest)); err != nil {
+		for id := range skills {
+			failed[id] = err
+		}
+		return failed, err
+	}
+	var mcpErr error
+	mcp := filepath.Join(k.plugin, ".mcp.json")
+	if len(servers) == 0 {
+		_ = os.Remove(mcp)
+	} else {
+		raw, err := json.MarshalIndent(map[string]any{"mcpServers": servers}, "", "  ")
+		if err == nil {
+			err = writeFileAtomic(mcp, append(raw, '\n'))
+		}
+		mcpErr = err
+	}
+	for id, body := range skills {
+		if err := writeFileAtomic(filepath.Join(k.plugin, "skills", id, "SKILL.md"), []byte(body)); err != nil {
+			failed[id] = err
+		}
+	}
+	k.prune(skills)
+	return failed, mcpErr
 }
 
 // prune removes the skills of the plugin folder that are not in the list any more.
-func (k *envKeeper) prune(keep map[string]bool) {
+func (k *envKeeper) prune(keep map[string]string) {
 	ents, err := os.ReadDir(filepath.Join(k.plugin, "skills"))
 	if err != nil {
 		return
 	}
 	for _, e := range ents {
-		if e.IsDir() && !keep[e.Name()] && envItemID.MatchString(e.Name()) {
+		if _, ok := keep[e.Name()]; e.IsDir() && !ok && envItemID.MatchString(e.Name()) {
 			_ = os.RemoveAll(filepath.Join(k.plugin, "skills", e.Name()))
 		}
 	}

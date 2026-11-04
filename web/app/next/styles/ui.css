@@ -664,10 +664,19 @@
   line-height: 20px;
   overflow-wrap: anywhere;
   pointer-events: auto;
+  /* A pull follows the hand (toast.tsx): the page does not scroll under it. */
+  touch-action: none;
+  user-select: none;
+  translate: var(--hx-toast-dx, 0px) var(--hx-toast-dy, 0px);
   animation: hx-toast-in 360ms var(--hx-ease-out) backwards;
   transition:
     opacity 220ms ease-in,
-    transform 220ms ease-in;
+    transform 220ms ease-in,
+    translate 260ms var(--hx-ease-out);
+}
+.hx-toast[data-drag='true'] {
+  transition: none;
+  cursor: grabbing;
 }
 .hx-toast[data-leaving='true'] {
   opacity: 0;
@@ -712,7 +721,7 @@
 }
 
 /* On the phone the notices stand above the chat's field (and the safe area under it), never over the field or the
-   header, as wide as the screen allows; the newest is the lowest, nearest the thumb, and a swipe sideways takes it away. */
+   header, as wide as the screen allows; the newest is the lowest, nearest the thumb, and a swipe sideways, up or down takes it away. */
 @media (max-width: 900px) {
   .hx-toasts {
     top: auto;
@@ -725,15 +734,10 @@
   .hx-toast {
     min-height: 52px;
     border-radius: 16px;
-    touch-action: pan-y;
-    transform: translateX(var(--hx-toast-dx, 0px));
     animation-name: hx-toast-up;
   }
-  .hx-toast[data-drag='true'] {
-    transition: none;
-  }
   .hx-toast[data-leaving='true'] {
-    transform: translate(var(--hx-toast-dx, 0px), 8px) scale(0.98);
+    transform: translateY(8px) scale(0.98);
   }
   .hx-toast__action {
     min-height: 36px;
@@ -996,6 +1000,21 @@ button[data-pic='true']:focus-visible {
   margin: var(--hx-space-10) auto 0;
   text-align: center;
 }
+.hx-lf[data-size='page'] .hx-lf__text {
+  justify-items: center;
+}
+.hx-lf[data-size='page'] .hx-lf__reason {
+  font-size: var(--hx-text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .hx-lf[data-size='page'] {
+    box-sizing: border-box;
+    max-width: 100%;
+    padding-inline: 16px;
+  }
+}
 .hx-lf[data-size='page'] .hx-lf__icon {
   width: 40px;
   height: 40px;
@@ -1094,6 +1113,10 @@ button[data-pic='true']:focus-visible {
 [data-drag-held] [data-drag-shift],
 [data-drag-held] [data-dragging='true'][data-drag-settle] {
   transition: transform var(--hx-drag-ms, 180ms) var(--hx-ease-out);
+}
+/* No frame takes the pointer while a row is carried (ui/use-drag): a fast move over a preview or a board must not drop it. */
+:root[data-hand-drag] iframe {
+  pointer-events: none;
 }
 /* Without its clip a box in a grid or a flex would grow to its longest line: it keeps its width, the rows their «…». */
 [data-drag-held] [data-drag-host] {

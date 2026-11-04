@@ -498,6 +498,20 @@ const lockOf = (ctx: MockCtx, e: Stored, scope: string): LockedReason | null => 
 const lastIso = (ago: number | null): string | null =>
   ago === null ? null : new Date(Date.now() - ago * MIN).toISOString();
 
+// Three machines hold the current list; a fourth has not answered. An MCP server with a secret waits for it on one.
+const MACHINES = { machines: 4, reported: 3, current: 3 };
+const deliveryOf = (e: Stored, kind: string): EnvEntryRow['delivery'] => {
+  if (!e.enabled) return null;
+  if (kind === 'mcp' && e.itemId === [...items.entries()].find(([, v]) => v.kind === 'mcp')?.[0])
+    return {
+      ok: 2,
+      pending: 1,
+      error: 0,
+      message: 'written; the secret TRACKER_TOKEN is not on this machine, so the server starts without it',
+    };
+  return { ok: MACHINES.current, pending: 0, error: 0, message: null };
+};
+
 const rowOf = (ctx: MockCtx, e: Stored, scope: string): EnvEntryRow => {
   const it = items.get(e.itemId);
   const reason = lockOf(ctx, e, scope);
@@ -516,6 +530,7 @@ const rowOf = (ctx: MockCtx, e: Stored, scope: string): EnvEntryRow => {
     spark14: e.spark,
     lastUsedAt: lastIso(e.ago),
     unused: e.enabled && e.unused ? true : e.calls > 0 || !e.enabled ? false : null,
+    delivery: deliveryOf(e, it?.kind ?? 'skill'),
   };
 };
 
@@ -560,6 +575,7 @@ const view = (ctx: MockCtx, scope: string): EnvResponse => {
     layers,
     teams: TEAMS.map((t) => ({ id: t.id, name: t.name, tenantId: TENANT_ID })),
     observed: observedOf(),
+    delivery: { ...MACHINES, lastAt: lastIso(3) },
   };
   return recount(base);
 };

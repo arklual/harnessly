@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
+	"github.com/ly-solutions/harnessly/internal/browseract"
 	"github.com/ly-solutions/harnessly/internal/delegation"
 	"github.com/ly-solutions/harnessly/internal/delivery"
 	"github.com/ly-solutions/harnessly/internal/design"
@@ -86,16 +87,17 @@ func (v *v2Live) serveDelegation(done <-chan struct{}) {
 		if rec, ok := v.rt.Record(id); ok {
 			place.Cwd = rec.Cwd
 		}
+		browse := browseract.Tools{Hub: v.browser, Chat: id, Why: why}
 		// The agent of a chat with apps stays in its wall: a chat it started or wrote to would run outside.
 		if _, walled := v.d.CLI.AgentOf(r); walled {
-			return toolsets{hand, pics, place}
+			return toolsets{hand, pics, place, browse}
 		}
 		// Only a chat that works in a video project carries the video's tools.
 		video := design.VideoTools{L: designAPI(v.d).L}
 		if rec, ok := v.rt.Record(id); ok {
 			video.Project = video.L.VideoProjectOf(rec.Cwd)
 		}
-		return toolsets{t, hand, pics, video, place}
+		return toolsets{t, hand, pics, video, place, browse}
 	}
 	set := previewOf(v.d)
 	set.agentTools.Store(&tools)

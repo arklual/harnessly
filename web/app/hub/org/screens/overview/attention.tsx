@@ -20,10 +20,12 @@ export const Attention = ({ signals, base }: { signals: Signal[]; base: string }
               <b>{s.title}</b>
               <span>{s.detail}</span>
             </div>
-            <Link to={`${base}/${s.action.section}`} className="ov-signal__go">
-              {s.action.label}
-              <ArrowUpRight size={13} aria-hidden="true" />
-            </Link>
+            {s.action && (
+              <Link to={`${base}/${s.action.section}`} className="ov-signal__go">
+                {s.action.label}
+                <ArrowUpRight size={13} aria-hidden="true" />
+              </Link>
+            )}
           </li>
         ))}
       </ul>

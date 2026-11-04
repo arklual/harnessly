@@ -1,9 +1,11 @@
 package design
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +36,8 @@ type deckSlideSrc struct {
 	Path  string
 	W, H  int
 	Notes string
+	// Fluid is a board without a size of its own (a site's page): as tall as what it shows, measured in the browser.
+	Fluid bool
 }
 
 // deckSlides are the slides of a deck in the order of its pages, with the notes written for them.
@@ -44,9 +48,9 @@ func (l *Library) deckSlides(artifact string) ([]deckSlideSrc, error) {
 	}
 	out := make([]deckSlideSrc, 0, len(a.Boards))
 	for _, b := range a.Boards {
-		s := deckSlideSrc{ID: b.ID, Title: b.Title, Path: b.Path, W: deckDefaultW, H: deckDefaultH}
+		s := deckSlideSrc{ID: b.ID, Title: b.Title, Path: b.Path, W: deckDefaultW, H: deckDefaultH, Fluid: true}
 		if b.W != nil && b.H != nil && *b.W > 0 && *b.H > 0 {
-			s.W, s.H = *b.W, *b.H
+			s.W, s.H, s.Fluid = *b.W, *b.H, false
 		}
 		if deckIDRe.MatchString(b.ID) {
 			if raw, err := os.ReadFile(filepath.Join(l.ArtifactDir(artifact), DeckNotesDir, b.ID+".md")); err == nil {
@@ -59,6 +63,62 @@ func (l *Library) deckSlides(artifact string) ([]deckSlideSrc, error) {
 		return nil, errors.New(locale.Pick("The deck has no slides yet", "В презентации пока нет слайдов"))
 	}
 	return out, nil
+}
+
+// runSlides are the slides an export makes: every one, or the one board it was asked for.
+func (l *Library) runSlides(run DeckExportRun) ([]deckSlideSrc, error) {
+	slides, err := l.deckSlides(run.Artifact)
+	if err != nil || run.Board == "" {
+		return slides, err
+	}
+	for _, sl := range slides {
+		if sl.ID == run.Board || sl.Path == run.Board {
+			return []deckSlideSrc{sl}, nil
+		}
+	}
+	return nil, errors.New(locale.Pick("The board is gone", "Этой доски больше нет"))
+}
+
+// hasBoard: the project has a board of this id or path (what the site view names its pages by).
+func (l *Library) hasBoard(artifact, board string) bool {
+	a := l.ReadArtifact(artifact)
+	if a == nil || board == "" {
+		return false
+	}
+	for _, b := range a.Boards {
+		if b.ID == board || b.Path == board {
+			return true
+		}
+	}
+	return false
+}
+
+// deckFluidMax bounds a measured page: Chrome prints a page at most 200 inches tall.
+const deckFluidMax = 19000
+
+const deckPageHeight = `Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)`
+
+// measureFluid makes every fluid slide as tall as its page shows at its width (never shorter than it was).
+func measureFluid(ctx context.Context, tab *deckTab, slides []deckSlideSrc) error {
+	for i := range slides {
+		if !slides[i].Fluid {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := tab.open(slides[i], 1); err != nil {
+			return fmt.Errorf("%s: %w", slides[i].Title, err)
+		}
+		v, err := tab.eval(deckPageHeight)
+		if err != nil {
+			continue
+		}
+		if h, ok := v.(float64); ok && int(h) > slides[i].H {
+			slides[i].H = min(int(h), deckFluidMax)
+		}
+	}
+	return nil
 }
 
 // sendLong is send with a wait of its own: printing a deck takes longer than the 15 s of an ordinary call.

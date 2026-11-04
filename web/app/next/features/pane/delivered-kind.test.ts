@@ -21,4 +21,14 @@ describe('how the pane shows a file that is not text', () => {
     expect(deliveredViewOf('/w/Makefile')).toBeNull();
     expect(deliveredViewOf('/w/.zip')).toBeNull();
   });
+
+  it('lists a tar plain or gzipped, shows a font, and reads an svg as text (HRN-679)', () => {
+    expect(deliveredViewOf('/w/site.tar.gz')).toBe(DELIVERED_VIEW.zip);
+    expect(deliveredViewOf('/w/site.tgz')).toBe(DELIVERED_VIEW.zip);
+    expect(deliveredViewOf('/w/site.tar')).toBe(DELIVERED_VIEW.zip);
+    expect(deliveredViewOf('/w/log.gz')).toBe(DELIVERED_VIEW.save);
+    expect(deliveredViewOf('/w/Inter.woff2')).toBe(DELIVERED_VIEW.font);
+    expect(deliveredViewOf('/w/Brand.OTF')).toBe(DELIVERED_VIEW.font);
+    expect(deliveredViewOf('/w/logo.svg')).toBeNull();
+  });
 });

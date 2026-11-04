@@ -39,8 +39,8 @@ export interface Signal {
   severity: 'critical' | 'warn';
   title: string;
   detail: string;
-  /** The label of the action and where it leads: a screen of the hub with its card (`query`), or a chat of a machine. */
-  action: SignalGo;
+  /** The label of the action and where it leads: a screen of the hub with its card (`query`), or a chat of a machine. Null: nothing to do but read. */
+  action: SignalGo | null;
 }
 
 /** Where a signal's button leads: the section, the card on it, or a chat that opens on its machine. */
@@ -150,7 +150,14 @@ export interface SpendDetail {
   accountedUntil: string | null;
 }
 
+/** How long a signal may be put off: the hub takes any time up to 30 days; the screen offers these two. */
+export type SnoozeFor = 'day' | 'week';
+
 export interface OverviewApi {
   overview(tenant: string, period: OverviewPeriod): Promise<OverviewData>;
+  /** `POST …/signals/{id}/snooze`: the signal leaves the list until it is over, or comes back worse. */
+  snoozeSignal(id: string, span: SnoozeFor): Promise<void>;
+  /** `DELETE …/signals/{id}/snooze`: the snooze is taken back and the signal is listed again. */
+  unsnoozeSignal(id: string): Promise<void>;
   spendDetail(by: SpendCut, span: SpendSpan): Promise<SpendDetail>;
 }

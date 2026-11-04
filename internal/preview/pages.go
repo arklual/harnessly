@@ -37,8 +37,9 @@ func statusPage(status int, text string) string {
 	return layout(locale.Pick("Preview · ", "Превью · ")+strconv.Itoa(status), "<p>"+escapeHTML(text)+"</p>")
 }
 
-// offerPage: the site redirects to another origin. The runtime never follows it: the page asks the preview island to
-// open that origin as a new target, which goes through the same checks again.
+// offerPage: the site redirects to another origin. The runtime never follows it: the page tells the preview island as
+// it loads (tk:redirect; the island follows a hop between its own sites, a sign-in say) and asks it on a press to
+// open that origin as a new target (tk:open), which goes through the same checks again.
 func offerPage(u *weburl.URL, parentOrigin, nonce string) string {
 	button, script := "", ""
 	if parentOrigin != "" {
@@ -49,6 +50,7 @@ func offerPage(u *weburl.URL, parentOrigin, nonce string) string {
   var ancestors = location.ancestorOrigins;
   if (window.parent === window || (ancestors && ancestors.length && ancestors[0] !== parentOrigin)) return;
   button.hidden = false;
+  window.parent.postMessage({ type: 'tk:redirect', url: button.getAttribute('data-url') }, parentOrigin);
   button.addEventListener('click', function () { window.parent.postMessage({ type: 'tk:open', url: button.getAttribute('data-url') }, parentOrigin); });
 })();</script>`
 	}

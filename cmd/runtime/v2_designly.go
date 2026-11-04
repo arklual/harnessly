@@ -186,7 +186,7 @@ func (d *v2Designly) Create(ctx context.Context, c wire.DesignlyCreate) (wire.De
 	}
 	// The owner file (personal, v2) is a note for the library's other runtimes and the gateway hears of the project:
 	// the project is made without them, nothing stops for it.
-	lib.AnnounceNew(project.ID)
+	lib.AnnounceNewBy(project.ID, d.api.PersonOf(wire.RequestOf(ctx)))
 	if err := d.change(func(st *designlyState) { st.Kinds[project.ID] = c.Kind }); err != nil {
 		return wire.DesignlyCreated{}, notStarted(err.Error())
 	}

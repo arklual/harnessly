@@ -43,16 +43,43 @@ func TestEnvKeeperKeepsAppliesAndReports(t *testing.T) {
 	for _, a := range st.Applied {
 		by[a.ItemID] = a
 	}
-	for id, want := range map[string]string{"skill1": hubproto.EnvPending, "skill2": hubproto.EnvPending, "mcp1": hubproto.EnvPending, "repo1": hubproto.EnvPending,
-		"doc1": hubproto.EnvPending, "../evil": hubproto.EnvError, "odd1": hubproto.EnvError} {
-		if by[id].Status != want || by[id].Message == "" {
-			t.Errorf("%s = %+v, want %s with a message", id, by[id], want)
+	// Every valid kind is applied; the MCP server waits for its secret, the bad ones say why.
+	for id, want := range map[string]string{"skill1": hubproto.EnvOK, "skill2": hubproto.EnvOK, "mcp1": hubproto.EnvPending, "repo1": hubproto.EnvOK,
+		"doc1": hubproto.EnvOK, "../evil": hubproto.EnvError, "odd1": hubproto.EnvError} {
+		if by[id].Status != want || (want != hubproto.EnvOK && by[id].Message == "") {
+			t.Errorf("%s = %+v, want %s", id, by[id], want)
 		}
 	}
+	if !strings.Contains(by["mcp1"].Message, "TRACKER_TOKEN") {
+		t.Errorf("the waiting server does not name its secret: %q", by["mcp1"].Message)
+	}
+	plugin := filepath.Join(dir, "environment", "claude-plugin")
 	// The skill with a body is on disk, in the agent's own folder; nothing outside it, nothing for the bad id.
-	skill := filepath.Join(dir, "environment", "claude-plugin", "skills", "skill1", "SKILL.md")
-	if raw, err := os.ReadFile(skill); err != nil || !strings.Contains(string(raw), "Пиши коротко.") {
+	skill := filepath.Join(plugin, "skills", "skill1", "SKILL.md")
+	if raw, err := os.ReadFile(skill); err != nil || !strings.Contains(string(raw), "Пиши коротко.") || !strings.Contains(string(raw), `description: "Ревью кода"`) {
 		t.Errorf("skill file: %q %v", raw, err)
+	}
+	// A skill by a reference, a document and a repository are skills that say where the thing is.
+	for id, want := range map[string]string{"skill2": "https://example.org/skill", "doc1": "https://docs.example.org/rules", "repo1": "git clone https://git.example.org/acme/mono.git"} {
+		if raw, err := os.ReadFile(filepath.Join(plugin, "skills", id, "SKILL.md")); err != nil || !strings.Contains(string(raw), want) {
+			t.Errorf("%s: %q %v", id, raw, err)
+		}
+	}
+	// The MCP server is in the plugin's .mcp.json, its secret by name only.
+	var mcp struct {
+		Servers map[string]map[string]any `json:"mcpServers"`
+	}
+	if raw, err := os.ReadFile(filepath.Join(plugin, ".mcp.json")); err != nil || json.Unmarshal(raw, &mcp) != nil {
+		t.Fatalf(".mcp.json: %q %v", raw, err)
+	}
+	if len(mcp.Servers) != 1 {
+		t.Fatalf("servers: %+v", mcp.Servers)
+	}
+	for _, srv := range mcp.Servers {
+		h, _ := srv["headers"].(map[string]any)
+		if srv["type"] != "http" || srv["url"] != "https://tracker.example.org/mcp" || h["Authorization"] != "Bearer ${TRACKER_TOKEN:-}" {
+			t.Errorf("server: %+v", srv)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(dir, "environment", "evil")); !os.IsNotExist(err) {
 		t.Errorf("a path escaped: %v", err)
@@ -97,6 +124,43 @@ func TestEnvKeeperKeepsAppliesAndReports(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "environment", "claude-plugin", "skills", "skill3", "SKILL.md")); err != nil {
 		t.Errorf("the new skill: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "environment", "claude-plugin", ".mcp.json")); !os.IsNotExist(err) {
+		t.Errorf("the servers that left the list stayed: %v", err)
+	}
+
+	// An empty list leaves no plugin for the chats to load.
+	if _, err = k2.Set(hubproto.EnvSet{Rev: 6, Hash: hubproto.EnvHash(nil), Items: nil}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "environment", "claude-plugin")); !os.IsNotExist(err) {
+		t.Errorf("an empty list left the plugin: %v", err)
+	}
+}
+
+// A secret that comes later turns the waiting server "ok", and the keeper says the outcome changed.
+func TestEnvKeeperReappliesWhenASecretComes(t *testing.T) {
+	k := newEnvKeeper(t.TempDir())
+	have := map[string]bool{}
+	k.hasSecret = func(n string) bool { return have[n] }
+	items := []hubproto.EnvItem{
+		{ItemID: "mcp1", Kind: "mcp", Name: "Трекер", Source: json.RawMessage(`{"transport":"stdio","command":"npx","args":["-y","tracker-mcp"],"secretRefs":["TRACKER_TOKEN"]}`)},
+		{ItemID: "mcp2", Kind: "mcp", Name: "Two secrets", Source: json.RawMessage(`{"transport":"sse","url":"https://x.example.org","secretRefs":["A","B"]}`)},
+	}
+	st, err := k.Set(hubproto.EnvSet{Rev: 1, Hash: hubproto.EnvHash(items), Items: items})
+	if err != nil || st.Applied[0].Status != hubproto.EnvPending || st.Applied[1].Status != hubproto.EnvPending {
+		t.Fatalf("%+v %v", st, err)
+	}
+	if k.Reapply() {
+		t.Error("nothing changed, yet the keeper says it did")
+	}
+	have["TRACKER_TOKEN"] = true
+	if !k.Reapply() || k.State().Applied[0].Status != hubproto.EnvOK {
+		t.Fatalf("after the secret: %+v", k.State())
+	}
+	raw, _ := os.ReadFile(filepath.Join(k.plugin, ".mcp.json"))
+	if !strings.Contains(string(raw), `"TRACKER_TOKEN": "${TRACKER_TOKEN:-}"`) || !strings.Contains(string(raw), `"tracker-mcp"`) || strings.Contains(string(raw), "x.example.org") {
+		t.Errorf(".mcp.json: %s", raw)
 	}
 }
 

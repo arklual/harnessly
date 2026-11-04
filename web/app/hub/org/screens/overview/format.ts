@@ -1,4 +1,4 @@
-import { inRubles, shownSymbol } from '../../money';
+import { inRubles, shownOfUsd, shownSymbol } from '../../money';
 
 // Number and time texts of Обзор, in Russian (decimal comma, «тыс», «млн»).
 const dec = (n: number, digits = 1, fixed = false): string =>
@@ -15,6 +15,23 @@ export const rub = (n: number): string => {
 export const thousands = (n: number): string => (inRubles() ? `${dec(n / 1000)} тыс` : dec(n, 0));
 
 export const usd = (n: number): string => `$${dec(n, n < 10 ? 1 : 0)}`;
+
+/**
+ * A dollar amount in the hub's currency, compact: $4,2 → «378 ₽», $810 → «72,9 тыс ₽». Every screen writes money with
+ * this, so a page never mixes ₽ and $; dollars only while the hub has not said its rate.
+ */
+export const fromUsd = (n: number): string => {
+  const s = shownOfUsd(n);
+  if (s === null) return usd(n);
+  return inRubles() ? rub(s) : usd(s);
+};
+
+/** The same, whole and exact: $18,5 → «1 665 ₽» (a KPI, a price per MR). */
+export const fromUsdExact = (n: number): string => {
+  const s = shownOfUsd(n);
+  if (s === null) return usd(n);
+  return inRubles() ? `${dec(s, 0)} ₽` : usd(s);
+};
 
 export const tokens = (n: number): string => {
   if (n >= 1_000_000_000) return `${dec(n / 1_000_000_000)} млрд`;

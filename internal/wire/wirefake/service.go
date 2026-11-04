@@ -1442,7 +1442,7 @@ func (s *Service) create(c wire.ConversationCreateCmd) wire.CmdResult {
 			ref, _, _ := s.opt.Uploads.Get(aid)
 			atts = append(atts, ref)
 		}
-		m := wire.Message{ClientID: c.First.ClientID, ConversationID: id, Text: c.First.Text, Attachments: atts, Mode: wire.ModeQueue,
+		m := wire.Message{ClientID: c.First.ClientID, ConversationID: id, Text: c.First.Text, Attachments: atts, Refs: c.First.Refs, Mode: wire.ModeQueue,
 			Kind: wire.KindPrompt, CreatedAt: now, State: wire.MessageState{K: wire.MsgQueued, Position: 1, Reason: wire.QueuedLaunching,
 				Wait: s.wait(wire.WaitSlowMs, 15*60*1000)}, Rev: 1}
 		cv.snap.Messages = append(cv.snap.Messages, m)

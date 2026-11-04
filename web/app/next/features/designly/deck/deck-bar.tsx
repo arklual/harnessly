@@ -5,14 +5,19 @@ import type { ReactNode } from 'react';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import Tooltip from '@/next/ui/tooltip';
+import ModeButton from '@/next/features/designly/mode-button';
+import type { ISiteMode } from '@/next/features/designly/site-view';
 import {
   DECK_OPENS,
   DECK_SCREEN,
   type TDeckOpens,
   type TDeckScreen,
 } from '@/next/features/designly/deck/types';
+import { ProjectDownloadMenu, type IDownloadItem } from '@/next/features/designly/project-downloads';
 
 export interface IDeckBarProps {
+  /** The switch between looking and editing; absent in the pane of a chat. */
+  mode?: ISiteMode;
   screen: TDeckScreen;
   title: string;
   /** The screen's place: the slide's title, «Запись», «3 из 5». */
@@ -40,6 +45,10 @@ export interface IDeckBarProps {
   /** Montage: the video's link and its MP4. */
   onVideoLink: () => void;
   onDownloadMp4: () => void;
+  /** «Скачать»: the deck's formats (deck-menu's deckDownloads); «Ещё» opens it too, so it is held from outside. */
+  downloads: readonly IDownloadItem[];
+  downloadOn: boolean;
+  onDownloadOn: (open: boolean) => void;
 }
 
 const Kbd = ({ children }: { children: ReactNode }) => <span className="hx-deck-kbd">{children}</span>;
@@ -101,6 +110,26 @@ const DeckBar = (p: IDeckBarProps) => {
   const edit = p.screen === DECK_SCREEN.edit;
   const link = p.screen === DECK_SCREEN.link;
   const cut = p.screen === DECK_SCREEN.cut;
+  const download = (
+    <ProjectDownloadMenu
+      items={p.downloads}
+      open={p.downloadOn}
+      onOpenChange={p.onDownloadOn}
+      trigger={
+        <button
+          type="button"
+          className="hx-btn"
+          data-variant="ghost"
+          data-size="sm"
+          data-k="download"
+          aria-label={t('next.download.label')}
+        >
+          <Icon name="download" />
+          <span className="hx-deck-lbl">{t('next.download.label')}</span>
+        </button>
+      }
+    />
+  );
   return (
     <header className="hx-deck__bar">
       <BarButton k="back" icon="arrow-left" label={t('next.deck.bar.back')} text={false} onClick={p.onBack} />
@@ -126,6 +155,7 @@ const DeckBar = (p: IDeckBarProps) => {
       <span className="hx-deck-grow" />
       {edit && (
         <>
+          {p.mode && <ModeButton mode={p.mode} />}
           <BarButton
             k="comment"
             icon="message-square-plus"
@@ -157,6 +187,7 @@ const DeckBar = (p: IDeckBarProps) => {
             blocked={p.playBlocked}
             onClick={p.onRec}
           />
+          {download}
           <BarButton
             k="share"
             icon="link"
@@ -169,6 +200,7 @@ const DeckBar = (p: IDeckBarProps) => {
       )}
       {link && (
         <>
+          {p.mode && <ModeButton mode={p.mode} />}
           <div className="hx-deck-seg hx-deck__lmode" role="group">
             <button
               type="button"
@@ -194,6 +226,7 @@ const DeckBar = (p: IDeckBarProps) => {
             kbd="C"
             onClick={p.onComment}
           />
+          {download}
           <BarButton
             k="full"
             icon="maximize-2"

@@ -220,24 +220,53 @@ const GroupItems = ({ label, children }: { label: string; children: ReactNode })
 
 /**
  * «Рабочее пространство»: back to where the person works with agents. Through the gateway that is its /agents/; a hub
- * of its own opens the person's machines, each with «Открыть».
+ * of its own opens the person's machine when it has exactly one that is on, otherwise its machines to pick from.
  */
 const Workspace = ({ onPick }: { onPick: () => void }) => {
   const { config } = useSession();
-  const { base } = useOrg();
-  const go = () => {
+  const { api, base, scope, shell } = useOrg();
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    if (config.proxied) {
+      onPick();
+      window.location.assign('/agents/');
+      return;
+    }
+    setBusy(true);
+    try {
+      const slug = scope.kind === 'org' ? 'all' : scope.tenant.slug;
+      const list = await api.machinesList(shell.org.slug, { scope: slug });
+      const on = list.groups
+        .flatMap((g) => g.machines)
+        .filter((m) => m.mine && (m.state === 'online' || m.state === 'idle'));
+      if (on.length === 1) {
+        const { url } = await api.openMachine(on[0].id);
+        window.location.assign(url);
+        return;
+      }
+    } catch {
+      // The list of machines shows what is wrong better than this button could.
+    } finally {
+      setBusy(false);
+    }
     onPick();
-    if (config.proxied) window.location.assign('/agents/');
-    else navigate(`${base}/machines`);
+    navigate(`${base}/machines`);
   };
   return (
     <div className="hx-nav ad-hubnav hx-wsnav">
       <div className="hx-nav__group">
-        <button type="button" className="hx-nav__item" onClick={go} title="Перейти к своим агентам и машинам">
+        <button
+          type="button"
+          className="hx-nav__item"
+          onClick={() => void go()}
+          disabled={busy}
+          aria-busy={busy}
+          title="Открыть свою машину с агентами"
+        >
           <span className="hx-nav__ic">
-            <Icon i="square-terminal" />
+            <Icon i={busy ? 'loader-circle' : 'square-terminal'} />
           </span>
-          <span className="hx-nav__label">Рабочее пространство</span>
+          <span className="hx-nav__label">{busy ? 'Открываю…' : 'Рабочее пространство'}</span>
         </button>
       </div>
     </div>
@@ -253,7 +282,7 @@ const User = () => {
       <button
         type="button"
         className="hx-user__open"
-        onClick={() => navigate('/account')}
+        onClick={() => navigate('/settings')}
         aria-label={`${viewer.name}, ${ROLE_LABEL[viewer.role]}`}
       >
         <span className="hx-avatar">{initial(viewer.name)}</span>
@@ -346,12 +375,4 @@ export const Titles = ({ title, lead, end }: { title: ReactNode; lead?: ReactNod
     {lead != null && <p className="hx-set__lead">{lead}</p>}
     {end}
   </div>
-);
-
-/** A screen of the menu that is not built yet, the way the board shows it. */
-export const Stub = ({ title, lead }: { title: string; lead: string }) => (
-  <>
-    <Titles title={title} lead={lead} />
-    <div className="ad-empty">Этот экран нарисуем следующим</div>
-  </>
 );

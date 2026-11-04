@@ -494,6 +494,40 @@ const QUESTION = (now: Ms): Question => ({
   ],
 });
 
+/** One long question, as agents ask it: a paragraph of a proposal, then three options. */
+const LONG_QUESTION = (now: Ms): Question => ({
+  id: 'q2',
+  turnId: 't1',
+  askedAt: now,
+  state: { k: 'open' },
+  items: [
+    {
+      header: 'Меню',
+      question:
+        'П.8 — меню размеров и «Обзор». Предлагаю так. Сверху «Окно W×H» и масштаб (−, 100%, +, вписать, замок); ' +
+        'дальше группы с заголовками: «Вид» — «По окну» и «Все экраны»; «Телефоны» — iPhone 15 Pro, Pixel 7, ' +
+        'Galaxy S24; «Планшеты» — iPad Pro 11; «Компьютеры» — ноутбук, Full HD. «Все экраны»: холст, где экраны ' +
+        'стоят в ряд по группам, над каждым подпись «iPhone 15 Pro · 393×852». Колесо над экраном прокручивает ' +
+        'страницу, и все экраны листаются синхронно. Пробел и перетаскивание двигают холст, ⌘/Ctrl и колесо меняют ' +
+        'масштаб. Клик по подписи открывает этот размер. Делаем так?',
+      multi: false,
+      options: [
+        {
+          label: 'Делай так',
+          description: 'Группы и названия в меню и новый «Все экраны» с синхронной прокруткой',
+          preview: null,
+        },
+        {
+          label: 'Без синхронной прокрутки',
+          description: 'То же, но каждый экран листается сам',
+          preview: null,
+        },
+        { label: 'Сейчас только меню', description: '«Все экраны» — отдельным заходом', preview: null },
+      ],
+    },
+  ],
+});
+
 const PERMISSION = (now: Ms): Permission => ({
   id: 'p1',
   kind: 'tool',
@@ -1127,6 +1161,26 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
       items: [...history(now), liveTurn(now, { now: null })],
       question: QUESTION(now),
       mode: 'answer',
+    }),
+  },
+  'question-queue': {
+    title: 'Длинный вопрос и очередь',
+    build: (now) => ({
+      items: [...history(now), liveTurn(now)],
+      question: LONG_QUESTION(now),
+      mode: 'answer',
+      queue: [
+        {
+          ...queued(
+            'Следующая пачка фиксов: 1. Когда машина отключается, у меня отображается старая плашка, а должна новая',
+          ),
+          attachments: [
+            { id: 'qa1', name: 'плашка.png', kind: 'image', mime: 'image/png' },
+            { id: 'qa2', name: 'лог.txt', kind: 'file', mime: 'text/plain' },
+          ],
+        },
+        queued('Дальше с «поделиться» надо разобраться: настройка «поделиться с кем-то вне команды» ложная'),
+      ],
     }),
   },
   permission: {

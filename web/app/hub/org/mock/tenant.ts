@@ -39,11 +39,16 @@ export const tenantMock = (_ctx: MockCtx): TenantApi => {
       expiresAt: new Date(Date.now() + 5 * DAY).toISOString(),
       uses: 0,
       maxUses: 1,
+      role: 'member',
     },
   ];
   let members = PEOPLE.map((m) => ({ ...m }));
 
-  const invite = (kind: 'email' | 'link', email: string | null): TenantInvite => {
+  const invite = (
+    kind: 'email' | 'link',
+    email: string | null,
+    role: TenantRole = 'member',
+  ): TenantInvite => {
     seq += 1;
     return {
       id: `inv-new-${seq}`,
@@ -54,6 +59,7 @@ export const tenantMock = (_ctx: MockCtx): TenantApi => {
       expiresAt: new Date(Date.now() + 7 * DAY).toISOString(),
       uses: 0,
       maxUses: kind === 'email' ? 1 : null,
+      role,
     };
   };
   const listed = (i: TenantInvite): TenantInvite => ({ ...i, url: null });
@@ -86,8 +92,8 @@ export const tenantMock = (_ctx: MockCtx): TenantApi => {
       return later(issued);
     },
     tenantInvites: async () => later(invites.map(listed)),
-    inviteByEmail: async (_space, email) => {
-      const made = invite('email', email);
+    inviteByEmail: async (_space, email, role) => {
+      const made = invite('email', email, role);
       invites = [listed(made), ...invites];
       return later(made);
     },

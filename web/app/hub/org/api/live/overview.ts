@@ -19,7 +19,7 @@ import type {
   SubscriptionUse,
   TeamEfficiency,
 } from '../overview';
-import { contractGet, orgPath } from './http';
+import { contractGet, http, orgPath } from './http';
 import { signalGo } from './signal-go';
 import type { AnalyticsCtx } from './analytics';
 
@@ -192,6 +192,14 @@ export const liveOverview = (
     });
     setShownCurrency(r.currency.code);
     return buildOverview(r, c.teamName, c.people);
+  },
+  snoozeSignal: async (id, span) => {
+    const c = ctx();
+    const until = new Date(Date.now() + (span === 'week' ? 7 : 1) * 86_400_000).toISOString();
+    await http.post(orgPath(c.org, `/signals/${encodeURIComponent(id)}/snooze`), { until });
+  },
+  unsnoozeSignal: async (id) => {
+    await http.del(orgPath(ctx().org, `/signals/${encodeURIComponent(id)}/snooze`));
   },
   spendDetail: async (by, span) => {
     const c = ctx();

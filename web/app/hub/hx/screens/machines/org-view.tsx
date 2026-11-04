@@ -21,7 +21,7 @@ import {
   type TenantFilter,
   toggleTenant,
 } from './calc';
-import { Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles } from './parts';
+import { AddCta, Group, MachineRow, MlLink, SearchBox, Seg, TableHead, Tiles } from './parts';
 import { useSentinel } from './use-sentinel';
 
 type View = 'tenant' | 'flat';
@@ -132,7 +132,16 @@ const Sentinel = ({ rows, onHit, more }: { rows?: boolean; onHit: () => void; mo
   );
 };
 
-export const OrgView = ({ list, onOpen }: { list: MachinesList; onOpen: (id: string) => void }) => {
+export const OrgView = ({
+  list,
+  onOpen,
+  onAdd,
+}: {
+  list: MachinesList;
+  onOpen: (id: string) => void;
+  /** Opens «Добавить машину»; absent for a role that cannot add. */
+  onAdd?: () => void;
+}) => {
   const { shell } = useOrg();
   const now = useNow(60_000);
   const [q, setQ] = useState('');
@@ -226,7 +235,10 @@ export const OrgView = ({ list, onOpen }: { list: MachinesList; onOpen: (id: str
         </div>
       )}
       {!searching && filter.mode === 'all' && list.groups.length === 0 && (
-        <div className="mo-empty">В организации пока нет машин</div>
+        <div className="mo-empty">
+          В организации пока нет машин
+          <AddCta onAdd={onAdd} />
+        </div>
       )}
     </div>
   );

@@ -8,8 +8,9 @@ type Action = NonNullable<ApiSignal['action']>;
 
 const q = (pairs: Record<string, string>): string => new URLSearchParams(pairs).toString();
 
-export const signalGo = (a: Action | null): SignalGo => {
-  if (!a) return { label: 'Открыть', section: 'overview' };
+/** Null: the hub gave no action, so the signal is only read (a button to nowhere would be a dead click). */
+export const signalGo = (a: Action | null): SignalGo | null => {
+  if (!a) return null;
   const label = a.label;
   switch (a.kind) {
     case 'raise_limit':

@@ -1,5 +1,4 @@
 {
-  "next.publish.title": "Опубликовать «{name}»",
   "next.publish.name": "Название сайта",
   "next.publish.namePlaceholder": "например, shop",
   "next.publish.nameBad": "Латиница, цифры и дефис, до 30 знаков, без двух дефисов подряд.",
@@ -9,9 +8,11 @@
   "next.publish.teamNote": "Сайт откроется после входа участникам пространства.",
   "next.publish.linkNote": "Сайт откроется у любого, кому вы дали адрес. В поиске его не будет.",
   "next.publish.go": "Опубликовать",
-  "next.publish.done": "Сайт опубликован",
   "next.publish.copy": "Скопировать",
   "next.publish.copied": "Скопировано",
   "next.publish.open": "Открыть",
-  "next.publish.button": "Опубликовать"
+  "next.publish.section": "Опубликовать как сайт",
+  "next.publish.none": "Сайт не опубликован",
+  "next.publish.update": "Обновить",
+  "next.publish.settings": "Настройки сайта"
 }

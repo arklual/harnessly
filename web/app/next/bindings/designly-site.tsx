@@ -5,13 +5,17 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import SiteView, {
   type ISiteAccess,
+  type ISiteMode,
   type ISitePage,
   type ISiteTab,
 } from '@/next/features/designly/site-view';
 import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
 import { ROLE, claimOwnership, fetchAccess } from '@/next/features/designly/access/api';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
-import PublishDialog from '@/next/features/designly/publish/publish-dialog';
+import ResourceShare from '@/next/features/designly/access/resource-share';
+import { useResourceView } from '@/next/features/designly/access/use-resource';
+import PublishSection from '@/next/features/designly/publish/publish-section';
+import { usePublish } from '@/next/features/designly/publish/use-publish';
 import NoAccess from '@/next/features/designly/access/no-access';
 import ProjectAway from '@/next/features/designly/access/project-away';
 import {
@@ -28,8 +32,10 @@ import type { IStageOptions } from '@/next/bindings/site-stage';
 import { usePaneChatStage, useSiteOnlyStage, type IStageWithChat } from '@/next/bindings/pane-stage';
 import { useTabState, useTabTitle } from '@/next/stores/tabs';
 import { useChatPaneView } from '@/next/stores/pane-state';
+import { modeKindOf, modeStateKey, useDesignMode } from '@/next/features/designly/design-mode';
 import { goTo, ROUTE, routePath, type TAccessFocus } from '@/next/routes/routes';
 import { useLinkRestored } from '@/next/stores/connection';
+import { useConversationList } from '@/next/stores/conversations';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { toast } from '@/next/ui/toast';
 import { t } from '@/next/i18n';
@@ -87,12 +93,17 @@ export interface IDesignlySiteProps {
   /** The chat the person came from: the design's chat column shows it. */
   chat?: string | null;
   maxed: boolean;
-  onToggleMax: () => void;
+  /** Null where there is nothing to widen: the full Sinopia view opens its sidebar from the rail itself. */
+  onToggleMax: (() => void) | null;
   onOpenDrawer: () => void;
   /** The project is not in the library (deleted, wrong address). */
   onMissing: () => void;
   /** `?access=` of the address: the share dialog opens on that block. */
   access?: TAccessFocus | null;
+  /** The editing mode (`?edit=1`): the chat, the tools and the pictures' edits. Without it the design is looked at. */
+  edit?: boolean;
+  /** Turns the editing mode on or off (the address keeps it). */
+  onMode?: (edit: boolean) => void;
   /** The right pane of the design's chat, as a chat has it: its button in the design's strip; null without a chat. */
   toolPane?: { open: boolean; onToggle: () => void } | null;
 }
@@ -111,6 +122,8 @@ interface IBodyProps extends IDesignlySiteProps {
 const designAddress = (id: string) => new URL(routePath({ kind: ROUTE.site, id }), window.location.href).href;
 
 /** The design's first pages are its tabs from the start, as in the design; the rest are opened with «+». */
+/** How often the pages are read again while an agent works on the design, ms. */
+const PAGES_POLL_MS = 4000;
 const SEED_TABS = 6;
 const seedTabs = (boards: readonly { path: string }[]): ISiteTab[] =>
   boards.slice(0, SEED_TABS).map((b) => newTab(b.path));
@@ -124,6 +137,8 @@ const DesignlySiteBody = ({
   onOpenDrawer,
   onMissing,
   access: accessFocus = null,
+  edit = false,
+  onMode,
   toolPane = null,
   pane,
 }: IBodyProps) => {
@@ -145,6 +160,8 @@ const DesignlySiteBody = ({
   const chatTab = useChatPaneView(paneConv, `site:${id}:tab`, start.tab?.id ?? '');
   const [tabs, setTabs] = paneConv === null ? windowTabs : chatTabs;
   const [tab, setTab] = paneConv === null ? windowTab : chatTab;
+  // Opened from a chat, the mode is that chat's; otherwise the address's (the pane has no switch: it edits).
+  const [asked, setMode] = useDesignMode({ conv: pane ? null : chat, id, edit, onMode });
   /** The slot's answer for the page it was asked for; a stale one (another page, a reload) does not count. */
   const [slot, setSlot] = useState<{
     key: string;
@@ -169,11 +186,41 @@ const DesignlySiteBody = ({
   // Who may do what with the project, from the gateway; where there is none (standalone) the design is as it was.
   const gate = useProjectAccess(id);
   const [shareOpen, setShareOpen] = useState(false);
-  const [publishOpen, setPublishOpen] = useState(false);
+  // the one «Поделиться» of every kind reads the gateway's common access API; an older gateway answers nothing
+  // there and the older dialog stays.
+  const shared = useResourceView('design', id, gate.state.k === ACCESS.ready);
   const focusPending = useRef(accessFocus);
   const seeded = useRef(tabs.length > 0);
   // The link coming back reads the library again, quietly: the open design stays as it is.
   const restored = useLinkRestored(machine);
+  // The pages' names and order change while an agent works on the design (a page renamed, added, removed): the library
+  // is read again every few seconds while a chat of this design is in a turn, once more as the turn ends, and when the
+  // person comes back to the window, so the bar follows without a reload.
+  const [fresh, setFresh] = useState(0);
+  const convs = useConversationList(machine);
+  const drawing =
+    project !== null &&
+    (convs ?? []).some(
+      (c) =>
+        (c.id === chat || project.design.convs.includes(c.id)) &&
+        (c.state.k === 'starting' || c.state.k === 'working'),
+    );
+  useEffect(() => {
+    if (!drawing) return;
+    const timer = setInterval(() => setFresh((n) => n + 1), PAGES_POLL_MS);
+    return () => {
+      clearInterval(timer);
+      setFresh((n) => n + 1);
+    };
+  }, [drawing]);
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState === 'visible') setFresh((n) => n + 1);
+    };
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, []);
+  const loaded = useRef(false);
   // The window's tab is named by the page a design is open on; in a pane the chat names it.
   useTabTitle(routePath({ kind: ROUTE.site, id }), pane ? null : (project?.design.title ?? null));
   const pageSlot = pane ? PANE_PAGE_SLOT : PAGE_SLOT;
@@ -200,6 +247,7 @@ const DesignlySiteBody = ({
           return;
         }
         setMissing(false);
+        loaded.current = true;
         setProject(read);
         const first = seedTabs(read.design.boards);
         if (!seeded.current && first.length > 0) {
@@ -209,13 +257,14 @@ const DesignlySiteBody = ({
         }
       },
       (failure: Error) => {
-        if (!abort.signal.aborted) setLoadError(failure.message);
+        // A failed quiet re-read keeps the pages on screen; only the first read turns into the error.
+        if (!abort.signal.aborted && !loaded.current) setLoadError(failure.message);
       },
     );
     return () => abort.abort();
     // onMissing is the host's; a new one each render must not load the library again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [machine, id, attempt, restored]);
+  }, [machine, id, attempt, restored, fresh]);
 
   const turnedAway = gate.state.k === ACCESS.ready && gate.state.access.role === null;
   // A role the gateway has just given reaches the runtime a moment later (its snapshot): the library is read again
@@ -252,7 +301,10 @@ const DesignlySiteBody = ({
   };
   // Opening the dialog asks the gateway again, quietly: a request that came in meanwhile shows up.
   useEffect(() => {
-    if (shareOpen) gate.reload();
+    if (shareOpen) {
+      gate.reload();
+      shared.reload();
+    }
     // reload is stable; only the opening matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shareOpen]);
@@ -409,6 +461,26 @@ const DesignlySiteBody = ({
   }, [id]);
 
   const gated = gate.state.k === ACCESS.ready ? gate.state.access : null;
+  // The state of «Опубликовать как сайт» stays with the design while the share dialog opens and closes.
+  const boards = project?.design.boards.map((b) => ({ path: b.path, title: b.title || b.path }));
+  const sitePublish = usePublish({
+    machine,
+    project: id,
+    title: project?.design.title ?? '',
+    pages: boards ?? [],
+  });
+  // The one dialog for a design page (decks and videos move in stage «д»), once the gateway answers its API and the
+  // project has an owner; a project without one is still claimed in the older dialog.
+  const oneDialog =
+    project !== null &&
+    project.design.kind !== 'slides' &&
+    project.design.kind !== 'video' &&
+    shared.state !== null &&
+    shared.state !== 'absent' &&
+    shared.state.stored &&
+    shared.state.owner !== null
+      ? shared.state
+      : null;
   // Wherever the gateway keeps the project's access, «Поделиться» opens its dialog, in the pane as on the page: who
   // manages shares there, anyone else sees their role, asks for more or copies the link from it.
   const shareButton = ((): ISiteAccess | undefined => {
@@ -436,6 +508,41 @@ const DesignlySiteBody = ({
   if (missing && project === null && granted && exhausted) {
     return <ProjectAway ownerName={gated?.ownerName ?? ''} onRetry={lookAgain} onBack={back} />;
   }
+
+  // A design is looked at unless the editing mode is asked for (and may be): the pane of a chat always edits, one
+  // opened from a chat edits as that chat last had it (design-mode).
+  const editing = pane !== undefined || (asked && mayEdit) || onMode === undefined;
+  const viewing = !editing;
+  // «Опубликовать как сайт» lives in «Поделиться», where a manager edits a site design.
+  const mayPublish =
+    !viewing &&
+    gated?.canManage === true &&
+    !!project &&
+    project.design.kind !== 'slides' &&
+    project.design.kind !== 'video';
+  const modeButton: ISiteMode | undefined = (() => {
+    if (pane || !onMode) return undefined;
+    const state = t(modeStateKey(modeKindOf(project?.design.kind), editing));
+    if (editing)
+      return {
+        state,
+        editing,
+        action: { label: t('next.site.modeView'), icon: 'eye', onClick: () => setMode(false) },
+      };
+    if (mayEdit)
+      return {
+        state,
+        editing,
+        action: { label: t('next.site.modeEdit'), icon: 'pencil', onClick: () => setMode(true) },
+      };
+    return {
+      state,
+      editing,
+      action: shareButton
+        ? { label: t('next.site.modeAsk'), icon: 'lock-keyhole', onClick: shareButton.onOpen }
+        : null,
+    };
+  })();
 
   // Before the project is known (the library, the gateway's answer, the waits for a role just given) the design's
   // frame stands with its loader, and a failed read says why with a retry: the screen is never empty.
@@ -522,13 +629,14 @@ const DesignlySiteBody = ({
       onOpenDrawer={onOpenDrawer}
       onToggleMax={onToggleMax}
       maxed={maxed}
-      stage={stage}
+      stage={viewing ? undefined : stage}
       pane={pane && { onShare: copyLink, chat: paneChat }}
-      toolPane={toolPane}
+      toolPane={viewing ? null : toolPane}
+      mode={modeButton}
       access={shareButton}
-      publish={gated?.canManage ? { onOpen: () => sinopia.gate(() => setPublishOpen(true)) } : undefined}
-      devtools={{ machine, slot: slotOrigin, artifact: id }}
-      images={mayEdit && project ? { machine, artifact: id } : undefined}
+      devtools={viewing ? undefined : { machine, slot: slotOrigin, artifact: id }}
+      images={!viewing && mayEdit && project ? { machine, artifact: id } : undefined}
+      downloads={project ? { machine, artifact: id, archives: mayEdit } : undefined}
       memoryKey={id}
     />
   );
@@ -549,9 +657,11 @@ const DesignlySiteBody = ({
         opened !== null && opened.origin !== null ? new URL(boardHref(id, page), opened.origin).href : null,
       slotError,
       onReload: () => setReloadKey((n) => n + 1),
-      stage,
+      stage: viewing ? undefined : stage,
       pane: pane && { onBack: pane.onBack },
       access: shareButton,
+      viewing,
+      mode: modeButton,
       mayEdit,
       maxed,
       onToggleMax,
@@ -575,17 +685,31 @@ const DesignlySiteBody = ({
       >
         {kindView()}
       </SinopiaStage>
-      {gated?.canManage && project && project.design.kind !== 'slides' && (
-        <PublishDialog
-          open={publishOpen}
-          onClose={() => setPublishOpen(false)}
-          machine={machine}
-          project={id}
-          title={project.design.title}
-          pages={project.design.boards.map((b) => ({ path: b.path, title: b.title || b.path }))}
+      {gated !== null && oneDialog !== null && (
+        <ResourceShare
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          target={{ kind: 'design', id }}
+          title={project?.design.title ?? ''}
+          view={oneDialog}
+          onNext={(next) => {
+            shared.apply(next);
+            // The page's own gate (who may edit pictures, the share button) follows what changed.
+            gate.reload();
+          }}
+          address={shareUrl}
+          onCopyLink={copyLink}
+          focus={accessFocus}
+          links={{
+            project: id,
+            access: gated,
+            onNext: gate.apply,
+            pages: boards,
+          }}
+          publish={mayPublish ? sitePublish : undefined}
         />
       )}
-      {gated !== null && (
+      {gated !== null && oneDialog === null && (
         <ShareDialog
           open={shareOpen}
           onClose={() => setShareOpen(false)}
@@ -594,8 +718,9 @@ const DesignlySiteBody = ({
           access={gated}
           focus={accessFocus}
           onNext={gate.apply}
-          pages={project?.design.boards.map((b) => ({ path: b.path, title: b.title || b.path }))}
+          pages={boards}
           onCopyLink={copyLink}
+          extra={mayPublish ? <PublishSection state={sitePublish} /> : undefined}
           onClaim={async () => {
             await claimOwnership(machine, id);
             const next = await fetchAccess(id);

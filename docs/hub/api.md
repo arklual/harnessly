@@ -197,7 +197,7 @@ The person's numbers are described in [analytics.md](analytics.md#the-person-api
 | `GET /api/spaces/{spaceId}/members` | member | | `{ members: { userId, email, name, role, joinedAt }[] }` |
 | `PATCH /api/spaces/{spaceId}/members/{userId}` | owner | `{ role }` | `{ member }`; 409 `last_owner` |
 | `DELETE /api/spaces/{spaceId}/members/{userId}` | owner, or self | | 204; 409 `last_owner` |
-| `POST /api/spaces/{spaceId}/invites` | owner | `{ emails: string[] }` (≤ 20) | 201 `{ invites: Invite[] }` |
+| `POST /api/spaces/{spaceId}/invites` | owner | `{ emails: string[], role?: "member" \| "owner" }` (≤ 20; `role` is what the invitee becomes, member by default) | 201 `{ invites: Invite[] }` |
 | `POST /api/spaces/{spaceId}/invites/link` | owner | `{ maxUses?: number, days?: 1..7 }` | 201 `{ invite: Invite }`; returns the current active link invite if one exists and the body is empty |
 | `GET /api/spaces/{spaceId}/invites` | owner | | `{ invites: Invite[] }` (active ones; `url` absent: only hashes are kept) |
 | `DELETE /api/spaces/{spaceId}/invites/{inviteId}` | owner | | 204 |

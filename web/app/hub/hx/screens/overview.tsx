@@ -159,6 +159,7 @@ const StaffView = ({
 };
 
 const MemberScreen = ({ period, onPeriod }: ViewProps) => {
+  const { base } = useOrg();
   const { data, error, reload } = useLoad((api) => api.myOverview(period), [period]);
   const shown = useKept<MyOverview>(data);
   const head = <Head role="member" tenantName={null} teamName={null} period={period} onPeriod={onPeriod} />;
@@ -176,7 +177,7 @@ const MemberScreen = ({ period, onPeriod }: ViewProps) => {
         {error ? <LoadFailed error={error} retry={reload} /> : null}
         <div className="an-stage">
           <div className="mx">
-            <MemberView data={shown} period={period} />
+            <MemberView data={shown} period={period} base={base} />
           </div>
         </div>
       </div>

@@ -4,7 +4,7 @@
 // comments (video-comments.tsx). The deck's own parts serve a video too: «Стиль» is DeckStyle on /design/deck/settings,
 // «Поделиться» is DeckShare in its video variant (the format the link opens in). A phone gets the player and a list of scenes instead of the timeline.
 import { useEffect, useState, type ReactNode } from 'react';
-import type { ISiteAccess, ISiteStage } from '@/next/features/designly/site-view';
+import type { ISiteAccess, ISiteMode, ISiteStage } from '@/next/features/designly/site-view';
 import type { MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import { Skeleton } from '@/next/ui/skeleton';
@@ -25,6 +25,7 @@ import {
 import DeckStyle, { DECK_THEMES, deckTheme, useThemeVars } from '@/next/features/designly/deck/deck-style';
 import DeckShare from '@/next/features/designly/deck/deck-share';
 import { shareFormatsOf } from '@/next/features/designly/video/share-view';
+import { DOWNLOAD_UNIT, projectDownloads } from '@/next/features/designly/project-downloads';
 import VideoBar from '@/next/features/designly/video/video-bar';
 import VideoComments from '@/next/features/designly/video/video-comments';
 import VideoPanel, {
@@ -82,8 +83,15 @@ export interface IVideoViewProps {
   /** Set in the right pane beside a chat: the compact column, its chat is the host's. */
   pane?: { onBack: () => void };
   access?: ISiteAccess;
+  /** The video is looked at, without the chat, comments and the author's tools, until the editing is asked for. */
+  viewing?: boolean;
+  /** «Редактировать» / «Запросить доступ» while looking, «Просмотр» while editing; absent in the pane of a chat. */
+  mode?: ISiteMode;
+  /** The person may change the project: «Скачать» offers its files as archives too. */
+  mayEdit?: boolean;
   maxed: boolean;
-  onToggleMax: () => void;
+  /** Null where there is nothing to widen: the full Sinopia view opens its sidebar from the rail itself. */
+  onToggleMax: (() => void) | null;
   onOpenDrawer: () => void;
   /** What shows until the shell is built: the site view of the same project. */
   fallback: ReactNode;
@@ -163,6 +171,7 @@ const VideoView = (props: IVideoViewProps) => {
   const video = useVideo(id);
   const phone = useMedia(VIDEO_PHONE_QUERY);
   const embed = pane !== undefined;
+  const viewing = props.viewing === true;
 
   const [chosen, setChosen] = useState<TVideoFormat | null>(null);
   const [want, setWant] = useState<TVideoSource>(VIDEO_SOURCE.live);
@@ -240,7 +249,7 @@ const VideoView = (props: IVideoViewProps) => {
   const scenes = video.scenes;
   const now = sceneAt(scenes, time);
   const crumb = now ? t('next.video.shell.crumb', { n: scenes.indexOf(now) + 1, time: clock(time) }) : '';
-  const panelMode = embed ? DECK_PANEL.off : panel;
+  const panelMode = embed || viewing ? DECK_PANEL.off : panel;
 
   const togglePop = (which: TPop) => setPop((cur) => (cur === which ? null : which));
   const openPanel = (on: TVideoTab) => {
@@ -314,11 +323,11 @@ const VideoView = (props: IVideoViewProps) => {
         onSource={setWant}
         time={time}
         onTime={setTime}
-        range={phone ? null : range}
-        onRange={phone ? () => undefined : setRange}
+        range={phone || viewing ? null : range}
+        onRange={phone || viewing ? () => undefined : setRange}
         loop={loop}
-        onComment={() => comment(range, null)}
-        onPick={(pick) => comment(null, pick)}
+        onComment={() => !viewing && comment(range, null)}
+        onPick={(pick) => !viewing && comment(null, pick)}
         command={view.command}
         onPlaying={setPlaying}
         overlays={overlays}
@@ -339,6 +348,8 @@ const VideoView = (props: IVideoViewProps) => {
       onKeyDownCapture={view.touch}
     >
       <VideoBar
+        mode={props.mode}
+        viewing={viewing}
         title={title}
         crumb={crumb}
         onBack={back}
@@ -362,9 +373,21 @@ const VideoView = (props: IVideoViewProps) => {
         badge={renderBadge(info)}
         onShare={onShare}
         shareOn={pop === POP.share}
+        downloads={[
+          {
+            id: 'mp4',
+            icon: 'clapperboard',
+            label: t('next.download.videoMp4'),
+            pick: () => setPop(POP.render),
+          },
+          ...projectDownloads(
+            { machine, artifact: id, board: path, archives: props.mayEdit === true },
+            DOWNLOAD_UNIT.scene,
+          ).map((item, i) => (i === 0 ? { ...item, sep: true } : item)),
+        ]}
       />
 
-      {!embed && (
+      {!embed && !viewing && (
         <VideoPanel
           mode={panelMode}
           tab={tab}
@@ -432,7 +455,7 @@ const VideoView = (props: IVideoViewProps) => {
               onRange={setRange}
               loop={loop}
               onLoop={setLoop}
-              onComment={(r) => comment(r, null)}
+              onComment={(r) => !viewing && comment(r, null)}
               onSendToChat={sendToChat}
               overlays={overlays}
             />

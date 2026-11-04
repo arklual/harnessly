@@ -70,6 +70,8 @@ const ACTION: Partial<Record<AuditEntry['action'], string>> = {
   'machine.enable': 'машина включена',
   'machine.restart': 'машина перезапущена',
   'change.create': 'отмечено изменение',
+  'signal.snooze': 'сигнал отложен',
+  'signal.unsnooze': 'сигнал возвращён',
 };
 
 const money = (v: unknown): string => (typeof v === 'number' ? kRub(v) : 'без лимита');

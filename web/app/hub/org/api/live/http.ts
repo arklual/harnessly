@@ -1,5 +1,6 @@
 // The transport of the live org API: the hub's JSON and error body (docs/hub/api.md, orgs.md) turned into OrgApiError.
 import type { Needs } from '../../../../hub-api/orgs';
+import { noteCurrency } from '../../money';
 import { OrgApiError } from '../errors';
 
 const CODES: Record<string, OrgApiError['code']> = {
@@ -55,7 +56,9 @@ const call = async <T>(method: string, path: string, body?: unknown, query?: Que
   }
   if (!res.ok) throw await failureOf(res);
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const out = (await res.json()) as T;
+  noteCurrency(out);
+  return out;
 };
 
 export const http = {

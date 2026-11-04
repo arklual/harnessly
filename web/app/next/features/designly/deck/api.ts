@@ -260,9 +260,13 @@ export const startDeckExport = async (
   rec?: string,
   /** A PDF only: also keep the finished file as the one guests may download (needs the edit role). */
   publish?: boolean,
+  /** A PDF or an HTML of this one board (its id or its path) instead of all of them. */
+  board?: string,
 ): Promise<IDeckExportJob> =>
   must(
-    readDeckExportJob(await runtimeJson(m, deck('/export'), postJson({ artifact, format, rec, publish }))),
+    readDeckExportJob(
+      await runtimeJson(m, deck('/export'), postJson({ artifact, format, rec, publish, board })),
+    ),
   );
 
 export const fetchDeckExport = async (

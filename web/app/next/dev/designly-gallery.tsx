@@ -17,6 +17,7 @@ import { useRouter } from '@/platform/router';
 import { pinLocale } from '@/next/i18n';
 import { NO_EDIT, type IStyleEdit } from '@/next/features/designly/element-style';
 import type { IPicked } from '@/next/features/designly/page-bridge';
+import AgentTerminal from '@/next/features/terminal/agent-terminal';
 import { NotePopover, type INoteDraft } from '@/next/features/designly/site-notes';
 import {
   IslandLast,
@@ -79,6 +80,43 @@ const IslandView = ({ status }: { status: TIslandStatus }) => {
   );
 };
 
+/** The design's section with its chat and the agent's terminal under the chat's field (?view=term&mode=chat|island). */
+const TermView = ({ mode }: { mode: 'chat' | 'island' }) => (
+  <section
+    className="hx-site hx-gallery-dl__site"
+    data-mode={mode}
+    data-dock="left"
+    data-min="false"
+    data-run="idle"
+  >
+    <aside className="hx-site__chat">
+      <div className="hx-site__chat-head">
+        <span className="hx-site__chat-title">Главная страница</span>
+      </div>
+      <div className="hx-site__conv">
+        <div className="hx-chat hx-gallery-dl__chat">
+          <div className="hx-dock">Поле ввода чата</div>
+        </div>
+      </div>
+    </aside>
+    <div className="hx-site__term">
+      <AgentTerminal
+        open
+        url="ws://127.0.0.1:9/terminal"
+        cwd="~/work/design"
+        title="Главная страница"
+        provider="claude"
+        onClose={() => {}}
+      />
+    </div>
+    <div className="hx-site__view">
+      <div className="hx-gallery-dl__page">
+        <a className="hx-gallery-dl__cta">{PICKED.text}</a>
+      </div>
+    </div>
+  </section>
+);
+
 const DesignlyGallery = () => {
   const { query } = useRouter();
   const dark = query.theme === 'dark';
@@ -99,6 +137,12 @@ const DesignlyGallery = () => {
     text,
     style,
   };
+  if (query.view === 'term')
+    return (
+      <div className="hx-root hx-gallery-dl">
+        <TermView mode={query.mode === 'island' ? 'island' : 'chat'} />
+      </div>
+    );
   if (query.view === 'island')
     return (
       <div className="hx-root hx-gallery-dl">

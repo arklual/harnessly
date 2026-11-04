@@ -8,6 +8,7 @@ import { Btn } from '../ui';
 import { Titles } from '../shell';
 import { tenantLead } from './machines/calc';
 import { MachineDrawer } from './machines/drawer';
+import { OpenCtx, useOpenMachine } from './machines/open';
 import { MemberSkeleton, MemberView } from './machines/member-view';
 import { OrgView } from './machines/org-view';
 import { ErrorRow, ListSkeleton } from './machines/parts';
@@ -24,6 +25,7 @@ const Screen = () => {
   const url = useDrawerUrl();
   const list = useMachineList();
   const [adding, setAdding] = useState(false);
+  const ws = useOpenMachine();
 
   // The card stays mounted while it slides away, and a fresh one is mounted every time a machine is opened.
   const [card, setCard] = useState<{ m: string | null; shown: string | null; n: number }>({
@@ -64,7 +66,12 @@ const Screen = () => {
     }
     if (!data) return member ? <MemberSkeleton /> : <ListSkeleton />;
     if (member) return <MemberView list={data} />;
-    return org ? <OrgView list={data} onOpen={url.open} /> : <TenantView list={data} onOpen={url.open} />;
+    const onAdd = canAdd ? () => setAdding(true) : undefined;
+    return org ? (
+      <OrgView list={data} onOpen={url.open} onAdd={onAdd} />
+    ) : (
+      <TenantView list={data} onOpen={url.open} onAdd={onAdd} />
+    );
   };
 
   return (
@@ -73,7 +80,10 @@ const Screen = () => {
         <Titles title={title} lead={data || member ? lead : undefined} />
         {end}
       </div>
-      {content()}
+      {ws.error && !card.shown && (
+        <ErrorRow text={ws.error.text} onRetry={() => void ws.open(ws.error!.id)} />
+      )}
+      <OpenCtx.Provider value={ws}>{content()}</OpenCtx.Provider>
       {canAdd && (
         <AddMachineSheet
           open={adding}
@@ -91,6 +101,10 @@ const Screen = () => {
           mlUrl={data?.mlCoreUrl ?? null}
           url={url}
           onChanged={list.patch}
+          onRemoved={() => {
+            url.close();
+            list.refresh();
+          }}
         />
       )}
     </>

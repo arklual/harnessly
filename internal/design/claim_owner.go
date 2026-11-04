@@ -9,9 +9,14 @@ import (
 	"github.com/ly-solutions/harnessly/internal/locale"
 )
 
-// ClaimOwnerless makes this runtime's person the owner of a project nobody owns: it exists, has no owner file and the
-// snapshot has no row for it. The owner file written is v1 (the gateway then registers the owner on design.claim).
-func (l *Library) ClaimOwnerless(id string) error {
+// ClaimOwnerless makes the person who asked the owner of a project nobody owns: it exists, has no owner file and the
+// snapshot has no row for it. The file names the person (v2, "claimed"): a v1 file named only the Unix user, so on a
+// shared library the runtime that clicked first owned a project another person made («harnessly»). The
+// gateway then registers the owner on design.claim and the team keeps editing. An empty person is the runtime's.
+func (l *Library) ClaimOwnerless(id string) error { return l.ClaimOwnerlessAs(id, "") }
+
+// ClaimOwnerlessAs is ClaimOwnerless for the person of the request.
+func (l *Library) ClaimOwnerlessAs(id, person string) error {
 	if !IsLibraryID(id) || l.ReadArtifact(id) == nil {
 		return &OwnerClaimError{Msg: locale.Pick("There is no such project", "Такого проекта нет"), Status: http.StatusNotFound}
 	}
@@ -22,12 +27,16 @@ func (l *Library) ClaimOwnerless(id string) error {
 			return &OwnerClaimError{Msg: locale.Pick("The project already has an owner", "У проекта уже есть владелец"), Status: http.StatusConflict}
 		}
 	}
-	who, err := l.Identity()
+	who, err := l.IdentityOf(person)
 	if err != nil {
 		return err
 	}
 	file := l.ownerPath(id)
-	body := append(jsvalue.Stringify(jsvalue.NewObject("v", 1, "user", who.Runtime, "name", who.Person), "  "), '\n')
+	obj := jsvalue.NewObject("v", 2, "user", who.Runtime, "name", who.Person, "private", false, "claimed", true)
+	if who.PersonID != "" {
+		obj.Set("person", who.PersonID)
+	}
+	body := append(jsvalue.Stringify(obj, "  "), '\n')
 	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		if os.IsExist(err) {
@@ -65,7 +74,7 @@ func (a *API) ClaimProject(r *http.Request) Answer {
 	if !IsLibraryID(project) {
 		return JSON(r, 400, errorBody(locale.Pick("Unknown design", "Неизвестный макет")), noStore())
 	}
-	if err := a.L.ClaimOwnerless(project); err != nil {
+	if err := a.L.ClaimOwnerlessAs(project, a.person(r)); err != nil {
 		if ce, ok := err.(*OwnerClaimError); ok {
 			return JSON(r, ce.Status, errorBody(ce.Msg), noStore())
 		}

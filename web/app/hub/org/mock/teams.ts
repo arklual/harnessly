@@ -506,6 +506,7 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
         const canTeamLimit = role === 'admin';
         return {
           id: t.id,
+          tenantId: `t-${slug}`,
           name: t.name,
           leadName: t.lead,
           spentRub: members.reduce((n, p) => n + p.spent, 0),
@@ -578,12 +579,14 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
       notAccepted: all.filter((p) => p.invited).length,
       notVisiting: all.filter((p) => !p.invited && (p.ago ?? 0) >= 7 * 24).length,
       can: { createTeam: role === 'admin', invite: role !== 'member' },
+      // The mock keeps what the live hub does not: machines per person, accounts and secrets.
+      supports: { teamExtras: true },
       spendKnown: true,
     };
   };
   const find = (id: string) => {
     const p = people.find((x) => x.id === id);
-    if (!p) throw new OrgApiError('not_found', 'person not found');
+    if (!p) throw new OrgApiError('not_found', 'Такого человека нет');
     return p;
   };
   const forbid = (p: P, field: 'limit' | 'role' | 'team' | 'remove') => {
@@ -612,7 +615,7 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
         limitSetAt.set(p.id, Date.now());
       } else if (on.kind === 'team') {
         const t = teamOf(on.id);
-        if (!t) throw new OrgApiError('not_found', 'team not found');
+        if (!t) throw new OrgApiError('not_found', 'Такой команды нет');
         if (role !== 'admin') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
         if (amount === null) throw new OrgApiError('invalid_request', 'У команды лимит есть всегда.');
         const inPlatform = s === 'platform';
@@ -688,13 +691,34 @@ export const teamsMock = (ctx: MockCtx): TeamsApi => {
       people.splice(people.indexOf(p), 1);
       return later(view(s), 500);
     },
-    createTeam: async (_o, s, name) => {
+    createTeam: async (_o, s, name, _tenantId) => {
       if (role !== 'admin') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
       const trimmed = name.trim();
       if (trimmed.length < 1 || trimmed.length > 60)
         throw new OrgApiError('invalid_request', 'Название — от 1 до 60 знаков.');
       teams.push({ id: `tm-${seq++}`, name: trimmed, lead: '', limit: 50_000 });
       log('team.create', { kind: 'team', id: trimmed, label: trimmed }, null, { name: trimmed });
+      return later(view(s), 500);
+    },
+    renameTeam: async (_o, s, teamId, name) => {
+      if (role !== 'admin') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
+      const t = teamOf(teamId);
+      if (!t) throw new OrgApiError('not_found', 'Такой команды нет');
+      const trimmed = name.trim();
+      if (trimmed.length < 1 || trimmed.length > 60)
+        throw new OrgApiError('invalid_request', 'Название — от 1 до 60 знаков.');
+      log('team.update', { kind: 'team', id: t.id, label: trimmed }, { name: t.name }, { name: trimmed });
+      t.name = trimmed;
+      return later(view(s), 400);
+    },
+    deleteTeam: async (_o, s, teamId) => {
+      if (role !== 'admin') throw new OrgApiError('forbidden', 'У вашей роли нет доступа к этому.');
+      const t = teamOf(teamId);
+      if (!t) throw new OrgApiError('not_found', 'Такой команды нет');
+      log('team.delete', { kind: 'team', id: t.id, label: t.name }, { name: t.name }, null);
+      // The people stay in the tenant without a team.
+      for (const p of people) if (p.team === teamId) p.team = null;
+      teams.splice(teams.indexOf(t), 1);
       return later(view(s), 500);
     },
     teamsAudit: async (_o, _s, before): Promise<AuditPage> => {

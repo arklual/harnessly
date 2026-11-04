@@ -157,10 +157,11 @@ func previewOf(d deps) *previewSet {
 		Forbidden:           hidden,
 		Stands: preview.Stands{Domain: os.Getenv("RUNTIME_STAND_DOMAIN"), SignInHosts: splitList(os.Getenv("RUNTIME_PREVIEW_SIGN_IN_HOSTS")),
 			SessionHeader: os.Getenv("RUNTIME_PREVIEW_STAND_SESSION_HEADER")},
-		SelfIPs: os.Getenv("RUNTIME_PREVIEW_SELF_IPS"),
-		Store:   store,
-		Cache:   preview.NewAssetCache(filepath.Join(d.DataDir, "preview-cache"), preview.DefaultMaxTotalBytes, preview.DefaultMaxFileBytes),
-		Bridge:  previewBridgeScript(os.Getenv("RUNTIME_PREVIEW_BRIDGE_FILE")),
+		SelfIPs:      os.Getenv("RUNTIME_PREVIEW_SELF_IPS"),
+		PrivateHosts: splitList(os.Getenv("RUNTIME_PREVIEW_PRIVATE_HOSTS")),
+		Store:        store,
+		Cache:        preview.NewAssetCache(filepath.Join(d.DataDir, "preview-cache"), preview.DefaultMaxTotalBytes, preview.DefaultMaxFileBytes),
+		Bridge:       previewBridgeScript(os.Getenv("RUNTIME_PREVIEW_BRIDGE_FILE")),
 	}
 	if d.Upstream != "" {
 		cfg.Fallback = previewOldRuntime(d.Upstream)

@@ -12,6 +12,7 @@ import { kRub, needsText } from '../../org/screens/teams/format';
 import { Btn, Icon, initial, usePop } from '../ui';
 import { Titles } from '../shell';
 import { InviteSheet } from './teams/extra';
+import { TeamEditSheet } from './teams/team-edit';
 import {
   budgetOf,
   envSummary,
@@ -28,6 +29,7 @@ import { useUrl } from './teams/url';
 import { type Op, useTeams } from './teams/use-teams';
 
 const CARDS = ['p', 'dlg'] as const;
+
 const ROLES: MemberRole[] = ['lead', 'member'];
 const ROLE_LABEL: Record<MemberRole, string> = { lead: 'Руководитель', member: 'Участник' };
 
@@ -143,12 +145,15 @@ const Limits = ({
   apply,
   onLimit,
   canMachines,
+  extras,
 }: {
   b: TeamBlock;
   base: string;
   apply: (op: Op) => Promise<boolean>;
   onLimit: () => void;
   canMachines: boolean;
+  /** The hub keeps machines per person, shared accounts and secrets; when it does not, the rows are not drawn. */
+  extras: boolean;
 }) => {
   const bud = budgetOf(b);
   const x = b.extras;
@@ -180,49 +185,53 @@ const Limits = ({
             </span>
           )}
         </div>
-        <div className="hx-set__row">
-          <div className="hx-set__row-text">
-            <span className="hx-set__row-label">Машин на человека</span>
-            <span className="hx-set__row-hint">{machinesHint(b)}</span>
-          </div>
-          <div className="hx-set__seg" role="radiogroup" data-off={!canMachines || undefined}>
-            {[1, 2, 3].map((n) => (
-              <button
-                key={n}
-                type="button"
-                className="hx-set__seg-item"
-                role="radio"
-                aria-checked={per === n}
-                disabled={!canMachines}
-                onClick={() => {
-                  if (b.id && per !== n) void apply(machinesPerPerson(b.id, n));
-                }}
-              >
-                {n}
+        {extras && (
+          <>
+            <div className="hx-set__row">
+              <div className="hx-set__row-text">
+                <span className="hx-set__row-label">Машин на человека</span>
+                <span className="hx-set__row-hint">{machinesHint(b)}</span>
+              </div>
+              <div className="hx-set__seg" role="radiogroup" data-off={!canMachines || undefined}>
+                {[1, 2, 3].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className="hx-set__seg-item"
+                    role="radio"
+                    aria-checked={per === n}
+                    disabled={!canMachines}
+                    onClick={() => {
+                      if (b.id && per !== n) void apply(machinesPerPerson(b.id, n));
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="hx-set__row">
+              <div className="hx-set__row-text">
+                <span className="hx-set__row-label">Общие аккаунты</span>
+                <span className="hx-set__row-hint">Агенты людей команды входят через общие подписки</span>
+              </div>
+              <button type="button" className="hx-set__link" onClick={goEnv}>
+                {x?.accounts ?? '—'}
+                <Icon i="chevron-right" size="sm" />
               </button>
-            ))}
-          </div>
-        </div>
-        <div className="hx-set__row">
-          <div className="hx-set__row-text">
-            <span className="hx-set__row-label">Общие аккаунты</span>
-            <span className="hx-set__row-hint">Агенты людей команды входят через общие подписки</span>
-          </div>
-          <button type="button" className="hx-set__link" onClick={goEnv}>
-            {x?.accounts ?? '—'}
-            <Icon i="chevron-right" size="sm" />
-          </button>
-        </div>
-        <div className="hx-set__row">
-          <div className="hx-set__row-text">
-            <span className="hx-set__row-label">Секреты</span>
-            <span className="hx-set__row-hint">Приходят на машины команды, значения не видны никому</span>
-          </div>
-          <button type="button" className="hx-set__link" onClick={goEnv}>
-            {secretsText(x?.secrets)}
-            <Icon i="chevron-right" size="sm" />
-          </button>
-        </div>
+            </div>
+            <div className="hx-set__row">
+              <div className="hx-set__row-text">
+                <span className="hx-set__row-label">Секреты</span>
+                <span className="hx-set__row-hint">Приходят на машины команды, значения не видны никому</span>
+              </div>
+              <button type="button" className="hx-set__link" onClick={goEnv}>
+                {secretsText(x?.secrets)}
+                <Icon i="chevron-right" size="sm" />
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -254,6 +263,7 @@ const Body = ({
       b={b}
       base={base}
       apply={apply}
+      extras={view.supports.teamExtras}
       canMachines={b.can.limit && !!b.id}
       onLimit={() => url.open({ dlg: 'limit', p: null })}
     />
@@ -296,7 +306,7 @@ const Page = ({ teamId }: { teamId: string | null }) => {
   const [seen, setSeen] = useState<{ slug: string; name: string }[]>([]);
   const own = scope.kind === 'org' ? 'all' : scope.tenant.slug;
   const slug = tn ?? own;
-  const { view, error, reload, apply, problem, clearProblem } = useTeams(slug);
+  const { view, error, reload, refresh, apply, problem, clearProblem } = useTeams(slug);
 
   const b = view ? (view.teams.find((t) => (teamId ? t.id === teamId : t.id !== null)) ?? null) : null;
   const tenants = b?.extras?.tenants;
@@ -311,18 +321,28 @@ const Page = ({ teamId }: { teamId: string | null }) => {
   const current = tabs.find((t) => t.slug === slug);
   const tenantName =
     b?.extras?.tenantName ?? current?.name ?? (scope.kind === 'tenant' ? scope.tenant.name : null);
-  const invitee = shell.tenants.find((t) => t.slug === slug) ?? null;
+  // The tenant to invite to: the open one, else the tenant of the team (in the «all» view the slug names none).
+  const invitee =
+    shell.tenants.find((t) => t.slug === slug) ?? shell.tenants.find((t) => t.id === b?.tenantId) ?? null;
+  const admin = shell.viewer.role === 'admin';
 
   const lead = b ? teamLead(b) : '';
   return (
     <>
       <div className="ad-head">
         <Titles title={b?.name ?? 'Команда'} lead={lead} />
-        {b && view?.can.invite && invitee && (
+        {b && view && (
           <div className="ad-tools">
-            <Btn size="sm" icon="mail" data-variant="outline" onClick={() => url.open({ dlg: 'invite' })}>
-              Пригласить
-            </Btn>
+            {admin && b.id && (
+              <Btn size="sm" icon="pencil" data-variant="outline" onClick={() => url.open({ dlg: 'edit' })}>
+                Изменить
+              </Btn>
+            )}
+            {view.can.invite && invitee && (
+              <Btn size="sm" icon="mail" data-variant="outline" onClick={() => url.open({ dlg: 'invite' })}>
+                Пригласить
+              </Btn>
+            )}
           </div>
         )}
       </div>
@@ -356,12 +376,26 @@ const Page = ({ teamId }: { teamId: string | null }) => {
           url={url}
         />
       )}
+      {b && view && admin && b.id && (
+        <TeamEditSheet
+          open={url.get('dlg') === 'edit'}
+          teamId={b.id}
+          name={b.name}
+          peopleCount={b.people.length}
+          taken={view.teams.filter((t) => t.id !== b.id).map((t) => t.name)}
+          canDelete
+          apply={apply}
+          problem={problem}
+          onClose={() => url.close()}
+          onDeleted={() => navigate(`${base}/teams`)}
+        />
+      )}
       {invitee && (
         <InviteSheet
           open={url.get('dlg') === 'invite'}
-          tenant={invitee}
+          tenants={[invitee]}
           onClose={() => url.close()}
-          onChanged={reload}
+          onChanged={refresh}
         />
       )}
     </>

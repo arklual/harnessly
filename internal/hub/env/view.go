@@ -69,6 +69,8 @@ type EntryItem struct {
 	Spark14      []int64      `json:"spark14"`
 	LastUsedAt   *string      `json:"lastUsedAt"`
 	Unused       *bool        `json:"unused"`
+	// Delivery is what the machines holding the current list said about the item; nil: none of them reported it.
+	Delivery *ItemDelivery `json:"delivery"`
 }
 
 // LayerView is one layer with its rows.
@@ -99,6 +101,8 @@ type Response struct {
 	// Observed is what the machines of the screen's tenants (and team) called in the last month, in the environment or
 	// not: the list the environment is filled from.
 	Observed []ObservedTool `json:"observed"`
+	// Delivery is how many of the screen's machines hold the list.
+	Delivery Delivery `json:"delivery"`
 }
 
 // ObservedTool is a skill or an MCP server the machines called: Name is as the chats name it (the skill, the MCP
