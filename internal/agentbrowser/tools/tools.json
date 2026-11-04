@@ -376,5 +376,49 @@
       ],
       "additionalProperties": false
     }
+  },
+  {
+    "name": "browser_profiles",
+    "description": "List only browser profiles allowed to this chat and the current profile.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_use_profile",
+    "description": "Select an allowed browser profile by name. Closes this chat's tabs in the previous profile.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "An allowed profile name from browser_profiles."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_request_profile",
+    "description": "Ask the person for another browser profile. Waits up to 55 seconds; when waiting, call again with the same reason. No access is granted until the person answers.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "why": {
+          "type": "string",
+          "description": "Why this chat needs another browser profile."
+        }
+      },
+      "required": [
+        "why"
+      ],
+      "additionalProperties": false
+    }
   }
 ]

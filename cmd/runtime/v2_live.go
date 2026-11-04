@@ -140,6 +140,9 @@ func newV2Live(d deps, c *core) *v2Live {
 	uploads := &wire.Uploads{Dir: filepath.Join(d.DataDir, "v2", "uploads"), Limits: wire.DefaultLimits}
 	ses := newV2Sessions(d.Home, func() map[string]string { return v.rt.AttachedSessions() })
 	publisher := autoOpenPublisher{hub: v.hub, watch: v.newPaneWatcher()}
+	if d.BrowserTools != nil {
+		publisher.browser = d.BrowserTools.Access
+	}
 	// The terminals are stopped by tmux and /proc; without tmux there is nothing to stop.
 	runtimeSettings := &wire.FileRuntimeSettings{Path: filepath.Join(d.DataDir, "v2", "runtime-settings.json")}
 	var terminals convo.Terminals

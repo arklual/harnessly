@@ -1155,6 +1155,9 @@ func (r *Runtime) hasProject(id string) bool {
 	return false
 }
 
+// Project returns local project metadata without entering a conversation actor.
+func (r *Runtime) Project(id string) (wire.Project, bool) { return r.project(id) }
+
 func (r *Runtime) project(id string) (wire.Project, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -332,7 +332,7 @@ tab, issue and pull request links show as chips with their state.
 
 ### Agent browser
 
-The agent browser starts lazily with profile `common`, separate from the VNC browser.
+The agent browser starts lazily with a project-specific profile, separate from the VNC browser.
 Its detached `browser-host` process keeps Chrome alive across runtime restarts. Managed
 profiles live in `<data>/agent-browser/profiles/<id>/chrome`; metadata and the bounded
 `host.log` live beside that directory. Private sockets live in `<data>/agent-browser/run`,
@@ -347,7 +347,19 @@ The runtime service must use `KillMode=process` to preserve the host on restart.
 | `RUNTIME_BROWSER_DOWNLOAD` | `off` forbids automatic downloads; system browsers and the verified installed cache remain usable |
 | `RUNTIME_BROWSER_CHROME_URL` | full archive URL for an internal mirror; the pinned SHA-256 is still mandatory |
 | `RUNTIME_BROWSER_MODE` | `auto` (default), `xvfb`, or `headless`; auto uses a private Xvfb when available, otherwise `--headless=new` |
-| `RUNTIME_BROWSER_CHROME_ARGS` | extra whitespace-separated Chrome arguments, also used by the VNC browser; `--no-sandbox` is never added automatically |
+| `RUNTIME_BROWSER_CHROME_ARGS` | extra whitespace-separated Chrome arguments, also used by the VNC browser; managed agent profiles use the explicit Settings → Browser sandbox preference instead of sandbox flags in this variable |
+| `RUNTIME_BROWSER_IDLE` | opt-in idle shutdown as a Go duration, e.g. `30m`; unset or `0` disables it. A profile with no viewers or calls stops and restores tabs on next use. Ordinary Chrome restart drops session cookies, so idle shutdown is disabled by default |
+
+Profiles and machine-local project/chat permissions are stored atomically in
+`<data>/agent-browser/profiles.json` with mode `0600`. Each project gets its own managed profile on first use.
+Chats without a project use the existing `common` directory. Sharing requires a person to grant access through
+Settings → Browser, project settings, or a `browser_request_profile` card. MCP and CLI share the same permission
+checks; `browser_profiles` and `browser_use_profile` never enumerate other projects' profile names.
+
+Settings → Browser can copy an existing Chrome user-data folder after its Chrome has stopped. Every import shows an explicit warning that cookies depending on a system key store may require signing in again;
+managed profiles use
+`--password-store=basic`. The sandbox switch is an explicit fallback for machines without a usable sandbox,
+affects new managed launches, and never changes the externally owned browser of an attached profile.
 
 ### Browser preparation and diagnostics
 
@@ -356,7 +368,7 @@ under `<data>/agent-browser/chrome/<version>/` after SHA-256 verification. Inter
 profiles and runtime processes share a download lock. Old versions are removed only after their browser hosts exit;
 active hosts retain a shared lease on their Chrome resources.
 
-The first request starts preparation. Tools can use `Manager.Ready(ctx)` before `InstanceFor`: `preparing` includes
+The first request starts preparation. Panels use `Manager.ReadyFor(ctx, conv)` before `InstanceFor`: `preparing` includes
 `progress` (0–100) and `hint`; retry in 20 seconds. The panel receives the same status until ready. Readiness `up` means
 the executable passed its pipe/renderer probe; a profile still starts through `InstanceFor`. A failed preparation
 reports `error` with a copyable `command`. After a system repair, `Ready` retries once 15 seconds have passed;

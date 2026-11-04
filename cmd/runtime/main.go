@@ -384,9 +384,41 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 			return claims
 		},
 	}
-	agentBrowser := agentbrowser.New(agentbrowser.ConfigFromEnv(cfg.DataDir))
-	d.BrowserTools = &browsertools.Service{Manager: agentBrowser}
+	browserConfig := agentbrowser.ConfigFromEnv(cfg.DataDir)
+	browserProfiles := agentbrowser.OpenProfiles(cfg.DataDir, browserConfig.CDP)
+	browserAccess := agentbrowser.NewProfileAccess(browserProfiles, func(id string) (agentbrowser.ConversationIdentity, bool) {
+		v := ref.c.v2.Load()
+		if v == nil {
+			return agentbrowser.ConversationIdentity{}, false
+		}
+		rec, ok := v.rt.Record(id)
+		if !ok {
+			return agentbrowser.ConversationIdentity{}, false
+		}
+		identity := agentbrowser.ConversationIdentity{Title: rec.Title}
+		if rec.ProjectID != nil {
+			identity.Project = *rec.ProjectID
+			if project, found := v.rt.Project(*rec.ProjectID); found {
+				identity.ProjectName = project.Name
+			}
+		}
+		return identity, true
+	})
+	browserConfig.ProfileOf = browserAccess.ProfileOf
+	browserConfig.LookupProfile = browserProfiles.Lookup
+	browserConfig.NoSandbox = browserProfiles.NoSandbox
+	agentBrowser := agentbrowser.New(browserConfig)
+	browserAccess.Manager = agentBrowser
+	d.BrowserTools = &browsertools.Service{Manager: agentBrowser, Access: browserAccess}
 	ref.c.v2d = &d
+	f.Add(agentBrowserProfileRoutes(d, browserAccess, func(id string) bool {
+		v := ref.c.v2.Load()
+		if v == nil {
+			return false
+		}
+		_, ok := v.rt.Project(id)
+		return ok
+	})...)
 	f.Add(agentBrowserRoutes(d, agentBrowser, func(id string) bool {
 		v := ref.c.v2.Load()
 		if v == nil {

@@ -233,7 +233,7 @@ setTimeout(()=>{const h=document.createElement('h2');h.textContent='Delayed cont
 			}))
 			defer mcp.Close()
 			c := mcpClient{t, mcp.URL, "chat-a", "fixture-password-" + mode, mcp.Client()}
-			if list := c.rpc("tools/list", nil)["tools"].([]any); len(list) != 18 {
+			if list := c.rpc("tools/list", nil)["tools"].([]any); len(list) != 21 {
 				t.Fatalf("tools: %d", len(list))
 			}
 			t.Run("cold_start", func(t *testing.T) {
