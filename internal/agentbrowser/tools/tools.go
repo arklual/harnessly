@@ -89,6 +89,11 @@ func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsv
 	if err != nil {
 		return mcpserver.TextResult(err.Error(), true)
 	}
+	// A large accessibility tree can take longer than an ordinary action, especially
+	// in a background renderer. Keep the budget bounded and configurable per snapshot.
+	if name == "browser_snapshot" && !args.Has("timeout_ms") {
+		a.TimeoutMS = 30000
+	}
 	startup, stop := context.WithTimeout(ctx, 800*time.Millisecond)
 	i, err := t.S.Manager.InstanceFor(startup, t.Caller)
 	stop()

@@ -102,6 +102,13 @@
         "interactive_only": {
           "type": "boolean",
           "description": "Show interactive roles and context headings only. Keep the same value for continuation pages."
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000,
+          "default": 30000,
+          "description": "Snapshot time budget; large accessibility trees can take several seconds."
         }
       },
       "required": [],
