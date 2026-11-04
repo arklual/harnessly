@@ -192,7 +192,7 @@ func (t Tools) call(ctx context.Context, i *agentbrowser.Instance, name string, 
 				return nil, err
 			}
 			if a.URL != "about:blank" {
-				if _, err = i.AgentCall(ctx, t.Caller, a.Tab, "Page.navigate", map[string]any{"url": a.URL}); err != nil {
+				if err = t.navigate(ctx, i, a.Tab, a.URL); err != nil {
 					return nil, err
 				}
 			}
@@ -253,7 +253,7 @@ func (t Tools) call(ctx context.Context, i *agentbrowser.Instance, name string, 
 	case "browser_wait_for":
 		output, err = t.waitFor(ctx, i, st, a)
 	case "browser_navigate":
-		_, err = i.AgentCall(ctx, t.Caller, a.Tab, "Page.navigate", map[string]any{"url": a.URL})
+		err = t.navigate(ctx, i, a.Tab, a.URL)
 	case "browser_resize":
 		err = i.AgentSetViewport(ctx, t.Caller, a.Tab, agentbrowser.Viewport{Mode: "fixed", W: a.Width, H: a.Height, DPR: 1})
 	default:
@@ -295,4 +295,21 @@ func (t Tools) redact(text string) string {
 		}
 	}
 	return text
+}
+
+func (t Tools) navigate(ctx context.Context, i *agentbrowser.Instance, id, url string) error {
+	raw, err := i.AgentCall(ctx, t.Caller, id, "Page.navigate", map[string]any{"url": url})
+	if err != nil {
+		return err
+	}
+	var result struct {
+		ErrorText string `json:"errorText"`
+	}
+	if err = json.Unmarshal(raw, &result); err != nil {
+		return err
+	}
+	if result.ErrorText != "" {
+		return errors.New("Navigation failed: " + result.ErrorText)
+	}
+	return nil
 }
