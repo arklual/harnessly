@@ -265,7 +265,8 @@ func (t Tools) buildSnapshot(ctx context.Context, i *agentbrowser.Instance, st *
 				if n.Value.Value != nil && !password {
 					value = " value=" + jsonText(n.Value.Value)
 				}
-				line := fmt.Sprintf("%s[%s] %v %s%s", strings.Repeat("  ", min(depth, 24)), ref, n.Role.Value, jsonText(n.Name.Value), value)
+				line := fmt.Sprintf("%s[%s] %v %s%s%s", strings.Repeat("  ", min(depth, 24)),
+					ref, n.Role.Value, jsonText(n.Name.Value), value, linkTarget(n))
 				lines = append(lines, snapshotLine{line, ref, nodeRef{n.Backend, scope.session, scope.frame, versions[scope.frame]}})
 				depth++
 			}
@@ -441,4 +442,25 @@ func (t Tools) isolated(ctx context.Context, i *agentbrowser.Instance, id string
 		return nil, err
 	}
 	return result.Result.Value, nil
+}
+
+func linkTarget(n axNode) string {
+	if n.Role.Value != "link" {
+		return ""
+	}
+	for _, property := range n.Properties {
+		if property.Name != "url" {
+			continue
+		}
+		url, ok := property.Value.Value.(string)
+		if !ok || url == "" {
+			return ""
+		}
+		const limit = 240
+		if len(url) > limit {
+			url = strings.ToValidUTF8(url[:limit], "") + "… [URL truncated]"
+		}
+		return " href=" + jsonText(url)
+	}
+	return ""
 }

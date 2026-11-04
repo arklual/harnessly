@@ -176,7 +176,9 @@ func TestChromeMCP(t *testing.T) {
 				switch r.URL.Path {
 				case "/controls":
 					fmt.Fprint(w, `<label>Region<select id="region" oninput="document.body.dataset.input=this.value" onchange="document.body.dataset.change=this.value"><option value="us">America</option><option value="eu">Europe</option></select></label>
-<div role="combobox" aria-label="Custom" tabindex="0">Choose</div><button id="hidden">Hidden later</button>`)
+<div role="combobox" aria-label="Custom" tabindex="0">Choose</div><button id="hidden">Hidden later</button>
+<a href="/one">Same link</a><a href="/two">Same link</a>`)
+					fmt.Fprintf(w, `<a href="/long?value=%s">Long target</a>`, strings.Repeat("a", 300))
 				case "/large":
 					fmt.Fprint(w, `<h1>Large page context</h1><p>Noninteractive explanation</p><iframe src="/frame"></iframe>`)
 					for n := 0; n < 5000; n++ {
@@ -452,6 +454,20 @@ window.addEventListener('keydown',e=>document.body.dataset.code=e.code);true`})
 				large := c.text("evaluate", map[string]any{"expression": "'x'.repeat(40000)"})
 				if len(large) > resultLimit+256 || !strings.Contains(large, "truncated") {
 					t.Fatal("evaluation limit missing")
+				}
+			})
+			c.t = t
+			t.Run("link_targets", func(t *testing.T) {
+				c.t = t
+				c.text("navigate", map[string]any{"url": page.URL + "/controls"})
+				snapshot := c.text("snapshot", nil)
+				for _, target := range []string{page.URL + "/one", page.URL + "/two"} {
+					if !strings.Contains(snapshot, "href="+jsonText(target)) {
+						t.Fatalf("link destination missing: %s", target)
+					}
+				}
+				if !strings.Contains(snapshot, "[URL truncated]") || strings.Contains(snapshot, strings.Repeat("a", 300)) {
+					t.Fatal("long href was not shortened")
 				}
 			})
 			c.t = t
