@@ -96,6 +96,7 @@ setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
 				m, func(id string) bool { return id == "known" })[0].Handler
 			server := httptest.NewServer(handler)
 			defer server.Close()
+			started := time.Now()
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
 			ws, _, err := websocket.Dial(ctx, "ws"+server.URL[4:]+"/api/agent-browser?conv=known",
@@ -137,6 +138,7 @@ setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
 				}
 			}
 			readTabs(0, "")
+			t.Logf("browser ready after %s", time.Since(started))
 			send(agentbrowser.Input{T: "tab.new", URL: page.URL})
 			a := readTabs(1, "")
 			if a.Tabs[0].Owner != "this" || a.Tabs[0].By != "person" {
@@ -150,6 +152,7 @@ setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
 			}
 			send(agentbrowser.Input{T: "tab.select", ID: first})
 			selected := readTabs(2, first)
+			t.Logf("first tab reselected after %s (generation %d)", time.Since(started), selected.Gen)
 			if selected.Gen <= b.Gen {
 				t.Fatal("selection did not advance generation")
 			}
@@ -159,6 +162,7 @@ setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
 					t.Fatal(e)
 				}
 				if typ != websocket.MessageBinary {
+					t.Logf("waiting for selected frame after %s: %s", time.Since(started), raw)
 					continue
 				}
 				if len(raw) < 16 || binary.BigEndian.Uint32(raw[8:]) != selected.Gen {
@@ -167,6 +171,7 @@ setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
 				if binary.BigEndian.Uint32(raw) == 0 || binary.BigEndian.Uint32(raw[4:]) == 0 || raw[12] != 0xff || raw[13] != 0xd8 {
 					t.Fatal("bad JPEG frame")
 				}
+				t.Logf("selected frame received after %s", time.Since(started))
 				break
 			}
 			send(agentbrowser.Input{T: "viewport", Mode: "mobile", W: 390, H: 844, DPR: 1})

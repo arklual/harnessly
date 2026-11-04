@@ -119,7 +119,12 @@ func (i *Instance) startCast(ctx context.Context, id string, b binding) error {
 		_, err := b.conn.Call(ctx, "Page.startScreencast", map[string]any{
 			"format": "jpeg", "quality": 75, "maxWidth": 1920, "maxHeight": 1400,
 		}, b.session)
-		if err == nil || err.Error() != "Not attached to an active page" {
+		// A canceled selection can abandon the reply after Chrome has started the
+		// stream. Reuse it when the next viewer subscribes on the same session.
+		if err == nil || err.Error() == "Screencast is already active" {
+			return nil
+		}
+		if err.Error() != "Not attached to an active page" {
 			return err
 		}
 		select {
