@@ -297,6 +297,9 @@ func (t Tools) call(ctx context.Context, i *agentbrowser.Instance, name string, 
 		if a.Expression == "" {
 			return nil, errors.New("expression is required")
 		}
+		if err = i.CheckPersonDocuments(ctx, t.Caller, a.Tab); err != nil {
+			return nil, err
+		}
 		if err = i.MarkScripted(t.Caller, a.Tab); err != nil {
 			return nil, err
 		}

@@ -2,12 +2,14 @@ package agentbrowser
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"time"
 )
 
-// personInput guards human keyboard/text dispatch and persists its first dirty
-// transition before Chrome receives input. AgentCall never uses this path.
-func (i *Instance) personInput(id string) (func(), error) {
+// personInput guards human keyboard/text dispatch and persists dirty/document
+// transitions before Chrome receives input. AgentCall never uses this path.
+func (i *Instance) personInput(ctx context.Context, id string) (func(), error) {
 	i.mu.Lock()
 	p := i.pages[id]
 	i.mu.Unlock()
@@ -15,15 +17,21 @@ func (i *Instance) personInput(id string) (func(), error) {
 		return nil, errors.New("unknown browser tab")
 	}
 	p.controlMu.Lock()
+	readCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	marker, err := i.personDocument(readCtx, id)
+	cancel()
+	if err != nil {
+		marker = unknownHandoffDocument
+	}
 	i.mu.Lock()
 	if i.pages[id] != p {
 		i.mu.Unlock()
 		p.controlMu.Unlock()
 		return nil, errors.New("unknown browser tab")
 	}
-	dirty := !p.PersonInput
+	dirty := !p.PersonInput || p.PersonDocument != marker
 	if dirty {
-		p.PersonInput = true
+		p.PersonInput, p.PersonDocument = true, marker
 		i.changedLocked()
 	}
 	i.mu.Unlock()
@@ -94,6 +102,83 @@ func (i *Instance) inspectPersonInput(ctx context.Context, conv, id string) erro
 	i.mu.Unlock()
 	if err != nil || saveErr != nil {
 		return errors.New("browser tab sealed: personal input inspection failed; navigate or close the tab and retry")
+	}
+	return nil
+}
+
+// personDocument reads browser-owned metadata without running page JavaScript.
+func (i *Instance) personDocument(ctx context.Context, id string) (string, error) {
+	raw, err := i.Call(ctx, id, "Page.getFrameTree", nil)
+	if err != nil {
+		return "", err
+	}
+	var result struct {
+		Tree handoffTree `json:"frameTree"`
+	}
+	if json.Unmarshal(raw, &result) != nil || result.Tree.Frame.Loader == "" {
+		return "", errors.New("browser document unavailable")
+	}
+	return result.Tree.Frame.Loader, nil
+}
+
+// ErrPersonDocument keeps agent JavaScript away from a document containing human input.
+var ErrPersonDocument = errors.New("The person typed on this page; JavaScript is unavailable here until the tab loads " +
+	"a new document (navigating to the same address works). Use browser_snapshot.")
+
+// CheckPersonDocuments checks the live opener component before marking or executing
+// agent JavaScript. Other tools and independent tabs do not use this guard.
+func (i *Instance) CheckPersonDocuments(ctx context.Context, conv, id string) error {
+	if err := i.agentAllowed(conv, id, "Runtime.evaluate"); err != nil {
+		return err
+	}
+	i.mu.Lock()
+	var pages []*page
+	for related := range i.openerComponentLocked(id) {
+		if p := i.pages[related]; p != nil {
+			pages = append(pages, p)
+		}
+	}
+	i.mu.Unlock()
+	for _, p := range pages {
+		if err := i.checkPersonDocument(ctx, p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *Instance) checkPersonDocument(ctx context.Context, p *page) error {
+	p.controlMu.Lock()
+	defer p.controlMu.Unlock()
+	i.mu.Lock()
+	present, marker, control := i.pages[p.ID] == p, p.PersonDocument, p.Control
+	i.mu.Unlock()
+	if !present {
+		return nil
+	}
+	if control == "person" {
+		return ErrPersonControl
+	}
+	if marker == "" {
+		return nil
+	}
+	readCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	current, err := i.personDocument(readCtx, p.ID)
+	cancel()
+	if err != nil {
+		return ErrPersonDocument
+	}
+	if marker == unknownHandoffDocument {
+		i.mu.Lock()
+		p.PersonDocument = current
+		i.changedLocked()
+		i.mu.Unlock()
+		i.save()
+		// Refuse this call even after the unknown marker has been anchored.
+		return ErrPersonDocument
+	}
+	if marker == current {
+		return ErrPersonDocument
 	}
 	return nil
 }

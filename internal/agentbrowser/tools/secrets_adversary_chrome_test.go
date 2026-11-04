@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -491,6 +490,65 @@ for(const type of ['hidden','checkbox','radio','submit','button','reset','file',
 						a.t.Fatal("non-text input entered the mask")
 					}
 				}
+				a.c.refuses("evaluate", map[string]any{"expression": "1"}, "The person typed")
+			})
+			run("person-document-custom-editor", func(a *secretAttack) {
+				a.open("/landing")
+				i, tab := a.instance(), a.tab()
+				_, err := i.Call(a.t.Context(), tab, "Runtime.evaluate", map[string]any{"expression": "const e=document.createElement('div');e.contentEditable='true';e.setAttribute('role','textbox');document.body.append(e);e.oninput=()=>{window.savedBySite=e.textContent;e.textContent=''};e.focus()"})
+				must(a.t, err)
+				_, err = i.Call(a.t.Context(), tab, "Input.insertText", map[string]any{"text": a.value})
+				must(a.t, err)
+				a.c.refuses("evaluate", map[string]any{"expression": "window.savedBySite"}, "The person typed")
+				if i.Tabs(a.c.chat)[0].Sealed {
+					a.t.Fatal("custom editor unexpectedly relied on the input classifier")
+				}
+			})
+			run("person-document-copy-clear", func(a *secretAttack) {
+				a.open("/login")
+				i, parent := a.instance(), a.tab()
+				_, err := i.Call(a.t.Context(), parent, "Runtime.evaluate", map[string]any{"expression": `
+const input=document.querySelector('input');
+input.addEventListener('input',()=>{window.savedBySite=input.value;input.value=''});`})
+				must(a.t, err)
+				a.personType(a.value)
+				a.c.refuses("evaluate", map[string]any{"expression": `window.savedBySite.split('').reverse().join('')`}, "The person typed")
+				if tab := i.Tabs(a.c.chat)[0]; tab.Sealed || tab.Scripted || tab.PersonDocument == "" {
+					a.t.Fatal("document guard was lost or confused with a seal")
+				}
+				a.c.text("snapshot", nil)
+				a.c.call("screenshot", nil)
+				a.c.text("console", nil)
+				a.c.text("network", nil)
+				_, err = i.Call(a.t.Context(), parent, "Runtime.evaluate", map[string]any{"expression": `history.pushState({},'', '/spa')`})
+				must(a.t, err)
+				a.c.refuses("evaluate", map[string]any{"expression": `window.savedBySite`}, "The person typed")
+				a.c.text("click", map[string]any{"id": a.c.node("Help")})
+				popup := a.tab()
+				if popup == parent {
+					a.t.Fatal("fixture did not create a popup")
+				}
+				a.c.refuses("evaluate", map[string]any{"expression": `opener.savedBySite`}, "The person typed")
+				for _, tab := range i.Tabs(a.c.chat) {
+					if tab.Scripted {
+						a.t.Fatal("refusal marked opener component scripted")
+					}
+				}
+				a.open("/landing")
+				a.evalExact("1+1", "2")
+				// Reattach the same surviving Chrome after a runtime restart.
+				service.Close()
+				manager.Close()
+				manager = agentbrowser.New(agentbrowser.Config{DataDir: data, Executable: exe, Chrome: chrome, Mode: mode})
+				access.Manager = manager
+				service = &Service{Manager: manager, Secrets: store, Access: access, Identity: service.Identity}
+				a.manager, a.service = manager, service
+				a.c.refuses("evaluate", map[string]any{"tab": parent, "expression": `window.savedBySite`}, "The person typed")
+				// Reloading the current address changes the loader even when the URL is identical.
+				a.c.text("navigate", map[string]any{"tab": parent, "url": pageURL + "/spa"})
+				if out := a.c.text("evaluate", map[string]any{"tab": parent, "expression": "typeof window.savedBySite"}); !strings.Contains(out, `"undefined"`) {
+					a.t.Fatal("same-address navigation did not release the document guard")
+				}
 			})
 			run("lazy-person-password", func(a *secretAttack) {
 				a.open("/login")
@@ -606,8 +664,14 @@ for(const type of ['hidden','checkbox','radio','submit','button','reset','file',
 						if kind != "ordinary" || login {
 							a.c.refuses("evaluate", map[string]any{"expression": `document.querySelector('input').value.split('').reverse().join('')`}, "sealed")
 						} else {
-							// Explicit policy: an ordinary field left by the person is readable.
-							a.evalExact(`btoa(document.querySelector('input').value)`, jsonText(base64.StdEncoding.EncodeToString([]byte(a.value))))
+							// Ordinary text stays visible to snapshots, but not agent JavaScript.
+							// This value intentionally is ordinary content, not a secret for this scenario.
+							client := a.c
+							client.password = ""
+							if !strings.Contains(client.text("snapshot", nil), a.value) {
+								a.t.Fatal("ordinary text missing from snapshot")
+							}
+							a.c.refuses("evaluate", map[string]any{"expression": "1"}, "The person typed")
 						}
 						masked := a.instance().Redact(a.value) != a.value
 						if masked != (kind != "ordinary") {

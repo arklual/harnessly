@@ -101,6 +101,27 @@ subdomain, another port or another scheme does not inherit permission. Use
 
 ## Browser sign-in
 
+| How input arrives | Tool protection | How it ends |
+| --- | --- | --- |
+| Safe filling | Exact field origin, atomic input, masks and a chat-wide seal | New main/field document or removal of the tracked field; history reset must succeed |
+| Login request | Fresh person-controlled tab; return scans fields, resets history and seals populated login fields | A handoff seal needs a new main document |
+| Taking control | Agent commands refuse; return scans secret-like text fields and resets history | Ordinary content remains visible to snapshots; a handoff seal needs a new main document |
+| Typing without takeover | Lazy field scan before the next chat tool; evaluate is blocked on the typed document and its live opener component | A different main document releases the evaluate guard, including navigation to the same address |
+
+Remaining limitations:
+
+- GET forms put values in the current URL and Chrome history. A manually submitted value can reach browser_tabs
+  before any scan collected it for masking; resetting navigation history does not scrub that URL or the history database.
+- The allowed site receives the value and can store or send it. Its DOM copies may remain visible in snapshots or
+  other permitted output, including arbitrary transformations that byte masking cannot recognize.
+- Ignoring the Scripted warning can expose manual input to an agent-installed hook already running on that page.
+- A tool already executing when the person types the first character may have passed its checks. Typing does not
+  automatically take control; use Take control when working alongside a running agent.
+- An agent-installed Service Worker can survive a fresh tab on an origin where the agent can publish code. Granting
+  a secret to such an origin gives the agent access through the site itself.
+- Before the wall, shell access and the same Unix account can bypass tool guards: secret run can retrieve a
+  project-authorized entry; the safe key, browser files and private CDP remain accessible to that account.
+
 Use `browser_fill_secret {id, secret}` for an existing entry, or `browser_request_secret {name, origin, why}` to open
 the same safe card without a shell. Entries without allowed origins cannot be filled. The runtime checks the field's
 `securityOrigin` from `Page.getFrameTree`, not JavaScript and not the top-level URL. Consequently, an allowed iframe
@@ -137,17 +158,27 @@ field references (person handoff or restart) also refuses snapshots and needs a 
 an initial document marker cannot be mistaken for proof of navigation.
 
 Returning any person-controlled tab to the agent first resets history and scans all frames and shadow roots in
-isolated worlds using native getters. A nonempty input is secret if its type is password, its computed
-`-webkit-text-security` is not none, its autocomplete includes current-password, new-password, one-time-code,
-cc-number or cc-csc, or its name, id, aria-label or placeholder matches `pass|pwd|парол|secret|otp|token|\bpin\b|cvv|cvc`
+isolated worlds using native getters. A nonempty password input is secret. Only text, email, tel, url, search and
+number inputs are otherwise classified: their computed `-webkit-text-security` is not none, their autocomplete includes
+current-password, new-password, one-time-code,
+cc-number or cc-csc, or their name, id, aria-label or placeholder matches `pass|pwd|парол|secret|otp|token|\bpin\b|cvv|cvc`
 (case insensitive). Such fields seal the document at any length; only values of at least four characters enter the
 mask, so partially typed single letters do not corrupt unrelated output. During a login request, any other nonempty
 text, email, tel, url, search or number input also seals the document, but its value never leaves the page for masking.
-An ordinary field without these hints, left after ordinary person control rather than a login request, remains readable:
-the person has chosen to leave that content to the agent. This is an explicit classification policy, not a claim to
-recognize arbitrary passwords.
+All other input types are ignored before reading their values, including hidden tokens, checkbox values and buttons.
+The scan never compares value with defaultValue: controlled frameworks can synchronize both for a shown password.
+An ordinary field without these hints, left outside a login request, stays visible to snapshots. This classification
+policy does not claim to recognize arbitrary passwords or custom editors.
 
 Keyboard, text, paste and screen-keyboard input persist `PersonInput` before dispatch, even without taking control.
+Each dispatch also reads the main frame's loader through Page.getFrameTree, with a 500 ms limit, and persists
+PersonDocument only when it changes. A failed read records an unknown-document marker without preventing input.
+Before evaluate, every live tab in the target's opener component is checked. A matching loader refuses JavaScript
+without setting Scripted; an unknown marker is anchored to the current loader and also refuses. The marker survives
+runtime restart. pushState does not change the loader; navigating to the same address does. Mouse input does not set
+this marker, and independent tabs are unaffected. This guard applies only to evaluate: without a separate seal,
+snapshots, screenshots, console, network and actions stay available. It also covers site copies after a field clears
+and human typing in custom editors outside input elements.
 Before the next chat tool, every dirty agent-controlled tab receives the same history reset and scan. A successful
 scan clears the flag; an incomplete scan keeps it and seals the tab, refusing the tool. A failed history reset or
 registry write during an explicit handoff keeps person control and the login pending. The runtime persists the seal
@@ -160,38 +191,9 @@ login card. The browser panel offers Done and Cancel. The call waits up to 55 se
 to continue the same request. Returning control also means Done; closing the tab cancels. Other tabs remain usable.
 The response contains only status and current URL. Login cookies are shared by chats authorized for that browser profile.
 
-### Remaining browser threats
-
-The tool boundary prevents agent-installed page hooks before filling, reads through sibling tabs while sealed,
-clipboard shortcuts, partial editable-value snapshots, and back/forward restoration after release. It does not make
-an allowed website trustworthy or isolate processes sharing the same Unix account:
-
-- The allowed site receives the value and may retain or send it. Site-owned copies placed in the DOM can remain
-  visible to snapshots in transformations not recognized by byte masking. Literal, JSON, URL/form, component, common
-  base64 and HTML forms are masked; arbitrary encodings, fragments and visual representations are not guaranteed.
-- An agent-installed Service Worker can survive its original scripted tab if the agent can host a worker script on
-  that origin. Granting a secret to an origin where the agent can publish code gives that agent access through the
-  website itself. A fresh browsing context group does not clear origin-scoped workers or storage.
-- GET forms place values into Chrome URL/history records; masking tool output and resetting the navigation stack do
-  not erase the browser's history database. Do not treat profile files as a secret-free archive. Disabling field
-  autocomplete prevents the tested text-form restoration/autofill writes, not arbitrary site storage or GET URLs.
-- Lazy input inspection runs before a tool, not continuously. A tool already past its seal check when the person
-  types the first character may still read or act before the next check. Typing does not automatically take control;
-  use Take control when working alongside a running agent. A value submitted and removed before any scan cannot be
-  collected for masking or establish a content-based seal, although the next scan still resets history. A site that
-  copies and clears the field before the first tool can leave that copy readable through evaluate. A manually
-  submitted GET form can likewise expose an unmasked value in the current URL through browser_tabs; resetting
-  history does not scrub the current URL. These cases do not require an agent tool to be running during typing.
-- Ordinary inputs without secret hints outside a login request are intentionally readable after handoff. Custom
-  editors and secrets represented outside input elements are not classified. Short values seal but are not masked.
-- Ignoring the scripted-tab warning and entering a password by hand can expose it to an earlier agent-installed
-  hook. Manual login requests always open a fresh tab, but taking over an existing scripted tab does not remove hooks.
-- After a permitted release, copies retained by the website may be accessible again, subject to output masking.
-  Removing a field or navigating is a workflow transition, not proof that the website destroyed all copies.
-- The agent's shell and cli-token can obtain an allowed entry through `secret run` and transform it to bypass output
-  masking. Project scopes apply to those API reads, but before stage 5 the same Unix user can also read the safe key,
-  profile files or private CDP socket directly. Masking values live only for the runtime's lifetime.
-
-Stage 5 supplies a separate process/filesystem boundary. It does not make an agent-writable or malicious allowed
-origin safe or recover manual values already missed by a lazy scan. Site-origin approval adds a site without replacing
-a value; an explicit `--replace` still requests rotation. An accessible unscoped entry can receive a site approval even from a chat without a project.
+Byte masking covers literal, JSON, URL/form, component, common base64 and HTML forms, not arbitrary transformations.
+Mask values live only for the runtime's lifetime. Disabling autocomplete prevents the tested text-form restoration
+and autofill writes; it does not prevent site storage or GET URLs. Stage 5 adds a process/filesystem boundary, but does
+not make a malicious or agent-writable allowed origin safe or recover manually submitted values missed by a scan.
+Site-origin approval adds a site without replacing the value; explicit --replace requests rotation. An accessible
+unscoped entry can receive a site approval even from a chat without a project.

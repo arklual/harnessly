@@ -2,9 +2,14 @@ package agentbrowser
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
 func TestPanelInputPersistsGuardBeforeDispatch(t *testing.T) {
@@ -26,7 +31,7 @@ func TestPanelInputPersistsGuardBeforeDispatch(t *testing.T) {
 			must(t, v.input(t.Context(), i, "chat", in))
 			restored := newInstance(m, DefaultProfile)
 			defer restored.cancel()
-			if !restored.pages[p.ID].PersonInput || p.Control != "agent" {
+			if !restored.pages[p.ID].PersonInput || restored.pages[p.ID].PersonDocument != "document" || p.Control != "agent" {
 				t.Fatal("panel input did not persist its guard without taking control")
 			}
 			writes := i.writes
@@ -34,6 +39,12 @@ func TestPanelInputPersistsGuardBeforeDispatch(t *testing.T) {
 			if i.writes != writes {
 				t.Fatal("repeated input synchronously rewrote an already dirty guard")
 			}
+			p.PersonDocument = "previous-document"
+			must(t, v.input(t.Context(), i, "chat", in))
+			if i.writes != writes+1 || p.PersonDocument != "document" {
+				t.Fatal("input in a different document did not update the durable marker")
+			}
+
 		})
 	}
 }
@@ -68,5 +79,96 @@ func TestPersonInputPersistenceFailureRefusesDispatch(t *testing.T) {
 	i.dir = filepath.Join(blocked, "profile")
 	if _, err := i.Call(context.Background(), p.ID, "Input.insertText", map[string]any{"text": "fixture"}); err == nil {
 		t.Fatal("input was dispatched without its durable guard")
+	}
+}
+
+func TestPanelInputDocumentTimeout(t *testing.T) {
+	m := New(Config{DataDir: t.TempDir()})
+	defer m.Close()
+	i := newInstance(m, DefaultProfile)
+	defer i.cancel()
+	p := newPage(Tab{ID: "tab", Conversation: "chat", URL: "about:blank", Control: "agent"})
+	i.pages[p.ID] = p
+	transport := &slowPersonDocumentTransport{handoffFixtureTransport: handoffFixtureTransport{replies: make(chan []byte, 1), done: make(chan struct{})}}
+	c := cdp.New(transport, nil)
+	i.conn = c
+	p.binding = binding{conn: c, session: "fixture", target: p.ID}
+	go func() { _ = c.Run(t.Context()) }()
+	defer c.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	began := time.Now()
+	_, err := i.Call(ctx, p.ID, "Input.insertText", map[string]any{"text": "ordinary"})
+	must(t, err)
+	if elapsed := time.Since(began); elapsed > time.Second {
+		t.Fatalf("metadata delayed panel input for %s", elapsed)
+	}
+	if !transport.input || p.PersonDocument != unknownHandoffDocument {
+		t.Fatal("timed-out metadata did not preserve input with an unknown marker")
+	}
+}
+
+type slowPersonDocumentTransport struct {
+	handoffFixtureTransport
+	input bool
+}
+
+func (x *slowPersonDocumentTransport) Write(ctx context.Context, raw []byte) error {
+	var request struct {
+		Method string `json:"method"`
+	}
+	if err := json.Unmarshal(raw, &request); err != nil {
+		return err
+	}
+	if request.Method == "Page.getFrameTree" {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	if request.Method == "Input.insertText" {
+		x.input = true
+	}
+	return x.handoffFixtureTransport.Write(ctx, raw)
+}
+
+func TestPersonDocumentUnknownAnchorsAndSurvivesRestart(t *testing.T) {
+	m := New(Config{DataDir: t.TempDir()})
+	defer m.Close()
+	i := newInstance(m, DefaultProfile)
+	defer i.cancel()
+	p := newPage(Tab{ID: "tab", Conversation: "chat", URL: "about:blank", Control: "agent", PersonDocument: unknownHandoffDocument})
+	i.pages[p.ID] = p
+	connectHandoffFixture(t, i, p, "")
+	if err := i.CheckPersonDocuments(t.Context(), "chat", p.ID); !errors.Is(err, ErrPersonDocument) {
+		t.Fatal("unknown document was allowed")
+	}
+	if p.PersonDocument != "document" || p.Scripted {
+		t.Fatal("unknown document was not anchored without marking scripted")
+	}
+	restored := newInstance(m, DefaultProfile)
+	defer restored.cancel()
+	q := restored.pages[p.ID]
+	if q == nil || q.PersonDocument != "document" {
+		t.Fatal("anchored document was not saved")
+	}
+	connectHandoffFixture(t, restored, q, "")
+	if err := restored.CheckPersonDocuments(t.Context(), "chat", q.ID); !errors.Is(err, ErrPersonDocument) {
+		t.Fatal("restart lost the document refusal")
+	}
+	q.PersonDocument = "older-document"
+	must(t, restored.CheckPersonDocuments(t.Context(), "chat", q.ID))
+}
+
+func TestPanelInputMouseDoesNotGuardDocument(t *testing.T) {
+	m := New(Config{DataDir: t.TempDir()})
+	defer m.Close()
+	i := newInstance(m, DefaultProfile)
+	defer i.cancel()
+	p := newPage(Tab{ID: "tab", Conversation: "chat", URL: "about:blank", Control: "agent"})
+	i.pages[p.ID] = p
+	connectHandoffFixture(t, i, p, "")
+	_, err := i.Call(t.Context(), p.ID, "Input.dispatchMouseEvent", map[string]any{"type": "mouseMoved", "x": 1, "y": 1})
+	must(t, err)
+	if p.PersonInput || p.PersonDocument != "" {
+		t.Fatal("mouse input restricted agent JavaScript")
 	}
 }

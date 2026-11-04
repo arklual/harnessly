@@ -49,6 +49,7 @@ type Tab struct {
 	SecretDocument  string   `json:"secretDocument,omitempty"`
 	SealGeneration  uint64   `json:"sealGeneration,omitempty"`
 	PersonInput     bool     `json:"personInput,omitempty"`
+	PersonDocument  string   `json:"personDocument,omitempty"`
 	SecretUntracked bool     `json:"secretUntracked,omitempty"`
 	Control         string   `json:"control"`
 	AgentAt         int64    `json:"agentAt"`
@@ -423,7 +424,7 @@ func (i *Instance) bind(ctx context.Context, p *page, c *cdp.Conn) (binding, err
 // It enforces ErrDialogOpen but does not enforce agent ownership or control.
 func (i *Instance) Call(ctx context.Context, id, method string, params any) (json.RawMessage, error) {
 	if method == "Input.insertText" || method == "Input.dispatchKeyEvent" {
-		unlock, err := i.personInput(id)
+		unlock, err := i.personInput(ctx, id)
 		if err != nil {
 			return nil, err
 		}
