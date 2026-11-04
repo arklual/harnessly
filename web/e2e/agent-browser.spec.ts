@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+import { execFileSync, spawn } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,6 +14,11 @@ interface Report {
   selected: string;
   confirmed: boolean | null;
   scroll: number;
+  doubles?: number;
+  range?: string;
+  typed?: string;
+  entered?: number;
+  targets?: Record<string, { x: number; y: number }>;
   select: { x: number; y: number };
   confirm: { x: number; y: number };
 }
@@ -33,6 +39,15 @@ fetch('/report?name='+location.pathname,{method:'POST',body:JSON.stringify({w:in
 selected:choice.value,confirmed,scroll:scrollY,select:point('#choice'),confirm:point('#confirm')})})}
 document.querySelector('#confirm').onclick=()=>{confirmed=confirm('Continue with this action?');report()};
 choice.onchange=report;onresize=report;onscroll=report;report();</script>`;
+
+const inputFixture = `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font:18px system-ui;margin:20px;background:#f4f7fc;color:#16273c}input{display:block;margin:14px 0;font:inherit;width:220px}p{margin:12px 0}h1{font-size:24px}</style>
+<h1>Remote input</h1><p id="words">Copy these words</p><input id="range" type="range" value="10">
+<input id="typed" aria-label="Name" placeholder="Enter your name"><input id="secret" type="password" value="private">
+<script>let doubles=0,entered=0;const typed=document.querySelector('#typed'),range=document.querySelector('#range');
+function report(){const targets={};for(const id of ['words','range','typed','secret']){const r=document.getElementById(id).getBoundingClientRect();targets[id]={x:r.x+15,y:r.y+r.height/2}};
+fetch('/report?name='+location.pathname,{method:'POST',body:JSON.stringify({w:innerWidth,h:innerHeight,scroll:scrollY,doubles,range:range.value,typed:typed.value,entered,targets})})}
+document.querySelector('#words').ondblclick=()=>{doubles++;report()};typed.oninput=report;range.oninput=report;typed.onkeydown=e=>{if(e.key==='Enter'){entered++;report()}};onresize=report;report();</script>`;
 
 test.beforeAll(async () => {
   rt = await startRuntime({
@@ -58,7 +73,7 @@ test.beforeAll(async () => {
       return;
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.end(fixture);
+    res.end(url.pathname.startsWith('/input') ? inputFixture : fixture);
   });
   await new Promise<void>((ok) => site.listen(port, '127.0.0.1', ok));
   if (screenshots) mkdirSync(screenshots, { recursive: true });
@@ -126,12 +141,19 @@ async function waitFrame(page: Page, w: number, h: number) {
   await expect(canvas).toHaveAttribute('data-page-height', String(h));
 }
 async function fitReady(page: Page, name: string) {
-  const box = (await page.locator('.hx-agent-browser__view').boundingBox())!;
-  const w = Math.max(320, Math.floor(box.width)),
-    h = Math.max(240, Math.floor(box.height));
-  await expect.poll(() => reports.get(name)?.w).toBe(w);
-  await expect.poll(() => reports.get(name)?.h).toBe(h);
-  await waitFrame(page, w, h);
+  // The phone pane animates its width; compare against current bounds, not an intermediate pixel.
+  await expect
+    .poll(async () => {
+      const box = (await page.locator('.hx-agent-browser__view').boundingBox())!;
+      const report = reports.get(name);
+      return (
+        report?.w === Math.max(320, Math.floor(box.width)) &&
+        report?.h === Math.max(240, Math.floor(box.height))
+      );
+    })
+    .toBe(true);
+  const report = reports.get(name)!;
+  await waitFrame(page, report.w, report.h);
 }
 async function clickPage(page: Page, name: string, key: 'select' | 'confirm') {
   const report = reports.get(name)!;
@@ -145,6 +167,13 @@ async function clickPage(page: Page, name: string, key: 'select' | 'confirm') {
 
 test('managed browser tabs, real viewport, dialogs, select and control', async ({ page, context }) => {
   test.setTimeout(180_000);
+  const notices: string[] = [];
+  page.on('websocket', (ws) =>
+    ws.on('framereceived', (frame) => {
+      if (typeof frame.payload === 'string' && frame.payload.includes('"t":"notice"'))
+        notices.push(frame.payload);
+    }),
+  );
   await chat(page, 'Browser test');
   const pane = page.locator('.hx-agent-browser');
   await pane.getByRole('button', { name: 'New tab', exact: true }).first().click();
@@ -155,6 +184,8 @@ test('managed browser tabs, real viewport, dialogs, select and control', async (
     await navigate(page, name);
   }
   await expect(pane.getByRole('tab')).toHaveCount(3);
+  expect(notices).toEqual([]);
+  await expect(pane.getByRole('alert')).toHaveCount(0, { timeout: 500 });
   await shot(page, 'three-tabs');
   await pane.getByRole('button', { name: 'Close tab: Browser fixture' }).last().click();
   await expect(pane.getByRole('tab')).toHaveCount(2);
@@ -265,4 +296,108 @@ test('server error remains visible after socket closes', async ({ page }) => {
   await chat(page, 'Browser error test', false);
   await expect(page.getByText('Chrome could not start: test failure')).toBeVisible();
   await shot(page, 'error');
+});
+
+test('double click, drag, clipboard and phone keyboard reach the page', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: rt.url });
+  await chat(page, 'Input test');
+  const pane = page.locator('.hx-agent-browser');
+  await pane.getByRole('button', { name: 'New tab', exact: true }).first().click();
+  await navigate(page, '/input');
+  const canvas = pane.locator('canvas');
+  const target = async (key: string) => {
+    const r = reports.get('/input')!;
+    await waitFrame(page, r.w, r.h);
+    const b = (await canvas.boundingBox())!,
+      p = r.targets![key]!;
+    return { x: b.x + (p.x * b.width) / r.w, y: b.y + (p.y * b.height) / r.h, scale: b.width / r.w };
+  };
+  let p = await target('words');
+  await page.mouse.dblclick(p.x, p.y);
+  await expect.poll(() => reports.get('/input')?.doubles).toBe(1);
+  await canvas.press('Control+c');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('Copy');
+  p = await target('range');
+  await page.mouse.move(p.x + 7 * p.scale, p.y);
+  await page.mouse.down();
+  await page.mouse.move(p.x + 175 * p.scale, p.y, { steps: 12 });
+  await page.mouse.up();
+  await expect.poll(() => Number(reports.get('/input')?.range)).toBeGreaterThan(70);
+  p = await target('typed');
+  await page.mouse.click(p.x, p.y);
+  await canvas.pressSequentially('sample');
+  await canvas.press('Control+a');
+  await canvas.press('Control+c');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('sample');
+  p = await target('secret');
+  await page.mouse.click(p.x, p.y);
+  await canvas.press('Control+a');
+  await canvas.press('Control+c');
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('sample');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fitReady(page, '/input');
+  p = await target('typed');
+  await page.touchscreen.tap(p.x, p.y);
+  await canvas.press('End');
+  await pane.getByRole('button', { name: 'Keyboard', exact: true }).click();
+  const keyboard = pane.getByLabel('Remote keyboard input');
+  await expect(keyboard).toBeFocused();
+  await keyboard.pressSequentially(' phone');
+  await expect(keyboard).toHaveValue('');
+  await expect.poll(() => reports.get('/input')?.typed).toBe('sample phone');
+  await keyboard.press('Backspace');
+  await keyboard.press('Enter');
+  await expect.poll(() => reports.get('/input')?.typed).toBe('sample phon');
+  await expect.poll(() => reports.get('/input')?.entered).toBe(1);
+  await shot(page, 'phone-keyboard');
+});
+
+test('agent viewport remains fixed when the panel opens and resizes', async ({ page }) => {
+  const binary = join(rt.root, 'browser-review');
+  execFileSync('go', ['build', '-o', binary, './e2e/fixtures/browser-agent']);
+  const child = spawn(binary, [], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const base = await new Promise<string>((resolve, reject) => {
+    child.stdout.once('data', (data) => resolve(String(data).trim()));
+    child.once('error', reject);
+    child.once('exit', (code) => reject(new Error(`Browser fixture exited: ${code}`)));
+  });
+  let browserConv = '';
+  try {
+    await page.routeWebSocket('**/api/agent-browser?*', (ws) => {
+      const url = new URL(ws.url());
+      browserConv = url.searchParams.get('conv')!;
+      // Bridge the real fixture socket; Playwright's connectToServer only connects
+      // to the original URL and cannot redirect to a different runtime.
+      const upstream = new WebSocket(base.replace('http:', 'ws:') + '/api/agent-browser' + url.search);
+      upstream.binaryType = 'arraybuffer';
+      upstream.onmessage = (event) =>
+        ws.send(typeof event.data === 'string' ? event.data : Buffer.from(event.data as ArrayBuffer));
+      ws.onMessage((message) =>
+        upstream.send(typeof message === 'string' ? message : Uint8Array.from(message)),
+      );
+      ws.onClose(() => upstream.close());
+      upstream.onclose = () => {
+        void ws.close();
+      };
+    });
+    await chat(page, 'Agent viewport test');
+    const conv = browserConv;
+    const response = await fetch(base + '/new?' + new URLSearchParams({ conv, url: siteURL + '/agent' }));
+    expect(response.status).toBe(204);
+    const pane = page.locator('.hx-agent-browser');
+    await expect.poll(() => reports.get('/agent')?.w).toBe(1280);
+    await waitFrame(page, 1280, 800);
+    await expect(pane.getByRole('button', { name: 'Viewport size' })).toHaveText('1280×800 ▾');
+    const box = (await pane.locator('canvas').boundingBox())!;
+    expect(box.width).toBeLessThan(1280);
+    await shot(page, 'agent-fixed');
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.waitForTimeout(500);
+    expect(reports.get('/agent')?.w).toBe(1280);
+    expect(reports.get('/agent')?.h).toBe(800);
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  }
 });
