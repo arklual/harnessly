@@ -95,6 +95,8 @@ RUN if [ "$DESIGN_TOOLS" = 1 ]; then \
    && rm -rf /var/lib/apt/lists/*; \
     fi
 # A container gives an unprivileged user no namespaces for Chromium's own sandbox: the container is the boundary.
+# The container explicitly disables Chrome sandboxing; the host installer never makes this choice.
+# The agent browser uses the packaged Chromium and Xvfb through a private debugging pipe.
 ENV RUNTIME_DESIGN_CHROME_ARGS=--no-sandbox \
     RUNTIME_BROWSER_CHROME_ARGS=--no-sandbox
 # --- end of design tools ---------------------------------------------------------------------------------------------

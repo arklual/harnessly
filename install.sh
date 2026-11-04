@@ -29,6 +29,8 @@ harnessly installer
   --prefix DIR      where bin/ goes (default ~/.local)
   --no-service      install the programs only, do not start anything
   --no-deps         do not install tmux and git, only check for them
+  --no-browser      skip optional browser libraries, Xvfb and fonts
+  --archive FILE    install a locally built release archive (trusted input)
   --uninstall       stop the service and remove the programs; your data in ~/.harnessly stays
   -h, --help        this text
 EOF
@@ -50,6 +52,8 @@ parse_args() {
 	SERVICE=1
 	DEPS=1
 	UNINSTALL=0
+	BROWSER=1
+	LOCAL_ARCHIVE=
 	while [ $# -gt 0 ]; do
 		case $1 in
 		--*=*)
@@ -59,17 +63,19 @@ parse_args() {
 			set -- "$_k" "$_v" "$@"
 			continue
 			;;
-		--version | --port | --prefix)
+		--version | --port | --prefix | --archive)
 			[ $# -ge 2 ] || die "$1 needs a value"
 			case $1 in
 			--version) VERSION=${2#v} ;;
 			--port) PORT=$2 ;;
 			--prefix) PREFIX=$2 ;;
+			--archive) LOCAL_ARCHIVE=$2 ;;
 			esac
 			shift
 			;;
 		--no-service) SERVICE=0 ;;
 		--no-deps) DEPS=0 ;;
+		--no-browser) BROWSER=0 ;;
 		--uninstall) UNINSTALL=1 ;;
 		-h | --help)
 			usage
@@ -105,7 +111,7 @@ as_root() {
 	if [ "$(id -u)" = 0 ]; then
 		"$@"
 	elif have sudo; then
-		sudo "$@"
+		sudo -n "$@"
 	else
 		return 1
 	fi
@@ -148,7 +154,62 @@ ensure_deps() {
 	fi
 }
 
+# Browser packages are optional: lack of privilege must never prevent the runtime installation.
+ensure_browser() {
+ [ "$BROWSER" = 1 ] || return 0
+ [ "$OS" = linux ] || return 0
+ if have apt-get; then
+  suffix=
+  if [ -f /etc/os-release ]; then
+   distro=$(sed -n 's/^ID=//p' /etc/os-release | tr -d '"')
+   release=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | tr -d '"')
+   case "$distro:$release" in ubuntu:2[4-9].* | debian:1[3-9]) suffix=t64 ;; esac
+  fi
+  packages="xvfb fonts-liberation fonts-noto-color-emoji libnss3 libnspr4 libatk1.0-0$suffix"
+  packages="$packages libatk-bridge2.0-0$suffix libcups2$suffix libdrm2 libxkbcommon0"
+  packages="$packages libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2$suffix"
+  browser_command="apt-get install -y $packages"
+ elif have dnf; then
+  packages="chromium xorg-x11-server-Xvfb liberation-fonts google-noto-color-emoji-fonts"
+  browser_command="dnf install -y $packages"
+ elif have apk; then
+  packages="chromium xvfb font-liberation font-noto-emoji"
+  browser_command="apk add $packages"
+ elif have pacman; then
+  packages="chromium xorg-server-xvfb ttf-liberation noto-fonts-emoji"
+  browser_command="pacman -S --noconfirm --needed $packages"
+ else
+  warn "Install Chromium, Xvfb and fonts with your package manager. Without Xvfb the browser uses headless mode."
+  return 0
+ fi
+ step "Installing optional browser dependencies (no password prompt)"
+ # shellcheck disable=SC2086 # package names contain no whitespace
+ if ! install_packages $packages; then
+  warn "Browser dependencies were not installed. Run: sudo $browser_command"
+ fi
+ say "    Chrome is downloaded and verified on first use if no system browser is available."
+ say "    Without Xvfb the agent browser uses headless mode; its sandbox is never disabled automatically."
+}
+
+# Verify both ownership and the command before trusting a stale host.pid.
+stop_browser_hosts() {
+ # Enumerate this user's hosts so custom data roots also stop, without trusting unrelated PID files.
+ ps -u "$(id -u)" -o pid= -o args= | while read -r host_pid command; do
+  case "$command" in *" browser-host --profile "*" --socket "*) ;; *) continue ;; esac
+  profile=${command#* browser-host --profile }
+  profile=${profile% --socket *}
+  pid_file=$profile/host.pid
+  [ -f "$pid_file" ] || continue
+  recorded=$(cat "$pid_file")
+  [ "$recorded" = "$host_pid" ] || continue
+  case $host_pid in '' | *[!0-9]*) continue ;; esac
+  [ "$host_pid" -gt 1 ] || continue
+  kill -TERM "$host_pid" 2>/dev/null || true
+ done
+}
+
 resolve_version() {
+	if [ -n "$LOCAL_ARCHIVE" ]; then VERSION=${VERSION:-local}; return 0; fi
 	[ -z "$VERSION" ] || return 0
 	# The /releases/latest page redirects to the tag; this needs no API token and no rate limit.
 	tag_url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest") ||
@@ -166,6 +227,12 @@ sha256_of() {
 }
 
 download_and_verify() {
+ if [ -n "$LOCAL_ARCHIVE" ]; then
+  TMP=$(mktemp -d)
+  trap 'rm -rf "$TMP"' EXIT
+  tar -xzf "$LOCAL_ARCHIVE" -C "$TMP" || die "could not unpack local archive"
+  return 0
+ fi
 	ARCHIVE=harnessly_${VERSION}_${OS}_${ARCH}.tar.gz
 	base=https://github.com/$REPO/releases/download/v$VERSION
 	TMP=$(mktemp -d)
@@ -247,7 +314,7 @@ Environment=PATH=$BIN:$PATH
 EnvironmentFile=-%h/.config/harnessly/env
 WorkingDirectory=%h
 ExecStart=$BIN/harnessly-runtime
-# Only the runtime stops with the service: tmux and the agents keep working through a restart or an update.
+# Only the runtime stops: tmux, agents and browser-host processes survive a restart or update.
 KillMode=process
 Restart=on-failure
 RestartSec=2
@@ -399,6 +466,7 @@ uninstall() {
 		systemctl --user daemon-reload
 	fi
 	stop_background
+	stop_browser_hosts
 	rm -f "$BIN/harnessly-runtime" "$BIN/harnessly-agent" "$BIN/harnessly"
 	say "Removed the programs and the service. Kept: your data (~/.harnessly), settings ($ENV_FILE) and tmux sessions."
 }
@@ -411,6 +479,7 @@ main() {
 		return 0
 	fi
 	ensure_deps
+	ensure_browser
 	resolve_version
 	download_and_verify
 	install_programs
