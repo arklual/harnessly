@@ -259,7 +259,7 @@ func (t Tools) call(ctx context.Context, i *agentbrowser.Instance, name string, 
 	case "browser_resize":
 		err = i.AgentSetViewport(ctx, t.Caller, a.Tab, agentbrowser.Viewport{Mode: "fixed", W: a.Width, H: a.Height, DPR: 1})
 	default:
-		err = t.action(ctx, i, st, name, a)
+		output, err = t.action(ctx, i, st, name, a)
 	}
 	if err != nil {
 		return nil, errors.New(st.redact(t.errorText(i, a.Tab, err)))

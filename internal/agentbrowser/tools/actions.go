@@ -49,13 +49,13 @@ func (t Tools) resolve(ctx context.Context, i *agentbrowser.Instance, st *tabSta
 	}
 	return ref, r.Object.ID, nil
 }
-func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabState, name string, a arguments) error {
+func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabState, name string, a arguments) (string, error) {
 	if name == "browser_press_key" {
-		return t.pressKey(ctx, i, a.Tab, a.Key)
+		return "", t.pressKey(ctx, i, a.Tab, a.Key)
 	}
 	ref, obj, err := t.resolve(ctx, i, st, a)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() {
 		_, _ = i.AgentFrameCall(ctx, t.Caller, a.Tab, ref.session, "Runtime.releaseObject", map[string]any{"objectId": obj})
@@ -67,28 +67,32 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 	case "browser_click", "browser_hover":
 		x, y, e := t.point(ctx, i, a.Tab, ref)
 		if e != nil {
-			return e
+			return "", e
 		}
 		if _, e = t.dispatch(ctx, i, a.Tab, "Input.dispatchMouseEvent", map[string]any{"type": "mouseMoved", "x": x, "y": y}); e != nil {
-			return e
+			return "", e
 		}
 		if name == "browser_hover" {
-			return nil
+			return "", nil
+		}
+		warning, e := t.obstruction(ctx, i, a.Tab, ref, obj)
+		if e != nil {
+			return "", e
 		}
 		for _, kind := range []string{"mousePressed", "mouseReleased"} {
 			if _, e = t.dispatch(ctx, i, a.Tab, "Input.dispatchMouseEvent", map[string]any{
 				"type": kind, "x": x, "y": y, "button": "left", "clickCount": 1,
 			}); e != nil {
-				return e
+				return "", e
 			}
 		}
-		return nil
+		return warning, nil
 	case "browser_type":
 		raw, e := call("Runtime.callFunctionOn", map[string]any{
 			"objectId": obj, "functionDeclaration": "function(){return this.type==='password'}", "returnByValue": true,
 		})
 		if e != nil {
-			return e
+			return "", e
 		}
 		var r struct {
 			Result struct {
@@ -96,21 +100,21 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 			} `json:"result"`
 		}
 		if e = json.Unmarshal(raw, &r); e != nil {
-			return e
+			return "", e
 		}
 		if r.Result.Value {
 			st.remember(a.Text)
 		}
 		if _, e = call("DOM.focus", map[string]any{"backendNodeId": ref.backend}); e != nil {
-			return e
+			return "", e
 		}
 		if _, e = call("Runtime.callFunctionOn", map[string]any{
 			"objectId": obj, "functionDeclaration": "function(){if(this.select)this.select()}",
 		}); e != nil {
-			return e
+			return "", e
 		}
 		_, e = i.AgentCall(ctx, t.Caller, a.Tab, "Input.insertText", map[string]any{"text": a.Text})
-		return e
+		return "", e
 	case "browser_select":
 		raw, e := call("Runtime.callFunctionOn", map[string]any{"objectId": obj, "functionDeclaration": `function(value) {
  if (this.tagName !== 'SELECT' || ![...this.options].some(o => o.value === value)) return false;
@@ -121,7 +125,7 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 }`,
 			"arguments": []any{map[string]any{"value": a.Value}}, "returnByValue": true})
 		if e != nil {
-			return e
+			return "", e
 		}
 		var r struct {
 			Result struct {
@@ -129,25 +133,25 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 			} `json:"result"`
 		}
 		if json.Unmarshal(raw, &r) != nil || !r.Result.Value {
-			return errors.New("Element is not a select or the option does not exist")
+			return "", errors.New("Element is not a select or the option does not exist")
 		}
-		return nil
+		return "", nil
 	case "browser_upload":
 		if len(a.Files) == 0 {
-			return errors.New("files must contain at least one path")
+			return "", errors.New("files must contain at least one path")
 		}
 		files := make([]string, 0, len(a.Files))
 		for _, path := range a.Files {
 			p, e := insideFile(t.Cwd, path)
 			if e != nil {
-				return e
+				return "", e
 			}
 			files = append(files, p)
 		}
 		_, e := call("DOM.setFileInputFiles", map[string]any{"backendNodeId": ref.backend, "files": files})
-		return e
+		return "", e
 	}
-	return fmt.Errorf("Unknown browser tool %s", name)
+	return "", fmt.Errorf("Unknown browser tool %s", name)
 }
 func (t Tools) point(ctx context.Context, i *agentbrowser.Instance, id string, ref nodeRef) (float64, float64, error) {
 	if _, err := i.AgentFrameCall(ctx, t.Caller, id, ref.session, "DOM.scrollIntoViewIfNeeded", map[string]any{
@@ -252,12 +256,23 @@ func (t Tools) pressKey(ctx context.Context, i *agentbrowser.Instance, id, key s
 		"Home": 36, "End": 35, "PageUp": 33, "PageDown": 34,
 	}
 	code := codes[key]
+	physical := key
 	text := ""
 	if code == 0 {
 		if len([]rune(key)) != 1 {
 			return errors.New("Unsupported key")
 		}
 		text = key
+		switch {
+		case key >= "a" && key <= "z", key >= "A" && key <= "Z":
+			physical = "Key" + strings.ToUpper(key)
+		case key >= "0" && key <= "9":
+			physical = "Digit" + key
+		case key == " ":
+			physical = "Space"
+		default:
+			physical = map[string]string{";": "Semicolon", "=": "Equal", ",": "Comma", "-": "Minus", ".": "Period", "/": "Slash", "`": "Backquote", "[": "BracketLeft", "\\": "Backslash", "]": "BracketRight", "'": "Quote"}[key]
+		}
 		code = int([]rune(strings.ToUpper(key))[0])
 	}
 	if key == "Enter" {
@@ -267,7 +282,7 @@ func (t Tools) pressKey(ctx context.Context, i *agentbrowser.Instance, id, key s
 		text = ""
 	}
 	for _, kind := range []string{"keyDown", "keyUp"} {
-		p := map[string]any{"type": kind, "key": key, "windowsVirtualKeyCode": code, "modifiers": mod}
+		p := map[string]any{"type": kind, "key": key, "code": physical, "windowsVirtualKeyCode": code, "modifiers": mod}
 		if kind == "keyDown" {
 			p["text"] = text
 		}
@@ -310,4 +325,40 @@ func (t Tools) dispatchFrame(ctx context.Context, i *agentbrowser.Instance, id, 
 		return nil, nil
 	}
 	return raw, err
+}
+
+func (t Tools) obstruction(ctx context.Context, i *agentbrowser.Instance, id string, ref nodeRef, obj string) (string, error) {
+	// DOM quads use the session viewport; the element's own document supplies local
+	// coordinates even for same-process frames. Descend into open shadow roots before comparing.
+	raw, err := i.AgentFrameCall(ctx, t.Caller, id, ref.session, "Runtime.callFunctionOn", map[string]any{
+		"objectId": obj, "returnByValue": true, "functionDeclaration": `function() {
+ const r = this.getBoundingClientRect(), x = (r.left+r.right)/2, y = (r.top+r.bottom)/2;
+ let hit = this.ownerDocument.elementFromPoint(x,y);
+ while (hit && hit.shadowRoot) {
+  const child = hit.shadowRoot.elementFromPoint(x,y);
+  if (!child || child === hit) break;
+  hit = child;
+ }
+ const parent = e => e.parentNode || (e.getRootNode && e.getRootNode().host);
+ const contains = (a,b) => { for(let e=b;e;e=parent(e)) if(e===a)return true; return false; };
+ if (hit && (contains(this,hit) || contains(hit,this))) return '';
+ return hit ? hit.tagName.toLowerCase() + (hit.id ? '#'+hit.id : '') +
+  (hit.getAttribute('role') ? ' role='+hit.getAttribute('role') : '') : 'outside the visible viewport';
+}`,
+	})
+	if err != nil {
+		return "", err
+	}
+	var result struct {
+		Result struct {
+			Value string `json:"value"`
+		} `json:"result"`
+	}
+	if err = json.Unmarshal(raw, &result); err != nil {
+		return "", err
+	}
+	if result.Result.Value == "" {
+		return "", nil
+	}
+	return "Warning: element is covered by " + result.Result.Value + "; the click was dispatched at its position.", nil
 }
