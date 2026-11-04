@@ -473,7 +473,7 @@ export default function AgentBrowserView({ url }: { url: string }) {
                     : label(status?.state ?? 'connecting')}
               </strong>
               {status?.error && <p>{status.error}</p>}
-              {status?.hint && <p>{status.hint}</p>}
+              {status?.state === 'preparing' && status.hint && <p>{status.hint}</p>}
               {status?.state === 'error' && (
                 <>
                   <button type="button" onClick={() => send({ t: 'browser.retry' })}>

@@ -176,6 +176,8 @@ test('managed browser tabs, real viewport, dialogs, select and control', async (
   );
   await chat(page, 'Browser test');
   const pane = page.locator('.hx-agent-browser');
+  await expect(pane.locator('.hx-agent-browser__note')).not.toContainText(/Chrome\/|sandbox:|renderer probe/);
+  await shot(page, 'empty');
   await pane.getByRole('button', { name: 'New tab', exact: true }).first().click();
   await expect(pane.locator('.hx-tbrowser__url')).toBeFocused();
   await navigate(page, '/first');
