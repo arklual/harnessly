@@ -65,6 +65,12 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 	}
 	switch name {
 	case "browser_click", "browser_hover":
+		if name == "browser_click" {
+			handled, output, e := t.selectOption(ctx, i, a.Tab, ref, obj, "", true)
+			if handled || e != nil {
+				return output, e
+			}
+		}
 		x, y, e := t.point(ctx, i, a.Tab, ref)
 		if e != nil {
 			return "", e
@@ -116,26 +122,9 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 		_, e = i.AgentCall(ctx, t.Caller, a.Tab, "Input.insertText", map[string]any{"text": a.Text})
 		return "", e
 	case "browser_select":
-		raw, e := call("Runtime.callFunctionOn", map[string]any{"objectId": obj, "functionDeclaration": `function(value) {
- if (this.tagName !== 'SELECT' || ![...this.options].some(o => o.value === value)) return false;
- this.value = value;
- this.dispatchEvent(new Event('input', {bubbles:true}));
- this.dispatchEvent(new Event('change', {bubbles:true}));
- return true;
-}`,
-			"arguments": []any{map[string]any{"value": a.Value}}, "returnByValue": true})
-		if e != nil {
-			return "", e
-		}
-		var r struct {
-			Result struct {
-				Value bool `json:"value"`
-			} `json:"result"`
-		}
-		if json.Unmarshal(raw, &r) != nil || !r.Result.Value {
-			return "", errors.New("Element is not a select or the option does not exist")
-		}
-		return "", nil
+		_, output, e := t.selectOption(ctx, i, a.Tab, ref, obj, a.Value, false)
+		return output, e
+
 	case "browser_upload":
 		if len(a.Files) == 0 {
 			return "", errors.New("files must contain at least one path")
@@ -361,4 +350,61 @@ func (t Tools) obstruction(ctx context.Context, i *agentbrowser.Instance, id str
 		return "", nil
 	}
 	return "Warning: element is covered by " + result.Result.Value + "; the click was dispatched at its position.", nil
+}
+
+// Native options in a closed select have no layout box. Both selection entry points
+// share matching and event dispatch so visible labels work just like option values.
+func (t Tools) selectOption(ctx context.Context, i *agentbrowser.Instance, id string, ref nodeRef,
+	obj, value string, optionClick bool) (bool, string, error) {
+	raw, err := t.dispatchFrame(ctx, i, id, ref.session, "Runtime.callFunctionOn", map[string]any{
+		"objectId": obj, "returnByValue": true,
+		"arguments": []any{map[string]any{"value": value}, map[string]any{"value": optionClick}},
+		"functionDeclaration": `function(value, optionClick) {
+ if (optionClick && this.tagName !== 'OPTION') return {handled:false};
+ const select = optionClick ? this.closest('select') : this;
+ if (!select || select.tagName !== 'SELECT') {
+  const role = this.getAttribute('role');
+  return {handled:true, error:'Element is not a native <select>' +
+   (role ? ' (role="'+role+'")' : '') + '; use browser_click and browser_press_key for custom controls.'};
+ }
+ const options = [...select.options];
+ const option = optionClick ? this : options.find(o => o.value === value) || options.find(o => o.label === value);
+ const describe = o => o.label + ' (' + o.value + ')';
+ if (!option) return {handled:true, error:'Option not found. Available options: ' + options.map(describe).join(', ')};
+ if (select.disabled || option.disabled || option.parentElement.matches('optgroup:disabled')) {
+  return {handled:true, error:'Option is disabled: ' + describe(option)};
+ }
+ select.selectedIndex = option.index;
+ select.dispatchEvent(new Event('input', {bubbles:true}));
+ select.dispatchEvent(new Event('change', {bubbles:true}));
+ return {handled:true, text:'Selected ' + describe(option)};
+}`,
+	})
+	if err != nil {
+		return false, "", err
+	}
+	if raw == nil {
+		return true, "", nil
+	}
+	var result struct {
+		Result struct {
+			Value struct {
+				Handled bool   `json:"handled"`
+				Error   string `json:"error"`
+				Text    string `json:"text"`
+			} `json:"value"`
+		} `json:"result"`
+		Exception json.RawMessage `json:"exceptionDetails"`
+	}
+	if err = json.Unmarshal(raw, &result); err != nil {
+		return false, "", err
+	}
+	if result.Exception != nil {
+		return false, "", errors.New("Could not inspect the select; refresh the snapshot")
+	}
+	v := result.Result.Value
+	if v.Error != "" {
+		return v.Handled, "", errors.New(v.Error)
+	}
+	return v.Handled, v.Text, nil
 }

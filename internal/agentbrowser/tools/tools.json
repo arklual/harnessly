@@ -220,7 +220,7 @@
   },
   {
     "name": "browser_click",
-    "description": "Click an element from the latest snapshot.",
+    "description": "Click an element from the latest snapshot. Clicking a native <option> selects it, including in a closed list.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -304,7 +304,7 @@
   },
   {
     "name": "browser_select",
-    "description": "Select an option by value in a snapshot element.",
+    "description": "Select a native <select> option by exact value or visible label; value wins if both match. Errors list available labels and values.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -312,7 +312,8 @@
           "type": "string"
         },
         "value": {
-          "type": "string"
+          "type": "string",
+          "description": "Exact option value or visible label."
         },
         "tab": {
           "type": "string",

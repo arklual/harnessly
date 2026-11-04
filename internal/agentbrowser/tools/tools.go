@@ -117,6 +117,10 @@ func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsv
 	return out
 }
 func (t Tools) errorText(i *agentbrowser.Instance, id string, err error) string {
+	if strings.Contains(strings.ToLower(err.Error()), "no layout object") ||
+		strings.Contains(strings.ToLower(err.Error()), "does not have a layout object") {
+		return "Element is not displayed; refresh the snapshot or scroll it into view before trying again."
+	}
 	switch {
 	case errors.Is(err, agentbrowser.ErrNotOwner):
 		return "Tab is not available to this chat. Use browser_tabs."

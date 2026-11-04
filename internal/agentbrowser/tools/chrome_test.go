@@ -174,6 +174,9 @@ func TestChromeMCP(t *testing.T) {
 			page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/html")
 				switch r.URL.Path {
+				case "/controls":
+					fmt.Fprint(w, `<label>Region<select id="region" oninput="document.body.dataset.input=this.value" onchange="document.body.dataset.change=this.value"><option value="us">America</option><option value="eu">Europe</option></select></label>
+<div role="combobox" aria-label="Custom" tabindex="0">Choose</div><button id="hidden">Hidden later</button>`)
 				case "/large":
 					fmt.Fprint(w, `<h1>Large page context</h1><p>Noninteractive explanation</p><iframe src="/frame"></iframe>`)
 					for n := 0; n < 5000; n++ {
@@ -452,6 +455,28 @@ window.addEventListener('keydown',e=>document.body.dataset.code=e.code);true`})
 				}
 			})
 			c.t = t
+			t.Run("native_options", func(t *testing.T) {
+				c.t = t
+				c.text("navigate", map[string]any{"url": page.URL + "/controls"})
+				snapshot := c.text("snapshot", nil)
+				selectID := snapshotID(t, snapshot, "Region")
+				c.text("select", map[string]any{"id": selectID, "value": "Europe"})
+				c.eval("[region.value,document.body.dataset.input,document.body.dataset.change]", `["eu","eu","eu"]`)
+				c.text("select", map[string]any{"id": selectID, "value": "us"})
+				c.eval("region.value", `"us"`)
+				c.refuses("select", map[string]any{"id": selectID, "value": "missing"}, "Available options: America (us), Europe (eu)")
+				c.text("evaluate", map[string]any{"expression": `region.add(new Option('Literal value','America'));true`})
+				c.text("select", map[string]any{"id": selectID, "value": "America"})
+				c.eval("region.value", `"America"`)
+				c.text("click", map[string]any{"id": c.node("Europe")})
+				c.eval("[region.value,document.body.dataset.input,document.body.dataset.change]", `["eu","eu","eu"]`)
+				c.refuses("select", map[string]any{"id": c.node("Custom"), "value": "anything"}, `not a native <select> (role="combobox")`)
+				hidden := c.node("Hidden later")
+				c.text("evaluate", map[string]any{"expression": `document.getElementById('hidden').style.display='none';true`})
+				c.refuses("click", map[string]any{"id": hidden}, "Element is not displayed")
+			})
+			c.t = t
+
 			t.Run("large_snapshot_and_wait", func(t *testing.T) {
 				c.t = t
 				c.text("navigate", map[string]any{"url": page.URL + "/large"})
