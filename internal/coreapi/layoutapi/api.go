@@ -123,6 +123,8 @@ type Sync interface {
 // Deps is everything the routes use. Status and Agents may be nil until they exist: tabs are then not registered,
 // every agent counts as available and a conversation start is refused.
 type Deps struct {
+	// Browser calls the same conversation-bound tools as MCP after the CLI guard succeeds.
+	Browser func(*http.Request, string, string, *jsvalue.Object) *jsvalue.Object
 	Store   *state.Store
 	Tmux    Tmux
 	Status  Status
@@ -504,6 +506,7 @@ func (a *api) table() []entry {
 	add("/api/cli/tabs/[tabId]/send", true, false, a.cliTabSend)
 	add("/api/cli/tabs/[tabId]/status", true, false, a.cliTabStatus)
 	add("/api/cli/panel", true, false, a.cliPanel)
+	add("/api/cli/browser/[tool]", true, false, a.cliBrowser)
 	add("/api/cli/deliver", true, false, a.cliDeliver)
 	add("/api/cli/vault", true, false, a.cliVault)
 	return t

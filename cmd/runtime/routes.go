@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	browsertools "github.com/ly-solutions/harnessly/internal/agentbrowser/tools"
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/machine"
 	"github.com/ly-solutions/harnessly/internal/preflight"
@@ -12,8 +13,9 @@ import (
 
 // deps is what a group of routes may use.
 type deps struct {
-	Home    string
-	DataDir string
+	BrowserTools *browsertools.Service
+	Home         string
+	DataDir      string
 	// ConfigFile is the runtime's config (the pair's secret, the remembered launch choices).
 	ConfigFile string
 	// Secret is the pair's secret, which signs page sessions and the tokens derived from it.
