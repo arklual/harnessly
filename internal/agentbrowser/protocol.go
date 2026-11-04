@@ -31,6 +31,9 @@ import (
 //     call's Unix time in milliseconds (zero until then). dialog is absent when closed.
 //     current is THIS SOCKET's displayed tab, agentTab is the chat's working tab;
 //     either may be empty. following says whether current follows the agent.
+//   {t:"select",x,y,w,h,options:[{value,label,disabled}],selected}
+//     A native single select intercepted by this socket; coordinates are CSS pixels.
+// Client also sends {t:"select.choose",index} or {t:"select.dismiss"}.
 // Server binary: [u32 BE width][u32 BE height][u32 BE gen][JPEG]. Dimensions are
 // CSS pixels. gen starts at zero and increases only when current changes. A tabs
 // message announces gen before its frames; discard frames from older generations.
@@ -188,13 +191,44 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	view := newPanelView()
+	menus := make(chan json.RawMessage, 8)
 	// Commands retain socket order while the writer keeps delivering frames and state changes.
 	go func() {
+		var selection panelSelect
+		defer func() {
+			cleanup, stop := context.WithTimeout(context.Background(), time.Second)
+			defer stop()
+			selection.clear(cleanup, i)
+		}()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case in := <-incoming:
+				selected, _, _, _ := view.resolve(i, conv)
+				if in.T == "select.choose" {
+					report(selection.choose(ctx, i, selected, in.Index))
+					continue
+				}
+				if in.T == "select.dismiss" {
+					selection.clear(ctx, i)
+					continue
+				}
+				if in.T == "mouse" && in.Type == "mouseReleased" && selection.swallowRelease {
+					selection.swallowRelease = false
+					continue
+				}
+				if in.T == "mouse" && in.Type == "mousePressed" && in.Button == "left" {
+					if menu := selection.hit(ctx, i, selected, in); menu != nil {
+						select {
+						case menus <- menu:
+						case <-ctx.Done():
+						}
+						continue
+					}
+				} else if in.T != "mouse" {
+					selection.clear(ctx, i)
+				}
 				report(view.input(ctx, i, conv, in))
 			}
 		}
@@ -274,6 +308,10 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ctx.Done():
 			return
+		case menu := <-menus:
+			if write(menu) != nil {
+				return
+			}
 		case err := <-failures:
 			if write(Notice{T: "notice", Level: "error", Message: err.Error()}) != nil {
 				return

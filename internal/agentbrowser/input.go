@@ -7,6 +7,7 @@ import (
 
 // Input is what the person does in the pane.
 type Input struct {
+	Index      int     `json:"index,omitempty"`
 	Accept     bool    `json:"accept,omitempty"`
 	Holder     string  `json:"holder,omitempty"`
 	Mode       string  `json:"mode,omitempty"`
