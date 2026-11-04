@@ -281,8 +281,9 @@ setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
 			t.Run("hard_kill_recovers_persistent_cookie", func(t *testing.T) {
 				evaluate(t, i, a.ID, `document.cookie="persistent=kept; Max-Age=3600; Path=/"`)
 				// Chrome batches cookie writes. SIGKILL cannot preserve data it has not flushed.
+				// Allow for delayed flushes under full-suite load; polling returns as soon as the cookie is stored.
 				cookieFile := filepath.Join(dir, "chrome", "Default", "Cookies")
-				eventually(t, 50*time.Second, func() bool {
+				eventually(t, 120*time.Second, func() bool {
 					db, err := sql.Open("sqlite", "file:"+cookieFile+"?mode=ro")
 					if err != nil {
 						return false

@@ -137,7 +137,23 @@ async function chat(page: Page, message: string, empty = true) {
   await openBrowser(page, empty);
 }
 async function openBrowser(page: Page, empty = true) {
-  if (!(await page.locator('.hx-pane').isVisible())) await page.locator('.hx-header__tools').click();
+  if (!(await page.locator('.hx-pane').isVisible())) {
+    const noticeClose = page.locator('.hx-notice__x').first();
+    // Replies from an earlier chat may arrive while the Tools click is waiting.
+    await page.addLocatorHandler(
+      noticeClose,
+      async (x) => {
+        // Notices can also disappear on their own between detection and dismissal.
+        await x.dispatchEvent('click', undefined, { timeout: 2000 }).catch(() => undefined);
+      },
+      { noWaitAfter: true },
+    );
+    try {
+      await page.locator('.hx-header__tools').click();
+    } finally {
+      await page.removeLocatorHandler(noticeClose);
+    }
+  }
   await page.locator('.hx-pane .hx-tab[data-home]').click();
   await page
     .locator('.hx-tl__tile')
