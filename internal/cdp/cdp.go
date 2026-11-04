@@ -138,16 +138,26 @@ func (c *Conn) Call(ctx context.Context, method string, params any, session stri
 		return nil, err
 	}
 	if err = c.write(ctx, raw); err != nil {
-		return nil, err
+		// A peer can answer and disconnect before the writer goroutine returns.
+		// Preserve a reply the reader has already delivered, including a CDP error.
+		select {
+		case r := <-ch:
+			return r.result, r.err
+		default:
+		}
+		if !errors.Is(err, ErrClosed) {
+			return nil, err
+		}
 	}
+	// Close completes every pending reply channel. Racing its notification against
+	// a completed reply would randomly discard successful commands on disconnect.
 	select {
 	case r := <-ch:
 		return r.result, r.err
 	case <-ctx.Done():
 		return nil, fmt.Errorf("%s: %w", method, ctx.Err())
-	case <-c.done:
-		return nil, ErrClosed
 	}
+
 }
 
 // DefaultTimeout bounds commands whose caller has not supplied a deadline.
