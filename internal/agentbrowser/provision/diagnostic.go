@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -35,9 +36,19 @@ func releaseValue(release, key string) string {
 
 // InstallCommand suggests a native browser, including its libraries, for the detected distribution.
 func InstallCommand(release string) string {
+	return installCommand(release, runtime.GOARCH)
+}
+
+func installCommand(release, arch string) string {
 	id := releaseValue(release, "ID")
 	switch id {
 	case "ubuntu":
+		if arch == "amd64" {
+			return "curl -fLo /tmp/google-chrome-stable_current_amd64.deb " +
+				"https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && " +
+				"sudo apt-get update && sudo apt-get install -y /tmp/google-chrome-stable_current_amd64.deb " +
+				"xvfb fonts-liberation fonts-noto-color-emoji"
+		}
 		return "sudo apt-get update && sudo apt-get install -y chromium-browser xvfb fonts-liberation fonts-noto-color-emoji"
 	case "alpine":
 		return "sudo apk add chromium xvfb font-liberation font-noto-emoji"
@@ -71,22 +82,53 @@ func libraryError() error {
 	return &Diagnostic{Message: "Chrome has missing shared libraries. Run: " + command, Command: command}
 }
 
-func sandboxCommand(chrome string) string {
+func appArmorPath(chrome string) string {
 	path, _ := filepath.Abs(chrome)
-	return "sudo tee /etc/apparmor.d/harnessly-browser <<'EOF'\nabi <abi/4.0>,\ninclude <tunables/global>\n" +
-		"profile harnessly-browser " + fmt.Sprintf("%q", path) + " flags=(unconfined) {\n  userns,\n}\nEOF\n" +
-		"sudo apparmor_parser -r /etc/apparmor.d/harnessly-browser"
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
+	// Only the version component of our own cache layout may be a wildcard.
+	parts := strings.Split(filepath.ToSlash(path), "/")
+	for i := range parts {
+		if i+4 == len(parts)-1 && parts[i] == "agent-browser" && parts[i+1] == "chrome" &&
+			(parts[i+3] == "chrome-linux64" || parts[i+3] == "chrome-linux-arm64") && parts[i+4] == "chrome" {
+			for j := range parts {
+				if j != i+2 {
+					parts[j] = appArmorEscape(parts[j])
+				}
+			}
+			parts[i+2] = "*"
+			return strings.Join(parts, "/")
+		}
+	}
+	return appArmorEscape(path)
+}
+
+func appArmorEscape(path string) string {
+	return strings.NewReplacer(`\`, `\\`, `"`, `\"`, "*", `\*`, "?", `\?`,
+		"[", `\[`, "]", `\]`, "{", `\{`, "}", `\}`).Replace(path)
+}
+
+func sandboxCommand(chrome string) string {
+	// Select an installed ABI when the operator runs this on the affected machine.
+	return "abi=; for v in 5.0 4.0; do if [ -f /etc/apparmor.d/abi/$v ]; then abi=$v; break; fi; done\n" +
+		"[ -n \"$abi\" ] && { printf 'abi <abi/%s>,\\n' \"$abi\"; cat <<'EOF'\n" +
+		"include <tunables/global>\nprofile harnessly-browser \"" + appArmorPath(chrome) +
+		"\" flags=(unconfined) {\n  userns,\n}\nEOF\n" +
+		"} | sudo tee /etc/apparmor.d/harnessly-browser &&\nsudo apparmor_parser -r /etc/apparmor.d/harnessly-browser"
 }
 
 // SandboxHelp preserves the sandbox by making every privilege-changing remedy an explicit choice.
 func SandboxHelp(chrome string) string {
 	path, _ := filepath.Abs(chrome)
 	helper := filepath.Join(filepath.Dir(path), "chrome-sandbox")
-	return "Chrome sandbox is unavailable. Choose one remedy: install system Google Chrome and set RUNTIME_BROWSER_CHROME; " +
-		"or ask an administrator to install an AppArmor profile for this exact executable:\n" +
-		sandboxCommand(chrome) + "\n" +
-		"Or install the trusted sandbox helper: sudo chown root:root " + shellQuote(helper) + " && sudo chmod 4755 " + shellQuote(helper) +
-		" (requires a filesystem allowing setuid and a service without NoNewPrivileges). " +
+	return "Chrome sandbox is unavailable. Run outside harnessly (normal SSH or local terminal): " +
+		"harnessly processes use NoNewPrivileges and cannot use sudo. " +
+		"First, allow user namespaces with an AppArmor profile:\n" + sandboxCommand(chrome) + "\n" +
+		"Alternatively install system Google Chrome (with its distribution AppArmor profile) and set RUNTIME_BROWSER_CHROME. " +
+		"Another option is the trusted setuid helper: sudo chown root:root " + shellQuote(helper) +
+		" && sudo chmod 4755 " + shellQuote(helper) + "; this DOES NOT work under the service's NoNewPrivileges " +
+		"and requires a filesystem allowing setuid. " +
 		"Last resort: explicitly set RUNTIME_BROWSER_CHROME_ARGS=--no-sandbox. WARNING: this disables Chrome's security sandbox; " +
 		"do not use it for untrusted sites."
 }

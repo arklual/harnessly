@@ -36,7 +36,7 @@ func platform(cfg Config) (archive, error) {
 			"chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"}, nil
 	default:
 		return archive{}, fmt.Errorf("no pinned Chrome for Testing build for %s/%s; install Chromium: %s; "+
-			"then set RUNTIME_BROWSER_CHROME to its executable", cfg.GOOS, cfg.GOARCH, InstallCommand(osRelease()))
+			"then set RUNTIME_BROWSER_CHROME to its executable", cfg.GOOS, cfg.GOARCH, installCommand(osRelease(), cfg.GOARCH))
 	}
 }
 

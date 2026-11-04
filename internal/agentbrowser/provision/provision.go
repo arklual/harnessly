@@ -114,7 +114,7 @@ func DownloadSupport(cfg Config) error {
 		message = err.Error()
 	}
 	if message != "" {
-		return &Diagnostic{Message: message, Command: InstallCommand(osRelease())}
+		return &Diagnostic{Message: message, Command: installCommand(osRelease(), cfg.GOARCH)}
 	}
 	return nil
 }

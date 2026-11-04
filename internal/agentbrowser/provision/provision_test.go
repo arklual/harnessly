@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -313,6 +314,54 @@ func TestDownloadSupportReportsRepairWithoutNetwork(t *testing.T) {
 		var diagnostic *Diagnostic
 		if err := DownloadSupport(cfg); !errors.As(err, &diagnostic) || diagnostic.Command == "" {
 			t.Fatalf("%s: %v", arch, err)
+		}
+	}
+}
+
+func TestSandboxRepairCommand(t *testing.T) {
+	for _, tc := range []struct{ path, want string }{
+		{"/srv/data/agent-browser/chrome/123.0.1.2/chrome-linux64/chrome", "/srv/data/agent-browser/chrome/*/chrome-linux64/chrome"},
+		{"/srv/data/agent-browser/chrome/123.0.1.2/chrome-linux-arm64/chrome", "/srv/data/agent-browser/chrome/*/chrome-linux-arm64/chrome"},
+		{"/opt/custom/chrome", "/opt/custom/chrome"},
+	} {
+		if got := sandboxCommand(tc.path); !strings.Contains(got, tc.want) || !strings.Contains(got, "-f /etc/apparmor.d/abi/$v") {
+			t.Fatal(got)
+		}
+	}
+	help := SandboxHelp("/opt/browser/chrome")
+	if strings.Index(help, "AppArmor profile") > strings.Index(help, "system Google Chrome") ||
+		!strings.Contains(help, "outside harnessly (normal SSH or local terminal)") || !strings.Contains(help, "DOES NOT work") {
+		t.Fatal(help)
+	}
+	if got := installCommand("ID=ubuntu", "amd64"); !strings.Contains(got, "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb") || strings.Contains(got, "chromium-browser") {
+		t.Fatal(got)
+	}
+	if got := installCommand("ID=ubuntu", "arm64"); !strings.Contains(got, "chromium-browser") {
+		t.Fatal(got)
+	}
+}
+
+func TestSandboxCommandAppArmorSyntax(t *testing.T) {
+	parser, err := exec.LookPath("apparmor_parser")
+	if err != nil {
+		t.Skip("AppArmor parser is not installed")
+	}
+	for _, path := range []string{
+		"/srv/browser [data]/agent-browser/chrome/123.0.0.1/chrome-linux64/chrome",
+		"/srv/browser/agent-browser/chrome/123.0.0.1/chrome-linux-arm64/chrome",
+		"/opt/custom browser/chrome",
+	} {
+		file := filepath.Join(t.TempDir(), "profile")
+		command := sandboxCommand(path)
+		command = strings.ReplaceAll(command, "/etc/apparmor.d/harnessly-browser", shellQuote(file))
+		command = strings.ReplaceAll(command, "sudo tee ", "cat > ")
+		command = strings.ReplaceAll(command, "sudo apparmor_parser -r", shellQuote(parser)+" -QK")
+		if strings.Contains(command, "sudo") {
+			t.Fatal("unsafe syntax check", command)
+		}
+		out, e := exec.Command("sh", "-c", command).CombinedOutput()
+		if e != nil {
+			t.Fatalf("syntax: %v\n%s", e, out)
 		}
 	}
 }
