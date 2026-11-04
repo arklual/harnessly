@@ -71,6 +71,8 @@ type binding struct {
 
 // Instance keeps registry locks independent of browser replies and disk writes.
 type Instance struct {
+	agentFrames               map[string]agentFrameBinding
+	agentListeners            map[*agentListener]bool
 	manager                   *Manager
 	profile                   Profile
 	dir                       string
