@@ -172,3 +172,55 @@ func TestPanelInputMouseDoesNotGuardDocument(t *testing.T) {
 		t.Fatal("mouse input restricted agent JavaScript")
 	}
 }
+
+func TestChangesPageContent(t *testing.T) {
+	for _, tc := range []struct {
+		name, method string
+		params       any
+		want         bool
+	}{
+		{"insert", "Input.insertText", map[string]any{"text": "fixture"}, true},
+		{"mouse", "Input.dispatchMouseEvent", map[string]any{"type": "mousePressed"}, false},
+		{"text", "Input.dispatchKeyEvent", map[string]any{"type": "keyDown", "text": "a"}, true},
+		{"enter-text", "Input.dispatchKeyEvent", map[string]any{"type": "keyDown", "text": "\r"}, true},
+		{"char", "Input.dispatchKeyEvent", map[string]any{"type": "char", "text": "a"}, true},
+		{"backspace", "Input.dispatchKeyEvent", map[string]any{"type": "rawKeyDown", "key": "Backspace"}, true},
+		{"delete", "Input.dispatchKeyEvent", map[string]any{"type": "rawKeyDown", "code": "Delete"}, true},
+		{"paste", "Input.dispatchKeyEvent", map[string]any{"type": "rawKeyDown", "key": "v", "modifiers": 2}, true},
+		{"undo", "Input.dispatchKeyEvent", map[string]any{"type": "rawKeyDown", "key": "z", "modifiers": 4}, true},
+		{"release-text", "Input.dispatchKeyEvent", map[string]any{"type": "keyUp", "text": "\r"}, false},
+		{"release-shortcut", "Input.dispatchKeyEvent", map[string]any{"type": "keyUp", "key": "v", "modifiers": 2}, false},
+		{"release-delete", "Input.dispatchKeyEvent", map[string]any{"type": "keyUp", "key": "Backspace"}, false},
+		{"shift-tab", "Input.dispatchKeyEvent", map[string]any{"type": "rawKeyDown", "key": "Tab", "modifiers": 8}, false},
+		{"alt-arrow", "Input.dispatchKeyEvent", map[string]any{"type": "rawKeyDown", "key": "ArrowLeft", "modifiers": 1}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := changesPageContent(tc.method, tc.params); got != tc.want {
+				t.Fatalf("changesPageContent = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPanelNavigationKeysDoNotGuardDocument(t *testing.T) {
+	for _, key := range []string{"Enter", "Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+		"PageUp", "PageDown", "Home", "End", "Escape", "F1", "F12", "Shift", "a"} {
+		for _, kind := range []string{"rawKeyDown", "keyUp"} {
+			t.Run(key+"/"+kind, func(t *testing.T) {
+				m := New(Config{DataDir: t.TempDir()})
+				defer m.Close()
+				i := newInstance(m, DefaultProfile)
+				defer i.cancel()
+				p := newPage(Tab{ID: "tab", Conversation: "chat", URL: "about:blank", Control: "agent"})
+				i.pages[p.ID] = p
+				// A frame lookup failure would install an unknown document guard.
+				connectHandoffFixture(t, i, p, "Page.getFrameTree")
+				_, err := i.Call(t.Context(), p.ID, "Input.dispatchKeyEvent", map[string]any{"type": kind, "key": key})
+				must(t, err)
+				if p.PersonInput || p.PersonDocument != "" {
+					t.Fatal("non-editing key queried or guarded the document")
+				}
+			})
+		}
+	}
+}

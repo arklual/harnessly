@@ -7,9 +7,33 @@ import (
 	"time"
 )
 
+// changesPageContent excludes key releases and navigation keys from the durable
+// human-input guard. Control/Meta shortcuts can paste, cut or undo page content.
+func changesPageContent(method string, params any) bool {
+	if method == "Input.insertText" {
+		return true
+	}
+	if method != "Input.dispatchKeyEvent" {
+		return false
+	}
+	var key struct {
+		Type, Text, Key, Code string
+		Modifiers             int
+	}
+	raw, err := json.Marshal(params)
+	if err != nil || json.Unmarshal(raw, &key) != nil {
+		return true // Malformed input must not bypass the guard.
+	}
+	if key.Type == "keyUp" {
+		return false
+	}
+	return key.Text != "" || key.Key == "Backspace" || key.Key == "Delete" ||
+		key.Code == "Backspace" || key.Code == "Delete" || key.Modifiers&(2|4) != 0
+}
+
 // personInput guards human keyboard/text dispatch and persists dirty/document
 // transitions before Chrome receives input. AgentCall never uses this path.
-func (i *Instance) personInput(ctx context.Context, id string) (func(), error) {
+func (i *Instance) personInput(ctx context.Context, id string, changesContent bool) (func(), error) {
 	i.mu.Lock()
 	p := i.pages[id]
 	i.mu.Unlock()
@@ -17,6 +41,9 @@ func (i *Instance) personInput(ctx context.Context, id string) (func(), error) {
 		return nil, errors.New("unknown browser tab")
 	}
 	p.controlMu.Lock()
+	if !changesContent {
+		return p.controlMu.Unlock, nil
+	}
 	readCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	marker, err := i.personDocument(readCtx, id)
 	cancel()

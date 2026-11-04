@@ -492,6 +492,52 @@ for(const type of ['hidden','checkbox','radio','submit','button','reset','file',
 				}
 				a.c.refuses("evaluate", map[string]any{"expression": "1"}, "The person typed")
 			})
+			for _, event := range []struct {
+				name, kind, key, text string
+				modifiers             int
+				blocked               bool
+			}{
+				{name: "late-enter-release", kind: "keyUp", key: "Enter"},
+				{name: "tab", kind: "rawKeyDown", key: "Tab"},
+				{name: "page-down", kind: "rawKeyDown", key: "PageDown"},
+				{name: "paste", kind: "rawKeyDown", key: "v", modifiers: 2, blocked: true},
+				{name: "backspace", kind: "rawKeyDown", key: "Backspace", blocked: true},
+				{name: "text", kind: "keyDown", key: "a", text: "a", blocked: true},
+			} {
+				run("person-document-keys-"+event.name, func(a *secretAttack) {
+					a.open("/login")
+					i, tab := a.instance(), a.tab()
+					must(a.t, i.SetControl(tab, "person"))
+					a.personType(a.value)
+					_, err := i.Call(a.t.Context(), tab, "Input.dispatchKeyEvent", map[string]any{
+						"type": "keyDown", "key": "Enter", "text": "\r", "windowsVirtualKeyCode": 13,
+					})
+					must(a.t, err)
+					deadline := time.Now().Add(5 * time.Second)
+					for {
+						out, err := i.Call(a.t.Context(), tab, "Runtime.evaluate", map[string]any{
+							"expression": "location.pathname === '/home' && document.readyState === 'complete'", "returnByValue": true,
+						})
+						if err == nil && bytes.Contains(out, []byte(`"value":true`)) {
+							break
+						}
+						if time.Now().After(deadline) {
+							a.t.Fatal("Enter did not finish the form navigation")
+						}
+						time.Sleep(10 * time.Millisecond)
+					}
+					_, err = i.Call(a.t.Context(), tab, "Input.dispatchKeyEvent", map[string]any{
+						"type": event.kind, "key": event.key, "text": event.text, "modifiers": event.modifiers,
+					})
+					must(a.t, err)
+					must(a.t, i.SetControl(tab, "agent"))
+					if event.blocked {
+						a.c.refuses("evaluate", map[string]any{"expression": "document.title"}, "The person typed")
+					} else {
+						a.evalExact("location.pathname", `"/home"`)
+					}
+				})
+			}
 			run("person-document-custom-editor", func(a *secretAttack) {
 				a.open("/landing")
 				i, tab := a.instance(), a.tab()

@@ -424,7 +424,7 @@ func (i *Instance) bind(ctx context.Context, p *page, c *cdp.Conn) (binding, err
 // It enforces ErrDialogOpen but does not enforce agent ownership or control.
 func (i *Instance) Call(ctx context.Context, id, method string, params any) (json.RawMessage, error) {
 	if method == "Input.insertText" || method == "Input.dispatchKeyEvent" {
-		unlock, err := i.personInput(ctx, id)
+		unlock, err := i.personInput(ctx, id, changesPageContent(method, params))
 		if err != nil {
 			return nil, err
 		}
