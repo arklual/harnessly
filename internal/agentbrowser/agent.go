@@ -122,8 +122,10 @@ func (i *Instance) setControl(id, holder string, inspect func(context.Context, s
 	}
 	conv := p.Conversation
 	i.mu.Unlock()
-	unlock := i.LockConversation(conv)
-	defer unlock()
+	if holder == "agent" {
+		unlock := i.lockControlConversation(conv)
+		defer unlock()
+	}
 	i.mu.Lock()
 	present := i.pages[id] == p && p.Conversation == conv && !p.provisional && Shown(p.URL)
 	i.mu.Unlock()

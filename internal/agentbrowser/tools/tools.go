@@ -133,9 +133,15 @@ func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) (res
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(a.TimeoutMS)*time.Millisecond)
 	defer cancel()
 	// Keep seal checks, tool dispatch and output inside the same gate as person handoffs.
-	unlock := i.LockConversation(t.Caller)
+	ctx, unlock, err := i.LockToolConversation(ctx, t.Caller)
+	if err != nil {
+		return mcpserver.TextResult(err.Error(), true)
+	}
 	defer unlock()
 	out, err := t.call(ctx, i, name, a)
+	if errors.Is(context.Cause(ctx), agentbrowser.ErrControlInterrupted) {
+		err = agentbrowser.ErrControlInterrupted
+	}
 	if err != nil {
 		return mcpserver.TextResult(untrustedNote+"\n"+t.redact(i.Redact(t.errorText(i, a.Tab, err))), true)
 	}

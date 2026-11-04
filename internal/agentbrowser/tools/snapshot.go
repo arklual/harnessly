@@ -412,6 +412,12 @@ func (t Tools) waitFor(ctx context.Context, i *agentbrowser.Instance, _ *tabStat
  }
  return contains(document.body || document.documentElement);
 })()`)
+			if errors.Is(e, agentbrowser.ErrPersonControl) {
+				return "", e
+			}
+			if ctx.Err() != nil {
+				return "", context.Cause(ctx)
+			}
 			// Frames can navigate while waiting. Retry against the next current frame tree.
 			if e == nil && string(found) == "true" {
 				return "Text found in frame " + scope.frame + ": " + jsonText(a.Text), nil

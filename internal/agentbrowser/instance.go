@@ -91,7 +91,7 @@ type Instance struct {
 	secretMasks               []string
 	maskPending               map[uint64][]string
 	maskNext                  uint64
-	conversationGates         map[string]chan struct{}
+	conversationGates         map[string]*conversationGate
 	agentFrames               map[string]agentFrameBinding
 	agentListeners            map[*agentListener]bool
 	manager                   *Manager

@@ -2,6 +2,7 @@ package agentbrowser
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -158,5 +159,58 @@ func TestConversationGatesBelongToTheirInstance(t *testing.T) {
 		defer unlock()
 		independent := second.LockConversation("chat")
 		independent()
+	})
+}
+
+func TestConversationGateReturnCancelsToolBeforeInspecting(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		m := New(Config{DataDir: t.TempDir()})
+		defer m.Close()
+		i := newInstance(m, DefaultProfile)
+		defer i.cancel()
+		p := newPage(Tab{ID: "tab", Conversation: "chat", URL: "about:blank", Control: "person"})
+		i.pages[p.ID] = p
+		ctx, release, err := i.LockToolConversation(t.Context(), "chat")
+		must(t, err)
+		unlock := sync.OnceFunc(release)
+		defer unlock()
+		inspected := false
+		done := make(chan error, 1)
+		go func() {
+			done <- i.setControl(p.ID, "agent", func(context.Context, string) (string, bool, error) {
+				inspected = true
+				return "document", true, nil
+			})
+		}()
+		synctest.Wait()
+		if !errors.Is(context.Cause(ctx), ErrControlInterrupted) {
+			t.Fatal("return did not cancel the active tool")
+		}
+		if inspected {
+			t.Fatal("handoff inspected while the cancelled tool still held the gate")
+		}
+		unlock()
+		must(t, <-done)
+		if !inspected || !i.Tabs("chat")[0].Sealed {
+			t.Fatal("handoff did not seal after cancellation completed")
+		}
+	})
+}
+
+func TestConversationGateTakeoverDoesNotWait(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		m := New(Config{DataDir: t.TempDir()})
+		defer m.Close()
+		i := newInstance(m, DefaultProfile)
+		defer i.cancel()
+		p := newPage(Tab{ID: "tab", Conversation: "chat", URL: "about:blank", Control: "agent"})
+		i.pages[p.ID] = p
+		_, unlock, err := i.LockToolConversation(t.Context(), "chat")
+		must(t, err)
+		defer unlock()
+		must(t, i.SetControl(p.ID, "person"))
+		if !errors.Is(i.AgentCheck("chat", p.ID, "Runtime.evaluate"), ErrPersonControl) {
+			t.Fatal("takeover did not stop agent commands")
+		}
 	})
 }

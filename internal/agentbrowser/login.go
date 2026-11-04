@@ -166,17 +166,27 @@ func (a *ProfileAccess) RequestLogin(ctx context.Context, conv, target, why stri
 	if err == nil {
 		x, fresh, err = a.Logins.open(conv, identity, target, why)
 	}
+	a.mu.Unlock()
 	if err == nil && fresh {
 		var i *Instance
 		i, err = a.Manager.InstanceFor(ctx, conv)
+		if err == nil && !a.loginIdentityCurrent(conv, identity.Project) {
+			err = errors.New("The requesting chat has moved or been removed")
+		}
 		if err == nil {
-			_, err = i.newTab(ctx, conv, "agent", target, x)
+			var tab Tab
+			tab, err = i.newTab(ctx, conv, "agent", target, x)
+			if err == nil && !a.loginIdentityCurrent(conv, identity.Project) {
+				cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = i.CloseTab(cleanup, tab.ID)
+				cancel()
+				err = errors.New("The requesting chat has moved or been removed")
+			}
 		}
 		if err != nil {
 			x.settle("cancelled", "about:blank")
 		}
 	}
-	a.mu.Unlock()
 	if err != nil {
 		return LoginAnswer{}, err
 	}
@@ -188,8 +198,6 @@ func (a *ProfileAccess) AnswerLogin(ctx context.Context, id, action string) erro
 	if action != "done" && action != "cancel" {
 		return errors.New("Invalid login action")
 	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
 	x := a.Logins.find(id)
 	if x == nil {
 		return errors.New("Login request is no longer pending")
@@ -200,8 +208,11 @@ func (a *ProfileAccess) AnswerLogin(ctx context.Context, id, action string) erro
 	if !pending || i == nil {
 		return errors.New("Login request is no longer pending")
 	}
+	a.mu.Lock()
 	identity, err := a.identity(ask.Conv)
-	if err != nil || identity.Project != ask.Project || a.ProfileOf(ask.Conv) != i.profile.ID {
+	valid := err == nil && identity.Project == ask.Project && a.ProfileOf(ask.Conv) == i.profile.ID
+	a.mu.Unlock()
+	if !valid {
 		x.settle("cancelled", i.loginURL(ask.Tab))
 		return errors.New("The requesting chat has moved or been removed")
 	}
@@ -256,4 +267,13 @@ func (i *Instance) AgentTabs(conv string) []Tab {
 		}
 	}
 	return tabs
+}
+
+// Startup and navigation run outside the access lock. Recheck the request's
+// identity on both sides so a concurrent move cannot leave a stale login tab.
+func (a *ProfileAccess) loginIdentityCurrent(conv, project string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	identity, err := a.identity(conv)
+	return err == nil && identity.Project == project
 }
