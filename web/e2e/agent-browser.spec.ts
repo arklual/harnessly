@@ -176,6 +176,8 @@ test('managed browser tabs, real viewport, dialogs, select and control', async (
   );
   await chat(page, 'Browser test');
   const pane = page.locator('.hx-agent-browser');
+  await expect(pane.locator('.hx-agent-browser__note')).not.toContainText(/Chrome\/|sandbox:|renderer probe/);
+  await shot(page, 'empty');
   await pane.getByRole('button', { name: 'New tab', exact: true }).first().click();
   await expect(pane.locator('.hx-tbrowser__url')).toBeFocused();
   await navigate(page, '/first');
@@ -391,6 +393,8 @@ test('agent viewport remains fixed when the panel opens and resizes', async ({ p
     await expect(pane.getByRole('button', { name: 'Viewport size' })).toHaveText('1280×800 ▾');
     const box = (await pane.locator('canvas').boundingBox())!;
     expect(box.width).toBeLessThan(1280);
+    const area = (await pane.locator('.hx-agent-browser__view').boundingBox())!;
+    expect(Math.abs(box.y - area.y)).toBeLessThan(1);
     await shot(page, 'agent-fixed');
     await page.setViewportSize({ width: 1100, height: 800 });
     await page.waitForTimeout(500);

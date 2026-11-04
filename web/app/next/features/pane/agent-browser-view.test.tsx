@@ -77,6 +77,16 @@ describe('agent browser panel', () => {
     });
     expect(screen.getByRole('progressbar').getAttribute('value')).toBe('35');
     expect(screen.getByText('Unpacking')).toBeTruthy();
+    for (const state of ['starting', 'up', 'down', 'error']) {
+      Socket.last.emit({
+        t: 'status',
+        state,
+        hint: 'Renderer diagnostics',
+        profile: { id: 'common', name: 'Common' },
+      });
+      expect(screen.queryByText('Renderer diagnostics')).toBeNull();
+    }
+    expect(screen.queryByText('Unpacking')).toBeNull();
     Socket.last.emit({ t: 'notice', message: 'Try again' });
     expect(screen.getByRole('alert').textContent).toBe('noticeFailed');
     Socket.last.emit({
