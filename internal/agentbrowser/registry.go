@@ -24,7 +24,7 @@ func newPage(t Tab) *page {
 	if t.Control == "" {
 		t.Control = "agent"
 	}
-	return &page{Tab: t, gate: make(chan struct{}, 1), viewers: make(map[*Viewer]bool)}
+	return &page{Tab: t, redactionLost: t.SecretTouched, gate: make(chan struct{}, 1), viewers: make(map[*Viewer]bool)}
 }
 
 func newInstance(m *Manager, id string) *Instance {
@@ -86,6 +86,11 @@ func (i *Instance) save() {
 	r := registry{Current: i.current, Hidden: i.hidden, Tabs: i.tabsLocked("")}
 	for n := range r.Tabs {
 		r.Tabs[n].Dialog = nil
+		// Once a value has entered this browser, page metadata may contain it later.
+		// Redaction keys are intentionally not persisted; omit metadata on restart too.
+		if r.Tabs[n].SecretTouched {
+			r.Tabs[n].URL, r.Tabs[n].Title = "about:blank", ""
+		}
 	}
 	raw, err := json.MarshalIndent(r, "", "  ")
 	i.mu.Unlock()
@@ -136,7 +141,16 @@ func (i *Instance) tabsLocked(conv string) []Tab {
 	out := []Tab{}
 	for _, p := range i.pages {
 		if !p.provisional && Shown(p.URL) && (conv == "" || p.Conversation == conv) {
-			out = append(out, tabSnapshot(p.Tab))
+			tab := tabSnapshot(p.Tab)
+			tab.Title, tab.URL = i.redactLocked(tab.Title), i.redactLocked(tab.URL)
+			if p.redactionLost {
+				tab.Title, tab.URL = "", "about:blank"
+			}
+			if tab.Dialog != nil {
+				tab.Dialog.Message = i.redactLocked(tab.Dialog.Message)
+				tab.Dialog.DefaultPrompt = i.redactLocked(tab.Dialog.DefaultPrompt)
+			}
+			out = append(out, tab)
 		}
 	}
 	sort.Slice(out, func(a, b int) bool { return out[a].Order < out[b].Order })
@@ -202,6 +216,9 @@ func (i *Instance) removeLocked(id string) {
 	if p == nil {
 		return
 	}
+	if p.login != nil {
+		p.login.settle("cancelled", i.redactLocked(p.URL))
+	}
 	delete(i.pages, id)
 	for conv, current := range i.current {
 		if current != id {
@@ -225,6 +242,10 @@ func (i *Instance) removeLocked(id string) {
 
 // NewTab creates a separate window without waiting for work on any existing tab.
 func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error) {
+	return i.newTab(ctx, conv, by, url, nil)
+}
+
+func (i *Instance) newTab(ctx context.Context, conv, by, url string, login *loginRequest) (Tab, error) {
 	if i.manager.cfg.ProfileOf != nil && i.manager.profileFor(conv) != i.profile.ID {
 		return Tab{}, ErrProfileUnavailable
 	}
@@ -270,6 +291,15 @@ func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error
 	working := i.currentLocked(conv)
 	p := i.upsertLocked(target{ID: r.ID, Type: "page", URL: url})
 	p.Conversation, p.By = conv, by
+	if login != nil {
+		p.URL = initialURL
+		p.Control = "person"
+		p.login = login
+		login.mu.Lock()
+		login.instance = i
+		login.ask.Tab = p.ID
+		login.mu.Unlock()
+	}
 	if by == "person" {
 		p.Viewport = Viewport{Mode: "fit", DPR: 1}
 	}
@@ -279,6 +309,15 @@ func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error
 	}
 	i.changedLocked()
 	i.mu.Unlock()
+	if login != nil {
+		defer func() {
+			if err != nil {
+				cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_ = i.CloseTab(cleanup, p.ID)
+			}
+		}()
+	}
 	if _, err = i.prepare(ctx, p, c); err != nil {
 		return Tab{}, err
 	}
@@ -323,6 +362,7 @@ func (i *Instance) CloseTab(ctx context.Context, id string) error {
 	// Chrome acknowledges before destruction. Events remove the tab as soon as they arrive.
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
+	lastClose := time.Now()
 	for {
 		raw, err := c.Call(ctx, "Target.getTargets", nil, "")
 		if err != nil {
@@ -346,6 +386,14 @@ func (i *Instance) CloseTab(ctx context.Context, id string) error {
 			i.removeLocked(id)
 			i.mu.Unlock()
 			return nil
+		}
+		// A close acknowledged during a pending navigation can leave the target alive.
+		// Retry the browser-side close instead of waiting out the entire call budget.
+		if time.Since(lastClose) >= 250*time.Millisecond {
+			if _, err = c.Call(ctx, "Target.closeTarget", map[string]any{"targetId": id}, ""); err != nil {
+				return err
+			}
+			lastClose = time.Now()
 		}
 		select {
 		case <-ctx.Done():

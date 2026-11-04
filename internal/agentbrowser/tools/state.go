@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
+	"github.com/ly-solutions/harnessly/internal/secrets"
 )
 
 type nodeRef struct {
@@ -21,7 +21,10 @@ type nodeRef struct {
 	epoch   uint64
 }
 type tabState struct {
+	mask             func(string) string
+	register         func(string)
 	action           sync.Mutex
+	sealed           []sealedField
 	mu               sync.Mutex
 	refs             map[string]nodeRef
 	next             uint64
@@ -68,7 +71,8 @@ func (s *Service) state(ctx context.Context, i *agentbrowser.Instance, conv, id 
 	stopEvents := unsubscribe
 	unsubscribe = func() { stopEvents(); stopChanges() }
 	life, cancel := context.WithCancel(context.Background())
-	st := &tabState{refs: map[string]nodeRef{}, requests: map[string]string{}, pending: map[string]bool{}, loading: map[string]bool{},
+	st := &tabState{mask: i.Redact, register: i.RememberSecret, refs: map[string]nodeRef{},
+		requests: map[string]string{}, pending: map[string]bool{}, loading: map[string]bool{},
 		last: time.Now(), cancel: cancel, unsubscribe: unsubscribe}
 	if s.tabs == nil {
 		s.tabs = map[string]*tabState{}
@@ -204,19 +208,12 @@ func (st *tabState) event(e agentbrowser.AgentEvent) {
 	}
 }
 func (st *tabState) redactLocked(s string) string {
-	for _, p := range st.passwords {
-		if p != "" {
-			for _, encoded := range []string{p, url.QueryEscape(p), url.PathEscape(p)} {
-				s = strings.ReplaceAll(s, encoded, "[redacted]")
-			}
-			escaped := strings.Trim(jsonText(p), `"`)
-			if escaped != p {
-				s = strings.ReplaceAll(s, escaped, "[redacted]")
-			}
-		}
+	if st.mask != nil {
+		return st.mask(s)
 	}
-	return s
+	return secrets.Mask(s, st.passwords)
 }
+
 func (st *tabState) redact(s string) string {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -234,6 +231,9 @@ func (st *tabState) remember(p string) {
 		}
 	}
 	st.passwords = append(st.passwords, p)
+	if st.register != nil {
+		st.register(p)
+	}
 }
 
 func (t Tools) recording(ctx context.Context, i *agentbrowser.Instance, st *tabState, name string, a arguments) (*jsvalue.Object, error) {

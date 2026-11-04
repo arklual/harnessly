@@ -42,21 +42,26 @@ type Dialog struct {
 // Tab records creation order independently of Chrome's target IDs. All fields except
 // the live Dialog are persisted; callers receive snapshots they may safely retain.
 type Tab struct {
-	Control      string   `json:"control"`
-	AgentAt      int64    `json:"agentAt"`
-	Dialog       *Dialog  `json:"dialog,omitempty"`
-	ID           string   `json:"id"`
-	Title        string   `json:"title"`
-	URL          string   `json:"url"`
-	Conversation string   `json:"conversation,omitempty"`
-	By           string   `json:"by"`
-	Viewport     Viewport `json:"viewport"`
-	Crashed      bool     `json:"crashed"`
-	Order        uint64   `json:"order"`
-	WindowID     int      `json:"windowId"`
+	Sealed         bool     `json:"sealed,omitempty"`
+	SecretTouched  bool     `json:"secretTouched,omitempty"`
+	SecretDocument string   `json:"secretDocument,omitempty"`
+	Control        string   `json:"control"`
+	AgentAt        int64    `json:"agentAt"`
+	Dialog         *Dialog  `json:"dialog,omitempty"`
+	ID             string   `json:"id"`
+	Title          string   `json:"title"`
+	URL            string   `json:"url"`
+	Conversation   string   `json:"conversation,omitempty"`
+	By             string   `json:"by"`
+	Viewport       Viewport `json:"viewport"`
+	Crashed        bool     `json:"crashed"`
+	Order          uint64   `json:"order"`
+	WindowID       int      `json:"windowId"`
 }
 
 type page struct {
+	redactionLost bool
+	login         *loginRequest
 	Tab
 	gate            chan struct{}
 	binding         binding
@@ -78,6 +83,7 @@ type binding struct {
 
 // Instance keeps registry locks independent of browser replies and disk writes.
 type Instance struct {
+	secretMasks               []string
 	agentFrames               map[string]agentFrameBinding
 	agentListeners            map[*agentListener]bool
 	manager                   *Manager

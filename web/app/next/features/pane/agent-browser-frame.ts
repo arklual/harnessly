@@ -10,6 +10,7 @@ export interface IBrowserTab {
   control: 'agent' | 'person';
   agentAt: number;
   dialog?: { type: string; message: string; defaultPrompt: string };
+  login?: import('@/next/features/browser/login-api').ILoginAsk;
 }
 /** CSS viewport dimensions are independent of encoded JPEG pixel density. */
 export interface IViewport {

@@ -30,6 +30,8 @@ type axNode struct {
 type frameTree struct {
 	Frame struct {
 		ID     string `json:"id"`
+		Origin string `json:"securityOrigin"`
+		Loader string `json:"loaderId"`
 		Parent string `json:"parentId"`
 	} `json:"frame"`
 	Children []frameTree `json:"childFrames"`
@@ -64,6 +66,11 @@ func (t Tools) scopes(ctx context.Context, i *agentbrowser.Instance, id string) 
 		}
 		frames = next
 	}
+	return t.frameScopes(ctx, i, id, frames)
+}
+
+// frameScopes reads browser-owned frame metadata after sessions have been attached.
+func (t Tools) frameScopes(ctx context.Context, i *agentbrowser.Instance, id string, frames []agentbrowser.AgentFrame) ([]frameScope, error) {
 	sessions := []string{""}
 	for _, f := range frames {
 		sessions = append(sessions, f.Session)

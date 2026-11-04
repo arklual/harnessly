@@ -410,6 +410,8 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	agentBrowser := agentbrowser.New(browserConfig)
 	browserAccess.Manager = agentBrowser
 	d.BrowserTools = &browsertools.Service{Manager: agentBrowser, Access: browserAccess}
+	configureBrowserSecrets(d, ref.c)
+	f.Add(agentBrowserLoginRoutes(d, browserAccess)...)
 	ref.c.v2d = &d
 	f.Add(agentBrowserProfileRoutes(d, browserAccess, func(id string) bool {
 		v := ref.c.v2.Load()

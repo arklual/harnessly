@@ -88,16 +88,17 @@ type Notice struct {
 
 // PanelTab is the public metadata for one visible page.
 type PanelTab struct {
-	Control  string   `json:"control"`
-	AgentAt  int64    `json:"agentAt"`
-	Dialog   *Dialog  `json:"dialog,omitempty"`
-	ID       string   `json:"id"`
-	Title    string   `json:"title"`
-	URL      string   `json:"url"`
-	Owner    string   `json:"owner"`
-	By       string   `json:"by"`
-	Viewport Viewport `json:"viewport"`
-	Crashed  bool     `json:"crashed"`
+	Login    *LoginAsk `json:"login,omitempty"`
+	Control  string    `json:"control"`
+	AgentAt  int64     `json:"agentAt"`
+	Dialog   *Dialog   `json:"dialog,omitempty"`
+	ID       string    `json:"id"`
+	Title    string    `json:"title"`
+	URL      string    `json:"url"`
+	Owner    string    `json:"owner"`
+	By       string    `json:"by"`
+	Viewport Viewport  `json:"viewport"`
+	Crashed  bool      `json:"crashed"`
 }
 
 // TabsMessage pairs a selection with the generation used by subsequent frames.
@@ -380,7 +381,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				owner = "this"
 			}
 			tabs = append(tabs, PanelTab{ID: t.ID, Title: t.Title, URL: t.URL, Owner: owner, By: t.By,
-				Viewport: t.Viewport, Crashed: t.Crashed, Control: t.Control, AgentAt: t.AgentAt, Dialog: t.Dialog})
+				Viewport: t.Viewport, Crashed: t.Crashed, Control: t.Control, AgentAt: t.AgentAt, Dialog: t.Dialog, Login: i.pendingLogin(t.ID)})
 		}
 		return write(TabsMessage{T: "tabs", Tabs: tabs, Current: current, Gen: gen, AgentTab: agentTab, Following: following})
 	}

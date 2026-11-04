@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -50,6 +51,11 @@ func run() error {
 		return err
 	}
 	m := agentbrowser.New(agentbrowser.Config{DataDir: dir, Executable: exe, Chrome: chrome, Mode: "headless"})
+	access := agentbrowser.NewProfileAccess(agentbrowser.OpenProfiles(dir, ""), func(conv string) (agentbrowser.ConversationIdentity, bool) {
+		return agentbrowser.ConversationIdentity{Title: "Manual login task"}, conv != ""
+	})
+	access.Manager = m
+	access.Wait = time.Millisecond
 	defer func() {
 		m.Close()
 		raw, _ := os.ReadFile(filepath.Join(dir, "agent-browser", "profiles", agentbrowser.DefaultProfile, "host.pid"))
@@ -58,6 +64,33 @@ func run() error {
 		}
 	}()
 	mux := http.NewServeMux()
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		answer, err := access.RequestLogin(r.Context(), r.URL.Query().Get("conv"), r.URL.Query().Get("url"), r.URL.Query().Get("why"))
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(answer)
+	})
+	mux.HandleFunc("/api/agent-browser/logins", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_ = json.NewEncoder(w).Encode(map[string]any{"asks": access.Logins.Pending()})
+			return
+		}
+		var body struct {
+			ID     string `json:"id"`
+			Action string `json:"action"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		if err := access.AnswerLogin(r.Context(), body.ID, body.Action); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	})
 	mux.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
 		conv := r.URL.Query().Get("conv")
 		i, e := m.InstanceFor(r.Context(), conv)

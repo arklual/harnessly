@@ -17,6 +17,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
+	"github.com/ly-solutions/harnessly/internal/secrets"
 )
 
 func TestDisabledUnknownAndStarting(t *testing.T) {
@@ -165,5 +166,28 @@ func TestPreparingDoesNotWaitForDownload(t *testing.T) {
 	out := set.Call(t.Context(), "browser_tabs", jsvalue.NewObject())
 	if time.Since(start) > time.Second || !strings.Contains(string(jsvalue.Stringify(out, "")), "Preparing browser") {
 		t.Fatalf("download blocked the tool: %s", jsvalue.Stringify(out, ""))
+	}
+}
+
+func TestRecordingOverlappingProfileValues(t *testing.T) {
+	short := strings.Repeat("q7", 6)
+	long := short + strings.Repeat("r2", 8)
+	var profile []string
+	mask := func(s string) string { return secrets.Mask(s, profile) }
+	register := func(s string) { profile = append(profile, s) }
+	first := &tabState{mask: mask, register: register}
+	second := &tabState{mask: mask, register: register}
+	first.remember(short)
+	second.remember(long)
+	for _, st := range []*tabState{first, second} {
+		raw, _ := json.Marshal(map[string]any{"type": "log", "args": []any{map[string]any{"value": long}}})
+		st.event(agentbrowser.AgentEvent{Method: "Runtime.consoleAPICalled", Params: raw})
+		if st.redact(long) != "[redacted]" || strings.Contains(st.console[0], strings.Repeat("r2", 8)) {
+			t.Fatal("tab recording exposed a longer sibling value's suffix")
+		}
+	}
+	set := Tools{Caller: "chat", S: &Service{tabs: map[string]*tabState{"profile/chat/one": first, "profile/chat/two": second}}}
+	if set.redact(long) != "[redacted]" {
+		t.Fatal("response masking exposed an overlapping tab value")
 	}
 }

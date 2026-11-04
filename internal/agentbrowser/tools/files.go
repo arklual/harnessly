@@ -8,7 +8,6 @@ import (
 	"errors"
 	"image"
 	"image/jpeg"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,11 +18,7 @@ import (
 )
 
 func allowedURL(raw string) error {
-	u, err := url.Parse(raw)
-	if err == nil && ((u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.User == nil || raw == "about:blank") {
-		return nil
-	}
-	return errors.New("URL refused: use http://, https:// or about:blank (localhost is allowed)")
+	return agentbrowser.AllowedURL(raw)
 }
 func relativePath(cwd, path string) (string, string, error) {
 	if cwd == "" || path == "" {

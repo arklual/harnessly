@@ -7,6 +7,8 @@ import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import { pagePoint, type IBrowserTab, type IViewport } from './agent-browser-frame';
 import { useBrowserSocket } from './agent-browser-socket';
+import { LoginBanner } from '@/next/features/browser/login-banner';
+import { useChatPaneView } from '@/next/stores/pane-state';
 
 const presets: IViewport[] = [
   { mode: 'fixed', w: 1280, h: 800, dpr: 1 },
@@ -30,6 +32,12 @@ export default function AgentBrowserView({
   const { pause, resume, canvas, page, status, tabs, menu, setMenu, notice, framed, imageSize, send } =
     useBrowserSocket(url);
   const active = tabs.tabs.find((tab) => tab.id === tabs.current);
+  const [loginTab, setLoginTab] = useChatPaneView<string | null>(conv ?? null, 'browser-login-tab', null);
+  useEffect(() => {
+    if (!loginTab || !tabs.tabs.some((tab) => tab.id === loginTab)) return;
+    send({ t: 'tab.select', id: loginTab });
+    setLoginTab(null);
+  }, [loginTab, tabs.tabs, send, setLoginTab]);
   const area = useRef<HTMLDivElement>(null),
     address = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<string | null>(null);
@@ -696,6 +704,7 @@ export default function AgentBrowserView({
           }}
         />
         <div className="hx-agent-browser__status">
+          {active?.login && machine && <LoginBanner machine={machine} ask={active.login} />}
           <button
             type="button"
             className="hx-agent-browser__keyboard"

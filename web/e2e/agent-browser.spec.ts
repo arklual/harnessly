@@ -701,3 +701,86 @@ test('real project profile switch closes old tabs and reconnects to the selected
   expect(selected.hasTabs).toBe(false);
   await expect(pane.getByText('No tabs', { exact: true })).toBeVisible();
 });
+
+test('manual login opens across chats, protects Chrome until Done and supports Cancel', async ({ page }) => {
+  test.setTimeout(180_000);
+  const binary = join(rt.root, 'browser-login');
+  execFileSync('go', ['build', '-o', binary, './e2e/fixtures/browser-agent']);
+  const child = spawn(binary, [], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const base = await new Promise<string>((resolve, reject) => {
+    child.stdout.once('data', (data) => resolve(String(data).trim()));
+    child.once('error', reject);
+    child.once('exit', (code) => reject(new Error(`Login fixture exited: ${code}`)));
+  });
+  try {
+    await page.route('**/api/agent-browser/logins?*', async (route) => {
+      const request = route.request();
+      const response = await fetch(base + '/api/agent-browser/logins', {
+        method: request.method(),
+        ...(request.method() === 'POST' ? { body: request.postData()! } : {}),
+      });
+      await route.fulfill({
+        status: response.status,
+        body: await response.text(),
+        contentType: 'application/json',
+      });
+    });
+    await page.routeWebSocket('**/api/agent-browser?*', (ws) => {
+      const url = new URL(ws.url());
+      const upstream = new WebSocket(base.replace('http:', 'ws:') + '/api/agent-browser' + url.search);
+      upstream.binaryType = 'arraybuffer';
+      upstream.onmessage = (event) =>
+        ws.send(typeof event.data === 'string' ? event.data : Buffer.from(event.data as ArrayBuffer));
+      ws.onMessage((message) =>
+        upstream.send(typeof message === 'string' ? message : Uint8Array.from(message)),
+      );
+      ws.onClose(() => upstream.close());
+      upstream.onclose = () => {
+        void ws.close();
+      };
+    });
+    await chat(page, 'Manual login task');
+    const requester = new URL(page.url()).pathname.split('/').at(-1)!;
+    await page.getByRole('button', { name: 'New chat', exact: true }).first().click();
+    await page.locator('.hx-composer__input').fill('Another task while login is waiting');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page).toHaveURL(/\/c\/[^/]+$/);
+    expect(new URL(page.url()).pathname.split('/').at(-1)).not.toBe(requester);
+    const requestLogin = async (why: string) => {
+      const response = await fetch(
+        base + '/login?' + new URLSearchParams({ conv: requester, url: siteURL + '/manual-login', why }),
+      );
+      expect(response.ok, await response.text()).toBe(true);
+    };
+    await requestLogin('Please sign in to the local account');
+    const card = page.getByRole('dialog', { name: 'Sign in requested', exact: true });
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    await expect(card).toContainText('Please sign in to the local account');
+    await shot(page, 'login-cross-chat-card');
+    await card.getByRole('button', { name: 'Open login', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/c/${requester}$`));
+    const pane = page.locator('.hx-agent-browser');
+    const banner = pane.getByRole('region', { name: 'Sign in requested', exact: true });
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('Please sign in to the local account');
+    await expect(pane.getByText('You have control', { exact: true })).toBeVisible();
+    await expect(pane.locator('canvas')).toHaveAttribute('data-shown', 'true');
+    await shot(page, 'login-banner-desktop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(banner.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await shot(page, 'login-banner-phone');
+    await banner.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(banner).toHaveCount(0);
+    await expect(pane.getByText('Agent has control', { exact: true })).toBeVisible();
+    await requestLogin('Cancel this second login');
+    await expect(banner).toContainText('Cancel this second login', { timeout: 10_000 });
+    await banner.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(banner).toHaveCount(0);
+    await expect(pane.getByRole('tab')).toHaveCount(1);
+  } finally {
+    await page.unroute('**/api/agent-browser/logins?*');
+    child.kill('SIGTERM');
+    await new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  }
+});

@@ -20,6 +20,7 @@ type ProfileAccess struct {
 	Store       *ProfileStore
 	Manager     *Manager
 	Asks        *ProfileAsks
+	Logins      *LoginRequests
 	Identity    func(string) (ConversationIdentity, bool)
 	Wait        time.Duration
 	mu          sync.Mutex
@@ -29,7 +30,7 @@ type ProfileAccess struct {
 
 // NewProfileAccess creates the shared authorization service for page, MCP and CLI callers.
 func NewProfileAccess(store *ProfileStore, identity func(string) (ConversationIdentity, bool)) *ProfileAccess {
-	return &ProfileAccess{Store: store, Asks: NewProfileAsks(), Identity: identity, Wait: 55 * time.Second, notices: map[string]string{}}
+	return &ProfileAccess{Store: store, Asks: NewProfileAsks(), Logins: NewLoginRequests(), Identity: identity, Wait: 55 * time.Second, notices: map[string]string{}}
 }
 
 type conversationTransition struct {

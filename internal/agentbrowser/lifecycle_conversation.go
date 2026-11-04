@@ -52,6 +52,13 @@ func (m *Manager) closeConversationProfile(ctx context.Context, id, conv string)
 	i := m.instances[id]
 	m.mu.Unlock()
 	if i != nil {
+		i.mu.Lock()
+		for _, p := range i.pages {
+			if p.Conversation == conv && p.login != nil {
+				p.login.settle("cancelled", i.redactLocked(p.URL))
+			}
+		}
+		i.mu.Unlock()
 		for _, tab := range i.Tabs(conv) {
 			if err := i.CloseTab(ctx, tab.ID); err != nil {
 				return err

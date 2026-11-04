@@ -9,6 +9,8 @@ import '@/next/styles/icons.css';
 import '@/next/styles/ui.css';
 import '@/next/styles/shell.css';
 import '@/next/styles/pane.css';
+import '@/next/styles/browser-profiles.css';
+import '@/next/styles/browser-login.css';
 import '@/next/styles/picker.css';
 import '@/next/styles/composer.css';
 import '@/next/styles/goal.css';

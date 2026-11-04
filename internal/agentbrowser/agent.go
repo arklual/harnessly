@@ -114,6 +114,10 @@ func (i *Instance) SetControl(id, holder string) error {
 	if p == nil || p.provisional || !Shown(p.URL) {
 		return errors.New("unknown browser tab")
 	}
+	if holder == "agent" && p.login != nil {
+		p.login.settle("done", i.redactLocked(p.URL))
+		p.login = nil
+	}
 	p.Control = holder
 	i.changedLocked()
 	return nil

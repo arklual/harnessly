@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
@@ -137,6 +138,10 @@ func (i *Instance) agentEvent(method, session string, raw json.RawMessage) {
 	if child != "" && method == "Page.javascriptDialogClosed" {
 		p.Dialog = nil
 		i.notifyLocked()
+	}
+	// Personal login activity must not be replayed through console/network after control returns.
+	if p.Control == "person" && (strings.HasPrefix(method, "Runtime.") || strings.HasPrefix(method, "Network.")) {
+		return
 	}
 	for l := range i.agentListeners {
 		if l.tab == tab && l.conv == p.Conversation {

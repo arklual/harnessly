@@ -66,7 +66,7 @@ const isAddress = (v: unknown): boolean => {
   return target.kind === 'url' && isString(target.origin);
 };
 
-const SIMPLE_KINDS: ReadonlySet<string> = new Set(['side', 'plan', 'machine']);
+const SIMPLE_KINDS: ReadonlySet<string> = new Set(['side', 'plan', 'machine', 'agent-browser']);
 
 const isPaneTab = (v: unknown): v is TTab => {
   if (!isRecord(v) || !isString(v.id) || !isString(v.kind)) return false;

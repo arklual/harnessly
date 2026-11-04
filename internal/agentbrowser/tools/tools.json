@@ -420,5 +420,72 @@
       ],
       "additionalProperties": false
     }
+  },
+  {
+    "name": "browser_fill_secret",
+    "description": "Fill a visible input from the safe without returning its value. The field origin and chat project must be allowed. Seals read tools until navigation or the field is removed or cleared.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "secret": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "secret"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_request_secret",
+    "description": "Ask the person to store or authorize a secret for a site. Never ask for its value in chat. Waits up to 55 seconds; repeat while waiting.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "origin",
+        "why"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "browser_request_login",
+    "description": "Ask the person to sign in. Opens a person-controlled tab; waits up to 55 seconds. Repeat the request while waiting.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "why"
+      ],
+      "additionalProperties": false
+    }
   }
 ]

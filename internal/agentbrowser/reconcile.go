@@ -33,6 +33,7 @@ func (i *Instance) upsertLocked(t target) *page {
 	p.Title, p.URL = t.Title, t.URL
 	if parent := i.pages[t.Opener]; parent != nil && p.Conversation == "" {
 		p.Conversation, p.By = parent.Conversation, parent.By
+		p.Control = parent.Control
 		// Site-created targets follow their agent-controlled opener without changing a pinned panel view.
 		if parent.Control != "person" && i.current[parent.Conversation] == parent.ID {
 			i.current[parent.Conversation] = p.ID
