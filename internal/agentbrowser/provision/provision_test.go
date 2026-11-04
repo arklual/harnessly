@@ -343,7 +343,8 @@ func TestSandboxRepairCommand(t *testing.T) {
 		!strings.Contains(help, "outside harnessly (normal SSH or local terminal)") || !strings.Contains(help, "DOES NOT work") {
 		t.Fatal(help)
 	}
-	if got := installCommand("ID=ubuntu", "amd64"); !strings.Contains(got, "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb") || strings.Contains(got, "chromium-browser") {
+	debURL := "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+	if got := installCommand("ID=ubuntu", "amd64"); !strings.Contains(got, debURL) || strings.Contains(got, "chromium-browser") {
 		t.Fatal(got)
 	}
 	if got := installCommand("ID=ubuntu", "arm64"); !strings.Contains(got, "chromium-browser") {
