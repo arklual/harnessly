@@ -147,3 +147,7 @@ func (i *Instance) agentEvent(method, session string, raw json.RawMessage) {
 		}
 	}
 }
+
+// AgentCheck allows tools to validate metadata operations without sending a command
+// into a renderer that may already be blocked by a modal dialog.
+func (i *Instance) AgentCheck(conv, id, method string) error { return i.agentAllowed(conv, id, method) }
