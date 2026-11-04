@@ -35,10 +35,11 @@ const p1 = {
   lastUsedAt: 0,
   usedBy: [],
   path: '/data/browser/p1',
+  sizeBytes: 64_000_000,
   running: true,
   projects: ['project-a'],
 };
-const p2 = { ...p1, id: 'p2', name: 'Other', path: '/data/browser/p2', projects: [] };
+const p2 = { ...p1, id: 'p2', name: 'Other', path: '/data/browser/p2', sizeBytes: undefined, projects: [] };
 const page = (): IProfilesPage => ({
   profiles: [p1, p2],
   projects: { 'project-a': { default: p1.id, granted: [] } },
@@ -157,8 +158,8 @@ it('ignores a late response from the previous machine', async () => {
 });
 it('requires confirmation listing affected projects before deletion and before disabling sandbox', async () => {
   render(<BrowserPage machine="m" now={1000} />);
-  await screen.findByText('/data/browser/p1');
-  const row = screen.getByText('/data/browser/p1').closest('article')!;
+  await screen.findByTitle('/data/browser/p1');
+  const row = screen.getByTitle('/data/browser/p1').closest('article')!;
   fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
   const dialog = await screen.findByRole('dialog');
   expect(within(dialog).getByText('Projects: Project A')).toBeTruthy();
@@ -194,6 +195,21 @@ it('saves an own default and extra grants without submitting the project name fo
   );
   expect(submit).not.toHaveBeenCalled();
 });
+it('shows disk usage, keeps the path in a tooltip, and warns about login loss before stopping', async () => {
+  render(<BrowserPage machine="m" now={1000} />);
+  const size = await screen.findByTitle('/data/browser/p1');
+  expect(size.textContent).toBe('64 MB');
+  expect(screen.getByTitle('/data/browser/p2').textContent).toBe('—');
+  expect(screen.queryByText('/data/browser/p1')).toBeNull();
+  fireEvent.click(within(size.closest('article')!).getByRole('button', { name: 'Stop' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Stop browser profile?' });
+  expect(
+    within(dialog).getByText(/Sites that keep you signed in only until the browser closes/),
+  ).toBeTruthy();
+  expect(api.changeProfile).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+  await waitFor(() => expect(api.changeProfile).toHaveBeenCalledWith('m', { action: 'stop', id: 'p1' }));
+});
 it('polls asks only while visible, and reloads immediately when the page becomes visible', async () => {
   vi.useFakeTimers();
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
@@ -208,7 +224,7 @@ it('polls asks only while visible, and reloads immediately when the page becomes
 });
 it('keeps an import path and a rename draft after a server error', async () => {
   render(<BrowserPage machine="m" now={1000} />);
-  await screen.findByText('/data/browser/p1');
+  await screen.findByTitle('/data/browser/p1');
   fireEvent.change(screen.getByLabelText('Profile source'), { target: { value: 'import' } });
   fireEvent.change(screen.getByLabelText('Profile name'), { target: { value: 'Imported' } });
   fireEvent.change(screen.getByLabelText('Disk path'), { target: { value: '/data/existing-chrome' } });
@@ -216,7 +232,7 @@ it('keeps an import path and a rename draft after a server error', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Import Chrome folder' }));
   await screen.findByText('Close Chrome first');
   expect((screen.getByLabelText('Disk path') as HTMLInputElement).value).toBe('/data/existing-chrome');
-  const row = screen.getByText('/data/browser/p1').closest('article')!;
+  const row = screen.getByTitle('/data/browser/p1').closest('article')!;
   fireEvent.click(within(row).getByRole('button', { name: 'Rename / color' }));
   fireEvent.change(within(row).getByLabelText('Profile name'), { target: { value: 'Renamed' } });
   fireEvent.click(within(row).getByRole('button', { name: 'Save' }));
@@ -232,7 +248,7 @@ it('keeps an import path and a rename draft after a server error', async () => {
 it('displays a successful import warning after clearing the form', async () => {
   api.changeProfile.mockResolvedValueOnce({ warning: 'Some saved logins could not be copied' });
   render(<BrowserPage machine="m" now={1000} />);
-  await screen.findByText('/data/browser/p1');
+  await screen.findByTitle('/data/browser/p1');
   fireEvent.change(screen.getByLabelText('Profile source'), { target: { value: 'import' } });
   fireEvent.change(screen.getByLabelText('Profile name'), { target: { value: 'Imported' } });
   fireEvent.change(screen.getByLabelText('Disk path'), { target: { value: '/data/existing-chrome' } });

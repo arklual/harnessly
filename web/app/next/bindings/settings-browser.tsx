@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { MachineId } from '@/next/protocol/v2';
 import { useProjects } from '@/next/stores/projects';
 import { formatAgoFull } from '@/next/i18n/format';
+import { locale } from '@/next/i18n';
 import Modal from '@/next/features/shell/modal';
 import { Group } from '@/next/features/settings/rows';
 import { useProfiles } from '@/next/features/browser/use-profiles';
@@ -229,10 +230,8 @@ function ProfileRow({
         <span>{bp(profile.running ? 'running' : 'stopped')}</span>
       </div>
       <dl>
-        <dt>{bp('path')}</dt>
-        <dd>
-          <code>{profile.path}</code>
-        </dd>
+        <dt>{bp('size')}</dt>
+        <dd title={profile.path}>{profileSize(profile.sizeBytes)}</dd>
         <dt>{bp('kind')}</dt>
         <dd>{bp(profile.kind === 'attached' ? 'attached' : 'managed')}</dd>
         <dt>{bp('projects')}</dt>
@@ -303,4 +302,16 @@ function ProfileRow({
       </div>
     </article>
   );
+}
+
+function profileSize(bytes: number | undefined): string {
+  if (bytes === undefined) return '—';
+  const units = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'];
+  const exponent = bytes > 0 ? Math.min(Math.floor(Math.log10(bytes) / 3), units.length - 1) : 0;
+  return new Intl.NumberFormat(locale(), {
+    style: 'unit',
+    unit: units[exponent],
+    unitDisplay: 'short',
+    maximumFractionDigits: 1,
+  }).format(bytes / 1000 ** exponent);
 }

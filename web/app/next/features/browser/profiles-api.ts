@@ -14,6 +14,7 @@ export interface IBrowserProfile extends IProfileChoice {
   lastUsedAt: number;
   usedBy: { conv: string; title: string; at: number }[];
   path: string;
+  sizeBytes?: number;
   running: boolean;
   projects: string[];
 }
@@ -89,6 +90,7 @@ const profile = (value: unknown): IBrowserProfile => {
     createdAt: number(p.createdAt),
     lastUsedAt: number(p.lastUsedAt),
     path: string(p.path),
+    sizeBytes: p.sizeBytes == null ? undefined : number(p.sizeBytes),
     running: boolean(p.running),
     projects: list(p.projects, string),
     usedBy: list(p.usedBy, (v) => {

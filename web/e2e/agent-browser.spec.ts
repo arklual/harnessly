@@ -450,6 +450,7 @@ test('profile switching, Browser settings and an access ask outside the browser 
       lastUsedAt: 0,
       usedBy: [],
       path: '/data/browser/work',
+      sizeBytes: 64_000_000,
       running: true,
       projects: ['demo'],
     },
@@ -462,6 +463,7 @@ test('profile switching, Browser settings and an access ask outside the browser 
       lastUsedAt: 0,
       usedBy: [],
       path: '/data/browser/other',
+      sizeBytes: 8_000_000,
       running: false,
       projects: [],
     },
@@ -558,7 +560,18 @@ test('profile switching, Browser settings and an access ask outside the browser 
   await picker.click();
   await page.getByRole('menuitem', { name: 'Browser settings…', exact: true }).click();
   await expect(page.locator('.hx-set__title')).toHaveText('Browser');
-  await expect(page.getByText('/data/browser/private', { exact: true })).toBeVisible();
+  await expect(page.getByTitle('/data/browser/work', { exact: true })).toHaveText('64 MB');
+  await expect(page.getByTitle('/data/browser/private', { exact: true })).toHaveText('—');
+  await expect(page.getByText('/data/browser/work', { exact: true })).toHaveCount(0);
+  const workRow = page
+    .locator('article')
+    .filter({ has: page.getByTitle('/data/browser/work', { exact: true }) });
+  await workRow.getByRole('button', { name: 'Stop', exact: true }).click();
+  const stop = page.getByRole('dialog', { name: 'Stop browser profile?' });
+  await expect(stop).toContainText(
+    'Sites that keep you signed in only until the browser closes will ask you to sign in again.',
+  );
+  await stop.getByRole('button', { name: 'Cancel', exact: true }).click();
   await shot(page, 'profiles-settings');
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByLabel('Profile source')).toBeVisible();

@@ -75,6 +75,7 @@ it('normalizes empty Go slices while retaining project access', async () => {
           lastUsedAt: 0,
           usedBy: null,
           path: '/data/p',
+          sizeBytes: 12345,
           running: false,
           projects: null,
         },
@@ -86,6 +87,7 @@ it('normalizes empty Go slices while retaining project access', async () => {
   );
   const data = await loadProfiles('m');
   expect(data.profiles[0]?.usedBy).toEqual([]);
+  expect(data.profiles[0]?.sizeBytes).toBe(12345);
   expect(data.projects.demo).toEqual({ default: 'p', granted: [] });
 });
 it('returns an import warning from the page API', async () => {
