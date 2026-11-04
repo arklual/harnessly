@@ -18,7 +18,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
-// DefaultProfile is the sole profile exposed until profile storage is introduced.
+// DefaultProfile is used for conversations without an explicit profile binding.
 const DefaultProfile = "common"
 
 // ErrOff reports that the browser was disabled by configuration.
@@ -28,6 +28,9 @@ var profileID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
 // Config selects managed Chrome or an externally owned CDP endpoint.
 type Config struct {
+	// ProfileOf resolves a conversation on each InstanceFor call. Nil or an empty result
+	// selects DefaultProfile. The callback must be safe for concurrent calls.
+	ProfileOf  func(conv string) string
 	DataDir    string
 	Executable string
 	Chrome     string
@@ -84,6 +87,21 @@ func (m *Manager) Enabled() bool { return !m.cfg.Off }
 
 // Close disconnects clients but deliberately leaves hosts and browsers running.
 func (m *Manager) Close() { m.mu.Lock(); m.cancel(); m.mu.Unlock(); m.wg.Wait() }
+
+// InstanceFor resolves the conversation's profile without coupling callers to profile storage.
+func (m *Manager) InstanceFor(ctx context.Context, conv string) (*Instance, error) {
+	return m.Instance(ctx, m.profileFor(conv))
+}
+
+func (m *Manager) profileFor(conv string) string {
+	id := DefaultProfile
+	if m.cfg.ProfileOf != nil {
+		if resolved := m.cfg.ProfileOf(conv); resolved != "" {
+			id = resolved
+		}
+	}
+	return id
+}
 
 // Instance waits for the named profile to become usable, starting its host when necessary.
 func (m *Manager) Instance(ctx context.Context, id string) (*Instance, error) {
