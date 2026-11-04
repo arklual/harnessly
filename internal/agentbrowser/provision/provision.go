@@ -126,6 +126,9 @@ func Ensure(ctx context.Context, cfg Config, progress func(Progress)) (string, e
 	}
 	path, snap, err := Find(cfg)
 	if err != nil || path != "" {
+		if err == nil && cfg.DataDir != "" {
+			prune(filepath.Join(cfg.DataDir, "agent-browser", "chrome"), path)
+		}
 		return path, err
 	}
 	a, platformErr := platform(cfg)
@@ -186,5 +189,6 @@ func Ensure(ctx context.Context, cfg Config, progress func(Progress)) (string, e
 		}
 		return "", err
 	}
+	prune(root)
 	return path, nil
 }

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -159,6 +160,50 @@ func TestChromeReadyRetryNewInstance(t *testing.T) {
 			t.Fatal(got)
 		}
 	}
+}
+
+func TestChromeLiveHostProtectsOldVersion(t *testing.T) {
+	chrome, err := FindChrome()
+	if err != nil {
+		t.Skip(err)
+	}
+	data := t.TempDir()
+	old := filepath.Join(data, "agent-browser", "chrome", "123.0.0.1", "chrome-linux64", "chrome")
+	current := filepath.Join(data, "agent-browser", "chrome", provision.Version, "chrome-linux64", "chrome")
+	for _, path := range []string{old, current} {
+		must(t, os.MkdirAll(filepath.Dir(path), 0700))
+		// A wrapper uses the system browser's own resources; the host still leases this version's directory.
+		must(t, os.WriteFile(path, []byte("#!/bin/sh\nexec "+strconv.Quote(chrome)+" \"$@\"\n"), 0700))
+	}
+	m := New(Config{DataDir: data, Chrome: old, Mode: "headless"})
+	dir := filepath.Join(data, "agent-browser", "profiles", DefaultProfile)
+	t.Cleanup(func() { m.Close(); cleanupHost(t, dir) })
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	_, err = m.Instance(ctx, DefaultProfile)
+	must(t, err)
+	cfg := provision.FromEnv(data)
+	cfg.Chrome = current
+	_, err = provision.Ensure(ctx, cfg, nil)
+	must(t, err)
+	if _, err = os.Stat(old); err != nil {
+		t.Fatal("removed live host resources", err)
+	}
+	m.Close()
+	_, err = provision.Ensure(ctx, cfg, nil)
+	must(t, err)
+	if _, err = os.Stat(old); err != nil {
+		t.Fatal("runtime disconnect removed live host resources", err)
+	}
+	cleanupHost(t, dir)
+	eventually(t, 5*time.Second, func() bool {
+		_, e := provision.Ensure(ctx, cfg, nil)
+		if e != nil {
+			return false
+		}
+		_, e = os.Stat(old)
+		return os.IsNotExist(e)
+	})
 }
 
 func waitPreparation(t *testing.T, socket *contractSocket, match func([]byte) bool) {

@@ -159,6 +159,11 @@ func (p probePipe) Close() error { return errors.Join(p.ReadCloser.Close(), p.Wr
 // Probe verifies the real debugging pipe and creates a renderer, so sandbox failures are not mistaken for readiness.
 func Probe(ctx context.Context, chrome, data string) (Inspection, error) {
 	result := Inspection{Chrome: chrome, Mode: Mode(os.Getenv("RUNTIME_BROWSER_MODE")), Sandbox: "not yet checked"}
+	lease, err := Retain(chrome)
+	if err != nil {
+		return result, err
+	}
+	defer lease.Close()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if os.Getenv("RUNTIME_BROWSER_MODE") == "xvfb" && result.Mode != "xvfb" {

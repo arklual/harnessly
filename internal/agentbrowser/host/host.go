@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/provision"
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
@@ -139,6 +140,11 @@ func Run(ctx context.Context, cfg Config) error {
 	if cfg.ProfileDir == "" || cfg.Socket == "" || cfg.Chrome == "" {
 		return errors.New("browser-host requires profile, socket and chrome")
 	}
+	lease, err := provision.Retain(cfg.Chrome)
+	if err != nil {
+		return err
+	}
+	defer lease.Close()
 	if cfg.Mode == "" {
 		cfg.Mode = "auto"
 	}
