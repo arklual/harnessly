@@ -16,7 +16,7 @@ var errStale = errors.New("Element ID is stale or missing; refresh the snapshot 
 func (t Tools) resolve(ctx context.Context, i *agentbrowser.Instance, st *tabState, a arguments) (nodeRef, string, error) {
 	st.mu.Lock()
 	ref, ok := st.refs[a.ID]
-	epoch := st.epoch
+	epoch := st.epochs[ref.frame]
 	st.mu.Unlock()
 	if !ok || ref.epoch != epoch {
 		return ref, "", errStale

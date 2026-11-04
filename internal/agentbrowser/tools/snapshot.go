@@ -15,21 +15,26 @@ type axValue struct {
 	Value any `json:"value"`
 }
 type axNode struct {
-	ID       string   `json:"nodeId"`
-	Children []string `json:"childIds"`
-	Ignored  bool     `json:"ignored"`
-	Backend  int      `json:"backendDOMNodeId"`
-	Role     axValue  `json:"role"`
-	Name     axValue  `json:"name"`
-	Value    axValue  `json:"value"`
+	ID         string   `json:"nodeId"`
+	Children   []string `json:"childIds"`
+	Ignored    bool     `json:"ignored"`
+	Backend    int      `json:"backendDOMNodeId"`
+	Role       axValue  `json:"role"`
+	Name       axValue  `json:"name"`
+	Value      axValue  `json:"value"`
+	Properties []struct {
+		Name  string  `json:"name"`
+		Value axValue `json:"value"`
+	} `json:"properties"`
 }
 type frameTree struct {
 	Frame struct {
-		ID string `json:"id"`
+		ID     string `json:"id"`
+		Parent string `json:"parentId"`
 	} `json:"frame"`
 	Children []frameTree `json:"childFrames"`
 }
-type frameScope struct{ session, frame string }
+type frameScope struct{ session, frame, parent string }
 
 func (t Tools) scopes(ctx context.Context, i *agentbrowser.Instance, id string) ([]frameScope, error) {
 	frames, err := i.AgentFrames(ctx, t.Caller, id)
@@ -84,7 +89,7 @@ func (t Tools) scopes(ctx context.Context, i *agentbrowser.Instance, id string) 
 			if !root && separate[f.Frame.ID] {
 				return
 			}
-			out = append(out, frameScope{session, f.Frame.ID})
+			out = append(out, frameScope{session, f.Frame.ID, f.Frame.Parent})
 			for _, child := range f.Children {
 				walk(child, false)
 			}
@@ -93,44 +98,135 @@ func (t Tools) scopes(ctx context.Context, i *agentbrowser.Instance, id string) 
 	}
 	return out, nil
 }
-func (t Tools) snapshot(ctx context.Context, i *agentbrowser.Instance, st *tabState, id string) (string, error) {
-	scopes, err := t.scopes(ctx, i, id)
-	if err != nil {
-		return "", err
+
+type snapshotLine struct {
+	text, id string
+	ref      nodeRef
+}
+
+var interactiveRoles = map[string]bool{
+	"button": true, "link": true, "textbox": true, "searchbox": true, "combobox": true,
+	"checkbox": true, "radio": true, "switch": true, "slider": true, "spinbutton": true,
+	"listbox": true, "option": true, "menuitem": true, "menuitemcheckbox": true,
+	"menuitemradio": true, "tab": true, "treeitem": true, "scrollbar": true,
+}
+
+func showAX(n axNode, interactive bool) bool {
+	if n.Ignored {
+		return false
 	}
-	refs := map[string]nodeRef{}
+	role, _ := n.Role.Value.(string)
+	if interactive {
+		if role == "heading" || interactiveRoles[role] {
+			return true
+		}
+		for _, property := range n.Properties {
+			if property.Name == "focusable" && property.Value.Value == true && role != "RootWebArea" {
+				return true
+			}
+		}
+		return false
+	}
+	switch role {
+	case "InlineTextBox", "LineBreak":
+		// StaticText already carries the complete text; inline boxes only duplicate it.
+		return false
+	case "generic", "none", "presentation":
+		return n.Name.Value != nil && n.Name.Value != ""
+	}
+	return true
+}
+
+func (t Tools) snapshot(ctx context.Context, i *agentbrowser.Instance, st *tabState, a arguments) (string, error) {
+	if a.Offset < 0 {
+		return "", errors.New("offset must be nonnegative")
+	}
+	if a.Offset == 0 {
+		if err := t.buildSnapshot(ctx, i, st, a); err != nil {
+			return "", err
+		}
+	}
 	st.mu.Lock()
-	epoch := st.epoch
-	st.mu.Unlock()
+	defer st.mu.Unlock()
+	if len(st.snapshot) == 0 || st.interactive != a.InteractiveOnly || a.Offset >= len(st.snapshot) {
+		return "", errors.New("Snapshot offset is unavailable; refresh with browser_snapshot offset 0")
+	}
 	var out strings.Builder
+	end := a.Offset
+	for end < len(st.snapshot) {
+		line := st.snapshot[end]
+		text := st.redactLocked(line.text)
+		// Keep each ID and its line together, reserving space for the pagination instructions.
+		if len(text) > resultLimit-1024 {
+			text = strings.ToValidUTF8(text[:resultLimit-1100], "") + " [long node text truncated]"
+		}
+		if out.Len()+len(text)+1 > resultLimit-512 {
+			break
+		}
+		out.WriteString(text + "\n")
+		if line.id != "" {
+			st.refs[line.id] = line.ref
+		}
+		end++
+	}
+	if end < len(st.snapshot) {
+		fmt.Fprintf(&out, "\nnext_offset: %d\nContinue with browser_snapshot {\"tab\":%s,\"offset\":%d,\"interactive_only\":%t}. IDs from earlier parts remain valid.\n",
+			end, jsonText(a.Tab), end, a.InteractiveOnly)
+	} else {
+		out.WriteString("\nnext_offset: null (end of snapshot)\n")
+	}
+	return out.String(), nil
+}
+
+func (t Tools) buildSnapshot(ctx context.Context, i *agentbrowser.Instance, st *tabState, a arguments) error {
+	scopes, err := t.scopes(ctx, i, a.Tab)
+	if err != nil {
+		return err
+	}
+	st.mu.Lock()
+	versions := make(map[string]uint64)
+	if st.epochs == nil {
+		st.epochs = map[string]uint64{}
+	}
+	if st.parents == nil {
+		st.parents = map[string]string{}
+	}
 	for _, scope := range scopes {
-		raw, e := i.AgentFrameCall(ctx, t.Caller, id, scope.session, "Accessibility.getFullAXTree", map[string]any{"frameId": scope.frame})
+		versions[scope.frame] = st.epochs[scope.frame]
+		if scope.parent != "" {
+			st.parents[scope.frame] = scope.parent
+		}
+	}
+	st.mu.Unlock()
+	var lines []snapshotLine
+	for _, scope := range scopes {
+		raw, e := i.AgentFrameCall(ctx, t.Caller, a.Tab, scope.session, "Accessibility.getFullAXTree", map[string]any{"frameId": scope.frame})
 		if e != nil {
-			return "", e
+			return e
 		}
 		var r struct {
 			Nodes []axNode `json:"nodes"`
 		}
 		if e = json.Unmarshal(raw, &r); e != nil {
-			return "", e
+			return e
 		}
 		nodes := map[string]axNode{}
 		for _, n := range r.Nodes {
 			nodes[n.ID] = n
 		}
-		fmt.Fprintf(&out, "Frame %s\n", scope.frame)
+		lines = append(lines, snapshotLine{text: "Frame " + scope.frame})
 		var walk func(string, int) error
 		walk = func(nodeID string, depth int) error {
 			n, ok := nodes[nodeID]
-			if !ok || depth > 100 || out.Len() > resultLimit {
+			if !ok {
 				return nil
 			}
-			if !n.Ignored {
+			if showAX(n, a.InteractiveOnly) {
 				ref := ""
 				password := false
-				if n.Backend != 0 {
-					// Inspect the DOM type instead of trusting an accessibility role or masked AX value.
-					data, e := i.AgentFrameCall(ctx, t.Caller, id, scope.session, "DOM.describeNode", map[string]any{"backendNodeId": n.Backend})
+				if n.Backend != 0 && n.Value.Value != nil {
+					// Only valued nodes can leak a password; inspecting every text node costs thousands of CDP round trips.
+					data, e := i.AgentFrameCall(ctx, t.Caller, a.Tab, scope.session, "DOM.describeNode", map[string]any{"backendNodeId": n.Backend})
 					if e != nil {
 						return e
 					}
@@ -147,15 +243,17 @@ func (t Tools) snapshot(ctx context.Context, i *agentbrowser.Instance, st *tabSt
 							password = true
 						}
 					}
+				}
+				if n.Backend != 0 {
 					st.next++
 					ref = fmt.Sprintf("e%d", st.next)
-					refs[ref] = nodeRef{n.Backend, scope.session, scope.frame, epoch}
 				}
 				value := ""
 				if n.Value.Value != nil && !password {
 					value = " value=" + jsonText(n.Value.Value)
 				}
-				fmt.Fprintf(&out, "%s[%s] %v %s%s\n", strings.Repeat("  ", depth), ref, n.Role.Value, jsonText(n.Name.Value), value)
+				line := fmt.Sprintf("%s[%s] %v %s%s", strings.Repeat("  ", min(depth, 24)), ref, n.Role.Value, jsonText(n.Name.Value), value)
+				lines = append(lines, snapshotLine{line, ref, nodeRef{n.Backend, scope.session, scope.frame, versions[scope.frame]}})
 				depth++
 			}
 			for _, child := range n.Children {
@@ -167,15 +265,23 @@ func (t Tools) snapshot(ctx context.Context, i *agentbrowser.Instance, st *tabSt
 		}
 		if len(r.Nodes) > 0 {
 			if err = walk(r.Nodes[0].ID, 0); err != nil {
-				return "", err
+				return err
 			}
 		}
 	}
+	if err = t.collectPasswords(ctx, i, st, a.Tab); err != nil {
+		return err
+	}
 	st.mu.Lock()
-	st.refs = refs
-	st.mu.Unlock()
-	_ = t.collectPasswords(ctx, i, st, id)
-	return clip(st.redact(out.String()), resultLimit), nil
+	defer st.mu.Unlock()
+	for frame, version := range versions {
+		if st.epochs[frame] != version {
+			return errors.New("Page changed during snapshot; refresh with browser_snapshot")
+		}
+	}
+	st.snapshot, st.interactive = lines, a.InteractiveOnly
+	st.refs = map[string]nodeRef{}
+	return nil
 }
 func (t Tools) evaluate(ctx context.Context, i *agentbrowser.Instance, id, session, expression string) (string, error) {
 	raw, err := t.dispatchFrame(ctx, i, id, session, "Runtime.evaluate", map[string]any{
@@ -258,19 +364,33 @@ func (t Tools) collectPasswords(ctx context.Context, i *agentbrowser.Instance, s
 	}
 	return nil
 }
-func (t Tools) waitFor(ctx context.Context, i *agentbrowser.Instance, st *tabState, a arguments) (string, error) {
+func (t Tools) waitFor(ctx context.Context, i *agentbrowser.Instance, _ *tabState, a arguments) (string, error) {
 	if a.Text == "" {
 		return "", errors.New("text is required")
 	}
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		s, err := t.snapshot(ctx, i, st, a.Tab)
+		scopes, err := t.scopes(ctx, i, a.Tab)
 		if err != nil {
 			return "", err
 		}
-		if strings.Contains(s, a.Text) {
-			return s, nil
+		for _, scope := range scopes {
+			found, e := t.isolated(ctx, i, a.Tab, scope, `(() => {
+ const needle = `+jsonText(a.Text)+`;
+ function contains(root) {
+  if ((root.innerText || '').includes(needle)) return true;
+  for (const e of root.querySelectorAll('*')) {
+   if (e.shadowRoot && [...e.shadowRoot.children].some(contains)) return true;
+  }
+  return false;
+ }
+ return contains(document.body || document.documentElement);
+})()`)
+			// Frames can navigate while waiting. Retry against the next current frame tree.
+			if e == nil && string(found) == "true" {
+				return "Text found in frame " + scope.frame + ": " + jsonText(a.Text), nil
+			}
 		}
 		select {
 		case <-ctx.Done():
@@ -278,4 +398,34 @@ func (t Tools) waitFor(ctx context.Context, i *agentbrowser.Instance, st *tabSta
 		case <-ticker.C:
 		}
 	}
+}
+
+func (t Tools) isolated(ctx context.Context, i *agentbrowser.Instance, id string, scope frameScope, expression string) (json.RawMessage, error) {
+	world, err := i.AgentFrameCall(ctx, t.Caller, id, scope.session, "Page.createIsolatedWorld", map[string]any{
+		"frameId": scope.frame, "worldName": "browser-tools",
+	})
+	if err != nil {
+		return nil, err
+	}
+	var w struct {
+		ID int `json:"executionContextId"`
+	}
+	if err = json.Unmarshal(world, &w); err != nil {
+		return nil, err
+	}
+	data, err := i.AgentFrameCall(ctx, t.Caller, id, scope.session, "Runtime.evaluate", map[string]any{
+		"contextId": w.ID, "returnByValue": true, "expression": expression,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var result struct {
+		Result struct {
+			Value json.RawMessage `json:"value"`
+		} `json:"result"`
+	}
+	if err = json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+	return result.Result.Value, nil
 }

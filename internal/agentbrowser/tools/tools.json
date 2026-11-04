@@ -86,13 +86,22 @@
   },
   {
     "name": "browser_snapshot",
-    "description": "Read the accessibility tree with fresh element IDs, including frames.",
+    "description": "Read a compact accessibility snapshot with element IDs, including frames. For large pages use interactive_only (controls and headings) or follow next_offset with the same options. Offset 0 starts a fresh snapshot; continuation pages retain all earlier IDs.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "tab": {
           "type": "string",
           "description": "Owned tab ID; defaults to this chat\u2019s working tab."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Continue the cached snapshot at next_offset; omit or use 0 to refresh."
+        },
+        "interactive_only": {
+          "type": "boolean",
+          "description": "Show interactive roles and context headings only. Keep the same value for continuation pages."
         }
       },
       "required": [],
@@ -119,7 +128,7 @@
   },
   {
     "name": "browser_wait_for",
-    "description": "Wait for visible text in the accessibility tree.",
+    "description": "Wait for rendered text anywhere in the page or its frames, including open shadow roots. Polls every 250 ms in isolated worlds.",
     "inputSchema": {
       "type": "object",
       "properties": {

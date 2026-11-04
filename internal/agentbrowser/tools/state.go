@@ -24,7 +24,11 @@ type tabState struct {
 	action           sync.Mutex
 	mu               sync.Mutex
 	refs             map[string]nodeRef
-	next, epoch      uint64
+	next             uint64
+	epochs           map[string]uint64
+	parents          map[string]string
+	snapshot         []snapshotLine
+	interactive      bool
 	passwords        []string
 	console, network []string
 	requests         map[string]string
@@ -118,9 +122,21 @@ func (st *tabState) event(e agentbrowser.AgentEvent) {
 		return
 	}
 	switch e.Method {
-	case "Page.frameNavigated", "Runtime.executionContextsCleared", "DOM.documentUpdated":
-		st.epoch++
+	case "Page.frameNavigated":
+		frame, _ := v["frame"].(map[string]any)
+		id, _ := frame["id"].(string)
+		parent, _ := frame["parentId"].(string)
+		if st.parents == nil {
+			st.parents = map[string]string{}
+		}
+		if parent != "" {
+			st.parents[id] = parent
+		}
+		st.invalidateFrame(id, e.Session == "" && parent == "")
 		st.last = time.Now()
+	case "Page.frameDetached":
+		id, _ := v["frameId"].(string)
+		st.invalidateFrame(id, false)
 	case "Page.frameStartedLoading", "Page.frameStoppedLoading":
 		frame, _ := v["frameId"].(string)
 		if st.loading == nil {
@@ -307,4 +323,37 @@ func (s *Service) forget(i *agentbrowser.Instance, conv, id string) {
 		st.unsubscribe()
 		delete(s.tabs, key)
 	}
+}
+
+// DOM.documentUpdated and executionContextsCleared lack frame identity. A real navigation
+// carries frameNavigated; detached DOM nodes are also rejected by resolve's isConnected check.
+func (st *tabState) invalidateFrame(id string, main bool) {
+	if st.epochs == nil {
+		st.epochs = map[string]uint64{}
+	}
+	affected := map[string]bool{id: true}
+	for changed := true; changed; {
+		changed = false
+		for child, parent := range st.parents {
+			if (main || affected[parent]) && !affected[child] {
+				affected[child] = true
+				changed = true
+			}
+		}
+	}
+	if main {
+		for frame := range st.epochs {
+			affected[frame] = true
+		}
+	}
+	for frame := range affected {
+		st.epochs[frame]++
+	}
+	for ref, node := range st.refs {
+		if main || affected[node.frame] {
+			delete(st.refs, ref)
+		}
+	}
+	// A continuation must never mix rows from two different documents. Existing IDs in other frames survive.
+	st.snapshot = nil
 }

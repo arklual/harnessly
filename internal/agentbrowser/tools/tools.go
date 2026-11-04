@@ -142,21 +142,23 @@ func clip(s string, n int) string {
 func jsonText(v any) string { b, _ := json.Marshal(v); return string(b) }
 
 type arguments struct {
-	Tab        string   `json:"tab"`
-	URL        string   `json:"url"`
-	ID         string   `json:"id"`
-	Text       string   `json:"text"`
-	Key        string   `json:"key"`
-	Value      string   `json:"value"`
-	Expression string   `json:"expression"`
-	Path       string   `json:"path"`
-	Files      []string `json:"files"`
-	Width      int      `json:"width"`
-	Height     int      `json:"height"`
-	TimeoutMS  int      `json:"timeout_ms"`
-	Accept     bool     `json:"accept"`
-	Clear      bool     `json:"clear"`
-	RequestID  string   `json:"request_id"`
+	Tab             string   `json:"tab"`
+	URL             string   `json:"url"`
+	ID              string   `json:"id"`
+	Text            string   `json:"text"`
+	Key             string   `json:"key"`
+	Value           string   `json:"value"`
+	Expression      string   `json:"expression"`
+	Path            string   `json:"path"`
+	Files           []string `json:"files"`
+	Width           int      `json:"width"`
+	Height          int      `json:"height"`
+	TimeoutMS       int      `json:"timeout_ms"`
+	Accept          bool     `json:"accept"`
+	Clear           bool     `json:"clear"`
+	RequestID       string   `json:"request_id"`
+	Offset          int      `json:"offset"`
+	InteractiveOnly bool     `json:"interactive_only"`
 }
 
 func parseArgs(o *jsvalue.Object) (arguments, error) {
@@ -237,7 +239,7 @@ func (t Tools) call(ctx context.Context, i *agentbrowser.Instance, name string, 
 	var output string
 	switch name {
 	case "browser_snapshot":
-		output, err = t.snapshot(ctx, i, st, a.Tab)
+		output, err = t.snapshot(ctx, i, st, a)
 	case "browser_screenshot":
 		return t.screenshot(ctx, i, st, a)
 	case "browser_console", "browser_network":
