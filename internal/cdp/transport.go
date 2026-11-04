@@ -13,8 +13,10 @@ import (
 	"github.com/coder/websocket"
 )
 
+// MaxMessage bounds a single CDP record in bytes.
 const MaxMessage = 64 << 20
 
+// Stream carries complete NUL-delimited records over a bidirectional byte stream.
 type Stream struct {
 	rw    io.ReadWriteCloser
 	r     *bufio.Reader
@@ -22,10 +24,15 @@ type Stream struct {
 	once  sync.Once
 }
 
+// NewStream wraps a transport whose Close interrupts blocked reads and writes.
 func NewStream(rw io.ReadWriteCloser) *Stream {
 	return &Stream{rw: rw, r: bufio.NewReader(rw), write: make(chan struct{}, 1)}
 }
-func (s *Stream) Close() error                           { var err error; s.once.Do(func() { err = s.rw.Close() }); return err }
+
+// Close interrupts I/O and closes the underlying stream once.
+func (s *Stream) Close() error { var err error; s.once.Do(func() { err = s.rw.Close() }); return err }
+
+// Read returns the next complete message; close the stream to interrupt it.
 func (s *Stream) Read(_ context.Context) ([]byte, error) { return ReadMessage(s.r) }
 
 // ReadMessage accepts only complete NUL-terminated records, with a bound for broken peers.
@@ -45,6 +52,8 @@ func ReadMessage(r *bufio.Reader) ([]byte, error) {
 		}
 	}
 }
+
+// Write serializes complete records and closes the transport after an interrupted write.
 func (s *Stream) Write(ctx context.Context, b []byte) error {
 	select {
 	case s.write <- struct{}{}:
@@ -71,8 +80,10 @@ func (s *Stream) Write(ctx context.Context, b []byte) error {
 	return nil
 }
 
+// Socket carries CDP messages over a WebSocket.
 type Socket struct{ ws *websocket.Conn }
 
+// Dial discovers the browser endpoint at an HTTP DevTools address.
 func Dial(ctx context.Context, base string, handler EventHandler) (*Conn, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(base, "/")+"/json/version", nil)
 	if err != nil {
@@ -102,8 +113,14 @@ func Dial(ctx context.Context, base string, handler EventHandler) (*Conn, error)
 	ws.SetReadLimit(MaxMessage)
 	return New(&Socket{ws}, handler), nil
 }
+
+// Read receives one CDP WebSocket message.
 func (s *Socket) Read(ctx context.Context) ([]byte, error) { _, b, e := s.ws.Read(ctx); return b, e }
+
+// Write sends one CDP WebSocket message.
 func (s *Socket) Write(ctx context.Context, b []byte) error {
 	return s.ws.Write(ctx, websocket.MessageText, b)
 }
+
+// Close interrupts the WebSocket connection.
 func (s *Socket) Close() error { return s.ws.CloseNow() }
