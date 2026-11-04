@@ -114,6 +114,11 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 	b.WriteString("Show the person what they should look at: after you publish a document or draw a board, or when a dev server is running, " +
 		"`harnessly open` it. Start another agent only with `tab create --prompt`; a `claude` or `codex` command typed into a shell tab " +
 		"starts it without the workspace's hooks.\n\n")
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off") {
+		b.WriteString("## Browser\n\n")
+		b.WriteString("The browser is already available: use `browser_*` tools or `harnessly browser`. " +
+			"Install nothing and never ask for passwords. Take a `browser_snapshot` before acting on elements.\n\n")
+	}
 	b.WriteString("## Handing files over\n\n")
 	b.WriteString("When the person asks you to send or collect a file (\"put it in a zip\", \"give me the docx\"), hand it over with " +
 		"`harnessly deliver <path>` (or the `deliver_file` tool): the chat gets a card that opens the file on the right and downloads it. " +

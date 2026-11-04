@@ -13,7 +13,7 @@ import (
 func clearServices(t *testing.T) {
 	t.Helper()
 	for _, k := range []string{"RUNTIME_BOARDS_URL", "RUNTIME_ARTIFACTS_URL", "RUNTIME_WORKSPACE_PROMPTS_FILE", "RUNTIME_RELEASE_FILE",
-		"RUNTIME_AGENT_SKILLS", "RUNTIME_AGENT_BIN_DIR", "RUNTIME_PANE_BIN_DIR", "CODEX_HOME"} {
+		"RUNTIME_BROWSER", "RUNTIME_AGENT_SKILLS", "RUNTIME_AGENT_BIN_DIR", "RUNTIME_PANE_BIN_DIR", "CODEX_HOME"} {
 		t.Setenv(k, "")
 	}
 }
@@ -141,6 +141,22 @@ func TestCodexHomeAndBinDirOverrides(t *testing.T) {
 	for _, f := range []string{filepath.Join(home, "cx", "skills", "harnessly", "artifacts", "SKILL.md"), filepath.Join(home, "tools", "artifacts")} {
 		if _, err := os.Stat(f); err != nil {
 			t.Error(err)
+		}
+	}
+}
+
+func TestAgentBrowserWorkspacePrompt(t *testing.T) {
+	clearServices(t)
+	for _, mode := range []string{"", "off"} {
+		t.Setenv("RUNTIME_BROWSER", mode)
+		p := workspacePrompts()
+		for _, provider := range []string{"claude", "codex"} {
+			text, _ := p.Text(provider, "ws-browser")
+			for _, phrase := range []string{"## Browser", "`browser_*`", "`harnessly browser`", "never ask for passwords"} {
+				if strings.Contains(text, phrase) != (mode != "off") {
+					t.Errorf("provider %s, mode %q: wrong presence of %q", provider, mode, phrase)
+				}
+			}
 		}
 	}
 }
