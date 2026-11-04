@@ -175,12 +175,16 @@ rm -rf "$DEMO_HOME"
 
 ## Agent browser on a new machine
 
-The installer tries to install Xvfb, Chrome libraries and fonts without prompting for a sudo password. Failure is a
-warning with a command you can run later. `--no-browser` skips this optional step. Chrome itself is downloaded and
+The installer skips browser dependencies that are already present. For missing Xvfb, Chrome libraries, fonts or the
+Ubuntu AppArmor profile, it tries passwordless sudo first. With a terminal it then explains the change and asks for
+a password once. Without a terminal, or if permission is denied, it prints a repair command and continues. Run repair
+commands outside harnessly: its processes inherit `NoNewPrivileges` and cannot use sudo. `--no-browser` skips this
+optional step. Chrome itself is downloaded and
 verified by the runtime when you first open the agent browser or call a browser tool, unless a system Chrome already
 exists. During preparation, the panel shows progress and tools ask you to retry in 20 seconds.
 
 No browser configuration is needed on supported machines with an available sandbox. If startup fails, open the machine
 checks and follow the reported library or sandbox repair. Ubuntu's AppArmor policy can block downloaded Chrome; the
-runtime explains the required administrator change instead of disabling security. Without Xvfb it uses headless mode.
+runtime explains the required administrator change instead of disabling security. After a repair, retry the tool
+after 15 seconds or send `browser.retry` through the panel socket; no runtime restart is needed. Without Xvfb it uses headless mode.
 See [browser sandbox](deploy.md#browser-sandbox) and [configuration](configuration.md#browser-preparation-and-diagnostics).

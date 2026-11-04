@@ -351,15 +351,17 @@ The runtime service must use `KillMode=process` to preserve the host on restart.
 
 ### Browser preparation and diagnostics
 
-The runtime pins Chrome for Testing 157.0.8103.38 for Linux amd64 and macOS arm64/amd64. Archives install atomically
+The runtime pins Chrome for Testing 157.0.8103.38 for Linux and macOS on amd64/arm64. Archives install atomically
 under `<data>/agent-browser/chrome/<version>/` after SHA-256 verification. Interrupted downloads restart from zero;
-profiles and runtime processes share a download lock. Linux arm64 has no pinned archive in this release: install your
-distribution's `chromium` package and set `RUNTIME_BROWSER_CHROME=chromium`.
+profiles and runtime processes share a download lock. Old versions are removed only after their browser hosts exit;
+active hosts retain a shared lease on their Chrome resources.
 
 The first request starts preparation. Tools can use `Manager.Ready(ctx)` before `InstanceFor`: `preparing` includes
 `progress` (0–100) and `hint`; retry in 20 seconds. The panel receives the same status until ready. Readiness `up` means
 the executable passed its pipe/renderer probe; a profile still starts through `InstanceFor`. A failed preparation
-reports `error` with a repair command; restart the runtime after changing its environment or system configuration.
+reports `error` with a copyable `command`. After a system repair, `Ready` retries once 15 seconds have passed;
+`Manager.Retry(ctx)` or the panel socket command `{t:"browser.retry"}` retries immediately. No runtime restart is
+needed for system repairs. Changing the service environment still requires restarting the runtime.
 
 Settings → machine checks includes `agent_browser`: executable, version, Xvfb/headless and sandbox. Opening checks
 does not download Chrome. Missing Xvfb selects headless in `auto`; explicitly requesting `xvfb` requires it installed.

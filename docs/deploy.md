@@ -505,20 +505,28 @@ The packaged container already provides Chromium, Xvfb and fonts. Its explicit
 chosen boundary. The machine installer supplies Chromium/Xvfb where supported but does **not** disable the sandbox.
 
 On Ubuntu with `kernel.apparmor_restrict_unprivileged_userns=1`, downloaded Chrome for Testing can fail with
-`No usable sandbox`. The `agent_browser` machine check and browser status show an AppArmor profile using the exact
-binary path and the command to load it. Ask an administrator to review that profile. Other choices are a system Google
-Chrome with its packaged policy, or a trusted `chrome-sandbox` helper owned by root with mode 4755. The helper requires
-a filesystem permitting setuid and a service without `NoNewPrivileges=true`; the default user unit intentionally sets
-that restriction. An already installed trusted helper can be selected with `CHROME_DEVEL_SANDBOX`, but it does not
-bypass `NoNewPrivileges` or a kernel namespace denial. Changing the pinned version changes its path: update any
-path-specific AppArmor rule too.
+`No usable sandbox`. Run repairs **outside harnessly** (normal SSH or a local terminal): harnessly processes inherit
+`NoNewPrivileges` and cannot use sudo. First use the AppArmor profile shown by `agent_browser` or browser status.
+The installer creates `/etc/apparmor.d/harnessly-browser` when the restriction is enabled and no native Chrome exists.
+It selects an installed ABI (5.0 or 4.0) and uses `<data>/agent-browser/chrome/*/chrome-linux64/chrome` (or
+`chrome-linux-arm64/chrome`) so Chrome upgrades keep working. It resolves `AGENT_DATA_DIR` from the environment or
+the service's environment file, otherwise defaults to `~/.harnessly`; use an absolute data path in service settings.
+Repeat the installer after changing that directory. Other browser paths receive an exact path in the diagnostic.
+An AppArmor `userns` allowance works with `NoNewPrivileges`; it does not require disabling that service protection.
+
+Alternatively, install system Google Chrome with its packaged policy. On Ubuntu amd64 the repair command installs
+Google's official `.deb`, avoiding the transitional Chromium snap package. A trusted `chrome-sandbox` helper owned
+by root with mode 4755 is another option, but **does not work under the service's `NoNewPrivileges=true`** and also
+requires a filesystem allowing setuid. After a system repair, browser preparation retries after 15 seconds or
+immediately through `{t:"browser.retry"}` on the panel socket. It keeps the socket open while preparation has an error.
 
 Explicitly setting `RUNTIME_BROWSER_CHROME_ARGS=--no-sandbox` disables Chrome's security sandbox. Do not use this option
 for arbitrary websites on a host. The runtime never retries with it automatically.
 
 The user unit uses `KillMode=process`: runtime upgrades/restarts leave browser hosts and sessions alive. `install.sh
 --uninstall` locates this user's `browser-host` processes, checks each profile's `host.pid` and sends SIGTERM so Chrome
-can flush its state. Browser profiles and downloaded Chrome stay on disk. Uninstallation does not delete data.
+can flush its state. It removes the AppArmor profile only with passwordless privileges; otherwise it prints the
+external-terminal removal command. Browser profiles and downloaded Chrome stay on disk. Uninstallation does not delete data.
 
 Maintainers update the pinned version and hashes using `tools/update-browser-checksums.sh VERSION`. For an offline-built
 runtime, `install.sh --archive FILE --no-service` accepts a **trusted local** tar archive containing `runtime`, `agent`
