@@ -62,6 +62,9 @@ func (i *Instance) setViewport(ctx context.Context, id string, v Viewport, allow
 	}
 	ctx, cancel := cdp.WithTimeout(ctx)
 	defer cancel()
+	if err := allowed(); err != nil {
+		return err
+	}
 	p, c, err := i.lookup(id)
 	if err != nil {
 		return err

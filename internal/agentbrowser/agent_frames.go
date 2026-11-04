@@ -94,7 +94,7 @@ func (i *Instance) agentEvent(method, session string, raw json.RawMessage) {
 	defer i.mu.Unlock()
 	tab, child := "", session
 	for id, p := range i.pages {
-		if p.binding.session == session && p.binding.conn == i.conn {
+		if session != "" && p.binding.session == session && p.binding.conn == i.conn {
 			tab, child = id, ""
 			break
 		}
