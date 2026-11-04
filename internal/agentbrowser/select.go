@@ -86,7 +86,7 @@ func (s *panelSelect) choose(ctx context.Context, i *Instance, tab string, index
 	if s.object == "" || s.tab != tab {
 		return errors.New("select is no longer open")
 	}
-	_, err := i.Call(ctx, tab, "Runtime.callFunctionOn", map[string]any{
+	_, err := i.panelCall(ctx, tab, "Runtime.callFunctionOn", map[string]any{
 		"objectId": s.object, "arguments": []map[string]any{{"value": index}}, "userGesture": true,
 		"functionDeclaration": `function(index){
    const el=this.element, o=el.options[index];

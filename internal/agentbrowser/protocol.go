@@ -455,7 +455,7 @@ func (v *panelView) input(ctx context.Context, i *Instance, conv string, in Inpu
 			return errors.New("invalid panel command")
 		}
 		for _, call := range calls {
-			if _, err := i.Call(ctx, selected, call.Method, call.Params); err != nil {
+			if _, err := i.panelCall(ctx, selected, call.Method, call.Params); err != nil {
 				return err
 			}
 		}
