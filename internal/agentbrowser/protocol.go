@@ -34,6 +34,9 @@ import (
 //   {t:"select",x,y,w,h,options:[{value,label,disabled}],selected}
 //     A native single select intercepted by this socket; coordinates are CSS pixels.
 // Client also sends {t:"select.choose",index} or {t:"select.dismiss"}.
+// Client sends {t:"clipboard.read",key,code,keyCode,ctrl?,meta?} only for a person's copy shortcut.
+// Server replies {t:"clipboard",text}; with no selection it forwards the original key.
+// Password input selections are never returned. This is not an agent tool.
 // Server binary: [u32 BE width][u32 BE height][u32 BE gen][JPEG]. Dimensions are
 // CSS pixels. gen starts at zero and increases only when current changes. A tabs
 // message announces gen before its frames; discard frames from older generations.
@@ -191,7 +194,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	view := newPanelView()
-	menus := make(chan json.RawMessage, 8)
+	outgoing := make(chan json.RawMessage, 8)
 	// Commands retain socket order while the writer keeps delivering frames and state changes.
 	go func() {
 		var selection panelSelect
@@ -206,6 +209,27 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			case in := <-incoming:
 				selected, _, _, _ := view.resolve(i, conv)
+				if in.T == "clipboard.read" {
+					text, err := i.panelClipboard(ctx, selected)
+					if err != nil {
+						report(err)
+						continue
+					}
+					if text == "" {
+						in.T = "key"
+						report(view.input(ctx, i, conv, in))
+					} else {
+						raw, _ := json.Marshal(struct {
+							T    string `json:"t"`
+							Text string `json:"text"`
+						}{"clipboard", text})
+						select {
+						case outgoing <- raw:
+						case <-ctx.Done():
+						}
+					}
+					continue
+				}
 				if in.T == "select.choose" {
 					report(selection.choose(ctx, i, selected, in.Index))
 					continue
@@ -221,7 +245,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if in.T == "mouse" && in.Type == "mousePressed" && in.Button == "left" {
 					if menu := selection.hit(ctx, i, selected, in); menu != nil {
 						select {
-						case menus <- menu:
+						case outgoing <- menu:
 						case <-ctx.Done():
 						}
 						continue
@@ -308,7 +332,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ctx.Done():
 			return
-		case menu := <-menus:
+		case menu := <-outgoing:
 			if write(menu) != nil {
 				return
 			}
