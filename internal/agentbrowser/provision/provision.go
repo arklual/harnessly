@@ -97,8 +97,10 @@ func Find(cfg Config) (path, snap string, err error) {
 			}
 		}
 	}
-	if snap == "" && executable("/snap/bin/chromium") {
-		snap = "/snap/bin/chromium"
+	if snap == "" {
+		if p, e := cfg.LookPath("/snap/bin/chromium"); e == nil {
+			snap = p
+		}
 	}
 	return "", snap, nil
 }
