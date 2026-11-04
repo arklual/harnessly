@@ -10,7 +10,7 @@ import {
   within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ReactNode, ReactElement } from 'react';
+import { useState, type ReactNode, type ReactElement } from 'react';
 import { PortalContext } from '@/next/ui/portal';
 import { pinLocale } from '@/next/i18n';
 import type { IProfilesPage } from './profiles-api';
@@ -18,6 +18,7 @@ const api = vi.hoisted(() => ({
   loadProfiles: vi.fn(),
   loadConversationProfiles: vi.fn(),
   changeProfile: vi.fn(),
+  previewProjectAccess: vi.fn(),
 }));
 vi.mock('./profiles-api', () => api);
 vi.mock('@/next/ui/use-media', () => ({ usePhone: () => false }));
@@ -25,7 +26,8 @@ vi.mock('@/next/stores/projects', () => ({ useProjects: () => [{ id: 'project-a'
 import { ProfilePicker } from './profile-picker';
 import { BrowserProfileAskHost } from '@/next/bindings/browser-profile-asks';
 import { BrowserPage } from '@/next/bindings/settings-browser';
-import { ProjectBrowserSettings } from './project-browser-settings';
+import { useProjectBrowserSettings } from './project-browser-settings';
+import ProjectSettingsDialog from '@/next/features/sidebar/project-settings-dialog';
 const p1 = {
   id: 'p1',
   name: 'Work',
@@ -62,6 +64,7 @@ beforeEach(() => {
   api.loadProfiles.mockResolvedValue(page());
   api.loadConversationProfiles.mockResolvedValue({ profiles: [p1, p2], current: p1, hasTabs: true });
   api.changeProfile.mockResolvedValue(undefined);
+  api.previewProjectAccess.mockResolvedValue(0);
 });
 afterEach(() => {
   cleanup();
@@ -174,26 +177,126 @@ it('requires confirmation listing affected projects before deletion and before d
     expect(api.changeProfile).toHaveBeenCalledWith('m', { action: 'sandbox', noSandbox: true }),
   );
 });
-it('saves an own default and extra grants without submitting the project name form', async () => {
-  const submit = vi.fn();
-  render(
-    <form onSubmit={submit}>
-      <ProjectBrowserSettings machine="m" project="project-a" />
-    </form>,
+function ProjectForm({
+  onSave,
+  onClose,
+}: {
+  onSave: (change: { name?: string; path?: string }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const browser = useProjectBrowserSettings('m', 'project-a');
+  const [project, setProject] = useState({ name: 'Project A', path: '/workspace' });
+  return (
+    <ProjectSettingsDialog
+      project={project}
+      folders={[]}
+      browserSettings={browser}
+      onClose={onClose}
+      onSave={async (change) => {
+        await onSave(change);
+        setProject((p) => ({ ...p, ...change }));
+      }}
+    />
   );
+}
+it('uses the single project Save button for browser-only changes', async () => {
+  const save = vi.fn(),
+    close = vi.fn();
+  render(<ProjectForm onSave={save} onClose={close} />);
   const select = await screen.findByRole('combobox', { name: 'Default profile' });
   fireEvent.change(select, { target: { value: '' } });
   fireEvent.click(screen.getByLabelText('Other'));
-  fireEvent.click(screen.getByRole('button', { name: 'Save browser access' }));
+  expect(screen.getAllByRole('button', { name: 'Save' })).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(api.changeProfile).toHaveBeenCalledWith('m', {
+    action: 'project',
+    project: 'project-a',
+    default: '',
+    granted: ['p2'],
+  });
+  expect(save).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog', { name: 'Change project browser access?' })).toBeNull();
+});
+it('confirms the affected chat count before either project or browser writes and supports cancellation', async () => {
+  const save = vi.fn(),
+    close = vi.fn();
+  api.previewProjectAccess.mockResolvedValue(2);
+  render(<ProjectForm onSave={save} onClose={close} />);
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Default profile' }), {
+    target: { value: 'p2' },
+  });
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Change project browser access?' });
+  expect(within(dialog).getByText('Chats whose browser tabs will close: 2. Continue saving?')).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+  expect(api.changeProfile).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   await waitFor(() =>
-    expect(api.changeProfile).toHaveBeenCalledWith('m', {
-      action: 'project',
-      project: 'project-a',
-      default: '',
-      granted: ['p2'],
-    }),
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(false),
   );
-  expect(submit).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  fireEvent.click(
+    within(await screen.findByRole('dialog', { name: 'Change project browser access?' })).getByRole(
+      'button',
+      { name: 'Confirm' },
+    ),
+  );
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(save).toHaveBeenCalledWith({ name: 'Renamed' });
+  expect(api.changeProfile).toHaveBeenCalledWith('m', {
+    action: 'project',
+    project: 'project-a',
+    default: 'p2',
+    granted: [],
+  });
+});
+it.each(['project', 'browser'])(
+  'keeps the dialog and browser draft when the %s write fails',
+  async (part) => {
+    const save = vi.fn(),
+      close = vi.fn();
+    if (part === 'project') save.mockRejectedValueOnce(new Error('Project is unavailable'));
+    else api.changeProfile.mockRejectedValueOnce(new Error('Access was revoked'));
+    render(<ProjectForm onSave={save} onClose={close} />);
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Default profile' }), {
+      target: { value: 'p2' },
+    });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain(
+      part === 'project' ? 'Project is unavailable' : 'Browser access was not saved: Access was revoked',
+    );
+    expect(close).not.toHaveBeenCalled();
+    expect((screen.getByRole('combobox', { name: 'Default profile' }) as HTMLSelectElement).value).toBe('p2');
+    if (part === 'project') expect(api.changeProfile).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    // A successful project write is not repeated when retrying only failed browser access.
+    expect(save).toHaveBeenCalledTimes(part === 'project' ? 2 : 1);
+  },
+);
+it('identifies a project timeout and never starts browser access after it', async () => {
+  const close = vi.fn();
+  render(<ProjectForm onSave={() => new Promise<void>(() => undefined)} onClose={close} />);
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Default profile' }), {
+    target: { value: 'p2' },
+  });
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed' } });
+  vi.useFakeTimers();
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await act(async () => {
+    await Promise.resolve();
+  });
+  await act(async () => vi.advanceTimersByTimeAsync(13_000));
+  expect(screen.getByRole('alert').textContent).toBe(
+    'Could not save the project: The server did not answer in time',
+  );
+  expect(api.changeProfile).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
 });
 it('shows disk usage, keeps the path in a tooltip, and warns about login loss before stopping', async () => {
   render(<BrowserPage machine="m" now={1000} />);

@@ -485,6 +485,7 @@ test('profile switching, Browser settings and an access ask outside the browser 
     sockets = 0;
   let asks: { id: string; conv: string; title: string; why: string; at: number }[] = [];
   const actions: Record<string, unknown>[] = [];
+  let refuseProjectSave = true;
   await page.route('**/api/agent-browser/profiles?*', async (route) => {
     const request = route.request(),
       url = new URL(request.url());
@@ -494,6 +495,15 @@ test('profile switching, Browser settings and an access ask outside the browser 
       if (action.action === 'use') {
         current = profiles.find((p) => p.id === action.id)!;
         hasTabs = false;
+      }
+      if (action.action === 'project-preview') {
+        await route.fulfill({ json: { affectedChats: 2 } });
+        return;
+      }
+      if (action.action === 'project' && refuseProjectSave) {
+        refuseProjectSave = false;
+        await route.fulfill({ status: 400, json: { error: 'Browser permission update failed' } });
+        return;
       }
       if (action.action === 'answer') asks = [];
       await route.fulfill({ json: { ok: true } });
@@ -585,11 +595,24 @@ test('profile switching, Browser settings and an access ask outside the browser 
     .first();
   await projectSettings.click();
   await expect(page.getByRole('group', { name: 'Browser access' })).toBeVisible();
+  const settings = page.getByRole('dialog', { name: 'Project settings', exact: true });
+  await settings.getByRole('combobox', { name: 'Default profile' }).selectOption('other');
+  await expect(settings.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1);
+  await expect(settings.getByRole('button', { name: 'Save browser access' })).toHaveCount(0);
   await shot(page, 'profiles-project-field');
-  await page
-    .getByRole('dialog', { name: 'Project settings', exact: true })
-    .getByRole('button', { name: 'Close', exact: true })
-    .click();
+  await settings.getByRole('button', { name: 'Save', exact: true }).click();
+  const accessConfirm = page.getByRole('dialog', { name: 'Change project browser access?' });
+  await expect(accessConfirm).toContainText('Chats whose browser tabs will close: 2.');
+  expect(actions.some((a) => a.action === 'project')).toBe(false);
+  await accessConfirm.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(settings.getByRole('alert')).toHaveText(
+    'Browser access was not saved: Browser permission update failed',
+  );
+  await expect(settings.getByRole('combobox', { name: 'Default profile' })).toHaveValue('other');
+  await settings.getByRole('button', { name: 'Save', exact: true }).click();
+  await accessConfirm.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(settings).toHaveCount(0);
+  expect(actions.filter((a) => a.action === 'project')).toHaveLength(2);
   // The Browser settings page has no browser panel open; asks still arrive through the shell's global host.
   asks = [
     {

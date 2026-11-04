@@ -22,7 +22,11 @@ export interface IProjectSettingsDialogProps {
   project: IProjectSettings | null;
   /** The folders offered under the field; null while they load (or when the machine did not give them). */
   folders: readonly IProjectFolder[] | null;
-  browserSettings?: ReactNode;
+  browserSettings?: {
+    render: (disabled: boolean) => ReactNode;
+    prepare: () => Promise<boolean>;
+    save: () => Promise<void>;
+  };
   onClose: () => void;
   /** Resolves once the server has the change; a rejection is said under the fields. Only what changed is passed. */
   onSave: (change: Partial<IProjectSettings>) => Promise<void>;
@@ -47,19 +51,21 @@ const ProjectSettingsDialog = ({
   const [state, setState] = useState<TState>(STATE.idle);
   const [error, setError] = useState<string | null>(null);
 
-  // a project opened (or changed on the machine) gives the fields their values again
+  // Opening the dialog initializes its fields. Remote updates must not erase a draft or a partial-save error.
   const [shown, setShown] = useState<IProjectSettings | null>(null);
   if (project !== shown) {
     setShown(project);
-    setName(project?.name ?? '');
-    setPath(project?.path ?? '');
-    setError(null);
-    setState(STATE.idle);
+    if (project === null || shown === null) {
+      setName(project?.name ?? '');
+      setPath(project?.path ?? '');
+      setError(null);
+      setState(STATE.idle);
+    }
   }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!project) return;
+    if (!project || state !== STATE.idle) return;
     const nextName = name.trim();
     const nextPath = path.trim().replace(/(.)\/+$/, '$1');
     if (!nextName) {
@@ -73,21 +79,33 @@ const ProjectSettingsDialog = ({
     const change: Partial<IProjectSettings> = {};
     if (nextName !== project.name) change.name = nextName;
     if (nextPath !== project.path) change.path = nextPath;
-    if (change.name === undefined && change.path === undefined) {
-      onClose();
-      return;
-    }
     setError(null);
     setState(STATE.busy);
-    const slow = setTimeout(() => setState(STATE.slow), SLOW_MS);
+    let slow: ReturnType<typeof setTimeout> | undefined;
     let giveUp: ReturnType<typeof setTimeout> | undefined;
     try {
-      await Promise.race([
-        onSave(change),
-        new Promise((_, reject) => {
-          giveUp = setTimeout(() => reject(new Error(t('next.pending.noAnswer'))), GIVE_UP_MS);
-        }),
-      ]);
+      if (browserSettings && !(await browserSettings.prepare())) {
+        setState(STATE.idle);
+        return;
+      }
+      slow = setTimeout(() => setState(STATE.slow), SLOW_MS);
+      if (change.name !== undefined || change.path !== undefined) {
+        try {
+          await Promise.race([
+            onSave(change),
+            new Promise((_, reject) => {
+              giveUp = setTimeout(() => reject(new Error(t('next.pending.noAnswer'))), GIVE_UP_MS);
+            }),
+          ]);
+        } catch (failure) {
+          const reason = failure instanceof Error ? failure.message : String(failure);
+          throw new Error(`${t('next.projectSettings.failed')}: ${reason}`, { cause: failure });
+        } finally {
+          clearTimeout(giveUp);
+        }
+      }
+      // The browser API has its own timeout and reports failures as browser-access errors.
+      await browserSettings?.save();
       onClose();
     } catch (failure) {
       setError(
@@ -113,7 +131,9 @@ const ProjectSettingsDialog = ({
   return (
     <Modal
       open={project !== null}
-      onClose={onClose}
+      onClose={() => {
+        if (!busy) onClose();
+      }}
       title={t('next.projectSettings.title')}
       lead={t('next.projectSettings.lead')}
       boxClass="hx-create"
@@ -168,7 +188,7 @@ const ProjectSettingsDialog = ({
               ))}
             </div>
           )}
-          {browserSettings}
+          {browserSettings?.render(busy)}
           {error && (
             <p className="hx-create__err" role="alert">
               {error}
@@ -177,10 +197,16 @@ const ProjectSettingsDialog = ({
           {state === STATE.slow && <p className="hx-create__slow">{t('next.chatRow.slow')}</p>}
         </div>
         <div className="hx-modal__foot">
-          <button type="button" className="hx-btn" data-variant="ghost" onClick={onClose}>
+          <button type="button" className="hx-btn" data-variant="ghost" disabled={busy} onClick={onClose}>
             {t('next.rowMenu.cancel')}
           </button>
-          <button type="submit" className="hx-btn hx-create__ok" data-variant="primary" data-busy={busy}>
+          <button
+            type="submit"
+            className="hx-btn hx-create__ok"
+            data-variant="primary"
+            data-busy={busy}
+            disabled={busy}
+          >
             <span>{t('next.projectSettings.save')}</span>
             <span className="hx-gate__spin" aria-hidden="true" />
           </button>

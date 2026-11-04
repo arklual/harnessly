@@ -156,3 +156,24 @@ export const changeProfile = async (
   window.dispatchEvent(new CustomEvent('browser-profiles-changed', { detail: machine }));
   return { warning: answer.warning };
 };
+/** Counts chats whose existing tabs would close, without changing project access. */
+export const previewProjectAccess = async (
+  machine: MachineId,
+  project: string,
+  access: IProfileAccess,
+): Promise<number> => {
+  const result = valueOf(
+    await sendBody(
+      'POST',
+      path(machine),
+      { action: 'project-preview', project, ...access },
+      read((o) => {
+        const count = number(o.affectedChats);
+        if (!Number.isSafeInteger(count) || count < 0) throw new Error('Invalid affected chat count');
+        return { affectedChats: count };
+      }),
+      10_000,
+    ),
+  );
+  return result.affectedChats;
+};

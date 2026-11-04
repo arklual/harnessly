@@ -1130,9 +1130,10 @@
   "next.browserProfiles.default": "Основной профиль",
   "next.browserProfiles.own": "Свой профиль (создаётся автоматически)",
   "next.browserProfiles.grants": "Дополнительные разрешённые профили",
-  "next.browserProfiles.saveAccess": "Сохранить доступ к браузеру",
-  "next.browserProfiles.saved": "Доступ к браузеру сохранён",
   "next.browserProfiles.common": "Общий",
   "next.browserProfiles.importSourceNote": "Укажите существующую папку данных Chrome. Перед импортом закройте Chrome, использующий эту папку.",
-  "next.browserProfiles.size": "Место на диске"
+  "next.browserProfiles.size": "Место на диске",
+  "next.browserProfiles.accessFailed": "Доступ к браузеру не сохранён: {reason}",
+  "next.browserProfiles.projectSwitchTitle": "Изменить доступ проекта к браузеру?",
+  "next.browserProfiles.projectSwitchWarning": "Чатов, чьи вкладки браузера закроются: {count}. Продолжить сохранение?"
 }

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { setFetch } from '@/next/core/net/http';
 import { setApiOrigin } from '@/next/core/net/machine';
-import { changeProfile, loadConversationProfiles, loadProfiles } from './profiles-api';
+import { changeProfile, loadConversationProfiles, loadProfiles, previewProjectAccess } from './profiles-api';
 const fetcher = vi.fn();
 beforeEach(() => {
   setApiOrigin({ base: '/agents' });
@@ -97,4 +97,24 @@ it('returns an import warning from the page API', async () => {
   await expect(
     changeProfile('m', { action: 'import', name: 'Imported', color: '#112233', path: '/data/chrome' }),
   ).resolves.toEqual({ warning: 'Some saved logins could not be copied' });
+});
+
+it('previews project access without announcing a mutation and validates the chat count', async () => {
+  const changed = vi.fn();
+  window.addEventListener('browser-profiles-changed', changed);
+  try {
+    fetcher.mockResolvedValueOnce(Response.json({ affectedChats: 2 }));
+    expect(await previewProjectAccess('m', 'project-a', { default: 'p', granted: [] })).toBe(2);
+    expect(JSON.parse(fetcher.mock.calls[0]![1].body as string)).toEqual({
+      action: 'project-preview',
+      project: 'project-a',
+      default: 'p',
+      granted: [],
+    });
+    expect(changed).not.toHaveBeenCalled();
+    fetcher.mockResolvedValueOnce(Response.json({ affectedChats: -1 }));
+    await expect(previewProjectAccess('m', 'project-a', { default: 'p', granted: [] })).rejects.toThrow();
+  } finally {
+    window.removeEventListener('browser-profiles-changed', changed);
+  }
 });

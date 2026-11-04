@@ -1074,9 +1074,10 @@
   "next.browserProfiles.default": "Default profile",
   "next.browserProfiles.own": "Own profile (created automatically)",
   "next.browserProfiles.grants": "Additional allowed profiles",
-  "next.browserProfiles.saveAccess": "Save browser access",
-  "next.browserProfiles.saved": "Browser access saved",
   "next.browserProfiles.common": "Common",
   "next.browserProfiles.importSourceNote": "Use an existing Chrome user data folder. Close Chrome using that folder before importing.",
-  "next.browserProfiles.size": "Disk usage"
+  "next.browserProfiles.size": "Disk usage",
+  "next.browserProfiles.accessFailed": "Browser access was not saved: {reason}",
+  "next.browserProfiles.projectSwitchTitle": "Change project browser access?",
+  "next.browserProfiles.projectSwitchWarning": "Chats whose browser tabs will close: {count}. Continue saving?"
 }
