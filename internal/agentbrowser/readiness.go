@@ -44,7 +44,8 @@ func (m *Manager) Ready(ctx context.Context) Status {
 		s.Hint = "Using externally managed Chrome"
 		return s
 	}
-	if m.preparation == nil {
+	if m.preparation == nil || m.preparation.status.State == "error" &&
+		time.Since(m.preparation.finished) >= 15*time.Second {
 		m.preparation = &browserPreparation{status: Status{
 			T: "status", State: "preparing", Hint: "Checking Chrome installation"}}
 		m.wg.Add(1)
@@ -54,8 +55,20 @@ func (m *Manager) Ready(ctx context.Context) Status {
 }
 
 type browserPreparation struct {
-	status Status
-	path   string
+	status   Status
+	path     string
+	finished time.Time
+}
+
+// Retry immediately rechecks a failed preparation after an operator repairs the machine.
+// An in-flight preparation is shared rather than duplicated.
+func (m *Manager) Retry(ctx context.Context) Status {
+	m.mu.Lock()
+	if m.preparation != nil && m.preparation.status.State == "error" {
+		m.preparation.finished = time.Time{}
+	}
+	m.mu.Unlock()
+	return m.Ready(ctx)
 }
 
 func (m *Manager) prepareBrowser() {
@@ -72,16 +85,21 @@ func (m *Manager) prepareBrowser() {
 	})
 	var info provision.Inspection
 	if err == nil {
-		info, err = provision.Probe(m.ctx, path, m.cfg.DataDir)
+		info, err = m.probe(m.ctx, path, m.cfg.DataDir)
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.preparation.finished = time.Now()
 	s := &m.preparation.status
 	s.Mode = provision.Mode(m.cfg.Mode)
 	s.Sandbox = info.Sandbox
 	if err != nil {
 		s.State = "error"
 		s.Error = err.Error()
+		var diagnostic *provision.Diagnostic
+		if errors.As(err, &diagnostic) {
+			s.Command = diagnostic.Command
+		}
 	} else {
 		s.State = "up"
 		s.Progress = 100
@@ -94,7 +112,7 @@ func (m *Manager) preparedChrome(ctx context.Context) (string, error) {
 	for {
 		s := m.Ready(ctx)
 		if s.State == "error" || s.State == "down" {
-			return "", errors.New(s.Error)
+			return "", &provision.Diagnostic{Message: s.Error, Command: s.Command}
 		}
 		if s.State == "up" {
 			m.mu.Lock()

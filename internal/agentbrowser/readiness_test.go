@@ -2,8 +2,15 @@ package agentbrowser
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/provision"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -51,5 +58,123 @@ func TestReadyDisabledAndAttached(t *testing.T) {
 			t.Fatalf("%+v", s)
 		}
 		m.Close()
+	}
+}
+
+func TestReadyRecoversWithoutRestart(t *testing.T) {
+	chrome, err := os.Executable()
+	must(t, err)
+	m := New(Config{DataDir: t.TempDir(), Chrome: chrome})
+	defer m.Close()
+	var fixed atomic.Bool
+	var probes atomic.Int32
+	m.probe = func(context.Context, string, string) (provision.Inspection, error) {
+		probes.Add(1)
+		if !fixed.Load() {
+			return provision.Inspection{}, &provision.Diagnostic{Message: "repair needed", Command: "repair-command"}
+		}
+		return provision.Inspection{Version: "Chrome fixture", Sandbox: "enabled"}, nil
+	}
+	eventually(t, time.Second, func() bool { return m.Ready(t.Context()).State == "error" })
+	if s := m.Ready(t.Context()); s.Command != "repair-command" {
+		t.Fatalf("lost command: %+v", s)
+	}
+	_, err = m.Instance(t.Context(), "before")
+	var diagnostic *provision.Diagnostic
+	if !errors.As(err, &diagnostic) || diagnostic.Command != "repair-command" {
+		t.Fatalf("lost typed diagnostic: %v", err)
+	}
+	fixed.Store(true)
+	if s := m.Ready(t.Context()); s.State != "error" || probes.Load() != 1 {
+		t.Fatal("retried before cooldown", s)
+	}
+	m.mu.Lock()
+	m.preparation.finished = time.Now().Add(-15 * time.Second)
+	m.mu.Unlock()
+	if s := m.Ready(t.Context()); s.State != "preparing" {
+		t.Fatalf("no automatic retry: %+v", s)
+	}
+	eventually(t, time.Second, func() bool { return m.Ready(t.Context()).State == "up" })
+	if probes.Load() != 2 || m.Ready(t.Context()).Command != "" {
+		t.Fatal("stale preparation")
+	}
+}
+
+func TestPanelRetriesPreparationOnSameSocket(t *testing.T) {
+	chrome, err := os.Executable()
+	must(t, err)
+	m := New(Config{DataDir: t.TempDir(), Chrome: chrome})
+	defer m.Close()
+	var probes atomic.Int32
+	m.probe = func(context.Context, string, string) (provision.Inspection, error) {
+		n := probes.Add(1)
+		return provision.Inspection{}, &provision.Diagnostic{Message: fmt.Sprintf("probe %d", n), Command: "repair-command"}
+	}
+	socket := openContractSocket(t, m, "retry")
+	waitPreparation(t, socket, func(raw []byte) bool {
+		return strings.Contains(string(raw), `"error":"probe 1"`) &&
+			strings.Contains(string(raw), `"command":"repair-command"`)
+	})
+	socket.send(t, Input{T: "browser.retry"})
+	waitPreparation(t, socket, func(raw []byte) bool { return strings.Contains(string(raw), `"error":"probe 2"`) })
+	if probes.Load() != 2 {
+		t.Fatal("duplicate preparation", probes.Load())
+	}
+}
+
+func TestChromeReadyRetryNewInstance(t *testing.T) {
+	chrome, err := FindChrome()
+	if err != nil {
+		t.Skip(err)
+	}
+	data := t.TempDir()
+	m := New(Config{DataDir: data, Chrome: chrome, Mode: "headless"})
+	t.Cleanup(func() {
+		m.Close()
+		for _, id := range []string{"first", "second"} {
+			cleanupHost(t, filepath.Join(data, "agent-browser", "profiles", id))
+		}
+	})
+	var fixed atomic.Bool
+	m.probe = func(ctx context.Context, chrome, data string) (provision.Inspection, error) {
+		if !fixed.Load() {
+			return provision.Inspection{}, &provision.Diagnostic{Message: "sandbox unavailable", Command: "repair"}
+		}
+		return provision.Probe(ctx, chrome, data)
+	}
+	eventually(t, time.Second, func() bool { return m.Ready(t.Context()).State == "error" })
+	fixed.Store(true)
+	m.mu.Lock()
+	m.preparation.finished = time.Now().Add(-15 * time.Second)
+	m.mu.Unlock()
+	eventually(t, 35*time.Second, func() bool { return m.Ready(t.Context()).State == "up" })
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	for _, id := range []string{"first", "second"} {
+		instance, e := m.Instance(ctx, id)
+		must(t, e)
+		tab, e := instance.NewTab(ctx, "retry", "agent", "about:blank")
+		must(t, e)
+		if got := string(evaluate(t, instance, tab.ID, "1+1")); got != "2" {
+			t.Fatal(got)
+		}
+	}
+}
+
+func waitPreparation(t *testing.T, socket *contractSocket, match func([]byte) bool) {
+	t.Helper()
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	for {
+		select {
+		case raw := <-socket.messages:
+			if match(raw) {
+				return
+			}
+		case err := <-socket.errors:
+			t.Fatal(err)
+		case <-timer.C:
+			t.Fatal("preparation status did not arrive")
+		}
 	}
 }

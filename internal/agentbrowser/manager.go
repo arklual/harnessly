@@ -61,6 +61,7 @@ func FindChrome() (string, error) {
 // Manager reconnects independent browser profiles throughout the runtime lifetime.
 type Manager struct {
 	preparation *browserPreparation
+	probe       func(context.Context, string, string) (provision.Inspection, error)
 	cfg         Config
 	mu          sync.Mutex
 	instances   map[string]*Instance
@@ -72,7 +73,7 @@ type Manager struct {
 // New creates a lazy manager; Instance starts the first connection.
 func New(cfg Config) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Manager{cfg: cfg, instances: make(map[string]*Instance), ctx: ctx, cancel: cancel}
+	return &Manager{probe: provision.Probe, cfg: cfg, instances: make(map[string]*Instance), ctx: ctx, cancel: cancel}
 }
 
 // Enabled reports whether browser access is configured.
