@@ -35,7 +35,7 @@ func TestRegistryCreationOrderAndSelection(t *testing.T) {
 	if got := i.Current("chat"); got != "a" {
 		t.Fatal(got)
 	}
-	must(t, i.Select("chat", "m"))
+	must(t, i.SetAgentTab("chat", "m"))
 	i.mu.Lock()
 	i.removeLocked("m")
 	i.mu.Unlock()

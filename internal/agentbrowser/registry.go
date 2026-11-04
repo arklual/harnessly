@@ -21,6 +21,9 @@ type registry struct {
 }
 
 func newPage(t Tab) *page {
+	if t.Control == "" {
+		t.Control = "agent"
+	}
 	return &page{Tab: t, gate: make(chan struct{}, 1), viewers: make(map[*Viewer]bool)}
 }
 
@@ -29,8 +32,12 @@ func newInstance(m *Manager, id string) *Instance {
 	if m.cfg.CDP != "" {
 		kind = "attached"
 	}
+	name := id
+	if id == DefaultProfile {
+		name = "Common"
+	}
 	i := &Instance{
-		manager: m, profile: Profile{id, "Common", kind},
+		manager: m, profile: Profile{id, name, kind},
 		dir:   filepath.Join(m.cfg.DataDir, "agent-browser", "profiles", id),
 		pages: make(map[string]*page), current: make(map[string]string), hidden: make(map[string]bool),
 		state: "starting", changes: make(map[chan struct{}]bool), refresh: make(chan struct{}, 1),
@@ -44,6 +51,7 @@ func newInstance(m *Manager, id string) *Instance {
 					t.Order = i.sequence + 1
 				}
 				i.sequence = max(i.sequence, t.Order)
+				t.Dialog = nil
 				i.pages[t.ID] = newPage(t)
 			}
 			if r.Current != nil {
@@ -80,6 +88,9 @@ func (i *Instance) save() {
 	}
 	revision := i.revision
 	r := registry{Current: i.current, Hidden: i.hidden, Tabs: i.tabsLocked("")}
+	for n := range r.Tabs {
+		r.Tabs[n].Dialog = nil
+	}
 	raw, err := json.MarshalIndent(r, "", "  ")
 	i.mu.Unlock()
 	if err == nil {
@@ -129,7 +140,7 @@ func (i *Instance) tabsLocked(conv string) []Tab {
 	out := []Tab{}
 	for _, p := range i.pages {
 		if !p.provisional && Shown(p.URL) && (conv == "" || p.Conversation == conv) {
-			out = append(out, p.Tab)
+			out = append(out, tabSnapshot(p.Tab))
 		}
 	}
 	sort.Slice(out, func(a, b int) bool { return out[a].Order < out[b].Order })
@@ -144,7 +155,7 @@ func (i *Instance) Tabs(conv string) []Tab {
 }
 
 func (i *Instance) currentLocked(conv string) string {
-	if p := i.pages[i.current[conv]]; p != nil && Shown(p.URL) {
+	if p := i.pages[i.current[conv]]; p != nil && p.Conversation == conv && !p.provisional && Shown(p.URL) {
 		return p.ID
 	}
 	tabs := i.tabsLocked(conv)
@@ -164,15 +175,16 @@ func (i *Instance) currentLocked(conv string) string {
 	return id
 }
 
-// Current falls back to the conversation's newest tab when no explicit selection survives.
+// Current returns the agent working tab, falling back to the conversation's newest tab
+// when no explicit selection survives.
 func (i *Instance) Current(conv string) string {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	return i.currentLocked(conv)
 }
 
-// Select changes this conversation's view; the authenticated person can inspect other owners' tabs.
-func (i *Instance) Select(conv, id string) error {
+// SetAgentTab selects an owned working tab without changing pinned panel views.
+func (i *Instance) SetAgentTab(conv, id string) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if i.closing || i.manager.ctx.Err() != nil {
@@ -180,6 +192,9 @@ func (i *Instance) Select(conv, id string) error {
 	}
 	if p := i.pages[id]; p == nil || !Shown(p.URL) {
 		return errors.New("unknown browser tab")
+	}
+	if i.pages[id].Conversation != conv {
+		return ErrNotOwner
 	}
 	i.current[conv] = id
 	i.changedLocked()
@@ -247,10 +262,13 @@ func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error
 		return Tab{}, err
 	}
 	i.mu.Lock()
+	working := i.currentLocked(conv)
 	p := i.upsertLocked(target{ID: r.ID, Type: "page", URL: url})
 	p.Conversation, p.By = conv, by
 	p.provisional = false
-	i.current[conv] = r.ID
+	if by == "agent" || working == "" {
+		i.current[conv] = r.ID
+	}
 	i.changedLocked()
 	i.mu.Unlock()
 	if _, err = i.prepare(ctx, p, c); err != nil {
@@ -258,7 +276,7 @@ func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error
 	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	return p.Tab, nil
+	return tabSnapshot(p.Tab), nil
 }
 
 // CloseTab bypasses a renderer's operation queue, including a renderer blocked in a dialog.
@@ -322,4 +340,12 @@ func (i *Instance) finishCreating() {
 		}
 		i.changedLocked()
 	}
+}
+
+func tabSnapshot(t Tab) Tab {
+	if t.Dialog != nil {
+		d := *t.Dialog
+		t.Dialog = &d
+	}
+	return t
 }

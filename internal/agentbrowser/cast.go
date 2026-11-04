@@ -112,9 +112,6 @@ func (i *Instance) startCast(ctx context.Context, id string, b binding) error {
 	if _, err := b.conn.Call(ctx, "Target.activateTarget", map[string]any{"targetId": id}, ""); err != nil {
 		return err
 	}
-	if _, err := b.conn.Call(ctx, "Page.enable", nil, b.session); err != nil {
-		return err
-	}
 	_, err := b.conn.Call(ctx, "Page.startScreencast", map[string]any{
 		"format": "jpeg", "quality": 75, "maxWidth": 1920, "maxHeight": 1400,
 	}, b.session)

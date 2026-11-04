@@ -26,8 +26,19 @@ type Viewport struct {
 	DPR  float64 `json:"dpr"`
 }
 
-// Tab is persistent metadata; Order records creation order independently of Chrome's target IDs.
+// Dialog describes a JavaScript modal dialog currently awaiting a response.
+type Dialog struct {
+	Type          string `json:"type"`
+	Message       string `json:"message"`
+	DefaultPrompt string `json:"defaultPrompt"`
+}
+
+// Tab records creation order independently of Chrome's target IDs. All fields except
+// the live Dialog are persisted; callers receive snapshots they may safely retain.
 type Tab struct {
+	Control      string   `json:"control"`
+	AgentAt      int64    `json:"agentAt"`
+	Dialog       *Dialog  `json:"dialog,omitempty"`
 	ID           string   `json:"id"`
 	Title        string   `json:"title"`
 	URL          string   `json:"url"`
@@ -184,6 +195,7 @@ func (i *Instance) run() {
 			i.ackNext = make(map[string]time.Time)
 			for _, p := range i.pages {
 				p.last = nil
+				p.Dialog = nil
 			}
 			i.mu.Unlock()
 			readerDone := make(chan struct{})
@@ -302,12 +314,6 @@ func (i *Instance) bind(ctx context.Context, p *page, c *cdp.Conn) (binding, err
 		return binding{}, err
 	}
 	b = binding{conn: c, session: a.Session, target: p.ID}
-	if _, err = c.Call(ctx, "Emulation.setFocusEmulationEnabled", map[string]any{"enabled": true}, b.session); err != nil {
-		return binding{}, err
-	}
-	if _, err = c.Call(ctx, "Inspector.enable", nil, b.session); err != nil {
-		return binding{}, err
-	}
 	raw, err = c.Call(ctx, "Browser.getWindowForTarget", map[string]any{"targetId": p.ID}, "")
 	if err != nil {
 		return binding{}, err
@@ -325,6 +331,21 @@ func (i *Instance) bind(ctx context.Context, p *page, c *cdp.Conn) (binding, err
 	viewers := len(p.viewers)
 	i.changedLocked()
 	i.mu.Unlock()
+	// Publish the session before enabling Page: dialog events can precede the reply.
+	if _, err = c.Call(ctx, "Page.enable", nil, b.session); err != nil {
+		i.mu.Lock()
+		if p.binding == b {
+			p.binding = binding{}
+		}
+		i.mu.Unlock()
+		return binding{}, err
+	}
+	if _, err = c.Call(ctx, "Emulation.setFocusEmulationEnabled", map[string]any{"enabled": true}, b.session); err != nil {
+		return binding{}, err
+	}
+	if _, err = c.Call(ctx, "Inspector.enable", nil, b.session); err != nil {
+		return binding{}, err
+	}
 	// An unresponsive renderer may reject restoration; other tabs remain usable.
 	if v.W > 0 {
 		err = i.viewport(ctx, b, v)
@@ -338,8 +359,14 @@ func (i *Instance) bind(ctx context.Context, p *page, c *cdp.Conn) (binding, err
 	return b, err
 }
 
-// Call sends a tab command with a bounded lifetime, independently of other tabs.
+// Call sends a human tab command with a bounded lifetime, independently of other tabs.
+// It enforces ErrDialogOpen but does not enforce agent ownership or control.
 func (i *Instance) Call(ctx context.Context, id, method string, params any) (json.RawMessage, error) {
+	return i.tabCall(ctx, id, method, params, func() error { return i.dialogError(id, method) })
+}
+
+func (i *Instance) tabCall(ctx context.Context, id, method string, params any,
+	allowed func() error) (json.RawMessage, error) {
 	if err := i.beginOperation(); err != nil {
 		return nil, err
 	}
@@ -350,8 +377,20 @@ func (i *Instance) Call(ctx context.Context, id, method string, params any) (jso
 	if err != nil {
 		return nil, err
 	}
-	b, err := i.prepare(ctx, p, c)
-	if err != nil {
+	if err := allowed(); err != nil {
+		return nil, err
+	}
+	i.mu.Lock()
+	b := p.binding
+	i.mu.Unlock()
+	// Dialog answers must bypass a viewport/screencast waiting on this renderer.
+	if method != "Page.handleJavaScriptDialog" || b.conn != c || b.session == "" {
+		b, err = i.prepare(ctx, p, c)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := allowed(); err != nil {
 		return nil, err
 	}
 	return c.Call(ctx, method, params, b.session)

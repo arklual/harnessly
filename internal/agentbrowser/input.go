@@ -7,11 +7,13 @@ import (
 
 // Input is what the person does in the pane.
 type Input struct {
+	Accept     bool    `json:"accept,omitempty"`
+	Holder     string  `json:"holder,omitempty"`
 	Mode       string  `json:"mode,omitempty"`
 	W          int     `json:"w,omitempty"`
 	H          int     `json:"h,omitempty"`
 	DPR        float64 `json:"dpr,omitempty"`
-	T          string  `json:"t"` // mouse, wheel, key, text, nav, tab.select, tab.new, tab.close, viewport
+	T          string  `json:"t"` // See the complete wire contract in protocol.go.
 	Type       string  `json:"type,omitempty"`
 	Button     string  `json:"button,omitempty"`
 	Buttons    int     `json:"buttons,omitempty"`

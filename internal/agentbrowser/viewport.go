@@ -18,6 +18,9 @@ type dimensions struct {
 }
 
 func (i *Instance) dimensions(ctx context.Context, b binding) (dimensions, error) {
+	if err := i.dialogError(b.target, "Runtime.evaluate"); err != nil {
+		return dimensions{}, err
+	}
 	raw, err := b.conn.Call(ctx, "Runtime.evaluate", map[string]any{
 		"expression":    "({w:innerWidth,h:innerHeight,outerW:outerWidth,outerH:outerHeight})",
 		"returnByValue": true,
@@ -54,6 +57,9 @@ func (i *Instance) SetViewport(ctx context.Context, id string, v Viewport) error
 	if err != nil {
 		return err
 	}
+	if err := i.dialogError(id, "Runtime.evaluate"); err != nil {
+		return err
+	}
 	if err = lockPage(ctx, p); err != nil {
 		return err
 	}
@@ -73,6 +79,9 @@ func (i *Instance) SetViewport(ctx context.Context, id string, v Viewport) error
 }
 
 func (i *Instance) viewport(ctx context.Context, b binding, v Viewport) error {
+	if err := i.dialogError(b.target, "Runtime.evaluate"); err != nil {
+		return err
+	}
 	// Shared-window targets keep stale inner bounds while hidden, even after the native window resizes.
 	if _, err := b.conn.Call(ctx, "Target.activateTarget", map[string]any{"targetId": b.target}, ""); err != nil {
 		return err

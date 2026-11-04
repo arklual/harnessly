@@ -54,6 +54,23 @@ func (i *Instance) event(method, session string, raw json.RawMessage) {
 		}
 		i.changedLocked()
 		i.mu.Unlock()
+	case "Page.javascriptDialogOpening", "Page.javascriptDialogClosed":
+		var dialog *Dialog
+		if method == "Page.javascriptDialogOpening" {
+			dialog = &Dialog{}
+			if json.Unmarshal(raw, dialog) != nil {
+				return
+			}
+		}
+		i.mu.Lock()
+		for _, p := range i.pages {
+			if p.binding.session == session {
+				p.Dialog = dialog
+			}
+		}
+		// Dialogs are live session state, not a durable entry in tabs.json.
+		i.notifyLocked()
+		i.mu.Unlock()
 	case "Page.screencastFrame":
 		var f struct {
 			Data     string `json:"data"`

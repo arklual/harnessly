@@ -37,6 +37,13 @@ type relay struct {
 
 func (r *relay) detach(sessions []string) {
 	for _, session := range sessions {
+		// Detaching alone leaves a native modal dialog without a DevTools handler.
+		// Cancel it first so a later client can attach and use the renderer again.
+		dialog, _ := json.Marshal(map[string]any{"id": 0, "sessionId": session,
+			"method": "Page.handleJavaScriptDialog", "params": map[string]bool{"accept": false}})
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), time.Second)
+		_ = r.chrome.Write(closeCtx, dialog)
+		closeCancel()
 		raw, _ := json.Marshal(map[string]any{"id": 0, "method": "Target.detachFromTarget",
 			"params": map[string]string{"sessionId": session}})
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)

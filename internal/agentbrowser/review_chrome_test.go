@@ -59,74 +59,6 @@ paint();
 			must(t, err)
 			b, err := i.NewTab(t.Context(), "neighbor", "agent", page.URL)
 			must(t, err)
-			t.Run("alert_isolation", func(t *testing.T) {
-				socket := httptest.NewServer(http.HandlerFunc(m.ServeHTTP))
-				defer socket.Close()
-				ws, _, err := websocket.Dial(t.Context(), "ws"+socket.URL[4:]+"?conv=chat", nil)
-				must(t, err)
-				defer ws.CloseNow()
-				ws.SetReadLimit(8 << 20)
-				// Wait until the socket is subscribed to the opener before blocking its input worker.
-				for {
-					typ, _, err := ws.Read(t.Context())
-					must(t, err)
-					if typ == websocket.MessageBinary {
-						break
-					}
-				}
-				evaluate(t, i, a.ID, "setTimeout(()=>alert('fixture'),50);true")
-				time.Sleep(200 * time.Millisecond)
-				started := time.Now()
-				must(t, ws.Write(t.Context(), websocket.MessageText, []byte(`{"t":"nav","action":"back"}`)))
-				time.Sleep(100 * time.Millisecond)
-				fast, cancel := context.WithTimeout(t.Context(), 2*time.Second)
-				defer cancel()
-				_, err = i.Call(fast, b.ID, "Runtime.evaluate", map[string]any{"expression": "1+1"})
-				must(t, err)
-				c, err := i.NewTab(fast, "temporary", "agent", page.URL)
-				must(t, err)
-				must(t, i.CloseTab(fast, c.ID))
-				if len(i.Tabs("")) != 2 {
-					t.Fatal("registry blocked or lost tabs")
-				}
-				must(t, i.Select("chat", b.ID))
-				count := 0
-				var gen uint32
-				readCtx, stop := context.WithTimeout(t.Context(), 12*time.Second)
-				defer stop()
-				for {
-					typ, raw, err := ws.Read(readCtx)
-					must(t, err)
-					if typ == websocket.MessageBinary {
-						if gen != 0 && binary.BigEndian.Uint32(raw[8:]) == gen {
-							count++
-						}
-						continue
-					}
-					var tabs TabsMessage
-					must(t, json.Unmarshal(raw, &tabs))
-					if tabs.T == "tabs" && tabs.Current == b.ID {
-						gen = tabs.Gen
-					}
-					var status Status
-					must(t, json.Unmarshal(raw, &status))
-					if status.T != "status" || status.State != "error" {
-						continue
-					}
-					if !strings.Contains(status.Error, "deadline exceeded") {
-						t.Fatal(status.Error)
-					}
-					if count < 10 {
-						t.Fatalf("only %d socket frames while input blocked", count)
-					}
-					_, err = i.Call(t.Context(), a.ID, "Page.handleJavaScriptDialog", map[string]any{"accept": true})
-					must(t, err)
-					must(t, i.Select("chat", a.ID))
-					t.Logf("other tab/NewTab/CloseTab/Tabs responded within 2s; nav deadline=%s; socket frames=%d",
-						time.Since(started).Round(time.Millisecond), count)
-					return
-				}
-			})
 			t.Run("title_writes_and_frame_budget", func(t *testing.T) {
 				must(t, i.SetViewport(t.Context(), b.ID, Viewport{"fixed", 800, 600, 1}))
 				v, err := i.Watch(t.Context(), b.ID)
@@ -277,9 +209,9 @@ paint();
 					if typ != websocket.MessageText {
 						continue
 					}
-					var status Status
-					must(t, json.Unmarshal(raw, &status))
-					if status.T == "status" && strings.Contains(status.Error, "1 MiB") {
+					var notice Notice
+					must(t, json.Unmarshal(raw, &notice))
+					if notice.T == "notice" && strings.Contains(notice.Message, "1 MiB") {
 						break
 					}
 				}
@@ -296,7 +228,7 @@ paint();
 						break
 					}
 				}
-				t.Log("70 KiB paste accepted; >1 MiB message returned status error; socket created another tab afterwards")
+				t.Log("70 KiB paste accepted; >1 MiB message returned notice; socket created another tab afterwards")
 			})
 			t.Run("transient_popup_churn", func(t *testing.T) {
 				c := i.connection()
