@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -178,6 +179,11 @@ func TestChromeMCP(t *testing.T) {
 			page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/html")
 				switch r.URL.Path {
+				case "/large":
+					fmt.Fprint(w, `<h1>Large page context</h1><p>Noninteractive explanation</p>`)
+					for n := 0; n < 5000; n++ {
+						fmt.Fprintf(w, `<div><button onclick="document.body.dataset.last=this.textContent">Large button %04d</button></div>`, n)
+					}
 				case "/login":
 					fmt.Fprint(w, `<form action="/submit" method="post"><label>User<input name="user"></label><label>Password<input name="password" type="password"></label><button>Sign in</button></form>`)
 				case "/submit":
@@ -270,6 +276,36 @@ setTimeout(()=>{const h=document.createElement('h2');h.textContent='Delayed cont
 					t.Fatalf("frame input missed: %s", raw)
 				}
 			})
+			c.t = t
+			t.Run("frame_reload_preserves_main_ids", func(t *testing.T) {
+				c.t = t
+				snapshot := c.text("snapshot", nil)
+				mainID, frameID := snapshotID(t, snapshot, "Main action"), snapshotID(t, snapshot, "Frame action")
+				c.text("evaluate", map[string]any{"expression": "document.querySelector('iframe').src += '?reload=1'"})
+				c.text("click", map[string]any{"id": mainID})
+				c.eval("document.body.dataset.clicked", `"yes"`)
+				c.refuses("click", map[string]any{"id": frameID}, "refresh the snapshot")
+			})
+			c.t = t
+			t.Run("overlay_and_key_code", func(t *testing.T) {
+				c.t = t
+				id := c.node("Main action")
+				c.text("evaluate", map[string]any{"expression": `document.body.dataset.clicked='no';
+const cover=document.createElement('div');cover.id='cover';cover.style='position:fixed;inset:0;z-index:9999;background:white';
+cover.onclick=()=>document.body.dataset.cover='yes';document.body.append(cover);
+window.addEventListener('keydown',e=>document.body.dataset.code=e.code);true`})
+				result := c.text("click", map[string]any{"id": id})
+				if !strings.Contains(result, "covered by div#cover") {
+					t.Fatal(result)
+				}
+				c.eval("[document.body.dataset.clicked,document.body.dataset.cover]", `["no","yes"]`)
+				c.text("evaluate", map[string]any{"expression": "document.querySelector('#cover').remove();true"})
+				for key, code := range map[string]string{"a": "KeyA", "Enter": "Enter", "ArrowDown": "ArrowDown"} {
+					c.text("press_key", map[string]any{"key": key})
+					c.eval("document.body.dataset.code", code)
+				}
+			})
+
 			c.t = t
 			t.Run("select_shadow_wait", func(t *testing.T) {
 				c.t = t
@@ -412,6 +448,92 @@ setTimeout(()=>{const h=document.createElement('h2');h.textContent='Delayed cont
 					t.Fatal("evaluation limit missing")
 				}
 			})
+			c.t = t
+			t.Run("large_snapshot_and_wait", func(t *testing.T) {
+				c.t = t
+				c.text("navigate", map[string]any{"url": page.URL + "/large"})
+				started := time.Now()
+				snap := c.text("snapshot", nil)
+				t.Logf("5000 elements: first snapshot %s, %d bytes", time.Since(started), len(snap))
+				early := snapshotID(t, snap, "Large button 0000")
+				if strings.Contains(snap, "InlineTextBox") || strings.Contains(snap, `generic ""`) {
+					t.Fatal("snapshot noise")
+				}
+				pages := 1
+				for !strings.Contains(snap, `button "Large button 4999"`) {
+					match := regexp.MustCompile(`next_offset: (\d+)`).FindStringSubmatch(snap)
+					if len(match) != 2 {
+						t.Fatal("no continuation before last button")
+					}
+					offset, e := strconv.Atoi(match[1])
+					must(t, e)
+					snap = c.text("snapshot", map[string]any{"offset": offset})
+					pages++
+				}
+				t.Logf("5000 elements: %d pages in %s", pages, time.Since(started))
+				last := snapshotID(t, snap, "Large button 4999")
+				c.text("click", map[string]any{"id": last})
+				c.eval("document.body.dataset.last", `"Large button 4999"`)
+				c.text("click", map[string]any{"id": early})
+				c.eval("document.body.dataset.last", `"Large button 0000"`)
+				interactive := c.text("snapshot", map[string]any{"interactive_only": true})
+				if !strings.Contains(interactive, "Large page context") || strings.Contains(interactive, "Noninteractive explanation") || strings.Contains(interactive, "StaticText") {
+					t.Fatal("bad interactive snapshot")
+				}
+				c.text("evaluate", map[string]any{"expression": `setTimeout(()=>document.body.append('Marker below snapshot limit'),1500);true`})
+				c.text("wait_for", map[string]any{"text": "Marker below snapshot limit"})
+			})
+			c.t = t
+			t.Run("navigation_error", func(t *testing.T) {
+				c.t = t
+				closed := httptest.NewServer(http.NotFoundHandler())
+				url := closed.URL
+				closed.Close()
+				for _, name := range []string{"navigate", "open"} {
+					c.refuses(name, map[string]any{"url": url}, "net::ERR_CONNECTION_REFUSED")
+				}
+			})
+			c.t = t
+			t.Run("person_close_releases_state", func(t *testing.T) {
+				c.t = t
+				c.text("open", map[string]any{"url": "about:blank"})
+				id := i.Current("chat-a")
+				key := i.Profile().ID + "/chat-a/" + id
+				var released atomic.Int32
+				service.mu.Lock()
+				count := len(service.tabs)
+				st := service.tabs[key]
+				unsubscribe := st.unsubscribe
+				st.unsubscribe = func() { unsubscribe(); released.Add(1) }
+				service.mu.Unlock()
+				must(t, i.CloseTab(t.Context(), id))
+				deadline := time.Now().Add(3 * time.Second)
+				for time.Now().Before(deadline) {
+					service.mu.Lock()
+					remaining := len(service.tabs)
+					service.mu.Unlock()
+					if remaining == count-1 && released.Load() == 1 {
+						return
+					}
+					time.Sleep(10 * time.Millisecond)
+				}
+				t.Fatal("closed tab retained state or subscriptions")
+			})
+
 		})
 	}
+}
+
+func snapshotID(t *testing.T, snapshot, label string) string {
+	t.Helper()
+	for _, line := range strings.Split(snapshot, "\n") {
+		if strings.Contains(line, `"`+label+`"`) && !strings.Contains(line, "StaticText") {
+			match := regexp.MustCompile(`\[(e\d+)\]`).FindStringSubmatch(line)
+			if len(match) == 2 {
+				return match[1]
+			}
+		}
+	}
+	t.Fatalf("no node %s", label)
+	return ""
 }
