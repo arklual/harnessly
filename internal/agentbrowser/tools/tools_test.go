@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -37,7 +38,12 @@ func TestDisabledUnknownAndStarting(t *testing.T) {
 	}
 	set.Caller = "chat"
 	started := time.Now()
-	out := set.Call(t.Context(), "browser_tabs", jsvalue.NewObject())
+	ctx, cancel := context.WithTimeout(t.Context(), 1200*time.Millisecond)
+	defer cancel()
+	out := set.Call(ctx, "browser_tabs", jsvalue.NewObject())
+	if time.Since(started) < time.Second {
+		t.Fatal("startup still uses the old short deadline")
+	}
 	if time.Since(started) > 2*time.Second {
 		t.Fatal("startup blocked")
 	}
@@ -133,4 +139,31 @@ func TestSnapshotContinuationAfterFrameChanges(t *testing.T) {
 		offset = next
 	}
 	t.Fatal("pagination did not terminate")
+}
+
+func TestPreparingDoesNotWaitForDownload(t *testing.T) {
+	started := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("RUNTIME_BROWSER_CHROME", "")
+	t.Setenv("RUNTIME_BROWSER_CHROME_URL", server.URL)
+	t.Setenv("RUNTIME_BROWSER_DOWNLOAD", "")
+	manager := agentbrowser.New(agentbrowser.Config{DataDir: t.TempDir()})
+	defer manager.Close()
+	manager.Ready(t.Context())
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("download did not start")
+	}
+	set := Tools{S: &Service{Manager: manager}, Caller: "chat"}
+	start := time.Now()
+	out := set.Call(t.Context(), "browser_tabs", jsvalue.NewObject())
+	if time.Since(start) > time.Second || !strings.Contains(string(jsvalue.Stringify(out, "")), "Preparing browser") {
+		t.Fatalf("download blocked the tool: %s", jsvalue.Stringify(out, ""))
+	}
 }

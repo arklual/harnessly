@@ -94,7 +94,7 @@ func (t Tools) Call(ctx context.Context, name string, args *jsvalue.Object) *jsv
 	if name == "browser_snapshot" && !args.Has("timeout_ms") {
 		a.TimeoutMS = 30000
 	}
-	startup, stop := context.WithTimeout(ctx, 800*time.Millisecond)
+	startup, stop := context.WithTimeout(ctx, 20*time.Second)
 	i, err := t.S.Manager.InstanceFor(startup, t.Caller)
 	stop()
 	if err != nil {

@@ -2,7 +2,6 @@ package tools
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -171,10 +170,6 @@ func TestChromeMCP(t *testing.T) {
 				m.Close()
 				cleanupHost(t, filepath.Join(data, "agent-browser", "profiles", agentbrowser.DefaultProfile))
 			})
-			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-			defer cancel()
-			i, err := m.InstanceFor(ctx, "chat-a")
-			must(t, err)
 			var pageURL string
 			page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/html")
@@ -236,7 +231,15 @@ setTimeout(()=>{const h=document.createElement('h2');h.textContent='Delayed cont
 			if list := c.rpc("tools/list", nil)["tools"].([]any); len(list) != 18 {
 				t.Fatalf("tools: %d", len(list))
 			}
-			c.text("navigate", map[string]any{"url": page.URL + "/login"})
+			t.Run("cold_start", func(t *testing.T) {
+				c.t = t
+				start := time.Now()
+				c.text("navigate", map[string]any{"url": page.URL + "/login"})
+				t.Logf("first MCP call with cold Chrome: %s", time.Since(start))
+			})
+			c.t = t
+			i, err := m.InstanceFor(t.Context(), "chat-a")
+			must(t, err)
 			first := i.Current("chat-a")
 			t.Run("login_password", func(t *testing.T) {
 				c.t = t
