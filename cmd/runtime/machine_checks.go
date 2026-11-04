@@ -598,9 +598,7 @@ func checkAgentBrowser(ctx context.Context, data string) machineCheck {
 	}
 	if err == nil && path == "" {
 		check.Detail = "Chrome for Testing will be downloaded and verified on first use; mode: " + provision.Mode(os.Getenv("RUNTIME_BROWSER_MODE")) + "; sandbox: not yet checked"
-		if !cfg.Download {
-			err = errors.New("Chrome not found and RUNTIME_BROWSER_DOWNLOAD=off")
-		}
+		err = provision.DownloadSupport(cfg)
 	}
 	if err == nil && path != "" {
 		var info provision.Inspection

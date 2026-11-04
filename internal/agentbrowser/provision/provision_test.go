@@ -301,3 +301,18 @@ func TestMissingLibrariesDoesNotClaimSandboxReady(t *testing.T) {
 		t.Fatalf("info=%+v error=%v", info, err)
 	}
 }
+
+func TestDownloadSupportReportsRepairWithoutNetwork(t *testing.T) {
+	cfg := testConfig(t)
+	if err := DownloadSupport(cfg); err != nil {
+		t.Fatal(err)
+	}
+	for _, arch := range []string{"arm64", "amd64"} {
+		cfg.GOARCH = arch
+		cfg.Download = arch == "arm64"
+		var diagnostic *Diagnostic
+		if err := DownloadSupport(cfg); !errors.As(err, &diagnostic) || diagnostic.Command == "" {
+			t.Fatalf("%s: %v", arch, err)
+		}
+	}
+}

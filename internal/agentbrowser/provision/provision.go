@@ -105,6 +105,20 @@ func Find(cfg Config) (path, snap string, err error) {
 	return "", snap, nil
 }
 
+// DownloadSupport lets machine checks explain unsupported or offline installs without starting a download.
+func DownloadSupport(cfg Config) error {
+	message := ""
+	if !cfg.Download {
+		message = "Chrome not found and RUNTIME_BROWSER_DOWNLOAD=off"
+	} else if _, err := platform(cfg); err != nil {
+		message = err.Error()
+	}
+	if message != "" {
+		return &Diagnostic{Message: message, Command: InstallCommand(osRelease())}
+	}
+	return nil
+}
+
 // Ensure serializes installations across profiles and runtime processes. Interrupted transfers restart from zero.
 func Ensure(ctx context.Context, cfg Config, progress func(Progress)) (string, error) {
 	if progress == nil {
