@@ -111,7 +111,7 @@ as_root() {
 	if [ "$(id -u)" = 0 ]; then
 		"$@"
 	elif have sudo; then
-		sudo -n "$@"
+		sudo "$@"
 	else
 		return 1
 	fi

@@ -119,3 +119,16 @@ echo local-archive-installed`, nil)
 		t.Fatal(out)
 	}
 }
+
+func TestRootInstallerDependenciesAllowPassword(t *testing.T) {
+	_, calls := installerFunctions(t, `parse_args
+OS=linux
+have() { [ "$1" != tmux ]; }
+ensure_deps`, map[string]string{
+		"id": "echo 1000", "sudo": `echo "sudo $*" >> "$CALLS"; [ "$1" != -n ] || exit 1; exec "$@"`,
+		"apt-get": `echo "apt-get $*" >> "$CALLS"`,
+	})
+	if !strings.Contains(calls, "install -y -qq tmux") || strings.Contains(calls, "sudo -n") {
+		t.Fatal(calls)
+	}
+}
