@@ -306,7 +306,7 @@ func (s *Store) put(name, value string, asked *Ask) (v View, created bool, err e
 		return View{}, false, err
 	}
 	if asked != nil {
-		if asked.Grant {
+		if asked.NeedsGrant() {
 			return View{}, false, refuse(ReasonNotFound, nil)
 		}
 		if existing := find(f, name); existing != nil && !existing.Allowed(asked.Project) {

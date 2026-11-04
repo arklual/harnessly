@@ -32,11 +32,12 @@ func configureBrowserSecrets(d deps, c *core) {
 			return secrets.AskReady, nil
 		}
 		grant := sf.store.Has(name) && lookupErr != nil
+		originGrant := lookupErr == nil && !slices.Contains(existing.Origins, origin)
 		if grant && use.Project == "" {
 			return "", errors.New("Secret is unavailable to this chat")
 		}
 		a, state, err := sf.asks.OpenScoped(secrets.Ask{Name: name, Origin: origin, Why: why,
-			Conv: id, Title: use.Title, Project: use.Project, Grant: grant})
+			Conv: id, Title: use.Title, Project: use.Project, Grant: grant, OriginGrant: originGrant})
 		if err != nil {
 			return "", err
 		}

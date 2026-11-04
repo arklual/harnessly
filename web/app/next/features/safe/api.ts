@@ -51,6 +51,7 @@ export interface ISecretAsk {
   origin?: string;
   project?: string;
   grant?: boolean;
+  originGrant?: boolean;
   at: number;
 }
 
@@ -116,6 +117,7 @@ export const readAsk = (v: unknown): ISecretAsk => {
     ...(o.origin === undefined ? {} : { origin: str(o.origin, 'origin') }),
     ...(o.project === undefined ? {} : { project: str(o.project, 'project') }),
     ...(o.grant === undefined ? {} : { grant: o.grant === true }),
+    ...(o.originGrant === undefined ? {} : { originGrant: o.originGrant === true }),
     at: num(o.at, 'at'),
   };
 };

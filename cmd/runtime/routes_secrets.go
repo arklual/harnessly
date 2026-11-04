@@ -302,9 +302,13 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 				}
 			}
 			var err error
-			if action == "grant" && a.Grant {
-				err = sf.store.Grant(a.Name, a.Project, a.Origin)
-			} else if action == "put" && !a.Grant {
+			if action == "grant" && a.NeedsGrant() {
+				if a.Grant {
+					err = sf.store.Grant(a.Name, a.Project, a.Origin)
+				} else {
+					err = sf.store.GrantOrigin(a.Name, a.Project, a.Origin)
+				}
+			} else if action == "put" && !a.NeedsGrant() {
 				var b struct {
 					Value string `json:"value"`
 				}
@@ -390,12 +394,13 @@ func (sf *safe) routes(d deps, conv func(session string) (string, string), resol
 			return
 		}
 		grant := sf.store.Has(b.Name) && lookupErr != nil
+		originGrant := !b.Replace && lookupErr == nil && b.Origin != "" && !slices.Contains(existing.Origins, b.Origin)
 		if grant && use.Project == "" {
 			secretRefusal(w, &secrets.Refusal{Reason: secrets.ReasonNotFound})
 			return
 		}
 		a, state, err := sf.asks.OpenScoped(secrets.Ask{Name: b.Name, Why: b.Why, Conv: id, Title: title,
-			Replace: b.Replace, Origin: b.Origin, Project: use.Project, Grant: grant})
+			Replace: b.Replace, Origin: b.Origin, Project: use.Project, Grant: grant, OriginGrant: originGrant})
 		if err != nil {
 			secretRefusal(w, err)
 			return

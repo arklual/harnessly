@@ -384,3 +384,45 @@ describe('project grants', () => {
     expect(onPut).not.toHaveBeenCalled();
   });
 });
+
+describe('origin-only grants', () => {
+  it.each(['en', 'ru'] as const)('shows an origin card without a value field in %s', async (locale) => {
+    pinLocale(locale);
+    const onGrant = vi.fn(async () => null);
+    const onPut = vi.fn(async () => null);
+    const ask = readAsk({
+      id: 'site-card',
+      name: 'service-key',
+      why: 'sign in',
+      conv: '',
+      title: '',
+      at: NOW,
+      origin: 'https://example.org',
+      originGrant: true,
+      value: VALUE,
+    });
+    expect(ask.originGrant).toBe(true);
+    expect(JSON.stringify(ask)).not.toContain(VALUE);
+    inRoot(
+      <SafeAskDialog
+        ask={ask}
+        more={0}
+        onGrant={onGrant}
+        onPut={onPut}
+        onDecline={async () => null}
+        onLater={() => undefined}
+      />,
+    );
+    const title =
+      locale === 'en'
+        ? 'Allow service-key on site https://example.org?'
+        : 'Разрешить service-key на сайте https://example.org?';
+    expect(screen.getByRole('dialog', { name: title })).toBeTruthy();
+    expect(screen.getByText(locale === 'en' ? 'Site' : 'Сайт', { exact: true })).toBeTruthy();
+    expect(document.querySelectorAll('input, textarea')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: locale === 'en' ? 'Allow' : 'Разрешить' }));
+    await waitFor(() => expect(onGrant).toHaveBeenCalledWith(ask));
+    expect(onPut).not.toHaveBeenCalled();
+    pinLocale('en');
+  });
+});

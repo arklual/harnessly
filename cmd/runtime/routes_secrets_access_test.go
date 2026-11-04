@@ -629,3 +629,77 @@ func TestSafeAccessRealRoutesDoNotTrustSessionWithoutSocketCaller(t *testing.T) 
 		t.Errorf("real list trusted claimed session: %d %s", w.Code, w.Body.String())
 	}
 }
+
+func TestSafeAccessRoutesOriginOnlyGrant(t *testing.T) {
+	for _, tc := range []struct {
+		name, caller string
+		projects     []string
+	}{
+		{"scoped", "a", []string{"project-a"}},
+		{"unscoped-project", "a", nil},
+		{"projectless", "unscoped", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rig := newSafeAccessRig(t)
+			rig.put("service-key", []string{"https://example.com"}, tc.projects)
+			w := rig.call("POST", "/api/cli/secrets/ask", map[string]any{"name": "service-key", "origin": "https://other.example.com", "wait": 0}, tc.caller, nil)
+			if w.Code != http.StatusOK {
+				t.Fatalf("ask: %d %s", w.Code, w.Body.String())
+			}
+			pending := rig.sf.asks.Pending()
+			if len(pending) != 1 || !pending[0].OriginGrant || pending[0].Grant || pending[0].Replace {
+				t.Fatalf("origin card: %+v", pending)
+			}
+			a := pending[0]
+			page := map[string]string{"X-Test-Page": "yes"}
+			card := platformAPI + "/secret-asks/" + a.ID
+			if w := rig.call("POST", card+"/put", map[string]any{"value": routeFakeValue + "replacement"}, "", page); w.Code != http.StatusBadRequest {
+				t.Fatalf("origin grant accepted /put: %d", w.Code)
+			}
+			w = rig.call("POST", card+"/grant", map[string]any{"value": routeFakeValue + "replacement", "project": "forged", "origin": "https://evil.example.com"}, "", page)
+			if w.Code != http.StatusOK {
+				t.Fatalf("grant: %d %s", w.Code, w.Body.String())
+			}
+			safeAccessPublic(t, w)
+			v, err := rig.sf.store.Lookup(a.Name, a.Project)
+			if err != nil || !slices.Equal(v.Projects, tc.projects) || !slices.Equal(v.Origins, []string{"https://example.com", a.Origin}) {
+				t.Fatalf("grant changed wrong scopes: %+v, %v", v, err)
+			}
+			got, err := rig.sf.store.Reveal([]string{a.Name}, secrets.Use{Project: a.Project, Origin: a.Origin})
+			if err != nil || got[a.Name] != routeFakeValue {
+				t.Fatalf("origin grant replaced value: %v", err)
+			}
+			w = rig.call("POST", "/api/cli/secrets/ask", map[string]any{"name": a.Name, "origin": a.Origin, "wait": 0}, tc.caller, nil)
+			if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"status":"ready"`) {
+				t.Fatalf("authorized retry: %d %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestSafeAccessRoutesAccessibleReplaceStillReplacesValue(t *testing.T) {
+	rig := newSafeAccessRig(t)
+	rig.put("service-key", []string{"https://example.com"}, nil)
+	w := rig.call("POST", "/api/cli/secrets/ask", map[string]any{"name": "service-key", "origin": "https://other.example.com", "replace": true, "wait": 0}, "unscoped", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("ask: %d", w.Code)
+	}
+	pending := rig.sf.asks.Pending()
+	if len(pending) != 1 || pending[0].NeedsGrant() || !pending[0].Replace {
+		t.Fatalf("replacement became permission: %+v", pending)
+	}
+	a := pending[0]
+	card := platformAPI + "/secret-asks/" + a.ID
+	page := map[string]string{"X-Test-Page": "yes"}
+	if w := rig.call("POST", card+"/grant", nil, "", page); w.Code != http.StatusBadRequest {
+		t.Fatalf("replacement accepted /grant: %d", w.Code)
+	}
+	w = rig.call("POST", card+"/put", map[string]any{"value": routeFakeValue + "replacement"}, "", page)
+	if w.Code != http.StatusOK {
+		t.Fatalf("replace: %d %s", w.Code, w.Body.String())
+	}
+	got, err := rig.sf.store.Reveal([]string{a.Name}, secrets.Use{Origin: a.Origin})
+	if err != nil || got[a.Name] != routeFakeValue+"replacement" {
+		t.Fatalf("value was not replaced: %v", err)
+	}
+}

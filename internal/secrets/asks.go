@@ -38,13 +38,16 @@ const (
 	maxWhy   = 300
 )
 
-// Ask is an agent's request that the person put a secret in the safe, as the page shows it.
+// Ask requests a value or approval to use an existing safe entry.
 type Ask struct {
 	Origin  string `json:"origin,omitempty"`
 	Project string `json:"project,omitempty"`
-	Grant   bool   `json:"grant,omitempty"`
-	ID      string `json:"id"`
-	Name    string `json:"name"`
+	// Grant permits the requested project and site.
+	Grant bool `json:"grant,omitempty"`
+	// OriginGrant permits only the requested site, without adding project access.
+	OriginGrant bool   `json:"originGrant,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
 	// Why is the agent's one line of what it needs the secret for.
 	Why string `json:"why"`
 	// Conv and Title are the conversation that asked ("" when the asking command ran outside one).
@@ -108,9 +111,12 @@ func (a *Asks) Open(name, why, conv, title string, replace bool) (Ask, string, e
 	return a.OpenScoped(Ask{Name: name, Why: why, Conv: conv, Title: title, Replace: replace})
 }
 
+// NeedsGrant reports whether this card approves access without accepting a value.
+func (a Ask) NeedsGrant() bool { return a.Grant || a.OriginGrant }
+
 // OpenScoped deduplicates only requests with the same chat, project and requested origin.
 func (a *Asks) OpenScoped(request Ask) (Ask, string, error) {
-	if request.Grant {
+	if request.NeedsGrant() {
 		request.Replace = false
 	}
 	name, why, conv, title, replace := request.Name, request.Why, request.Conv, request.Title, request.Replace
@@ -122,7 +128,7 @@ func (a *Asks) OpenScoped(request Ask) (Ask, string, error) {
 	now := a.Now()
 	a.prune(now)
 	for _, x := range a.list {
-		if x.Name == name && x.Conv == conv && x.Project == request.Project && x.Origin == request.Origin && x.Grant == request.Grant && (x.state == AskWaiting || x.state == AskDeclined) {
+		if x.Name == name && x.Conv == conv && x.Project == request.Project && x.Origin == request.Origin && x.Grant == request.Grant && x.OriginGrant == request.OriginGrant && x.Replace == request.Replace && (x.state == AskWaiting || x.state == AskDeclined) {
 			return x.Ask, x.state, nil
 		}
 	}
@@ -139,7 +145,7 @@ func (a *Asks) OpenScoped(request Ask) (Ask, string, error) {
 		return Ask{}, "", refuse(ReasonRateLimited, nil)
 	}
 	x := &ask{Ask: Ask{ID: newID(), Name: name, Why: CleanWhy(why), Conv: conv, Title: jscompat.Slice(tmux.OneLineSafe(title), 200),
-		Replace: replace, Origin: request.Origin, Project: request.Project, Grant: request.Grant, At: now.UnixMilli()}, state: AskWaiting, done: make(chan struct{})}
+		Replace: replace, Origin: request.Origin, Project: request.Project, Grant: request.Grant, OriginGrant: request.OriginGrant, At: now.UnixMilli()}, state: AskWaiting, done: make(chan struct{})}
 	a.list[x.ID] = x
 	return x.Ask, AskWaiting, nil
 }
@@ -202,7 +208,7 @@ func (a *Asks) Fulfil(name string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for _, x := range a.list {
-		if x.Name == name && !x.Grant {
+		if x.Name == name && !x.NeedsGrant() {
 			a.settle(x, AskReady)
 		}
 	}

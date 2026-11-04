@@ -105,7 +105,19 @@ func (s *Store) Metadata(name string, origins, projects []string) (View, error) 
 
 // Grant adds a project and requested site after a person approves an access card.
 func (s *Store) Grant(name, project, origin string) error {
-	if project == "" {
+	return s.grant(name, project, origin, true)
+}
+
+// GrantOrigin adds only a site and rechecks project access when the card is answered.
+func (s *Store) GrantOrigin(name, project, origin string) error {
+	if origin == "" {
+		return refuse("bad-origin", nil)
+	}
+	return s.grant(name, project, origin, false)
+}
+
+func (s *Store) grant(name, project, origin string, projectGrant bool) error {
+	if projectGrant && project == "" {
 		return refuse(ReasonNotFound, nil)
 	}
 	if origin != "" {
@@ -121,10 +133,10 @@ func (s *Store) Grant(name, project, origin string) error {
 		return err
 	}
 	e := find(f, name)
-	if e == nil {
+	if e == nil || !projectGrant && !e.Allowed(project) {
 		return refuse(ReasonNotFound, nil)
 	}
-	if len(e.Projects) > 0 && !slices.Contains(e.Projects, project) {
+	if projectGrant && len(e.Projects) > 0 && !slices.Contains(e.Projects, project) {
 		e.Projects = append(e.Projects, project)
 	}
 	if origin != "" && !slices.Contains(e.Origins, origin) {

@@ -163,3 +163,47 @@ func TestBrowserSecretsWaitingRequestRejectsMovedProject(t *testing.T) {
 		})
 	}
 }
+
+func TestBrowserSecretsOriginGrantReusesCLIAndPreservesValue(t *testing.T) {
+	for _, project := range []string{"project-a", ""} {
+		t.Run("project="+project, func(t *testing.T) {
+			rig, svc := browserSecretRig(t)
+			var projects []string
+			caller := "unscoped"
+			if project != "" {
+				projects, caller = []string{project}, "a"
+			}
+			rig.put("service-key", []string{"https://other.example.com"}, projects)
+			svc.Identity = func(id string) (secrets.Use, error) {
+				return secrets.Use{Conv: "chat-" + caller, Project: project}, nil
+			}
+			w := rig.call("POST", "/api/cli/secrets/ask", map[string]any{"name": "service-key", "origin": "https://example.com", "wait": 0}, caller, nil)
+			if w.Code != 200 {
+				t.Fatalf("CLI ask: %d", w.Code)
+			}
+			before := rig.sf.asks.Pending()
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			state, err := svc.RequestSecret(ctx, "chat-"+caller, "service-key", "https://example.com", "sign in")
+			if err != nil || state != secrets.AskWaiting {
+				t.Fatalf("browser request: %s, %v", state, err)
+			}
+			after := rig.sf.asks.Pending()
+			if len(before) != 1 || len(after) != 1 || before[0].ID != after[0].ID || !after[0].OriginGrant || after[0].Grant {
+				t.Fatalf("origin card not shared: %+v", after)
+			}
+			w = rig.call("POST", platformAPI+"/secret-asks/"+after[0].ID+"/grant", nil, "", map[string]string{"X-Test-Page": "yes"})
+			if w.Code != 200 {
+				t.Fatalf("approve: %d %s", w.Code, w.Body.String())
+			}
+			state, err = svc.RequestSecret(context.Background(), "chat-"+caller, "service-key", "https://example.com", "sign in")
+			if err != nil || state != secrets.AskReady {
+				t.Fatalf("authorized request: %s, %v", state, err)
+			}
+			got, err := rig.sf.store.Reveal([]string{"service-key"}, secrets.Use{Project: project, Origin: "https://example.com"})
+			if err != nil || got["service-key"] != routeFakeValue {
+				t.Fatalf("origin approval changed value: %v", err)
+			}
+		})
+	}
+}

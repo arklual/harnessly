@@ -74,3 +74,24 @@ test('Safe edits origins and project choices with PATCH, without rotating the va
   });
   expect(state.calls.some((call) => call.method === 'PUT')).toBe(false);
 });
+
+test('origin-only grant card requests site permission without any value input', async ({ page }) => {
+  const state = await mockSafe(page);
+  state.asks = [ask({ originGrant: true })];
+  await safeReady(page);
+  const dialog = page.getByRole('dialog', {
+    name: 'Allow release-token on site https://example.org?',
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('Site', { exact: true })).toBeVisible();
+  await expect(dialog.locator('input, textarea')).toHaveCount(0);
+  await safeShot(page, 'safe-origin-grant');
+  await dialog.getByRole('button', { name: 'Allow', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(state.calls.find((call) => call.method === 'POST')).toEqual({
+    method: 'POST',
+    path: '/api/platform/secret-asks/sa_fixture/grant',
+    body: null,
+  });
+});

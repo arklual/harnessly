@@ -385,3 +385,78 @@ func TestSafeAccessAsksKeepApprovalsSeparate(t *testing.T) {
 		}
 	}
 }
+
+func TestSafeAccessOriginGrantPreservesValueAndProjects(t *testing.T) {
+	for _, tc := range []struct {
+		name, project string
+		projects      []string
+	}{
+		{"scoped", "project-a", []string{"project-a", "project-b"}},
+		{"unscoped-project", "project-a", nil},
+		{"projectless", "", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, dir, _ := newStore(t)
+			accessPut(t, s, "service-key", []string{"https://example.com"}, tc.projects)
+			before, err := s.read()
+			if err != nil {
+				t.Fatal(err)
+			}
+			card := Ask{Name: "service-key", Project: tc.project, Origin: "https://other.example.com", OriginGrant: true}
+			if _, _, err := s.PutAsked(card, fakeValue+"replacement"); ReasonOf(err) != ReasonNotFound {
+				t.Fatalf("origin card accepted a value: %v", err)
+			}
+			for range 2 {
+				if err := s.GrantOrigin(card.Name, card.Project, card.Origin); err != nil {
+					t.Fatal(err)
+				}
+			}
+			after, err := s.read()
+			if err != nil {
+				t.Fatal(err)
+			}
+			x, y := before.Secrets[0], after.Secrets[0]
+			if !slices.Equal(x.Projects, y.Projects) || !slices.Equal(y.Origins, []string{"https://example.com", "https://other.example.com"}) {
+				t.Fatalf("origin grant changed project access or duplicated a site: %+v", y.View)
+			}
+			if !bytes.Equal(x.Box, y.Box) || !bytes.Equal(x.Nonce, y.Nonce) || x.CreatedAt != y.CreatedAt || !reflect.DeepEqual(x.UsedBy, y.UsedBy) {
+				t.Error("origin grant changed the sealed value or its history")
+			}
+			if _, err := s.Metadata(card.Name, y.Origins, []string{"project-other"}); err != nil {
+				t.Fatal(err)
+			}
+			unchanged := accessBytes(t, dir)
+			if err := s.GrantOrigin(card.Name, card.Project, "https://third.example.com"); ReasonOf(err) != ReasonNotFound {
+				t.Fatalf("origin grant added project access after revocation: %v", err)
+			}
+			if !bytes.Equal(unchanged, accessBytes(t, dir)) {
+				t.Error("refused origin grant changed the safe")
+			}
+		})
+	}
+}
+
+func TestSafeAccessOriginCardsStaySeparateFromValueAndProjectCards(t *testing.T) {
+	asks := NewAsks()
+	base := Ask{Name: "service-key", Conv: "chat-a", Project: "project-a", Origin: "https://example.com", OriginGrant: true, Replace: true}
+	origin, _, err := asks.OpenScoped(base)
+	if err != nil || !origin.OriginGrant || origin.Grant || origin.Replace {
+		t.Fatalf("origin card: %+v, %v", origin, err)
+	}
+	value := base
+	value.OriginGrant = false
+	valueCard, _, err := asks.OpenScoped(value)
+	if err != nil || valueCard.ID == origin.ID || !valueCard.Replace {
+		t.Fatalf("replacement card was merged: %+v, %v", valueCard, err)
+	}
+	project := base
+	project.OriginGrant, project.Grant = false, true
+	projectCard, _, err := asks.OpenScoped(project)
+	if err != nil || projectCard.ID == origin.ID {
+		t.Fatalf("project card was merged: %+v, %v", projectCard, err)
+	}
+	asks.Fulfil(base.Name)
+	if asks.Wait(context.Background(), origin.ID, 0) != AskWaiting || asks.Wait(context.Background(), projectCard.ID, 0) != AskWaiting || asks.Wait(context.Background(), valueCard.ID, 0) != AskReady {
+		t.Error("put settled a permission card or left a value card pending")
+	}
+}

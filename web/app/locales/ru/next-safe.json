@@ -52,5 +52,9 @@
   "next.safe.ask.granted": "Доступ к «{name}» разрешён — агент продолжит работу",
   "next.safe.projects.hint": "Выберите проекты, чтобы ограничить доступ. Если ничего не выбрано, секрет доступен всем проектам.",
   "next.safe.reason.bad-origin": "Укажите HTTPS-адрес без пути, параметров и фрагмента (HTTP допустим для localhost).",
-  "next.safe.reason.bad-project": "Некорректный идентификатор проекта"
+  "next.safe.reason.bad-project": "Некорректный идентификатор проекта",
+  "next.safe.ask.site": "Сайт",
+  "next.safe.ask.titleOriginGrant": "Разрешить {name} на сайте {site}?",
+  "next.safe.ask.leadOriginGrant": "Агент запрашивает доступ к секрету из сейфа на этом сайте",
+  "next.safe.ask.noteOriginGrant": "Разрешение добавит сайт в список доступа к секрету. Повторно вводить значение не нужно."
 }
