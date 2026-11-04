@@ -52,14 +52,15 @@ type Tab struct {
 
 type page struct {
 	Tab
-	gate         chan struct{}
-	binding      binding
-	preparing    bool
-	viewers      map[*Viewer]bool
-	last         *Frame
-	delivered    time.Time
-	framePending bool
-	provisional  bool
+	gate            chan struct{}
+	binding         binding
+	preparing       bool
+	viewers         map[*Viewer]bool
+	last            *Frame
+	delivered       time.Time
+	framePending    bool
+	provisional     bool
+	defaultsPending bool
 }
 
 type binding struct {
@@ -294,13 +295,21 @@ func (i *Instance) prepare(ctx context.Context, p *page, c *cdp.Conn) (binding, 
 
 func (i *Instance) bind(ctx context.Context, p *page, c *cdp.Conn) (binding, error) {
 	i.mu.Lock()
-	b, v := p.binding, p.Viewport
+	b, v, pending := p.binding, p.Viewport, p.defaultsPending
 	present := i.pages[p.ID] == p && i.conn == c
 	i.mu.Unlock()
 	if !present {
 		return binding{}, errors.New("browser tab is no longer available")
 	}
 	if b.conn == c && b.session != "" {
+		if pending {
+			if err := i.viewport(ctx, b, v); err != nil {
+				return b, err
+			}
+			i.mu.Lock()
+			p.defaultsPending = false
+			i.mu.Unlock()
+		}
 		return b, nil
 	}
 	raw, err := c.Call(ctx, "Target.attachToTarget", map[string]any{"targetId": p.ID, "flatten": true}, "")
@@ -349,6 +358,11 @@ func (i *Instance) bind(ctx context.Context, p *page, c *cdp.Conn) (binding, err
 	// An unresponsive renderer may reject restoration; other tabs remain usable.
 	if v.W > 0 {
 		err = i.viewport(ctx, b, v)
+		if err == nil {
+			i.mu.Lock()
+			p.defaultsPending = false
+			i.mu.Unlock()
+		}
 	}
 	if viewers > 0 {
 		castErr := i.startCast(ctx, p.ID, b)

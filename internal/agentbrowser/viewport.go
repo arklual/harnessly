@@ -10,6 +10,8 @@ import (
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
+func agentViewport() Viewport { return Viewport{Mode: "fixed", W: 1280, H: 800, DPR: 1} }
+
 type dimensions struct {
 	W      int `json:"w"`
 	H      int `json:"h"`
