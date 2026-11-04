@@ -21,6 +21,9 @@ type registry struct {
 }
 
 func newPage(t Tab) *page {
+	if t.Sealed {
+		t.SecretUntracked = true
+	}
 	if t.Control == "" {
 		t.Control = "agent"
 	}
@@ -304,6 +307,7 @@ func (i *Instance) newTab(ctx context.Context, conv, by, url string, login *logi
 		p.Viewport = Viewport{Mode: "fit", DPR: 1}
 	}
 	p.provisional = false
+	i.attributeOpenersLocked()
 	if by == "agent" || working == "" {
 		i.current[conv] = r.ID
 	}

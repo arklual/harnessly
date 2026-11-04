@@ -18,6 +18,8 @@ import (
 
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
+	browsertools "github.com/ly-solutions/harnessly/internal/agentbrowser/tools"
+	"github.com/ly-solutions/harnessly/internal/jsvalue"
 )
 
 func main() {
@@ -63,6 +65,8 @@ func run() error {
 			_ = syscall.Kill(pid, syscall.SIGTERM)
 		}
 	}()
+	browserTools := &browsertools.Service{Manager: m}
+	defer browserTools.Close()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		answer, err := access.RequestLogin(r.Context(), r.URL.Query().Get("conv"), r.URL.Query().Get("url"), r.URL.Query().Get("why"))
@@ -102,6 +106,23 @@ func run() error {
 			return
 		}
 		w.WriteHeader(204)
+	})
+	mux.HandleFunc("/evaluate", func(w http.ResponseWriter, r *http.Request) {
+		conv := r.URL.Query().Get("conv")
+		i, err := m.InstanceFor(r.Context(), conv)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		tabs := i.AgentTabs(conv)
+		if len(tabs) == 0 {
+			http.Error(w, "No agent tab", 400)
+			return
+		}
+		set := browsertools.Tools{S: browserTools, Caller: conv}
+		result := set.Call(r.Context(), "browser_evaluate", jsvalue.NewObject("tab", tabs[0].ID, "expression", "document.title"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(jsvalue.Stringify(result, ""))
 	})
 	mux.HandleFunc("/api/agent-browser", func(w http.ResponseWriter, r *http.Request) {
 		// Playwright forwards this socket from the temporary runtime's origin. This

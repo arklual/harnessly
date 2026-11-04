@@ -25,7 +25,7 @@ import (
 //   {t:"notice",level:"error",message}
 //     A recoverable command, input validation or streaming error.
 //   {t:"tabs",tabs:[{id,title,url,owner:"this|other",by:"agent|person",
-//     viewport:{mode,w,h,dpr},crashed,control:"agent|person",agentAt,
+//     viewport:{mode,w,h,dpr},crashed,scripted,control:"agent|person",agentAt,
 //     dialog?:{type,message,defaultPrompt}}],current,agentTab,following,gen}
 //     Tabs are in persistent creation order. agentAt is the last successful agent
 //     call's Unix time in milliseconds (zero until then). dialog is absent when closed.
@@ -88,6 +88,7 @@ type Notice struct {
 
 // PanelTab is the public metadata for one visible page.
 type PanelTab struct {
+	Scripted bool      `json:"scripted"`
 	Login    *LoginAsk `json:"login,omitempty"`
 	Control  string    `json:"control"`
 	AgentAt  int64     `json:"agentAt"`
@@ -381,7 +382,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				owner = "this"
 			}
 			tabs = append(tabs, PanelTab{ID: t.ID, Title: t.Title, URL: t.URL, Owner: owner, By: t.By,
-				Viewport: t.Viewport, Crashed: t.Crashed, Control: t.Control, AgentAt: t.AgentAt, Dialog: t.Dialog, Login: i.pendingLogin(t.ID)})
+				Scripted: t.Scripted, Viewport: t.Viewport, Crashed: t.Crashed, Control: t.Control, AgentAt: t.AgentAt, Dialog: t.Dialog, Login: i.pendingLogin(t.ID)})
 		}
 		return write(TabsMessage{T: "tabs", Tabs: tabs, Current: current, Gen: gen, AgentTab: agentTab, Following: following})
 	}

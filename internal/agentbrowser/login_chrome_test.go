@@ -125,6 +125,9 @@ func TestChromeManualLogin(t *testing.T) {
 			_, err = a.RequestLogin(t.Context(), "chat", page.URL+"/account", "Return control")
 			must(t, err)
 			ask = a.Logins.Pending()[0]
+			eventually(t, 5*time.Second, func() bool {
+				return string(evaluate(t, i, ask.Tab, "location.pathname+':'+document.readyState")) == `"/account:complete"`
+			})
 			must(t, i.SetControl(ask.Tab, "agent"))
 			if got := a.Logins.find(ask.ID).wait(t.Context(), 0); got.Status != "done" {
 				t.Fatal(got)

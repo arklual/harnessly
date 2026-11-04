@@ -17,3 +17,14 @@ it('keeps shell and browser translation keys identical in English and Russian', 
     expect(String(ru[key]).trim()).not.toBe('');
   }
 });
+
+it('tells the person to open a new tab after agent JavaScript in both languages', () => {
+  const en = JSON.parse(enText) as Record<string, string>;
+  const ru = JSON.parse(ruText) as Record<string, string>;
+  expect(en['next.agentBrowser.scriptedWarning']).toBe(
+    'The agent ran JavaScript on this page. Do not enter a password here: open a new tab.',
+  );
+  expect(ru['next.agentBrowser.scriptedWarning']).toBe(
+    'Агент запускал JavaScript на этой странице. Не вводите здесь пароль: откройте новую вкладку.',
+  );
+});

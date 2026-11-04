@@ -42,24 +42,29 @@ type Dialog struct {
 // Tab records creation order independently of Chrome's target IDs. All fields except
 // the live Dialog are persisted; callers receive snapshots they may safely retain.
 type Tab struct {
-	Sealed         bool     `json:"sealed,omitempty"`
-	SecretTouched  bool     `json:"secretTouched,omitempty"`
-	SecretDocument string   `json:"secretDocument,omitempty"`
-	Control        string   `json:"control"`
-	AgentAt        int64    `json:"agentAt"`
-	Dialog         *Dialog  `json:"dialog,omitempty"`
-	ID             string   `json:"id"`
-	Title          string   `json:"title"`
-	URL            string   `json:"url"`
-	Conversation   string   `json:"conversation,omitempty"`
-	By             string   `json:"by"`
-	Viewport       Viewport `json:"viewport"`
-	Crashed        bool     `json:"crashed"`
-	Order          uint64   `json:"order"`
-	WindowID       int      `json:"windowId"`
+	Scripted        bool     `json:"scripted,omitempty"`
+	Opener          string   `json:"opener,omitempty"`
+	Sealed          bool     `json:"sealed,omitempty"`
+	SecretTouched   bool     `json:"secretTouched,omitempty"`
+	SecretDocument  string   `json:"secretDocument,omitempty"`
+	SealGeneration  uint64   `json:"sealGeneration,omitempty"`
+	SecretUntracked bool     `json:"secretUntracked,omitempty"`
+	Control         string   `json:"control"`
+	AgentAt         int64    `json:"agentAt"`
+	Dialog          *Dialog  `json:"dialog,omitempty"`
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	URL             string   `json:"url"`
+	Conversation    string   `json:"conversation,omitempty"`
+	By              string   `json:"by"`
+	Viewport        Viewport `json:"viewport"`
+	Crashed         bool     `json:"crashed"`
+	Order           uint64   `json:"order"`
+	WindowID        int      `json:"windowId"`
 }
 
 type page struct {
+	controlMu     sync.Mutex
 	redactionLost bool
 	login         *loginRequest
 	Tab
@@ -84,6 +89,9 @@ type binding struct {
 // Instance keeps registry locks independent of browser replies and disk writes.
 type Instance struct {
 	secretMasks               []string
+	maskPending               map[uint64][]string
+	maskNext                  uint64
+	conversationGates         map[string]chan struct{}
 	agentFrames               map[string]agentFrameBinding
 	agentListeners            map[*agentListener]bool
 	manager                   *Manager

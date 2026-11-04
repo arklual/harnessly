@@ -104,20 +104,37 @@ the same safe card without a shell. Entries without allowed origins cannot be fi
 `securityOrigin` from `Page.getFrameTree`, not JavaScript and not the top-level URL. Consequently, an allowed iframe
 embedded on a different site is permitted deliberately; a foreign iframe on an allowed site is refused.
 
-Only visible, enabled, writable `input` elements of type password, text, email, tel or number are eligible. The runtime
-focuses the field, checks the active element in an isolated world (including shadow roots and every embedding frame),
-then uses `Input.insertText`.
-A focus handler that redirects input is refused. The safe records the chat and frame origin in `UsedBy`. A TOTP URI
-(`otpauth://totp/...`) produces the current code locally using RFC 6238, including SHA-1, SHA-256 and SHA-512; neither the
-URI nor the code appears in a successful tool response.
+Only visible, enabled, writable `input` elements of type password, text, email, tel or number are eligible, with a
+nonzero rectangle that intersects the area below/right of the page's top-left edge. One isolated-world renderer task
+checks its origin and field, disables autocomplete, focuses and verifies the shadow-root focus chain, selects, and
+uses native `execCommand('insertText')`. Values are passed only as CDP arguments. A partial/sanitized insertion is
+cleared in that same task and refused; no alternate input path is used. Embedding frames must be visible, but moving
+focus in an embedding document cannot redirect this document's insertion. Controlled input handlers receive native
+input events. The safe records the chat and field origin in `UsedBy`. TOTP is calculated locally using RFC 6238.
 
-Before insertion, the value joins in-memory masking and the tab is sealed. Evaluate, console, network and screenshot
-tools refuse while sealed. Clicks, typing, keys and masked accessibility snapshots remain available. A new main-frame
-document, or removal/clearing of every filled field, releases the seal. Seal checks execute private-world DOM code only;
-a refused evaluation never executes the agent's page expression. A durable document marker survives runtime restarts.
-After a restart, lost node references require navigation to release the seal; snapshots also fail closed until then.
-The runtime does not persist masking values. Registry URL/title restoration is disabled for tabs that received a secret,
-so page-controlled metadata cannot write that secret into `tabs.json`. Cookies remain in the browser profile, not the safe.
+An agent evaluation permanently marks the tab and its live opener-connected component `Scripted`. Such tabs cannot
+receive safe input; the person sees a warning when taking control. `browser_open` creates an independent browsing
+context group. Popups inherit their opener's chat, control and scripted state, including late discovery.
+
+The runtime persists a provisional seal and reserves masks before sending the value. Known rejection restores the
+previous seal and removes that attempt's masks; an uncertain CDP failure remains sealed. Tool calls within a chat
+and person control transitions share a conversation gate through seal checking, dispatch and output. Seal release
+also compares the checked generation before clearing tracking. While any tab of the chat is sealed, evaluate, console, network and screenshots refuse on every tab
+of that chat. Other chats remain usable. Snapshots of a tracked sealed tab omit all editable values and their text
+children. Control/Meta/Alt shortcuts and Shift+Insert/Delete are refused before dispatch; ordinary keys still work.
+
+A new main document, a new field document, or removal of every tracked field can release a seal. Empty fields do not.
+Before release, `Page.resetNavigationHistory` must succeed and console/network/request recordings are cleared.
+Back/forward cannot restore the old input document. Read tools run only after this check. A seal without reliable
+field references (person handoff or restart) also refuses snapshots and needs a new main document. Failure to read
+an initial document marker cannot be mistaken for proof of navigation.
+
+Returning any person-controlled tab to the agent first resets history and scans all frames and shadow roots in
+isolated worlds for nonempty password inputs. Found passwords are masked and the tab gets an untracked seal;
+CDP failure also seals it. A failed history reset or registry write keeps person control and the login pending.
+The runtime persists the marker before returning control and settling login completion.
+Mask values stay only in memory. Registry URL/title restoration is disabled for secret-touched tabs so page metadata
+does not persist secret bytes in `tabs.json`. Cookies remain in the browser profile, never in the safe.
 
 For CAPTCHA, 2FA and account-provider sign-in, `browser_request_login {url, why}` opens a person-controlled tab and a
 login card. The browser panel offers Done and Cancel. The call waits up to 55 seconds, then returns `waiting`; repeat it
@@ -126,26 +143,31 @@ The response contains only status and current URL. Login cookies are shared by c
 
 ### Remaining browser threats
 
-The seal restricts specific reading tools; it is **not** an information-flow boundary against a hostile website or an
-agent deliberately extracting secrets. In particular:
+The tool boundary prevents agent-installed page hooks before filling, reads through sibling tabs while sealed,
+clipboard shortcuts, partial editable-value snapshots, and back/forward restoration after release. It does not make
+an allowed website trustworthy or isolate processes sharing the same Unix account:
 
-- Masking is byte-based (with common JSON/URL escaping also covered), not semantic. A site can expose base64, character
-  codes, fragments, transformed DOM text or visual pixels. Accessibility snapshots remain allowed while sealed, so
-  transformed text in the DOM can escape. Once unsealed, screenshots can show copies rendered outside password fields.
-- Sealing applies to one tab. A same-origin popup with an `opener` reference can read the sealed opener through
-  its own evaluation tool, and encoding defeats byte masking. An agent can also install page listeners before the
-  first fill. Keeping other tabs usable is not equivalent to isolating JavaScript window references.
-- Clearing/removing an input says nothing about other copies: the site can retain the value in JavaScript, another
-  frame, storage, a response or its server. Unsealing after this change or after navigation is a usability rule, not
-  proof that all copies disappeared. Encoded console/network history may remain readable after unsealing.
-- A page can move focus or navigate asynchronously between CDP commands. The final isolated-world focus and origin
-  checks reduce this window but do not make validation and `Input.insertText` atomic. The allowed site receives input
-  events and can copy or transmit the value. Browser input is not a transaction spanning all renderer tasks.
-- The agent's shell and cli-token can still obtain an allowed entry through `secret run` and transform it to bypass
-  output masking. Project restrictions apply to those API reads, but before stage 5 a same-user agent can also read the
-  safe key, browser profile or private CDP socket directly. Hiding a token or sealing a tool does not isolate Unix files.
-- Masking values live only for the runtime's lifetime. A persisted seal fails closed on restart, but previously
-  unsealed pages and their stored copies are not a durable redaction system. The browser itself may persist what a site
-  receives as input; the safe cannot prevent that.
+- The allowed site receives the value and may retain or send it. Site-owned copies placed in the DOM can remain
+  visible to snapshots in transformations not recognized by byte masking. Literal, JSON, URL/form, component, common
+  base64 and HTML forms are masked; arbitrary encodings, fragments and visual representations are not guaranteed.
+- An agent-installed Service Worker can survive its original scripted tab if the agent can host a worker script on
+  that origin. Granting a secret to an origin where the agent can publish code gives that agent access through the
+  website itself. A fresh browsing context group does not clear origin-scoped workers or storage.
+- GET forms place values into Chrome URL/history records; masking tool output and resetting the navigation stack do
+  not erase the browser's history database. Do not treat profile files as a secret-free archive. Disabling field
+  autocomplete prevents the tested text-form restoration/autofill writes, not arbitrary site storage or GET URLs.
+- The person-handoff scan recognizes only inputs whose current type is `password`. If the person reveals a password
+  (`type=text`) before returning control, the value is not registered and can appear in a snapshot. Plaintext password
+  fields have the same limitation. This is an unclosed manual-entry gap; the process boundary in stage 5 cannot fix it.
+  These handoff checks also require person control: ordinary pane input does not automatically take control.
+- Ignoring the scripted-tab warning and entering a password by hand can expose it to an earlier agent-installed
+  hook. Manual login requests always open a fresh tab, but taking over an existing scripted tab does not remove hooks.
+- After a permitted release, copies retained by the website may be accessible again, subject to output masking.
+  Removing a field or navigating is a workflow transition, not proof that the website destroyed all copies.
+- The agent's shell and cli-token can obtain an allowed entry through `secret run` and transform it to bypass output
+  masking. Project scopes apply to those API reads, but before stage 5 the same Unix user can also read the safe key,
+  profile files or private CDP socket directly. Masking values live only for the runtime's lifetime.
 
-Stage 5's process/filesystem boundary is separate work. It will not, by itself, make a malicious allowed site trustworthy.
+Stage 5 supplies a separate process/filesystem boundary. It does not make an agent-writable or malicious allowed
+origin safe. Site-origin approval adds a site without replacing a value; an explicit `--replace` still requests
+rotation. An accessible unscoped entry can receive a site approval even from a chat without a project.

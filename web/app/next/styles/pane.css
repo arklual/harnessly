@@ -2230,3 +2230,14 @@ input.hx-tbrowser__url:focus {
 .hx-agent-browser__sizes .hx-cmenu__item {
   flex-shrink: 0;
 }
+.hx-agent-browser__scripted-warning {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--hx-warning);
+  border-radius: 5px;
+  color: var(--hx-warning);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

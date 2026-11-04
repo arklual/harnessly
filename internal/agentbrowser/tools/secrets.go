@@ -129,47 +129,91 @@ func (t Tools) releaseNode(ctx context.Context, i *agentbrowser.Instance, tab st
 	_, _ = i.AgentFrameCall(ctx, t.Caller, tab, ref.session, "Runtime.releaseObject", map[string]any{"objectId": obj})
 }
 
-func (t Tools) checkSeal(ctx context.Context, i *agentbrowser.Instance, st *tabState, id, tool string) error {
-	var sealed agentbrowser.Tab
-	for _, tab := range i.Tabs(t.Caller) {
-		if tab.ID == id {
-			sealed = tab
-			break
-		}
-	}
-	if !sealed.Sealed {
-		return nil
+// checkSeals releases verified seals before the requested action and enforces the read barrier across the chat.
+// Chat actions are serialized, while node tracking and recordings use st.mu; CDP never runs under that mutex.
+func (t Tools) checkSeals(ctx context.Context, i *agentbrowser.Instance, target, tool string) error {
+	if target == "" {
+		target = i.Current(t.Caller)
 	}
 	blocked := tool == "browser_evaluate" || tool == "browser_console" || tool == "browser_network" || tool == "browser_screenshot"
-	tree, err := t.frameTree(ctx, i, id, "")
-	if err == nil && tree.Frame.Loader != "" && tree.Frame.Loader != sealed.SecretDocument {
-		st.sealed = nil
-		return i.Unseal(t.Caller, id)
-	}
-	if err == nil && len(st.sealed) > 0 {
-		keep := []sealedField{}
-		for _, field := range st.sealed {
-			ref, obj := field.ref, field.object
-			var present bool
-			e := t.nodeCheck(ctx, i, id, ref, obj, "function(){return this.isConnected && this.value !== ''}", &present)
-			if e != nil && t.fieldDocumentGone(ctx, i, id, field) {
-				e, present = nil, false
-			}
-			if e != nil || present {
-				keep = append(keep, field)
-			} else {
-				t.releaseNode(ctx, i, id, ref, obj)
-			}
+	for _, tab := range i.Tabs(t.Caller) {
+		if !tab.Sealed {
+			continue
 		}
-		st.sealed = keep
-		if len(keep) == 0 {
-			return i.Unseal(t.Caller, id)
+		t.S.mu.Lock()
+		st := t.S.tabs[i.Profile().ID+"/"+t.Caller+"/"+tab.ID]
+		t.S.mu.Unlock()
+		if t.releaseSeal(ctx, i, st, tab) {
+			continue
 		}
-	}
-	if blocked || len(st.sealed) == 0 && (tool == "browser_snapshot" || tool == "browser_wait_for") {
-		return errSealed
+		unknown := true
+		if st != nil {
+			st.mu.Lock()
+			unknown = tab.SecretUntracked || len(st.sealed) == 0
+			st.mu.Unlock()
+		}
+		if blocked || tab.ID == target && unknown && (tool == "browser_snapshot" || tool == "browser_wait_for") {
+			return fmt.Errorf("%w (%s): submit the form, navigate to another page, or close that tab", errSealed, tab.ID)
+		}
 	}
 	return nil
+}
+
+func (t Tools) releaseSeal(ctx context.Context, i *agentbrowser.Instance, st *tabState, tab agentbrowser.Tab) bool {
+	tree, err := t.frameTree(ctx, i, tab.ID, "")
+	if err == nil && tree.Frame.Loader != "" && (tab.SecretDocument == "" || tab.SecretDocument == "handoff:unknown") {
+		// A failed handoff has no document proof. Establish a baseline, never infer navigation from the sentinel.
+		_ = i.Seal(t.Caller, tab.ID, tree.Frame.Loader)
+		return false
+	}
+	changed := err == nil && tree.Frame.Loader != "" && tree.Frame.Loader != tab.SecretDocument
+	var fields []sealedField
+	if st != nil {
+		st.mu.Lock()
+		fields = append(fields, st.sealed...)
+		st.mu.Unlock()
+	}
+	if !changed {
+		if err != nil || tab.SecretUntracked || len(fields) == 0 {
+			return false
+		}
+		for _, field := range fields {
+			var connected bool
+			err := t.nodeCheck(ctx, i, tab.ID, field.ref, field.object, "function(){return this.isConnected}", &connected)
+			if err != nil && t.fieldDocumentGone(ctx, i, tab.ID, field) {
+				err, connected = nil, false
+			}
+			if err != nil || connected {
+				return false
+			}
+		}
+	}
+	// Returning via back/forward must never restore the document that held the input.
+	if _, err = i.AgentCall(ctx, t.Caller, tab.ID, "Page.resetNavigationHistory", nil); err != nil {
+		return false
+	}
+	if err = i.Unseal(t.Caller, tab.ID, tab.SealGeneration); err != nil {
+		return false
+	}
+	if st != nil {
+		st.mu.Lock()
+		st.sealed, st.console, st.network, st.snapshot = nil, nil, nil, nil
+		st.requests = map[string]string{}
+		st.mu.Unlock()
+	}
+	for _, field := range fields {
+		t.releaseNode(ctx, i, tab.ID, field.ref, field.object)
+	}
+	return true
+}
+
+func tabSealed(i *agentbrowser.Instance, conv, id string) bool {
+	for _, tab := range i.Tabs(conv) {
+		if tab.ID == id {
+			return tab.Sealed
+		}
+	}
+	return false
 }
 
 func (t Tools) secretScopes(ctx context.Context, i *agentbrowser.Instance, tab string) ([]frameScope, error) {
@@ -202,7 +246,7 @@ func (t Tools) fieldDocumentGone(ctx context.Context, i *agentbrowser.Instance, 
 }
 
 // visibleFrame checks embedding elements too: a visible input inside a hidden iframe is not visible to the person.
-func (t Tools) visibleFrame(ctx context.Context, i *agentbrowser.Instance, tab string, ref nodeRef, focused bool) error {
+func (t Tools) visibleFrame(ctx context.Context, i *agentbrowser.Instance, tab string, ref nodeRef) error {
 	scopes, err := t.secretScopes(ctx, i, tab)
 	if err != nil {
 		return err
@@ -241,49 +285,56 @@ func (t Tools) visibleFrame(ctx context.Context, i *agentbrowser.Instance, tab s
 		var visible bool
 		check := `function(){
    const r=this.getBoundingClientRect();
-   return r.width>0 && r.height>0 && this.checkVisibility({checkOpacity:true,checkVisibilityCSS:true});
+   return r.width>0 && r.height>0 && r.right>0 && r.bottom>0 && this.checkVisibility({checkOpacity:true,checkVisibilityCSS:true});
   }`
-		if focused {
-			check = focusCheck
-		}
 		err = t.nodeCheck(ctx, i, tab, ownerRef, obj, check, &visible)
 		t.releaseNode(ctx, i, tab, ownerRef, obj)
 		if err != nil {
 			return err
 		}
 		if !visible {
-			if focused {
-				return errors.New("Page moved focus away from the field frame; no secret was entered")
-			}
 			return errors.New("Field must be in a visible frame")
 		}
 		frame = parent.frame
 	}
 }
 
-const inputCheck = `function(){
+// atomicSecretInput validates and inserts in the field's own isolated world in one renderer task.
+// Secret bytes occur only in the CDP argument list, never in this function's source or result.
+const atomicSecretInput = `function(value, origin){
+ if (self.origin !== origin) return 'origin';
  if (!(this instanceof HTMLInputElement) || !['password','text','email','tel','number'].includes(this.type)
-  || this.disabled || this.readOnly || !this.isConnected) return {ok:false};
- const r = this.getBoundingClientRect();
- if (r.width <= 0 || r.height <= 0 || !this.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})) return {ok:false};
- return {ok:true,name:this.getAttribute('aria-label') || this.name || this.id || this.type};
-}`
-const focusCheck = `function(){
- if (!this.isConnected || !this.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})) return false;
+  || this.disabled || this.readOnly || !this.isConnected) return 'field';
  const r=this.getBoundingClientRect();
- if (r.width<=0 || r.height<=0) return false;
- if (this instanceof HTMLInputElement && (this.disabled || this.readOnly ||
-  !['password','text','email','tel','number'].includes(this.type))) return false;
- let element=this;
- for (;;) {
-  const root=element.getRootNode();
-  if (root.activeElement !== element) return false;
-  if (!(root instanceof ShadowRoot)) return true;
-  element=root.host;
- }
+ if (r.width<=0 || r.height<=0 || r.right<=0 || r.bottom<=0 ||
+  !this.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})) return 'field';
+ this.setAttribute('autocomplete','off');
+ this.focus();
+ const focused=()=>{
+  let element=this;
+  for (;;) {
+   const root=element.getRootNode();
+   if (root.activeElement !== element) return false;
+   if (!(root instanceof ShadowRoot)) return true;
+   element=root.host;
+  }
+ };
+ if (!focused()) return 'focus';
+ this.select();
+ if (!focused()) return 'focus';
+ const accepted=document.execCommand('insertText',false,value);
+ if (accepted && this.value===value) return 'entered';
+ this.select();
+ document.execCommand('delete');
+ return this.value==='' ? 'rejected' : 'uncertain';
 }`
 
 func (t Tools) fillSecret(ctx context.Context, i *agentbrowser.Instance, st *tabState, a arguments) (string, error) {
+	for _, tab := range i.Tabs(t.Caller) {
+		if tab.ID == a.Tab && tab.Scripted {
+			return "", errors.New("JavaScript was executed in this tab; open the site in a new tab with browser_open and fill the secret there")
+		}
+	}
 	if t.S.Secrets == nil || t.S.Identity == nil {
 		return "", errSecretUnavailable
 	}
@@ -328,50 +379,12 @@ func (t Tools) fillSecret(ctx context.Context, i *agentbrowser.Instance, st *tab
 			t.releaseNode(ctx, i, a.Tab, ref, obj)
 		}
 	}()
-	var field struct {
-		OK   bool   `json:"ok"`
-		Name string `json:"name"`
-	}
-	if err = t.nodeCheck(ctx, i, a.Tab, ref, obj, inputCheck, &field); err != nil {
+	var fieldName string
+	if err = t.nodeCheck(ctx, i, a.Tab, ref, obj, "function(){return this.getAttribute('aria-label') || this.name || this.id || this.type || 'input'}", &fieldName); err != nil {
 		return "", err
 	}
-	if !field.OK {
-		return "", errors.New("Field must be a visible, enabled, writable input")
-	}
-	if err = t.visibleFrame(ctx, i, a.Tab, ref, false); err != nil {
+	if err = t.visibleFrame(ctx, i, a.Tab, ref); err != nil {
 		return "", err
-	}
-	if _, err = i.AgentFrameCall(ctx, t.Caller, a.Tab, ref.session, "DOM.focus", map[string]any{"backendNodeId": ref.backend}); err != nil {
-		return "", err
-	}
-	var selected bool
-	if err = t.nodeCheck(ctx, i, a.Tab, ref, obj, "function(){this.select(); return true}", &selected); err != nil {
-		return "", err
-	}
-	var focused bool
-	if err = t.nodeCheck(ctx, i, a.Tab, ref, obj, focusCheck, &focused); err != nil {
-		return "", err
-	}
-	if !focused {
-		return "", errors.New("Page moved focus away from the field; no secret was entered")
-	}
-	if err = t.nodeCheck(ctx, i, a.Tab, ref, obj, inputCheck, &field); err != nil {
-		return "", err
-	}
-	if !field.OK {
-		return "", errors.New("Field became hidden, disabled or readonly after focus; no secret was entered")
-	}
-	if err = t.visibleFrame(ctx, i, a.Tab, ref, true); err != nil {
-		return "", err
-	}
-	// Recheck origin/document and project after focus handlers have run.
-	latest, err := t.frameTree(ctx, i, a.Tab, ref.session)
-	if err != nil {
-		return "", err
-	}
-	current, ok := findFrame(latest, ref.frame)
-	if !ok || current.Frame.Loader != frame.Frame.Loader || secrets.Origin(current.Frame.Origin) != origin {
-		return "", errStale
 	}
 	use, err = t.S.Identity(t.Caller)
 	if err != nil {
@@ -386,26 +399,45 @@ func (t Tools) fillSecret(ctx context.Context, i *agentbrowser.Instance, st *tab
 	if err != nil {
 		return "", err
 	}
+	// The persisted seal also survives a runtime crash during the renderer task.
+	finishSeal, err := i.BeginSecretInput(t.Caller, a.Tab, main.Frame.Loader)
+	if err != nil {
+		return "", err
+	}
+	keep := true // A missing CDP reply cannot prove that the renderer did not insert.
+	defer func() { finishSeal(keep) }()
+	// The per-chat action lock excludes every sibling read during this reservation and renderer task.
+	finishMask := i.ReserveSecrets(values[a.Secret], value)
+	defer func() { finishMask(keep) }()
+	raw, callErr := i.AgentFrameCall(ctx, t.Caller, a.Tab, ref.session, "Runtime.callFunctionOn", map[string]any{
+		"objectId": obj, "functionDeclaration": atomicSecretInput, "returnByValue": true,
+		"arguments": []map[string]any{{"value": value}, {"value": frame.Frame.Origin}},
+	})
+	var result struct {
+		Result struct {
+			Value string `json:"value"`
+		} `json:"result"`
+		Exception json.RawMessage `json:"exceptionDetails"`
+	}
+	if callErr == nil {
+		callErr = json.Unmarshal(raw, &result)
+	}
+	if callErr == nil && result.Exception == nil {
+		switch result.Result.Value {
+		case "origin", "field", "focus", "rejected":
+			keep = false
+			return "", errors.New("Secret input refused: " + result.Result.Value + "; use a visible, writable field with focus that accepts the complete value")
+		}
+	}
+	st.mu.Lock()
+	st.sealed = append(st.sealed, sealedField{ref: ref, object: obj, document: frame.Frame.Loader})
+	st.snapshot = nil
+	st.mu.Unlock()
+	retained = true
 	st.remember(values[a.Secret])
 	st.remember(value)
-	if err = i.Seal(t.Caller, a.Tab, main.Frame.Loader); err != nil {
-		return "", err
+	if callErr != nil || result.Exception != nil || result.Result.Value != "entered" {
+		return "", errors.New("Secret input could not be confirmed; the tab remains sealed")
 	}
-	st.sealed = append(st.sealed, sealedField{ref: ref, object: obj, document: frame.Frame.Loader})
-	retained = true
-	// This final check reduces focus races, but asynchronous page tasks can still run
-	// between CDP commands; the browser is not an atomic secret-input broker.
-	if err = t.nodeCheck(ctx, i, a.Tab, ref, obj, focusCheck, &focused); err != nil {
-		return "", err
-	}
-	if !focused {
-		return "", errors.New("Page moved focus away from the field; no secret was entered")
-	}
-	if err = t.visibleFrame(ctx, i, a.Tab, ref, true); err != nil {
-		return "", err
-	}
-	if _, err = i.AgentCall(ctx, t.Caller, a.Tab, "Input.insertText", map[string]any{"text": value}); err != nil {
-		return "", errors.New("Secret input failed; the tab remains sealed")
-	}
-	return fmt.Sprintf("Entered on %s into %s", origin, field.Name), nil
+	return fmt.Sprintf("Entered on %s into %s", origin, fieldName), nil
 }

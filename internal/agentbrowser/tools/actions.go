@@ -223,6 +223,14 @@ func (t Tools) quad(ctx context.Context, i *agentbrowser.Instance, id, session s
 }
 func (t Tools) pressKey(ctx context.Context, i *agentbrowser.Instance, id, key string) error {
 	parts := strings.Split(key, "+")
+	if tabSealed(i, t.Caller, id) {
+		for _, part := range parts[:len(parts)-1] {
+			if part == "Control" || part == "Ctrl" || part == "Meta" || part == "Alt" ||
+				part == "Shift" && (parts[len(parts)-1] == "Delete" || parts[len(parts)-1] == "Insert") {
+				return errors.New("Modified keys are unavailable in a sealed tab; submit the form, navigate, or close the tab")
+			}
+		}
+	}
 	key = parts[len(parts)-1]
 	mod := 0
 	for _, p := range parts[:len(parts)-1] {

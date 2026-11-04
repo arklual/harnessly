@@ -9,6 +9,7 @@ export interface IBrowserTab {
   crashed: boolean;
   control: 'agent' | 'person';
   agentAt: number;
+  scripted?: boolean;
   dialog?: { type: string; message: string; defaultPrompt: string };
   login?: import('@/next/features/browser/login-api').ILoginAsk;
 }
@@ -51,6 +52,23 @@ export interface IStatus {
 /** Recoverable notices leave availability and the current page intact. */
 export type TBrowserMessage =
   IStatus | ITabsMessage | ISelectMenu | { t: 'notice'; message: string } | { t: 'clipboard'; text: string };
+/** Preserve the server's script marker and treat older servers as unscripted. */
+export function parseBrowserMessage(raw: string): TBrowserMessage | null {
+  try {
+    const message = JSON.parse(raw) as TBrowserMessage | null;
+    if (!message || typeof message !== 'object' || !('t' in message)) return null;
+    if (message.t === 'tabs') {
+      if (!Array.isArray(message.tabs)) return null;
+      return {
+        ...message,
+        tabs: message.tabs.map((tab) => ({ ...tab, scripted: tab.scripted === true })),
+      };
+    }
+    return message;
+  } catch {
+    return null;
+  }
+}
 /** Reject short or invalid frame headers before attempting an expensive JPEG decode. */
 export function parseBrowserFrame(data: ArrayBuffer) {
   if (data.byteLength <= 12) return null;

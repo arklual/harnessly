@@ -218,6 +218,7 @@ func (t Tools) buildSnapshot(ctx context.Context, i *agentbrowser.Instance, st *
 		}
 	}
 	st.mu.Unlock()
+	sealed := tabSealed(i, t.Caller, a.Tab)
 	var lines []snapshotLine
 	for _, scope := range scopes {
 		raw, e := i.AgentFrameCall(ctx, t.Caller, a.Tab, scope.session, "Accessibility.getFullAXTree", map[string]any{"frameId": scope.frame})
@@ -235,16 +236,19 @@ func (t Tools) buildSnapshot(ctx context.Context, i *agentbrowser.Instance, st *
 			nodes[n.ID] = n
 		}
 		lines = append(lines, snapshotLine{text: "Frame " + scope.frame, ref: nodeRef{frame: scope.frame, epoch: versions[scope.frame]}})
-		var walk func(string, int) error
-		walk = func(nodeID string, depth int) error {
+		var walk func(string, int, bool) error
+		walk = func(nodeID string, depth int, insideEditable bool) error {
 			n, ok := nodes[nodeID]
 			if !ok {
 				return nil
 			}
-			if showAX(n, a.InteractiveOnly) {
+			role, _ := n.Role.Value.(string)
+			editable := role == "textbox" || role == "searchbox" || role == "spinbutton" || role == "combobox"
+			hideText := sealed && insideEditable && (role == "StaticText" || role == "InlineTextBox")
+			if !hideText && showAX(n, a.InteractiveOnly) {
 				ref := ""
-				password := false
-				if n.Backend != 0 && n.Value.Value != nil {
+				password := sealed && editable
+				if !password && n.Backend != 0 && n.Value.Value != nil {
 					// Only valued nodes can leak a password; inspecting every text node costs thousands of CDP round trips.
 					data, e := i.AgentFrameCall(ctx, t.Caller, a.Tab, scope.session, "DOM.describeNode", map[string]any{"backendNodeId": n.Backend})
 					if e != nil {
@@ -278,14 +282,14 @@ func (t Tools) buildSnapshot(ctx context.Context, i *agentbrowser.Instance, st *
 				depth++
 			}
 			for _, child := range n.Children {
-				if e := walk(child, depth); e != nil {
+				if e := walk(child, depth, insideEditable || editable); e != nil {
 					return e
 				}
 			}
 			return nil
 		}
 		if len(r.Nodes) > 0 {
-			if err = walk(r.Nodes[0].ID, 0); err != nil {
+			if err = walk(r.Nodes[0].ID, 0, false); err != nil {
 				return err
 			}
 		}

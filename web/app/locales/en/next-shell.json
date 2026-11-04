@@ -1010,6 +1010,7 @@
   "next.agentBrowser.ok": "OK",
   "next.agentBrowser.follow": "Follow agent",
   "next.agentBrowser.working": "Agent is working in this tab",
+  "next.agentBrowser.scriptedWarning": "The agent ran JavaScript on this page. Do not enter a password here: open a new tab.",
   "next.agentBrowser.personControl": "You have control",
   "next.agentBrowser.agentControl": "Agent has control",
   "next.agentBrowser.take": "Take control",

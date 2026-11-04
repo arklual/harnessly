@@ -118,7 +118,8 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		b.WriteString("## Browser\n\n")
 		b.WriteString("The browser is already available: use `browser_*` tools or `harnessly browser`. " +
 			"Install nothing and never ask for passwords in chat. Take a `browser_snapshot` before acting on elements. " +
-			"To sign in, use `browser_fill_secret` for an existing safe entry; otherwise use `browser_request_login`.\n\n")
+			"To sign in, use `browser_fill_secret` for an existing safe entry; otherwise use `browser_request_login`. " +
+			"If you ran JavaScript on a tab, use `browser_open` to create a fresh tab before entering a secret.\n\n")
 	}
 	b.WriteString("## Handing files over\n\n")
 	b.WriteString("When the person asks you to send or collect a file (\"put it in a zip\", \"give me the docx\"), hand it over with " +

@@ -31,18 +31,10 @@ func (i *Instance) upsertLocked(t target) *page {
 		i.pages[t.ID] = p
 	}
 	p.Title, p.URL = t.Title, t.URL
-	if parent := i.pages[t.Opener]; parent != nil && p.Conversation == "" {
-		p.Conversation, p.By = parent.Conversation, parent.By
-		p.Control = parent.Control
-		// Site-created targets follow their agent-controlled opener without changing a pinned panel view.
-		if parent.Control != "person" && i.current[parent.Conversation] == parent.ID {
-			i.current[parent.Conversation] = p.ID
-		}
-		if p.By == "agent" && p.Viewport.Mode == "" {
-			p.Viewport = agentViewport()
-			p.defaultsPending = true
-		}
+	if t.Opener != "" {
+		p.Opener = t.Opener
 	}
+	i.attributeOpenersLocked()
 	if before != p.Tab {
 		i.changedLocked()
 	}
@@ -110,15 +102,7 @@ func (i *Instance) reconcile(ctx context.Context, c *cdp.Conn, initial bool) err
 		i.upsertLocked(t)
 	}
 	// Parents need not precede their popups in the discovery response.
-	for _, t := range r.Targets {
-		if p, parent := i.pages[t.ID], i.pages[t.Opener]; p != nil && parent != nil && p.Conversation == "" {
-			p.Conversation, p.By = parent.Conversation, parent.By
-			if p.By == "agent" && p.Viewport.Mode == "" {
-				p.Viewport = agentViewport()
-				p.defaultsPending = true
-			}
-		}
-	}
+	i.attributeOpenersLocked()
 	for id := range i.hidden {
 		if !live[id] {
 			delete(i.hidden, id)

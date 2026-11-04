@@ -784,3 +784,83 @@ test('manual login opens across chats, protects Chrome until Done and supports C
     await new Promise<void>((resolve) => child.once('exit', () => resolve()));
   }
 });
+
+test('scripted page warns on person control and a fresh manual login has no warning', async ({ page }) => {
+  test.setTimeout(180_000);
+  const binary = join(rt.root, 'browser-scripted');
+  execFileSync('go', ['build', '-o', binary, './e2e/fixtures/browser-agent']);
+  const child = spawn(binary, [], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const base = await new Promise<string>((resolve, reject) => {
+    child.stdout.once('data', (data) => resolve(String(data).trim()));
+    child.once('error', reject);
+    child.once('exit', (code) => reject(new Error(`Browser fixture exited: ${code}`)));
+  });
+  try {
+    await page.route('**/api/agent-browser/logins?*', async (route) => {
+      const request = route.request();
+      const response = await fetch(base + '/api/agent-browser/logins', {
+        method: request.method(),
+        ...(request.method() === 'POST' ? { body: request.postData()! } : {}),
+      });
+      await route.fulfill({
+        status: response.status,
+        body: await response.text(),
+        contentType: 'application/json',
+      });
+    });
+    await page.routeWebSocket('**/api/agent-browser?*', (ws) => {
+      const url = new URL(ws.url());
+      const upstream = new WebSocket(base.replace('http:', 'ws:') + '/api/agent-browser' + url.search);
+      upstream.binaryType = 'arraybuffer';
+      upstream.onmessage = (event) =>
+        ws.send(typeof event.data === 'string' ? event.data : Buffer.from(event.data as ArrayBuffer));
+      ws.onMessage((message) =>
+        upstream.send(typeof message === 'string' ? message : Uint8Array.from(message)),
+      );
+      ws.onClose(() => upstream.close());
+      upstream.onclose = () => {
+        void ws.close();
+      };
+    });
+    await chat(page, 'Scripted page warning', false);
+    const conv = new URL(page.url()).pathname.split('/').at(-1)!;
+    const created = await fetch(base + '/new?' + new URLSearchParams({ conv, url: siteURL + '/scripted' }));
+    expect(created.status).toBe(204);
+    const pane = page.locator('.hx-agent-browser');
+    await expect(pane.locator('canvas')).toHaveAttribute('data-shown', 'true');
+    const evaluated = await fetch(base + '/evaluate?' + new URLSearchParams({ conv }));
+    expect(evaluated.ok).toBe(true);
+    const result = (await evaluated.json()) as { isError?: boolean };
+    expect(result.isError ?? false).toBe(false);
+    const warning = pane.getByText(
+      'The agent ran JavaScript on this page. Do not enter a password here: open a new tab.',
+      { exact: true },
+    );
+    await expect(warning).toHaveCount(0);
+    await pane.getByRole('button', { name: 'Take control', exact: true }).click();
+    await expect(warning).toBeVisible();
+    await expect(pane.getByText('You have control', { exact: true })).toBeVisible();
+    await shot(page, 'scripted-warning');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(warning).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await shot(page, 'scripted-warning-phone');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const login = await fetch(
+      base +
+        '/login?' +
+        new URLSearchParams({ conv, url: siteURL + '/fresh-manual-login', why: 'Sign in on a fresh tab' }),
+    );
+    expect(login.ok).toBe(true);
+    const banner = pane.getByRole('region', { name: 'Sign in requested', exact: true });
+    await expect(banner).toBeVisible();
+    await expect(pane.getByText('You have control', { exact: true })).toBeVisible();
+    await expect(warning).toHaveCount(0);
+    await banner.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(banner).toHaveCount(0);
+  } finally {
+    await page.unrouteAll({ behavior: 'wait' });
+    child.kill('SIGTERM');
+    await new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  }
+});

@@ -81,6 +81,7 @@ func TestLoginProtectionAndSettlement(t *testing.T) {
 	p := newPage(Tab{ID: "tab", Conversation: "chat", URL: "https://example.org/account", Control: "person"})
 	p.login = x
 	i.pages[p.ID] = p
+	connectHandoffFixture(t, i, p, "")
 	for _, method := range []string{"Runtime.evaluate", "Page.captureScreenshot", "Accessibility.getFullAXTree", "Page.navigate", "Input.insertText", "Page.handleJavaScriptDialog", "Target.closeTarget", ""} {
 		if err := i.AgentCheck("chat", p.ID, method); !errors.Is(err, ErrPersonControl) {
 			t.Fatalf("%s: %v", method, err)
@@ -139,6 +140,7 @@ func TestLoginResultURLRedaction(t *testing.T) {
 	p := newPage(Tab{ID: "tab", Conversation: "chat", URL: current, Control: "person"})
 	p.login = x
 	i.pages[p.ID] = p
+	connectHandoffFixture(t, i, p, "")
 	i.RememberSecret(value)
 	check := func(answer LoginAnswer) {
 		t.Helper()

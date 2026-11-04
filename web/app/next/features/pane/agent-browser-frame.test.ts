@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pagePoint, parseBrowserFrame } from './agent-browser-frame';
+import { pagePoint, parseBrowserFrame, parseBrowserMessage } from './agent-browser-frame';
 import { runtimeSocket, setApiOrigin } from '@/next/core/net/machine';
 import type { MachineId } from '@/next/protocol/v2';
 
@@ -29,4 +29,21 @@ describe('browser frame contract', () => {
     );
     setApiOrigin({ base: '', host: 'localhost', protocol: 'http:' });
   });
+});
+
+it('preserves the script marker from tab messages without trusting truthy non-booleans', () => {
+  for (const [scripted, expected] of [
+    [true, true],
+    [false, false],
+    [undefined, false],
+    ['true', false],
+  ]) {
+    const message = parseBrowserMessage(
+      JSON.stringify({ t: 'tabs', tabs: [{ id: 'a', scripted }], current: 'a', gen: 2 }),
+    );
+    expect(message?.t).toBe('tabs');
+    if (message?.t === 'tabs') expect(message.tabs[0]).toMatchObject({ id: 'a', scripted: expected });
+  }
+  for (const raw of ['null', '42', '{', '{"t":"tabs","tabs":null}'])
+    expect(parseBrowserMessage(raw)).toBeNull();
 });

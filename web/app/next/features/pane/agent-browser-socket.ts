@@ -2,10 +2,10 @@ import { noticeKey } from './agent-browser-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   parseBrowserFrame,
+  parseBrowserMessage,
   type ITabsMessage,
   type IStatus,
   type ISelectMenu,
-  type TBrowserMessage,
 } from './agent-browser-frame';
 
 /** One socket owns its selection and discards frames decoded after a selection change. */
@@ -104,12 +104,8 @@ export function useBrowserSocket(url: string) {
           draw(event.data, epoch);
           return;
         }
-        let m: TBrowserMessage;
-        try {
-          m = JSON.parse(event.data) as TBrowserMessage;
-        } catch {
-          return;
-        }
+        const m = parseBrowserMessage(event.data);
+        if (!m) return;
         if (m.t === 'status') setStatus(m);
         if (m.t === 'tabs') {
           if (m.gen !== generation) {

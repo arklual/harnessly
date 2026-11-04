@@ -158,7 +158,7 @@
   },
   {
     "name": "browser_evaluate",
-    "description": "Evaluate JavaScript, await promises; output limited to 20 KiB. Default timeout 10 seconds.",
+    "description": "Evaluate JavaScript, await promises; output limited to 20 KiB. Permanently prevents safe input in this tab and its opener-connected tabs. Refuses while any tab of this chat is sealed. Default timeout 10 seconds.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -423,7 +423,7 @@
   },
   {
     "name": "browser_fill_secret",
-    "description": "Fill a visible input from the safe without returning its value. The field origin and chat project must be allowed. Seals read tools until navigation or the field is removed or cleared.",
+    "description": "Fill a visible writable input from the safe without returning its value. The field origin and chat project must be allowed. JavaScript must never have been evaluated in this tab or its opener-connected tabs; otherwise use browser_open for a fresh tab. While sealed, evaluate, console, network and screenshots refuse across all tabs of this chat. A new main/field document or removal of the field releases the seal after history is reset; clearing the value does not.",
     "inputSchema": {
       "type": "object",
       "properties": {

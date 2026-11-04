@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
 // ErrNotOwner means the requested tab does not belong to the calling conversation.
@@ -101,6 +103,10 @@ func (i *Instance) AgentCloseTab(ctx context.Context, conv, id string) error {
 
 // SetControl persists who may operate a tab; people may always use Call to take over.
 func (i *Instance) SetControl(id, holder string) error {
+	return i.setControl(id, holder, i.inspectPersonPage)
+}
+
+func (i *Instance) setControl(id, holder string, inspect func(context.Context, string) (string, bool, error)) error {
 	if holder != "agent" && holder != "person" {
 		return errors.New("invalid browser control holder")
 	}
@@ -109,17 +115,66 @@ func (i *Instance) SetControl(id, holder string) error {
 	}
 	defer i.endOperation()
 	i.mu.Lock()
-	defer i.mu.Unlock()
 	p := i.pages[id]
 	if p == nil || p.provisional || !Shown(p.URL) {
+		i.mu.Unlock()
 		return errors.New("unknown browser tab")
 	}
+	conv := p.Conversation
+	i.mu.Unlock()
+	unlock := i.LockConversation(conv)
+	defer unlock()
+	i.mu.Lock()
+	present := i.pages[id] == p && p.Conversation == conv && !p.provisional && Shown(p.URL)
+	i.mu.Unlock()
+	if !present {
+		return errors.New("browser tab is no longer available")
+	}
+	p.controlMu.Lock()
+	defer p.controlMu.Unlock()
+	i.mu.Lock()
+	if i.pages[id] != p || p.Conversation != conv {
+		i.mu.Unlock()
+		return errors.New("browser tab is no longer available")
+	}
+	returning := holder == "agent" && p.Control == "person"
+	i.mu.Unlock()
+	if returning {
+		ctx, cancel := context.WithTimeout(i.ctx, cdp.DefaultTimeout)
+		defer cancel()
+		marker, touched, err := inspect(ctx, id)
+		i.mu.Lock()
+		if touched || err != nil {
+			p.SealGeneration++
+			p.Sealed, p.SecretTouched, p.SecretDocument = true, true, marker
+			p.SecretUntracked = true
+			i.changedLocked()
+		}
+		i.mu.Unlock()
+		if touched || err != nil {
+			i.save()
+			i.mu.Lock()
+			saveErr := i.saveError
+			i.mu.Unlock()
+			if saveErr != nil {
+				return errors.New("cannot save browser handoff")
+			}
+		}
+		if errors.Is(err, ErrHandoffHistory) {
+			return ErrHandoffHistory
+		}
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.pages[id] != p || p.Conversation != conv {
+		return errors.New("browser tab is no longer available")
+	}
+	p.Control = holder
+	i.changedLocked()
 	if holder == "agent" && p.login != nil {
 		p.login.settle("done", i.redactLocked(p.URL))
 		p.login = nil
 	}
-	p.Control = holder
-	i.changedLocked()
 	return nil
 }
 

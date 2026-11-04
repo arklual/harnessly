@@ -2,7 +2,9 @@ package agentbrowser
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,5 +66,75 @@ func TestSecretMasksAcrossTabs(t *testing.T) {
 	}
 	if got := i.Tabs("other")[0].Title; got != "[redacted]" {
 		t.Fatal("sibling tab metadata exposed an overlapping value")
+	}
+}
+
+func TestSecretInputReservationRollbackAndDurability(t *testing.T) {
+	m := New(Config{DataDir: t.TempDir()})
+	defer m.Close()
+	i := newInstance(m, DefaultProfile)
+	i.pages["tab"] = newPage(Tab{ID: "tab", Conversation: "chat", URL: "about:blank", Control: "agent"})
+	value := strings.Repeat("p7", 13)
+	finish, err := i.BeginSecretInput("chat", "tab", "document")
+	must(t, err)
+	mask := i.ReserveSecrets(value)
+	if i.Redact(value) != "[redacted]" {
+		t.Fatal("in-flight value was not masked")
+	}
+	restored := newInstance(m, DefaultProfile)
+	if tab := restored.Tabs("chat")[0]; !tab.Sealed || !tab.SecretUntracked {
+		t.Fatal("in-flight input was not durably sealed")
+	}
+	mask(false)
+	finish(false)
+	if i.Tabs("chat")[0].Sealed || i.Tabs("chat")[0].SecretTouched || i.Redact(value) != value {
+		t.Fatal("rejected input retained state")
+	}
+	first, second := i.ReserveSecrets(value), i.ReserveSecrets(value)
+	first(false)
+	if i.Redact(value) != "[redacted]" {
+		t.Fatal("rollback removed another reservation")
+	}
+	second(true)
+	third := i.ReserveSecrets(value)
+	third(false)
+	if i.Redact(value) != "[redacted]" {
+		t.Fatal("rollback removed a committed mask")
+	}
+}
+
+func TestUnsealRejectsReplacedGenerationAndControl(t *testing.T) {
+	m := New(Config{DataDir: t.TempDir()})
+	defer m.Close()
+	i := newInstance(m, DefaultProfile)
+	defer i.cancel()
+	p := newPage(Tab{ID: "tab", Conversation: "chat", URL: "about:blank", Control: "agent"})
+	i.pages[p.ID] = p
+	must(t, i.Seal("chat", p.ID, "document"))
+	checked := i.Tabs("chat")[0]
+	must(t, i.SetControl(p.ID, "person"))
+	must(t, i.setControl(p.ID, "agent", func(context.Context, string) (string, bool, error) {
+		return "document", true, nil
+	}))
+	if err := i.Unseal("chat", p.ID, checked.SealGeneration); err == nil {
+		t.Fatal("stale field proof removed a newer handoff seal in the same document")
+	}
+	current := i.Tabs("chat")[0]
+	if !current.Sealed || !current.SecretUntracked {
+		t.Fatal("failed comparison changed the current seal")
+	}
+	must(t, i.SetControl(p.ID, "person"))
+	if err := i.Unseal("chat", p.ID, current.SealGeneration); !errors.Is(err, ErrPersonControl) {
+		t.Fatal("seal release ignored person control")
+	}
+	if err := i.Unseal("another-chat", p.ID, current.SealGeneration); !errors.Is(err, ErrNotOwner) {
+		t.Fatal("seal release ignored ownership")
+	}
+	must(t, i.setControl(p.ID, "agent", func(context.Context, string) (string, bool, error) {
+		return "document", false, nil
+	}))
+	must(t, i.Unseal("chat", p.ID, current.SealGeneration))
+	if i.Tabs("chat")[0].Sealed {
+		t.Fatal("matching seal was not released")
 	}
 }

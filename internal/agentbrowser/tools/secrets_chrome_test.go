@@ -3,8 +3,8 @@ package tools
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -135,7 +135,27 @@ func TestChromeFillSecret(t *testing.T) {
 			}))
 			defer server.Close()
 			c := mcpClient{t, server.URL, "chat", value, server.Client()}
-			navigate := func(path string) { c.text("navigate", map[string]any{"url": pageURL + path}) }
+			navigate := func(path string) {
+				i, e := manager.InstanceFor(t.Context(), "chat")
+				must(t, e)
+				for _, tab := range i.Tabs("chat") {
+					c.text("close_tab", map[string]any{"tab": tab.ID})
+				}
+				c.text("open", map[string]any{"url": pageURL + path})
+			}
+			fixtureJS := func(expression string) {
+				i, e := manager.InstanceFor(t.Context(), "chat")
+				must(t, e)
+				raw, e := i.Call(t.Context(), i.Current("chat"), "Runtime.evaluate", map[string]any{"expression": expression})
+				must(t, e)
+				var result struct {
+					Exception json.RawMessage `json:"exceptionDetails"`
+				}
+				must(t, json.Unmarshal(raw, &result))
+				if result.Exception != nil {
+					t.Fatal("fixture JavaScript assertion failed")
+				}
+			}
 			fill := func() { c.text("fill_secret", map[string]any{"id": c.node("Credential"), "secret": "login"}) }
 			navigate("/login")
 			fill()
@@ -183,23 +203,27 @@ func TestChromeFillSecret(t *testing.T) {
 				runCLI("fill_secret", map[string]any{"id": c.node("Credential"), "secret": "login"}, 0)
 				c.refuses("evaluate", map[string]any{"expression": "window.forbiddenRan = true"}, "sealed")
 				c.text("click", map[string]any{"id": c.node(button)})
-				c.eval("window.forbiddenRan === undefined", "true")
+				if button == "Clear" {
+					c.refuses("evaluate", map[string]any{"expression": "1"}, "sealed")
+				} else {
+					c.eval("window.forbiddenRan === undefined", "true")
+				}
 			}
 			for _, kind := range []string{"password", "text", "email", "tel"} {
 				navigate("/login?type=" + kind)
-				c.eval("document.querySelector('[name=credential]').value='old';true", "true")
+				fixtureJS("document.querySelector('[name=credential]').value='old'")
 				fill()
 				// A private CDP assertion observes only a boolean, never returning the value through an agent tool.
 				i, e := manager.InstanceFor(t.Context(), "chat")
 				must(t, e)
 				st, e := service.state(t.Context(), i, "chat", i.Current("chat"))
 				must(t, e)
-				st.action.Lock()
+				st.mu.Lock()
 				field := st.sealed[len(st.sealed)-1]
+				st.mu.Unlock()
 				var exact bool
 				e = (Tools{S: service, Caller: "chat"}).nodeCheck(t.Context(), i, i.Current("chat"), field.ref, field.object,
 					"function(){return this.value === "+jsonText(value)+"}", &exact)
-				st.action.Unlock()
 				must(t, e)
 				if !exact {
 					t.Fatal("secret did not replace existing field text")
@@ -208,24 +232,18 @@ func TestChromeFillSecret(t *testing.T) {
 			navigate("/shadow")
 			fill()
 			c.refuses("evaluate", map[string]any{"expression": "1"}, "sealed")
-			// Document the architecture's residual information channels, not a promise of semantic masking.
+			// A site-owned copy remains masked; clearing does not permit page evaluation.
 			navigate("/copy")
 			fill()
-			encoded := base64.StdEncoding.EncodeToString([]byte(value))
-			if !strings.Contains(c.text("snapshot", nil), encoded) {
-				t.Fatal("fixture did not expose the expected encoded DOM copy")
+			if strings.Contains(c.text("snapshot", nil), value) {
+				t.Fatal("snapshot leaked a site copy")
 			}
 			c.text("click", map[string]any{"id": c.node("Clear")})
-			c.eval("btoa(window.saved)", encoded)
+			c.refuses("evaluate", map[string]any{"expression": "btoa(window.saved)"}, "sealed")
 			navigate("/copy")
 			fill()
-			original, e := manager.InstanceFor(t.Context(), "chat")
-			must(t, e)
-			sealedTab := original.Current("chat")
 			c.text("click", map[string]any{"id": c.node("Open copy")})
-			c.eval("btoa(opener.document.querySelector('input').value)", encoded)
-			c.refuses("evaluate", map[string]any{"tab": sealedTab, "expression": "1"}, "sealed")
-			c.text("close_tab", nil)
+			c.refuses("evaluate", map[string]any{"expression": "btoa(opener.document.querySelector('input').value)"}, "sealed")
 			// Wrong port, host, scheme and subdomain are exact mismatches, never suffix matches.
 			for _, origin := range []string{pageURL + "1", strings.Replace(pageURL, "127.0.0.1", "localhost", 1), strings.Replace(pageURL, "http:", "https:", 1), "https://sub.example.com"} {
 				// The first test may produce an invalid port; use a valid distinct port instead.
@@ -244,7 +262,7 @@ func TestChromeFillSecret(t *testing.T) {
 				navigate(path)
 				id := c.node("Credential")
 				if path == "/hidden" {
-					c.eval("document.querySelector('[name=credential]').style.display='none';true", "true")
+					fixtureJS("document.querySelector('[name=credential]').style.display='none'")
 				}
 				want := "visible"
 				if path == "/focus" {
@@ -265,11 +283,11 @@ func TestChromeFillSecret(t *testing.T) {
 			c.refuses("fill_secret", map[string]any{"id": c.node("Credential"), "secret": "login"}, "origin")
 			_, err = store.Metadata("login", []string{strings.Replace(pageURL, "127.0.0.1", "localhost", 1)}, []string{"alpha"})
 			must(t, err)
-			for _, trap := range []string{"/iframe-focus", "/iframe-opacity"} {
-				navigate(trap)
-				c.refuses("fill_secret", map[string]any{"id": c.node("Credential"), "secret": "login"}, "focus")
-				c.eval("document.getElementById('outside').value === ''", "true")
-			}
+			// Input runs in the frame document; its embedding page cannot redirect it by moving focus.
+			navigate("/iframe-focus")
+			fill()
+			fixtureJS("if(document.getElementById('outside').value!=='')throw new Error('unexpected input')")
+
 			navigate("/iframe")
 			fill()
 			// The frame origin, intentionally not its embedding page, is the authority.
@@ -288,7 +306,7 @@ func TestChromeFillSecret(t *testing.T) {
 			c.eval("true", "true")
 			navigate("/iframe")
 			hiddenID := c.node("Credential")
-			c.eval("document.querySelector('iframe').style.display='none';true", "true")
+			fixtureJS("document.querySelector('iframe').style.display='none'")
 			c.refuses("fill_secret", map[string]any{"id": hiddenID, "secret": "login"}, "visible")
 			// Real TLS on loopback tests host and subdomain boundaries without external DNS.
 			secure := httptest.NewTLSServer(page.Config.Handler)
@@ -301,6 +319,10 @@ func TestChromeFillSecret(t *testing.T) {
 			c.text("navigate", map[string]any{"url": allowedTLS + "/login"})
 			fill()
 			for _, deniedTLS := range []string{secure.URL, strings.Replace(allowedTLS, "localhost", "sub.localhost", 1)} {
+				c.text("close_tab", nil)
+				c.text("open", map[string]any{"url": "about:blank"})
+				_, e = i.Call(t.Context(), i.Current("chat"), "Security.setIgnoreCertificateErrors", map[string]any{"ignore": true})
+				must(t, e)
 				c.text("navigate", map[string]any{"url": deniedTLS + "/login"})
 				c.refuses("fill_secret", map[string]any{"id": c.node("Credential"), "secret": "login"}, "origin")
 				c.eval("document.querySelector('[name=credential]').value === ''", "true")
@@ -315,12 +337,12 @@ func TestChromeFillSecret(t *testing.T) {
 			c.text("fill_secret", map[string]any{"id": c.node("Credential"), "secret": "number"})
 			st, e := service.state(t.Context(), i, "chat", i.Current("chat"))
 			must(t, e)
-			st.action.Lock()
+			st.mu.Lock()
 			field := st.sealed[len(st.sealed)-1]
+			st.mu.Unlock()
 			var numericOK bool
 			e = (Tools{S: service, Caller: "chat"}).nodeCheck(t.Context(), i, i.Current("chat"), field.ref, field.object,
 				"function(){return this.value === "+jsonText(numeric)+"}", &numericOK)
-			st.action.Unlock()
 			must(t, e)
 			if !numericOK {
 				t.Fatal("number input did not receive the numeric secret")

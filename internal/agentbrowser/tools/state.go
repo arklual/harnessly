@@ -23,7 +23,6 @@ type nodeRef struct {
 type tabState struct {
 	mask             func(string) string
 	register         func(string)
-	action           sync.Mutex
 	sealed           []sealedField
 	mu               sync.Mutex
 	refs             map[string]nodeRef
