@@ -426,3 +426,50 @@ describe('origin-only grants', () => {
     pinLocale('en');
   });
 });
+
+describe('value request copy', () => {
+  it.each([
+    [
+      'en',
+      'https://example.org',
+      'Password or code',
+      'The agent will not see the value: it only gets "done" and enters it into a field on this site',
+    ],
+    [
+      'ru',
+      'https://example.org',
+      'Пароль или код',
+      'Агент не увидит значение: он получит только «готово» и введёт его в поле на этом сайте',
+    ],
+    [
+      'en',
+      '',
+      'Paste the token or key',
+      'The agent never sees the value: it gets only «ready» and puts the secret into its commands.',
+    ],
+    [
+      'ru',
+      '',
+      'Вставьте токен или ключ',
+      'Агент не увидит значение: он получит только «готово» и будет подставлять секрет в команды.',
+    ],
+  ] as const)('matches the site context in %s (%s)', (locale, origin, placeholder, note) => {
+    pinLocale(locale);
+    try {
+      inRoot(
+        <SafeAskDialog
+          ask={readAsk({ id: 'value-card', name: 'login', why: '', conv: '', title: '', at: NOW, origin })}
+          more={0}
+          onGrant={async () => null}
+          onPut={async () => null}
+          onDecline={async () => null}
+          onLater={() => undefined}
+        />,
+      );
+      expect(screen.getByPlaceholderText(placeholder)).toBeTruthy();
+      expect(screen.getByText(note, { exact: true })).toBeTruthy();
+    } finally {
+      pinLocale('en');
+    }
+  });
+});

@@ -33,6 +33,8 @@
   "next.safe.ask.titleReplace": "An agent asks for a new value of «{name}»",
   "next.safe.ask.lead": "The value goes into this machine's safe, not through the chat",
   "next.safe.ask.leadChat": "Chat «{chat}». The value goes into the machine's safe, not through the chat",
+  "next.safe.ask.sitePlaceholder": "Password or code",
+  "next.safe.ask.siteNote": "The agent will not see the value: it only gets \"done\" and enters it into a field on this site",
   "next.safe.ask.note": "The agent never sees the value: it gets only «ready» and puts the secret into its commands.",
   "next.safe.ask.more": "More requests: {n}",
   "next.safe.ask.put": "Put in the safe",

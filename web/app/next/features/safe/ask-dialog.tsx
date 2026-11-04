@@ -118,7 +118,7 @@ const SafeAskDialog = ({
                 setError(null);
               }}
               label={t('next.safe.value', { name: shown?.name ?? '' })}
-              placeholder={t('next.safe.value.placeholder')}
+              placeholder={t(shown?.origin ? 'next.safe.ask.sitePlaceholder' : 'next.safe.value.placeholder')}
               disabled={busy !== null}
               invalid={error !== null}
             />
@@ -131,7 +131,9 @@ const SafeAskDialog = ({
                   ? 'next.safe.ask.noteGrant'
                   : shown?.originGrant
                     ? 'next.safe.ask.noteOriginGrant'
-                    : 'next.safe.ask.note',
+                    : shown?.origin
+                      ? 'next.safe.ask.siteNote'
+                      : 'next.safe.ask.note',
               )}
             </span>
           </p>
