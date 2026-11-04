@@ -23,8 +23,10 @@ import (
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
+// LogLimit caps the persistent host log in bytes.
 const LogLimit = 4 << 20
 
+// Config contains the paths and display mode for one profile host.
 type Config struct{ ProfileDir, Socket, Chrome, Mode string }
 
 // SocketPath keeps room for the terminating NUL on both Linux and Darwin.
@@ -36,6 +38,8 @@ func SocketPath(runDir, profile string) string {
 	sum := sha256.Sum256([]byte(p))
 	return filepath.Join("/tmp", fmt.Sprintf("agent-browser-%d-%x", os.Getuid(), sum[:12]), "host.sock")
 }
+
+// PrivateDir creates an owner-only directory and rejects foreign ownership or symlinks.
 func PrivateDir(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -53,6 +57,7 @@ func PrivateDir(dir string) error {
 	return os.Chmod(dir, 0700)
 }
 
+// Main parses the browser-host subcommand and handles termination signals.
 func Main(args []string) error {
 	fs := flag.NewFlagSet("browser-host", flag.ContinueOnError)
 	var cfg Config
@@ -81,7 +86,9 @@ func Start(executable string, cfg Config) error {
 	if st, e := f.Stat(); e == nil && st.Size() > LogLimit {
 		_ = f.Truncate(0)
 	}
-	cmd := exec.Command(executable, "browser-host", "--profile", cfg.ProfileDir, "--socket", cfg.Socket, "--chrome", cfg.Chrome, "--mode", cfg.Mode)
+	cmd := exec.Command(executable, "browser-host",
+		"--profile", cfg.ProfileDir, "--socket", cfg.Socket, "--chrome", cfg.Chrome, "--mode", cfg.Mode,
+	)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = f
 	cmd.Stderr = f
@@ -127,6 +134,7 @@ type pipe struct {
 
 func (p pipe) Close() error { _ = p.ReadCloser.Close(); return p.WriteCloser.Close() }
 
+// Run owns a profile lock, relay, display and Chrome until termination.
 func Run(ctx context.Context, cfg Config) error {
 	if cfg.ProfileDir == "" || cfg.Socket == "" || cfg.Chrome == "" {
 		return errors.New("browser-host requires profile, socket and chrome")
@@ -220,7 +228,12 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 	defer readChrome.Close()
 	defer fromChrome.Close()
-	args := []string{"--remote-debugging-pipe", "--user-data-dir=" + filepath.Join(cfg.ProfileDir, "chrome"), "--no-first-run", "--no-default-browser-check", "--password-store=basic", "--use-mock-keychain", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--disable-background-timer-throttling", "--disable-dev-shm-usage"}
+	args := []string{
+		"--remote-debugging-pipe", "--user-data-dir=" + filepath.Join(cfg.ProfileDir, "chrome"),
+		"--no-first-run", "--no-default-browser-check", "--password-store=basic", "--use-mock-keychain",
+		"--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding",
+		"--disable-background-timer-throttling", "--disable-dev-shm-usage",
+	}
 	if display == "" {
 		args = append(args, "--headless=new")
 	}
@@ -232,6 +245,16 @@ func Run(ctx context.Context, cfg Config) error {
 	chrome.Stderr = log
 	chrome.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	chrome.Env = os.Environ()
+	// Chrome puts SingletonSocket beneath TMPDIR, with its own generated suffix.
+	// A short relay address alone cannot protect startup from a long caller TMPDIR.
+	if len(os.TempDir()) > 50 {
+		tempDir, e := os.MkdirTemp("/tmp", "agent-browser-")
+		if e != nil {
+			return e
+		}
+		defer os.RemoveAll(tempDir)
+		chrome.Env = append(chrome.Env, "TMPDIR="+tempDir)
+	}
 	if display != "" {
 		chrome.Env = append(chrome.Env, "DISPLAY="+display)
 	}
@@ -247,7 +270,7 @@ func Run(ctx context.Context, cfg Config) error {
 	chromeDone := make(chan error, 1)
 	go func() { chromeDone <- chrome.Wait() }()
 	stream := cdp.NewStream(pipe{readChrome, writeChrome})
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	r := &relay{chrome: stream}
 	defer func() {
 		_ = listener.Close()
@@ -269,10 +292,11 @@ func Run(ctx context.Context, cfg Config) error {
 			r.replace(conn)
 		}
 	}()
+	var relayErr error
 	select {
 	case err = <-chromeDone:
 		return err
-	case <-readDone:
+	case relayErr = <-readDone:
 	case <-ctx.Done():
 	}
 	// Give Chrome a chance to flush persistent cookies before terminating its process group.
@@ -280,10 +304,13 @@ func Run(ctx context.Context, cfg Config) error {
 	_ = stream.Write(closeCtx, []byte(`{"id":0,"method":"Browser.close"}`))
 	cancel()
 	select {
-	case <-chromeDone:
+	case err = <-chromeDone:
 	case <-time.After(3 * time.Second):
 		_ = syscall.Kill(-chrome.Process.Pid, syscall.SIGKILL)
-		<-chromeDone
+		err = <-chromeDone
 	}
-	return nil
+	if ctx.Err() != nil {
+		return nil
+	}
+	return errors.Join(err, relayErr)
 }

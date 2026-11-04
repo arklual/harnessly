@@ -25,6 +25,7 @@ type request struct {
 	id     json.RawMessage
 	method string
 }
+
 type relay struct {
 	mu      sync.Mutex
 	current *client
@@ -36,12 +37,14 @@ type relay struct {
 
 func (r *relay) detach(sessions []string) {
 	for _, session := range sessions {
-		raw, _ := json.Marshal(map[string]any{"id": 0, "method": "Target.detachFromTarget", "params": map[string]string{"sessionId": session}})
+		raw, _ := json.Marshal(map[string]any{"id": 0, "method": "Target.detachFromTarget",
+			"params": map[string]string{"sessionId": session}})
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		_ = r.chrome.Write(ctx, raw)
 		cancel()
 	}
 }
+
 func (r *relay) disconnect(c *client) {
 	c.close()
 	r.mu.Lock()
@@ -62,6 +65,7 @@ func (r *relay) disconnect(c *client) {
 	// Detach stops the old client's screencasts without closing any browser tabs.
 	r.detach(sessions)
 }
+
 func (r *relay) replace(conn net.Conn) {
 	c := &client{conn: conn, frames: make(chan []byte, 32), done: make(chan struct{}), sessions: map[string]bool{}}
 	r.mu.Lock()
@@ -137,6 +141,7 @@ func (r *relay) replace(conn net.Conn) {
 		}
 	}()
 }
+
 func (r *relay) read(ctx context.Context) error {
 	for {
 		raw, err := r.chrome.Read(ctx)
@@ -181,14 +186,15 @@ func (r *relay) read(ctx context.Context) error {
 			msg["id"] = req.id
 			raw, _ = json.Marshal(msg)
 		}
+		r.mu.Unlock()
+		// Backpressure preserves bursts; replacement and write deadlines can still close this client.
 		if c != nil {
 			select {
+			case <-ctx.Done():
+				return ctx.Err()
 			case <-c.done:
 			case c.frames <- raw:
-			default:
-				c.close()
 			}
 		}
-		r.mu.Unlock()
 	}
 }

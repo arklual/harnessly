@@ -3,7 +3,6 @@ package host
 import (
 	"context"
 	"encoding/json"
-	"github.com/ly-solutions/harnessly/internal/cdp"
 	"net"
 	"os"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/ly-solutions/harnessly/internal/cdp"
 )
 
 func TestLongSocketAndStaleLock(t *testing.T) {
@@ -32,6 +33,7 @@ func TestLongSocketAndStaleLock(t *testing.T) {
 		t.Fatalf("lock not respected: %v", err)
 	}
 }
+
 func TestCappedLog(t *testing.T) {
 	f, err := os.OpenFile(filepath.Join(t.TempDir(), "host.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
@@ -118,4 +120,113 @@ func TestRelayReplacementKeepsMessageAndRequestBoundaries(t *testing.T) {
 	if result["id"] != float64(1) || result["result"] != "new" {
 		t.Fatalf("late reply crossed clients: %s", response)
 	}
+}
+
+func TestRelayBurstBackpressure(t *testing.T) {
+	chromeSide, hostSide := net.Pipe()
+	defer chromeSide.Close()
+	stream := cdp.NewStream(hostSide)
+	defer stream.Close()
+	r := &relay{chrome: stream}
+	go func() { _ = r.read(t.Context()) }()
+	clientSide, relaySide := net.Pipe()
+	defer clientSide.Close()
+	r.replace(relaySide)
+	peer := cdp.NewStream(chromeSide)
+	viewer := cdp.NewStream(clientSide)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	sent := make(chan error, 1)
+	go func() {
+		for n := 0; n < 3000; n++ {
+			raw, _ := json.Marshal(map[string]any{"method": "Network.event", "params": map[string]int{"n": n}})
+			if err := peer.Write(ctx, raw); err != nil {
+				sent <- err
+				return
+			}
+		}
+		sent <- nil
+	}()
+	// Fill the small queue before consuming, then keep a deliberately slower reader.
+	time.Sleep(150 * time.Millisecond)
+	for n := 0; n < 3000; n++ {
+		raw, err := viewer.Read(ctx)
+		if err != nil {
+			t.Fatalf("event %d: %v", n, err)
+		}
+		var event struct {
+			Params struct {
+				N int `json:"n"`
+			} `json:"params"`
+		}
+		if err = json.Unmarshal(raw, &event); err != nil || event.Params.N != n {
+			t.Fatalf("event %d: %s (%v)", n, raw, err)
+		}
+		if n%50 == 0 {
+			time.Sleep(time.Millisecond)
+		}
+	}
+	if err := <-sent; err != nil {
+		t.Fatal(err)
+	}
+	t.Log("3000 ordered events delivered to a slow client without disconnect")
+}
+
+func TestRelayStalledClientDeadlineAndReplacement(t *testing.T) {
+	chromeSide, hostSide := net.Pipe()
+	defer chromeSide.Close()
+	stream := cdp.NewStream(hostSide)
+	defer stream.Close()
+	r := &relay{chrome: stream}
+	go func() { _ = r.read(t.Context()) }()
+	first, firstHost := net.Pipe()
+	defer first.Close()
+	r.replace(firstHost)
+	r.mu.Lock()
+	old := r.current
+	r.mu.Unlock()
+	peer := cdp.NewStream(chromeSide)
+	started := time.Now()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	sent := make(chan error, 1)
+	go func() {
+		for n := 0; n < 100; n++ {
+			if err := peer.Write(ctx, []byte(`{"method":"Network.event"}`)); err != nil {
+				sent <- err
+				return
+			}
+		}
+		sent <- nil
+	}()
+	select {
+	case <-old.done:
+	case <-ctx.Done():
+		t.Fatal("stalled client was not closed")
+	}
+	elapsed := time.Since(started)
+	if elapsed < 4*time.Second || elapsed > 7*time.Second {
+		t.Fatalf("write deadline: %s", elapsed)
+	}
+	if err := <-sent; err != nil {
+		t.Fatal(err)
+	}
+	second, secondHost := net.Pipe()
+	defer second.Close()
+	r.replace(secondHost)
+	go func() { sent <- peer.Write(ctx, []byte(`{"method":"Browser.replacement"}`)) }()
+	reader := cdp.NewStream(second)
+	for {
+		raw, err := reader.Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(raw), "replacement") {
+			break
+		}
+	}
+	if err := <-sent; err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("stalled client closed after %s; replacement received its event", elapsed.Round(time.Millisecond))
 }
