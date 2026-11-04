@@ -1,18 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
+	"github.com/ly-solutions/harnessly/internal/agentbrowser/host"
 )
 
 func TestAgentBrowserLoginPageGuards(t *testing.T) {
@@ -89,13 +89,14 @@ func TestAgentBrowserLoginPageDecisionsChrome(t *testing.T) {
 	t.Cleanup(func() {
 		m.Close()
 		profile := filepath.Join(data, "agent-browser", "profiles", agentbrowser.DefaultProfile)
-		for _, name := range []string{"host", "chrome", "xvfb"} {
-			raw, _ := os.ReadFile(filepath.Join(profile, name+".pid"))
-			pid, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
-			if pid > 0 {
-				_ = syscall.Kill(pid, syscall.SIGTERM)
-			}
+		// Wait for Chrome's final profile writes before TempDir removes its files.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		socket := host.SocketPath(filepath.Join(data, "agent-browser", "run"), agentbrowser.DefaultProfile)
+		if err := host.Stop(ctx, profile, socket); err != nil {
+			t.Errorf("stop private browser host: %v", err)
 		}
+
 	})
 	d := deps{SessionOK: func(r *http.Request) bool { return r.Header.Get("Cookie") == "session=ok" }}
 	handler := agentBrowserLoginRoutes(d, a)[0].Handler
