@@ -2,10 +2,13 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -94,4 +97,40 @@ func TestRecordingBoundsAndRedaction(t *testing.T) {
 	if strings.Contains(st.network[0], "secret") {
 		t.Fatal("network secret leaked")
 	}
+}
+
+func TestSnapshotContinuationAfterFrameChanges(t *testing.T) {
+	st := &tabState{refs: map[string]nodeRef{}, epochs: map[string]uint64{}, snapshot: []snapshotLine{{text: "first page"}}}
+	for n := 0; n < 1000; n++ {
+		frame := fmt.Sprintf("changed-frame-%d", n)
+		st.epochs[frame] = 1
+		st.snapshot = append(st.snapshot, snapshotLine{text: "obsolete", ref: nodeRef{frame: frame}})
+	}
+	st.snapshot = append(st.snapshot, snapshotLine{text: `[last] button "Main document"`, id: "last", ref: nodeRef{frame: "main"}})
+	offset := 1
+	for pages := 0; pages < 20; pages++ {
+		out, err := (Tools{}).snapshot(t.Context(), nil, st, arguments{Offset: offset})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(out) > resultLimit || strings.Contains(out, "obsolete") || strings.Contains(out, "truncated") {
+			t.Fatal("continuation leaked obsolete rows or exceeded the page limit")
+		}
+		if strings.Contains(out, "next_offset: null") {
+			if _, ok := st.refs["last"]; !ok {
+				t.Fatal("main document ID was lost")
+			}
+			return
+		}
+		match := regexp.MustCompile(`next_offset: (\d+)`).FindStringSubmatch(out)
+		if len(match) != 2 {
+			t.Fatal("missing continuation")
+		}
+		next, err := strconv.Atoi(match[1])
+		if err != nil || next <= offset {
+			t.Fatal("pagination did not advance")
+		}
+		offset = next
+	}
+	t.Fatal("pagination did not terminate")
 }

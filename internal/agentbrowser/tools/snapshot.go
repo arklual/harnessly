@@ -153,8 +153,21 @@ func (t Tools) snapshot(ctx context.Context, i *agentbrowser.Instance, st *tabSt
 	}
 	var out strings.Builder
 	end := a.Offset
+	changed := map[string]bool{}
 	for end < len(st.snapshot) {
 		line := st.snapshot[end]
+		if line.ref.frame != "" && line.ref.epoch != st.epochs[line.ref.frame] {
+			if !changed[line.ref.frame] {
+				notice := fmt.Sprintf("[Frame %s changed; its old rows are omitted. Refresh offset 0 to inspect it.]\n", line.ref.frame)
+				if out.Len()+len(notice) > resultLimit-512 {
+					break
+				}
+				out.WriteString(notice)
+				changed[line.ref.frame] = true
+			}
+			end++
+			continue
+		}
 		text := st.redactLocked(line.text)
 		// Keep each ID and its line together, reserving space for the pagination instructions.
 		if len(text) > resultLimit-1024 {
@@ -214,7 +227,7 @@ func (t Tools) buildSnapshot(ctx context.Context, i *agentbrowser.Instance, st *
 		for _, n := range r.Nodes {
 			nodes[n.ID] = n
 		}
-		lines = append(lines, snapshotLine{text: "Frame " + scope.frame})
+		lines = append(lines, snapshotLine{text: "Frame " + scope.frame, ref: nodeRef{frame: scope.frame, epoch: versions[scope.frame]}})
 		var walk func(string, int) error
 		walk = func(nodeID string, depth int) error {
 			n, ok := nodes[nodeID]

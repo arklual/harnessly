@@ -180,7 +180,7 @@ func TestChromeMCP(t *testing.T) {
 				w.Header().Set("Content-Type", "text/html")
 				switch r.URL.Path {
 				case "/large":
-					fmt.Fprint(w, `<h1>Large page context</h1><p>Noninteractive explanation</p>`)
+					fmt.Fprint(w, `<h1>Large page context</h1><p>Noninteractive explanation</p><iframe src="/frame"></iframe>`)
 					for n := 0; n < 5000; n++ {
 						fmt.Fprintf(w, `<div><button onclick="document.body.dataset.last=this.textContent">Large button %04d</button></div>`, n)
 					}
@@ -454,11 +454,14 @@ window.addEventListener('keydown',e=>document.body.dataset.code=e.code);true`})
 				c.text("navigate", map[string]any{"url": page.URL + "/large"})
 				started := time.Now()
 				snap := c.text("snapshot", nil)
-				t.Logf("5000 elements: first snapshot %s, %d bytes", time.Since(started), len(snap))
+				snapshotTime := time.Since(started)
+				t.Logf("5000 elements: first snapshot %s, %d bytes", snapshotTime, len(snap))
 				early := snapshotID(t, snap, "Large button 0000")
 				if strings.Contains(snap, "InlineTextBox") || strings.Contains(snap, `generic ""`) {
 					t.Fatal("snapshot noise")
 				}
+				// An ad frame reload between pages must not discard the rest of the main document.
+				c.text("evaluate", map[string]any{"expression": "document.querySelector('iframe').src += '?reload=1'"})
 				pages := 1
 				for !strings.Contains(snap, `button "Large button 4999"`) {
 					match := regexp.MustCompile(`next_offset: (\d+)`).FindStringSubmatch(snap)
@@ -467,10 +470,12 @@ window.addEventListener('keydown',e=>document.body.dataset.code=e.code);true`})
 					}
 					offset, e := strconv.Atoi(match[1])
 					must(t, e)
+					partStart := time.Now()
 					snap = c.text("snapshot", map[string]any{"offset": offset})
+					snapshotTime += time.Since(partStart)
 					pages++
 				}
-				t.Logf("5000 elements: %d pages in %s", pages, time.Since(started))
+				t.Logf("5000 elements: %d pages in %s", pages, snapshotTime)
 				last := snapshotID(t, snap, "Large button 4999")
 				c.text("click", map[string]any{"id": last})
 				c.eval("document.body.dataset.last", `"Large button 4999"`)

@@ -354,6 +354,9 @@ func (st *tabState) invalidateFrame(id string, main bool) {
 			delete(st.refs, ref)
 		}
 	}
-	// A continuation must never mix rows from two different documents. Existing IDs in other frames survive.
-	st.snapshot = nil
+	// A child navigation must not interrupt pagination of the unchanged main document.
+	// Its cached rows are skipped by snapshot; only a top-level navigation discards the whole snapshot.
+	if main {
+		st.snapshot = nil
+	}
 }
