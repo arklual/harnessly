@@ -736,11 +736,23 @@ test('manual login opens across chats, protects Chrome until Done and supports C
         method: request.method(),
         ...(request.method() === 'POST' ? { body: request.postData()! } : {}),
       });
-      await route.fulfill({
-        status: response.status,
-        body: await response.text(),
-        contentType: 'application/json',
-      });
+      await route
+        .fulfill({
+          status: response.status,
+          body: await response.text(),
+          contentType: 'application/json',
+        })
+        .catch((error: unknown) => {
+          // Navigation can cancel a login poll while the upstream fetch is pending.
+          if (
+            !(error instanceof Error) ||
+            !/^route\.fulfill: (Route is already handled!|Target page, context or browser has been closed)(?:\n|$)/.test(
+              error.message,
+            )
+          ) {
+            throw error;
+          }
+        });
     });
     await page.routeWebSocket('**/api/agent-browser?*', (ws) => {
       const url = new URL(ws.url());
@@ -824,11 +836,23 @@ test('scripted page warns before takeover on desktop and phone and a fresh manua
         method: request.method(),
         ...(request.method() === 'POST' ? { body: request.postData()! } : {}),
       });
-      await route.fulfill({
-        status: response.status,
-        body: await response.text(),
-        contentType: 'application/json',
-      });
+      await route
+        .fulfill({
+          status: response.status,
+          body: await response.text(),
+          contentType: 'application/json',
+        })
+        .catch((error: unknown) => {
+          // Navigation can cancel a login poll while the upstream fetch is pending.
+          if (
+            !(error instanceof Error) ||
+            !/^route\.fulfill: (Route is already handled!|Target page, context or browser has been closed)(?:\n|$)/.test(
+              error.message,
+            )
+          ) {
+            throw error;
+          }
+        });
     });
     await page.routeWebSocket('**/api/agent-browser?*', (ws) => {
       const url = new URL(ws.url());
