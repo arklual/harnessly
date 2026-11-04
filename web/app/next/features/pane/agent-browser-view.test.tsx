@@ -78,7 +78,7 @@ describe('agent browser panel', () => {
     expect(screen.getByRole('progressbar').getAttribute('value')).toBe('35');
     expect(screen.getByText('Unpacking')).toBeTruthy();
     Socket.last.emit({ t: 'notice', message: 'Try again' });
-    expect(screen.getByRole('alert').textContent).toBe('Try again');
+    expect(screen.getByRole('alert').textContent).toBe('noticeFailed');
     Socket.last.emit({
       t: 'status',
       state: 'error',
@@ -182,5 +182,59 @@ describe('viewport and frame timing', () => {
     });
     expect(close).toHaveBeenCalledOnce();
     expect(screen.getByLabelText('screen').getAttribute('data-shown')).toBe('false');
+  });
+});
+
+describe('panel review fixes', () => {
+  it('does not fit another conversation or a legacy agent viewport', () => {
+    vi.useFakeTimers();
+    render(<AgentBrowserView url="ws://test" />);
+    Socket.last.emit({ t: 'status', state: 'up', profile: { id: 'common', name: 'Common' } });
+    tabs([{ ...tab('other', 'other'), viewport: { mode: 'fit', w: 800, h: 600, dpr: 1 } }]);
+    act(() => vi.advanceTimersByTime(600));
+    expect(Socket.last.sent).toHaveLength(0);
+    tabs([{ ...tab('agent'), viewport: { mode: '' as 'fixed', w: 1280, h: 800, dpr: 1 } }]);
+    act(() => vi.advanceTimersByTime(600));
+    expect(Socket.last.sent).toHaveLength(0);
+    expect(screen.getByLabelText('resize')).toBeTruthy();
+  });
+  it('expires translated notices and suppresses only the legacy retry rejection', () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    render(<AgentBrowserView url="ws://test" />);
+    Socket.last.emit({ t: 'notice', message: 'Not attached to an active page' });
+    expect(screen.getByRole('alert').textContent).toBe('noticePage');
+    act(() => vi.advanceTimersByTime(5100));
+    expect(screen.queryByRole('alert')).toBeNull();
+    Socket.last.emit({
+      t: 'status',
+      state: 'error',
+      error: 'Setup failed',
+      command: 'browser install',
+      profile: { id: 'p', name: 'P' },
+    });
+    expect(screen.getByText('browser install')).toBeTruthy();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    fireEvent.click(screen.getByText('copy'));
+    expect(writeText).toHaveBeenCalledWith('browser install');
+    fireEvent.click(screen.getByText('retry'));
+    expect(Socket.last.sent.at(-1)).toEqual({ t: 'browser.retry' });
+    Socket.last.emit({ t: 'notice', message: 'invalid panel command' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    Socket.last.emit({ t: 'notice', message: 'invalid panel command' });
+    expect(screen.getByRole('alert').textContent).toBe('noticeFailed');
+    vi.restoreAllMocks();
+  });
+  it('clears keyboard text immediately and forwards editing keys', () => {
+    render(<AgentBrowserView url="ws://test" />);
+    const input = screen.getByLabelText('keyboardInput') as HTMLTextAreaElement;
+    fireEvent.input(input, { target: { value: 'private' } });
+    expect(input.value).toBe('');
+    expect(Socket.last.sent.at(-1)).toEqual({ t: 'text', text: 'private' });
+    fireEvent.keyDown(input, { key: 'Backspace', code: 'Backspace' });
+    expect(Socket.last.sent.at(-1)).toEqual({ t: 'key', key: 'Backspace', code: 'Backspace', keyCode: 8 });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+    expect(Socket.last.sent.at(-1)).toEqual({ t: 'key', key: 'Enter', code: 'Enter', keyCode: 13 });
   });
 });

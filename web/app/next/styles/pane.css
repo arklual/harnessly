@@ -1977,7 +1977,7 @@ input.hx-tbrowser__url:focus {
   font-size: 11px;
   padding: 0 6px;
 }
-.hx-agent-browser__sizes {
+.hx-cmenu.hx-agent-browser__sizes {
   position: absolute;
   z-index: 5;
   top: 40px;
@@ -1989,9 +1989,9 @@ input.hx-tbrowser__url:focus {
   border: 1px solid var(--hx-border);
   border-radius: 8px;
   background: var(--hx-bg-raised);
-  box-shadow: 0 8px 30px #0003;
+  box-shadow: var(--hx-shadow-overlay);
 }
-.hx-agent-browser__sizes button,
+.hx-agent-browser__sizes form button,
 .hx-agent-browser__note button,
 .hx-agent-browser__modal button {
   padding: 7px 10px;
@@ -2006,9 +2006,25 @@ input.hx-tbrowser__url:focus {
   gap: 6px;
   align-items: center;
 }
+.hx-agent-browser__sizes label {
+  display: grid;
+  grid-template-columns: 68px 12px 68px;
+  align-items: center;
+  gap: 4px;
+}
+.hx-agent-browser__sizes label > span {
+  grid-column: 1 / -1;
+  color: var(--hx-fg-2);
+  font-size: 12px;
+}
 .hx-agent-browser__sizes input {
   width: 68px;
-  margin: 4px;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--hx-border);
+  border-radius: 5px;
+  background: var(--hx-bg);
+  color: inherit;
 }
 .hx-agent-browser__view {
   position: relative;
@@ -2182,4 +2198,35 @@ input.hx-tbrowser__url:focus {
   border-radius: 6px 0 0;
   background: var(--hx-bg-raised);
   color: var(--hx-fg-2);
+}
+
+.hx-agent-browser__keyboard {
+  display: none;
+}
+@media (pointer: coarse) {
+  .hx-agent-browser__keyboard {
+    display: inline-flex;
+  }
+}
+/* Remain focusable on mobile without retaining or displaying the person's input. */
+.hx-agent-browser__keyboard-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+  font-size: 16px;
+  pointer-events: none;
+}
+.hx-agent-browser__command {
+  max-width: 100%;
+}
+.hx-agent-browser__command pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.hx-agent-browser__sizes .hx-cmenu__item {
+  flex-shrink: 0;
 }

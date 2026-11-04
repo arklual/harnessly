@@ -1,3 +1,4 @@
+import { noticeKey } from './agent-browser-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   parseBrowserFrame,
@@ -22,7 +23,9 @@ export function useBrowserSocket(url: string) {
     gen: 0,
   });
   const [menu, setMenu] = useState<ISelectMenu | null>(null);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<{ key: string; at: number } | null>(null);
+  const retryPending = useRef(false),
+    copyUntil = useRef(0);
   const [framed, setFramed] = useState(false);
   const [imageSize, setImageSize] = useState({ w: 1, h: 1 });
   useEffect(() => {
@@ -88,12 +91,25 @@ export function useBrowserSocket(url: string) {
             generation = m.gen;
             setFramed(false);
             setMenu(null);
-            setNotice('');
+            setNotice(null);
           }
           setTabs(m);
         }
         if (m.t === 'select') setMenu(m);
-        if (m.t === 'notice') setNotice(m.message);
+        if (m.t === 'notice') {
+          console.warn('Agent browser command failed:', m.message);
+          // Older runtimes do not implement retry yet. Suppress only their corresponding rejection.
+          if (m.message === 'invalid panel command' && retryPending.current) {
+            retryPending.current = false;
+          } else setNotice({ key: noticeKey(m.message), at: Date.now() });
+        }
+        if (m.t === 'clipboard' && Date.now() < copyUntil.current) {
+          copyUntil.current = 0;
+          void navigator.clipboard.writeText(m.text).catch((error: unknown) => {
+            console.warn('Agent browser clipboard failed:', error);
+            setNotice({ key: 'noticeClipboard', at: Date.now() });
+          });
+        }
       };
       ws.onclose = () => {
         if (gone) return;
@@ -117,10 +133,12 @@ export function useBrowserSocket(url: string) {
   }, [url]);
   useEffect(() => {
     if (!notice) return;
-    const timer = setTimeout(() => setNotice(''), 6000);
+    const timer = setTimeout(() => setNotice(null), 5000);
     return () => clearTimeout(timer);
   }, [notice]);
   const send = useCallback((input: Record<string, unknown>) => {
+    if (input.t === 'browser.retry') retryPending.current = true;
+    if (input.t === 'clipboard.read') copyUntil.current = Date.now() + 5000;
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(JSON.stringify(input));
   }, []);
   return { canvas, page, status, tabs, menu, setMenu, notice, framed, imageSize, send };

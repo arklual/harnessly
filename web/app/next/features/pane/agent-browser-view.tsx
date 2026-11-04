@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { nextClick, pointerButton } from './agent-browser-input';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
 import { pagePoint, type IBrowserTab, type IViewport } from './agent-browser-frame';
@@ -21,8 +22,9 @@ export default function AgentBrowserView({ url }: { url: string }) {
   const area = useRef<HTMLDivElement>(null),
     address = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<string | null>(null);
-  const [sizeOpen, setSizeOpen] = useState(false),
-    [custom, setCustom] = useState(false);
+  const [sizeOpen, setSizeOpen] = useState(false);
+  const keyboard = useRef<HTMLTextAreaElement>(null);
+  const clicks = useRef<ReturnType<typeof nextClick> | null>(null);
   const [width, setWidth] = useState(1280),
     [height, setHeight] = useState(800);
   const [bounds, setBounds] = useState({ w: 320, h: 240 });
@@ -34,8 +36,12 @@ export default function AgentBrowserView({ url }: { url: string }) {
   const moveAt = useRef(0);
   const resize = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   // Recovered and newly discovered tabs can arrive before their first explicit viewport.
-  const mode = active?.viewport.mode || 'fit';
+  const mode = active?.viewport.mode || (active?.by === 'agent' ? 'fixed' : 'fit');
+  const own = active?.owner === 'this';
   const activeId = active?.id;
+  useEffect(() => {
+    clicks.current = null;
+  }, [activeId]);
   const dialog = active?.dialog;
   const viewportWidth = active?.viewport.w,
     viewportHeight = active?.viewport.h;
@@ -49,7 +55,7 @@ export default function AgentBrowserView({ url }: { url: string }) {
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    if (!activeId || mode !== 'fit' || dialog || status?.state !== 'up') return;
+    if (!own || !activeId || mode !== 'fit' || dialog || status?.state !== 'up') return;
     const w = Math.max(320, Math.floor(bounds.w)),
       h = Math.max(240, Math.floor(bounds.h));
     // Avoid clearing device metrics again after dialogs or metadata-only updates.
@@ -66,7 +72,7 @@ export default function AgentBrowserView({ url }: { url: string }) {
       300,
     );
     return () => clearTimeout(timer);
-  }, [bounds, mode, activeId, dialog, viewportWidth, viewportHeight, status?.state, send]);
+  }, [bounds, mode, own, activeId, dialog, viewportWidth, viewportHeight, status?.state, send]);
   useEffect(() => {
     if (focusNew.current && active?.url === 'about:blank') {
       focusNew.current = false;
@@ -78,6 +84,34 @@ export default function AgentBrowserView({ url }: { url: string }) {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  useEffect(() => {
+    const el = keyboard.current;
+    if (!el) return;
+    const before = (event: InputEvent) => {
+      const key =
+        event.inputType === 'deleteContentBackward'
+          ? 'Backspace'
+          : /insertLineBreak|insertParagraph/.test(event.inputType)
+            ? 'Enter'
+            : '';
+      if (key) {
+        event.preventDefault();
+        el.value = '';
+        send({ t: 'key', key, code: key, keyCode: key === 'Backspace' ? 8 : 13 });
+      }
+    };
+    el.addEventListener('beforeinput', before);
+    return () => el.removeEventListener('beforeinput', before);
+  }, [send]);
+  useEffect(() => {
+    if (!sizeOpen) return;
+    const close = (event: globalThis.PointerEvent) => {
+      if (!(event.target as Element).closest('.hx-agent-browser__sizes, .hx-agent-browser__size-button'))
+        setSizeOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [sizeOpen]);
   const newTab = () => {
     focusNew.current = true;
     setDraft('');
@@ -97,13 +131,14 @@ export default function AgentBrowserView({ url }: { url: string }) {
   const mouse = (type: string, event: PointerEvent<HTMLCanvasElement>) => {
     const p = point(event);
     if (!p) return;
+    if (type === 'mousePressed') clicks.current = nextClick(clicks.current, event, performance.now());
     send({
       t: 'mouse',
       type,
       ...p,
-      button: ['left', 'middle', 'right'][event.button] ?? 'none',
-      buttons: event.buttons,
-      clickCount: 1,
+      button: pointerButton(event.button, event.buttons),
+      buttons: type === 'mousePressed' ? event.buttons || 1 : event.buttons,
+      clickCount: type === 'mouseMoved' ? 0 : (clicks.current?.count ?? 1),
       alt: event.altKey,
       ctrl: event.ctrlKey,
       meta: event.metaKey,
@@ -234,11 +269,22 @@ export default function AgentBrowserView({ url }: { url: string }) {
           </details>
         )}
         {sizeOpen && (
-          <div className="hx-agent-browser__sizes" role="dialog" aria-label={label('size')}>
+          <div
+            className="hx-cmenu hx-agent-browser__sizes"
+            role="dialog"
+            aria-label={label('size')}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                setSizeOpen(false);
+              }
+            }}
+          >
             <button
               type="button"
+              className="hx-cmenu__item"
+              aria-current={mode === 'fit' ? 'page' : undefined}
               onClick={() => {
-                setCustom(false);
                 viewport({
                   mode: 'fit',
                   w: Math.max(320, Math.floor(bounds.w)),
@@ -247,30 +293,38 @@ export default function AgentBrowserView({ url }: { url: string }) {
                 });
               }}
             >
-              {label('fit')}
+              <span className="hx-cmenu__txt">{label('fit')}</span>
+              <Icon name="check" size="sm" className="hx-cmenu__check" />
             </button>
             {presets.map((v, index) => (
               <button
                 type="button"
                 key={index}
+                className="hx-cmenu__item"
+                aria-current={
+                  mode === v.mode && active?.viewport.w === v.w && active?.viewport.h === v.h
+                    ? 'page'
+                    : undefined
+                }
                 onClick={() => {
-                  setCustom(false);
                   viewport(v);
                 }}
               >
-                {index === 3 ? `${label('phone')} · ` : index === 4 ? `${label('tablet')} · ` : ''}
-                {v.w}×{v.h}
+                <span className="hx-cmenu__txt">
+                  {index === 3 ? `${label('phone')} · ` : index === 4 ? `${label('tablet')} · ` : ''}
+                  {v.w}×{v.h}
+                </span>
+                <Icon name="check" size="sm" className="hx-cmenu__check" />
               </button>
             ))}
             <form
               onSubmit={(event) => {
                 event.preventDefault();
-                setCustom(true);
                 viewport({ mode: 'fixed', w: width, h: height, dpr: 1 });
               }}
             >
               <label>
-                {label('custom')}
+                <span>{label('custom')}</span>
                 <input
                   aria-label={label('width')}
                   type="number"
@@ -336,7 +390,7 @@ export default function AgentBrowserView({ url }: { url: string }) {
                   start.y = event.clientY;
                   return;
                 }
-                if (performance.now() - moveAt.current < 50) return;
+                if (!event.buttons && performance.now() - moveAt.current < 50) return;
                 moveAt.current = performance.now();
                 mouse('mouseMoved', event);
               }}
@@ -362,7 +416,10 @@ export default function AgentBrowserView({ url }: { url: string }) {
                 event.preventDefault();
                 event.stopPropagation();
                 send({
-                  t: 'key',
+                  t:
+                    (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c'
+                      ? 'clipboard.read'
+                      : 'key',
                   key: event.key,
                   code: event.code,
                   keyCode: event.keyCode,
@@ -377,7 +434,7 @@ export default function AgentBrowserView({ url }: { url: string }) {
                 send({ t: 'text', text: event.clipboardData.getData('text') });
               }}
             />
-            {custom && active && mode === 'fixed' && (
+            {active && mode === 'fixed' && (
               <button
                 type="button"
                 className="hx-agent-browser__resize"
@@ -420,6 +477,32 @@ export default function AgentBrowserView({ url }: { url: string }) {
               </strong>
               {status?.error && <p>{status.error}</p>}
               {status?.hint && <p>{status.hint}</p>}
+              {status?.state === 'error' && (
+                <>
+                  <button type="button" onClick={() => send({ t: 'browser.retry' })}>
+                    {label('retry')}
+                  </button>
+                  {status.command && (
+                    <div className="hx-agent-browser__command">
+                      <pre>
+                        <code>{status.command}</code>
+                      </pre>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard
+                            .writeText(status.command!)
+                            .catch((error: unknown) =>
+                              console.warn('Could not copy browser setup command:', error),
+                            );
+                        }}
+                      >
+                        {label('copy')}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
               {status?.state === 'preparing' && <progress max={100} value={status.progress} />}
               {status?.state === 'up' && !active && (
                 <button type="button" onClick={newTab}>
@@ -547,11 +630,55 @@ export default function AgentBrowserView({ url }: { url: string }) {
           )}
           {notice && (
             <div className="hx-agent-browser__toast" role="alert">
-              {notice}
+              {label(notice.key)}
             </div>
           )}
         </div>
+        <textarea
+          ref={keyboard}
+          className="hx-agent-browser__keyboard-input"
+          aria-label={label('keyboardInput')}
+          tabIndex={-1}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          rows={1}
+          onInput={(event) => {
+            const text = event.currentTarget.value;
+            event.currentTarget.value = '';
+            if (text && !(event.nativeEvent as InputEvent).isComposing) send({ t: 'text', text });
+          }}
+          onCompositionEnd={(event) => {
+            event.currentTarget.value = '';
+            if (event.data) send({ t: 'text', text: event.data });
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Backspace' || event.key === 'Enter') {
+              event.preventDefault();
+              event.stopPropagation();
+              event.currentTarget.value = '';
+              send({
+                t: 'key',
+                key: event.key,
+                code: event.code,
+                keyCode: event.key === 'Backspace' ? 8 : 13,
+              });
+            }
+          }}
+          onBlur={(event) => {
+            event.currentTarget.value = '';
+          }}
+        />
         <div className="hx-agent-browser__status">
+          <button
+            type="button"
+            className="hx-agent-browser__keyboard"
+            disabled={!active}
+            onClick={() => keyboard.current?.focus({ preventScroll: true })}
+          >
+            {label('keyboard')}
+          </button>
           <span>
             {active?.control === 'person'
               ? label('personControl')

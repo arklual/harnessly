@@ -1008,5 +1008,15 @@
   "next.agentBrowser.personControl": "You have control",
   "next.agentBrowser.agentControl": "Agent has control",
   "next.agentBrowser.take": "Take control",
-  "next.agentBrowser.release": "Return to agent"
+  "next.agentBrowser.release": "Return to agent",
+  "next.agentBrowser.keyboard": "Keyboard",
+  "next.agentBrowser.keyboardInput": "Remote keyboard input",
+  "next.agentBrowser.retry": "Check again",
+  "next.agentBrowser.copy": "Copy",
+  "next.agentBrowser.noticeDialog": "Answer the page dialog before continuing.",
+  "next.agentBrowser.noticePage": "This tab is no longer ready. Select it again or reload it.",
+  "next.agentBrowser.noticeTimeout": "The page took too long to respond. Try again.",
+  "next.agentBrowser.noticeConnection": "The browser connection was interrupted. Reconnecting…",
+  "next.agentBrowser.noticeClipboard": "Could not copy text. Allow clipboard access and try again.",
+  "next.agentBrowser.noticeFailed": "The browser could not complete this action. Try again."
 }

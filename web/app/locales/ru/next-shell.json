@@ -1064,5 +1064,15 @@
   "next.agentBrowser.personControl": "Управление у вас",
   "next.agentBrowser.agentControl": "Управление у агента",
   "next.agentBrowser.take": "Взять управление",
-  "next.agentBrowser.release": "Вернуть агенту"
+  "next.agentBrowser.release": "Вернуть агенту",
+  "next.agentBrowser.keyboard": "Клавиатура",
+  "next.agentBrowser.keyboardInput": "Ввод в удалённую страницу",
+  "next.agentBrowser.retry": "Проверить снова",
+  "next.agentBrowser.copy": "Копировать",
+  "next.agentBrowser.noticeDialog": "Ответьте на диалог страницы, чтобы продолжить.",
+  "next.agentBrowser.noticePage": "Вкладка пока недоступна. Выберите её снова или перезагрузите.",
+  "next.agentBrowser.noticeTimeout": "Страница не успела ответить. Попробуйте ещё раз.",
+  "next.agentBrowser.noticeConnection": "Связь с браузером прервалась. Подключаемся снова…",
+  "next.agentBrowser.noticeClipboard": "Не удалось скопировать текст. Разрешите доступ к буферу обмена и повторите.",
+  "next.agentBrowser.noticeFailed": "Браузер не смог выполнить действие. Попробуйте ещё раз."
 }

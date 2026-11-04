@@ -44,10 +44,12 @@ export interface IStatus {
   error?: string;
   progress?: number;
   hint?: string;
+  command?: string;
   profile: { id: string; name: string };
 }
 /** Recoverable notices leave availability and the current page intact. */
-export type TBrowserMessage = IStatus | ITabsMessage | ISelectMenu | { t: 'notice'; message: string };
+export type TBrowserMessage =
+  IStatus | ITabsMessage | ISelectMenu | { t: 'notice'; message: string } | { t: 'clipboard'; text: string };
 /** Reject short or invalid frame headers before attempting an expensive JPEG decode. */
 export function parseBrowserFrame(data: ArrayBuffer) {
   if (data.byteLength <= 12) return null;
