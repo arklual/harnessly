@@ -1,6 +1,7 @@
 // The shell's dialogs over the machine: «Новый проект» (a name), «Настройки проекта» (its name and folder) and
 // «Продолжить сессию» (what terminal agents kept there). The last asks the machine when it opens; a list that did not
 // come says why.
+import { ProjectSafeAccess } from '@/next/bindings/project-safe-access';
 import { useProjectBrowserSettings } from '@/next/features/browser/project-browser-settings';
 import { useMemo, useState } from 'react';
 import { failureText, settled, pageText } from '@/next/bindings/outcome';
@@ -85,6 +86,9 @@ export const useProjectSettingsDialog = (machine: MachineId | null, person: bool
       key={project?.id ?? 'closed'}
       project={current}
       browserSettings={browserSettings}
+      secretAccess={
+        project && <ProjectSafeAccess machine={machine} project={project.id} onEdit={() => setOpenId(null)} />
+      }
       folders={folders}
       onClose={() => setOpenId(null)}
       onSave={async (change) => {

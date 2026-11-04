@@ -1,0 +1,7 @@
+{
+  "next.safe.latestUses": "Последние использования",
+  "next.safe.use.agent": "Агент",
+  "next.safe.project.access": "Доступ",
+  "next.safe.project.note": "Секреты, доступные этому проекту. Сайты и доступ проектов можно изменить в сейфе.",
+  "next.safe.project.empty": "Этому проекту пока не доступны секреты"
+}

@@ -22,6 +22,7 @@ export interface IProjectSettingsDialogProps {
   project: IProjectSettings | null;
   /** The folders offered under the field; null while they load (or when the machine did not give them). */
   folders: readonly IProjectFolder[] | null;
+  secretAccess?: ReactNode;
   browserSettings?: {
     render: (disabled: boolean) => ReactNode;
     prepare: () => Promise<boolean>;
@@ -42,6 +43,7 @@ const ProjectSettingsDialog = ({
   project,
   folders,
   browserSettings,
+  secretAccess,
   onClose,
   onSave,
 }: IProjectSettingsDialogProps) => {
@@ -136,7 +138,7 @@ const ProjectSettingsDialog = ({
       }}
       title={t('next.projectSettings.title')}
       lead={t('next.projectSettings.lead')}
-      boxClass="hx-create"
+      boxClass="hx-create hx-project-settings"
       initialFocus={pathRef}
     >
       <form onSubmit={(event) => void submit(event)}>
@@ -188,7 +190,13 @@ const ProjectSettingsDialog = ({
               ))}
             </div>
           )}
-          {browserSettings?.render(busy)}
+          {(browserSettings || secretAccess) && (
+            <section className="hx-project-access" aria-label={t('next.safe.project.access')}>
+              <h3>{t('next.safe.project.access')}</h3>
+              {browserSettings?.render(busy)}
+              {secretAccess}
+            </section>
+          )}
           {error && (
             <p className="hx-create__err" role="alert">
               {error}
