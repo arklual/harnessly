@@ -246,19 +246,46 @@ describe('panel review fixes', () => {
 });
 
 describe('scripted page warning', () => {
-  it('warns when the person takes over a scripted page and keeps the warning through navigation', () => {
+  it('warns before takeover and keeps the warning through control changes and navigation', () => {
     render(<AgentBrowserView url="ws://test" />);
     tabs([{ ...tab('a'), scripted: true }]);
-    expect(screen.queryByText('scriptedWarning')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toBe('scriptedWarning');
+    fireEvent.input(screen.getByLabelText('keyboardInput'), { target: { value: 'sample' } });
+    expect(Socket.last.sent.at(-1)).toEqual({ t: 'text', text: 'sample' });
+    expect(Socket.last.sent.some((message) => message.t === 'control')).toBe(false);
+    expect(screen.getByRole('alert').textContent).toBe('scriptedWarning');
     fireEvent.click(screen.getByText('take'));
     expect(Socket.last.sent.at(-1)).toEqual({ t: 'control', holder: 'person' });
     tabs([{ ...tab('a'), scripted: true, control: 'person' }]);
     expect(screen.getByRole('alert').textContent).toBe('scriptedWarning');
     tabs([{ ...tab('a'), url: 'https://example.org/login', scripted: true, control: 'person' }]);
     expect(screen.getByRole('alert').textContent).toBe('scriptedWarning');
+    fireEvent.click(screen.getByText('release'));
+    expect(Socket.last.sent.at(-1)).toEqual({ t: 'control', holder: 'agent' });
+    tabs([{ ...tab('a'), url: 'https://example.org/login', scripted: true }]);
+    expect(screen.getByRole('alert').textContent).toBe('scriptedWarning');
     tabs([{ ...tab('fresh'), by: 'person', scripted: false, control: 'person' }]);
     expect(screen.queryByText('scriptedWarning')).toBeNull();
   });
+
+  it.each(['agent', 'person'] as const)(
+    'only warns for the active scripted tab under %s control',
+    (control) => {
+      render(<AgentBrowserView url="ws://test" />);
+      const items = [
+        { ...tab('scripted'), scripted: true, control },
+        { ...tab('fresh'), scripted: false, control },
+      ];
+      tabs(items, 'fresh');
+      expect(screen.queryByText('scriptedWarning')).toBeNull();
+      tabs(items, 'scripted');
+      expect(screen.getByRole('alert').textContent).toBe('scriptedWarning');
+      tabs(items, 'fresh');
+      expect(screen.queryByText('scriptedWarning')).toBeNull();
+      tabs([]);
+      expect(screen.queryByText('scriptedWarning')).toBeNull();
+    },
+  );
 
   it('leaves fresh manual login tabs warning-free, including older messages without a marker', () => {
     render(<AgentBrowserView url="ws://test" />);

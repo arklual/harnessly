@@ -705,7 +705,7 @@ export default function AgentBrowserView({
         />
         <div className="hx-agent-browser__status">
           {active?.login && machine && <LoginBanner machine={machine} ask={active.login} />}
-          {active?.control === 'person' && active.scripted && (
+          {active?.scripted && (
             <p className="hx-agent-browser__scripted-warning" role="alert">
               {label('scriptedWarning')}
             </p>

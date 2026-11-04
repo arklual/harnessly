@@ -81,6 +81,9 @@
   margin: 18px 0 0;
   padding: 12px;
 }
+.hx-browser-profiles__project > .hx-create__f {
+  margin: 12px 0;
+}
 .hx-browser-profiles__grants {
   display: grid;
   gap: 8px;

@@ -698,8 +698,9 @@
   border-radius: 9px;
   background: var(--hx-bg-active);
   color: var(--hx-fg-2);
-  font-family: var(--hx-font-mono);
-  font-size: 12px;
+  font-family: var(--hx-font-ui);
+  font-size: var(--hx-text-sm);
+  letter-spacing: normal;
 }
 .hx-tbrowser__page {
   flex: 1;
@@ -959,10 +960,9 @@ input.hx-tbrowser__url:focus {
   gap: 8px;
   padding: 0 6px 0 14px;
 }
-/* iOS zooms into a field under 16px on focus (as the design's search field does). */
+/* The address field uses base.css's touch-only zoom guard, even inside a narrow desktop pane. */
 @media (max-width: 900px) {
-  .hx-tl__search input,
-  input.hx-tbrowser__url {
+  .hx-tl__search input {
     font-size: 16px;
   }
 }

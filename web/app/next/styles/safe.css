@@ -208,7 +208,7 @@
 }
 .hx-safe-ask__origin strong {
   color: var(--hx-fg-1);
-  font-family: var(--hx-font-mono);
+  font-weight: var(--hx-weight-medium);
 }
 
 @media (max-width: 600px) {

@@ -704,6 +704,7 @@ test('real project profile switch closes old tabs and reconnects to the selected
 
 test('manual login opens across chats, protects Chrome until Done and supports Cancel', async ({ page }) => {
   test.setTimeout(180_000);
+  const touch = await page.context().newCDPSession(page);
   const binary = join(rt.root, 'browser-login');
   execFileSync('go', ['build', '-o', binary, './e2e/fixtures/browser-agent']);
   const child = spawn(binary, [], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -740,6 +741,7 @@ test('manual login opens across chats, protects Chrome until Done and supports C
       };
     });
     await chat(page, 'Manual login task');
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     const requester = new URL(page.url()).pathname.split('/').at(-1)!;
     await page.getByRole('button', { name: 'New chat', exact: true }).first().click();
     await page.locator('.hx-composer__input').fill('Another task while login is waiting');
@@ -767,6 +769,7 @@ test('manual login opens across chats, protects Chrome until Done and supports C
     await expect(pane.locator('canvas')).toHaveAttribute('data-shown', 'true');
     await shot(page, 'login-banner-desktop');
     await page.setViewportSize({ width: 390, height: 844 });
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true });
     await expect(banner.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await shot(page, 'login-banner-phone');
@@ -785,8 +788,11 @@ test('manual login opens across chats, protects Chrome until Done and supports C
   }
 });
 
-test('scripted page warns on person control and a fresh manual login has no warning', async ({ page }) => {
+test('scripted page warns before takeover on desktop and phone and a fresh manual login has no warning', async ({
+  page,
+}) => {
   test.setTimeout(180_000);
+  const touch = await page.context().newCDPSession(page);
   const binary = join(rt.root, 'browser-scripted');
   execFileSync('go', ['build', '-o', binary, './e2e/fixtures/browser-agent']);
   const child = spawn(binary, [], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -823,29 +829,52 @@ test('scripted page warns on person control and a fresh manual login has no warn
       };
     });
     await chat(page, 'Scripted page warning', false);
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     const conv = new URL(page.url()).pathname.split('/').at(-1)!;
     const created = await fetch(base + '/new?' + new URLSearchParams({ conv, url: siteURL + '/scripted' }));
     expect(created.status).toBe(204);
     const pane = page.locator('.hx-agent-browser');
     await expect(pane.locator('canvas')).toHaveAttribute('data-shown', 'true');
+    const warning = pane.getByRole('alert').filter({
+      hasText: 'The agent ran JavaScript on this page. Do not enter a password here: open a new tab.',
+    });
+    await expect(warning).toHaveCount(0);
     const evaluated = await fetch(base + '/evaluate?' + new URLSearchParams({ conv }));
     expect(evaluated.ok).toBe(true);
     const result = (await evaluated.json()) as { isError?: boolean };
     expect(result.isError ?? false).toBe(false);
-    const warning = pane.getByText(
-      'The agent ran JavaScript on this page. Do not enter a password here: open a new tab.',
-      { exact: true },
-    );
-    await expect(warning).toHaveCount(0);
+    await expect(warning).toBeVisible();
+    await expect(pane.getByRole('button', { name: 'Take control', exact: true })).toBeVisible();
+    const addressStyle = await pane.locator('input.hx-tbrowser__url').evaluate((input) => {
+      const style = getComputedStyle(input);
+      return { size: parseFloat(style.fontSize), family: style.fontFamily };
+    });
+    expect(addressStyle.size).toBeLessThanOrEqual(14);
+    expect(addressStyle.family).not.toMatch(/mono/i);
+    await shot(page, 'scripted-warning-agent');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+    await expect(warning).toBeVisible();
+    await expect(pane.getByRole('button', { name: 'Take control', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await shot(page, 'scripted-warning-agent-phone');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await pane.getByRole('button', { name: 'Take control', exact: true }).click();
     await expect(warning).toBeVisible();
     await expect(pane.getByText('You have control', { exact: true })).toBeVisible();
     await shot(page, 'scripted-warning');
     await page.setViewportSize({ width: 390, height: 844 });
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true });
     await expect(warning).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await shot(page, 'scripted-warning-phone');
+    await pane.getByRole('button', { name: 'Return to agent', exact: true }).click();
+    await expect(pane.getByRole('button', { name: 'Take control', exact: true })).toBeVisible();
+    await expect(warning).toBeVisible();
     await page.setViewportSize({ width: 1440, height: 900 });
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await expect(warning).toBeVisible();
     const login = await fetch(
       base +
         '/login?' +
@@ -855,6 +884,10 @@ test('scripted page warns on person control and a fresh manual login has no warn
     const banner = pane.getByRole('region', { name: 'Sign in requested', exact: true });
     await expect(banner).toBeVisible();
     await expect(pane.getByText('You have control', { exact: true })).toBeVisible();
+    await expect(warning).toHaveCount(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+    await expect(banner).toBeVisible();
     await expect(warning).toHaveCount(0);
     await banner.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(banner).toHaveCount(0);
