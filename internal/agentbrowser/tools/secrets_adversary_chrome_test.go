@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -65,7 +66,7 @@ func TestChromeSecretAdversary(t *testing.T) {
 				case "/home":
 					fmt.Fprint(w, `<h1>Home</h1><button onclick="history.back()">Back</button>`)
 				case "/landing":
-					fmt.Fprint(w, `<h1>Landing</h1>`)
+					fmt.Fprint(w, `<h1>Landing</h1><p>quiet query</p>`)
 				case "/popup":
 					fmt.Fprint(w, `<h1>Popup</h1><button onclick="window.open('/popup')">Next</button>`)
 				case "/paste":
@@ -406,6 +407,194 @@ document.querySelector('form').onsubmit=e=>{e.preventDefault();fetch('/submit',{
 				a.c.refuses("evaluate", map[string]any{"expression": "1"}, "sealed")
 			})
 
+			for _, takeover := range []bool{true, false} {
+				name := "control-return-interrupts-wait"
+				if takeover {
+					name = "control-takeover-interrupts-wait"
+				}
+				run(name, func(a *secretAttack) {
+					a.open("/login")
+					i, first := a.instance(), a.tab()
+					a.open("/landing")
+					other := a.tab()
+					var before int64
+					for _, tab := range i.Tabs(a.c.chat) {
+						if tab.ID == first {
+							before = tab.AgentAt
+						}
+					}
+					finished := make(chan *jsvalue.Object, 1)
+					go func() {
+						set := Tools{S: service, Caller: a.c.chat}
+						finished <- set.Call(a.t.Context(), "browser_wait_for", jsvalue.NewObject(
+							"tab", first, "text", "never appears", "timeout_ms", 20000))
+					}()
+					deadline := time.Now().Add(3 * time.Second)
+					started := false
+					for time.Now().Before(deadline) && !started {
+						for _, tab := range i.Tabs(a.c.chat) {
+							if tab.ID == first && tab.AgentAt > before {
+								started = true
+							}
+						}
+						if !started {
+							time.Sleep(10 * time.Millisecond)
+						}
+					}
+					if !started {
+						a.t.Fatal("wait tool did not start")
+					}
+					began := time.Now()
+					holder, target, limit, reason := "agent", other, 2*time.Second, "Interrupted"
+					if takeover {
+						holder, target, limit, reason = "person", first, time.Second, "The person has control"
+					}
+					must(a.t, i.SetControl(target, holder))
+					a.t.Logf("control change took %s", time.Since(began))
+					if time.Since(began) >= limit {
+						a.t.Fatalf("control change blocked for %v", time.Since(began))
+					}
+					select {
+					case result := <-finished:
+						raw := string(jsvalue.Stringify(result, ""))
+						if !strings.Contains(raw, `"isError":true`) || !strings.Contains(raw, reason) {
+							a.t.Fatalf("wait did not return a control error: %s", raw)
+						}
+					case <-time.After(time.Second):
+						a.t.Fatal("wait continued after control change")
+					}
+				})
+			}
+			run("lazy-person-password", func(a *secretAttack) {
+				a.open("/login")
+				a.personType(a.value)
+				a.c.refuses("evaluate", map[string]any{"expression": `document.querySelector('input').value.split('').reverse().join('')`}, "sealed")
+				if tab := a.instance().Tabs(a.c.chat)[0]; !tab.Sealed || tab.PersonInput || tab.Control != "agent" {
+					a.t.Fatal("lazy input scan did not consume the guard and seal the agent-owned tab")
+				}
+				if a.instance().Redact(a.value) == a.value {
+					a.t.Fatal("lazy password was not masked")
+				}
+			})
+			run("person-opener-control", func(a *secretAttack) {
+				a.open("/login")
+				parent := a.tab()
+				a.c.text("click", map[string]any{"id": a.c.node("Help")})
+				popup := a.tab()
+				if popup == parent {
+					a.t.Fatal("fixture did not open popup")
+				}
+				i := a.instance()
+				must(a.t, i.SetControl(parent, "person"))
+				_, err := i.Call(a.t.Context(), parent, "Runtime.evaluate", map[string]any{"expression": `document.querySelector('input').focus()`})
+				must(a.t, err)
+				_, err = i.Call(a.t.Context(), parent, "Input.insertText", map[string]any{"text": a.value})
+				must(a.t, err)
+				a.c.refuses("evaluate", map[string]any{"tab": popup, "expression": `opener.document.querySelector('input').value`}, "person")
+				for _, tab := range i.Tabs(a.c.chat) {
+					if tab.Scripted {
+						a.t.Fatal("refused related evaluation marked the person's page scripted")
+					}
+				}
+				// Independent tabs in the same chat remain usable during person control.
+				a.open("/landing")
+				a.evalExact("1+1", "2")
+				must(a.t, i.SetControl(parent, "agent"))
+				a.c.refuses("evaluate", map[string]any{"tab": popup, "expression": "1"}, "sealed")
+			})
+
+			run("lazy-person-history", func(a *secretAttack) {
+				a.open("/login")
+				// Capture the button before input, like a tool already planning its next action.
+				button := a.c.node("Sign in")
+				a.personType(a.value)
+				a.c.text("click", map[string]any{"id": button})
+				a.evalExact("history.length", "1")
+				a.c.text("evaluate", map[string]any{"expression": "history.back();1"})
+				time.Sleep(100 * time.Millisecond)
+				a.c.eval(`location.pathname==='/home' && document.querySelector('input')===null`, "true")
+			})
+			run("lazy-person-submitted", func(a *secretAttack) {
+				a.open("/login")
+				a.personType(a.value)
+				_, e := a.instance().Call(a.t.Context(), a.tab(), "Runtime.evaluate", map[string]any{
+					"expression": `document.querySelector('form').requestSubmit()`})
+				must(a.t, e)
+				deadline := time.Now().Add(3 * time.Second)
+				for time.Now().Before(deadline) {
+					raw, e := a.instance().Call(a.t.Context(), a.tab(), "Runtime.evaluate", map[string]any{"expression": `location.pathname==='/home'`, "returnByValue": true})
+					if e == nil && strings.Contains(string(raw), `"value":true`) {
+						break
+					}
+					time.Sleep(10 * time.Millisecond)
+				}
+				a.evalExact("history.length", "1")
+				a.c.text("evaluate", map[string]any{"expression": "history.back();1"})
+				time.Sleep(100 * time.Millisecond)
+				a.c.eval(`location.pathname==='/home' && document.querySelector('input')===null`, "true")
+			})
+
+			run("lazy-short-password", func(a *secretAttack) {
+				a.open("/login")
+				a.personType("q")
+				a.c.refuses("evaluate", map[string]any{"expression": "1"}, "sealed")
+				a.open("/landing")
+				if a.instance().Redact("quiet query") != "quiet query" {
+					a.t.Fatal("one-character password corrupted unrelated output")
+				}
+				// Read tools are chat-wide sealed, while snapshot of the untouched neighbor remains available.
+				if !strings.Contains(a.c.text("snapshot", nil), "quiet query") {
+					a.t.Fatal("neighbor snapshot was corrupted")
+				}
+			})
+			for _, login := range []bool{false, true} {
+				for _, kind := range []string{"name", "ordinary", "css", "autocomplete", "aria", "placeholder", "id"} {
+					name := fmt.Sprintf("manual-reveal-%s-login-%t", kind, login)
+					run(name, func(a *secretAttack) {
+						if login {
+							a.c.text("request_login", map[string]any{"url": pageURL + "/login", "why": "Manual sign in"})
+						} else {
+							a.open("/login")
+							must(a.t, a.instance().SetControl(a.tab(), "person"))
+						}
+						a.personType(a.value)
+						expression := `const p=document.querySelector('input');p.type='text';`
+						switch kind {
+						case "name":
+							expression += `p.name='password';`
+						case "css":
+							expression += `p.style.webkitTextSecurity='disc';`
+						case "autocomplete":
+							expression += `p.autocomplete='one-time-code';`
+						case "aria":
+							expression += `p.setAttribute('aria-label','PIN');`
+						case "placeholder":
+							expression += `p.placeholder='пароль';`
+						case "id":
+							expression += `p.id='access-token';`
+						}
+						_, e := a.instance().Call(a.t.Context(), a.tab(), "Runtime.evaluate", map[string]any{"expression": expression})
+						must(a.t, e)
+						must(a.t, a.instance().SetControl(a.tab(), "agent"))
+						if kind != "ordinary" || login {
+							a.c.refuses("evaluate", map[string]any{"expression": `document.querySelector('input').value.split('').reverse().join('')`}, "sealed")
+						} else {
+							// Explicit policy: an ordinary field left by the person is readable.
+							a.evalExact(`btoa(document.querySelector('input').value)`, jsonText(base64.StdEncoding.EncodeToString([]byte(a.value))))
+						}
+						masked := a.instance().Redact(a.value) != a.value
+						if masked != (kind != "ordinary") {
+							a.t.Fatal("manual input classification applied the wrong mask policy")
+						}
+						a.assertPrivate(`history.length===1`)
+						a.c.text("navigate", map[string]any{"url": pageURL + "/home"})
+						if kind != "ordinary" || login {
+							a.evalExact("history.length", "1")
+						}
+					})
+				}
+			}
+
 			if mode == "headless" {
 				run("profile-persistence", func(a *secretAttack) {
 					a.open("/login?type=text")
@@ -508,4 +697,14 @@ func (a *secretAttack) evalExact(expression, want string) {
 	if len(lines) < 2 || strings.TrimSpace(lines[1]) != want {
 		a.t.Fatal("unexpected evaluate result for " + expression)
 	}
+}
+
+// Human CDP goes through the same Call path as panel keys, paste and screen keyboard.
+func (a *secretAttack) personType(value string) {
+	a.t.Helper()
+	i, tab := a.instance(), a.tab()
+	_, err := i.Call(a.t.Context(), tab, "Runtime.evaluate", map[string]any{"expression": `document.querySelector('input').focus()`})
+	must(a.t, err)
+	_, err = i.Call(a.t.Context(), tab, "Input.insertText", map[string]any{"text": value})
+	must(a.t, err)
 }

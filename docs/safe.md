@@ -90,7 +90,9 @@ legacy CLI access. A nonempty project list restricts `secret list`, `secret run`
 The runtime resolves the chat from the calling connection and reads its current project; an unknown connection or a
 claimed session belonging to another chat cannot use a scoped entry. A foreign entry and an absent entry have the same
 use refusal. An ask for an existing foreign entry displays an access grant, never a value field. Approving adds access
-without replacing the encrypted value. Settings → Safe edits sites and project IDs independently of value rotation.
+without replacing the encrypted value. Creating a secret from a project chat automatically restricts it to that project;
+this changes the old globally available default for newly created entries. Existing entries keep their scopes.
+Settings → Safe edits sites and project IDs independently of value rotation.
 
 Origins are exact scheme/host/port tuples: HTTPS, or HTTP only on `localhost`, `127.0.0.1` and `[::1]`. Default ports and
 host case are canonicalized. Paths, credentials, queries, wildcard domains and HTTP on other hosts are refused. A
@@ -113,14 +115,19 @@ focus in an embedding document cannot redirect this document's insertion. Contro
 input events. The safe records the chat and field origin in `UsedBy`. TOTP is calculated locally using RFC 6238.
 
 An agent evaluation permanently marks the tab and its live opener-connected component `Scripted`. Such tabs cannot
-receive safe input; the person sees a warning when taking control. `browser_open` creates an independent browsing
-context group. Popups inherit their opener's chat, control and scripted state, including late discovery.
+receive safe input; the panel always warns the person, even while the agent holds control. `browser_open` creates an
+independent browsing context group. Popups inherit their opener's chat, control and scripted state, including late discovery.
+An evaluation is refused while any live opener-connected tab is person-controlled, even if the target popup still
+belongs to the agent. Independent tabs remain usable. This prevents a new sibling evaluation from reading a personal
+page before handoff; scripts installed before takeover remain subject to the warning and limitations below.
 
 The runtime persists a provisional seal and reserves masks before sending the value. Known rejection restores the
 previous seal and removes that attempt's masks; an uncertain CDP failure remains sealed. Tool calls within a chat
-and person control transitions share a conversation gate through seal checking, dispatch and output. Seal release
-also compares the checked generation before clearing tracking. While any tab of the chat is sealed, evaluate, console, network and screenshots refuse on every tab
-of that chat. Other chats remain usable. Snapshots of a tracked sealed tab omit all editable values and their text
+and returns of person control share a conversation gate through seal checking, dispatch and output. Taking control
+does not wait for that gate: the next agent CDP call refuses. Returning control cancels the current chat tool first,
+then waits for its gate before inspecting; the agent receives an interruption error and can retry. Seal release
+also compares the checked generation before clearing tracking. While any tab of the chat is sealed, evaluate, console,
+network and screenshots refuse on every tab of that chat. Other chats remain usable. Snapshots of a tracked sealed tab omit all editable values and their text
 children. Control/Meta/Alt shortcuts and Shift+Insert/Delete are refused before dispatch; ordinary keys still work.
 
 A new main document, a new field document, or removal of every tracked field can release a seal. Empty fields do not.
@@ -130,9 +137,21 @@ field references (person handoff or restart) also refuses snapshots and needs a 
 an initial document marker cannot be mistaken for proof of navigation.
 
 Returning any person-controlled tab to the agent first resets history and scans all frames and shadow roots in
-isolated worlds for nonempty password inputs. Found passwords are masked and the tab gets an untracked seal;
-CDP failure also seals it. A failed history reset or registry write keeps person control and the login pending.
-The runtime persists the marker before returning control and settling login completion.
+isolated worlds using native getters. A nonempty input is secret if its type is password, its computed
+`-webkit-text-security` is not none, its autocomplete includes current-password, new-password, one-time-code,
+cc-number or cc-csc, or its name, id, aria-label or placeholder matches `pass|pwd|парол|secret|otp|token|\bpin\b|cvv|cvc`
+(case insensitive). Such fields seal the document at any length; only values of at least four characters enter the
+mask, so partially typed single letters do not corrupt unrelated output. During a login request, any other nonempty
+text, email, tel, url, search or number input also seals the document, but its value never leaves the page for masking.
+An ordinary field without these hints, left after ordinary person control rather than a login request, remains readable:
+the person has chosen to leave that content to the agent. This is an explicit classification policy, not a claim to
+recognize arbitrary passwords.
+
+Keyboard, text, paste and screen-keyboard input persist `PersonInput` before dispatch, even without taking control.
+Before the next chat tool, every dirty agent-controlled tab receives the same history reset and scan. A successful
+scan clears the flag; an incomplete scan keeps it and seals the tab, refusing the tool. A failed history reset or
+registry write during an explicit handoff keeps person control and the login pending. The runtime persists the seal
+before returning control and settling login completion. These untracked seals require main-document navigation.
 Mask values stay only in memory. Registry URL/title restoration is disabled for secret-touched tabs so page metadata
 does not persist secret bytes in `tabs.json`. Cookies remain in the browser profile, never in the safe.
 
@@ -156,10 +175,15 @@ an allowed website trustworthy or isolate processes sharing the same Unix accoun
 - GET forms place values into Chrome URL/history records; masking tool output and resetting the navigation stack do
   not erase the browser's history database. Do not treat profile files as a secret-free archive. Disabling field
   autocomplete prevents the tested text-form restoration/autofill writes, not arbitrary site storage or GET URLs.
-- The person-handoff scan recognizes only inputs whose current type is `password`. If the person reveals a password
-  (`type=text`) before returning control, the value is not registered and can appear in a snapshot. Plaintext password
-  fields have the same limitation. This is an unclosed manual-entry gap; the process boundary in stage 5 cannot fix it.
-  These handoff checks also require person control: ordinary pane input does not automatically take control.
+- Lazy input inspection runs before a tool, not continuously. A tool already past its seal check when the person
+  types the first character may still read or act before the next check. Typing does not automatically take control;
+  use Take control when working alongside a running agent. A value submitted and removed before any scan cannot be
+  collected for masking or establish a content-based seal, although the next scan still resets history. A site that
+  copies and clears the field before the first tool can leave that copy readable through evaluate. A manually
+  submitted GET form can likewise expose an unmasked value in the current URL through browser_tabs; resetting
+  history does not scrub the current URL. These cases do not require an agent tool to be running during typing.
+- Ordinary inputs without secret hints outside a login request are intentionally readable after handoff. Custom
+  editors and secrets represented outside input elements are not classified. Short values seal but are not masked.
 - Ignoring the scripted-tab warning and entering a password by hand can expose it to an earlier agent-installed
   hook. Manual login requests always open a fresh tab, but taking over an existing scripted tab does not remove hooks.
 - After a permitted release, copies retained by the website may be accessible again, subject to output masking.
@@ -169,5 +193,5 @@ an allowed website trustworthy or isolate processes sharing the same Unix accoun
   profile files or private CDP socket directly. Masking values live only for the runtime's lifetime.
 
 Stage 5 supplies a separate process/filesystem boundary. It does not make an agent-writable or malicious allowed
-origin safe. Site-origin approval adds a site without replacing a value; an explicit `--replace` still requests
-rotation. An accessible unscoped entry can receive a site approval even from a chat without a project.
+origin safe or recover manual values already missed by a lazy scan. Site-origin approval adds a site without replacing
+a value; an explicit `--replace` still requests rotation. An accessible unscoped entry can receive a site approval even from a chat without a project.

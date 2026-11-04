@@ -108,3 +108,27 @@ func TestOrphanPopupLateAttribution(t *testing.T) {
 		t.Fatal("late attribution was not persisted")
 	}
 }
+
+func TestScriptedRefusesPersonOpenerComponent(t *testing.T) {
+	m := New(Config{DataDir: t.TempDir()})
+	defer m.Close()
+	i := newInstance(m, DefaultProfile)
+	defer i.cancel()
+	for _, tab := range []Tab{
+		{ID: "parent", Conversation: "chat", URL: "about:blank", Control: "person"},
+		{ID: "child", Conversation: "chat", URL: "about:blank", Control: "agent", Opener: "parent"},
+		{ID: "grandchild", Conversation: "chat", URL: "about:blank", Control: "agent", Opener: "child"},
+		{ID: "separate", Conversation: "chat", URL: "about:blank", Control: "agent"},
+	} {
+		i.pages[tab.ID] = newPage(tab)
+	}
+	if err := i.MarkScripted("chat", "grandchild"); !errors.Is(err, ErrPersonControl) {
+		t.Fatal("evaluation can reach a person-controlled opener")
+	}
+	for _, tab := range i.Tabs("chat") {
+		if tab.Scripted {
+			t.Fatal("refused evaluation changed script provenance")
+		}
+	}
+	must(t, i.MarkScripted("chat", "separate"))
+}

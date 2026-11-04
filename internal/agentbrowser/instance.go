@@ -48,6 +48,7 @@ type Tab struct {
 	SecretTouched   bool     `json:"secretTouched,omitempty"`
 	SecretDocument  string   `json:"secretDocument,omitempty"`
 	SealGeneration  uint64   `json:"sealGeneration,omitempty"`
+	PersonInput     bool     `json:"personInput,omitempty"`
 	SecretUntracked bool     `json:"secretUntracked,omitempty"`
 	Control         string   `json:"control"`
 	AgentAt         int64    `json:"agentAt"`
@@ -421,6 +422,13 @@ func (i *Instance) bind(ctx context.Context, p *page, c *cdp.Conn) (binding, err
 // Call sends a human tab command with a bounded lifetime, independently of other tabs.
 // It enforces ErrDialogOpen but does not enforce agent ownership or control.
 func (i *Instance) Call(ctx context.Context, id, method string, params any) (json.RawMessage, error) {
+	if method == "Input.insertText" || method == "Input.dispatchKeyEvent" {
+		unlock, err := i.personInput(id)
+		if err != nil {
+			return nil, err
+		}
+		defer unlock()
+	}
 	return i.tabCall(ctx, id, method, params, func() error { return i.dialogError(id, method) })
 }
 

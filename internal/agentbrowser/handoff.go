@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"unicode/utf8"
 
 	"github.com/ly-solutions/harnessly/internal/cdp"
 )
@@ -52,12 +53,15 @@ func (i *Instance) inspectPersonPage(ctx context.Context, id string) (string, bo
 		}
 		return out
 	}
-	return inspectHandoff(ctx, call, frames, i.RememberSecret)
+	i.mu.Lock()
+	login := i.pages[id] != nil && i.pages[id].login != nil
+	i.mu.Unlock()
+	return inspectHandoff(ctx, call, frames, i.RememberSecret, login)
 }
 
 // inspectHandoff uses human CDP access while agent access is still blocked. A
 // missing frame, detached node or unsupported command seals the document too.
-func inspectHandoff(ctx context.Context, call handoffCall, frames func() []AgentFrame, remember func(string)) (string, bool, error) {
+func inspectHandoff(ctx context.Context, call handoffCall, frames func() []AgentFrame, remember func(string), login bool) (string, bool, error) {
 	marker, touched := unknownHandoffDocument, false
 	var failure error
 	record := func(err error) {
@@ -135,9 +139,11 @@ func inspectHandoff(ctx context.Context, call handoffCall, frames func() []Agent
 			if !root && separate[tree.Frame.ID] {
 				return
 			}
-			err := scanHandoffFrame(ctx, call, session, tree.Frame.ID, func(value string) {
+			err := scanHandoffFrame(ctx, call, session, tree.Frame.ID, login, func(value string) {
 				touched = true
-				remember(value)
+				if utf8.RuneCountInString(value) >= 4 {
+					remember(value)
+				}
 			})
 			record(err)
 			for _, child := range tree.Children {
@@ -169,7 +175,7 @@ type handoffNode struct {
 
 // Browser DOM traversal includes closed shadow roots. Native getters in the
 // isolated world avoid page-defined getters or forged querySelector methods.
-func scanHandoffFrame(ctx context.Context, call handoffCall, session, frame string, remember func(string)) error {
+func scanHandoffFrame(ctx context.Context, call handoffCall, session, frame string, login bool, remember func(string)) error {
 	raw, err := call(ctx, session, "Page.createIsolatedWorld", map[string]any{
 		"frameId": frame, "worldName": "person-handoff",
 	})
@@ -222,9 +228,18 @@ func scanHandoffFrame(ctx context.Context, call handoffCall, session, frame stri
 			}
 			raw, err = call(ctx, session, "Runtime.callFunctionOn", map[string]any{
 				"objectId": node.Object.ID, "returnByValue": true,
-				"functionDeclaration": `function() {
- const type = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'type').get.call(this);
- return type === 'password' ? Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').get.call(this) : '';
+				"arguments": []any{map[string]any{"value": login}},
+				"functionDeclaration": `function(login) {
+ const get = name => Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, name).get.call(this);
+ const attr = name => Element.prototype.getAttribute.call(this, name) || '';
+ const type = get('type'), value = get('value');
+ if (!value) return {sealed:false};
+ const secret = type === 'password' || getComputedStyle(this).getPropertyValue('-webkit-text-security') !== 'none' &&
+   getComputedStyle(this).getPropertyValue('-webkit-text-security') !== '' ||
+   /(?:^|\s)(?:current-password|new-password|one-time-code|cc-number|cc-csc)(?:\s|$)/i.test(get('autocomplete')) ||
+   /pass|pwd|парол|secret|otp|token|\bpin\b|cvv|cvc/i.test([get('name'), attr('id'), attr('aria-label'), attr('placeholder')].join(' '));
+ if (secret) return {sealed:true, value};
+ return {sealed:login && ['text','email','tel','url','search','number'].includes(type)};
 }`,
 			})
 			if err != nil {
@@ -232,15 +247,18 @@ func scanHandoffFrame(ctx context.Context, call handoffCall, session, frame stri
 			}
 			var value struct {
 				Result struct {
-					Value *string `json:"value"`
+					Value *struct {
+						Sealed bool   `json:"sealed"`
+						Value  string `json:"value"`
+					} `json:"value"`
 				} `json:"result"`
 				Exception json.RawMessage `json:"exceptionDetails"`
 			}
 			if json.Unmarshal(raw, &value) != nil || value.Exception != nil || value.Result.Value == nil {
 				return errors.New("browser input inspection failed")
 			}
-			if *value.Result.Value != "" {
-				remember(*value.Result.Value)
+			if value.Result.Value.Sealed {
+				remember(value.Result.Value.Value)
 			}
 		}
 		for _, list := range [][]handoffNode{n.Children, n.Shadows} {

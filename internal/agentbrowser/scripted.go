@@ -14,9 +14,13 @@ func (i *Instance) MarkScripted(conv, id string) error {
 		i.mu.Unlock()
 		return ErrNotOwner
 	}
-	if p.Control == "person" {
-		i.mu.Unlock()
-		return ErrPersonControl
+	// A sibling window can evaluate its opener without a command on that tab.
+	// Refuse before marking or dispatching when any live related page is personal.
+	for related := range i.openerComponentLocked(id) {
+		if page := i.pages[related]; page != nil && page.Control == "person" {
+			i.mu.Unlock()
+			return ErrPersonControl
+		}
 	}
 	i.markScriptedLocked(id)
 	i.mu.Unlock()
@@ -32,7 +36,7 @@ func (i *Instance) MarkScripted(conv, id string) error {
 	return nil
 }
 
-func (i *Instance) markScriptedLocked(id string) {
+func (i *Instance) openerComponentLocked(id string) map[string]bool {
 	connected := map[string]bool{id: true}
 	for changed := true; changed; {
 		changed = false
@@ -48,7 +52,11 @@ func (i *Instance) markScriptedLocked(id string) {
 			}
 		}
 	}
-	for id := range connected {
+	return connected
+}
+
+func (i *Instance) markScriptedLocked(id string) {
+	for id := range i.openerComponentLocked(id) {
 		if p := i.pages[id]; p != nil && !p.Scripted {
 			p.Scripted = true
 			i.changedLocked()

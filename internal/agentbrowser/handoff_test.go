@@ -45,7 +45,7 @@ func TestHandoffInspectionFailures(t *testing.T) {
 					if fail == "exception" {
 						return json.RawMessage(`{"exceptionDetails":{}}`), nil
 					}
-					raw, err := json.Marshal(map[string]any{"result": map[string]any{"value": value}})
+					raw, err := json.Marshal(map[string]any{"result": map[string]any{"value": map[string]any{"sealed": true, "value": value}}})
 					return raw, err
 				}
 				return json.RawMessage(`{}`), nil
@@ -55,7 +55,7 @@ func TestHandoffInspectionFailures(t *testing.T) {
 					t.Fatal("wrong password masked")
 				}
 				masked = true
-			})
+			}, false)
 			if (err != nil) != (fail != "") {
 				t.Fatalf("failure not closed for %s: %v", fail, err)
 			}

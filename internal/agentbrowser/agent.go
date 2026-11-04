@@ -146,6 +146,10 @@ func (i *Instance) setControl(id, holder string, inspect func(context.Context, s
 		defer cancel()
 		marker, touched, err := inspect(ctx, id)
 		i.mu.Lock()
+		if err == nil {
+			p.PersonInput = false
+			i.changedLocked()
+		}
 		if touched || err != nil {
 			p.SealGeneration++
 			p.Sealed, p.SecretTouched, p.SecretDocument = true, true, marker

@@ -132,6 +132,9 @@ func (t Tools) releaseNode(ctx context.Context, i *agentbrowser.Instance, tab st
 // checkSeals releases verified seals before the requested action and enforces the read barrier across the chat.
 // Chat actions are serialized, while node tracking and recordings use st.mu; CDP never runs under that mutex.
 func (t Tools) checkSeals(ctx context.Context, i *agentbrowser.Instance, target, tool string) error {
+	if err := i.InspectPersonInputs(ctx, t.Caller); err != nil {
+		return err
+	}
 	if target == "" {
 		target = i.Current(t.Caller)
 	}
