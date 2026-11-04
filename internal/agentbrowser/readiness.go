@@ -22,6 +22,7 @@ func (e *PreparingError) Error() string {
 // Ready starts lazy preparation and returns immediately. State is preparing, up (executable ready), error or down.
 // Tools should call this before InstanceFor; preparing includes progress and a retry hint, never a blocked download.
 func (m *Manager) Ready(ctx context.Context) Status {
+	preference := sandboxPreference(m.cfg.NoSandbox)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	s := Status{T: "status", State: "up"}
@@ -40,13 +41,16 @@ func (m *Manager) Ready(ctx context.Context) Status {
 		s.Error = cdp.ErrClosed.Error()
 		return s
 	}
-	if m.cfg.CDP != "" {
+	if m.cfg.CDP != "" && m.cfg.LookupProfile == nil {
 		s.Hint = "Using externally managed Chrome"
 		return s
 	}
+	if m.preparation != nil && !m.preparation.finished.IsZero() && !sameSandbox(m.preparation.noSandbox, preference) {
+		m.preparation = nil
+	}
 	if m.preparation == nil || m.preparation.status.State == "error" &&
 		time.Since(m.preparation.finished) >= 15*time.Second {
-		m.preparation = &browserPreparation{status: Status{
+		m.preparation = &browserPreparation{noSandbox: preference, status: Status{
 			T: "status", State: "preparing", Hint: "Checking Chrome installation"}}
 		m.wg.Add(1)
 		go m.prepareBrowser()
@@ -55,9 +59,10 @@ func (m *Manager) Ready(ctx context.Context) Status {
 }
 
 type browserPreparation struct {
-	status   Status
-	path     string
-	finished time.Time
+	status    Status
+	path      string
+	finished  time.Time
+	noSandbox *bool
 }
 
 // Retry immediately rechecks a failed preparation after an operator repairs the machine.
@@ -85,7 +90,14 @@ func (m *Manager) prepareBrowser() {
 	})
 	var info provision.Inspection
 	if err == nil {
-		info, err = m.probe(m.ctx, path, m.cfg.DataDir)
+		m.mu.Lock()
+		preference := m.preparation.noSandbox
+		m.mu.Unlock()
+		if preference == nil {
+			info, err = m.probe(m.ctx, path, m.cfg.DataDir)
+		} else {
+			info, err = provision.ProbeWithSandbox(m.ctx, path, m.cfg.DataDir, preference)
+		}
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -116,9 +128,15 @@ func (m *Manager) preparedChrome(ctx context.Context) (string, error) {
 		}
 		if s.State == "up" {
 			m.mu.Lock()
-			path := m.preparation.path
+			path := ""
+			if m.preparation != nil && m.preparation.status.State == "up" {
+				path = m.preparation.path
+			}
 			m.mu.Unlock()
-			return path, nil
+			if path != "" {
+				return path, nil
+			}
+			continue
 		}
 		// Preserve Instance's existing wait-for-startup contract for installed browsers, but never await a download.
 		if s.Progress > 0 || strings.HasPrefix(s.Hint, "Downloading") || strings.Contains(s.Hint, "download lock") {
@@ -130,4 +148,42 @@ func (m *Manager) preparedChrome(ctx context.Context) (string, error) {
 		case <-time.After(20 * time.Millisecond):
 		}
 	}
+}
+
+func sameSandbox(a, b *bool) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// ReadyFor resolves outside the manager lock: profile callbacks may acquire the
+// access/store locks and must never run while holding the manager mutex.
+func (m *Manager) ReadyFor(ctx context.Context, conv string) Status {
+	if m.cfg.Off || ctx.Err() != nil || m.ctx.Err() != nil {
+		return m.Ready(ctx)
+	}
+	p, err := m.lookupProfile(m.profileFor(conv))
+	if err != nil {
+		return Status{T: "status", State: "error", Error: err.Error()}
+	}
+	if p.Kind == "attached" {
+		return Status{T: "status", State: "up", Hint: "Using externally managed Chrome"}
+	}
+	return m.Ready(ctx)
+}
+
+// RetryFor rechecks managed Chrome or immediately accepts an attached profile.
+func (m *Manager) RetryFor(ctx context.Context, conv string) Status {
+	if m.cfg.Off || ctx.Err() != nil || m.ctx.Err() != nil {
+		return m.Ready(ctx)
+	}
+	p, err := m.lookupProfile(m.profileFor(conv))
+	if err != nil {
+		return Status{T: "status", State: "error", Error: err.Error()}
+	}
+	if p.Kind == "attached" {
+		return Status{T: "status", State: "up", Hint: "Using externally managed Chrome"}
+	}
+	return m.Retry(ctx)
 }

@@ -28,7 +28,10 @@ import (
 const LogLimit = 4 << 20
 
 // Config contains the paths and display mode for one profile host.
-type Config struct{ ProfileDir, Socket, Chrome, Mode string }
+type Config struct {
+	ProfileDir, Socket, Chrome, Mode string
+	NoSandbox                        *bool
+}
 
 // SocketPath keeps room for the terminating NUL on both Linux and Darwin.
 func SocketPath(runDir, profile string) string {
@@ -66,8 +69,17 @@ func Main(args []string) error {
 	fs.StringVar(&cfg.Socket, "socket", "", "private relay socket")
 	fs.StringVar(&cfg.Chrome, "chrome", "", "Chrome executable")
 	fs.StringVar(&cfg.Mode, "mode", "auto", "auto, xvfb or headless")
+	sandbox := fs.String("sandbox", "inherit", "inherit, enabled or disabled")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	switch *sandbox {
+	case "enabled", "disabled":
+		value := *sandbox == "disabled"
+		cfg.NoSandbox = &value
+	case "inherit":
+	default:
+		return errors.New("invalid sandbox preference")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
@@ -90,6 +102,13 @@ func Start(executable string, cfg Config) error {
 	cmd := exec.Command(executable, "browser-host",
 		"--profile", cfg.ProfileDir, "--socket", cfg.Socket, "--chrome", cfg.Chrome, "--mode", cfg.Mode,
 	)
+	if cfg.NoSandbox != nil {
+		value := "enabled"
+		if *cfg.NoSandbox {
+			value = "disabled"
+		}
+		cmd.Args = append(cmd.Args, "--sandbox", value)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = f
 	cmd.Stderr = f
@@ -243,7 +262,7 @@ func Run(ctx context.Context, cfg Config) error {
 	if display == "" {
 		args = append(args, "--headless=new")
 	}
-	args = append(args, strings.Fields(os.Getenv("RUNTIME_BROWSER_CHROME_ARGS"))...)
+	args = append(args, provision.SandboxArgs(strings.Fields(os.Getenv("RUNTIME_BROWSER_CHROME_ARGS")), cfg.NoSandbox)...)
 	args = append(args, "--no-startup-window")
 	chrome := exec.Command(cfg.Chrome, args...)
 	chrome.ExtraFiles = []*os.File{toChrome, fromChrome}

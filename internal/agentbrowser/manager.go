@@ -30,7 +30,12 @@ var profileID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 type Config struct {
 	// ProfileOf resolves a conversation on each InstanceFor call. Nil or an empty result
 	// selects DefaultProfile. The callback must be safe for concurrent calls.
-	ProfileOf  func(conv string) string
+	ProfileOf     func(conv string) string
+	LookupProfile func(id string) (Profile, bool)
+	// NoSandbox, when set, is the explicit preference and overrides environment flags.
+	NoSandbox func() bool
+	// Idle is the inactivity timeout; zero disables automatic shutdown.
+	Idle       time.Duration
 	DataDir    string
 	Executable string
 	Chrome     string
@@ -43,8 +48,9 @@ type Config struct {
 func ConfigFromEnv(data string) Config {
 	return Config{
 		DataDir: data, Chrome: os.Getenv("RUNTIME_BROWSER_CHROME"), Mode: os.Getenv("RUNTIME_BROWSER_MODE"),
-		CDP: strings.TrimSpace(os.Getenv("RUNTIME_BROWSER_CDP")),
-		Off: strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off"),
+		CDP:  strings.TrimSpace(os.Getenv("RUNTIME_BROWSER_CDP")),
+		Idle: browserIdle(os.Getenv("RUNTIME_BROWSER_IDLE")),
+		Off:  strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off"),
 	}
 }
 
@@ -60,20 +66,21 @@ func FindChrome() (string, error) {
 
 // Manager reconnects independent browser profiles throughout the runtime lifetime.
 type Manager struct {
-	preparation *browserPreparation
-	probe       func(context.Context, string, string) (provision.Inspection, error)
-	cfg         Config
-	mu          sync.Mutex
-	instances   map[string]*Instance
-	ctx         context.Context
-	cancel      context.CancelFunc
-	wg          sync.WaitGroup
+	preparation  *browserPreparation
+	probe        func(context.Context, string, string) (provision.Inspection, error)
+	cfg          Config
+	mu           sync.Mutex
+	instances    map[string]*Instance
+	profileLocks map[string]chan struct{}
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
 }
 
 // New creates a lazy manager; Instance starts the first connection.
 func New(cfg Config) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Manager{probe: provision.Probe, cfg: cfg, instances: make(map[string]*Instance), ctx: ctx, cancel: cancel}
+	return &Manager{probe: provision.Probe, cfg: cfg, instances: make(map[string]*Instance), profileLocks: make(map[string]chan struct{}), ctx: ctx, cancel: cancel}
 }
 
 // Enabled reports whether browser access is configured.
@@ -105,7 +112,16 @@ func (m *Manager) Instance(ctx context.Context, id string) (*Instance, error) {
 	if !profileID.MatchString(id) {
 		return nil, errors.New("invalid browser profile id")
 	}
-	if m.cfg.CDP == "" {
+	unlock, err := m.lockProfile(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	profile, err := m.lookupProfile(id)
+	if err != nil {
+		return nil, err
+	}
+	if profile.Kind != "attached" {
 		if _, err := m.preparedChrome(ctx); err != nil {
 			return nil, err
 		}
@@ -116,17 +132,31 @@ func (m *Manager) Instance(ctx context.Context, id string) (*Instance, error) {
 		return nil, cdp.ErrClosed
 	}
 	i := m.instances[id]
+	m.mu.Unlock()
 	if i == nil {
+		// Profile callbacks and registry reads run outside the manager lock.
 		i = newInstance(m, id)
+		m.mu.Lock()
+		if m.ctx.Err() != nil {
+			m.mu.Unlock()
+			i.cancel()
+			return nil, cdp.ErrClosed
+		}
 		m.instances[id] = i
 		m.wg.Add(1)
 		go func() { defer m.wg.Done(); i.run() }()
+		m.mu.Unlock()
 	}
-	m.mu.Unlock()
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		state, err := i.State()
+		i.mu.Lock()
+		closing := i.closing
+		i.mu.Unlock()
+		if closing {
+			return nil, cdp.ErrClosed
+		}
 		if state == "up" {
 			i.mu.Lock()
 			conn := i.conn
@@ -136,6 +166,7 @@ func (m *Manager) Instance(ctx context.Context, id string) (*Instance, error) {
 			case <-m.ctx.Done():
 				return nil, cdp.ErrClosed
 			default:
+				i.touch()
 				return i, nil
 			}
 		}
@@ -154,8 +185,8 @@ func (m *Manager) Instance(ctx context.Context, id string) (*Instance, error) {
 
 func (i *Instance) connect(ctx context.Context) (*cdp.Conn, error) {
 	cfg := i.manager.cfg
-	if cfg.CDP != "" {
-		return cdp.Dial(ctx, cfg.CDP, i.event)
+	if i.profile.Kind == "attached" {
+		return cdp.Dial(ctx, i.profile.CDP, i.event)
 	}
 	socket := host.SocketPath(filepath.Join(cfg.DataDir, "agent-browser", "run"), i.profile.ID)
 	dial := func() (net.Conn, error) { return (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "unix", socket) }
@@ -178,7 +209,7 @@ func (i *Instance) connect(ctx context.Context) (*cdp.Conn, error) {
 		mode = "auto"
 	}
 	if err = host.Start(executable, host.Config{ProfileDir: i.dir, Socket: socket,
-		Chrome: chrome, Mode: mode}); err != nil {
+		Chrome: chrome, Mode: mode, NoSandbox: sandboxPreference(cfg.NoSandbox)}); err != nil {
 		return nil, err
 	}
 	ticker := time.NewTicker(50 * time.Millisecond)

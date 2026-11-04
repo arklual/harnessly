@@ -72,7 +72,7 @@ func (i *Instance) AgentFrameCall(ctx context.Context, conv, id, session, method
 	if err := i.beginOperation(); err != nil {
 		return nil, err
 	}
-	defer i.tasks.Done()
+	defer i.endOperation()
 	if err := i.agentAllowed(conv, id, method); err != nil {
 		return nil, err
 	}

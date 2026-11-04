@@ -71,7 +71,7 @@ func (i *Instance) Watch(ctx context.Context, id string) (*Viewer, error) {
 	if err := i.beginOperation(); err != nil {
 		return nil, err
 	}
-	defer i.tasks.Done()
+	defer i.endOperation()
 	ctx, cancel := cdp.WithTimeout(ctx)
 	defer cancel()
 	p, c, err := i.lookup(id)

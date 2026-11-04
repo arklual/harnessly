@@ -28,16 +28,10 @@ func newPage(t Tab) *page {
 }
 
 func newInstance(m *Manager, id string) *Instance {
-	kind := "managed"
-	if m.cfg.CDP != "" {
-		kind = "attached"
-	}
-	name := id
-	if id == DefaultProfile {
-		name = "Common"
-	}
+	profile, _ := m.lookupProfile(id)
+	ctx, cancel := context.WithCancel(m.ctx)
 	i := &Instance{
-		manager: m, profile: Profile{id, name, kind},
+		manager: m, profile: profile, ctx: ctx, cancel: cancel, done: make(chan struct{}), lastActivity: time.Now(),
 		dir:   filepath.Join(m.cfg.DataDir, "agent-browser", "profiles", id),
 		pages: make(map[string]*page), current: make(map[string]string), hidden: make(map[string]bool),
 		state: "starting", changes: make(map[chan struct{}]bool), refresh: make(chan struct{}, 1),
@@ -81,6 +75,8 @@ func (i *Instance) persist(stop <-chan struct{}) {
 }
 
 func (i *Instance) save() {
+	i.saveMu.Lock()
+	defer i.saveMu.Unlock()
 	i.mu.Lock()
 	if i.revision == i.saved {
 		i.mu.Unlock()
@@ -229,10 +225,13 @@ func (i *Instance) removeLocked(id string) {
 
 // NewTab creates a separate window without waiting for work on any existing tab.
 func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error) {
+	if i.manager.cfg.ProfileOf != nil && i.manager.profileFor(conv) != i.profile.ID {
+		return Tab{}, ErrProfileUnavailable
+	}
 	if err := i.beginOperation(); err != nil {
 		return Tab{}, err
 	}
-	defer i.tasks.Done()
+	defer i.endOperation()
 	ctx, cancel := cdp.WithTimeout(ctx)
 	defer cancel()
 	if by != "agent" && by != "person" {
@@ -293,6 +292,14 @@ func (i *Instance) NewTab(ctx context.Context, conv, by, url string) (Tab, error
 			}
 		}
 	}
+	// A switch may have closed the old registry while Chrome was creating this
+	// target. Do not leave the late target behind in a now-unavailable profile.
+	if i.manager.cfg.ProfileOf != nil && i.manager.profileFor(conv) != i.profile.ID {
+		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = i.CloseTab(cleanup, p.ID)
+		return Tab{}, ErrProfileUnavailable
+	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	return tabSnapshot(p.Tab), nil
@@ -303,7 +310,7 @@ func (i *Instance) CloseTab(ctx context.Context, id string) error {
 	if err := i.beginOperation(); err != nil {
 		return err
 	}
-	defer i.tasks.Done()
+	defer i.endOperation()
 	ctx, cancel := cdp.WithTimeout(ctx)
 	defer cancel()
 	_, c, err := i.lookup(id)

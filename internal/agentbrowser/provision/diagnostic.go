@@ -129,7 +129,7 @@ func SandboxHelp(chrome string) string {
 		"Another option is the trusted setuid helper: sudo chown root:root " + shellQuote(helper) +
 		" && sudo chmod 4755 " + shellQuote(helper) + "; this DOES NOT work under the service's NoNewPrivileges " +
 		"and requires a filesystem allowing setuid. " +
-		"Last resort: explicitly set RUNTIME_BROWSER_CHROME_ARGS=--no-sandbox. WARNING: this disables Chrome's security sandbox; " +
+		"Last resort: explicitly enable running without a sandbox in Settings > Browser. WARNING: this disables Chrome's security sandbox; " +
 		"do not use it for untrusted sites."
 }
 
@@ -158,6 +158,28 @@ func (p probePipe) Close() error { return errors.Join(p.ReadCloser.Close(), p.Wr
 
 // Probe verifies the real debugging pipe and creates a renderer, so sandbox failures are not mistaken for readiness.
 func Probe(ctx context.Context, chrome, data string) (Inspection, error) {
+	return ProbeWithSandbox(ctx, chrome, data, nil)
+}
+
+// SandboxArgs applies an explicit preference over manual environment flags.
+// Nil preserves legacy environment configuration for deployments without a preference.
+func SandboxArgs(extra []string, noSandbox *bool) []string {
+	out := make([]string, 0, len(extra)+1)
+	for _, arg := range extra {
+		if noSandbox != nil && (arg == "--no-sandbox" || strings.HasPrefix(arg, "--no-sandbox=") ||
+			arg == "--disable-setuid-sandbox" || strings.HasPrefix(arg, "--disable-setuid-sandbox=")) {
+			continue
+		}
+		out = append(out, arg)
+	}
+	if noSandbox != nil && *noSandbox {
+		out = append(out, "--no-sandbox")
+	}
+	return out
+}
+
+// ProbeWithSandbox checks Chrome with the same explicit preference as a new host.
+func ProbeWithSandbox(ctx context.Context, chrome, data string, noSandbox *bool) (Inspection, error) {
 	result := Inspection{Chrome: chrome, Mode: Mode(os.Getenv("RUNTIME_BROWSER_MODE")), Sandbox: "not yet checked"}
 	lease, err := Retain(chrome)
 	if err != nil {
@@ -204,11 +226,14 @@ func Probe(ctx context.Context, chrome, data string) (Inspection, error) {
 	defer replyWriter.Close()
 	args := []string{"--headless=new", "--remote-debugging-pipe", "--user-data-dir=" + profile,
 		"--no-first-run", "--no-default-browser-check", "--disable-dev-shm-usage", "--no-startup-window"}
-	extra := strings.Fields(os.Getenv("RUNTIME_BROWSER_CHROME_ARGS"))
+	extra := SandboxArgs(strings.Fields(os.Getenv("RUNTIME_BROWSER_CHROME_ARGS")), noSandbox)
 	for _, arg := range extra {
 		if arg == "--no-sandbox" || arg == "--no-sandbox=true" {
 			result.Sandbox = "DISABLED explicitly by RUNTIME_BROWSER_CHROME_ARGS"
 		}
+	}
+	if noSandbox != nil && *noSandbox {
+		result.Sandbox = "DISABLED explicitly by browser preference"
 	}
 	args = append(args, extra...)
 	cmd := exec.CommandContext(ctx, chrome, args...)

@@ -9,13 +9,19 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/cdp"
+	"github.com/ly-solutions/harnessly/internal/secrets"
 )
 
 // Profile identifies the browser process or external connection shared by conversations.
 type Profile struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Kind string `json:"-"`
+	ID         string        `json:"id"`
+	Name       string        `json:"name"`
+	Color      string        `json:"color"`
+	Kind       string        `json:"kind"`
+	CDP        string        `json:"cdp,omitempty"`
+	CreatedAt  int64         `json:"createdAt"`
+	LastUsedAt int64         `json:"lastUsedAt"`
+	UsedBy     []secrets.Use `json:"usedBy"`
 }
 
 // Viewport describes the requested content area in CSS pixels.
@@ -75,9 +81,15 @@ type Instance struct {
 	agentFrames               map[string]agentFrameBinding
 	agentListeners            map[*agentListener]bool
 	manager                   *Manager
+	ctx                       context.Context
+	cancel                    context.CancelFunc
+	done                      chan struct{}
+	lastActivity              time.Time
+	operations                int
 	profile                   Profile
 	dir                       string
 	mu                        sync.Mutex
+	saveMu                    sync.Mutex
 	closing                   bool
 	creating                  int
 	conn                      *cdp.Conn
@@ -96,7 +108,15 @@ type Instance struct {
 }
 
 // Profile returns this instance's identity.
-func (i *Instance) Profile() Profile { return i.profile }
+func (i *Instance) Profile() Profile {
+	p := Profile{ID: i.profile.ID, Name: i.profile.Name, Color: i.profile.Color, Kind: i.profile.Kind}
+	if lookup := i.manager.cfg.LookupProfile; lookup != nil {
+		if current, ok := lookup(p.ID); ok {
+			p.Name, p.Color = current.Name, current.Color
+		}
+	}
+	return p
+}
 
 // State reports connection or persistence failures without discarding healthy tabs.
 func (i *Instance) State() (string, string) {
@@ -154,6 +174,8 @@ func (i *Instance) beginOperation() error {
 		return cdp.ErrClosed
 	}
 	i.tasks.Add(1)
+	i.operations++
+	i.lastActivity = time.Now()
 	return nil
 }
 
@@ -168,7 +190,8 @@ func (i *Instance) task(fn func()) {
 }
 
 func (i *Instance) run() {
-	ctx := i.manager.ctx
+	ctx := i.ctx
+	defer close(i.done)
 	workers := make(chan struct{})
 	flush := make(chan struct{})
 	go func() { defer close(workers); i.persist(flush) }()
@@ -203,7 +226,10 @@ func (i *Instance) run() {
 			i.mu.Unlock()
 			readerDone := make(chan struct{})
 			go func() { defer close(readerDone); _ = c.Run(ctx) }()
-			err = i.reconcile(ctx, c, true)
+			err = i.restoreTabs(ctx, c)
+			if err == nil {
+				err = i.reconcile(ctx, c, true)
+			}
 			if err == nil {
 				_, err = c.Call(ctx, "Target.setDiscoverTargets", map[string]any{"discover": true}, "")
 			}
@@ -252,6 +278,9 @@ func (i *Instance) connected(ctx context.Context, c *cdp.Conn) error {
 		case <-c.Done():
 			return cdp.ErrClosed
 		case <-metadata.C:
+			if i.manager.cfg.Idle > 0 && i.idleFor(time.Now()) >= i.manager.cfg.Idle && i.profile.Kind == "managed" {
+				i.manager.stopIdle(i)
+			}
 			_ = i.reconcile(ctx, c, false)
 		case <-i.refresh:
 			// A transient target error must not disconnect every conversation in the profile.
@@ -386,7 +415,7 @@ func (i *Instance) tabCall(ctx context.Context, id, method string, params any,
 	if err := i.beginOperation(); err != nil {
 		return nil, err
 	}
-	defer i.tasks.Done()
+	defer i.endOperation()
 	ctx, cancel := cdp.WithTimeout(ctx)
 	defer cancel()
 	p, c, err := i.lookup(id)

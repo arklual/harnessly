@@ -43,6 +43,9 @@ func (i *Instance) dialogError(id, method string) error {
 }
 
 func (i *Instance) agentAllowed(conv, id, method string) error {
+	if i.manager.cfg.ProfileOf != nil && i.manager.profileFor(conv) != i.profile.ID {
+		return ErrProfileUnavailable
+	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	p := i.pages[id]
@@ -67,7 +70,7 @@ func (i *Instance) AgentCall(ctx context.Context, conv, id, method string, param
 	if err := i.beginOperation(); err != nil {
 		return nil, err
 	}
-	defer i.tasks.Done()
+	defer i.endOperation()
 	if err := i.agentAllowed(conv, id, method); err != nil {
 		return nil, err
 	}
@@ -104,7 +107,7 @@ func (i *Instance) SetControl(id, holder string) error {
 	if err := i.beginOperation(); err != nil {
 		return err
 	}
-	defer i.tasks.Done()
+	defer i.endOperation()
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	p := i.pages[id]

@@ -64,6 +64,7 @@ import (
 // Disconnecting the panel does not dismiss dialogs. Disconnecting the runtime from
 // its managed host cancels pending dialogs before detaching its CDP sessions.
 // Messages over 1 MiB are drained and rejected with notice without closing the socket.
+// A changed conversation profile closes with 1012; reconnect and discard all old frames.
 
 // Status reports browser availability, never individual command failures.
 type Status struct {
@@ -195,7 +196,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 	conv := r.URL.Query().Get("conv")
 	for {
-		ready := m.Ready(ctx)
+		ready := m.ReadyFor(ctx, conv)
 		if ready.State == "up" {
 			break
 		}
@@ -207,7 +208,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		case in := <-incoming:
 			if in.T == "browser.retry" {
-				m.Retry(ctx)
+				m.RetryFor(ctx, conv)
 			} else {
 				report(errors.New("browser is not ready; fix the reported problem and send browser.retry"))
 			}
@@ -224,6 +225,21 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = write(Status{T: "status", State: "error", Error: err.Error(), Profile: profile})
 		return
 	}
+	// Re-resolve permissions before input or frames; a page can remain open while
+	// another device, an agent, or a conversation move changes the active profile.
+	profileCurrent := func() bool {
+		if m.profileFor(conv) != i.Profile().ID {
+			return false
+		}
+		m.mu.Lock()
+		current := m.instances[i.profile.ID] == i
+		m.mu.Unlock()
+		return current
+	}
+	profileChanged := func() {
+		_ = ws.Close(websocket.StatusServiceRestart, "Browser profile changed; reconnect")
+		cancel()
+	}
 	view := newPanelView()
 	outgoing := make(chan json.RawMessage, 8)
 	// Commands retain socket order while the writer keeps delivering frames and state changes.
@@ -239,8 +255,12 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case <-ctx.Done():
 				return
 			case in := <-incoming:
+				if !profileCurrent() {
+					profileChanged()
+					return
+				}
 				if in.T == "browser.retry" {
-					m.Retry(ctx)
+					m.RetryFor(ctx, conv)
 					continue
 				}
 				selected, _, _, _ := view.resolve(i, conv)
@@ -310,8 +330,12 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	syncView := func() error {
+		if !profileCurrent() {
+			profileChanged()
+			return errors.New("browser profile changed")
+		}
 		state, reason := i.State()
-		status := m.Ready(ctx)
+		status := m.ReadyFor(ctx, conv)
 		status.State, status.Error, status.Profile = state, reason, i.Profile()
 		if e := write(status); e != nil {
 			return e
@@ -363,12 +387,19 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if syncView() != nil {
 		return
 	}
+	profileTick := time.NewTicker(250 * time.Millisecond)
+	defer profileTick.Stop()
 	ping := time.NewTicker(20 * time.Second)
 	defer ping.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-profileTick.C:
+			if !profileCurrent() {
+				profileChanged()
+				return
+			}
 		case menu := <-outgoing:
 			if write(menu) != nil {
 				return
@@ -402,6 +433,10 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case f := <-frames:
+			if !profileCurrent() {
+				profileChanged()
+				return
+			}
 			wctx, stop := context.WithTimeout(ctx, 5*time.Second)
 			err = ws.Write(wctx, websocket.MessageBinary, f.Encode(gen))
 			stop()

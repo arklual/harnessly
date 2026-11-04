@@ -52,7 +52,7 @@ func (i *Instance) setViewport(ctx context.Context, id string, v Viewport, allow
 	if err := i.beginOperation(); err != nil {
 		return err
 	}
-	defer i.tasks.Done()
+	defer i.endOperation()
 	if v.Mode != "fit" && v.Mode != "fixed" && v.Mode != "mobile" {
 		return errors.New("invalid viewport mode")
 	}

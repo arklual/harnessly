@@ -181,7 +181,7 @@ func TestDiagnostics(t *testing.T) {
 	}
 	help := SandboxHelp("/opt/browser/chrome")
 	for _, want := range []string{"/opt/browser/chrome", "apparmor_parser", "4755", "NoNewPrivileges", "WARNING",
-		"RUNTIME_BROWSER_CHROME_ARGS=--no-sandbox", "system Google Chrome"} {
+		"Settings > Browser", "system Google Chrome"} {
 		if !strings.Contains(help, want) {
 			t.Errorf("missing %s", want)
 		}
