@@ -840,7 +840,9 @@ const PaneBody = (props: IPaneBodyProps) => {
       )}
       {tab?.kind === 'agent-browser' && (
         <AgentBrowserView
-          key={tab.id}
+          key={`${conv.machineId}:${conv.id}:${tab.id}`}
+          machine={conv.machineId}
+          conv={conv.id}
           url={runtimeSocket(`/api/agent-browser?conv=${encodeURIComponent(conv.id)}`, conv.machineId)}
         />
       )}

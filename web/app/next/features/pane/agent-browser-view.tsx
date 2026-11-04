@@ -1,3 +1,6 @@
+import { profileName } from '@/next/features/browser/profile-fields';
+import { ProfilePicker } from '@/next/features/browser/profile-picker';
+import type { MachineId } from '@/next/protocol/v2';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { nextClick, pointerButton } from './agent-browser-input';
 import Icon from '@/next/ui/icon';
@@ -15,8 +18,16 @@ const presets: IViewport[] = [
 const label = (key: string) => t(`next.agentBrowser.${key}`);
 
 /** A conversation's managed browser, with person input independent of the agent's working tab. */
-export default function AgentBrowserView({ url }: { url: string }) {
-  const { canvas, page, status, tabs, menu, setMenu, notice, framed, imageSize, send } =
+export default function AgentBrowserView({
+  url,
+  machine,
+  conv,
+}: {
+  url: string;
+  machine?: MachineId;
+  conv?: string;
+}) {
+  const { pause, resume, canvas, page, status, tabs, menu, setMenu, notice, framed, imageSize, send } =
     useBrowserSocket(url);
   const active = tabs.tabs.find((tab) => tab.id === tabs.current);
   const area = useRef<HTMLDivElement>(null),
@@ -200,9 +211,26 @@ export default function AgentBrowserView({ url }: { url: string }) {
     <div className="hx-tv" data-tool="agent-browser">
       <div className="hx-tbrowser hx-agent-browser">
         <div className="hx-tbrowser__bar">
-          <span className="hx-agent-browser__profile" title={status?.profile.name}>
-            {status?.profile.name}
-          </span>
+          {machine && conv ? (
+            <ProfilePicker
+              key={`${machine}:${conv}`}
+              machine={machine}
+              conv={conv}
+              currentId={status?.profile.id}
+              onPause={pause}
+              onResume={() => {
+                setDraft(null);
+                resume();
+              }}
+            />
+          ) : (
+            <span
+              className="hx-agent-browser__profile"
+              title={status ? profileName(status.profile) : undefined}
+            >
+              {status ? profileName(status.profile) : null}
+            </span>
+          )}
           {(['back', 'forward', 'reload'] as const).map((action, index) => (
             <button
               key={action}

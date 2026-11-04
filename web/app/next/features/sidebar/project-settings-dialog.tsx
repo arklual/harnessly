@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type ReactNode, type FormEvent } from 'react';
 import { t } from '@/next/i18n';
 import Modal from '@/next/features/shell/modal';
 import Icon from '@/next/ui/icon';
@@ -22,6 +22,7 @@ export interface IProjectSettingsDialogProps {
   project: IProjectSettings | null;
   /** The folders offered under the field; null while they load (or when the machine did not give them). */
   folders: readonly IProjectFolder[] | null;
+  browserSettings?: ReactNode;
   onClose: () => void;
   /** Resolves once the server has the change; a rejection is said under the fields. Only what changed is passed. */
   onSave: (change: Partial<IProjectSettings>) => Promise<void>;
@@ -33,7 +34,13 @@ type TState = (typeof STATE)[keyof typeof STATE];
 /** «Настройки проекта»: its name and the folder its new chats start in. The chats it has stay where they started. */
 const FOLDERS_SHOWN = 6;
 
-const ProjectSettingsDialog = ({ project, folders, onClose, onSave }: IProjectSettingsDialogProps) => {
+const ProjectSettingsDialog = ({
+  project,
+  folders,
+  browserSettings,
+  onClose,
+  onSave,
+}: IProjectSettingsDialogProps) => {
   const pathRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
@@ -161,6 +168,7 @@ const ProjectSettingsDialog = ({ project, folders, onClose, onSave }: IProjectSe
               ))}
             </div>
           )}
+          {browserSettings}
           {error && (
             <p className="hx-create__err" role="alert">
               {error}

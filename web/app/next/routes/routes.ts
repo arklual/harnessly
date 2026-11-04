@@ -34,6 +34,7 @@ export const SETTINGS_SECTIONS = [
   'codex',
   'skills',
   'safe',
+  'browser',
   'machines',
   'apps',
   'connections',

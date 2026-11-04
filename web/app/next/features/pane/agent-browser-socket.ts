@@ -10,6 +10,10 @@ import {
 
 /** One socket owns its selection and discards frames decoded after a selection change. */
 export function useBrowserSocket(url: string) {
+  const [connection, setConnection] = useState(0);
+  const pauseRef = useRef<() => void>(() => undefined);
+  const pause = useCallback(() => pauseRef.current(), []);
+  const resume = useCallback(() => setConnection((n) => n + 1), []);
   const canvas = useRef<HTMLCanvasElement>(null);
   const socket = useRef<WebSocket | null>(null);
   const page = useRef({ w: 0, h: 0 });
@@ -28,6 +32,7 @@ export function useBrowserSocket(url: string) {
   const [framed, setFramed] = useState(false);
   const [imageSize, setImageSize] = useState({ w: 1, h: 1 });
   useEffect(() => {
+    let paused = false;
     let gone = false,
       generation = -1,
       epoch = 0;
@@ -46,7 +51,7 @@ export function useBrowserSocket(url: string) {
         .then((bitmap) => {
           try {
             const el = canvas.current;
-            if (gone || source !== epoch || frame.gen !== generation || !el) return;
+            if (gone || paused || source !== epoch || frame.gen !== generation || !el) return;
             page.current = { w: frame.w, h: frame.h };
             el.width = bitmap.width;
             el.height = bitmap.height;
@@ -65,6 +70,27 @@ export function useBrowserSocket(url: string) {
           if (next && !gone) draw(next, epoch);
         });
     };
+    const clear = () => {
+      epoch++;
+      generation = -1;
+      waiting = null;
+      page.current = { w: 0, h: 0 };
+      if (canvas.current) {
+        canvas.current.width = 0;
+        canvas.current.height = 0;
+      }
+      setFramed(false);
+      setMenu(null);
+      setNotice(null);
+      setTabs({ t: 'tabs', tabs: [], current: '', agentTab: '', following: true, gen: 0 });
+    };
+    pauseRef.current = () => {
+      paused = true;
+      clearTimeout(retry);
+      clear();
+      socket.current?.close();
+      socket.current = null;
+    };
     const open = () => {
       epoch++;
       generation = -1;
@@ -73,7 +99,7 @@ export function useBrowserSocket(url: string) {
       socket.current = ws;
       ws.binaryType = 'arraybuffer';
       ws.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
-        if (gone || socket.current !== ws) return;
+        if (gone || paused || socket.current !== ws) return;
         if (typeof event.data !== 'string') {
           draw(event.data, epoch);
           return;
@@ -107,8 +133,9 @@ export function useBrowserSocket(url: string) {
           });
         }
       };
-      ws.onclose = () => {
-        if (gone) return;
+      ws.onclose = (event) => {
+        if (gone || paused) return;
+        clear();
         setStatus((old) =>
           old?.state === 'error'
             ? old
@@ -116,7 +143,7 @@ export function useBrowserSocket(url: string) {
         );
         setFramed(false);
         setMenu(null);
-        retry = setTimeout(open, 2000);
+        retry = setTimeout(open, event?.code === 1012 ? 0 : 2000);
       };
     };
     open();
@@ -126,7 +153,7 @@ export function useBrowserSocket(url: string) {
       socket.current?.close();
       socket.current = null;
     };
-  }, [url]);
+  }, [url, connection]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(null), 5000);
@@ -136,5 +163,5 @@ export function useBrowserSocket(url: string) {
     if (input.t === 'clipboard.read') copyUntil.current = Date.now() + 5000;
     if (socket.current?.readyState === WebSocket.OPEN) socket.current.send(JSON.stringify(input));
   }, []);
-  return { canvas, page, status, tabs, menu, setMenu, notice, framed, imageSize, send };
+  return { pause, resume, canvas, page, status, tabs, menu, setMenu, notice, framed, imageSize, send };
 }

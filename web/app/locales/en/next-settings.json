@@ -477,5 +477,7 @@
   "next.settings.voice.words.problem.twice": "This word is already there",
   "next.settings.voice.words.problem.full": "There are too many words",
   "next.settings.voice.words.problem.heardLong": "A variant is too long",
-  "next.settings.voice.words.problem.heardMany": "There are too many variants"
+  "next.settings.voice.words.problem.heardMany": "There are too many variants",
+  "next.settings.section.browser": "Browser",
+  "next.settings.lead.browser": "Browser profiles, project access and Chrome security on this machine."
 }

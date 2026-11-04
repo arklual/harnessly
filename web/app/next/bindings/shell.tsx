@@ -41,6 +41,7 @@ import { notificationsFromChats } from '@/next/features/notifications/from-chats
 import { notificationsFromMachines } from '@/next/features/notifications/from-machines';
 import NotificationCenter from '@/next/features/notifications/notification-center';
 import NoticeStack from '@/next/features/notifications/notice-stack';
+import { BrowserProfileAskHost } from '@/next/bindings/browser-profile-asks';
 import { SecretAskHost } from '@/next/bindings/safe-asks';
 import { useNotices } from '@/next/bindings/notices';
 import { useNotify } from '@/next/stores/notices';
@@ -749,6 +750,7 @@ const Shell = ({ owner }: IShellProps) => {
           hideAfterMs={notify.hideAfter * 1000}
         />
       )}
+      <BrowserProfileAskHost machine={boot.k === 'ready' ? model.active : null} />
       <SecretAskHost machine={boot.k === 'ready' ? model.active : null} />
       <ToastHost />
       <UpdateBanner available={update.available} onReload={update.reload} onDismiss={update.dismiss} />

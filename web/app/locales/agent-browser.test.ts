@@ -6,7 +6,9 @@ it('keeps shell and browser translation keys identical in English and Russian', 
   const en = JSON.parse(enText) as Record<string, unknown>;
   const ru = JSON.parse(ruText) as Record<string, unknown>;
   expect(Object.keys(en).sort()).toEqual(Object.keys(ru).sort());
-  const keys = Object.keys(en).filter((key) => key.startsWith('next.agentBrowser.'));
+  const keys = Object.keys(en).filter(
+    (key) => key.startsWith('next.agentBrowser.') || key.startsWith('next.browserProfiles.'),
+  );
   expect(keys.length).toBeGreaterThan(30);
   for (const key of keys) {
     expect(typeof en[key]).toBe('string');

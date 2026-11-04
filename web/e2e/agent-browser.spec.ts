@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { freePort, startRuntime, type Runtime } from './runtime';
@@ -79,24 +79,36 @@ test.beforeAll(async () => {
   if (screenshots) mkdirSync(screenshots, { recursive: true });
 });
 test.afterAll(async () => {
-  // Hosts intentionally outlive the runtime, so terminate only the host in this test's temporary data directory.
-  try {
-    process.kill(
-      Number(
-        readFileSync(join(rt.home, '.harnessly', 'agent-browser', 'profiles', 'common', 'host.pid'), 'utf8'),
-      ),
-      'SIGTERM',
-    );
-  } catch {
-    /* no host was started */
-  }
+  // Hosts intentionally outlive the runtime. Visit only this test's temporary profile directories,
+  // without following links, since managed profile IDs are random and several profiles can have hosts.
+  const stopHosts = (dir: string) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) stopHosts(path);
+      if (entry.isFile() && entry.name === 'host.pid') {
+        try {
+          const pid = Number(readFileSync(path, 'utf8').trim());
+          if (Number.isInteger(pid) && pid > 1) process.kill(pid, 'SIGTERM');
+        } catch {
+          /* host already stopped */
+        }
+      }
+    }
+  };
+  if (rt) stopHosts(join(rt.home, '.harnessly', 'agent-browser', 'profiles'));
   await rt?.stop();
-  await new Promise<void>((ok) => site?.close(() => ok()));
+  if (site) await new Promise<void>((ok) => site.close(() => ok()));
 });
 async function shot(page: Page, name: string) {
   if (screenshots) await page.screenshot({ path: join(screenshots, `${name}.png`), animations: 'disabled' });
 }
-async function chat(page: Page, message: string, empty = true) {
+async function ready(page: Page) {
   await page.addInitScript((id) => localStorage.setItem('hx:whats-new', id), RELEASES[0]!.id);
   await page.goto(rt.url);
   await page
@@ -115,10 +127,16 @@ async function chat(page: Page, message: string, empty = true) {
     await setup.locator('button[type=submit]').click();
   }
   await expect(page.locator('.hx-composer__input')).toBeVisible();
+}
+async function chat(page: Page, message: string, empty = true) {
+  await ready(page);
   await page.getByRole('button', { name: 'New chat', exact: true }).first().click();
   await page.locator('.hx-composer__input').fill(message);
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page).toHaveURL(/\/c\/[^/]+$/);
+  await openBrowser(page, empty);
+}
+async function openBrowser(page: Page, empty = true) {
   if (!(await page.locator('.hx-pane').isVisible())) await page.locator('.hx-header__tools').click();
   await page.locator('.hx-pane .hx-tab[data-home]').click();
   await page
@@ -126,6 +144,16 @@ async function chat(page: Page, message: string, empty = true) {
     .filter({ has: page.locator('[data-i="agent-browser"]') })
     .click();
   if (empty) await expect(page.getByText('No tabs', { exact: true })).toBeVisible({ timeout: 90_000 });
+}
+async function createProjectUI(page: Page, name: string): Promise<string> {
+  await page.locator('.hx-sidebar').getByRole('button', { name: 'New project', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'New project', exact: true });
+  await dialog.getByLabel('Name', { exact: true }).fill(name);
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  const project = page.locator('.hx-sidebar [data-drop="project"]').filter({ hasText: name });
+  await expect(project).toHaveCount(1);
+  return (await project.getAttribute('data-drop-id'))!;
 }
 async function navigate(page: Page, name: string) {
   const address = page.locator('.hx-agent-browser .hx-tbrowser__url');
@@ -189,9 +217,13 @@ test('managed browser tabs, real viewport, dialogs, select and control', async (
   expect(notices).toEqual([]);
   await expect(pane.getByRole('alert')).toHaveCount(0, { timeout: 500 });
   await shot(page, 'three-tabs');
-  await pane.getByRole('button', { name: 'Close tab: Browser fixture' }).last().click();
+  await pane
+    .getByTitle(siteURL + '/third', { exact: true })
+    .locator('..')
+    .getByRole('button', { name: 'Close tab: Browser fixture' })
+    .click();
   await expect(pane.getByRole('tab')).toHaveCount(2);
-  await pane.getByRole('tab').last().click({ button: 'middle' });
+  await pane.getByTitle(siteURL + '/second', { exact: true }).click({ button: 'middle' });
   await expect(pane.getByRole('tab')).toHaveCount(1);
   await expect(pane.locator('.hx-tbrowser__url')).toHaveValue(siteURL + '/first');
   await pane.getByRole('button', { name: 'Viewport size' }).click();
@@ -404,4 +436,232 @@ test('agent viewport remains fixed when the panel opens and resizes', async ({ p
     child.kill('SIGTERM');
     await new Promise<void>((resolve) => child.once('exit', () => resolve()));
   }
+});
+
+test('profile switching, Browser settings and an access ask outside the browser panel', async ({ page }) => {
+  // Exercise the page contract independently of Chrome: backend profile isolation is covered by the runtime tests.
+  const profiles = [
+    {
+      id: 'work',
+      name: 'Work account',
+      color: '#3377cc',
+      kind: 'managed',
+      createdAt: 1,
+      lastUsedAt: 0,
+      usedBy: [],
+      path: '/data/browser/work',
+      running: true,
+      projects: ['demo'],
+    },
+    {
+      id: 'other',
+      name: 'Other account',
+      color: '#cc7733',
+      kind: 'managed',
+      createdAt: 1,
+      lastUsedAt: 0,
+      usedBy: [],
+      path: '/data/browser/other',
+      running: false,
+      projects: [],
+    },
+    {
+      id: 'private',
+      name: 'Private account',
+      color: '#8877cc',
+      kind: 'managed',
+      createdAt: 1,
+      lastUsedAt: 0,
+      usedBy: [],
+      path: '/data/browser/private',
+      running: false,
+      projects: [],
+    },
+  ];
+  let current = profiles[0]!,
+    hasTabs = true,
+    sockets = 0;
+  let asks: { id: string; conv: string; title: string; why: string; at: number }[] = [];
+  const actions: Record<string, unknown>[] = [];
+  await page.route('**/api/agent-browser/profiles?*', async (route) => {
+    const request = route.request(),
+      url = new URL(request.url());
+    if (request.method() === 'POST') {
+      const action = request.postDataJSON() as Record<string, unknown>;
+      actions.push(action);
+      if (action.action === 'use') {
+        current = profiles.find((p) => p.id === action.id)!;
+        hasTabs = false;
+      }
+      if (action.action === 'answer') asks = [];
+      await route.fulfill({ json: { ok: true } });
+      return;
+    }
+    await route.fulfill({
+      json: url.searchParams.has('conv')
+        ? {
+            profiles: profiles.slice(0, 2),
+            current,
+            hasTabs,
+          }
+        : { profiles, projects: { demo: { default: 'work', granted: ['other'] } }, asks, noSandbox: false },
+    });
+  });
+  await page.routeWebSocket('**/api/agent-browser?*', (ws) => {
+    sockets++;
+    ws.send(JSON.stringify({ t: 'status', state: 'up', profile: current }));
+    ws.send(
+      JSON.stringify({
+        t: 'tabs',
+        tabs: hasTabs
+          ? [
+              {
+                id: 'previous-tab',
+                title: 'Previous account tab',
+                url: 'https://example.test',
+                owner: 'this',
+                by: 'agent',
+                viewport: { mode: 'fixed', w: 1280, h: 800, dpr: 1 },
+                crashed: false,
+                control: 'agent',
+                agentAt: 0,
+              },
+            ]
+          : [],
+        current: hasTabs ? 'previous-tab' : '',
+        agentTab: '',
+        following: true,
+        gen: 1,
+      }),
+    );
+  });
+  await chat(page, 'Profile access test', false);
+  const picker = page.getByRole('button', { name: 'Browser profile', exact: true });
+  await expect(picker).toContainText('Work account');
+  await picker.click();
+  await expect(page.getByRole('menuitemradio')).toHaveCount(2);
+  await shot(page, 'profiles-menu');
+  await page.keyboard.press('Escape');
+  await picker.click();
+  await page.getByRole('menuitemradio', { name: 'Other account', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Switch browser profile?' })).toBeVisible();
+  expect(actions).toHaveLength(0);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(picker).toContainText('Work account');
+  await picker.click();
+  await page.getByRole('menuitemradio', { name: 'Other account', exact: true }).click();
+  await page.getByRole('button', { name: 'Switch profile', exact: true }).click();
+  await expect(picker).toContainText('Other account');
+  await expect(page.getByRole('tab', { name: 'Previous account tab' })).toHaveCount(0);
+  await expect.poll(() => sockets).toBeGreaterThan(1);
+  expect(actions[0]).toMatchObject({ action: 'use', id: 'other' });
+  await picker.click();
+  await page.getByRole('menuitem', { name: 'Browser settings…', exact: true }).click();
+  await expect(page.locator('.hx-set__title')).toHaveText('Browser');
+  await expect(page.getByText('/data/browser/private', { exact: true })).toBeVisible();
+  await shot(page, 'profiles-settings');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByLabel('Profile source')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await shot(page, 'profiles-phone');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await createProjectUI(page, 'Browser UI project');
+  const projectSettings = page
+    .locator('.hx-sidebar')
+    .getByRole('button', { name: /^Settings of/ })
+    .first();
+  await projectSettings.click();
+  await expect(page.getByRole('group', { name: 'Browser access' })).toBeVisible();
+  await shot(page, 'profiles-project-field');
+  await page
+    .getByRole('dialog', { name: 'Project settings', exact: true })
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  // The Browser settings page has no browser panel open; asks still arrive through the shell's global host.
+  asks = [
+    {
+      id: 'request-account',
+      conv: 'requesting-chat',
+      title: 'Staging login task',
+      why: 'Please allow the staging account',
+      at: 1,
+    },
+  ];
+  await expect(page.getByRole('dialog', { name: 'Browser profile access' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('Staging login task', { exact: true })).toBeVisible();
+  await expect(page.getByText('Please allow the staging account', { exact: true })).toBeVisible();
+  await shot(page, 'profiles-card');
+  const ask = page.getByRole('dialog', { name: 'Browser profile access' });
+  await ask.getByRole('combobox').selectOption('private');
+  await ask.getByRole('button', { name: 'Only this chat', exact: true }).click();
+  await expect(ask).toHaveCount(0);
+  expect(actions.at(-1)).toMatchObject({
+    action: 'answer',
+    askId: 'request-account',
+    id: 'private',
+    scope: 'chat',
+  });
+});
+
+test('real project profile switch closes old tabs and reconnects to the selected profile', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  let connections = 0;
+  const statusProfiles: string[] = [];
+  page.on('websocket', (socket) => {
+    if (!new URL(socket.url()).pathname.endsWith('/api/agent-browser')) return;
+    connections++;
+    socket.on('framereceived', (frame) => {
+      if (typeof frame.payload !== 'string') return;
+      const message = JSON.parse(frame.payload) as { t: string; state?: string; profile?: { id: string } };
+      if (message.t === 'status' && message.state === 'up' && message.profile)
+        statusProfiles.push(message.profile.id);
+    });
+  });
+  await ready(page);
+  const projectName = 'Browser isolation project';
+  const project = await createProjectUI(page, projectName);
+  await page.getByRole('button', { name: `New chat in “${projectName}”`, exact: true }).click();
+  await page.locator('.hx-composer__input').fill('Real profile switch');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page).toHaveURL(/\/c\/[^/]+$/);
+  const conv = new URL(page.url()).pathname.split('/').at(-1)!;
+  await openBrowser(page);
+  const endpoint = rt.url + '/api/agent-browser/profiles?machine=local';
+  const initialResponse = await page.request.get(endpoint + '&conv=' + encodeURIComponent(conv));
+  expect(initialResponse.ok()).toBe(true);
+  const initial = (await initialResponse.json()) as { current: { id: string; name: string } };
+  const change = async (data: Record<string, unknown>) => {
+    const response = await page.request.post(endpoint, { data, headers: { Origin: rt.url } });
+    expect(response.ok(), await response.text()).toBe(true);
+  };
+  await change({ action: 'create', name: 'Second project account', color: '#b87333' });
+  const settings = (await (await page.request.get(endpoint)).json()) as {
+    profiles: { id: string; name: string }[];
+  };
+  const extra = settings.profiles.find((profile) => profile.name === 'Second project account')!;
+  expect(extra).toBeTruthy();
+  expect(extra.id).not.toBe(initial.current.id);
+  await change({ action: 'project', project, default: initial.current.id, granted: [extra.id] });
+  const pane = page.locator('.hx-agent-browser');
+  await pane.getByRole('button', { name: 'New tab', exact: true }).first().click();
+  await navigate(page, '/real-profile');
+  await expect(pane.getByRole('tab')).toHaveCount(1);
+  const before = connections;
+  await pane.getByRole('button', { name: 'Browser profile', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: extra.name, exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Switch browser profile?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Switch profile', exact: true }).click();
+  await expect(pane.locator('canvas')).toHaveAttribute('data-shown', 'false');
+  await expect(pane.getByRole('tab')).toHaveCount(0);
+  await expect.poll(() => connections).toBeGreaterThan(before);
+  await expect.poll(() => statusProfiles.at(-1)).toBe(extra.id);
+  await expect(pane.getByRole('button', { name: 'Browser profile', exact: true })).toContainText(extra.name);
+  const selected = (await (
+    await page.request.get(endpoint + '&conv=' + encodeURIComponent(conv))
+  ).json()) as { current: { id: string }; hasTabs: boolean };
+  expect(selected.current.id).toBe(extra.id);
+  expect(selected.hasTabs).toBe(false);
+  await expect(pane.getByText('No tabs', { exact: true })).toBeVisible();
 });
