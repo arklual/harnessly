@@ -140,6 +140,19 @@ func (c mcpClient) eval(expression, want string) {
 		c.t.Fatalf("evaluate %s: want %s got %s", expression, want, s)
 	}
 }
+
+// evalSoon is eval for what follows a key: Chrome answers the key before the focus has moved.
+func (c mcpClient) evalSoon(expression, want string) {
+	c.t.Helper()
+	s := ""
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		s = c.text("evaluate", map[string]any{"expression": expression})
+		if strings.Contains(s, want) {
+			return
+		}
+	}
+	c.t.Fatalf("evaluate %s: want %s got %s", expression, want, s)
+}
 func cleanupHost(t *testing.T, dir string) {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(dir, "host.pid"))
@@ -263,7 +276,7 @@ setTimeout(()=>{const h=document.createElement('h2');h.textContent='Delayed cont
 				c.t = t
 				c.text("type", map[string]any{"id": c.node("User"), "text": "agent"})
 				c.text("press_key", map[string]any{"key": "Tab"})
-				c.eval("document.activeElement.type", `"password"`)
+				c.evalSoon("document.activeElement.type", `"password"`)
 				c.text("type", map[string]any{"id": c.node("Password"), "text": c.password})
 				c.text("snapshot", nil)
 				c.text("evaluate", map[string]any{"expression": "document.querySelector('[type=password]').value"})
