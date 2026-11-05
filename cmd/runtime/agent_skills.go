@@ -58,6 +58,7 @@ func provisionAgentSkills(dataDir string) {
 	opts := agentskills.Options{
 		DataDir: dataDir, CodexHome: codexHomeDir(home), BinDir: agentBinDir(home),
 		Boards: integ.BoardsURL != "", Artifacts: integ.ArtifactsURL != "",
+		MCPServer: env("RUNTIME_MCP_SERVER", "harnessly"),
 	}
 	if exe, err := os.Executable(); err == nil {
 		opts.Harnessly = filepath.Join(filepath.Dir(exe), "harnessly")

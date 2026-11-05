@@ -17,7 +17,8 @@ import LazyView from '@/next/ui/lazy-view';
 import MediaPlayer from '@/next/features/pane/media/media-player';
 import { SHEET_FILE } from '@/next/features/pane/sheet/sheet-api';
 import { MEDIA_KIND } from '@/next/features/pane/media/media-model';
-import { downloadUrl, listZip, previewUrl, zipEntryUrl, type IZipList } from '@/next/features/pane/delivered';
+import { listZip, previewUrl, zipEntryUrl, type IZipList } from '@/next/features/pane/delivered';
+import { downloadHref } from '@/next/features/pane/download';
 
 export interface IDeliveredViewProps {
   /** The chat the pane is beside: it hears what is selected in the file. */
@@ -32,6 +33,7 @@ const loadPdfView = () => import('@/next/features/pane/pdf/pdf-view');
 const loadSheetView = () => import('@/next/features/pane/sheet/sheet-view');
 const loadDocxView = () => import('@/next/features/pane/docx/docx-view');
 const loadPptxView = () => import('@/next/features/pane/pptx/pptx-view');
+const loadFontView = () => import('@/next/features/pane/font-view');
 
 const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1);
 
@@ -115,6 +117,8 @@ const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
   // Closed, the file holds no selection any more.
   useEffect(() => () => reportFileSelection(machine, conv, path, null), [machine, conv, path]);
   const toFile = { onSelection, place, onPlaced };
+  // Saved through the chat: a file in its folder is saved wherever the folder lies.
+  const saveHref = downloadHref(machine, conv, [path]);
   // A spreadsheet looks after its own file; the rest are read again from an address that says the file changed.
   const reads =
     view === DELIVERED_VIEW.pdf ||
@@ -127,7 +131,7 @@ const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
     <div className="hx-tv hx-deliv" data-tool="disk" data-view={view}>
       <div className="hx-tv__sum">
         <span className="hx-tv__big hx-deliv__name">{name}</span>
-        <Save href={downloadUrl(machine, path)} />
+        <Save href={saveHref} />
       </div>
       {view === DELIVERED_VIEW.zip && <ZipContents machine={machine} path={path} />}
       {view === DELIVERED_VIEW.image && (
@@ -136,7 +140,7 @@ const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
       {view === DELIVERED_VIEW.pdf && (
         <LazyView
           load={loadPdfView}
-          props={{ src, name, saveHref: downloadUrl(machine, path), ...toFile }}
+          props={{ src, name, saveHref, ...toFile }}
           fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
           title={t('next.pdf.broken')}
         />
@@ -148,7 +152,7 @@ const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
           kind={MEDIA_KIND.video}
           name={name}
           path={path}
-          saveHref={downloadUrl(machine, path)}
+          saveHref={saveHref}
           {...toFile}
         />
       )}
@@ -159,7 +163,7 @@ const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
           kind={MEDIA_KIND.audio}
           name={name}
           path={path}
-          saveHref={downloadUrl(machine, path)}
+          saveHref={saveHref}
           {...toFile}
         />
       )}
@@ -172,7 +176,7 @@ const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
             src: previewUrl(machine, path),
             name,
             kind: /\.(?:csv|tsv)$/i.test(path) ? SHEET_FILE.csv : SHEET_FILE.xlsx,
-            saveHref: downloadUrl(machine, path),
+            saveHref,
             ...toFile,
           }}
           fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
@@ -193,6 +197,14 @@ const DeliveredView = ({ conv, machine, path, view }: IDeliveredViewProps) => {
           props={{ machine, path, src: previewUrl(machine, path), name, ...toFile }}
           fallback={<span className="hx-sk hx-pdf__wait-sheet" />}
           title={t('next.pptx.failed')}
+        />
+      )}
+      {view === DELIVERED_VIEW.font && (
+        <LazyView
+          load={loadFontView}
+          props={{ href: saveHref, name }}
+          fallback={<span className="hx-sk hx-plan__sk" />}
+          title={t('next.font.failed')}
         />
       )}
       {view === DELIVERED_VIEW.save && <div className="hx-tv__note">{t('next.delivered.saveOnly')}</div>}

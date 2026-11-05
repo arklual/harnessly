@@ -41,13 +41,13 @@ const TOOLS = [
   { kind: 'artifacts', group: 'chat' },
   { kind: 'peers', group: 'chat' },
   { kind: 'economics', group: 'chat' },
-  { kind: 'disk', group: 'vm' },
   { kind: 'gitlab', group: 'links' },
   { kind: 'vault', group: 'links' },
 ] as const satisfies readonly { kind: TPaneTabKind; group: string }[];
 
-/** Legacy's tabs the design has no place for: one left open in Legacy does not come over. */
-const GONE: ReadonlySet<TPaneTabKind> = new Set(['overview', 'design', 'app']);
+/** Legacy's tabs the design has no place for: one left open in Legacy does not come over. «Диск» is the pane's «Файлы»
+ *  on the machine now. */
+const GONE: ReadonlySet<TPaneTabKind> = new Set(['overview', 'design', 'app', 'disk']);
 
 /** Legacy's tabs the new pane has tools of its own for: what Legacy's pane gets for them is handed over. */
 const HANDED: ReadonlySet<TPaneTabKind> = new Set(['browser', 'plan', 'side-chat']);

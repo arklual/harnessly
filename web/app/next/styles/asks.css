@@ -2,7 +2,7 @@
    and Settings → Notifications → «Questions to people». Tokens of the neighbouring peer cards. */
 
 /* ── The card ─────────────────────────────────────────── */
-.hx-ask {
+.hx-pask {
   display: flex;
   flex-direction: column;
   gap: var(--hx-space-2);
@@ -10,21 +10,21 @@
   max-width: 88%;
   padding: 2px 0 2px var(--hx-space-4);
   border-left: 2px solid var(--hx-border-strong);
-  animation: hx-ask-in 220ms var(--hx-ease-out) backwards;
+  animation: hx-pask-in 220ms var(--hx-ease-out) backwards;
 }
-.hx-ask[data-tone='run'] {
+.hx-pask[data-tone='run'] {
   border-left-color: var(--hx-accent);
 }
-.hx-ask[data-tone='ok'] {
+.hx-pask[data-tone='ok'] {
   border-left-color: color-mix(in srgb, var(--hx-success) 70%, transparent);
 }
-.hx-ask[data-tone='warn'] {
+.hx-pask[data-tone='warn'] {
   border-left-color: color-mix(in srgb, var(--hx-warning) 70%, transparent);
 }
-.hx-ask[data-tone='fail'] {
+.hx-pask[data-tone='fail'] {
   border-left-color: color-mix(in srgb, var(--hx-danger) 60%, transparent);
 }
-.hx-ask__head {
+.hx-pask__head {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
@@ -33,20 +33,20 @@
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-3);
 }
-.hx-ask__ic {
+.hx-pask__ic {
   align-self: center;
 }
-.hx-ask__to {
+.hx-pask__to {
   font-weight: var(--hx-weight-semibold);
   color: var(--hx-fg-2);
 }
-.hx-ask__where {
+.hx-pask__where {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hx-ask__chat {
+.hx-pask__chat {
   padding: 0;
   border: 0;
   background: none;
@@ -57,11 +57,11 @@
   text-underline-offset: 2px;
   cursor: pointer;
 }
-.hx-ask__chat:hover {
+.hx-pask__chat:hover {
   color: var(--hx-fg-1);
 }
 /* The question is the largest text of the card. */
-.hx-ask__q {
+.hx-pask__q {
   margin: 0;
   font-size: var(--hx-text-lg);
   line-height: 1.4;
@@ -69,14 +69,14 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.hx-ask__details {
+.hx-pask__details {
   margin: 0;
   font-size: var(--hx-text-sm);
   color: var(--hx-fg-2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.hx-ask__link {
+.hx-pask__link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -87,23 +87,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hx-ask__state {
+.hx-pask__state {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: var(--hx-text-sm);
   color: var(--hx-fg-2);
 }
-.hx-ask[data-tone='ok'] .hx-ask__state {
+.hx-pask[data-tone='ok'] .hx-pask__state {
   color: var(--hx-success);
 }
-.hx-ask[data-tone='warn'] .hx-ask__state {
+.hx-pask[data-tone='warn'] .hx-pask__state {
   color: var(--hx-warning);
 }
-.hx-ask[data-tone='fail'] .hx-ask__state {
+.hx-pask[data-tone='fail'] .hx-pask__state {
   color: var(--hx-danger);
 }
-.hx-ask__said {
+.hx-pask__said {
   margin: 0;
   padding: var(--hx-space-2) var(--hx-space-3);
   border-radius: var(--hx-radius-md);
@@ -113,7 +113,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.hx-ask__replies {
+.hx-pask__replies {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -121,45 +121,45 @@
   padding: 0;
   list-style: none;
 }
-.hx-ask__reply {
+.hx-pask__reply {
   display: flex;
   align-items: baseline;
   gap: 8px;
   font-size: var(--hx-text-sm);
   color: var(--hx-fg-2);
 }
-.hx-ask__reply-who {
+.hx-pask__reply-who {
   flex: none;
   font-weight: var(--hx-weight-medium);
   color: var(--hx-fg-1);
 }
-.hx-ask__reply-text {
+.hx-pask__reply-text {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.hx-ask__reply-mark {
+.hx-pask__reply-mark {
   flex: none;
   align-self: center;
   color: var(--hx-fg-3);
 }
-.hx-ask__reply[data-read] .hx-ask__reply-mark {
+.hx-pask__reply[data-read] .hx-pask__reply-mark {
   color: var(--hx-success);
 }
 
 /* The answer from here */
-.hx-ask__answer {
+.hx-pask__answer {
   display: flex;
   flex-direction: column;
   gap: var(--hx-space-2);
 }
-.hx-ask__acts {
+.hx-pask__acts {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-.hx-ask__btn {
+.hx-pask__btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -177,39 +177,39 @@
     background 160ms ease,
     opacity 160ms ease;
 }
-.hx-ask__btn:hover {
+.hx-pask__btn:hover {
   background: var(--hx-bg-hover);
 }
-.hx-ask__btn:focus-visible {
+.hx-pask__btn:focus-visible {
   outline: 2px solid var(--hx-focus);
   outline-offset: 1px;
 }
-.hx-ask__btn:disabled {
+.hx-pask__btn:disabled {
   cursor: default;
   opacity: 0.5;
 }
-.hx-ask__btn[data-tone='primary'] {
+.hx-pask__btn[data-tone='primary'] {
   border-color: transparent;
   background: var(--hx-primary);
   color: var(--hx-primary-fg);
 }
-.hx-ask__btn[data-tone='primary']:hover {
+.hx-pask__btn[data-tone='primary']:hover {
   opacity: 0.9;
 }
-.hx-ask__btn[data-tone='ghost'] {
+.hx-pask__btn[data-tone='ghost'] {
   border-color: transparent;
   color: var(--hx-fg-2);
 }
-.hx-ask__box {
+.hx-pask__box {
   display: flex;
   align-items: flex-end;
   gap: var(--hx-space-2);
-  animation: hx-ask-in 220ms var(--hx-ease-out);
+  animation: hx-pask-in 220ms var(--hx-ease-out);
 }
-.hx-ask__box[data-state='closing'] {
-  animation: hx-ask-box-out 160ms var(--hx-ease-out) forwards;
+.hx-pask__box[data-state='closing'] {
+  animation: hx-pask-box-out 160ms var(--hx-ease-out) forwards;
 }
-.hx-ask__input {
+.hx-pask__input {
   flex: 1;
   min-height: 52px;
   padding: 8px 10px;
@@ -222,24 +222,24 @@
   resize: vertical;
   outline: 0;
 }
-.hx-ask__input:focus {
+.hx-pask__input:focus {
   border-color: var(--hx-focus);
   box-shadow: 0 0 0 3px var(--hx-accent-soft);
 }
-.hx-ask__err {
+.hx-pask__err {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: var(--hx-text-sm);
   color: var(--hx-danger);
 }
-@keyframes hx-ask-in {
+@keyframes hx-pask-in {
   from {
     opacity: 0;
     transform: translateY(-4px);
   }
 }
-@keyframes hx-ask-box-out {
+@keyframes hx-pask-box-out {
   to {
     opacity: 0;
     transform: translateY(-4px);
@@ -247,13 +247,13 @@
 }
 
 /* In the dialog the card is the whole body. */
-.hx-ask-modal {
+.hx-pask-modal {
   width: min(560px, 100%);
 }
-.hx-ask-modal__body {
+.hx-pask-modal__body {
   padding: 8px 24px 20px;
 }
-.hx-ask-modal .hx-ask {
+.hx-pask-modal .hx-pask {
   max-width: none;
 }
 
@@ -382,9 +382,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hx-ask,
-  .hx-ask__box,
-  .hx-ask__box[data-state='closing'] {
+  .hx-pask,
+  .hx-pask__box,
+  .hx-pask__box[data-state='closing'] {
     animation: none;
   }
 }

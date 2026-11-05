@@ -27,6 +27,7 @@ const inviteOf = (i: Invite): TenantInvite => ({
   expiresAt: i.expiresAt,
   uses: i.uses,
   maxUses: i.maxUses,
+  role: i.role === 'owner' ? 'owner' : 'member',
 });
 
 export const liveTenant = (fetcher?: Fetcher): TenantApi => {
@@ -46,9 +47,9 @@ export const liveTenant = (fetcher?: Fetcher): TenantApi => {
         (e) => (e.code === 'provider_off' && profile === 'container' ? CONTAINER_OFF : null),
       ),
     tenantInvites: (spaceId) => wrap(async () => (await api.spaces.invites(spaceId)).invites.map(inviteOf)),
-    inviteByEmail: (spaceId, email) =>
+    inviteByEmail: (spaceId, email, role = 'member') =>
       wrap(async () => {
-        const { invites } = await api.spaces.invite(spaceId, [email]);
+        const { invites } = await api.spaces.invite(spaceId, [email], role);
         const first = invites[0];
         if (!first) throw new OrgApiError('invalid_request', 'Проверьте адрес почты.');
         return inviteOf(first);

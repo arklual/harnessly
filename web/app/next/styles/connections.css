@@ -2,7 +2,7 @@
    «disconnect?» open under the row, removal folds it with .hx-reveal, a new row slides in), the paste field under them,
    and the card of what a pasted link turned out to be, which slides in and fades out. */
 
-/* The product's mark: its letters on its own colour */
+/* The product's mark: its logo (or letters) on its own colour */
 .hx-conn-glyph {
   --hx-conn-c: var(--hx-fg-2);
   display: grid;
@@ -23,6 +23,13 @@
   height: 36px;
   border-radius: 10px;
   font-size: 13px;
+}
+.hx-conn-glyph__logo {
+  width: 56%;
+  height: 56%;
+}
+.hx-conn-glyph__logo[data-faded] path {
+  opacity: 0.65;
 }
 .hx-conn-glyph[data-kind='jira'] {
   --hx-conn-c: #0c66e4;
@@ -54,7 +61,7 @@
   --hx-conn-c: #b32024;
 }
 .hx-conn-glyph[data-kind='yandex-tracker'] {
-  --hx-conn-c: #fc3f1d;
+  --hx-conn-c: #5282ff;
 }
 .hx-conn-glyph[data-kind='azure-devops'] {
   --hx-conn-c: #0078d4;
@@ -96,9 +103,6 @@ html[data-theme='dark'] .hx-conn-glyph[data-kind='outline'] {
 .hx-conn-glyph[data-mcp='cloudflare-docs'] {
   --hx-conn-c: #f38020;
 }
-.hx-conn-glyph[data-mcp='context7'] {
-  --hx-conn-c: #0f766e;
-}
 .hx-conn-glyph[data-mcp='huggingface'] {
   --hx-conn-c: #ff9d00;
 }
@@ -118,12 +122,14 @@ html[data-theme='dark'] .hx-conn-glyph[data-kind='outline'] {
   --hx-conn-c: #003087;
 }
 .hx-conn-glyph[data-mcp='github'],
+.hx-conn-glyph[data-mcp='context7'],
 .hx-conn-glyph[data-mcp='notion'],
 .hx-conn-glyph[data-mcp='vercel'],
 .hx-conn-glyph[data-mcp='square'] {
   --hx-conn-c: #24292f;
 }
 html[data-theme='dark'] .hx-conn-glyph[data-mcp='github'],
+html[data-theme='dark'] .hx-conn-glyph[data-mcp='context7'],
 html[data-theme='dark'] .hx-conn-glyph[data-mcp='notion'],
 html[data-theme='dark'] .hx-conn-glyph[data-mcp='vercel'],
 html[data-theme='dark'] .hx-conn-glyph[data-mcp='square'] {

@@ -56,7 +56,7 @@ import ProductSwitcher from '@/next/features/sidebar/product-switcher';
 import useDrag, { afterTouchClick } from '@/next/ui/use-drag';
 import MachineAlert from '@/next/features/sidebar/machine-alert';
 import MachineCard from '@/next/features/sidebar/machine-card';
-import useRailTip, { isRail } from '@/next/features/sidebar/use-rail-tip';
+import useRailTip, { isRail, opensRail } from '@/next/features/sidebar/use-rail-tip';
 import useRowCard from '@/next/features/sidebar/row-card';
 import '@/next/styles/delegation.css';
 import {
@@ -159,8 +159,6 @@ export interface ISidebarProps {
   onManageMachines?: () => void;
   /** Each new value opens the machine's card (a notification about the machine). */
   machineReveal?: number;
-  /** What the folded rail lists in place of the projects (the live chats); shown only on the rail. */
-  rail?: ReactNode;
   /** The agents' questions to people («People»), under the favorites; hidden on the rail. */
   people?: ReactNode;
   /** The designs at work under «Sinopia Design»: the first five, then «Дальше»; null or empty shows none. */
@@ -473,7 +471,6 @@ const Sidebar = ({
   onPickMachine,
   onManageMachines,
   machineReveal = 0,
-  rail,
   people,
   designs = null,
   ref,
@@ -744,8 +741,12 @@ const Sidebar = ({
     listRef,
     dragKinds: DRAG_KINDS,
     dropKinds: DROP_KINDS,
+    // A chat steps among chats and a group among groups; a group carried past the loose chats would show a place it
+    // cannot take (groups stand first) and jump back on the drop.
     lined: (source, target) =>
-      target.kind === DROP.chat || (target.kind === DROP.group && source.kind === DRAG.group),
+      (source.kind === DRAG.chat && target.kind === DROP.chat) ||
+      (source.kind === DRAG.group && target.kind === DROP.group),
+    tracked: false,
     resolve: (source, target) => {
       const plan = resolveDrop(source, target, favView, chats ?? []);
       if (!plan) return null;
@@ -832,6 +833,9 @@ const Sidebar = ({
       ref={ref}
       {...railTip.handlers}
       {...rowCard.handlers}
+      onClick={(event) => {
+        if (opensRail(event.target)) onToggleRail();
+      }}
     >
       {rowCard.card}
       <div className="hx-brand hx-enter" data-enter="up" data-eb="160">
@@ -966,7 +970,6 @@ const Sidebar = ({
       <MachineAlert alert={machine?.alert ?? null} onMore={() => setAlertReveal((n) => n + 1)} />
 
       <div className="hx-sidebar__list" ref={listRef}>
-        {rail}
         {showSkeleton && <ListSkeleton />}
         {chats === null && loadError !== null && onRetryLoad && (
           <div className="hx-snote">

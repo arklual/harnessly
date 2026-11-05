@@ -19,6 +19,7 @@
   "next.keys.scope.video": "Видео",
   "next.keys.scope.pictures": "Картинки",
   "next.keys.scope.site": "Дизайн сайта",
+  "next.keys.scope.files": "Файлы",
   "next.keys.cmd.global.help": "Шпаргалка по клавишам",
   "next.keys.cmd.global.search": "Поиск",
   "next.keys.cmd.global.newChat": "Новый чат",
@@ -71,5 +72,7 @@
   "next.keys.cmd.site.inspect": "Выбрать элемент на странице",
   "next.keys.copied": "Ответ скопирован",
   "next.keys.cmd.site.pick": "Выбрать место для комментария",
-  "next.keys.cmd.site.stopInspect": "Выйти из выбора элемента"
+  "next.keys.cmd.site.stopInspect": "Выйти из выбора элемента",
+  "next.keys.cmd.files.quickOpen": "Перейти к файлу",
+  "next.keys.cmd.files.find": "Найти в файлах"
 }

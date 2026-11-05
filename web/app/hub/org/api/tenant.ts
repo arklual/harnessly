@@ -40,6 +40,8 @@ export interface TenantInvite {
   expiresAt: string;
   uses: number;
   maxUses: number | null;
+  /** What the invitee becomes on accepting: a member or a tenant admin. */
+  role: TenantRole;
 }
 
 export interface TenantApi {
@@ -48,8 +50,8 @@ export interface TenantApi {
   /** POST …/machines/codes. `full` needs the confirmation, a container may be off on this hub. */
   issueMachineCode(spaceId: string, profile: MachineProfile, confirmFull: boolean): Promise<IssuedCode>;
   tenantInvites(spaceId: string): Promise<TenantInvite[]>;
-  /** Invites one address; the invitee joins as a member. */
-  inviteByEmail(spaceId: string, email: string): Promise<TenantInvite>;
+  /** Invites one address; the invitee joins with the role given (a member by default). */
+  inviteByEmail(spaceId: string, email: string, role?: TenantRole): Promise<TenantInvite>;
   inviteByLink(spaceId: string): Promise<TenantInvite>;
   revokeInvite(spaceId: string, inviteId: string): Promise<void>;
   tenantMembers(spaceId: string): Promise<TenantMember[]>;

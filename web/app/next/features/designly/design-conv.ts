@@ -11,7 +11,6 @@ export const DESIGN_CONV = {
 
 export interface IDesignConvRow {
   id: string;
-  cwd: string;
   lastActivityAt: number;
 }
 
@@ -23,13 +22,6 @@ export interface IDesignBinding {
 }
 
 export type TDesignConv = { k: typeof DESIGN_CONV.none } | { k: typeof DESIGN_CONV.conv; id: string };
-
-/** In the project's folder or under it: the runtime's own rule for the design's conversations. */
-export const inFolder = (cwd: string, dir: string): boolean => {
-  const root = dir.replace(/\/+$/, '');
-  const at = cwd.replace(/\/+$/, '');
-  return at === root || at.startsWith(`${root}/`);
-};
 
 export interface IPickInput {
   /** The chat the person came from and has not changed since; null without one. */
@@ -51,43 +43,34 @@ export const pickDesignConv = ({ arrived, bound, list, answered }: IPickInput): 
   return gone ? { k: DESIGN_CONV.none } : { k: DESIGN_CONV.conv, id };
 };
 
+/** What one machine said of the design's chats: the ones started from it, then the ones that edited its files. */
+export interface IDesignChatsFound {
+  machine: string;
+  convs: readonly string[];
+}
+
 /**
- * The chats that worked on the design, for the column's switch. First the ones tied to it — in its folder, or the ones
- * it was opened from or worked in (`seen`) — then the others the machine found worked on it (`touched`: their agent
- * wrote its files or named it to the design CLI, the chats from before included); each group the latest activity
- * first. A chat the list does not have yet (made a moment ago, or the list still loading) stays in when it is the
- * current one.
+ * The design's chats for the column's switch, from every machine of the person: the ones each machine says
+ * were started from the design or edited its files, the latest activity first. Nothing else ties a chat to the design:
+ * not its folder, not opening the design from it, not naming it — a chat the design was opened from is shown in the
+ * column, but is not listed as the design's. A chat just started from the column (`fresh`) is in before the machine's
+ * next answer has it.
  */
-export const designChats = <T extends IDesignConvRow>({
+export const designChats = <T extends IDesignConvRow & { machineId: string }>({
   list,
-  dir,
-  seen,
-  touched,
-  current,
+  found,
+  fresh,
 }: {
+  /** The conversations of every machine. */
   list: readonly T[] | null;
-  dir: string | null;
-  seen: readonly string[];
-  touched: readonly string[];
-  current: string | null;
+  found: readonly IDesignChatsFound[];
+  fresh: string | null;
 }): T[] => {
-  const known = new Set(seen);
-  if (current) known.add(current);
-  const worked = new Set(touched);
-  const latest = (a: T, b: T) => b.lastActivityAt - a.lastActivityAt;
-  const all = list ?? [];
-  const tied = all.filter((c) => known.has(c.id) || (dir !== null && inFolder(c.cwd, dir)));
-  const tiedIds = new Set(tied.map((c) => c.id));
-  const others = all.filter((c) => worked.has(c.id) && !tiedIds.has(c.id));
-  return [...tied.sort(latest), ...others.sort(latest)];
+  const tied = new Set(found.flatMap((f) => f.convs.map((id) => `${f.machine}|${id}`)));
+  return (list ?? [])
+    .filter((c) => c.id === fresh || tied.has(`${c.machineId}|${c.id}`))
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 };
 
 /** The key a design's chats are kept under: a design is per machine. */
 export const designKey = (machine: string, design: string): string => `${machine}|${design}`;
-
-/** How many chats a design remembers it was opened from or worked in. */
-export const SEEN_MAX = 20;
-
-/** The remembered chats with this one first. */
-export const withSeen = (seen: readonly string[], id: string): string[] =>
-  [id, ...seen.filter((x) => x !== id)].slice(0, SEEN_MAX);

@@ -16,6 +16,7 @@ package agentskills
 
 import (
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -39,6 +40,9 @@ type Options struct {
 	Harnessly string
 	// Boards and Artifacts say whether those servers are configured.
 	Boards, Artifacts bool
+	// MCPServer is the name the runtime's MCP server has for the agents (RUNTIME_MCP_SERVER); "" is harnessly. The
+	// browser-operator subagent lists the browser tools by it.
+	MCPServer string
 	// Source is the skills' files; nil is skills.Upstream.
 	Source fs.FS
 }
@@ -67,6 +71,27 @@ func ClaudePluginDir(dataDir string) string { return filepath.Join(dataDir, "age
 
 // ToolsDir is where the artifacts client lives.
 func ToolsDir(dataDir string) string { return filepath.Join(dataDir, "agent-skills", "tools") }
+
+//go:embed agents/browser-operator.md
+var browserOperator string
+
+// browserTools are the MCP tools of the browser-operator subagent, by their names without the server.
+var browserTools = []string{"browser_snapshot", "browser_read", "browser_click", "browser_type", "browser_press", "browser_hover",
+	"browser_select", "browser_scroll", "browser_wait", "browser_navigate", "browser_back", "browser_site_tools",
+	"browser_call_site_tool"}
+
+// browserOperatorFile is the subagent's definition with the tools named for the runtime's MCP server.
+func (o Options) browserOperatorFile() file {
+	server := o.MCPServer
+	if server == "" {
+		server = "harnessly"
+	}
+	names := make([]string, len(browserTools))
+	for i, t := range browserTools {
+		names[i] = "mcp__" + server + "__" + t
+	}
+	return file{data: []byte(strings.Replace(browserOperator, "__TOOLS__", strings.Join(names, ", "), 1)), mode: 0o644}
+}
 
 const manifestName = ".harnessly-managed.json"
 
@@ -121,6 +146,7 @@ func Provision(o Options) (Result, error) {
 			codex[path.Join(s.name, rel)] = f
 		}
 	}
+	claude["agents/browser-operator.md"] = o.browserOperatorFile()
 	claude[".claude-plugin/plugin.json"] = file{data: pluginJSON(version), mode: 0o644}
 
 	sync := func(root, manifest string, want map[string]file) {

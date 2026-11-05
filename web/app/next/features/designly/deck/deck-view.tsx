@@ -7,7 +7,7 @@
 import { placeOf } from '@/next/features/keys/chord';
 import { runChord } from '@/next/features/keys/use-keys';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import type { ISiteAccess, ISiteStage } from '@/next/features/designly/site-view';
+import type { ISiteAccess, ISiteMode, ISiteStage } from '@/next/features/designly/site-view';
 import type { MachineId } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
@@ -69,7 +69,7 @@ import {
 } from '@/next/features/designly/image-gen/gen-store';
 import { DeckNotesLine, DeckPager, type IDeckSubsDictation } from '@/next/features/designly/deck/deck-subs';
 import DeckStyle, { DECK_THEMES, deckTheme, useThemeVars } from '@/next/features/designly/deck/deck-style';
-import DeckMenu, { exportDeck, lastRecording } from '@/next/features/designly/deck/deck-menu';
+import DeckMenu, { deckDownloads, exportDeck, lastRecording } from '@/next/features/designly/deck/deck-menu';
 import DeckMdock from '@/next/features/designly/deck/deck-mdock';
 import DeckShow from '@/next/features/designly/deck/deck-show';
 import DeckRec from '@/next/features/designly/deck/deck-rec';
@@ -93,6 +93,9 @@ import {
 import { useDeckComments } from '@/next/features/designly/deck/use-deck-comments';
 import { useDeckDictation } from '@/next/features/designly/deck/dictation';
 import { DICT } from '@/next/features/designly/deck/dictation-state';
+
+/** A pane at least this wide (px) shows the deck as its own page does: the panel, the strip on the left. */
+const DECK_PANE_WIDE_PX = 1100;
 
 export interface IDeckBoard {
   path: string;
@@ -133,10 +136,15 @@ export interface IDeckViewProps {
   /** Set in the right pane beside a chat: the compact column (`data-embed`), its chat is the host's. */
   pane?: { onBack: () => void };
   access?: ISiteAccess;
+  /** The deck is looked at, as a guest of its link sees it (the `link` screen), until the editing is asked for. */
+  viewing?: boolean;
+  /** «Редактировать» / «Запросить доступ» while looking, «Просмотр» while editing; absent in the pane of a chat. */
+  mode?: ISiteMode;
   /** The person may change the deck: its pictures get «Изменить» / «Сгенерировать» on them. */
   mayEdit?: boolean;
   maxed: boolean;
-  onToggleMax: () => void;
+  /** Null where there is nothing to widen: the full Sinopia view opens its sidebar from the rail itself. */
+  onToggleMax: (() => void) | null;
   onOpenDrawer: () => void;
   /** What shows until the shell is built: the site view of the same project. */
   fallback: ReactNode;
@@ -205,13 +213,18 @@ const DeckView = (props: IDeckViewProps) => {
     access,
     mayEdit = false,
     deckError = null,
+    viewing = false,
   } = props;
   const deck = useDeck(id) ?? null;
   const phone = useMedia(DECK_PHONE_QUERY);
-  const embed = pane !== undefined;
+  // In the right pane the deck is the compact column (strip below, chat on the left) while the pane is narrow; a pane
+  // as wide as the deck's own page (expanded to the whole window) shows the page's layout, with its panel and chat.
+  const [wide, setWide] = useState(false);
+  const embed = pane !== undefined && !wide;
   const frameRef = useRef<HTMLIFrameElement>(null);
 
-  const [screen, setScreen] = useState<TDeckScreen>(DECK_SCREEN.edit);
+  const [screen, setScreen] = useState<TDeckScreen>(viewing ? DECK_SCREEN.link : DECK_SCREEN.edit);
+
   const [panel, setPanel] = useState<TDeckPanelMode>(phone ? DECK_PANEL.off : DECK_PANEL.dock);
   const [tab, setTab] = useState<TDeckTab>(DECK_TAB.chat);
   // A phone hides the panel, a wide window brings it back docked (the board's resize rule).
@@ -239,6 +252,14 @@ const DeckView = (props: IDeckViewProps) => {
   const [subsOn, setSubsOn] = useState(true);
   const [lmode, setLmode] = useState<TDeckOpens>(DECK_OPENS.slides);
   const [lfull, setLfull] = useState(false);
+  // The mode asked for from outside (the address) puts the deck on the screen that is its own.
+  const [wasViewing, setWasViewing] = useState(viewing);
+  if (wasViewing !== viewing) {
+    setWasViewing(viewing);
+    setScreen(viewing ? DECK_SCREEN.link : DECK_SCREEN.edit);
+    setLmode(DECK_OPENS.slides);
+    setLfull(false);
+  }
   const [board, setBoard] = useState<{ w: number; h: number } | null>(null);
   /** What the person set on blocks this session, by `<page>:<tpl>`. */
   const [looks, setLooks] = useState<Record<string, IDeckTextLook>>({});
@@ -304,6 +325,16 @@ const DeckView = (props: IDeckViewProps) => {
     deck ? deckTheme(deck.settings).vars : DECK_THEMES[0].vars,
     deck?.settings.font,
   );
+  const inPane = pane !== undefined;
+  useLayoutEffect(() => {
+    const root = themeRef.current;
+    if (!inPane || !root) return;
+    const fit = () => setWide(root.clientWidth >= DECK_PANE_WIDE_PX);
+    fit();
+    const watch = new ResizeObserver(fit);
+    watch.observe(root);
+    return () => watch.disconnect();
+  }, [inPane, themeRef]);
 
   // A new slide starts with nothing selected or hovered; the board says its size again when it is ready.
   const [shownPath, setShownPath] = useState(path);
@@ -364,12 +395,14 @@ const DeckView = (props: IDeckViewProps) => {
     if (to !== null) go(to);
   };
   const togglePop = (which: TPop) => setPop((now) => (now === which ? null : which));
+  // «Скачать» on the bar; «Ещё» opens it too.
+  const [downloadOn, setDownloadOn] = useState(false);
   const openPanel = (on: TDeckTab) => {
     setTab(on);
     setPanel((now) => (now === DECK_PANEL.off ? DECK_PANEL.dock : now));
   };
   const back = () => {
-    if (!edit) {
+    if (!edit && !viewing) {
       setScreen(DECK_SCREEN.edit);
       setLfull(false);
       return;
@@ -668,11 +701,11 @@ const DeckView = (props: IDeckViewProps) => {
         setLfull(true);
         return;
       case DECK_KEY.show:
-        if (playBlock !== null) return;
+        if (viewing || playBlock !== null) return;
         setScreen(DECK_SCREEN.show);
         return;
       case DECK_KEY.rec:
-        if (playBlock !== null) return;
+        if (viewing || playBlock !== null) return;
         setScreen(DECK_SCREEN.rec);
         go(0);
         return;
@@ -814,7 +847,7 @@ const DeckView = (props: IDeckViewProps) => {
     return null;
   })();
   const mdock = phone && edit && panel === DECK_PANEL.off && sheet === null && !pick.draft;
-  // A person who manages the project gets the deck's share popover; anyone else the access dialog (ask for edit).
+  // «Поделиться» is the one dialog of every kind; the deck's older popover only where the gateway has none.
   const onShare = access ? () => (access.manage ? togglePop(POP.share) : access.onOpen()) : undefined;
 
   return (
@@ -834,6 +867,7 @@ const DeckView = (props: IDeckViewProps) => {
       data-paused={screen === DECK_SCREEN.rec && paused ? '1' : '0'}
     >
       <DeckBar
+        mode={props.mode}
         screen={screen}
         title={title}
         crumb={crumbs[screen]}
@@ -858,6 +892,9 @@ const DeckView = (props: IDeckViewProps) => {
         onFull={() => onKey(DECK_KEY.full)}
         onVideoLink={() => onShare?.()}
         onDownloadMp4={() => runExport('mp4', rec?.summary.id)}
+        downloads={deckDownloads(deck, mayEdit, (format) => runExport(format))}
+        downloadOn={downloadOn}
+        onDownloadOn={setDownloadOn}
       />
 
       {!embed && (
@@ -1076,9 +1113,11 @@ const DeckView = (props: IDeckViewProps) => {
       {shownPop.value === POP.menu && (
         <DeckMenu
           state={shownPop.state}
-          deck={deck}
           edit={edit}
-          onExport={runExport}
+          onDownload={() => {
+            setPop(null);
+            setDownloadOn(true);
+          }}
           onGuest={() => {
             setPop(null);
             setLmode(DECK_OPENS.slides);

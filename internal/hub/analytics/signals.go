@@ -51,6 +51,7 @@ var severityRank = map[string]int{"critical": 0, "warn": 1, "info": 2}
 func (s *Service) mountSignals(mux *http.ServeMux) {
 	mux.Handle("GET /api/orgs/{org}/signals", s.gate(s.listSignals))
 	mux.Handle("POST /api/orgs/{org}/signals/{id}/snooze", s.gate(s.snoozeSignal))
+	mux.Handle("DELETE /api/orgs/{org}/signals/{id}/snooze", s.gate(s.unsnoozeSignal))
 	mux.Handle("POST /api/me/limit-requests", s.gate(s.limitRequest))
 }
 
@@ -123,7 +124,7 @@ func (s *Service) findSignals(ctx context.Context, st store.Store, m *money, tot
 			f.addressee = r.UserID
 			uid := r.UserID
 			f.action = SignalAction{Kind: "raise_limit", Label: "Поднять лимит", Scope: scope, UserID: &uid}
-			f.title = fmt.Sprintf("%s потратил(а) %d%% личного лимита", name, pct)
+			f.title = fmt.Sprintf("%s: потрачено %d%% личного лимита", name, pct)
 		} else {
 			f.subject = SignalSubject{Kind: r.ScopeKind, ID: r.ScopeID, Label: m.scopeLabel(r.ScopeKind, r.ScopeID)}
 			f.action = SignalAction{Kind: "raise_limit", Label: "Поднять лимит", Scope: scope}
@@ -383,13 +384,36 @@ func (s *Service) listSignals(w http.ResponseWriter, r *http.Request, p *auth.Pr
 }
 
 func (s *Service) snoozeSignal(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
-	ctx := r.Context()
 	var req struct {
 		Until string `json:"until"`
 	}
 	if err := httpx.Decode(r, &req); err != nil {
 		return err
 	}
+	return s.setSnooze(w, r, p, func(loc *time.Location, now time.Time) (*time.Time, error) {
+		until, ok := changeAt(strings.TrimSpace(req.Until), loc)
+		switch {
+		case !ok:
+			return nil, httpx.Invalid("until", "Срок — YYYY-MM-DD или RFC 3339")
+		case !until.After(now):
+			return nil, httpx.Invalid("until", "Отложить можно только до будущего времени")
+		case until.After(now.Add(maxSnooze)):
+			return nil, httpx.Invalid("until", "Отложить можно не больше чем на 30 дней")
+		}
+		u := until.UTC()
+		return &u, nil
+	})
+}
+
+// unsnoozeSignal brings a snoozed signal back at once: the «Вернуть» of a snooze made by mistake.
+func (s *Service) unsnoozeSignal(w http.ResponseWriter, r *http.Request, p *auth.Principal) error {
+	return s.setSnooze(w, r, p, func(*time.Location, time.Time) (*time.Time, error) { return nil, nil })
+}
+
+// setSnooze checks who may act on the signal, sets its snooze to what pick says (nil lifts it) and journals it.
+func (s *Service) setSnooze(w http.ResponseWriter, r *http.Request, p *auth.Principal,
+	pick func(loc *time.Location, now time.Time) (*time.Time, error)) error {
+	ctx := r.Context()
 	st := s.db.S()
 	o, err := orgs.Resolve(ctx, st, p, r.PathValue("org"))
 	if err != nil {
@@ -413,16 +437,10 @@ func (s *Service) snoozeSignal(w http.ResponseWriter, r *http.Request, p *auth.P
 		return err
 	}
 	now := s.now()
-	until, ok := changeAt(strings.TrimSpace(req.Until), loc)
-	switch {
-	case !ok:
-		return httpx.Invalid("until", "Срок — YYYY-MM-DD или RFC 3339")
-	case !until.After(now):
-		return httpx.Invalid("until", "Отложить можно только до будущего времени")
-	case until.After(now.Add(maxSnooze)):
-		return httpx.Invalid("until", "Отложить можно не больше чем на 30 дней")
+	until, err := pick(loc, now)
+	if err != nil {
+		return err
 	}
-	until = until.UTC()
 	err = s.db.Tx(ctx, func(st store.Store) error {
 		chain, err := orgs.Chain(ctx, st, o, sc)
 		if err != nil {
@@ -432,13 +450,16 @@ func (s *Service) snoozeSignal(w http.ResponseWriter, r *http.Request, p *auth.P
 			return err
 		}
 		before := httpx.TimePtr(g.SnoozedUntil)
-		g.SnoozedUntil, g.ActedAt = &until, &now
+		g.SnoozedUntil, g.ActedAt = until, &now
 		if err := st.UpdateSignal(ctx, g); err != nil {
 			return err
 		}
-		return st.AddAudit(ctx, orgs.Journal(chain, p.User.ID, "signal.snooze", "signal", g.ID,
-			map[string]any{"snoozedUntil": before},
-			map[string]any{"rule": g.Rule, "title": g.Title, "snoozedUntil": httpx.Time(until)}, now))
+		action, after := "signal.unsnooze", map[string]any{"rule": g.Rule, "title": g.Title, "snoozedUntil": nil}
+		if until != nil {
+			action, after["snoozedUntil"] = "signal.snooze", httpx.Time(*until)
+		}
+		return st.AddAudit(ctx, orgs.Journal(chain, p.User.ID, action, "signal", g.ID,
+			map[string]any{"snoozedUntil": before}, after, now))
 	})
 	if err != nil {
 		return err

@@ -54,7 +54,17 @@ export type EnvEntryRow = {
   spark14: number[]; // 14 UTC days, the last one is today
   lastUsedAt: string | null;
   unused: boolean | null; // no calls for 30 days and the entry is older than that; null: unknown
+  // What the machines holding the current list said about the item; null: none of them reported it.
+  delivery: ItemDelivery | null;
 };
+
+// How many machines put an item in, keep it without being able to load it yet, or failed it; `message` is the first
+// reason a machine gave (a missing secret, an unsupported source).
+export type ItemDelivery = { ok: number; pending: number; error: number; message: string | null };
+
+// How far the screen's environment got: the working machines of the screen, those that reported what they hold, and
+// those that hold the current list.
+export type EnvDelivery = { machines: number; reported: number; current: number; lastAt: string | null };
 
 export type EnvLayer = {
   layer: EnvLayerKind;
@@ -90,6 +100,7 @@ export type EnvResponse = {
   layers: EnvLayer[];
   teams: TeamRef[];
   observed: ObservedTool[];
+  delivery: EnvDelivery;
 };
 
 export type EnvCard = {

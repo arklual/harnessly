@@ -1,0 +1,69 @@
+/* The mode of a project at the head of its bar (features/designly/mode-button): «Макет» or «Редактирование макета»,
+   a quiet switch beside the address. */
+.hx-mode {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 160ms var(--hx-ease-out);
+}
+button.hx-mode {
+  cursor: pointer;
+}
+button.hx-mode:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+button.hx-mode:active {
+  transform: scale(0.97);
+}
+button.hx-mode:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
+}
+.hx-mode[data-editing='true'] {
+  color: var(--hx-fg-1);
+  font-weight: var(--hx-weight-medium);
+}
+.hx-mode[data-editing='true'] .hx-mode__icon {
+  color: var(--hx-accent);
+}
+/* Editing: the whole «Редактирование макета» on a wide screen, «Редактирование» on a usual one. */
+.hx-mode__short {
+  display: none;
+}
+@media (max-width: 1599px) {
+  .hx-mode[data-editing='true'] .hx-mode__name {
+    display: none;
+  }
+  .hx-mode[data-editing='true'] .hx-mode__short {
+    display: inline;
+  }
+}
+/* A phone's bar, a narrow window: the icon says the mode, the hint the rest. */
+.hx-mode[data-compact='true'] {
+  padding: 0 8px;
+}
+.hx-mode[data-compact='true'] :is(.hx-mode__name, .hx-mode__short) {
+  display: none;
+}
+@media (max-width: 900px) {
+  .hx-mode {
+    padding: 0 8px;
+  }
+  .hx-mode[data-editing] :is(.hx-mode__name, .hx-mode__short) {
+    display: none;
+  }
+}

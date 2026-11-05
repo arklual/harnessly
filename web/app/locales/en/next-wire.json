@@ -35,7 +35,8 @@
   "next.update.title": "A new version is out",
   "next.update.reload": "Reload",
   "next.update.later": "Later",
-  "next.connection.now": "Now",
+  "next.connection.now": "Reconnect",
+  "next.connection.nowShort": "Now",
   "next.connection.retrying": "Reconnecting",
   "next.connection.back": "Back online"
 }

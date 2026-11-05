@@ -1,13 +1,15 @@
 // What a device adds around the page of an open design: the phone's own interface in a case (the status bar, the browser's
-// bars), «Обзор» with all sizes side by side, and the phone's code. They are drawings of the design's .hx-vp, .hx-ovw
-// and .hx-phone; the page itself is the frame the site view puts between them.
+// bars) and the phone's code. They are drawings of the design's .hx-vp and .hx-phone; the page itself is the frame the
+// site view puts between them. «Все экраны» is site-overview.tsx.
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
-import type { IBrowser, IOverviewCard } from '@/next/features/designly/devices';
-import { postDeck } from '@/next/features/designly/deck/bridge';
+import type { IBrowser } from '@/next/features/designly/devices';
 
 interface IBarsProps {
-  browser: IBrowser;
+  /** The browser's bars; null without them (turned off, or a page from the home screen). */
+  browser: IBrowser | null;
+  /** The status bar on top and the home indicator under the page. */
+  status: boolean;
   /** The host the browser's address shows. */
   host: string;
   /** A press on a folded bar unfolds the bars. */
@@ -15,23 +17,25 @@ interface IBarsProps {
 }
 
 /** Over the page: the status bar and, for a browser with its address on top, that bar. */
-export const PhoneTop = ({ browser, host, onUnfold }: IBarsProps) => (
+export const PhoneTop = ({ browser, status, host, onUnfold }: IBarsProps) => (
   <>
-    <div className="hx-pbar" aria-hidden="true">
-      <span className="hx-pbar__time">9:41</span>
-      <span className="hx-spacer" />
-      <span className="hx-pbar__sig">
-        <i />
-        <i />
-        <i />
-        <i />
-      </span>
-      <Icon name="wifi" size="sm" className="hx-pbar__wifi" />
-      <span className="hx-pbar__bat">
-        <i />
-      </span>
-    </div>
-    {browser.top && (
+    {status && (
+      <div className="hx-pbar" aria-hidden="true">
+        <span className="hx-pbar__time">9:41</span>
+        <span className="hx-spacer" />
+        <span className="hx-pbar__sig">
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
+        <Icon name="wifi" size="sm" className="hx-pbar__wifi" />
+        <span className="hx-pbar__bat">
+          <i />
+        </span>
+      </div>
+    )}
+    {browser?.top && (
       <div className="hx-pchrome" aria-hidden="true" onClick={onUnfold}>
         <span className="hx-pchrome__url">
           <Icon name="lock" size="sm" />
@@ -47,9 +51,9 @@ export const PhoneTop = ({ browser, host, onUnfold }: IBarsProps) => (
 const TOOLS = ['chevron-left', 'chevron-right', 'share', 'book-open', 'copy'] as const;
 
 /** Under the page: the browser's bottom bars of its kind, and the home indicator. */
-export const PhoneBottom = ({ browser, host, onUnfold }: IBarsProps) => (
+export const PhoneBottom = ({ browser, status, host, onUnfold }: IBarsProps) => (
   <>
-    {browser.id === 'ios26' && (
+    {browser?.id === 'ios26' && (
       <div className="hx-psafari" aria-hidden="true" onClick={onUnfold}>
         <span className="hx-psafari__btn">
           <Icon name="chevron-left" size="sm" />
@@ -60,7 +64,7 @@ export const PhoneBottom = ({ browser, host, onUnfold }: IBarsProps) => (
         </span>
       </div>
     )}
-    {browser.id === 'ios18' && (
+    {browser?.id === 'ios18' && (
       <div className="hx-ps18" aria-hidden="true" onClick={onUnfold}>
         <div className="hx-ps18__url">
           <span className="hx-ps18__aa">аА</span>
@@ -74,7 +78,7 @@ export const PhoneBottom = ({ browser, host, onUnfold }: IBarsProps) => (
         </div>
       </div>
     )}
-    {browser.id === 'sam85' && (
+    {browser?.id === 'sam85' && (
       <div className="hx-psam" aria-hidden="true" onClick={onUnfold}>
         <span className="hx-psam__url">
           <Icon name="house" size="sm" />
@@ -86,71 +90,15 @@ export const PhoneBottom = ({ browser, host, onUnfold }: IBarsProps) => (
         </span>
       </div>
     )}
-    {browser.bot && (
+    {browser?.bot && (
       <div className="hx-pbot" aria-hidden="true">
         {TOOLS.map((name) => (
           <Icon key={name} name={name} size="sm" />
         ))}
       </div>
     )}
-    <span className="hx-phome" aria-hidden="true" />
+    {status && <span className="hx-phome" aria-hidden="true" />}
   </>
-);
-
-interface IOverviewProps {
-  cards: readonly IOverviewCard[];
-  /** Room at the bottom for the field or a guest's list of comments (devices.ts overviewBox counts it too). */
-  room: boolean;
-  /** The page at an address the slot lets in without a ticket; null until the slot has let the first frame in. */
-  src: string | null;
-  onPick: (id: string) => void;
-}
-
-/** The devices side by side, each with the page in its own size, scaled by one factor. */
-export const Overview = ({ cards, room, src, onPick }: IOverviewProps) => (
-  <div className="hx-ovw" data-room={room}>
-    {cards.map(({ device, w, h, scale }) => {
-      const name = t(`next.site.devices.${device.id}`);
-      return (
-        <div
-          key={device.id}
-          className="hx-ovw__card"
-          ref={(el) => {
-            el?.style.setProperty('--w', `${w}px`);
-            el?.style.setProperty('--h', `${h}px`);
-            el?.style.setProperty('--s', scale.toFixed(4));
-          }}
-        >
-          <button
-            type="button"
-            className="hx-ovw__label"
-            aria-label={`${name}: ${t('next.site.overviewOpen')}`}
-            title={`${name} ${w}×${h}`}
-            onClick={() => onPick(device.id)}
-          >
-            <Icon name={device.icon} size="sm" />
-            <span className="hx-ovw__name">{name}</span>
-            <span className="hx-ovw__size">{`${w}×${h}`}</span>
-          </button>
-          <div className="hx-ovw__screen" data-round={w < 1000}>
-            <div className="hx-ovw__scroll">
-              {src !== null && (
-                <iframe
-                  className="hx-ovw__frame"
-                  src={src}
-                  title={name}
-                  // The board draws the library's boards bar unless it is told the host draws its own.
-                  onLoad={(event) =>
-                    postDeck(event.currentTarget, src, { type: 'tk:tweaks-host', on: true, open: false })
-                  }
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    })}
-  </div>
 );
 
 interface IPhoneProps {

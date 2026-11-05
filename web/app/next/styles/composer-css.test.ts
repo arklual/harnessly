@@ -32,14 +32,14 @@ describe('the narrow field', () => {
     expect(css).toMatch(/\.hx-composer,\s*\.hx-dl__composer\s*\{\s*container: hx-field \/ inline-size;/);
   });
 
-  it("has the phone's look under one container query: the pill with its name, the ring and idle limits gone", () => {
+  it("has the phone's look under one container query: the pill with its name, the ring gone, the limit down to its tightest window", () => {
     expect(field).toHaveLength(1);
     const [rules] = field;
     expect(rules).toMatch(/^@container hx-field \(max-width: 580px\)/);
     for (const part of [
       '--hx-composer-h: 96px',
       '.hx-model__effort,\n  .hx-model__chev {\n    display: none;',
-      ".hx-composer__bar .hx-lim:not(:has([data-level='low'], [data-level='out']))",
+      '.hx-composer__bar .hx-lim__win:not([data-least]):not(:only-of-type)',
       '.hx-composer__bar .hx-ctx',
       '.hx-dock .hx-composer__field',
     ])

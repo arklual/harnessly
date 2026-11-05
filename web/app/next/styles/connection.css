@@ -18,9 +18,13 @@
   white-space: nowrap;
   overflow: hidden;
   width: var(--hx-pill-w, auto);
+  /* Never wider than the window: on a phone or in a narrow window the button stays inside the pill. */
+  max-width: calc(100vw - 24px);
   transform: translateX(-50%);
-  animation: hx-net-in 320ms var(--hx-ease-out) backwards;
-  transition: width 320ms var(--hx-ease-out);
+  animation: hx-net-in 420ms var(--hx-ease-out) backwards;
+  transition:
+    width 460ms var(--hx-ease-out),
+    border-color 300ms ease;
 }
 /* What the pill says: one state fades in over the last, the pill eases to its width (ui/use-pill-width). */
 .hx-net__in {
@@ -28,13 +32,16 @@
   flex: none;
   align-items: center;
   gap: 8px;
-  animation: hx-net-swap 260ms var(--hx-ease-out) backwards;
+  /* The window bounds the content, not the pill: the pill's width follows the content, so this cannot feed back. */
+  max-width: calc(100vw - 56px);
+  min-width: 0;
+  animation: hx-net-swap 380ms var(--hx-ease-out) backwards;
 }
 @keyframes hx-net-swap {
   from {
     opacity: 0;
-    filter: blur(2px);
-    transform: translateY(3px);
+    filter: blur(4px);
+    transform: translateY(4px) scale(0.98);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -48,6 +55,7 @@
   padding-right: 5px;
 }
 .hx-net__icon {
+  flex: none;
   color: var(--hx-warning);
   transition: color 240ms ease;
 }
@@ -58,11 +66,21 @@
 .hx-net:is([data-state='back'], [data-state='closing']) .hx-net__icon {
   color: var(--hx-success);
 }
+.hx-net__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .hx-net__sub {
+  /* «через 9 с» and «через 10 с» take the same room: the pill does not twitch every second. */
+  display: inline-block;
+  flex: none;
+  min-width: 8ch;
   color: var(--hx-fg-3);
   font-variant-numeric: tabular-nums;
 }
 .hx-net__now {
+  flex: none;
   height: 26px;
   margin-left: 4px;
   padding: 0 11px;
@@ -74,6 +92,30 @@
   font-size: var(--hx-text-xs);
   font-weight: var(--hx-weight-medium);
   cursor: pointer;
+  transition:
+    opacity 200ms ease,
+    transform 160ms var(--hx-ease-out);
+}
+.hx-net__now-short {
+  display: none;
+}
+/* A narrow window: the countdown goes first, the reason and the button stay. */
+@media (max-width: 420px) {
+  .hx-net__sub {
+    display: none;
+  }
+}
+/* A very narrow one: the button says it shorter. */
+@media (max-width: 374px) {
+  .hx-net__now-long {
+    display: none;
+  }
+  .hx-net__now-short {
+    display: inline;
+  }
+}
+.hx-net__now:active:not(:disabled) {
+  transform: scale(0.96);
 }
 .hx-net__now:disabled {
   opacity: 0.6;
@@ -84,19 +126,21 @@
   outline-offset: 2px;
 }
 .hx-net[data-state='closing'] {
-  animation: hx-net-out 260ms ease forwards;
+  animation: hx-net-out 320ms var(--hx-ease-out) forwards;
   pointer-events: none;
 }
 @keyframes hx-net-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -10px) scale(0.96);
+    filter: blur(4px);
+    transform: translate(-50%, -12px) scale(0.94);
   }
 }
 @keyframes hx-net-out {
   to {
     opacity: 0;
-    transform: translate(-50%, -8px) scale(0.97);
+    filter: blur(3px);
+    transform: translate(-50%, -10px) scale(0.96);
   }
 }
 @keyframes hx-net-spin {

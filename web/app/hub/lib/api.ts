@@ -248,8 +248,12 @@ export const createApi = (fetcher: Fetcher = (input, init) => fetch(input, init)
       setRole: (id: string, userId: string, role: Role) =>
         patch<{ member: Member }>(`/api/spaces/${enc(id)}/members/${enc(userId)}`, { role }),
       removeMember: (id: string, userId: string) => del(`/api/spaces/${enc(id)}/members/${enc(userId)}`),
-      invite: (id: string, emails: string[]) =>
-        post<{ invites: Invite[] }>(`/api/spaces/${enc(id)}/invites`, { emails }),
+      /** A role other than member (a co-owner) goes only when asked, so the old body stays as it was. */
+      invite: (id: string, emails: string[], role: Role = 'member') =>
+        post<{ invites: Invite[] }>(
+          `/api/spaces/${enc(id)}/invites`,
+          role === 'member' ? { emails } : { emails, role },
+        ),
       inviteLink: (id: string, opts: { maxUses?: number; days?: number } = {}) =>
         post<{ invite: Invite }>(`/api/spaces/${enc(id)}/invites/link`, opts),
       invites: (id: string) => get<{ invites: Invite[] }>(`/api/spaces/${enc(id)}/invites`),

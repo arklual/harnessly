@@ -521,6 +521,7 @@ func TestInviteValidation(t *testing.T) {
 		"missing":  map[string]any{},
 		"bad":      map[string]any{"emails": []string{"not an email"}},
 		"too many": map[string]any{"emails": many},
+		"bad role": map[string]any{"emails": []string{"a@example.com"}, "role": "admin"},
 	} {
 		if r := owner.do("POST", "/api/spaces/"+sp.ID+"/invites", body); r.Code != 400 || r.errCode() != "invalid_request" {
 			t.Errorf("%s: %d %s", name, r.Code, r.Body)
@@ -533,6 +534,25 @@ func TestInviteValidation(t *testing.T) {
 		if r := owner.do("POST", "/api/spaces/"+sp.ID+"/invites/link", body); r.Code != 400 {
 			t.Errorf("%s: %d %s", name, r.Code, r.Body)
 		}
+	}
+}
+
+func TestEmailInviteAsOwner(t *testing.T) {
+	e := newEnv(t)
+	owner := e.signIn("owner@example.com")
+	sp := owner.newSpace("Команда")
+	r := owner.do("POST", "/api/spaces/"+sp.ID+"/invites", map[string]any{"emails": []string{"co@example.com"}, "role": "owner"})
+	var made struct{ Invites []InviteView }
+	r.into(&made)
+	if r.Code != 201 || len(made.Invites) != 1 || made.Invites[0].Role != "owner" {
+		t.Fatalf("invite: %d %s", r.Code, r.Body)
+	}
+	co := e.signIn("co@example.com")
+	ar := co.do("POST", "/api/invites/"+tokenOf(made.Invites[0].URL)+"/accept", map[string]any{})
+	var acc struct{ Space auth.SpaceRef }
+	ar.into(&acc)
+	if ar.Code != 200 || acc.Space.Role != "owner" {
+		t.Fatalf("accept: %d %s", ar.Code, ar.Body)
 	}
 }
 

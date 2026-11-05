@@ -125,8 +125,11 @@ func (p *fakeProvider) Running(pid int, _ []int) bool {
 	return p.running[pid]
 }
 func (p *fakeProvider) Detect(pid int, _ []int) agents.SessionInfo {
-	if p.Running(pid, nil) && p.detected != "" {
-		return agents.SessionInfo{Status: agents.Running, JSONLPath: p.detected}
+	p.mu.Lock()
+	detected := p.detected
+	p.mu.Unlock()
+	if p.Running(pid, nil) && detected != "" {
+		return agents.SessionInfo{Status: agents.Running, JSONLPath: detected}
 	}
 	return agents.SessionInfo{Status: agents.NotRunning}
 }

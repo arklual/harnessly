@@ -240,11 +240,12 @@ type DesignOwner struct {
 
 func (o DesignOwner) Validate() error { return need("name", o.Name) }
 
-// DesignArtifact is a project of the library. Convs are the v2 conversations whose folder is the project's. TouchedBy are
-// the other conversations that worked on it, from any folder: their agent wrote its files or named it to the design CLI
-// (read from their transcripts, so it holds for the chats from before), the latest activity first; absent from an
-// older runtime. Owner is there for a project made after owners were recorded; an older one has none, and none is
-// guessed.
+// DesignArtifact is a project of the library. Convs are the v2 conversations started from it (a new project's first chat,
+// a new chat of the design's column: POST /api/v2/designly/chat). TouchedBy are the other conversations that worked on
+// it: their agent wrote its files or named it to a writing command of the design CLI (read from their transcripts, so it
+// holds for the chats from before), the latest activity first; absent from an older runtime. A chat's folder, a design
+// named in its message or opened from it make it neither. Owner is there for a project made after owners were
+// recorded; an older one has none, and none is guessed.
 type DesignArtifact struct {
 	ID          string        `json:"id"`
 	Title       string        `json:"title"`
@@ -332,6 +333,21 @@ type DesignlyPin struct {
 
 func (p DesignlyPin) Validate() error { return need("id", p.ID) }
 
+// DesignlyChat is the body and the answer of POST /api/v2/designly/chat: the person started conversation Conv from the
+// column of design ID, so it is one of the design's chats.
+type DesignlyChat struct {
+	ID   string `json:"id"`
+	Conv string `json:"conv"`
+}
+
+func (c DesignlyChat) Validate() error {
+	errs := []error{need("id", c.ID)}
+	if !ValidConvID(c.Conv) {
+		errs = append(errs, errors.New("conv: not a conversation id"))
+	}
+	return errors.Join(errs...)
+}
+
 // DesignlyRefusal is the answer of a designly page that refuses: the code of the protocol, a message worded for the
 // person, and the project that was made before the failure, if one was.
 type DesignlyRefusal struct {
@@ -360,19 +376,21 @@ type DesignlySource interface {
 	Library(ctx context.Context) (DesignLibrary, error)
 	Systems(ctx context.Context) ([]DesignSystemInfo, error)
 	Pin(ctx context.Context, id string, pinned bool) error
+	// Chat records that conversation conv was started from the column of design id.
+	Chat(ctx context.Context, id, conv string) error
 }
 
 // designlyBudget is how long a project may take to be made and its conversation to be opened.
 const designlyBudget = 30 * time.Second
 
-// designly serves /api/v2/designly/{create,library,systems,pin}.
+// designly serves /api/v2/designly/{create,library,systems,pin,chat}.
 func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 	if s.Designly == nil {
 		refuse(w, RefuseNotFound)
 		return
 	}
 	want := http.MethodGet
-	if what == "create" || what == "pin" {
+	if what == "create" || what == "pin" || what == "chat" {
 		want = http.MethodPost
 	}
 	if r.Method != want {
@@ -387,7 +405,7 @@ func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 		if !readDesignly(w, r, &body) {
 			return
 		}
-		out, err := s.Designly.Create(ctx, body)
+		out, err := s.Designly.Create(WithRequest(ctx, r), body)
 		if err != nil {
 			s.designlyRefusal(w, r, err)
 			return
@@ -428,6 +446,16 @@ func (s *Server) designly(w http.ResponseWriter, r *http.Request, what string) {
 			return
 		}
 		if err := s.Designly.Pin(ctx, body.ID, body.Pinned); err != nil {
+			s.designlyRefusal(w, r, err)
+			return
+		}
+		s.writeChecked(w, r, body)
+	case "chat":
+		var body DesignlyChat
+		if !readDesignly(w, r, &body) {
+			return
+		}
+		if err := s.Designly.Chat(ctx, body.ID, body.Conv); err != nil {
 			s.designlyRefusal(w, r, err)
 			return
 		}

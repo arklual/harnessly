@@ -1,7 +1,8 @@
 // Quiet notices at the top of the window (after lib/hx/toast.js of the design): at most three on screen, 4 s each by
 // default, an optional action, and an exit animation. The store lives outside React so anything may call toast().
-// On the phone they stand above the chat's field and the safe area instead (styles/ui.css), and a finger swipes one away.
-import { useSyncExternalStore, type TouchEvent } from 'react';
+// On the phone they stand above the chat's field and the safe area instead (styles/ui.css). A swipe takes one away:
+// a finger, a held mouse button or a trackpad's two fingers, sideways or up (and down on the phone).
+import { useSyncExternalStore, type MouseEvent, type PointerEvent, type WheelEvent } from 'react';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import '@/next/styles/ui.css';
 
@@ -63,46 +64,109 @@ export const toast = (
   return () => dismiss(id);
 };
 
-/** A swipe sideways past this, or a quick flick, takes a notice away, px and px/ms. */
+/** A swipe past this, or a quick flick, takes a notice away, px and px/ms. */
 const SWIPE_PX = 72;
 const SWIPE_VELOCITY = 0.45;
+/** A press moves this far before it is a drag, so a tap on the notice's button stays a click, px. */
+const DRAG_SLOP = 6;
+/** A trackpad's two-finger swipe has no end event: it ends when the wheel is quiet this long, ms. */
+const WHEEL_IDLE_MS = 140;
 
-/** Follows a finger moving a notice sideways (straight into --hx-toast-dx, no state per frame); far or fast enough, it goes. */
+/** On the phone the notices stand at the foot of the screen, so a swipe down takes them away too. */
+const atFoot = () => window.matchMedia('(max-width: 900px)').matches;
+
+/** Where a pull may go: sideways always, up always, down only where the notices stand at the foot. */
+const allowed = (x: number, y: number) => ({ x, y: y > 0 && !atFoot() ? 0 : y });
+
+const place = (el: HTMLElement, at: { x: number; y: number }) => {
+  el.style.setProperty('--hx-toast-dx', `${at.x}px`);
+  el.style.setProperty('--hx-toast-dy', `${at.y}px`);
+};
+
+/** Far or fast enough, the notice flies out the way it was pulled; otherwise it springs back. */
+const release = (el: HTMLElement, id: number, at: { x: number; y: number }, ms: number) => {
+  delete el.dataset.drag;
+  const far = Math.hypot(at.x, at.y);
+  const fast = far / Math.max(1, ms) > SWIPE_VELOCITY;
+  if (far > SWIPE_PX || (fast && far > DRAG_SLOP)) {
+    const side = Math.abs(at.x) >= Math.abs(at.y);
+    place(
+      el,
+      side ? { x: Math.sign(at.x) * window.innerWidth, y: at.y } : { x: at.x, y: Math.sign(at.y) * 200 },
+    );
+    dismiss(id);
+    return;
+  }
+  el.style.removeProperty('--hx-toast-dx');
+  el.style.removeProperty('--hx-toast-dy');
+};
+
+/**
+ * Takes a notice away with a gesture: a finger or a held mouse button pulls it sideways or up (and down on the phone),
+ * a trackpad's two-finger swipe does the same. The move goes straight into --hx-toast-dx/-dy, no state per frame.
+ */
 const swipeAway = (id: number) => {
-  let start: { x: number; y: number; t: number } | null = null;
-  let dx = 0;
-  let dragging = false;
+  let start: { x: number; y: number; t: number; pointer: number } | null = null;
+  let at = { x: 0, y: 0 };
+  let dragged = false;
+  let wheel: { t: number; timer: number } | null = null;
   return {
-    onTouchStart: (event: TouchEvent<HTMLElement>) => {
-      const touch = event.touches[0];
-      start = { x: touch.clientX, y: touch.clientY, t: event.timeStamp };
-      dx = 0;
-      dragging = false;
+    onPointerDown: (event: PointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      start = { x: event.clientX, y: event.clientY, t: event.timeStamp, pointer: event.pointerId };
+      at = { x: 0, y: 0 };
+      dragged = false;
     },
-    onTouchMove: (event: TouchEvent<HTMLElement>) => {
-      if (!start) return;
-      const touch = event.touches[0];
-      dx = touch.clientX - start.x;
-      if (!dragging && Math.abs(touch.clientY - start.y) > Math.abs(dx)) {
-        start = null;
-        return;
+    onPointerMove: (event: PointerEvent<HTMLElement>) => {
+      if (!start || event.pointerId !== start.pointer) return;
+      const next = allowed(event.clientX - start.x, event.clientY - start.y);
+      if (!dragged) {
+        if (Math.hypot(next.x, next.y) < DRAG_SLOP) return;
+        dragged = true;
+        event.currentTarget.dataset.drag = 'true';
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // The pointer is already gone: the release ends the pull anyway.
+        }
       }
-      dragging = true;
-      event.currentTarget.dataset.drag = 'true';
-      event.currentTarget.style.setProperty('--hx-toast-dx', `${dx}px`);
+      at = next;
+      place(event.currentTarget, at);
     },
-    onTouchEnd: (event: TouchEvent<HTMLElement>) => {
-      if (!start) return;
-      const fast = Math.abs(dx) / Math.max(1, event.timeStamp - start.t) > SWIPE_VELOCITY;
+    onPointerUp: (event: PointerEvent<HTMLElement>) => {
+      if (!start || event.pointerId !== start.pointer) return;
+      const ms = event.timeStamp - start.t;
       start = null;
+      if (dragged) release(event.currentTarget, id, at, ms);
+    },
+    onPointerCancel: (event: PointerEvent<HTMLElement>) => {
+      start = null;
+      if (dragged) release(event.currentTarget, id, { x: 0, y: 0 }, 1);
+      dragged = false;
+    },
+    // The release of a pull is no press on the notice's button.
+    onClickCapture: (event: MouseEvent<HTMLElement>) => {
+      if (!dragged) return;
+      dragged = false;
+      event.stopPropagation();
+      event.preventDefault();
+    },
+    onWheel: (event: WheelEvent<HTMLElement>) => {
       const el = event.currentTarget;
-      delete el.dataset.drag;
-      if (dragging && (Math.abs(dx) > SWIPE_PX || fast)) {
-        el.style.setProperty('--hx-toast-dx', `${Math.sign(dx) * window.innerWidth}px`);
-        dismiss(id);
-        return;
+      if (!wheel) {
+        at = { x: 0, y: 0 };
+        wheel = { t: event.timeStamp, timer: 0 };
+        el.dataset.drag = 'true';
       }
-      el.style.removeProperty('--hx-toast-dx');
+      // The fingers move the notice the way the page would follow them.
+      at = allowed(at.x - event.deltaX, at.y - event.deltaY);
+      place(el, at);
+      window.clearTimeout(wheel.timer);
+      const begun = wheel.t;
+      wheel.timer = window.setTimeout(() => {
+        wheel = null;
+        release(el, id, at, performance.now() - begun);
+      }, WHEEL_IDLE_MS);
     },
   };
 };

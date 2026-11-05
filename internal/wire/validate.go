@@ -1005,7 +1005,7 @@ func (c ConversationCreateCmd) Validate() error {
 		errs = append(errs, errors.New("projectId: either projectId or cwd"))
 	}
 	if c.First != nil {
-		errs = append(errs, need("first.clientId", c.First.ClientID))
+		errs = append(errs, need("first.clientId", c.First.ClientID), refsValid(c.First.Refs))
 	}
 	if c.Launch != nil {
 		errs = append(errs, need("launch.id", c.Launch.ID))

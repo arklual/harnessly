@@ -101,9 +101,14 @@ func (s *Server) cancelPending(session string) {
 
 // watchForJSONL watches the project folder (or the projects folder, while the project's does not exist) for the
 // session's transcript, and moves the tab's sockets onto it once it appears.
-func (s *Server) watchForJSONL(session, sessionID, cwd string, p *Provider) {
+// agentDir is the folder the running Claude keeps its state in (agents.SessionInfo.Dir); "" for ClaudeProjects.
+func (s *Server) watchForJSONL(session, sessionID, cwd, agentDir string, p *Provider) {
 	s.cancelPending(session)
-	dir := projectDir(s.d.ClaudeProjects, cwd)
+	projects := s.d.ClaudeProjects
+	if agentDir != "" {
+		projects = filepath.Join(agentDir, "projects")
+	}
+	dir := projectDir(projects, cwd)
 	name := sessionID + ".jsonl"
 	expected := filepath.Join(dir, name)
 	w := &pendingWatch{}
@@ -439,7 +444,7 @@ func (s *Server) onSessionChange(session string, p *Provider, info agents.Sessio
 			}
 			if !active && len(conns) > 0 {
 				s.cancelPending(session)
-				s.watchForJSONL(session, info.SessionID, info.Cwd, p)
+				s.watchForJSONL(session, info.SessionID, info.Cwd, info.Dir, p)
 			}
 		}
 	}

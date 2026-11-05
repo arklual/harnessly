@@ -22,6 +22,8 @@ export interface IFoundComponent {
 export type TParentMessage =
   | { type: 'tk:pick'; on: boolean }
   | { type: 'tk:go'; action: 'back' | 'forward' | 'reload' }
+  /** The tab's answer to a page leaving for another site by script (`tk:redirect`): it goes there itself, or not. */
+  | { type: 'tk:redirect-answer'; url: string; follow: boolean }
   /** The parent saw the frame load and asks whether a bridge lives in this document: the answer is `tk:hello`. */
   | { type: 'tk:ping' }
   /** A chip in the composer was clicked: scroll to the element and outline it for a moment. */
@@ -44,10 +46,74 @@ export type TParentMessage =
    */
   | { type: 'tk:canvas'; on: boolean }
   /**
+   * The page is one of several screens scrolled together («Все экраны»): while on, a scroll of the document is told at
+   * once, a frame at most (`tk:doc-scroll {y}`), and `tk:scroll-to` puts the document at a place.
+   */
+  | { type: 'tk:scroll-sync'; on: boolean }
+  | { type: 'tk:scroll-to'; y: number }
+  /** The page is a phone's or a tablet's, touched (installTouch): no hover, the media of a touch screen, a fingertip. */
+  | { type: 'tk:touch'; on: boolean }
+  /**
    * The blocks the parent pins its notes to: the bridge keeps telling where each one shows (`tk:anchored`) while the page
    * scrolls, moves or covers it. An empty set stops it.
    */
-  | { type: 'tk:anchors'; items: IAnchorItem[] };
+  | { type: 'tk:anchors'; items: IAnchorItem[] }
+  /** The coding agent acts on the page (the pane relays it after the person let it onto this site): the answer is `tk:acted`. */
+  | IActMessage
+  | TDomMessageIn;
+
+/**
+ * The DevTools «Elements» protocol (the same one a design board's own script speaks). The bridge answers it only after
+ * `tk:dom-on`: a board runs its script and this bridge in one frame, and only one of them answers.
+ */
+export type TDomMessageIn =
+  | { type: 'tk:dom-on' }
+  | { type: 'tk:dom-tree'; req: number; path: number[]; depth: number }
+  | { type: 'tk:dom-node'; req: number; path: number[] }
+  | { type: 'tk:dom-mark'; path: number[] | null; reveal: boolean }
+  | { type: 'tk:dom-inspect'; on: boolean }
+  | { type: 'tk:dom-watch'; on: boolean };
+
+export type TActOp =
+  | 'snapshot'
+  | 'read'
+  | 'locate'
+  | 'click'
+  | 'type'
+  | 'press'
+  | 'hover'
+  | 'select'
+  | 'scroll'
+  | 'wait'
+  | 'tools'
+  | 'call';
+
+/** One action; an unused field is absent (the parent may send it empty or zero, which is read as absent). */
+export interface IActMessage {
+  type: 'tk:act';
+  id: string;
+  op: TActOp;
+  ref?: string;
+  text?: string;
+  key?: string;
+  value?: string;
+  dy?: number;
+  ms?: number;
+  submit?: boolean;
+  /** `wait`: the state of a video or audio to wait for: ended, playing or paused. */
+  event?: string;
+  /** `call`: the name of one of the page's own (WebMCP) tools. */
+  tool?: string;
+  /** `call`: the tool's input as JSON text. */
+  input?: string;
+}
+
+/** What an action came to: `rect` is the target's box in the viewport (CSS px) once it was scrolled into view. */
+export interface IActResult {
+  ok: boolean;
+  text: string;
+  rect?: { x: number; y: number; width: number; height: number };
+}
 
 /** A block a note is pinned to: by the number `tk:picked` gave it, else by its selector (a page loaded again). */
 export interface IAnchorItem {
@@ -150,12 +216,132 @@ export const parseStyleItems = (value: unknown): IStyleItem[] | null => {
   return items;
 };
 
+/** The farthest place a parent may put the document at: a page longer than this is not a design's. */
+const MAX_SCROLL_TO = 1_000_000;
+
+const DOM_PATH_MAX = 64;
+const DOM_INDEX_MAX = 100000;
+const DOM_DEPTH_MAX = 6;
+const DOM_NODES_MAX = 400;
+const DOM_KIDS_MAX = 120;
+
+/** A path of child indices from the document element: at most 64 non-negative integers. */
+export const parseDomPath = (value: unknown): number[] | null => {
+  if (!Array.isArray(value) || value.length > DOM_PATH_MAX) return null;
+  for (const item of value)
+    if (typeof item !== 'number' || !Number.isInteger(item) || item < 0 || item > DOM_INDEX_MAX) return null;
+  return value.slice();
+};
+
+export const parseDomMessage = (message: Record<string, unknown>): TDomMessageIn | null => {
+  if (message.type === 'tk:dom-on') return { type: 'tk:dom-on' };
+  if (message.type === 'tk:dom-inspect' || message.type === 'tk:dom-watch') {
+    return typeof message.on === 'boolean' ? { type: message.type, on: message.on } : null;
+  }
+  if (message.type === 'tk:dom-mark') {
+    const path = message.path === null ? null : parseDomPath(message.path);
+    if (message.path !== null && path === null) return null;
+    if (message.reveal !== undefined && typeof message.reveal !== 'boolean') return null;
+    return { type: 'tk:dom-mark', path, reveal: message.reveal === true };
+  }
+  if (message.type === 'tk:dom-tree' || message.type === 'tk:dom-node') {
+    const path = parseDomPath(message.path);
+    if (!path || typeof message.req !== 'number' || !Number.isFinite(message.req)) return null;
+    if (message.type === 'tk:dom-node') return { type: 'tk:dom-node', req: message.req, path };
+    if (message.depth !== undefined && (typeof message.depth !== 'number' || !Number.isFinite(message.depth)))
+      return null;
+    const depth = message.depth === undefined ? 1 : Math.floor(message.depth);
+    return {
+      type: 'tk:dom-tree',
+      req: message.req,
+      path,
+      depth: Math.max(0, Math.min(DOM_DEPTH_MAX, depth)),
+    };
+  }
+  return null;
+};
+
+export const isDomMessage = (message: { type: string }): message is TDomMessageIn =>
+  message.type.startsWith('tk:dom-');
+
+const MAX_LEAVE_URL = 8192;
+
+/** How long a page leaving for another site by script waits for the tab's answer before it goes on by itself (a
+ *  parent that does not know the question never answers). */
+export const LEAVE_WAIT_MS = 1500;
+
+/**
+ * A page leaving the slot for another site by script (`location.replace`, the hop back of a sign-in): the slot would
+ * carry the frame to that site directly, past the proxy and its cookies. The navigation is held back and told to the
+ * parent as a redirect; when the tab goes there itself the page stays put, and otherwise it leaves as it asked. A
+ * click, a form and a traversal are the person's and go on untouched; so does a browser without the Navigation API.
+ */
+export const installLeave = (win: any, post: (message: Record<string, unknown>) => void) => {
+  const navigation = win.navigation;
+  const waiting = new Map<string, { timer: number; replace: boolean }>();
+  let passing = '';
+  const leave = (url: string) => {
+    const held = waiting.get(url);
+    if (!held) return;
+    waiting.delete(url);
+    win.clearTimeout(held.timer);
+    passing = url;
+    if (held.replace) win.location.replace(url);
+    else win.location.assign(url);
+  };
+  if (navigation && typeof navigation.addEventListener === 'function') {
+    navigation.addEventListener('navigate', (event: any) => {
+      const to = String(event.destination?.url ?? '');
+      if (to === passing) {
+        passing = '';
+        return;
+      }
+      if (!event.cancelable || event.userInitiated || event.hashChange || event.formData) return;
+      if (event.navigationType !== 'push' && event.navigationType !== 'replace') return;
+      if (event.downloadRequest !== null && event.downloadRequest !== undefined) return;
+      let url: URL;
+      try {
+        url = new win.URL(to);
+      } catch {
+        return;
+      }
+      if (url.protocol !== 'https:' || url.origin === win.location.origin || to.length > MAX_LEAVE_URL)
+        return;
+      event.preventDefault();
+      if (waiting.has(to)) return;
+      waiting.set(to, {
+        timer: win.setTimeout(() => leave(to), LEAVE_WAIT_MS),
+        replace: event.navigationType === 'replace',
+      });
+      post({ type: 'tk:redirect', url: to });
+    });
+  }
+  return (url: string, follow: boolean) => {
+    const held = waiting.get(url);
+    if (!held) return;
+    if (!follow) {
+      leave(url);
+      return;
+    }
+    // The tab opens the site itself and takes this document away; until then the page stays as it is.
+    waiting.delete(url);
+    win.clearTimeout(held.timer);
+  };
+};
+
 export const parseParentMessage = (data: unknown): TParentMessage | null => {
   if (!data || typeof data !== 'object') return null;
   const message = data as Record<string, unknown>;
   if (message.type === 'tk:pick' && typeof message.on === 'boolean')
     return { type: 'tk:pick', on: message.on };
   if (message.type === 'tk:ping') return { type: 'tk:ping' };
+  if (
+    message.type === 'tk:redirect-answer' &&
+    typeof message.url === 'string' &&
+    message.url.length <= MAX_LEAVE_URL &&
+    typeof message.follow === 'boolean'
+  )
+    return { type: 'tk:redirect-answer', url: message.url, follow: message.follow };
   if (
     message.type === 'tk:highlight' &&
     typeof message.selector === 'string' &&
@@ -180,6 +366,18 @@ export const parseParentMessage = (data: unknown): TParentMessage | null => {
   if (message.type === 'tk:probe-login') return { type: 'tk:probe-login' };
   if (message.type === 'tk:canvas' && typeof message.on === 'boolean')
     return { type: 'tk:canvas', on: message.on };
+  if (message.type === 'tk:scroll-sync' && typeof message.on === 'boolean')
+    return { type: 'tk:scroll-sync', on: message.on };
+  if (message.type === 'tk:touch' && typeof message.on === 'boolean')
+    return { type: 'tk:touch', on: message.on };
+  if (
+    message.type === 'tk:scroll-to' &&
+    typeof message.y === 'number' &&
+    Number.isFinite(message.y) &&
+    message.y >= 0 &&
+    message.y <= MAX_SCROLL_TO
+  )
+    return { type: 'tk:scroll-to', y: message.y };
   if (message.type === 'tk:styles') {
     const items = parseStyleItems(message.items);
     return items ? { type: 'tk:styles', items } : null;
@@ -188,7 +386,192 @@ export const parseParentMessage = (data: unknown): TParentMessage | null => {
     const items = parseAnchorItems(message.items);
     return items ? { type: 'tk:anchors', items } : null;
   }
+  if (message.type === 'tk:act') return parseActMessage(message);
+  if (typeof message.type === 'string' && message.type.startsWith('tk:dom-')) return parseDomMessage(message);
   return null;
+};
+
+const ACT_OPS = [
+  'snapshot',
+  'read',
+  'locate',
+  'click',
+  'type',
+  'press',
+  'hover',
+  'select',
+  'scroll',
+  'wait',
+  'tools',
+  'call',
+];
+const TOOL_NAME = /^[A-Za-z0-9_.:-]{1,128}$/;
+/** What a wait may be for on a video or audio, and how long such a wait may take. */
+const ACT_EVENTS = /^(ended|playing|paused)$/;
+const ACT_EVENT_MS = 25_000;
+
+/** An action as the parent sent it: every field that is there must be right, else the whole message is dropped. */
+export const parseActMessage = (message: Record<string, unknown>): IActMessage | null => {
+  const { id, op, ref, text, key, value, dy, ms, submit, event, tool, input } = message;
+  if (typeof id !== 'string' || id.length < 1 || id.length > 64) return null;
+  if (typeof op !== 'string' || !ACT_OPS.includes(op)) return null;
+  const act: IActMessage = { type: 'tk:act', id, op: op as TActOp };
+  if (ref !== undefined && ref !== null && ref !== '') {
+    if (typeof ref !== 'string' || !/^e\d{1,6}$/.test(ref)) return null;
+    act.ref = ref;
+  }
+  if (text !== undefined && text !== null) {
+    if (typeof text !== 'string' || text.length > 4000) return null;
+    if (text !== '' || op === 'type') act.text = text;
+  }
+  if (key !== undefined && key !== null && key !== '') {
+    if (typeof key !== 'string' || key.length > 32) return null;
+    act.key = key;
+  }
+  if (value !== undefined && value !== null && value !== '') {
+    if (typeof value !== 'string' || value.length > 500) return null;
+    act.value = value;
+  }
+  if (dy !== undefined && dy !== null) {
+    if (typeof dy !== 'number' || !Number.isFinite(dy) || Math.abs(dy) > 20_000) return null;
+    if (dy !== 0) act.dy = dy;
+  }
+  if (event !== undefined && event !== null && event !== '') {
+    if (typeof event !== 'string' || !ACT_EVENTS.test(event)) return null;
+    act.event = event;
+  }
+  if (ms !== undefined && ms !== null) {
+    const limit = act.event ? ACT_EVENT_MS : 10_000;
+    if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0 || ms > limit) return null;
+    if (ms !== 0) act.ms = ms;
+  }
+  if (submit !== undefined && submit !== null) {
+    if (typeof submit !== 'boolean') return null;
+    if (submit) act.submit = true;
+  }
+  if (tool !== undefined && tool !== null && tool !== '') {
+    if (typeof tool !== 'string' || !TOOL_NAME.test(tool)) return null;
+    act.tool = tool;
+  }
+  if (input !== undefined && input !== null && input !== '') {
+    if (typeof input !== 'string' || input.length > 8000) return null;
+    act.input = input;
+  }
+  return act;
+};
+
+/** A tool the page offers to agents through `navigator.modelContext` (WebMCP). */
+export interface ISiteTool {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+  readOnly: boolean;
+  execute: (input: unknown, client: unknown) => unknown;
+}
+
+export const makeSiteTools = (): Map<string, ISiteTool> => new Map();
+
+/** The tool as the page gave it; null when it is not one (nothing throws). */
+export const readSiteTool = (raw: any): ISiteTool | null => {
+  try {
+    if (!raw || typeof raw !== 'object') return null;
+    const { name, description, inputSchema, annotations, execute } = raw;
+    if (typeof name !== 'string' || !TOOL_NAME.test(name) || typeof execute !== 'function') return null;
+    return {
+      name,
+      description: typeof description === 'string' ? description.slice(0, 1000) : '',
+      inputSchema: inputSchema && typeof inputSchema === 'object' ? inputSchema : undefined,
+      readOnly: annotations?.readOnlyHint === true,
+      execute: (input, client) => execute.call(raw, input, client),
+    };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * `navigator.modelContext` for the page: made when the browser has none, else its methods are wrapped to still run
+ * and also record into `registry`. Never throws into the page.
+ */
+export const installModelContext = (win: any, registry: Map<string, ISiteTool>): void => {
+  const add = (raw: any) => {
+    const tool = readSiteTool(raw);
+    if (tool) registry.set(tool.name, tool);
+    return tool;
+  };
+  const provide = (options: any) => {
+    try {
+      const list = options && Array.isArray(options.tools) ? options.tools : [];
+      registry.clear();
+      for (const raw of list) add(raw);
+    } catch {
+      // A broken list: the registry stays as it is.
+    }
+  };
+  const register = (raw: any) => {
+    const tool = add(raw);
+    return {
+      unregister: () => {
+        try {
+          if (tool && registry.get(tool.name) === tool) registry.delete(tool.name);
+        } catch {
+          // Nothing to remove.
+        }
+      },
+    };
+  };
+  const unregister = (name: unknown) => {
+    try {
+      if (typeof name === 'string') registry.delete(name);
+    } catch {
+      // Nothing to remove.
+    }
+  };
+  const nav = win.navigator;
+  const native = nav.modelContext;
+  if (!native) {
+    const context = {
+      provideContext: (options: any) => provide(options),
+      clearContext: () => registry.clear(),
+      registerTool: register,
+      unregisterTool: unregister,
+    };
+    try {
+      Object.defineProperty(nav, 'modelContext', {
+        value: context,
+        configurable: true,
+        enumerable: true,
+        writable: true,
+      });
+    } catch {
+      // The navigator does not take it: the page has no WebMCP here.
+    }
+    return;
+  }
+  const wrap = (method: string, record: (...args: any[]) => any, merge: boolean) => {
+    const original = native[method];
+    if (typeof original !== 'function') return;
+    try {
+      native[method] = function (this: unknown, ...args: any[]) {
+        const result = original.apply(this ?? native, args);
+        const recorded = record(...args);
+        if (merge && result && typeof result.unregister === 'function') {
+          const first = result.unregister;
+          result.unregister = (...rest: any[]) => {
+            recorded.unregister();
+            return first.apply(result, rest);
+          };
+        }
+        return result;
+      };
+    } catch {
+      // A frozen object: the tools of this page stay unseen.
+    }
+  };
+  wrap('provideContext', provide, false);
+  wrap('clearContext', () => registry.clear(), false);
+  wrap('registerTool', register, true);
+  wrap('unregisterTool', unregister, false);
 };
 
 const MAX_ANCHORS = 64;
@@ -788,6 +1171,34 @@ export const captureNatives = (win: any) => {
   return {
     ...natives,
     controlled: () => Boolean(workers && controller && controller.call(workers)),
+    // What an action of the agent needs. None of it gates `ready`: a missing one fails that action alone.
+    setTextarea: win.HTMLTextAreaElement
+      ? Object.getOwnPropertyDescriptor(win.HTMLTextAreaElement.prototype, 'value')?.set
+      : undefined,
+    setSelectedIndex: win.HTMLSelectElement
+      ? Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, 'selectedIndex')?.set
+      : undefined,
+    HTMLTextAreaElement: win.HTMLTextAreaElement,
+    HTMLSelectElement: win.HTMLSelectElement,
+    MouseEvent: win.MouseEvent,
+    PointerEvent: win.PointerEvent,
+    KeyboardEvent: win.KeyboardEvent,
+    InputEvent: win.InputEvent,
+    closest: win.Element?.prototype?.closest,
+    matches: win.Element?.prototype?.matches,
+    scrollIntoView: win.Element?.prototype?.scrollIntoView,
+    tagName: get(win.Element?.prototype, 'tagName'),
+    isConnected: get(win.Node?.prototype, 'isConnected'),
+    textContent: get(win.Node?.prototype, 'textContent'),
+    innerText: get(win.HTMLElement?.prototype, 'innerText'),
+    activeElement: get(win.Document?.prototype, 'activeElement'),
+    execCommand: win.Document?.prototype?.execCommand,
+    scrollBy: win.scrollBy,
+    createRange: win.Document?.prototype?.createRange,
+    getSelection: win.getSelection,
+    WeakRef: win.WeakRef,
+    MutationObserver: win.MutationObserver,
+    requestAnimationFrame: win.requestAnimationFrame,
     ready:
       Object.values(natives).every((value) => value !== undefined && value !== null) &&
       (!workers || Boolean(controller)),
@@ -978,18 +1389,161 @@ export const installCookieShim = (doc: any, core: any, tag: string): void => {
   });
 };
 
+/** The event's composed path goes through the design runtime's own UI (its `[data-tk-library-bar]` host): its card, bar, panels. */
+export const isRuntimeUi = (path: readonly unknown[]): boolean =>
+  path.some((node) => {
+    const el = node as { nodeType?: number; hasAttribute?: (name: string) => boolean } | null;
+    return (
+      el?.nodeType === 1 && typeof el.hasAttribute === 'function' && el.hasAttribute('data-tk-library-bar')
+    );
+  });
+
 /**
  * Messaging with the parent page: only to `win.parent` with its origin as the target, only from it with that
  * origin. Nothing from a message is executed: the bridge reads the DOM, scrolls and draws one highlight box.
  */
+/** A selector that never matches while hovered: each `:hover` of it asks for an element that is none (`:not(*)`). */
+export const untouchSelector = (selector: string): string =>
+  selector.replace(/:hover(?![\w-])/g, ':hover:not(*)');
+
+/** A media query as a touch screen reads it, on a computer with a mouse: `hover` and `pointer` turned the other way. */
+export const touchMedia = (text: string): string =>
+  text
+    .replace(
+      /\b(any-)?hover\s*:\s*(hover|none)\b/gi,
+      (_all: string, any: string | undefined, value: string) =>
+        `${any ?? ''}hover: ${value.toLowerCase() === 'hover' ? 'none' : 'hover'}`,
+    )
+    .replace(
+      /\b(any-)?pointer\s*:\s*(fine|coarse)\b/gi,
+      (_all: string, any: string | undefined, value: string) =>
+        `${any ?? ''}pointer: ${value.toLowerCase() === 'fine' ? 'coarse' : 'fine'}`,
+    );
+
+/**
+ * A phone's or a tablet's page on a design's canvas, touched (`tk:touch`): no rule of the page answers hover, the media of
+ * `hover` and `pointer` read as a touch screen's (only where this computer is one with a mouse), and the pointer is a
+ * fingertip. The sheets the page adds later are taken as they come; off, every rule is given back what it had.
+ */
+export const installTouch = (win: any, doc: any, core: any): ((on: boolean) => void) => {
+  let changed: { target: any; key: 'selectorText' | 'mediaText'; was: string }[] = [];
+  let seen = new WeakSet<object>();
+  let counts = new WeakMap<object, number>();
+  let on = false;
+  let cursor: any = null;
+  let observer: any = null;
+  let timer = 0;
+  const mouse = (() => {
+    try {
+      return win.matchMedia('(hover: hover)').matches === true;
+    } catch {
+      return false;
+    }
+  })();
+  const rulesOf = (owner: any): any[] => {
+    try {
+      return Array.from(owner.cssRules ?? []);
+    } catch {
+      // A sheet of another origin keeps its rules to itself.
+      return [];
+    }
+  };
+  const change = (target: any, key: 'selectorText' | 'mediaText', next: string) => {
+    const was = String(target[key]);
+    if (next === was) return;
+    try {
+      target[key] = next;
+      changed.push({ target, key, was });
+    } catch {
+      // A rule the browser does not let be changed stays as it is.
+    }
+  };
+  const visit = (rules: any[]) => {
+    for (const rule of rules) {
+      if (!seen.has(rule)) {
+        seen.add(rule);
+        if (typeof rule.selectorText === 'string' && rule.selectorText.includes(':hover'))
+          change(rule, 'selectorText', core.untouchSelector(rule.selectorText));
+        if (mouse && rule.media && typeof rule.media.mediaText === 'string' && rule.cssRules)
+          change(rule.media, 'mediaText', core.touchMedia(rule.media.mediaText));
+      }
+      if (rule.cssRules) visit(rulesOf(rule));
+    }
+  };
+  const sweep = () => {
+    timer = 0;
+    for (const sheet of Array.from(doc.styleSheets ?? []) as any[]) {
+      const rules = rulesOf(sheet);
+      // A sheet read already, with as many rules as then, has nothing new.
+      if (counts.get(sheet) === rules.length) continue;
+      counts.set(sheet, rules.length);
+      visit(rules);
+    }
+  };
+  const later = () => {
+    if (!timer) timer = win.setTimeout(sweep, 120);
+  };
+  const styles = (nodes: any) =>
+    Array.from(nodes ?? []).some((node: any) => node.nodeName === 'STYLE' || node.nodeName === 'LINK');
+  return (next: boolean) => {
+    if (next === on) return;
+    on = next;
+    if (on) {
+      cursor = doc.createElement('style');
+      cursor.setAttribute('data-tk-touch', '');
+      cursor.textContent =
+        'html,html *{cursor:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2728%27%3E%3Ccircle cx=%2714%27 cy=%2714%27 r=%2711%27 fill=%27rgba(120,120,130,.35)%27 stroke=%27white%27 stroke-width=%272%27/%3E%3C/svg%3E") 14 14,pointer!important}';
+      (doc.head ?? doc.documentElement).appendChild(cursor);
+      sweep();
+      // A sheet added, a <link> loaded or a <style> rewritten later is read in a moment.
+      observer = new win.MutationObserver((records: any[]) => {
+        if (
+          records.some(
+            (r) =>
+              styles(r.addedNodes) ||
+              (r.type === 'characterData' && r.target.parentNode?.nodeName === 'STYLE') ||
+              r.target?.nodeName === 'STYLE',
+          )
+        )
+          later();
+      });
+      observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true });
+      doc.addEventListener('load', later, true);
+      return;
+    }
+    observer?.disconnect();
+    observer = null;
+    doc.removeEventListener('load', later, true);
+    if (timer) win.clearTimeout(timer);
+    timer = 0;
+    cursor?.remove();
+    cursor = null;
+    for (const { target, key, was } of changed.reverse()) {
+      try {
+        target[key] = was;
+      } catch {
+        // Gone with its sheet.
+      }
+    }
+    changed = [];
+    seen = new WeakSet();
+    counts = new WeakMap();
+  };
+};
+
 export const installBridge = (win: any, doc: any, parentOrigin: string, core: any): void => {
   // Taken before any script of the page runs (the bridge is the first one in <head>): the page cannot swap them later.
   const parent = win.parent;
   const nonce = Array.from(win.crypto.getRandomValues(new win.Uint8Array(16)) as ArrayLike<number>, (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('');
-  const bound = { ...core.captureNatives(win), origin: win.location.origin, parent };
+  const siteTools = core.makeSiteTools();
+  const bound = { ...core.captureNatives(win), origin: win.location.origin, parent, siteTools };
+  core.installModelContext(win, siteTools);
   const post = (message: Record<string, unknown>) => parent.postMessage(message, parentOrigin);
+  const actRefs = core.makeActRefs();
+  const setTouch = core.installTouch(win, doc, core);
+  const domState = core.makeDomState(actRefs);
   let lastUrl = win.location.href;
   let picking = false;
   let box: any = null;
@@ -1011,6 +1565,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   const highlight = (el: any) => {
     if (!box) {
       box = doc.createElement('div');
+      box.setAttribute('data-tk-bridge-box', '');
       box.style.cssText =
         'position:absolute;pointer-events:none;z-index:2147483647;box-sizing:border-box;border:2px dashed #8b5cf6;background:rgba(139,92,246,.12);border-radius:2px';
       label = doc.createElement('div');
@@ -1114,6 +1669,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
     return fits ? el : (query(item.selector) ?? el);
   };
   const setAnchors = core.installAnchors(win, doc, post, findAnchor, core);
+  const answerLeave = core.installLeave(win, post);
 
   const nav = () => {
     if (win.location.href === lastUrl) return;
@@ -1132,8 +1688,12 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   win.addEventListener('popstate', nav);
   win.addEventListener('hashchange', nav);
 
+  // The design runtime's own card, bar and panels are pressed as they are: a pick never takes them, or the board's error
+  // card could not be clicked while picking.
+  const ownUi = (event: any) =>
+    typeof event.composedPath === 'function' && core.isRuntimeUi(event.composedPath());
   const swallow = (event: any) => {
-    if (!picking) return;
+    if (!picking || ownUi(event)) return;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation?.();
@@ -1157,7 +1717,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   win.addEventListener(
     'pointermove',
     (event: any) => {
-      if (!picking) return;
+      if (!picking || ownUi(event)) return;
       const target = deepTarget(event);
       if (isPage(target)) highlight(target);
     },
@@ -1166,7 +1726,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
   win.addEventListener(
     'click',
     (event: any) => {
-      if (!picking) return;
+      if (!picking || ownUi(event)) return;
       swallow(event);
       const target = deepTarget(event);
       if (!isPage(target)) return;
@@ -1208,6 +1768,21 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       const wait = 100 - (Date.now() - scrollAt);
       if (wait <= 0) postScroll();
       else scrollTimer = win.setTimeout(postScroll, wait);
+    },
+    { capture: true, passive: true },
+  );
+
+  // Screens scrolled together: the document's own scroll is told once a frame while the parent asks for it.
+  let syncScroll = false;
+  let syncFrame = 0;
+  win.addEventListener(
+    'scroll',
+    (event: any) => {
+      if (!syncScroll || syncFrame || (event.target && event.target.nodeType === 1)) return;
+      syncFrame = win.requestAnimationFrame(() => {
+        syncFrame = 0;
+        post({ type: 'tk:doc-scroll', y: Number(win.scrollY) || 0 });
+      });
     },
     { capture: true, passive: true },
   );
@@ -1321,10 +1896,42 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       const message = core.parseParentMessage(bound.messageData ? bound.messageData.call(event) : event.data);
       if (!message) return;
       if (message.type === 'tk:ping') hello();
+      else if (message.type === 'tk:redirect-answer') answerLeave(message.url, message.follow);
       else if (message.type === 'tk:highlight') flash(message.selector);
       else if (message.type === 'tk:pick') setPicking(message.on, false);
       else if (message.type === 'tk:styles') setStyles(message.items);
       else if (message.type === 'tk:anchors') setAnchors(message.items);
+      else if (isDomMessage(message)) core.handleDomMessage(win, doc, bound, core, domState, message, post);
+      else if (message.type === 'tk:act') {
+        const answer = (result: { ok: boolean; text: string; rect?: unknown }) => {
+          try {
+            post({
+              type: 'tk:acted',
+              id: message.id,
+              ok: result.ok,
+              text: result.text,
+              ...(result.rect ? { rect: result.rect } : {}),
+            });
+          } catch {
+            // The parent is gone: nobody waits for the answer.
+          }
+        };
+        try {
+          core.runAct(win, doc, bound, core, actRefs, message).then(answer, (error: any) =>
+            answer({
+              ok: false,
+              text: `The page got in the way of the action: ${String(error?.message ?? error).slice(0, 200)}`,
+            }),
+          );
+        } catch (error: any) {
+          answer({
+            ok: false,
+            text: `The page got in the way of the action: ${String(error?.message ?? error).slice(0, 200)}`,
+          });
+        }
+      } else if (message.type === 'tk:scroll-sync') syncScroll = message.on;
+      else if (message.type === 'tk:touch') setTouch(message.on);
+      else if (message.type === 'tk:scroll-to') win.scrollTo({ top: message.y, behavior: 'instant' });
       else if (message.type === 'tk:canvas') {
         canvas = message.on;
         if (!canvas) postSpace(false);
@@ -2084,4 +2691,1508 @@ export const installDevtools = (win: any, doc: any, core: any, initial: string |
     );
   }
   win.addEventListener('pagehide', () => flush(true));
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The coding agent acting on the page (`tk:act` → `tk:acted`). The page is foreign code: everything is read through the
+// accessors taken before its scripts ran, inside try/catch, and nothing is written to its DOM but what an action does.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** The refs of one document: the same element keeps its ref over snapshots; a ref is only given by a snapshot. */
+export interface IActRefs {
+  byElement: WeakMap<object, string>;
+  byRef: Map<string, { deref: () => any }>;
+  next: number;
+  /** The bridge's own overlay (the DevTools mark): never listed to the agent. */
+  skip?: any;
+}
+
+export const makeActRefs = (): IActRefs => ({ byElement: new WeakMap(), byRef: new Map(), next: 1 });
+
+const ACT_MAX_ITEMS = 400;
+const ACT_MAX_CHARS = 24_000;
+const ACT_ROLES = 'button|link|checkbox|radio|tab|menuitem|option|switch|combobox|textbox';
+const ACT_ITEM_SELECTOR =
+  `a[href],button,input:not([type="hidden"]),textarea,select,summary,[role]:not([role=""]),` +
+  `[contenteditable]:not([contenteditable="false"]),h1,h2,h3,video,audio`;
+const ACT_MAX_READ = 8000;
+const ACT_FOCUSABLE_SELECTOR =
+  'a[href],button,input:not([type="hidden"]),select,textarea,summary,[tabindex],[contenteditable]:not([contenteditable="false"])';
+const ACT_SECRET_NAME = /card|cvv|cvc|ccnum|cc-?num|cardnumber|(^|[^a-z])pan([^a-z]|$)/i;
+export const ACT_SECRET_REFUSAL =
+  'This field takes a password or card details: the person types it themselves.';
+
+const actClip = (value: string, max: number): string => {
+  const flat = value.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+};
+
+const actAttr = (bound: any, el: any, name: string): string | null => {
+  try {
+    const value = bound.getAttribute.call(el, name);
+    return value === null || value === undefined ? null : String(value);
+  } catch {
+    return null;
+  }
+};
+
+const actTag = (bound: any, el: any): string => {
+  try {
+    return String(bound.tagName.call(el)).toLowerCase();
+  } catch {
+    return '';
+  }
+};
+
+const actTextOf = (bound: any, node: any): string => {
+  try {
+    return String(bound.textContent.call(node) ?? '');
+  } catch {
+    return '';
+  }
+};
+
+/** What the person reads on the page: `innerText` where the engine has it. */
+const actPageText = (bound: any, doc: any): string => {
+  try {
+    const body = doc.body;
+    if (!body) return '';
+    const text = bound.innerText ? bound.innerText.call(body) : undefined;
+    return String(typeof text === 'string' ? text : (bound.textContent.call(body) ?? ''));
+  } catch {
+    return '';
+  }
+};
+
+const actSelectAll = (bound: any, root: any, selector: string): any[] => {
+  try {
+    const select = root.nodeType === 9 ? bound.selectAllInDocument : bound.selectAll;
+    return Array.from(select.call(root, selector) as ArrayLike<any>);
+  } catch {
+    return [];
+  }
+};
+
+const actInputType = (bound: any, el: any): string => {
+  try {
+    return String(bound.inputType.call(el)).toLowerCase();
+  } catch {
+    return 'text';
+  }
+};
+
+const actIsInput = (bound: any, el: any): boolean => el instanceof bound.HTMLInputElement;
+const actIsTextarea = (bound: any, el: any): boolean =>
+  Boolean(bound.HTMLTextAreaElement) && el instanceof bound.HTMLTextAreaElement;
+const actIsSelect = (bound: any, el: any): boolean =>
+  Boolean(bound.HTMLSelectElement) && el instanceof bound.HTMLSelectElement;
+const actIsEditable = (bound: any, el: any): boolean => {
+  const value = actAttr(bound, el, 'contenteditable');
+  return value !== null && value.toLowerCase() !== 'false';
+};
+
+export const actVisible = (win: any, el: any, bound: any): boolean => {
+  try {
+    const box = bound.box.call(el);
+    if (!(box.width > 0 && box.height > 0)) return false;
+    const style = bound.style.call(win, el);
+    return style.visibility !== 'hidden' && style.display !== 'none';
+  } catch {
+    return false;
+  }
+};
+
+/** A field that takes a password or card details: the agent never types into it and its value is never shown. */
+export const actIsSecret = (bound: any, el: any): boolean => {
+  const tag = actTag(bound, el);
+  if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return false;
+  if (actIsInput(bound, el) && actInputType(bound, el) === 'password') return true;
+  const autocomplete = (actAttr(bound, el, 'autocomplete') ?? '').toLowerCase();
+  if (/(^|\s)(cc-|current-password|new-password|one-time-code)/.test(autocomplete)) return true;
+  return [actAttr(bound, el, 'name'), actAttr(bound, el, 'id'), autocomplete].some(
+    (hint) => hint !== null && ACT_SECRET_NAME.test(hint),
+  );
+};
+
+export const actRole = (bound: any, el: any): string => {
+  const tag = actTag(bound, el);
+  const explicit = (actAttr(bound, el, 'role') ?? '').trim().toLowerCase().split(/\s+/)[0];
+  if (explicit && new RegExp(`^(${ACT_ROLES})$`).test(explicit)) return explicit;
+  if (tag === 'a') return 'link';
+  if (tag === 'video' || tag === 'audio') return tag;
+  if (tag === 'button' || tag === 'summary') return 'button';
+  if (tag === 'select') return 'combobox';
+  if (tag === 'textarea') return 'textbox';
+  if (tag === 'input') {
+    const type = actInputType(bound, el);
+    if (type === 'button' || type === 'submit' || type === 'reset' || type === 'image') return 'button';
+    if (type === 'checkbox' || type === 'radio') return type;
+    return 'textbox';
+  }
+  if (actIsEditable(bound, el)) return 'textbox';
+  return '';
+};
+
+const actByIdText = (bound: any, doc: any, ids: string): string => {
+  const parts: string[] = [];
+  for (const id of ids.split(/\s+/).filter(Boolean).slice(0, 8)) {
+    const found = actSelectAll(bound, doc, `[id="${id.replace(/["\\]/g, '\\$&')}"]`)[0];
+    if (found) parts.push(actTextOf(bound, found));
+  }
+  return actClip(parts.join(' '), 80);
+};
+
+/** The name a person would call an element by: aria-label, aria-labelledby, its label, placeholder, alt, title, its text. */
+export const actName = (bound: any, doc: any, el: any): string => {
+  const tag = actTag(bound, el);
+  const label = actAttr(bound, el, 'aria-label');
+  if (label && label.trim()) return actClip(label, 80);
+  const labelledBy = actAttr(bound, el, 'aria-labelledby');
+  if (labelledBy) {
+    const named = actByIdText(bound, doc, labelledBy);
+    if (named) return named;
+  }
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+    let text = '';
+    try {
+      for (const item of Array.from((el.labels ?? []) as ArrayLike<any>))
+        text += ` ${actTextOf(bound, item)}`;
+    } catch {
+      text = '';
+    }
+    if (!text.trim()) {
+      try {
+        const wrap = bound.closest.call(el, 'label');
+        if (wrap) text = actTextOf(bound, wrap);
+      } catch {
+        text = '';
+      }
+    }
+    if (text.trim()) return actClip(text, 80);
+  }
+  const placeholder = actAttr(bound, el, 'placeholder');
+  if (placeholder && placeholder.trim()) return actClip(placeholder, 80);
+  const alt = actAttr(bound, el, 'alt');
+  if (alt && alt.trim()) return actClip(alt, 80);
+  if (tag === 'input' && ['button', 'submit', 'reset'].includes(actInputType(bound, el))) {
+    const value = actAttr(bound, el, 'value');
+    if (value && value.trim()) return actClip(value, 80);
+  }
+  const title = actAttr(bound, el, 'title');
+  if (title && title.trim()) return actClip(title, 80);
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') return '';
+  return actClip(actTextOf(bound, el), 80);
+};
+
+const actQuote = (value: string): string => `"${value.replace(/["\\]/g, '\\$&')}"`;
+
+const actHref = (win: any, bound: any, el: any): string | null => {
+  const raw = actAttr(bound, el, 'href');
+  if (raw === null || raw.trim() === '' || /^\s*javascript:/i.test(raw)) return null;
+  try {
+    const url = new win.URL(raw, win.location.href);
+    return actClip(
+      url.origin === win.location.origin ? `${url.pathname}${url.search}${url.hash}` : url.href,
+      100,
+    );
+  } catch {
+    return actClip(raw, 100);
+  }
+};
+
+/** The words after the name: what the element is in (disabled, checked, expanded…) and what it holds. */
+/** A video or audio of the page: whether it plays, where it is and how long it is. */
+const actIsMedia = (bound: any, el: any): boolean => {
+  const tag = actTag(bound, el);
+  return tag === 'video' || tag === 'audio';
+};
+const actSeconds = (n: unknown): string =>
+  typeof n === 'number' && Number.isFinite(n) ? `${Math.round(n * 10) / 10}s` : '?';
+const actMediaWords = (el: any): string[] => {
+  try {
+    const words = [
+      el.ended === true ? 'ended' : el.paused === false ? 'playing' : 'paused',
+      `at=${actSeconds(el.currentTime)}`,
+      `of=${actSeconds(el.duration)}`,
+    ];
+    if (el.muted === true) words.push('muted');
+    if (el.loop === true) words.push('loop');
+    return words;
+  } catch {
+    return [];
+  }
+};
+const actMediaShown = (win: any, doc: any, bound: any): any[] =>
+  actSelectAll(bound, doc, 'video,audio').filter((el) => {
+    try {
+      return actVisible(win, el, bound) || el.paused === false;
+    } catch {
+      return false;
+    }
+  });
+/** The media an event is about: the ref given, else the one playing, else the biggest one shown. */
+const actMediaOf = (
+  win: any,
+  doc: any,
+  bound: any,
+  refs: IActRefs,
+  ref: string | undefined,
+): { el: any } | { fail: IActResult } => {
+  if (ref) {
+    const found = actResolve(refs, bound, ref);
+    if ('fail' in found) return found;
+    if (!actIsMedia(bound, found.el))
+      return {
+        fail: actFail(`${ref} is not a video or audio: give the ref of one from the snapshot, or no ref.`),
+      };
+    return found;
+  }
+  const area = (el: any): number => {
+    const b = actBox(win, bound, el);
+    return b ? b.width * b.height : 0;
+  };
+  const shown = actMediaShown(win, doc, bound);
+  const playing = shown.find((el) => {
+    try {
+      return el.paused === false && el.ended !== true;
+    } catch {
+      return false;
+    }
+  });
+  const el = playing ?? shown.sort((a, b) => area(b) - area(a))[0];
+  return el ? { el } : { fail: actFail('No video or audio is on the page.') };
+};
+
+const actStates = (win: any, bound: any, el: any, role: string): string[] => {
+  const words: string[] = [];
+  const tag = actTag(bound, el);
+  const flag = (name: string) => actAttr(bound, el, name)?.toLowerCase();
+  if (tag === 'video' || tag === 'audio') return actMediaWords(el);
+  try {
+    if (el.disabled === true || flag('aria-disabled') === 'true') words.push('disabled');
+  } catch {
+    // A page may put anything under these names.
+  }
+  try {
+    if (role === 'checkbox' || role === 'radio' || role === 'switch') {
+      const checked = actIsInput(bound, el) ? el.checked === true : flag('aria-checked') === 'true';
+      if (checked) words.push('checked');
+    }
+  } catch {
+    // Same.
+  }
+  if (flag('aria-expanded') === 'true') words.push('expanded');
+  if (flag('aria-expanded') === 'false') words.push('collapsed');
+  if (flag('aria-selected') === 'true') words.push('selected');
+  if (flag('aria-pressed') === 'true') words.push('pressed');
+  if (tag === 'a') {
+    const href = actHref(win, bound, el);
+    if (href) words.push(`href=${href}`);
+  }
+  const secret = actIsSecret(bound, el);
+  if (secret)
+    words.push(actIsInput(bound, el) && actInputType(bound, el) === 'password' ? 'password' : 'sensitive');
+  try {
+    if (tag === 'input' && role === 'textbox') {
+      const type = actInputType(bound, el);
+      if (type !== 'text' && type !== 'password') words.push(`type=${type}`);
+      const value = String(el.value ?? '');
+      if (!secret && value) words.push(`value=${actQuote(actClip(value, 60))}`);
+    } else if (tag === 'textarea') {
+      const value = String(el.value ?? '');
+      if (!secret && value) words.push(`value=${actQuote(actClip(value, 60))}`);
+    } else if (actIsSelect(bound, el)) {
+      const options = Array.from((el.options ?? []) as ArrayLike<any>);
+      const picked = options
+        .filter((option) => option.selected)
+        .map((option) => actClip(actTextOf(bound, option), 40));
+      if (!secret && picked.length) words.push(`value=${actQuote(picked.join(', '))}`);
+      const shown = options.slice(0, 20).map((option) => actQuote(actClip(actTextOf(bound, option), 40)));
+      words.push(
+        `options=[${shown.join(', ')}${options.length > 20 ? `, … ${options.length - 20} more` : ''}]`,
+      );
+    } else if (actIsEditable(bound, el)) {
+      const value = actClip(actTextOf(bound, el), 60);
+      if (value) words.push(`value=${actQuote(value)}`);
+    }
+  } catch {
+    // Fields the page broke are listed without their value.
+  }
+  return words;
+};
+
+/** The ref of an element, given now if it has none. */
+const actRefOf = (refs: IActRefs, bound: any, el: any): string => {
+  const known = refs.byElement.get(el);
+  if (known) return known;
+  if (refs.next > 999_000) {
+    // A document that lived through a million elements: start over, old refs read as unknown.
+    refs.byRef.clear();
+    refs.next = 1;
+  }
+  const ref = `e${refs.next}`;
+  refs.next += 1;
+  refs.byElement.set(el, ref);
+  refs.byRef.set(ref, typeof bound.WeakRef === 'function' ? new bound.WeakRef(el) : { deref: () => el });
+  return ref;
+};
+
+/** The page as text: its address and title, then what can be acted on, with refs, in the document's order. */
+export const actSnapshot = (win: any, doc: any, bound: any, refs: IActRefs): string => {
+  let title = '';
+  try {
+    title = String(bound.title.call(doc));
+  } catch {
+    title = '';
+  }
+  const lines = [`url: ${String(win.location.href)}`, `title: ${actClip(title, 200)}`];
+  let size = lines.join('\n').length;
+  let listed = 0;
+  let skipped = 0;
+  for (const el of actSelectAll(bound, doc, ACT_ITEM_SELECTOR)) {
+    if (refs.skip && (el === refs.skip || refs.skip.contains(el))) continue;
+    const tag = actTag(bound, el);
+    const heading = /^h[1-3]$/.test(tag);
+    const role = heading ? 'heading' : actRole(bound, el);
+    if (!role || !actVisible(win, el, bound)) continue;
+    let line: string;
+    if (heading) {
+      const text = actClip(actTextOf(bound, el), 80);
+      if (!text) continue;
+      line = `- heading ${actQuote(text)} level=${tag.slice(1)}`;
+    } else {
+      if (listed >= ACT_MAX_ITEMS || size > ACT_MAX_CHARS) {
+        skipped += 1;
+        continue;
+      }
+      const name = actName(bound, doc, el);
+      const parts = [`- ${role}`];
+      if (name) parts.push(actQuote(name));
+      parts.push(`[${actRefOf(refs, bound, el)}]`, ...actStates(win, bound, el, role));
+      line = parts.join(' ');
+      listed += 1;
+    }
+    if (size + line.length > ACT_MAX_CHARS + 400) {
+      skipped += 1;
+      continue;
+    }
+    size += line.length + 1;
+    lines.push(line);
+  }
+  if (skipped > 0) lines.push(`… (${skipped} more)`);
+  if (listed === 0) lines.push('(nothing to act on is shown on this page yet)');
+  return lines.join('\n');
+};
+
+const actDescribe = (bound: any, doc: any, el: any): string => {
+  const role = actRole(bound, el) || actTag(bound, el) || 'element';
+  const name = actName(bound, doc, el);
+  return name ? `${role} ${actQuote(name)}` : role;
+};
+
+const actFail = (text: string): IActResult => ({ ok: false, text });
+
+/** The element a ref stands for; the failure when the page dropped it or the ref is not one a snapshot gave. */
+const actResolve = (
+  refs: IActRefs,
+  bound: any,
+  ref: string | undefined,
+): { el: any } | { fail: IActResult } => {
+  if (!ref) return { fail: actFail('This action needs a ref from the last snapshot.') };
+  const entry = refs.byRef.get(ref);
+  if (!entry) return { fail: actFail(`${ref} is not a ref of this page: take a snapshot first.`) };
+  const el = entry.deref();
+  let connected = false;
+  try {
+    connected = Boolean(el && bound.isConnected.call(el));
+  } catch {
+    connected = false;
+  }
+  if (!connected) return { fail: actFail(`${ref} is gone from the page: take a new snapshot`) };
+  return { el };
+};
+
+const actBox = (win: any, bound: any, el: any): IActResult['rect'] => {
+  const box = bound.box.call(el);
+  return { x: box.left, y: box.top, width: box.width, height: box.height };
+};
+
+const actBringIntoView = (el: any, bound: any): void => {
+  try {
+    bound.scrollIntoView.call(el, { block: 'center', inline: 'nearest', behavior: 'instant' });
+  } catch {
+    // An element that cannot be scrolled to is acted on where it is.
+  }
+};
+
+const actCenter = (rect: NonNullable<IActResult['rect']>) => ({
+  clientX: rect.x + rect.width / 2,
+  clientY: rect.y + rect.height / 2,
+});
+
+const actFire = (win: any, bound: any, el: any, type: string, init: Record<string, unknown>): boolean => {
+  const Pointer =
+    type.startsWith('pointer') && typeof bound.PointerEvent === 'function' ? bound.PointerEvent : null;
+  const Ctor = Pointer ?? bound.MouseEvent ?? bound.Event;
+  const enter = type.endsWith('enter') || type.endsWith('leave');
+  const event = new Ctor(type, {
+    bubbles: !enter,
+    cancelable: !enter,
+    composed: true,
+    ...init,
+    ...(Pointer ? { pointerId: 1, pointerType: 'mouse', isPrimary: true } : {}),
+  });
+  return bound.dispatch.call(el, event);
+};
+
+const actFocus = (bound: any, el: any): void => {
+  try {
+    bound.focus.call(el);
+  } catch {
+    // Not focusable: the events still go to it.
+  }
+};
+
+const actUrlNote = (win: any, before: string): string => {
+  const now = String(win.location.href);
+  return now === before ? '' : `; the page is now ${now}`;
+};
+
+const actPause = (win: any, bound: any, ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    bound.setTimeout.call(win, resolve, ms);
+  });
+
+const TOOLS_LISTED = 50;
+const TOOL_WAIT_MS = 10_000;
+
+const actSiteTools = (bound: any): ISiteTool[] =>
+  bound.siteTools ? Array.from(bound.siteTools.values()) : [];
+
+const actToolsHint = (bound: any): string => {
+  const count = actSiteTools(bound).length;
+  return count > 0
+    ? `\nThis page offers ${count} tools of its own (WebMCP): list them with browser_site_tools.`
+    : '';
+};
+
+const actToolsList = (bound: any): IActResult => {
+  const tools = actSiteTools(bound);
+  if (tools.length === 0) return { ok: true, text: 'This page offers no tools of its own (WebMCP).' };
+  const lines = [`This page offers ${tools.length} tools of its own (WebMCP):`];
+  for (const tool of tools.slice(0, TOOLS_LISTED)) {
+    const about = tool.description.replace(/\s+/g, ' ').trim();
+    lines.push(`- ${tool.name}${tool.readOnly ? ' (read-only)' : ''}: ${about}`);
+    if (tool.inputSchema) {
+      let schema: string;
+      try {
+        schema = String(bound.stringify(tool.inputSchema)).slice(0, 600);
+      } catch {
+        schema = '';
+      }
+      if (schema) lines.push(`  input: ${schema}`);
+    }
+  }
+  if (tools.length > TOOLS_LISTED) lines.push(`…and ${tools.length - TOOLS_LISTED} more`);
+  return { ok: true, text: lines.join('\n') };
+};
+
+/** What a tool answered as text, and whether it says it failed. */
+const actToolText = (bound: any, result: any): { text: string; error: boolean } => {
+  if (typeof result === 'string') return { text: result, error: false };
+  if (result && typeof result === 'object' && Array.isArray(result.content)) {
+    const parts = result.content.map((item: any) =>
+      item && item.type === 'text' && typeof item.text === 'string' ? item.text : `[${String(item?.type)}]`,
+    );
+    return { text: parts.join('\n'), error: result.isError === true };
+  }
+  try {
+    const json = bound.stringify(result);
+    return { text: typeof json === 'string' ? json : String(result), error: false };
+  } catch {
+    return { text: String(result), error: false };
+  }
+};
+
+// A site tool's field for a password, a one-time code or card details: the agent never fills one, as with typing.
+const TOOL_SECRET_WORD =
+  /\b(password|passwd|passcode|passphrase|pwd|otp|totp|mfa|2fa|one time (code|password)|pincode|pin code|cvv|cvv2|cvc|cardnumber|card (number|num|no)|ccnum|pan|secret)\b/;
+
+export const isSecretKey = (key: string): boolean =>
+  TOOL_SECRET_WORD.test(
+    key
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_\-.]+/g, ' ')
+      .toLowerCase(),
+  );
+
+/** What a check of keys came to: the first key that names a secret, or that the check could not finish. */
+export type TSecretCheck = { kind: 'clean' } | { kind: 'secret'; key: string } | { kind: 'unchecked' };
+
+const CLEAN: TSecretCheck = { kind: 'clean' };
+const UNCHECKED: TSecretCheck = { kind: 'unchecked' };
+/** Nodes a check reads at most: past it the call is refused, not let through. */
+const SECRET_CHECK_NODES = 5000;
+
+/** Every key of the agent's arguments, at any depth (they are JSON the agent wrote, at most 8000 characters). */
+export const secretInInput = (input: unknown): TSecretCheck => {
+  const stack: unknown[] = [input];
+  let seen = 0;
+  while (stack.length > 0) {
+    const value = stack.pop();
+    if (!value || typeof value !== 'object') continue;
+    if ((seen += 1) > SECRET_CHECK_NODES) return UNCHECKED;
+    if (Array.isArray(value)) stack.push(...value);
+    else
+      for (const [key, child] of Object.entries(value)) {
+        if (isSecretKey(key)) return { kind: 'secret', key };
+        stack.push(child);
+      }
+  }
+  return CLEAN;
+};
+
+// The parts of a JSON Schema that hold schemas: under the first, the keys are field names; under the rest, not.
+const SCHEMA_NAMED = ['properties', 'patternProperties', 'dependentSchemas'];
+const SCHEMA_MAPS = ['$defs', 'definitions'];
+const SCHEMA_ONE = [
+  'items',
+  'additionalProperties',
+  'unevaluatedProperties',
+  'contains',
+  'not',
+  'if',
+  'then',
+  'else',
+  'propertyNames',
+];
+const SCHEMA_LISTS = ['prefixItems', 'anyOf', 'oneOf', 'allOf', 'items'];
+
+/**
+ * The field names a site tool's input schema declares, walked by the schema's own structure. The schema is the page's
+ * object: one that throws on reading, or is too large to read whole, counts as unchecked, and the call is refused.
+ */
+export const secretInSchema = (schema: unknown): TSecretCheck => {
+  const stack: unknown[] = [schema];
+  let seen = 0;
+  try {
+    while (stack.length > 0) {
+      const node = stack.pop() as Record<string, unknown> | null | undefined;
+      if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+      if ((seen += 1) > SECRET_CHECK_NODES) return UNCHECKED;
+      for (const part of SCHEMA_NAMED) {
+        const map = node[part];
+        if (!map || typeof map !== 'object') continue;
+        for (const [key, child] of Object.entries(map)) {
+          if (isSecretKey(key)) return { kind: 'secret', key };
+          stack.push(child);
+        }
+      }
+      for (const part of SCHEMA_MAPS) {
+        const map = node[part];
+        if (map && typeof map === 'object') stack.push(...Object.values(map));
+      }
+      for (const part of SCHEMA_ONE) stack.push(node[part]);
+      for (const part of SCHEMA_LISTS) {
+        const list = node[part];
+        if (Array.isArray(list)) stack.push(...list);
+      }
+      const required = node.required;
+      if (Array.isArray(required))
+        for (const key of required)
+          if (typeof key === 'string' && isSecretKey(key)) return { kind: 'secret', key };
+    }
+  } catch {
+    return UNCHECKED;
+  }
+  return CLEAN;
+};
+
+const actToolCall = async (win: any, bound: any, act: IActMessage, before: string): Promise<IActResult> => {
+  if (!act.tool) return actFail('call needs a tool name.');
+  const name = act.tool;
+  const tool: ISiteTool | undefined = bound.siteTools?.get(name);
+  if (!tool) return actFail(`The page has no tool ${name}; list them with browser_site_tools.`);
+  let input: unknown = {};
+  if (act.input !== undefined) {
+    try {
+      input = bound.parse(act.input);
+    } catch {
+      return actFail('input must be a JSON object.');
+    }
+    if (!input || typeof input !== 'object' || Array.isArray(input))
+      return actFail('input must be a JSON object.');
+  }
+  const checked = [secretInInput(input), secretInSchema(tool.inputSchema)];
+  const secret = checked.find((c) => c.kind === 'secret');
+  if (secret?.kind === 'secret')
+    return actFail(
+      `The tool ${name} takes a password, a one-time code or card details (${secret.key}): the person enters them. Ask them in the chat.`,
+    );
+  if (checked.some((c) => c.kind === 'unchecked'))
+    return actFail(
+      `The input of the tool ${name} is too large or too odd to check for passwords: it is not called.`,
+    );
+  const client = { requestUserInteraction: async (callback: () => unknown) => callback() };
+  const limit = bound.toolWaitMs ?? TOOL_WAIT_MS;
+  const late = Symbol('late');
+  let timer: unknown;
+  try {
+    const answer = await Promise.race([
+      Promise.resolve().then(() => tool.execute(input, client)),
+      new Promise<symbol>((resolve) => {
+        timer = bound.setTimeout.call(win, () => resolve(late), limit);
+      }),
+    ]);
+    if (answer === late) return actFail(`The tool ${name} did not answer within ${limit / 1000} s.`);
+    const { text, error } = actToolText(bound, answer);
+    return {
+      ok: !error,
+      text: `${name} returned:\n${text.slice(0, 16_000)}${actUrlNote(win, before)}`,
+    };
+  } catch (error: any) {
+    let message: string;
+    try {
+      message = String(error?.message ?? error);
+    } catch {
+      message = 'error';
+    }
+    return actFail(`The tool ${name} failed: ${message.slice(0, 500)}`);
+  } finally {
+    try {
+      win.clearTimeout(timer);
+    } catch {
+      // The timer fires into nothing.
+    }
+  }
+};
+
+const actActive = (bound: any, doc: any): any => {
+  try {
+    return bound.activeElement.call(doc) || doc.body;
+  } catch {
+    return doc.body;
+  }
+};
+
+const actKeyInit = (key: string): Record<string, unknown> => {
+  const parts = key.length > 1 && key.includes('+') ? key.split('+') : [key];
+  const main = parts[parts.length - 1] || '+';
+  const has = (...names: string[]) => parts.slice(0, -1).some((part) => names.includes(part.toLowerCase()));
+  const letter = /^[a-z]$/i.test(main)
+    ? `Key${main.toUpperCase()}`
+    : /^[0-9]$/.test(main)
+      ? `Digit${main}`
+      : main;
+  return {
+    key: main,
+    code: main === ' ' ? 'Space' : letter,
+    ctrlKey: has('control', 'ctrl'),
+    shiftKey: has('shift'),
+    altKey: has('alt'),
+    metaKey: has('meta', 'cmd', 'command'),
+  };
+};
+
+const actSubmitForm = (bound: any, el: any): boolean => {
+  try {
+    const form = actIsInput(bound, el) ? bound.inputForm.call(el) : bound.closest.call(el, 'form');
+    if (!form) return false;
+    bound.requestSubmit.call(form);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const actFireKeys = (win: any, bound: any, el: any, key: string): boolean => {
+  const init: Record<string, unknown> = {
+    ...actKeyInit(key),
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  };
+  const Ctor = bound.KeyboardEvent ?? bound.Event;
+  const down = bound.dispatch.call(el, new Ctor('keydown', init));
+  if (down && (String(init.key).length === 1 || init.key === 'Enter'))
+    bound.dispatch.call(el, new Ctor('keypress', init));
+  bound.dispatch.call(el, new Ctor('keyup', init));
+  return down;
+};
+
+export const actFocusNext = (win: any, doc: any, bound: any, from: any): any => {
+  const items = actSelectAll(bound, doc, ACT_FOCUSABLE_SELECTOR).filter((el) => {
+    try {
+      return !el.disabled && actAttr(bound, el, 'tabindex') !== '-1' && actVisible(win, el, bound);
+    } catch {
+      return false;
+    }
+  });
+  if (!items.length) return null;
+  const at = items.indexOf(from);
+  const next = items[(at + 1) % items.length];
+  actFocus(bound, next);
+  return next;
+};
+
+const actType = async (
+  win: any,
+  doc: any,
+  bound: any,
+  el: any,
+  text: string,
+  submit: boolean,
+): Promise<IActResult> => {
+  if (actIsSecret(bound, el)) return actFail(ACT_SECRET_REFUSAL);
+  const what = actDescribe(bound, doc, el);
+  const input = actIsInput(bound, el);
+  const area = actIsTextarea(bound, el);
+  try {
+    if (el.disabled === true) return actFail(`The ${what} is disabled.`);
+    if ((input || area) && el.readOnly === true) return actFail(`The ${what} is read-only.`);
+  } catch {
+    // Judged by what the events do.
+  }
+  if (
+    input &&
+    !/^(text|search|email|url|tel|number|date|time|datetime-local|month|week|color|range)$/.test(
+      actInputType(bound, el),
+    )
+  )
+    return actFail(`The ${what} does not take text: use click for a checkbox, radio or button.`);
+  actFocus(bound, el);
+  if (input || area) {
+    const set = input ? bound.setValue : bound.setTextarea;
+    if (!set) return actFail('This page does not let the bridge set a field.');
+    // The native setter, not `el.value =`: a framework that tracks the value on the element (React) then sees a change.
+    set.call(el, text);
+    const Input = bound.InputEvent ?? bound.Event;
+    bound.dispatch.call(
+      el,
+      new Input('input', { bubbles: true, composed: true, inputType: 'insertText', data: text }),
+    );
+    bound.dispatch.call(el, new bound.Event('change', { bubbles: true }));
+  } else if (actIsEditable(bound, el)) {
+    let done = false;
+    try {
+      const range = bound.createRange.call(doc);
+      range.selectNodeContents(el);
+      const selection = bound.getSelection.call(win);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      done =
+        Boolean(bound.execCommand) &&
+        bound.execCommand.call(doc, text === '' ? 'delete' : 'insertText', false, text);
+    } catch {
+      done = false;
+    }
+    if (!done) {
+      el.textContent = text;
+      const Input = bound.InputEvent ?? bound.Event;
+      bound.dispatch.call(
+        el,
+        new Input('input', { bubbles: true, composed: true, inputType: 'insertText', data: text }),
+      );
+    }
+  } else {
+    return actFail(`The ${what} is not a text field.`);
+  }
+  if (submit) {
+    const prevented = !actFireKeys(win, bound, el, 'Enter');
+    if (!prevented) actSubmitForm(bound, el);
+  }
+  return { ok: true, text: `typed into ${what}${submit ? ' and pressed Enter' : ''}` };
+};
+
+const actSelect = (doc: any, bound: any, el: any, value: string | undefined): IActResult => {
+  const what = actDescribe(bound, doc, el);
+  if (!actIsSelect(bound, el)) return actFail(`The ${what} is not a select: use click or type.`);
+  if (value === undefined) return actFail("select needs the option's value or text.");
+  const options = Array.from(el.options as ArrayLike<any>);
+  const textOf = (option: any) => actTextOf(bound, option).trim();
+  const found =
+    options.find((option) => option.value === value) ??
+    options.find((option) => textOf(option) === value.trim()) ??
+    options.find((option) => textOf(option).toLowerCase() === value.trim().toLowerCase());
+  if (!found) {
+    const shown = options.slice(0, 10).map((option) => actQuote(textOf(option)));
+    return actFail(
+      `No option "${value}" in the ${what}; it has ${shown.join(', ')}${options.length > 10 ? ', …' : ''}.`,
+    );
+  }
+  if (found.disabled) return actFail(`The option "${textOf(found)}" is disabled.`);
+  actFocus(bound, el);
+  const index = options.indexOf(found);
+  if (bound.setSelectedIndex) bound.setSelectedIndex.call(el, index);
+  else found.selected = true;
+  bound.dispatch.call(el, new bound.Event('input', { bubbles: true, composed: true }));
+  bound.dispatch.call(el, new bound.Event('change', { bubbles: true }));
+  return { ok: true, text: `selected "${textOf(found)}" in ${what}` };
+};
+
+/** The page's state as text: address, title, its videos and audios, and its text (or one element's). */
+export const actRead = (win: any, doc: any, bound: any, refs: IActRefs, act: IActMessage): IActResult => {
+  let title = '';
+  try {
+    title = String(bound.title.call(doc));
+  } catch {
+    title = '';
+  }
+  const lines = [`url: ${String(win.location.href)}`, `title: ${actClip(title, 200)}`];
+  for (const el of actMediaShown(win, doc, bound))
+    lines.push(`- ${actTag(bound, el)} [${actRefOf(refs, bound, el)}] ${actMediaWords(el).join(' ')}`);
+  let text: string;
+  if (act.ref) {
+    const found = actResolve(refs, bound, act.ref);
+    if ('fail' in found) return found.fail;
+    let own: unknown;
+    try {
+      own = bound.innerText ? bound.innerText.call(found.el) : undefined;
+    } catch {
+      own = undefined;
+    }
+    text = typeof own === 'string' ? own : actTextOf(bound, found.el);
+  } else {
+    text = actPageText(bound, doc);
+  }
+  text = text
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  lines.push(
+    'text:',
+    text.length > ACT_MAX_READ
+      ? `${text.slice(0, ACT_MAX_READ)}… (${text.length - ACT_MAX_READ} more characters)`
+      : text || '(no text)',
+  );
+  return { ok: true, text: lines.join('\n') };
+};
+
+const actWaitEvent = async (
+  win: any,
+  doc: any,
+  bound: any,
+  refs: IActRefs,
+  act: IActMessage,
+): Promise<IActResult> => {
+  const event = String(act.event);
+  const found = actMediaOf(win, doc, bound, refs, act.ref);
+  if ('fail' in found) return found.fail;
+  const el = found.el;
+  const what = `${actTag(bound, el)} [${actRefOf(refs, bound, el)}]`;
+  const limit = Math.min(act.ms || ACT_EVENT_MS, ACT_EVENT_MS);
+  const time = (): number => {
+    try {
+      return Number(el.currentTime) || 0;
+    } catch {
+      return 0;
+    }
+  };
+  const state = (): { paused: boolean; ended: boolean; duration: number } => {
+    try {
+      return { paused: el.paused !== false, ended: el.ended === true, duration: Number(el.duration) };
+    } catch {
+      return { paused: true, ended: false, duration: NaN };
+    }
+  };
+  let waited = 0;
+  let last = time();
+  for (;;) {
+    const now = time();
+    const { paused, ended, duration } = state();
+    // A clip that loops, or that the page starts over, never ends: its jump back to the start counts as its end.
+    const over =
+      ended ||
+      (last > 0.5 && now + 0.5 < last) ||
+      (Number.isFinite(duration) && duration > 0 && now >= duration - 0.05);
+    const met = event === 'ended' ? over : event === 'playing' ? !paused && !ended : paused;
+    if (met) {
+      const verb =
+        event === 'ended'
+          ? ended
+            ? 'has ended'
+            : 'played to its end'
+          : event === 'playing'
+            ? 'is playing'
+            : 'is paused';
+      return {
+        ok: true,
+        text: `the ${what} ${verb}: ${actMediaWords(el).join(' ')}`,
+        rect: actBox(win, bound, el),
+      };
+    }
+    if (waited >= limit)
+      return actFail(
+        `The ${what} is not ${event} after ${limit} ms: ${actMediaWords(el).join(' ')}. Call again to keep waiting.`,
+      );
+    last = now;
+    const step = Math.min(100, limit - waited);
+    await actPause(win, bound, step);
+    waited += step;
+  }
+};
+
+export const actWait = async (
+  win: any,
+  doc: any,
+  bound: any,
+  act: IActMessage,
+  refs: IActRefs = makeActRefs(),
+): Promise<IActResult> => {
+  if (act.event) return actWaitEvent(win, doc, bound, refs, act);
+  if (act.text === undefined && act.ms === undefined) return actFail('wait needs text, an event or ms.');
+  if (act.text === undefined) {
+    await actPause(win, bound, act.ms as number);
+    return { ok: true, text: `waited ${act.ms} ms` };
+  }
+  const wanted = act.text.replace(/\s+/g, ' ').trim();
+  const limit = Math.min(act.ms ?? 5000, 10_000);
+  const read = () => actPageText(bound, doc).replace(/\s+/g, ' ');
+  let waited = 0;
+  for (;;) {
+    if (read().includes(wanted))
+      return { ok: true, text: `the text ${actQuote(actClip(wanted, 80))} is on the page` };
+    if (waited >= limit)
+      return actFail(`The text ${actQuote(actClip(wanted, 80))} did not show up within ${limit} ms.`);
+    const step = Math.min(100, limit - waited);
+    await actPause(win, bound, step);
+    waited += step;
+  }
+};
+
+/**
+ * One action of the agent. Answers with what it came to and never throws: a page that breaks the action gets a plain
+ * failure. `refs` is the document's `makeActRefs()`. A step that may move the page is given a moment before its address
+ * is read; a full navigation takes this document with it, and the next one's `tk:hello` tells the parent.
+ */
+export const runAct = async (
+  win: any,
+  doc: any,
+  bound: any,
+  core: any,
+  refs: IActRefs,
+  act: IActMessage,
+): Promise<IActResult> => {
+  try {
+    if (!bound.ready) return actFail('The page bridge cannot act on this page.');
+    const before = String(win.location.href);
+    if (act.op === 'snapshot') {
+      return { ok: true, text: core.actSnapshot(win, doc, bound, refs) + actToolsHint(bound) };
+    }
+    if (act.op === 'tools') return actToolsList(bound);
+    if (act.op === 'call') return await actToolCall(win, bound, act, before);
+    if (act.op === 'read') return core.actRead(win, doc, bound, refs, act);
+    if (act.op === 'wait') return await core.actWait(win, doc, bound, act, refs);
+    if (act.op === 'press') {
+      if (!act.key) return actFail('press needs a key.');
+      const target = actActive(bound, doc);
+      const prevented = !actFireKeys(win, bound, target, act.key);
+      const main = actKeyInit(act.key).key as string;
+      const tag = actTag(bound, target);
+      const chord = actKeyInit(act.key);
+      if (!prevented && !chord.ctrlKey && !chord.metaKey) {
+        if (main === 'Enter') {
+          if (tag === 'input') actSubmitForm(bound, target);
+          else if (
+            tag === 'button' ||
+            tag === 'summary' ||
+            (tag === 'a' && actAttr(bound, target, 'href') !== null)
+          ) {
+            const rect = actBox(win, bound, target);
+            actFire(win, bound, target, 'click', { ...actCenter(rect as any), button: 0 });
+          }
+        } else if (main === 'Tab') core.actFocusNext(win, doc, bound, target);
+      }
+      await actPause(win, bound, 60);
+      const rect = target && target !== doc.body ? actBox(win, bound, target) : undefined;
+      return { ok: true, text: `pressed ${act.key}${actUrlNote(win, before)}`, ...(rect ? { rect } : {}) };
+    }
+    if (act.op === 'scroll' && !act.ref) {
+      if (act.dy === undefined) return actFail('scroll needs a ref or dy.');
+      bound.scrollBy.call(win, { left: 0, top: act.dy, behavior: 'instant' });
+      return { ok: true, text: actScrolled(win, doc) };
+    }
+    const found = actResolve(refs, bound, act.ref);
+    if ('fail' in found) return found.fail;
+    const el = found.el;
+    const what = actDescribe(bound, doc, el);
+    if (act.op !== 'scroll' && !actVisible(win, el, bound))
+      return actFail(`The ${what} [${act.ref}] is not shown on the page now.`);
+    actBringIntoView(el, bound);
+    const rect = actBox(win, bound, el);
+    const center = actCenter(rect as any);
+    if (act.op === 'scroll') return { ok: true, text: actScrolled(win, doc), rect };
+    if (act.op === 'locate') return { ok: true, text: `found ${what}`, rect };
+    if (act.op === 'hover') {
+      for (const type of [
+        'pointerover',
+        'pointerenter',
+        'mouseover',
+        'mouseenter',
+        'pointermove',
+        'mousemove',
+      ])
+        actFire(win, bound, el, type, center);
+      return { ok: true, text: `hovered ${what}`, rect };
+    }
+    if (act.op === 'click') {
+      try {
+        if (el.disabled === true) return actFail(`The ${what} is disabled.`);
+      } catch {
+        // Judged by what the click does.
+      }
+      for (const type of ['pointerover', 'pointerenter', 'mouseover', 'pointerdown', 'mousedown']) {
+        actFire(win, bound, el, type, { ...center, button: 0, buttons: type.endsWith('down') ? 1 : 0 });
+      }
+      actFocus(bound, el);
+      for (const type of ['pointerup', 'mouseup', 'click'])
+        actFire(win, bound, el, type, { ...center, button: 0 });
+      await actPause(win, bound, 80);
+      return { ok: true, text: `clicked ${what}${actUrlNote(win, before)}`, rect };
+    }
+    if (act.op === 'select') {
+      const result = actSelect(doc, bound, el, act.value);
+      return result.ok ? { ...result, rect } : result;
+    }
+    if (act.op === 'type') {
+      const result = await actType(win, doc, bound, el, act.text ?? '', act.submit === true);
+      if (!result.ok) return result;
+      if (act.submit) await actPause(win, bound, 80);
+      return { ...result, text: `${result.text}${actUrlNote(win, before)}`, rect };
+    }
+    return actFail('Unknown action.');
+  } catch (error) {
+    return actFail(
+      `The page got in the way of the action: ${String((error as any)?.message ?? error).slice(0, 200)}`,
+    );
+  }
+};
+
+const actScrolled = (win: any, doc: any): string => {
+  const root = doc.scrollingElement || doc.documentElement;
+  return `scrolled to y=${Math.round(Number(win.scrollY) || 0)} of ${Math.round(Number(root?.scrollHeight) || 0)}`;
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// DevTools «Elements»: the page's DOM read for the pane, as a design board's own script does (internal/design/texts/
+// client.js). Silent until the parent says `tk:dom-on`. What goes back is tags, ids, classes, a few words of a node's own
+// text and numbers: never attribute values, scripts or styles' text.
+// ---------------------------------------------------------------------------------------------------------------------
+
+const DOM_SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
+const DOM_STYLES = [
+  'display',
+  'position',
+  'width',
+  'height',
+  'margin',
+  'padding',
+  'color',
+  'background-color',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'line-height',
+  'border-radius',
+  'opacity',
+  'z-index',
+  'overflow',
+];
+const DOM_OWN_SELECTOR = '[data-tk-library-bar],[data-tk-library-mark],[data-tk-bridge-box]';
+
+export interface IDomState {
+  on: boolean;
+  refs: IActRefs | null;
+  markPath: number[] | null;
+  mark: any;
+  frame: number;
+  inspecting: boolean;
+  stopInspect: (() => void) | null;
+  observer: any;
+  stopWatch: (() => void) | null;
+  changeTimer: number;
+}
+
+export const makeDomState = (refs: IActRefs | null = null): IDomState => ({
+  on: false,
+  refs,
+  markPath: null,
+  mark: null,
+  frame: 0,
+  inspecting: false,
+  stopInspect: null,
+  observer: null,
+  stopWatch: null,
+  changeTimer: 0,
+});
+
+const domRect = (bound: any, el: any) => (bound.box ? bound.box.call(el) : el.getBoundingClientRect());
+
+/** The bridge's own elements (the mark, the picking frame) and the design runtime's: not the page's, never in a path. */
+export const domOurs = (bound: any, state: IDomState, node: any): boolean => {
+  try {
+    if (!node || node.nodeType !== 1) return false;
+    if (node === state.mark) return true;
+    const closest = bound.closest ?? node.closest;
+    return Boolean(closest && closest.call(node, DOM_OWN_SELECTOR)) || node.hasAttribute('data-artifact');
+  } catch {
+    return false;
+  }
+};
+
+export const domKids = (bound: any, state: IDomState, el: any): any[] =>
+  Array.prototype.filter.call(el.children, (child: any) => !domOurs(bound, state, child));
+
+export const domPathOf = (doc: any, bound: any, state: IDomState, el: any): number[] | null => {
+  const path: number[] = [];
+  let node = el;
+  while (node && node !== doc.documentElement) {
+    const parent = node.parentElement;
+    if (!parent) return null;
+    const index = domKids(bound, state, parent).indexOf(node);
+    if (index < 0) return null;
+    path.unshift(index);
+    node = parent;
+  }
+  return node && path.length <= DOM_PATH_MAX ? path : null;
+};
+
+export const domAt = (doc: any, bound: any, state: IDomState, path: readonly number[]): any => {
+  let el = doc.documentElement;
+  for (const index of path) {
+    el = el ? domKids(bound, state, el)[index] : null;
+    if (!el) return null;
+  }
+  return el;
+};
+
+export const domWords = (el: any): string => {
+  if (DOM_SKIP_TAGS.has(String(el.tagName).toUpperCase())) return '';
+  const own = Array.prototype.filter
+    .call(el.childNodes, (child: any) => child.nodeType === 3)
+    .map((child: any) => child.nodeValue)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return own.slice(0, 60);
+};
+
+const domClasses = (el: any, max: number): string =>
+  typeof el.className === 'string' ? el.className.trim().replace(/\s+/g, ' ').slice(0, max) : '';
+
+export const domNode = (
+  bound: any,
+  state: IDomState,
+  el: any,
+  depth: number,
+  budget: { left: number },
+): any => {
+  const kids = domKids(bound, state, el);
+  const node: Record<string, unknown> = { tag: String(el.localName).slice(0, 32), n: kids.length };
+  if (el.id) node.id = String(el.id).slice(0, 64);
+  const cls = domClasses(el, 120);
+  if (cls) node.cls = cls;
+  const words = domWords(el);
+  if (words) node.text = words;
+  budget.left -= 1;
+  if (depth > 0 && kids.length) {
+    const list: any[] = [];
+    for (let i = 0; i < kids.length && i < DOM_KIDS_MAX && budget.left > 0; i += 1)
+      list.push(domNode(bound, state, kids[i], depth - 1, budget));
+    node.kids = list;
+    if (list.length < kids.length) node.more = kids.length - list.length;
+  }
+  return node;
+};
+
+const domBoxValue = (style: any, name: string): string => {
+  const sides = ['top', 'right', 'bottom', 'left'].map((side) => style.getPropertyValue(`${name}-${side}`));
+  return sides[0] === sides[1] && sides[1] === sides[2] && sides[2] === sides[3] ? sides[0] : sides.join(' ');
+};
+
+export const domStyles = (win: any, bound: any, el: any): Record<string, string> => {
+  const style = bound.style.call(win, el);
+  const out: Record<string, string> = {};
+  for (const name of DOM_STYLES) {
+    const value =
+      name === 'margin' || name === 'padding' ? domBoxValue(style, name) : style.getPropertyValue(name);
+    out[name] = String(value).slice(0, 120);
+  }
+  return out;
+};
+
+export const domPlaceMark = (win: any, doc: any, bound: any, state: IDomState): void => {
+  const el = state.markPath && state.mark ? domAt(doc, bound, state, state.markPath) : null;
+  const mark = state.mark;
+  if (!el || !mark) {
+    mark?.style.setProperty('display', 'none');
+    return;
+  }
+  const rect = domRect(bound, el);
+  const set = (name: string, value: string) => mark.style.setProperty(name, value);
+  set('display', 'block');
+  set('left', `${rect.left}px`);
+  set('top', `${rect.top}px`);
+  set('width', `${rect.width}px`);
+  set('height', `${rect.height}px`);
+  const label = mark.firstChild;
+  const cls = domClasses(el, 120);
+  const classes = cls ? `.${cls.split(' ').slice(0, 3).join('.')}` : '';
+  label.firstChild.textContent = `${String(el.localName)}${el.id ? `#${el.id}` : ''}${classes}`;
+  label.lastChild.textContent = `${Math.round(rect.width)} × ${Math.round(rect.height)}`;
+  // The label stands above the box; a box at the top edge takes it inside.
+  const top = rect.top < 28;
+  label.style.setProperty('top', top ? '6px' : 'auto');
+  label.style.setProperty('bottom', top ? 'auto' : 'calc(100% + 6px)');
+  label.style.setProperty('left', top ? '6px' : '0');
+};
+
+const domEnsureMark = (doc: any, state: IDomState): void => {
+  if (state.mark) return;
+  const mark = doc.createElement('div');
+  mark.setAttribute('data-tk-library-mark', '');
+  const label = doc.createElement('span');
+  label.appendChild(doc.createElement('span'));
+  label.appendChild(doc.createElement('span'));
+  mark.appendChild(label);
+  const boxStyle: Record<string, string> = {
+    position: 'fixed',
+    display: 'none',
+    'z-index': '2147483645',
+    'pointer-events': 'none',
+    'box-sizing': 'border-box',
+    background: 'rgba(111, 168, 220, .36)',
+    outline: '1px solid rgba(111, 168, 220, .95)',
+  };
+  for (const name of Object.keys(boxStyle)) mark.style.setProperty(name, boxStyle[name]);
+  const tagStyle: Record<string, string> = {
+    position: 'absolute',
+    display: 'flex',
+    gap: '8px',
+    padding: '4px 8px',
+    'border-radius': '4px',
+    background: '#1f2430',
+    color: '#7dd3fc',
+    font: '12px/16px ui-monospace, SFMono-Regular, Menlo, monospace',
+    'white-space': 'nowrap',
+  };
+  for (const name of Object.keys(tagStyle)) label.style.setProperty(name, tagStyle[name]);
+  label.lastChild.style.setProperty('color', 'rgba(255, 255, 255, .7)');
+  state.mark = mark;
+  // Watched before it is placed in the document, so that placing it is already not the page's change.
+  if (state.refs) state.refs.skip = mark;
+  doc.documentElement.appendChild(mark);
+};
+
+export const domMarkNode = (
+  win: any,
+  doc: any,
+  bound: any,
+  state: IDomState,
+  path: number[] | null,
+  reveal: boolean,
+): void => {
+  state.markPath = path;
+  if (path) {
+    domEnsureMark(doc, state);
+    const el = domAt(doc, bound, state, path);
+    if (el && reveal) {
+      try {
+        (bound.scrollIntoView ?? el.scrollIntoView).call(el, { block: 'nearest', inline: 'nearest' });
+      } catch {
+        // A page that cannot scroll there is left as it is.
+      }
+    }
+  }
+  domPlaceMark(win, doc, bound, state);
+};
+
+const domLater = (win: any, bound: any, fn: () => void): number => {
+  const raf = bound.requestAnimationFrame;
+  return raf ? raf.call(win, fn) : bound.setTimeout.call(win, fn, 16);
+};
+
+export const domWatch = (
+  win: any,
+  doc: any,
+  bound: any,
+  state: IDomState,
+  tell: (m: Record<string, unknown>) => void,
+  on: boolean,
+): void => {
+  if (!on) {
+    state.stopWatch?.();
+    state.stopWatch = null;
+    state.observer?.disconnect();
+    state.observer = null;
+    return;
+  }
+  if (state.observer || !bound.MutationObserver) return;
+  const changed = () => {
+    win.clearTimeout(state.changeTimer);
+    state.changeTimer = bound.setTimeout.call(win, () => tell({ type: 'tk:dom-changed' }), 400);
+  };
+  win.addEventListener('resize', changed);
+  state.stopWatch = () => {
+    win.removeEventListener('resize', changed);
+    win.clearTimeout(state.changeTimer);
+  };
+  state.observer = new bound.MutationObserver((records: any[]) => {
+    try {
+      const real = records.some((record) => {
+        if (domOurs(bound, state, record.target)) return false;
+        if (record.type !== 'childList') return true;
+        const moved = [
+          ...Array.from(record.addedNodes as ArrayLike<any>),
+          ...Array.from(record.removedNodes as ArrayLike<any>),
+        ];
+        return !moved.every((node) => domOurs(bound, state, node));
+      });
+      if (real) changed();
+    } catch {
+      // A page that breaks the observer's records is not reported on.
+    }
+  });
+  state.observer.observe(doc.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'id'],
+  });
+};
+
+export const domInspect = (
+  win: any,
+  doc: any,
+  bound: any,
+  state: IDomState,
+  tell: (m: Record<string, unknown>) => void,
+  on: boolean,
+): void => {
+  if (state.inspecting === on) return;
+  state.inspecting = on;
+  if (!on) {
+    state.stopInspect?.();
+    state.stopInspect = null;
+    domMarkNode(win, doc, bound, state, null, false);
+    return;
+  }
+  const target = (event: any) => {
+    const el = event.target;
+    return el && el.nodeType === 1 && !domOurs(bound, state, el) ? el : null;
+  };
+  const over = (event: any) => {
+    const el = target(event);
+    if (el) domMarkNode(win, doc, bound, state, domPathOf(doc, bound, state, el), false);
+  };
+  const swallow = (event: any) => {
+    const el = target(event);
+    if (!el) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    if (event.type !== 'click') return;
+    const path = domPathOf(doc, bound, state, el);
+    domInspect(win, doc, bound, state, tell, false);
+    if (path) tell({ type: 'tk:dom-picked', path });
+    else tell({ type: 'tk:dom-inspect', on: false });
+  };
+  const escape = (event: any) => {
+    if (event.key !== 'Escape') return;
+    domInspect(win, doc, bound, state, tell, false);
+    tell({ type: 'tk:dom-inspect', on: false });
+  };
+  const swallowed = ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend'];
+  win.addEventListener('mousemove', over, true);
+  for (const name of swallowed) win.addEventListener(name, swallow, true);
+  win.addEventListener('keydown', escape, true);
+  state.stopInspect = () => {
+    win.removeEventListener('mousemove', over, true);
+    for (const name of swallowed) win.removeEventListener(name, swallow, true);
+    win.removeEventListener('keydown', escape, true);
+  };
+};
+
+/** `tk:dom-on`: the tools are on for this document, and the parent is told (the board script's own `tk:lib-ready`). */
+export const domEnable = (
+  win: any,
+  doc: any,
+  bound: any,
+  state: IDomState,
+  tell: (m: Record<string, unknown>) => void,
+): void => {
+  if (!state.on) {
+    state.on = true;
+    const replace = () => {
+      if (!state.markPath || state.frame) return;
+      state.frame = domLater(win, bound, () => {
+        state.frame = 0;
+        try {
+          domPlaceMark(win, doc, bound, state);
+        } catch {
+          // The mark is only a hint.
+        }
+      });
+    };
+    win.addEventListener('scroll', replace, true);
+    win.addEventListener('resize', replace);
+  }
+  tell({ type: 'tk:lib-ready' });
+};
+
+/** Answers one parsed `tk:dom-*` message of the parent. Nothing is answered before `tk:dom-on`; nothing throws out. */
+export const handleDomMessage = (
+  win: any,
+  doc: any,
+  bound: any,
+  core: any,
+  state: IDomState,
+  message: TDomMessageIn,
+  post: (m: Record<string, unknown>) => void,
+): void => {
+  const tell = (m: Record<string, unknown>) => {
+    try {
+      post(m);
+    } catch {
+      // The parent is gone.
+    }
+  };
+  try {
+    if (message.type === 'tk:dom-on') return core.domEnable(win, doc, bound, state, tell);
+    if (!state.on) return;
+    if (message.type === 'tk:dom-tree') {
+      const el = core.domAt(doc, bound, state, message.path);
+      if (!el) return tell({ type: 'tk:dom-tree', req: message.req, path: message.path, gone: true });
+      const node = core.domNode(bound, state, el, message.depth, { left: DOM_NODES_MAX });
+      return tell({ type: 'tk:dom-tree', req: message.req, path: message.path, node });
+    }
+    if (message.type === 'tk:dom-node') {
+      const el = core.domAt(doc, bound, state, message.path);
+      if (!el) return tell({ type: 'tk:dom-node', req: message.req, path: message.path, gone: true });
+      const rect = domRect(bound, el);
+      return tell({
+        type: 'tk:dom-node',
+        req: message.req,
+        path: message.path,
+        tag: String(el.localName).slice(0, 32),
+        id: el.id ? String(el.id).slice(0, 64) : '',
+        cls: domClasses(el, 120),
+        text: core.domWords(el),
+        rect: {
+          x: Math.round(rect.left + win.scrollX),
+          y: Math.round(rect.top + win.scrollY),
+          w: Math.round(rect.width),
+          h: Math.round(rect.height),
+        },
+        viewport: { w: win.innerWidth, h: win.innerHeight },
+        styles: core.domStyles(win, bound, el),
+      });
+    }
+    if (message.type === 'tk:dom-mark')
+      return core.domMarkNode(win, doc, bound, state, message.path, message.reveal);
+    if (message.type === 'tk:dom-inspect') return core.domInspect(win, doc, bound, state, tell, message.on);
+    return core.domWatch(win, doc, bound, state, tell, message.on);
+  } catch {
+    // The page got in the way: the pane's request times out and says the page is silent.
+  }
 };

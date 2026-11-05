@@ -10,6 +10,26 @@
     display: none;
   }
 }
+/* The browser's bar: the wide one has every tool as a button, the narrow one (a phone, a narrow pane) keeps back,
+   reload, the address and picking, and «…» holds the rest. */
+.hx-tbrowser {
+  container: hx-browser / inline-size;
+}
+span.hx-tbrowser__wide {
+  display: contents;
+}
+.hx-tbrowser__bar .hx-head-btn.hx-tbrowser__narrow {
+  display: none;
+}
+@container hx-browser (max-width: 440px) {
+  .hx-tbrowser__bar .hx-head-btn.hx-tbrowser__wide,
+  .hx-tbrowser__bar span.hx-tbrowser__wide {
+    display: none;
+  }
+  .hx-tbrowser__bar .hx-head-btn.hx-tbrowser__narrow {
+    display: inline-flex;
+  }
+}
 .hx-pane__split {
   position: absolute;
   top: 0;
@@ -927,6 +947,212 @@ input.hx-tbrowser__url:focus {
 .hx-tbrowser__frame[data-theme='light'] {
   color-scheme: light;
 }
+/* The page's place: the pane itself, or a device's screen scaled to show whole (browser-view.tsx sets --vw, --vh, --fit). */
+.hx-tbrowser__stage {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 420px;
+  overflow: hidden;
+}
+/* A device's screen is taller than the pane: the stage keeps the pane's height and the screen is scaled into it. */
+.hx-tbrowser__stage:not([data-device='fill']) {
+  min-height: 0;
+}
+.hx-tbrowser__stage:not([data-device='fill']) {
+  align-items: center;
+  padding-top: 12px;
+  background: var(--hx-bg-hover);
+}
+.hx-tbrowser__stage:not([data-device='fill']) > .hx-tbrowser__frame {
+  flex: none;
+  width: var(--vw, 390px);
+  height: var(--vh, 844px);
+  min-height: 0;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 1px var(--hx-border-strong),
+    var(--hx-shadow-sm);
+  transform: scale(var(--fit, 1));
+  transform-origin: top center;
+  transition: transform 240ms var(--hx-ease-out);
+}
+/* The card of a picked element: under it (or above when there is no room), inside the page's place. */
+.hx-pickcard {
+  position: absolute;
+  top: var(--y, 8px);
+  left: var(--x, 8px);
+  z-index: 3;
+  display: grid;
+  gap: 8px;
+  width: 300px;
+  max-width: calc(100% - 16px);
+  padding: 10px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  box-sizing: border-box;
+  transform-origin: 16px 0;
+  animation: hx-dl-pop-in 220ms var(--hx-ease-out) backwards;
+}
+.hx-pickcard[data-state='closing'] {
+  animation: hx-dl-pop-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-pickcard__what {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+}
+.hx-pickcard__what > .hx-icon {
+  flex: none;
+  color: var(--hx-accent);
+}
+.hx-pickcard__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-pickcard__text {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: 8px;
+  background: var(--hx-bg-window);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  resize: vertical;
+  box-sizing: border-box;
+}
+.hx-pickcard__text:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: -1px;
+}
+.hx-pickcard__row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.hx-pickcard__btn {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  cursor: pointer;
+}
+.hx-pickcard__btn[data-primary] {
+  background: var(--hx-accent);
+  color: #fff;
+}
+.hx-tbrowser__bar .hx-head-btn[data-active='true'] {
+  color: var(--hx-accent);
+}
+/* DevTools under the page (site-devtools.tsx, its styles in site-tools.css): the page gives up its least height. */
+.hx-tbrowser[data-dev] > .hx-tv__body .hx-tbrowser__stage,
+.hx-tbrowser[data-dev] .hx-tbrowser__stage,
+.hx-tbrowser[data-dev] .hx-tbrowser__frame {
+  min-height: 160px;
+}
+.hx-tbrowser > .hx-devtools {
+  margin: 0 -8px -8px;
+}
+/* The agent in the browser tab (agent-overlay.tsx): its cursor over the page, the strip while it acts, the question
+   before its first action on a site. */
+.hx-agent-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  pointer-events: none;
+  transform: translate(var(--x, -40px), var(--y, -40px));
+  transition: transform 360ms var(--hx-ease-out);
+  animation: hx-agent-in 180ms var(--hx-ease-out) backwards;
+}
+.hx-agent-cursor[data-state='closing'] {
+  animation: hx-agent-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+.hx-agent-cursor__arrow {
+  position: absolute;
+  top: -2px;
+  left: -3px;
+  display: block;
+  fill: var(--hx-accent);
+  stroke: #fff;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
+}
+.hx-agent-cursor__ripple {
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--hx-accent);
+  opacity: 0;
+  animation: hx-agent-press 520ms var(--hx-ease-out);
+}
+.hx-agent-cursor__label {
+  position: absolute;
+  top: 16px;
+  left: 12px;
+  max-width: 220px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--hx-accent);
+  color: #fff;
+  font-size: var(--hx-text-xs);
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes hx-agent-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hx-agent-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes hx-agent-press {
+  from {
+    opacity: 0.45;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-agent-cursor {
+    transition: none;
+  }
+  .hx-agent-cursor__ripple {
+    animation: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-tbrowser__stage:not([data-device='fill']) > .hx-tbrowser__frame {
+    transition: none;
+  }
+}
 .hx-tbrowser__note {
   padding: 28px 12px;
   color: var(--hx-fg-3);
@@ -1081,6 +1307,290 @@ input.hx-tbrowser__url:focus {
   gap: 2px;
   padding: 2px 4px 8px;
   color: var(--hx-fg-3);
+}
+/* The crumbs and, for a folder, what is done with all of it: pick entries, save the folder as a zip. */
+.hx-disk__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.hx-disk__head > .hx-disk__crumbs {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hx-disk__tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+/* An open file: one row — the crumbs on the left (the folders shrink first), the switch of the view, download, «…»
+   and «Сохранить» (only while there is something to save) on the right. */
+.hx-tv[data-file] .hx-disk__head {
+  align-items: center;
+  padding-bottom: 6px;
+}
+.hx-tv[data-file] .hx-disk__crumbs {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  padding-bottom: 2px;
+}
+.hx-tv[data-file] .hx-disk__step {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.hx-tv[data-file] .hx-disk__step:last-child {
+  flex: none;
+  max-width: 60%;
+}
+.hx-tv[data-file] .hx-disk__crumb {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-disk__mode {
+  display: inline-flex;
+  margin-right: 4px;
+}
+.hx-disk__mode:empty {
+  display: none;
+}
+.hx-disk__mode .hx-segmented > button,
+.hx-disk__tools > .hx-segmented > button {
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--hx-text-sm);
+}
+/* «Проект / Машина» of a folder, before its buttons. */
+.hx-disk__tools > .hx-segmented {
+  margin-right: 4px;
+}
+/* A new folder's name, typed in a row over the list. */
+.hx-disk__new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 8px;
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+  animation: hx-disk-bar-in 160ms var(--hx-ease-out) both;
+}
+.hx-disk__name {
+  flex: 1;
+  min-width: 120px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--hx-border);
+  border-radius: 6px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+}
+.hx-disk__name:focus {
+  border-color: var(--hx-accent);
+  outline: none;
+}
+.hx-disk__name[aria-invalid] {
+  border-color: var(--hx-danger);
+}
+.hx-disk__fail {
+  flex-basis: 100%;
+  color: var(--hx-danger);
+  font-size: var(--hx-text-xs);
+}
+/* Files carried over the list: it shows it takes them. */
+.hx-disk__list[data-drop] {
+  border-radius: 10px;
+  outline: 2px dashed var(--hx-accent);
+  outline-offset: -2px;
+  background: var(--hx-accent-soft);
+}
+/* The files being sent, under the list. */
+.hx-upl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  background: var(--hx-bg-raised);
+  animation: hx-disk-bar-in 200ms var(--hx-ease-out) both;
+}
+.hx-upl__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+.hx-upl__title {
+  flex: 1;
+  font-weight: var(--hx-weight-medium);
+}
+.hx-upl__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.hx-upl__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hx-upl__head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.hx-upl__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--hx-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-upl__bar {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--hx-bg-active);
+}
+.hx-upl__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hx-accent);
+  transition: width 200ms linear;
+}
+.hx-upl__row[data-state='done'] .hx-upl__bar > span {
+  background: var(--hx-success);
+}
+.hx-upl__status {
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-upl__row[data-state='failed'] .hx-upl__status {
+  color: var(--hx-danger);
+}
+.hx-upl__ask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-xs);
+}
+.hx-upl__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hx-upl__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hx-disk__item {
+  position: relative;
+}
+.hx-disk__item > .hx-tv__row {
+  padding-right: 72px;
+}
+.hx-disk__acts {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+  translate: 0 -50%;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.hx-disk__item:hover > .hx-disk__acts,
+.hx-disk__acts:focus-within,
+.hx-disk__acts:has([data-popup-open]) {
+  opacity: 1;
+}
+@media (hover: none) {
+  .hx-disk__acts {
+    opacity: 0.75;
+  }
+  /* A held finger picks the row: no callout or text selection under it. */
+  .hx-disk__item > .hx-tv__row {
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+  .hx-disk__bar {
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+}
+.hx-disk__check {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--hx-border-strong);
+  border-radius: 5px;
+  color: transparent;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+.hx-disk__check[data-on='true'] {
+  border-color: var(--hx-primary);
+  background: var(--hx-primary);
+  color: var(--hx-primary-fg);
+}
+.hx-disk__list[data-picking='true'] {
+  padding-bottom: 56px;
+}
+.hx-disk__bar {
+  position: sticky;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-md);
+  animation: hx-disk-bar-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hx-disk__bar[data-state='closing'] {
+  animation: hx-disk-bar-out 180ms ease-out both;
+}
+.hx-disk__count {
+  color: var(--hx-fg-2);
+  font-size: var(--hx-text-sm);
+}
+@keyframes hx-disk-bar-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+@keyframes hx-disk-bar-out {
+  to {
+    opacity: 0;
+    translate: 0 8px;
+  }
 }
 .hx-disk__crumb {
   padding: 2px 4px;
@@ -1664,15 +2174,20 @@ input.hx-tbrowser__url:focus {
   display: grid;
   grid-template-rows: 1fr;
   opacity: 1;
-  animation: hx-in-up var(--hx-dur-md) var(--hx-ease-out) backwards;
   transition:
-    grid-template-rows 300ms cubic-bezier(0.4, 0, 1, 1),
-    opacity 240ms cubic-bezier(0.4, 0, 1, 1);
+    grid-template-rows 300ms var(--hx-ease-out),
+    opacity 240ms var(--hx-ease-out);
+}
+/* Mounted collapsed, then opened: the block grows instead of pushing the sections below in one jump. */
+.hx-made[data-state='opening'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
 }
 .hx-made[data-state='closing'] {
   grid-template-rows: 0fr;
   opacity: 0;
   pointer-events: none;
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
 }
 .hx-made__clip {
   min-height: 0;
@@ -1701,12 +2216,8 @@ input.hx-tbrowser__url:focus {
   list-style: none;
 }
 /* A row has one height whatever it holds (a bar, a title, no host), so a name arriving moves nothing. */
-.hx-made__card-sk,
 .hx-made__card {
   height: 40px;
-}
-.hx-made__card-sk {
-  border-radius: 10px;
 }
 .hx-made__card {
   display: flex;
@@ -1899,7 +2410,7 @@ input.hx-tbrowser__url:focus {
 }
 @media (prefers-reduced-motion: reduce) {
   .hx-made {
-    animation: none;
+    transition: none;
   }
   .hx-made__fold {
     transition: none;
@@ -2240,4 +2751,328 @@ input.hx-tbrowser__url:focus {
   font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+/* A font as a specimen: the person's text in it at several sizes, then its letters and digits. */
+.hx-font {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 4px 24px;
+  opacity: 0.4;
+  transition: opacity 220ms var(--hx-ease-out);
+}
+.hx-font[data-ready='true'] {
+  opacity: 1;
+}
+.hx-font :is(.hx-font__field, .hx-font__text, .hx-font__glyphs) {
+  font-family: 'hx-specimen', var(--hx-font-ui);
+}
+.hx-font__field {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: 9px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-1);
+  font-size: 15px;
+}
+.hx-font__line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+.hx-font__size {
+  flex: none;
+  width: 22px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.hx-font__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hx-fg-1);
+  line-height: 1.2;
+}
+.hx-font__text[data-size='12'] {
+  font-size: 12px;
+}
+.hx-font__text[data-size='16'] {
+  font-size: 16px;
+}
+.hx-font__text[data-size='24'] {
+  font-size: 24px;
+}
+.hx-font__text[data-size='36'] {
+  font-size: 36px;
+}
+.hx-font__text[data-size='56'] {
+  font-size: 56px;
+}
+.hx-font__glyphs {
+  padding-top: 10px;
+  border-top: 1px solid var(--hx-border);
+  color: var(--hx-fg-1);
+  font-size: 20px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.hx-font__glyphs p {
+  margin: 0;
+}
+/* «Перейти к файлу» (⌘P): a field with the matching files, over the top of the list. */
+.hx-qo {
+  position: absolute;
+  z-index: 5;
+  top: 40px;
+  right: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  max-height: min(420px, 70%);
+  overflow: hidden;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  animation: hx-disk-bar-in 160ms var(--hx-ease-out) both;
+}
+.hx-qo__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--hx-border);
+  color: var(--hx-fg-2);
+}
+.hx-qo__input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--hx-fg-1);
+  font: inherit;
+}
+.hx-qo__list {
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+.hx-qo__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-qo__row[aria-selected='true'] {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-qo__name {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  color: var(--hx-fg-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-qo__dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.hx-qo__note {
+  padding: 10px 8px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+}
+@media (hover: none) {
+  .hx-qo__row {
+    min-height: 40px;
+  }
+}
+/* «Найти в файлах» (⇧⌘F): the field, a line of what was found, the lines grouped by file — over the tab's body. */
+.hx-fif {
+  position: absolute;
+  z-index: 5;
+  top: 40px;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--hx-border);
+  border-radius: 12px;
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  animation: hx-disk-bar-in 160ms var(--hx-ease-out) both;
+}
+.hx-fif__sum {
+  padding: 6px 12px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+}
+.hx-fif__sum:empty {
+  display: none;
+}
+.hx-fif__list {
+  flex: 1;
+  padding: 0 4px 6px;
+  overflow-y: auto;
+}
+.hx-fif__file {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 8px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-fg-2);
+}
+.hx-fif__hit {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 26px;
+  padding: 3px 8px 3px 32px;
+  border-radius: 6px;
+  color: var(--hx-fg-2);
+  cursor: pointer;
+}
+.hx-fif__hit[aria-selected='true'] {
+  background: var(--hx-bg-active);
+  color: var(--hx-fg-1);
+}
+.hx-fif__line {
+  flex: none;
+  min-width: 3ch;
+  color: var(--hx-fg-3);
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+  text-align: right;
+}
+.hx-fif__text {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--hx-font-mono);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+.hx-fif__text mark {
+  border-radius: 3px;
+  background: var(--hx-accent-soft);
+  color: var(--hx-fg-1);
+}
+@media (hover: none) {
+  .hx-fif__hit {
+    min-height: 36px;
+  }
+}
+/* Git's mark of an entry: the name takes the colour, a dot after it says it without the colour too. */
+.hx-tv__name[data-git='changed'] {
+  color: var(--hx-warning);
+}
+.hx-tv__name[data-git='new'] {
+  color: var(--hx-success);
+}
+.hx-disk__git {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--hx-warning);
+}
+.hx-disk__git[data-git='new'] {
+  background: var(--hx-success);
+}
+/* «В корзину?» under the entry it is about. */
+.hx-disk__ask {
+  flex: 1;
+  min-width: 140px;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-sm);
+  overflow-wrap: anywhere;
+}
+/* The page of the machine's live browser (live-view.tsx): its picture on a canvas, the box takes the keys. */
+.hx-tbrowser__live {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  outline: none;
+  cursor: default;
+  background: var(--hx-bg);
+  touch-action: none;
+  user-select: none;
+}
+.hx-tbrowser__live-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+.hx-tbrowser__live[data-loading]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 40%;
+  background: var(--hx-accent);
+  animation: hx-live-loading 1.1s ease-in-out infinite;
+}
+@keyframes hx-live-loading {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+.hx-tbrowser__live-note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  font-size: 13px;
+  color: var(--hx-fg-muted);
+  text-align: center;
+  pointer-events: none;
+}
+.hx-tbrowser__live-note[data-tone='error'] {
+  inset: auto 8px 8px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--hx-bg-raised);
+  color: var(--hx-danger);
+  box-shadow: var(--hx-shadow-sm);
+  pointer-events: auto;
+}
+.hx-tbrowser__live-failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--hx-bg);
 }

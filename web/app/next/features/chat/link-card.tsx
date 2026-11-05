@@ -1,8 +1,11 @@
 // A link to one of the installation's own documents or boards, alone in its paragraph: a compact card (what it is,
 // its name, where it lives) instead of a bare link; a tap opens it in the pane like the chip of any other link.
 // Which hosts are ours comes from the page's config (the artifacts, the boards and the reader).
+// ⌘/Ctrl-click opens it in a new tab of the browser, and a right click or a held finger opens the link's menu.
 import { useContext } from 'react';
-import { RefContext } from '@/next/features/chat/ref-chip';
+import { useLinkMenu } from '@/next/features/chat/link-menu';
+import { openOutside } from '@/next/features/chat/pane-sites';
+import { isOutsideClick, RefContext } from '@/next/features/chat/ref-chip';
 import { appConfig } from '@/platform/config';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
@@ -61,16 +64,29 @@ const LinkCard = ({ kind, href, text }: ILinkCardProps) => {
       </span>
     </>
   );
-  if (!onOpen) return <div className="hx-file hx-linkcard">{body}</div>;
+  const onPane = onOpen && (() => onOpen('link', href, href));
+  const { handlers, held, menu } = useLinkMenu({ href, onPane, outside: true });
   return (
-    <button
-      type="button"
-      className="hx-file hx-linkcard"
-      data-open="true"
-      onClick={() => onOpen('link', href, href)}
-    >
-      {body}
-    </button>
+    <>
+      <a
+        className="hx-file hx-linkcard"
+        data-open="true"
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) => {
+          if (isOutsideClick(event)) return;
+          event.preventDefault();
+          if (held()) return;
+          if (onPane) onPane();
+          else openOutside(href);
+        }}
+        {...handlers}
+      >
+        {body}
+      </a>
+      {menu}
+    </>
   );
 };
 

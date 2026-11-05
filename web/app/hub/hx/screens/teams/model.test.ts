@@ -8,6 +8,7 @@ import {
   patchNewTeam,
   patchPersonLimit,
   patchRemove,
+  patchRename,
   patchRole,
   patchTeamLimit,
   rowOf,
@@ -73,6 +74,7 @@ const view = (): TeamsView => ({
   notAccepted: 0,
   notVisiting: 0,
   can: { createTeam: true, invite: true },
+  supports: { teamExtras: true },
   spendKnown: true,
 });
 
@@ -101,6 +103,18 @@ describe('rows', () => {
     expect(r.sub).toBe('Фронт · 2 ч назад');
     expect(r.w).toBe('90%');
     expect(rowOf(person('a', { invited: true, lastActiveAt: null }), NOW, null).limTxt).toBe('— из 20 тыс ₽');
+
+    const loose = rowOf(
+      person('a', {
+        teamId: null,
+        effective: { amountRub: 400_000, source: 'tenant', setBy: null, setAt: null },
+      }),
+      NOW,
+      null,
+    );
+    expect(loose.limTxt).toBe('10 тыс ₽ · без своего лимита');
+    expect(loose.w).toBe('0%');
+    expect(loose.limHint).toContain('400 тыс ₽');
   });
 });
 
@@ -189,5 +203,14 @@ describe('patches', () => {
     patchMove(v, 'a', 't2');
     patchPersonLimit(v, 'a', 1);
     expect(JSON.stringify(v)).toBe(before);
+  });
+});
+
+describe('rename', () => {
+  it('renames the team and keeps its people', () => {
+    const v = patchRename(view(), 't1', '  Фронт  ');
+    const t = v.teams.find((x) => x.id === 't1');
+    expect(t?.name).toBe('Фронт');
+    expect(t?.people).toHaveLength(2);
   });
 });

@@ -140,3 +140,17 @@ func (s *Server) made(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		s.writeChecked(w, r, out)
 	}
 }
+
+type requestKey struct{}
+
+// WithRequest carries the page's request into a service call, so the service can tell whose session asked (HRN-675:
+// a design made from the page belongs to that person, not to the one the machine belongs to).
+func WithRequest(ctx context.Context, r *http.Request) context.Context {
+	return context.WithValue(ctx, requestKey{}, r)
+}
+
+// RequestOf is the page's request a call was made for; nil when the call came another way.
+func RequestOf(ctx context.Context) *http.Request {
+	r, _ := ctx.Value(requestKey{}).(*http.Request)
+	return r
+}

@@ -1,6 +1,7 @@
 // The Аналитика section's contract. `…/kpis`, `…/kpis/{kpi}/series`, `…/changes`, `…/waste` of
 // docs/hub (analytics) map onto these shapes; until those contracts land the mock (../mock/analytics.ts) is the
 // reference and live answers `not_ready`.
+import { addDays } from '../dates';
 import type { SignalGo } from './overview';
 
 export type KpiId =
@@ -72,6 +73,20 @@ export interface AnalyticsFrame {
   lastChange: ChangeRef | null;
 }
 
+/**
+ * The weeks of the current month, as the screen opens on the same period as «Обзор». A week belongs to the month its
+ * Thursday is in (so «ноябрь» does not start with a week that is mostly October); the strip's last week is the current
+ * one. Nothing of the month yet: the last week.
+ */
+export const monthPeriod = (weeks: readonly Week[]): Week => {
+  const last = weeks[weeks.length - 1];
+  if (!last) throw new Error('no weeks');
+  const month = (w: Week): string => addDays(w.from, 3).slice(0, 7);
+  const ref = month(last);
+  const mine = weeks.filter((w) => month(w) === ref);
+  return { from: (mine[0] ?? last).from, to: last.to };
+};
+
 export interface AnalyticsQuery {
   /** Of the selected weeks: the first Monday and the last Sunday. */
   period: Week;
@@ -96,7 +111,8 @@ export interface Signal {
   tone: SignalTone;
   title: string;
   text: string;
-  action: SignalGo;
+  /** Null: nothing to do but read. */
+  action: SignalGo | null;
   /** The numbers behind the card, for its hover bubble. Absent: the bubble is not drawn. */
   detail?: DetailRow[];
 }

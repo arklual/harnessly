@@ -201,3 +201,102 @@
   background: var(--hx-success, #2fa86b);
   box-shadow: 0 0 0 2px var(--hx-bg-panel, #fff);
 }
+
+/* «Требует внимания»: the cell is a row, its fix and «Отложить» are two separate buttons under the text. */
+.ad-dash .mx-attention .at-cell {
+  cursor: default;
+}
+.ad-dash .mx-attention .at-cell[data-link] {
+  cursor: pointer;
+}
+.ad-dash .mx-attention .at-cell__acts {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+}
+.ad-dash .mx-attention button.at-cell__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--t-text-primary);
+}
+.ad-dash .mx-attention button.at-cell__action:hover svg {
+  transform: translate(2px, -2px);
+}
+.at-cell__snooze {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font: var(--t-font-ui-xs);
+  color: var(--t-text-muted);
+}
+.at-cell__snooze button {
+  padding: 0.125rem 0.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--t-text-primary) 6%, transparent);
+  color: var(--t-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.at-cell__snooze button:hover {
+  background: color-mix(in srgb, var(--t-text-primary) 12%, transparent);
+  color: var(--t-text-primary);
+}
+.at-cell__action:focus-visible,
+.at-cell__snooze button:focus-visible {
+  outline: 2px solid var(--t-accent, #7c5cff);
+  outline-offset: 2px;
+}
+
+/* Right after «Отложить»: what went where and «Вернуть», so a wrong click costs one more click. */
+.at-undo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.875rem;
+  border-radius: var(--t-radius-md, 8px);
+  background: color-mix(in srgb, var(--t-text-primary) 5%, transparent);
+  font: var(--t-font-ui-s);
+  color: var(--t-text-secondary);
+}
+.at-undo > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.at-undo__btn {
+  padding: 0.25rem 0.625rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-weight: var(--t-font-weight-medium, 500);
+  color: var(--t-text-primary);
+  cursor: pointer;
+}
+.at-undo__btn:hover {
+  background: color-mix(in srgb, var(--t-text-primary) 8%, transparent);
+}
+.at-undo__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.at-undo__x {
+  display: inline-flex;
+  padding: 0.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--t-text-muted);
+  cursor: pointer;
+}
+.at-undo__x:hover {
+  color: var(--t-text-primary);
+}

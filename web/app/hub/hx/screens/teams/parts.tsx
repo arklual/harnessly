@@ -120,7 +120,12 @@ const PersonRowButton = ({
       <span className="pt-role" data-lead={r.lead ? '1' : '0'}>
         {r.role}
       </span>
-      <span className="pt-lim" data-hot={r.hot ? '1' : '0'}>
+      <span
+        className="pt-lim"
+        data-hot={r.hot ? '1' : '0'}
+        data-loose={r.limHint ? '1' : undefined}
+        title={r.limHint}
+      >
         <i style={{ '--w': r.w } as CSSProperties} />
         <b>{r.limTxt}</b>
       </span>

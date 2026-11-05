@@ -14,7 +14,14 @@ import { totalsText } from './analytics/calc';
 import type { ChartMode } from './analytics/chart';
 import { PeriodControls } from './analytics/header';
 import { Hero } from './analytics/hero';
-import { decodePeriod, encodePeriod, labelOf, type PickerState, queryOf } from './analytics/period';
+import {
+  compareNameOf,
+  decodePeriod,
+  encodePeriod,
+  nameOf,
+  type PickerState,
+  queryOf,
+} from './analytics/period';
 import { chartKey, createStore, dataKey, useAnswer } from './analytics/store';
 import { Tiles } from './analytics/tiles';
 
@@ -131,8 +138,10 @@ const Body = ({ frame }: { frame: AnalyticsFrame }) => {
   // The series is fetched while the pointer is still on the tile, so the click finds it ready.
   const warm = useCallback((id: KpiId) => void store.chart(query, id).catch(() => undefined), [store, query]);
 
-  const nowLabel = labelOf(frame.weeks, picker.a);
-  const prevLabel = labelOf(frame.weeks, picker.b);
+  const nowName = nameOf(frame.weeks, picker.a, { month: true });
+  const prevName = compareNameOf(frame.weeks, picker);
+  const nowLabel = `${nowName.title.toLowerCase()} (${nowName.dates})`;
+  const prevLabel = `${prevName.title.toLowerCase()} (${prevName.dates})`;
   const d = data.data;
   const kpi = d?.kpis.find((k) => k.id === kpiId) ?? null;
   const shownKpi = chart.data ? (d?.kpis.find((k) => k.id === chart.data?.kpi) ?? null) : null;

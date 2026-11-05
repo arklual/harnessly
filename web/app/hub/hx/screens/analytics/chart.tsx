@@ -18,6 +18,7 @@ import {
 
 import type { Kpi, KpiChart, KpiFormat, Marker } from '../../../org/api/analytics';
 import { parseDay } from '../../../org/dates';
+import { inRubles, shownOfUsd } from '../../../org/money';
 import { DASH, effectNote, effectWindows, formatChart, meanOf, ru, shiftOf, VERDICT_WORD } from './calc';
 import { teamSlot } from './colors';
 
@@ -27,13 +28,25 @@ const HOUR = 36e5;
 const DAY = 864e5;
 
 const UNIT: Record<KpiFormat, VizUnit> = {
-  usd: { kind: 'currency', currency: 'USD' },
+  usd: { kind: 'currency', currency: 'USD' }, // in rubles once the hub's rate is known, see unitOf
   pct: { kind: 'percent' },
   minutes: { kind: 'count', forms: ['минута', 'минуты', 'минут'] },
   count: { kind: 'count', forms: ['сессия', 'сессии', 'сессий'] },
   tokens: { kind: 'count', forms: ['токен', 'токена', 'токенов'] },
   perMonth: { kind: 'count', forms: ['MR', 'MR', 'MR'] },
   perWeek: { kind: 'count', forms: ['MR', 'MR', 'MR'] },
+};
+
+/** The axis counts what the lines hold: dollars turned to the hub's rubles are rubles. */
+const unitOf = (format: KpiFormat): VizUnit =>
+  format === 'usd' && inRubles() && shownOfUsd(1) !== null
+    ? { kind: 'currency', currency: 'RUB' }
+    : UNIT[format];
+
+/** A money line in the currency shown, so the axis and the hover agree with the tiles. */
+const shownLine = (format: KpiFormat, values: Values): Values => {
+  if (format !== 'usd' || shownOfUsd(1) === null) return values;
+  return values.map((v) => (v === null ? null : (shownOfUsd(v) ?? v)));
 };
 
 const OPTIONS: Partial<WaveEngineOptions> = {
@@ -121,7 +134,7 @@ const build = (chart: KpiChart, kpi: Kpi, mode: ChartMode, order: readonly strin
         { id: 'prev', label: 'Период сравнения', slot: 'other', values: prev },
       ];
   const values: Record<string, Float64Array> = {};
-  for (const l of lines) values[l.id] = hourly(l.values);
+  for (const l of lines) values[l.id] = hourly(shownLine(kpi.format, l.values));
   const source = createSource<string, string>({
     hourly: { [metric]: { start: first, length: n * 24, values } },
     extent: { start: first, end, now: end },
@@ -144,6 +157,9 @@ const build = (chart: KpiChart, kpi: Kpi, mode: ChartMode, order: readonly strin
   });
   const lowIsBetter = kpi.better === 'down';
   const f = (v: number | null | undefined) => formatChart(kpi.format, v);
+  // The library hands the hover the values it draws, already in the shown currency: back to dollars for the formatter.
+  const rate = kpi.format === 'usd' ? (shownOfUsd(1) ?? 1) : 1;
+  const fDrawn = (v: number) => f(v / rate);
 
   const tooltip = (ctx: WaveTooltipContext) => {
     const rows = ctx.values.slice();
@@ -162,20 +178,20 @@ const build = (chart: KpiChart, kpi: Kpi, mode: ChartMode, order: readonly strin
           <div key={r.id} className="viz-tip__row" data-focus={r.id === ctx.seriesId || undefined}>
             <Swatch color={r.color} />
             <span className="viz-tip__label">{r.label}</span>
-            <b className="viz-tip__value">{Number.isFinite(r.value) ? f(r.value) : DASH}</b>
+            <b className="viz-tip__value">{Number.isFinite(r.value) ? fDrawn(r.value) : DASH}</b>
           </div>
         ))}
         {teams
           ? shown.length > 0 && (
               <div className="viz-tip__total">
                 <span>В среднем по командам</span>
-                <b>{f(avg)}</b>
+                <b>{fDrawn(avg)}</b>
               </div>
             )
           : Number.isFinite(diff) && (
               <div className="viz-tip__total">
                 <span>Разница</span>
-                <b>{`${diff > 0 ? '+' : diff < 0 ? '−' : ''}${f(Math.abs(diff))}`}</b>
+                <b>{`${diff > 0 ? '+' : diff < 0 ? '−' : ''}${fDrawn(Math.abs(diff))}`}</b>
               </div>
             )}
         {ctx.markers.map((x) => (
@@ -237,7 +253,7 @@ const build = (chart: KpiChart, kpi: Kpi, mode: ChartMode, order: readonly strin
     );
   };
 
-  return { metric, source, series, markers, unit: UNIT[kpi.format], tooltip, effect };
+  return { metric, source, series, markers, unit: unitOf(kpi.format), tooltip, effect };
 };
 
 export interface AnalyticsChartProps {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -43,30 +44,28 @@ var _ wire.DesignlySource = (*v2Designly)(nil)
 type designlyState struct {
 	Kinds  map[string]wire.DesignKind `json:"kinds"`
 	Pinned map[string]bool            `json:"pinned"`
-	// AttachedDesigns are the designs a conversation outside their folders was pointed at from its composer, by the
-	// conversation's id: the library lists the conversation among each design's chats.
-	AttachedDesigns map[string][]string `json:"attachedDesigns,omitempty"`
+	// CreatedFrom is, by conversation id, the design the conversation was started from: a new project's first chat or
+	// a new chat of the design's own column. Only this and the chat's own edits of the design's files make it one of the
+	// design's chats: its folder, a design named in a message or opened from the chat do not. The links of
+	// the older rule (attachedDesigns, the folder) are not read, and the next write of the file drops them.
+	CreatedFrom map[string]string `json:"createdFrom,omitempty"`
 }
 
-// attachedMax is how many designs one conversation keeps linked; the oldest goes first.
-const attachedMax = 20
+// createdFromMax bounds the record; the oldest conversations go first (map order is no age, so the cut is by id).
+const createdFromMax = 2000
 
-// attachDesign links design to conv, the newest last.
-func attachDesign(st *designlyState, conv, design string) {
-	if st.AttachedDesigns == nil {
-		st.AttachedDesigns = map[string][]string{}
+// markCreatedFrom records that conv was started from design.
+func markCreatedFrom(st *designlyState, conv, design string) {
+	if st.CreatedFrom == nil {
+		st.CreatedFrom = map[string]string{}
 	}
-	have := slices.DeleteFunc(slices.Clone(st.AttachedDesigns[conv]), func(id string) bool { return id == design })
-	have = append(have, design)
-	if len(have) > attachedMax {
-		have = have[len(have)-attachedMax:]
+	st.CreatedFrom[conv] = design
+	if len(st.CreatedFrom) > createdFromMax {
+		ids := slices.Sorted(maps.Keys(st.CreatedFrom))
+		for _, id := range ids[:len(ids)-createdFromMax] {
+			delete(st.CreatedFrom, id)
+		}
 	}
-	st.AttachedDesigns[conv] = have
-}
-
-// attachedTo says whether conv was pointed at design.
-func attachedTo(st designlyState, conv, design string) bool {
-	return slices.Contains(st.AttachedDesigns[conv], design)
 }
 
 func (d *v2Designly) load() designlyState {
@@ -186,7 +185,7 @@ func (d *v2Designly) Create(ctx context.Context, c wire.DesignlyCreate) (wire.De
 	}
 	// The owner file (personal, v2) is a note for the library's other runtimes and the gateway hears of the project:
 	// the project is made without them, nothing stops for it.
-	lib.AnnounceNew(project.ID)
+	lib.AnnounceNewBy(project.ID, d.api.PersonOf(wire.RequestOf(ctx)))
 	if err := d.change(func(st *designlyState) { st.Kinds[project.ID] = c.Kind }); err != nil {
 		return wire.DesignlyCreated{}, notStarted(err.Error())
 	}
@@ -229,6 +228,7 @@ func (d *v2Designly) Create(ctx context.Context, c wire.DesignlyCreate) (wire.De
 	}
 	// The conversation is the project's: it carries its name, not the start of the first message.
 	d.v.rt.Do(ctx, "designly", wire.ConversationRenameCmd{OpID: "dz-" + randomToken(), ID: *res.ID, Title: project.Title})
+	d.recordCreated(*res.ID, project.ID)
 	return wire.DesignlyCreated{ID: project.ID, Title: project.Title, Conv: *res.ID}, nil
 }
 
@@ -387,6 +387,31 @@ func (d *v2Designly) systemLine(sys string) (string, bool) {
 	return "", false
 }
 
+// recordCreated keeps that conv was started from design; a failed write only costs the chat its place in the list.
+func (d *v2Designly) recordCreated(conv, design string) {
+	if err := d.change(func(st *designlyState) { markCreatedFrom(st, conv, design) }); err != nil {
+		if log := d.api.L.Config().Log; log != nil {
+			log("warn", "design: the chat started from a design was not recorded", err)
+		}
+	}
+}
+
+// Chat records that the person started conversation conv from the design's own column (POST /api/v2/designly/chat).
+func (d *v2Designly) Chat(ctx context.Context, id, conv string) error {
+	if d.api.L.ReadArtifact(id) == nil || !d.api.L.Can(id, design.RoleView) {
+		return designlyFail(wire.RefuseNotFound, locale.Pick("The design is gone", "Макета больше нет"), "")
+	}
+	convs, err := d.v.rt.Conversations(ctx)
+	if err != nil {
+		return err
+	}
+	if !slices.ContainsFunc(convs.Conversations, func(c wire.Conversation) bool { return c.ID == conv }) {
+		return designlyFail(wire.RefuseNotFound, locale.Pick("The conversation is gone", "Чата больше нет"), "")
+	}
+	d.recordCreated(conv, id)
+	return nil
+}
+
 func (d *v2Designly) Pin(_ context.Context, id string, pinned bool) error {
 	// A project the person has no role in answers as a missing one.
 	if d.api.L.ReadArtifact(id) == nil || !d.api.L.Can(id, design.RoleView) {
@@ -402,7 +427,8 @@ func (d *v2Designly) Pin(_ context.Context, id string, pinned bool) error {
 }
 
 // Line is a design attached to a message of conversation conv (convo.Refs): where the project is and the rules a
-// design dialog works by. The conversation is linked to the design, so the library lists it among the design's chats.
+// design dialog works by. Naming a design is no work on it: the chat joins the design's chats only once it edits its
+// files.
 func (d *v2Designly) Line(conv string, r wire.MessageRef) (string, wire.RefuseCode) {
 	lib := d.api.L
 	art, rules, _, err := lib.PrepareDialog(r.ID)
@@ -411,11 +437,6 @@ func (d *v2Designly) Line(conv string, r wire.MessageRef) (string, wire.RefuseCo
 		return "", wire.RefuseNotFound
 	case err != nil:
 		return "", wire.RefuseInternal
-	}
-	if err := d.change(func(st *designlyState) { attachDesign(st, conv, art.ID) }); err != nil {
-		if log := lib.Config().Log; log != nil {
-			log("warn", "design: the chat a design was attached to was not recorded", err)
-		}
 	}
 	return lib.AttachedLine(art, rules), ""
 }
@@ -456,7 +477,6 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 		if _, ok := appDocs[a.ID]; ok {
 			continue
 		}
-		dir := lib.ArtifactDir(a.ID)
 		item := wire.DesignArtifact{ID: a.ID, Title: a.Title, UpdatedAt: wire.Ms(a.UpdatedAt), Kind: kindOf(st, lib, a.ID), Pinned: st.Pinned[a.ID],
 			ProjectPath: a.ProjectPath, Boards: []wire.DesignBoard{}, Convs: []string{}, Role: wire.DesignRole(lib.RoleOf(a.ID, me, now))}
 		if a.Cover != nil && *a.Cover != "" {
@@ -475,8 +495,9 @@ func (d *v2Designly) Library(ctx context.Context) (wire.DesignLibrary, error) {
 				item.Boards = append(item.Boards, wire.DesignBoard{Title: title, Path: b.Path})
 			}
 		}
+		// The chats started from the design, then the ones that edited its files.
 		for _, c := range convs.Conversations {
-			if c.Cwd == dir || strings.HasPrefix(c.Cwd, dir+string(filepath.Separator)) || attachedTo(st, c.ID, a.ID) {
+			if st.CreatedFrom[c.ID] == a.ID {
 				item.Convs = append(item.Convs, c.ID)
 			}
 		}

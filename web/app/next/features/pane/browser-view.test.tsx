@@ -2,9 +2,19 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pinLocale } from '@/next/i18n';
+import { FILL_SCREEN } from '@/next/features/pane/browser-device';
 import BrowserView, { type IBrowserViewProps } from '@/next/features/pane/browser-view';
 
-beforeAll(() => pinLocale('en'));
+beforeAll(() => {
+  pinLocale('en');
+  // The device menu asks whether the window is a phone's.
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })) as unknown as typeof window.matchMedia;
+});
 afterEach(cleanup);
 
 const props = (over: Partial<IBrowserViewProps> = {}): IBrowserViewProps => ({
@@ -32,6 +42,18 @@ const props = (over: Partial<IBrowserViewProps> = {}): IBrowserViewProps => ({
   onHistory: () => {},
   onReload: () => {},
   onNewTab: () => {},
+  picking: null,
+  onPick: () => {},
+  picked: null,
+  onPickSend: () => {},
+  onPickCancel: () => {},
+  screen: FILL_SCREEN,
+  onScreen: () => {},
+  outsideUrl: null,
+  agent: null,
+  devtools: null,
+  vault: null,
+  live: null,
   ...over,
 });
 
@@ -138,5 +160,78 @@ describe('BrowserView', () => {
     expect(onSignInRefresh).toHaveBeenCalled();
     rerender(<BrowserView {...props({ address: 'a.org', signIn: 'none' })} />);
     expect(screen.queryByRole('group')).toBeNull();
+  });
+});
+
+describe('BrowserView: the tools of a page', () => {
+  it('turns picking on only once the page has a bridge, and opens the page outside', () => {
+    const onPick = vi.fn();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const { rerender } = render(
+      <BrowserView {...props({ address: 'stand.example.com', src: 'https://slot/x', onPick })} />,
+    );
+    const pick = screen.getByRole('button', { name: 'Pick an element and comment' });
+    fireEvent.click(pick);
+    expect(onPick).not.toHaveBeenCalled();
+    rerender(
+      <BrowserView
+        {...props({
+          address: 'stand.example.com',
+          src: 'https://slot/x',
+          onPick,
+          picking: false,
+          outsideUrl: 'https://stand.example.com/x',
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Pick an element and comment' }));
+    expect(onPick).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Open in the browser' }));
+    expect(open).toHaveBeenCalledWith('https://stand.example.com/x', '_blank', 'noopener,noreferrer');
+    open.mockRestore();
+  });
+
+  it('asks for a comment on the picked element and sends it', () => {
+    const onPickSend = vi.fn();
+    render(
+      <BrowserView
+        {...props({
+          address: 'stand.example.com',
+          src: 'https://slot/x',
+          picking: false,
+          onPickSend,
+          picked: {
+            selector: 'button.buy',
+            tag: 'button',
+            text: 'Buy',
+            rect: { x: 0, y: 0, width: 10, height: 10 },
+            html: '',
+            component: null,
+            url: 'https://slot/x',
+          },
+        })}
+      />,
+    );
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bigger' } });
+    fireEvent.click(screen.getByRole('button', { name: 'To the chat' }));
+    expect(onPickSend).toHaveBeenCalledWith('bigger');
+  });
+
+  it('shows the page on a phone', () => {
+    globalThis.ResizeObserver ??= class {
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    } as unknown as typeof ResizeObserver;
+    const { container } = render(
+      <BrowserView
+        {...props({
+          address: 'stand.example.com',
+          src: 'https://slot/x',
+          screen: { device: 'phone', turned: false },
+        })}
+      />,
+    );
+    expect(container.querySelector('.hx-tbrowser__stage')?.getAttribute('data-device')).toBe('phone');
   });
 });

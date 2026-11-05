@@ -13,6 +13,216 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-05n',
+    items: [{ key: 'designChats', icon: 'messages-square' }],
+  },
+  {
+    id: '2026-11-05m',
+    items: [{ key: 'askAccess', icon: 'lock-keyhole' }],
+  },
+  {
+    id: '2026-11-05h',
+    items: [
+      { key: 'shareEverywhere', icon: 'share-2' },
+      { key: 'docLinks', icon: 'file-lock' },
+      { key: 'deckLinks', icon: 'presentation' },
+    ],
+  },
+  {
+    id: '2026-11-05g',
+    items: [{ key: 'castFast', icon: 'gauge' }],
+  },
+  {
+    id: '2026-11-05f',
+    items: [{ key: 'liveTools', icon: 'square-mouse-pointer' }],
+  },
+  {
+    id: '2026-11-05e',
+    items: [
+      { key: 'guestLinks', icon: 'link' },
+      { key: 'guestLinkSettings', icon: 'sliders-horizontal' },
+      { key: 'siteAddress', icon: 'globe' },
+    ],
+  },
+  {
+    id: '2026-11-05d',
+    items: [{ key: 'agentCards', icon: 'message-square-text' }],
+  },
+  {
+    id: '2026-11-05b',
+    items: [{ key: 'noAsk', icon: 'square-dashed-mouse-pointer' }],
+  },
+  {
+    id: '2026-11-05a',
+    items: [{ key: 'liveBrowser', icon: 'globe' }],
+  },
+  {
+    id: '2026-11-04z',
+    items: [{ key: 'browserAsk', icon: 'shield-question' }],
+  },
+  {
+    id: '2026-11-04y',
+    items: [
+      { key: 'findInFiles', icon: 'text-search' },
+      { key: 'gitMarks', icon: 'git-compare' },
+      { key: 'fileOps', icon: 'file-plus' },
+    ],
+  },
+  {
+    id: '2026-11-04x',
+    items: [{ key: 'claudeConfigDir', icon: 'message-square-text' }],
+  },
+  {
+    id: '2026-11-04w',
+    items: [
+      { key: 'machineFiles', icon: 'hard-drive' },
+      { key: 'quickOpen', icon: 'search' },
+      { key: 'phoneFiles', icon: 'list-checks' },
+    ],
+  },
+  {
+    id: '2026-11-04u',
+    items: [{ key: 'teleportApps', icon: 'log-in' }],
+  },
+  {
+    id: '2026-11-04t',
+    items: [{ key: 'fullQuiet', icon: 'maximize-2' }],
+  },
+  {
+    id: '2026-11-04s',
+    items: [{ key: 'modeLeft', icon: 'pencil' }],
+  },
+  {
+    id: '2026-11-04r',
+    items: [{ key: 'sinopiaDownload', icon: 'download' }],
+  },
+  {
+    id: '2026-11-04q',
+    items: [{ key: 'vaultLogin', icon: 'key-round' }],
+  },
+  {
+    id: '2026-11-04p',
+    items: [{ key: 'siteHops', icon: 'log-in' }],
+  },
+  {
+    id: '2026-11-04o',
+    items: [{ key: 'siteTools', icon: 'blocks' }],
+  },
+  {
+    id: '2026-11-04n',
+    items: [
+      { key: 'shareOne', icon: 'share' },
+      { key: 'shareTeams', icon: 'users' },
+      { key: 'publishInShare', icon: 'globe' },
+    ],
+  },
+  {
+    id: '2026-11-04m',
+    items: [
+      { key: 'diff', icon: 'git-compare' },
+      { key: 'askCode', icon: 'message-square-text' },
+    ],
+  },
+  {
+    id: '2026-11-04l',
+    items: [
+      { key: 'phonePill', icon: 'smartphone' },
+      { key: 'netPill', icon: 'wifi-off' },
+      { key: 'chatMode', icon: 'pencil' },
+      { key: 'devtools', icon: 'panel-bottom' },
+      { key: 'inspect', icon: 'square-mouse-pointer' },
+    ],
+  },
+  {
+    id: '2026-11-04k',
+    items: [
+      { key: 'offlineSend', icon: 'send' },
+      { key: 'offlineVoice', icon: 'mic' },
+    ],
+  },
+  {
+    id: '2026-11-04j',
+    items: [
+      { key: 'agentBrowser', icon: 'sparkles' },
+      { key: 'agentAsk', icon: 'shield-check' },
+    ],
+  },
+  {
+    id: '2026-11-04i',
+    items: [
+      { key: 'fileMenu', icon: 'ellipsis' },
+      { key: 'viewers', icon: 'eye' },
+    ],
+  },
+  {
+    id: '2026-11-04h',
+    items: [
+      { key: 'download', icon: 'download' },
+      { key: 'htmlPage', icon: 'code-xml' },
+    ],
+  },
+  {
+    id: '2026-11-04g',
+    items: [
+      { key: 'pick', icon: 'square-mouse-pointer' },
+      { key: 'devices', icon: 'smartphone' },
+    ],
+  },
+  {
+    id: '2026-11-04f',
+    items: [
+      { key: 'links', icon: 'external-link' },
+      { key: 'linkMenu', icon: 'menu' },
+    ],
+  },
+  {
+    id: '2026-11-04e',
+    items: [
+      { key: 'viewMode', icon: 'eye' },
+      { key: 'swipeToast', icon: 'bell' },
+      { key: 'livePages', icon: 'file-text' },
+    ],
+  },
+  {
+    id: '2026-11-04d',
+    items: [
+      { key: 'fitRotate', icon: 'rotate-cw' },
+      { key: 'voiceRetry', icon: 'mic' },
+      { key: 'boardError', icon: 'message-square' },
+    ],
+  },
+  {
+    id: '2026-11-04c',
+    items: [
+      { key: 'sidebar', icon: 'panel-left' },
+      { key: 'askCard', icon: 'message-square' },
+      { key: 'startAttach', icon: 'paperclip' },
+    ],
+  },
+  {
+    id: '2026-11-04b',
+    items: [
+      { key: 'designChat', icon: 'panel-left' },
+      { key: 'designCanvas', icon: 'maximize-2' },
+      { key: 'allScreens', icon: 'layout-grid' },
+    ],
+  },
+  {
+    id: '2026-11-04a',
+    items: [
+      { key: 'deckTerminal', icon: 'square-terminal' },
+      { key: 'startFiles', icon: 'image' },
+    ],
+  },
+  {
+    id: '2026-11-04',
+    items: [{ key: 'officialLogos', icon: 'blocks' }],
+  },
+  {
+    id: '2026-11-03h',
+    items: [{ key: 'brandIcons', icon: 'blocks' }],
+  },
+  {
     id: '2026-11-03g',
     items: [
       { key: 'pictureEdit', icon: 'pencil' },

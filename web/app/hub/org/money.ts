@@ -5,10 +5,23 @@ import type { Currency, Money } from '../../hub-api/common';
 const SYMBOL: Record<Currency['code'], string> = { RUB: '₽', USD: '$' };
 
 let current: Currency['code'] = 'RUB';
+// Rubles per dollar of the last answer that said it; 0 while none has (then a dollar amount stays in dollars).
+let perUsd = 0;
 
-export const setShownCurrency = (code: Currency['code']): void => {
+export const setShownCurrency = (code: Currency['code'], rate?: number): void => {
   current = code;
+  if (rate && rate > 0) perUsd = rate;
 };
+
+/** Remembers the currency any answer of the hub carries, so every screen writes money the same way. */
+export const noteCurrency = (body: unknown): void => {
+  const c = (body as { currency?: Partial<Currency> } | null)?.currency;
+  if (c && (c.code === 'RUB' || c.code === 'USD')) setShownCurrency(c.code, c.perUsd);
+};
+
+/** A dollar amount in the shown currency, or null when the hub has not said the rate yet. */
+export const shownOfUsd = (usd: number): number | null =>
+  current === 'USD' ? usd : perUsd > 0 ? usd * perUsd : null;
 
 export const shownSymbol = (): string => SYMBOL[current];
 

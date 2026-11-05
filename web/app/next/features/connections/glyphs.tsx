@@ -1,25 +1,28 @@
-// A product's mark on the Connections page: a letter mark in the product's own colour (styles/connections.css,
-// .hx-conn-glyph[data-kind]). No vendor logos are drawn: the colour and the letters are enough to tell them apart.
-import { isKnownKind, type TKind } from '@/next/features/connections/model';
+// A product's mark on the Connections page: its logo in white on the product's own colour (styles/connections.css,
+// .hx-conn-glyph[data-kind] / [data-mcp]). Something without a logo in brand-marks.ts — a server of the person's own, a
+// product added later — gets its name's first letter on a neutral tile.
+import { BRAND_MARK, type IBrandMark, type TBrand } from '@/next/features/connections/brand-marks';
 
-const MARK = {
-  jira: 'J',
-  confluence: 'C',
-  youtrack: 'YT',
-  linear: 'L',
-  gitlab: 'GL',
-  github: 'GH',
-  gitea: 'Gt',
-  bitbucket: 'Bb',
-  redmine: 'R',
-  'yandex-tracker': 'Y',
-  'azure-devops': 'Az',
-  notion: 'N',
-  mediawiki: 'W',
-  outline: 'O',
-  bookstack: 'B',
-  wikijs: 'Wj',
-} as const satisfies Record<TKind, string>;
+const isBrand = (id: string): id is TBrand => Object.hasOwn(BRAND_MARK, id);
+
+const BrandMark = ({ mark }: { mark: IBrandMark }) => (
+  <svg
+    className="hx-conn-glyph__logo"
+    viewBox={mark.box ?? '0 0 24 24'}
+    fill="currentColor"
+    fillRule={mark.evenOdd === true ? 'evenodd' : undefined}
+    data-faded={mark.faded === true ? '' : undefined}
+    focusable="false"
+  >
+    {mark.d.map((d) => (
+      <path key={d} d={d} />
+    ))}
+  </svg>
+);
+
+/** The logo when there is one, else the first letter of the name. */
+const Mark = ({ brand, name }: { brand: TBrand | null; name: string }) =>
+  brand === null ? name.trim().slice(0, 1).toUpperCase() : <BrandMark mark={BRAND_MARK[brand]} />;
 
 interface IGlyphProps {
   kind: string;
@@ -28,36 +31,19 @@ interface IGlyphProps {
 
 const ProductGlyph = ({ kind, size = 'md' }: IGlyphProps) => (
   <span className="hx-conn-glyph" data-kind={kind} data-size={size} aria-hidden="true">
-    {isKnownKind(kind) ? MARK[kind] : kind.slice(0, 1).toUpperCase()}
+    <Mark brand={isBrand(kind) ? kind : null} name={kind} />
   </span>
 );
 
 export default ProductGlyph;
 
-/** The catalog's MCP servers (mcpconn's catalog ids); a server of the person's own gets its name's first letter. */
-const MCP_MARK = {
-  atlassian: 'A',
-  linear: 'L',
-  notion: 'N',
-  sentry: 'S',
-  github: 'GH',
-  asana: 'As',
-  stripe: 'S',
-  vercel: 'V',
-  supabase: 'Sb',
-  'cloudflare-docs': 'Cf',
-  context7: 'C7',
-  huggingface: 'HF',
-  figma: 'F',
-  intercom: 'I',
-  monday: 'M',
-  webflow: 'W',
-  paypal: 'PP',
-  square: 'Sq',
-} as const;
-type TMcpMarked = keyof typeof MCP_MARK;
+/** Catalog servers (mcpconn's catalog ids) whose logo has another key in brand-marks.ts. */
+const MCP_BRAND: Readonly<Record<string, TBrand>> = { 'cloudflare-docs': 'cloudflare' };
 
-const isMarked = (id: string): id is TMcpMarked => Object.hasOwn(MCP_MARK, id);
+const mcpBrand = (id: string): TBrand | null => {
+  if (Object.hasOwn(MCP_BRAND, id)) return MCP_BRAND[id];
+  return isBrand(id) ? id : null;
+};
 
 interface IMcpGlyphProps {
   /** The catalog id; empty for a server of the person's own. */
@@ -66,9 +52,9 @@ interface IMcpGlyphProps {
   size?: 'sm' | 'md';
 }
 
-/** An MCP server's mark: the catalog's letters on the product's colour (.hx-conn-glyph[data-mcp]), else a neutral one. */
+/** An MCP server's mark: the catalog server's logo on its colour, else the name's first letter on a neutral tile. */
 export const McpGlyph = ({ id, name, size = 'md' }: IMcpGlyphProps) => (
   <span className="hx-conn-glyph" data-mcp={id === '' ? undefined : id} data-size={size} aria-hidden="true">
-    {isMarked(id) ? MCP_MARK[id] : name.trim().slice(0, 1).toUpperCase()}
+    <Mark brand={mcpBrand(id)} name={name} />
   </span>
 );

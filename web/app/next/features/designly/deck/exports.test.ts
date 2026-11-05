@@ -58,13 +58,27 @@ describe('runDeckExport', () => {
   it('asks for the guests copy of a PDF and for a recording of a video', async () => {
     api.startDeckExport.mockResolvedValue(job({ state: 'done', progress: 1 }));
     await runDeckExport('m1', 'demo', 'pdf', { publish: true });
-    expect(api.startDeckExport).toHaveBeenCalledWith('m1', 'demo', 'pdf', undefined, true);
+    expect(api.startDeckExport).toHaveBeenCalledWith('m1', 'demo', 'pdf', undefined, true, undefined);
     api.startDeckExport.mockResolvedValue(job({ format: 'mp4', state: 'done', progress: 1 }));
     await runDeckExport('m1', 'demo', 'mp4', { rec: 'r1' });
-    expect(api.startDeckExport).toHaveBeenLastCalledWith('m1', 'demo', 'mp4', 'r1', undefined);
+    expect(api.startDeckExport).toHaveBeenLastCalledWith('m1', 'demo', 'mp4', 'r1', undefined, undefined);
     expect(toast).toHaveBeenLastCalledWith('next.deck.toast.videoBuilding');
     // A video is picked up from the montage, not downloaded here.
     expect(clicked).toHaveLength(1);
+  });
+
+  it('asks for the HTML of one board, by its path', async () => {
+    api.startDeckExport.mockResolvedValue(job({ format: 'html', state: 'done', progress: 1 }));
+    await runDeckExport('m1', 'demo', 'html', { board: 'Главная.dc.html' });
+    expect(api.startDeckExport).toHaveBeenLastCalledWith(
+      'm1',
+      'demo',
+      'html',
+      undefined,
+      undefined,
+      'Главная.dc.html',
+    );
+    expect(toast).toHaveBeenLastCalledWith('next.deck.menu.htmlToast');
   });
 
   it('says why a job failed, in the runtime words', async () => {

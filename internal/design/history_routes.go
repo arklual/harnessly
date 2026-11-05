@@ -234,7 +234,7 @@ func (a *API) Import(r *http.Request) Answer {
 	if err != nil {
 		return JSON(r, http.StatusInternalServerError, errorBody(locale.Pick("Could not upload the project", "Не удалось загрузить проект")), h)
 	}
-	a.L.AnnounceNew(res.ID)
+	a.L.AnnounceNewBy(res.ID, a.person(r))
 	return JSON(r, http.StatusCreated, struct {
 		ID     string `json:"id"`
 		Title  string `json:"title"`

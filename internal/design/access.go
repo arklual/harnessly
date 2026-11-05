@@ -206,8 +206,11 @@ func (l *Library) refuseBoard(w http.ResponseWriter, ref string, head bool) bool
 
 // AnnounceNew is what a runtime does about a project it just made: the owner file (personal) and the news for the
 // gateway, which then registers the person as the owner.
-func (l *Library) AnnounceNew(id string) {
-	if err := l.SetOwner(id); err != nil && l.cfg.Log != nil {
+func (l *Library) AnnounceNew(id string) { l.AnnounceNewBy(id, "") }
+
+// AnnounceNewBy is AnnounceNew for the person who made the project (the page session's address); empty is the runtime's.
+func (l *Library) AnnounceNewBy(id, person string) {
+	if err := l.SetOwnerAs(id, person); err != nil && l.cfg.Log != nil {
 		l.cfg.Log("warn", "design: the owner of a new project was not recorded", err)
 	}
 	l.emit(agent.DesignCreated, id)
@@ -225,7 +228,7 @@ func (l *Library) emit(kind, project string) {
 // once for the life of the runtime, and registers the person as the owner of it. Without a snapshot nothing is sent
 // (that gateway does not know the event).
 func (l *Library) ClaimOnce(id string, owner Owner, who Identity) {
-	if owner.V >= 2 || !owner.Mine(who) {
+	if (owner.V >= 2 && !owner.Claimed) || !owner.Mine(who) {
 		return
 	}
 	snap, ok := l.Access()
@@ -269,7 +272,7 @@ func (l *Library) ReannounceOwn() {
 			continue
 		}
 		owner, have := l.ReadOwner(id)
-		if !have || owner.V < 2 || !owner.Mine(who) {
+		if !have || owner.V < 2 || owner.Claimed || !owner.Mine(who) {
 			continue
 		}
 		l.mu.Lock()

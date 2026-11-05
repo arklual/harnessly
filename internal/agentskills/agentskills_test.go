@@ -398,3 +398,22 @@ func TestSourcesArePinnedAndComplete(t *testing.T) {
 		}
 	}
 }
+
+// The browser-operator subagent lists the browser tools by the runtime's MCP server name.
+func TestBrowserOperatorNamesTheRuntimeServer(t *testing.T) {
+	d := newDirs(t)
+	o := d.opts(false, false)
+	o.MCPServer = "acme-preview"
+	if _, err := Provision(o); err != nil {
+		t.Fatal(err)
+	}
+	def := read(t, filepath.Join(ClaudePluginDir(d.data), "agents", "browser-operator.md"))
+	for _, want := range []string{"name: browser-operator", "model: haiku", "mcp__acme-preview__browser_snapshot", "mcp__acme-preview__browser_back", "mcp__acme-preview__browser_call_site_tool"} {
+		if !strings.Contains(def, want) {
+			t.Errorf("the definition lacks %q", want)
+		}
+	}
+	if strings.Contains(def, "__TOOLS__") || strings.Contains(def, "mcp__harnessly__") {
+		t.Error("the tools are not named for the server")
+	}
+}

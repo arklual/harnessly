@@ -25,6 +25,10 @@ interface IRoleMenuProps<R extends TGrantRole> {
   /** Says the term in force beside the role on the button (the add field: nothing else shows it). */
   showTerm?: boolean;
   onRemove?: () => void;
+  /** The words of the remove item («Убрать доступ команды»); «Убрать доступ» by default. */
+  removeLabel?: string;
+  /** «Может делиться» under the roles while the role is edit; a menu without it has no such item. */
+  share?: { on: boolean; onToggle: () => void };
   disabled?: boolean;
 }
 
@@ -36,6 +40,8 @@ const RoleMenu = <R extends TGrantRole>({
   term,
   showTerm = false,
   onRemove,
+  removeLabel,
+  share,
   disabled = false,
 }: IRoleMenuProps<R>) => {
   const [open, setOpen] = useState(false);
@@ -87,6 +93,24 @@ const RoleMenu = <R extends TGrantRole>({
             <Icon name="check" size="sm" className="hx-acc-mi__check" />
           </button>
         ))}
+        {share && role === 'edit' && (
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={share.on}
+            className="hx-acc-mi"
+            onClick={() => {
+              close();
+              share.onToggle();
+            }}
+          >
+            <Icon name="share" size="sm" className="hx-acc-mi__icon" />
+            <span className="hx-acc-mi__text">{t('next.access.mayShare')}</span>
+            <span className="hx-acc-mi__box" aria-hidden="true">
+              <Icon name="check" size="sm" />
+            </span>
+          </button>
+        )}
         {term && (
           <>
             <span className="hx-acc-mi__sep" role="separator" />
@@ -156,7 +180,7 @@ const RoleMenu = <R extends TGrantRole>({
                 onRemove();
               }}
             >
-              <span className="hx-acc-mi__text">{t('next.access.removeAccess')}</span>
+              <span className="hx-acc-mi__text">{removeLabel ?? t('next.access.removeAccess')}</span>
             </button>
           </>
         )}

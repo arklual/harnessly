@@ -567,3 +567,9 @@
 .hx-icon[data-i='film'] {
   --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Crect width=%2218%22 height=%2218%22 x=%223%22 y=%223%22 rx=%222%22/%3E%3Cpath d=%22M7 3v18%22/%3E%3Cpath d=%22M3 7.5h4%22/%3E%3Cpath d=%22M3 12h18%22/%3E%3Cpath d=%22M3 16.5h4%22/%3E%3Cpath d=%22M17 3v18%22/%3E%3Cpath d=%22M17 7.5h4%22/%3E%3Cpath d=%22M17 16.5h4%22/%3E%3C/svg%3E');
 }
+.hx-icon[data-i='pointer'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M22 14a8 8 0 0 1-8 8%22 /%3E%3Cpath d=%22M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2%22 /%3E%3Cpath d=%22M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1%22 /%3E%3Cpath d=%22M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10%22 /%3E%3Cpath d=%22M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15%22 /%3E%3C/svg%3E');
+}
+.hx-icon[data-i='signal'] {
+  --hx-i: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2224%22 height=%2224%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22black%22 stroke-width=%221.75%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 %3E%3Cpath d=%22M2 20h.01%22 /%3E%3Cpath d=%22M7 20v-4%22 /%3E%3Cpath d=%22M12 20v-8%22 /%3E%3Cpath d=%22M17 20V8%22 /%3E%3Cpath d=%22M22 4v16%22 /%3E%3C/svg%3E');
+}

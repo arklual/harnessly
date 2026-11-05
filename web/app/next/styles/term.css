@@ -158,3 +158,61 @@
 .hx-term__body .xterm-viewport {
   background: transparent !important;
 }
+
+/* In a design's chat the panel stands in the slot of the design's view (.hx-site__term), under the chat's field and as
+   wide as its column; the column, or the lifted island, leaves it the room (--term-space). */
+.hx-site__term {
+  position: absolute;
+  z-index: 9;
+  left: 12px;
+  bottom: 12px;
+  width: var(--site-chat);
+  pointer-events: none;
+}
+.hx-site__term .hx-term {
+  pointer-events: auto;
+}
+.hx-site__term .hx-term__inner {
+  width: calc(100% - 16px);
+  margin: 0 auto 4px;
+  /* The panel clips what overflows it: a soft glow would show as a grey box, so only the line stays. */
+  box-shadow: 0 0 0 1px var(--hx-term-line);
+}
+.hx-site[data-dock='right'] .hx-site__term {
+  left: calc(100% - 12px - var(--site-chat));
+}
+.hx-site[data-mode='float'] .hx-site__term {
+  left: var(--fx);
+  width: var(--fw);
+  bottom: calc(100% - var(--fy) - var(--fh));
+}
+.hx-site:is([data-mode='island'], [data-mode='notes']) .hx-site__term {
+  left: calc(12px + (100% - 24px) / 2 - 300px);
+  width: 600px;
+  max-width: calc(100% - 24px);
+}
+.hx-site[data-mode='chat'] .hx-site__chat,
+.hx-site[data-mode='float'] .hx-site__chat {
+  padding-bottom: var(--term-space, 0px);
+  box-sizing: border-box;
+  transition:
+    opacity 300ms ease,
+    padding-bottom 460ms var(--term-ease, cubic-bezier(0.45, 0, 0.2, 1));
+}
+.hx-site[data-mode='chat'] .hx-island,
+.hx-site[data-mode='float'] .hx-island {
+  margin-bottom: 0;
+}
+.hx-site:is([data-mode='island'], [data-mode='notes']) .hx-island {
+  margin-bottom: var(--term-space, 0px);
+}
+@media (max-width: 700px) {
+  .hx-site .hx-site__term {
+    left: 8px;
+    width: calc(100% - 16px);
+    max-width: none;
+  }
+  .hx-site[data-mode='float'] .hx-site__term {
+    bottom: 8px;
+  }
+}

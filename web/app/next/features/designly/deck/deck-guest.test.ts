@@ -5,6 +5,7 @@ import {
   pdfAllowed,
   readDeckLinkView,
   startOpens,
+  startSlideOf,
   statsOn,
 } from '@/next/features/designly/deck/deck-link-view';
 import { createSeenTracker } from '@/next/features/designly/deck/guest-seen';
@@ -145,5 +146,16 @@ describe('seen tracker', () => {
       { board: 'b', ms: 120_000 },
       { board: 'b', ms: 10_000 },
     ]);
+  });
+});
+
+describe('the slide a deck link starts on (HRN-675)', () => {
+  it("is the link's 1-based «from», kept within the deck; an older link starts at the first", () => {
+    expect(startSlideOf({ deck: 'slides', from: 3 }, 10)).toBe(2);
+    expect(startSlideOf({ deck: 'slides', from: 30 }, 10)).toBe(9);
+    expect(startSlideOf({ deck: 'slides', from: 0 }, 10)).toBe(0);
+    expect(startSlideOf({ deck: 'slides', from: 2.5 }, 10)).toBe(0);
+    expect(startSlideOf({ deck: 'slides' }, 10)).toBe(0);
+    expect(startSlideOf(null, 10)).toBe(0);
   });
 });

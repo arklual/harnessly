@@ -1,11 +1,11 @@
-// The open machine card lives in the address: `?m=<machine>&tab=<resources|access>&dlg=<restart|off>`. Opening a card is
+// The open machine card lives in the address: `?m=<machine>&tab=<resources|access>&dlg=<restart|off|remove>`. Opening a card is
 // a new history entry, so Back closes it; changing the tab or the dialog replaces the entry. The pure part is here.
 import { useCallback, useMemo } from 'react';
 
 import { useLocation } from '../../../lib/router';
 
 export type DrawerTab = 'resources' | 'access';
-export type DrawerDlg = 'restart' | 'off';
+export type DrawerDlg = 'restart' | 'off' | 'remove';
 
 export interface DrawerUrl {
   m: string | null;
@@ -15,7 +15,7 @@ export interface DrawerUrl {
 }
 
 const TABS: readonly string[] = ['resources', 'access'];
-const DLGS: readonly string[] = ['restart', 'off'];
+const DLGS: readonly string[] = ['restart', 'off', 'remove'];
 
 export const readDrawer = (search: string): DrawerUrl => {
   const q = new URLSearchParams(search);

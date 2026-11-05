@@ -37,11 +37,13 @@ import type {
   Signal,
   Week,
 } from '../analytics';
+import { monthPeriod } from '../analytics';
 import { formatValue } from '../../screens/analytics/format';
 import { spentOf } from '../../money';
 import { contractGet, http, orgPath } from './http';
 import { signalGo } from './signal-go';
 import { allSessions } from './member';
+import { KPI_COPY } from '../kpi-copy';
 
 interface KpiMeta {
   id: KpiId;
@@ -57,96 +59,84 @@ export const KPI: Record<ApiKpi, KpiMeta> = {
   money_per_mr: {
     id: 'moneyPerMr',
     group: 'result',
-    title: 'Деньги на MR',
-    hint: 'Сколько стоил один смёрженный MR по прайсу API: токены чатов, где он сделан, по цене модели.',
+    ...KPI_COPY.moneyPerMr,
     format: 'usd',
     delta: 'rel',
   },
   completion: {
     id: 'yield',
     group: 'result',
-    title: 'Доходимость',
-    hint: 'Сколько сессий заканчиваются MR.',
+    ...KPI_COPY.yield,
     format: 'pct',
     delta: 'pts',
   },
   time_to_mr: {
     id: 'timeToMr',
     group: 'result',
-    title: 'Время до MR',
-    hint: 'От начала сессии до её первого MR.',
+    ...KPI_COPY.timeToMr,
     format: 'minutes',
     delta: 'rel',
   },
   mrs_per_person: {
     id: 'mrPerPerson',
     group: 'result',
-    title: 'MR на человека',
-    hint: 'Смёрженные MR на активного человека за неделю.',
+    ...KPI_COPY.mrPerPerson,
     format: 'perWeek',
     delta: 'rel',
   },
   autonomy: {
     id: 'autonomy',
     group: 'agent',
-    title: 'Автономность',
-    hint: 'Какую долю работы агент делает сам.',
+    ...KPI_COPY.autonomy,
     format: 'pct',
     delta: 'pts',
   },
   waiting_human: {
     id: 'waiting',
     group: 'agent',
-    title: 'Ждёт человека',
-    hint: 'Сколько агент ждёт человека после остановки.',
+    ...KPI_COPY.waiting,
     format: 'minutes',
     delta: 'rel',
   },
   parallelism: {
     id: 'parallel',
     group: 'agent',
-    title: 'Параллельность',
-    hint: 'Сколько сессий человек ведёт одновременно.',
+    ...KPI_COPY.parallel,
     format: 'count',
     delta: 'abs',
   },
   tool_errors: {
     id: 'toolErrors',
     group: 'agent',
-    title: 'Ошибки инструментов',
-    hint: 'Как часто падает вызов инструмента.',
+    ...KPI_COPY.toolErrors,
     format: 'pct',
     delta: 'pts',
   },
   reread_context: {
     id: 'reread',
     group: 'env',
-    title: 'Перечитанный контекст',
-    hint: 'Доля входа, которая несётся заново.',
+    ...KPI_COPY.reread,
     format: 'pct',
     delta: 'pts',
   },
   session_start_ctx: {
     id: 'sessionStart',
     group: 'env',
-    title: 'Старт сессии',
-    hint: 'С каким контекстом начинается сессия.',
+    ...KPI_COPY.sessionStart,
     format: 'tokens',
     delta: 'rel',
   },
   cache_hit: {
     id: 'cache',
     group: 'env',
-    title: 'Кэш',
-    hint: 'Какая доля входа прочитана из кэша.',
+    ...KPI_COPY.cache,
     format: 'pct',
     delta: 'pts',
   },
   skills_in_use: {
     id: 'skills',
     group: 'env',
-    title: 'Скиллы в ходу',
-    hint: 'Сколько из предложенных скиллов используются.',
+    ...KPI_COPY.skills,
     format: 'pct',
     delta: 'pts',
   },
@@ -330,9 +320,9 @@ const scopeParam = (c: AnalyticsCtx): string => `${c.scope.kind}:${c.scope.id}`;
 export const liveAnalytics = (ctx: () => AnalyticsCtx): AnalyticsApi => ({
   analyticsFrame: async () => {
     const weeks = weeksUpTo(new Date());
-    // The last finished week: the current one has only begun.
-    const defaultPeriod = weeks[weeks.length - 2] ?? weeks[0];
-    if (!defaultPeriod) throw new OrgApiError('internal', 'no weeks');
+    // The weeks of the current month, as «Обзор» opens on the month.
+    if (weeks.length === 0) throw new OrgApiError('internal', 'no weeks');
+    const defaultPeriod = monthPeriod(weeks);
     const c = ctx();
     let lastChange = null;
     if (c.role !== 'member') {

@@ -183,13 +183,27 @@ const ChatRow = ({
         if (event.pointerType === 'mouse' && menuMount === MENU_MOUNT.none) setMenuMount(MENU_MOUNT.ready);
       }}
     >
-      {variant === ROW_VARIANT.pinned && (
-        <span className="hx-mono" aria-hidden="true">
-          {chat.title.slice(0, 1).toUpperCase()}
-        </span>
-      )}
+      {/* The folded rail shows this mark at the title's place: same row, same height, so a chat never moves on fold. */}
+      <span className="hx-item__mark" aria-hidden="true">
+        <span className="hx-mono">{chat.title.slice(0, 1).toUpperCase()}</span>
+        {look && (
+          <span className="hx-item__badge">
+            <i
+              className="hx-icon hx-chat-status"
+              data-i={look.icon}
+              data-size="sm"
+              data-status={chat.status}
+            />
+          </span>
+        )}
+      </span>
       {rename === RENAME.off ? (
-        <button type="button" className="hx-item__open" onClick={() => handlers.open(chat.id)}>
+        <button
+          type="button"
+          className="hx-item__open"
+          data-tip={label ? `${chat.title} · ${label}` : chat.title}
+          onClick={() => handlers.open(chat.id)}
+        >
           <span className="hx-item__title">{chat.launch ? chat.launch.model : chat.title}</span>
         </button>
       ) : (

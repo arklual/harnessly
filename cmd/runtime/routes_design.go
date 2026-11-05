@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
 	"io/fs"
 	"net/http"
 	"os"
@@ -70,8 +71,8 @@ func designConfig(d deps) design.Config {
 			TokenFile: os.Getenv("RUNTIME_DESIGN_HUB_TOKEN_FILE"),
 		},
 		// The transcripts the listing reads to see who works on what: the agents' own folders under the home.
-		ClaudeProjects: filepath.Join(d.Home, ".claude", "projects"),
-		CodexSessions:  filepath.Join(d.Home, ".codex", "sessions"),
+		ClaudeProjects: filepath.Join(agentcfg.ClaudeDirIn(os.Getenv, d.Home), "projects"),
+		CodexSessions:  filepath.Join(agentcfg.CodexDirIn(os.Getenv, d.Home), "sessions"),
 		Texts: design.Texts{
 			CLI:          env("RUNTIME_CLI_NAME", "harnessly"),
 			Host:         env("RUNTIME_PLATFORM_HOST", "localhost"),
@@ -105,6 +106,7 @@ func designAPI(d deps) *design.API {
 	a := &design.API{
 		L:            design.New(designConfig(d)),
 		Session:      d.SessionOK,
+		Person:       sessionPerson(d.Claims),
 		MachineAgent: d.MachineAgent,
 		CLIToken:     cliTokenFirst(d.DataDir, d.TokenHeaders),
 		APIRefusal:   d.APIRefusal,
@@ -121,6 +123,22 @@ func designAPI(d deps) *design.API {
 	}
 	designAPIs[d.CLI] = a
 	return a
+}
+
+// sessionPerson is the address a page session was signed for: the hub's runtime.session names the person, the
+// machine agent signs with its name (no address), so only a value with an @ is a person.
+func sessionPerson(claims func(*http.Request) map[string]any) func(*http.Request) string {
+	return func(r *http.Request) string {
+		if claims == nil {
+			return ""
+		}
+		sub, _ := claims(r)["sub"].(string)
+		sub = strings.ToLower(strings.TrimSpace(sub))
+		if !strings.Contains(sub, "@") || len(sub) > 254 {
+			return ""
+		}
+		return sub
+	}
 }
 
 // designRoute is a JSON route of the slice at one path of the platform's API (or the CLI's when cli).
@@ -152,6 +170,7 @@ func designRoutes(d deps) []gate.JSONRoute {
 		designRoute(platformAPI+"/design/library/releases", a.Releases),
 		designRoute(platformAPI+"/design/access", a.PostAccess),
 		designRoute(platformAPI+"/design/publish", a.Publish),
+		designRoute(platformAPI+"/design/published", a.Published),
 		designRoute(platformAPI+"/design/library/claim", a.ClaimProject),
 		designRoute(platformAPI+"/design/library/delete", a.DeleteProject),
 		designRoute(platformAPI+"/design/engine", a.EngineStatus),

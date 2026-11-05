@@ -191,6 +191,7 @@ const FilesScene = () => {
         void later('ready' as const).then(setState);
       }}
       onOpen={noop}
+      onDownload={noop}
     />
   );
 };

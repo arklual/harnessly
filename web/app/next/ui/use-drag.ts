@@ -95,6 +95,11 @@ interface IOptions<TDrag extends string, TDrop extends string, TPlan> {
   external?: { selector: string; resolve: (source: IDragSource<TDrag>) => TPlan | null };
   /** A finger that held a row and let go where it was, without carrying it: the place of the release. */
   onHoldRelease?: (source: IDragSource<TDrag>, point: { x: number; y: number }) => void;
+  /**
+   * The owner reads `dragging` (default). false: it does not, and the pickup and the drop render nothing — a long list
+   * re-rendered at the pickup is the hitch the drag starts with.
+   */
+  tracked?: boolean;
 }
 
 /** The neighbours the carried row moves among: the places of its own list, measured when it was picked up. */
@@ -139,6 +144,23 @@ interface ITracking<TDrag extends string, TDrop extends string, TPlan> {
   /** The place the row stands in already: a drop on it as a whole is a move among the neighbours. */
   home: HTMLElement | null;
   hosts: HTMLElement[];
+  /** The other places of the list, measured once at pickup: nothing is measured while the pointer moves. */
+  drops: IDropBox<TDrop>[];
+  /** The list's box in the window at pickup. */
+  listBox: DOMRect | null;
+}
+
+/** A place of the list off the carried row's own line, in the list's content (so its scroll moves nothing). */
+interface IDropBox<TDrop extends string> {
+  el: HTMLElement;
+  /** What lights up: the place itself or its row around it (`data-drop-box="parent"`). */
+  box: HTMLElement;
+  kind: TDrop;
+  id: string | undefined;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
 /** A drop made, waiting for the owner's new order: the row stands in its new place meanwhile. */
@@ -182,12 +204,13 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
   onDrop,
   onHoldRelease,
   external,
+  tracked = true,
 }: IOptions<TDrag, TDrop, TPlan>): IUseDrag => {
   const [dragging, setDragging] = useState(false);
   const held = useRef<IHeld | null>(null);
-  const latest = useRef({ resolve, onDrop, onHoldRelease, lined, dragKinds, dropKinds, external });
+  const latest = useRef({ resolve, onDrop, onHoldRelease, lined, dragKinds, dropKinds, external, tracked });
   useEffect(() => {
-    latest.current = { resolve, onDrop, onHoldRelease, lined, dragKinds, dropKinds, external };
+    latest.current = { resolve, onDrop, onHoldRelease, lined, dragKinds, dropKinds, external, tracked };
   });
 
   // The render that brings the new order lets the dropped row go, before it is painted: it is in that place already.
@@ -270,33 +293,57 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
       else box.removeAttribute('data-drop-edge');
     };
 
-    // A place elsewhere in the list under the pointer: the innermost one, by the boxes as they stand.
-    const elsewhere = (t: ITracking<TDrag, TDrop, TPlan>) => {
-      let found: { box: HTMLElement; plan: TPlan; line: TEdge | null } | null = null;
+    // The places off the carried row's line: measured once, when it is picked up. A place inside a folded list (inert)
+    // is clipped out of sight yet laid out over the rows after it, so it is never one.
+    const dropsOf = (t: ITracking<TDrag, TDrop, TPlan>): IDropBox<TDrop>[] => {
+      const out: IDropBox<TDrop>[] = [];
+      const left = (t.listBox?.left ?? 0) - list.scrollLeft;
+      const top = (t.listBox?.top ?? 0) - list.scrollTop;
       for (const el of list.querySelectorAll<HTMLElement>('[data-drop]')) {
         if (t.mover.contains(el) || t.slots?.items.some((item) => item.contains(el))) continue;
+        if (el.closest('[inert]')) continue;
         const kind = kindOf(latest.current.dropKinds, el.dataset.drop);
-        const rect = el.getBoundingClientRect();
-        const inside = t.x >= rect.left && t.x <= rect.right && t.y >= rect.top && t.y <= rect.bottom;
-        if (!kind || !inside) continue;
         const box = el.dataset.dropBox === 'parent' ? el.parentElement : el;
-        if (!box || box === t.home) {
-          found = null;
-          continue;
-        }
-        const before = across ? t.x < rect.left + rect.width / 2 : t.y < rect.top + rect.height / 2;
-        const edge = before ? EDGE.before : EDGE.after;
-        const target: IDropTarget<TDrop> = { kind, id: el.dataset.dropId, edge };
-        const plan = latest.current.resolve(t.source, target);
-        found = plan ? { box, plan, line: latest.current.lined?.(t.source, target) ? edge : null } : null;
+        if (!kind || !box) continue;
+        const rect = el.getBoundingClientRect();
+        out.push({
+          el,
+          box,
+          kind,
+          id: el.dataset.dropId,
+          left: rect.left - left,
+          top: rect.top - top,
+          right: rect.right - left,
+          bottom: rect.bottom - top,
+        });
       }
-      return found;
+      return out;
+    };
+
+    // A place elsewhere in the list under the pointer: the innermost one (the last in the page's order).
+    const elsewhere = (t: ITracking<TDrag, TDrop, TPlan>) => {
+      const x = t.x - (t.listBox?.left ?? 0) + list.scrollLeft;
+      const y = t.y - (t.listBox?.top ?? 0) + list.scrollTop;
+      let under: IDropBox<TDrop> | null = null;
+      for (const drop of t.drops)
+        if (x >= drop.left && x <= drop.right && y >= drop.top && y <= drop.bottom) under = drop;
+      if (!under || under.box === t.home) return null;
+      const before = across ? x < (under.left + under.right) / 2 : y < (under.top + under.bottom) / 2;
+      const edge = before ? EDGE.before : EDGE.after;
+      const target: IDropTarget<TDrop> = { kind: under.kind, id: under.id, edge };
+      const plan = latest.current.resolve(t.source, target);
+      return plan
+        ? { box: under.box, plan, line: latest.current.lined?.(t.source, target) ? edge : null }
+        : null;
     };
 
     // The outside place under the pointer, if the owner has one for what is carried.
     const outside = (t: ITracking<TDrag, TDrop, TPlan>) => {
       const spec = latest.current.external;
       if (!spec) return null;
+      // A place outside the list is outside its box: inside it, no hit test (it would lay the page out every frame).
+      const b = t.listBox;
+      if (b && t.x >= b.left && t.x <= b.right && t.y >= b.top && t.y <= b.bottom) return null;
       const box = document.elementFromPoint(t.x, t.y)?.closest<HTMLElement>(spec.selector);
       if (!box || list.contains(box)) return null;
       const plan = spec.resolve(t.source);
@@ -408,7 +455,7 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
       requestAnimationFrame(() => {
         if (!busy) list.removeAttribute('data-drag-held');
       });
-      setDragging(false);
+      if (latest.current.tracked) setDragging(false);
     };
 
     // The row eases back to its own place, the neighbours to theirs.
@@ -475,6 +522,7 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
       }
       document.removeEventListener('touchmove', keepFromScrolling);
       document.removeEventListener('contextmenu', noMenu);
+      document.documentElement.removeAttribute('data-hand-drag');
       clear(t.box);
       list.removeAttribute('data-dragging');
       // The click that ends a drag on a row is not a click on it.
@@ -508,6 +556,8 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
       t.grab = along(t.x0, t.y0) - t.start0;
       t.slots = slotsOf(t);
       t.home = homeOf(t.mover);
+      t.listBox = listRect;
+      t.drops = dropsOf(t);
       t.mover.setAttribute('data-dragging', 'true');
       for (const item of t.slots?.items ?? [])
         if (item !== t.mover) item.setAttribute('data-drag-shift', 'true');
@@ -520,7 +570,10 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
       list.setAttribute('data-drag-held', 'true');
       document.addEventListener('touchmove', keepFromScrolling, { passive: false });
       document.addEventListener('contextmenu', noMenu);
-      setDragging(true);
+      // No frame of the page takes the pointer meanwhile (ui.css): a fast move over a chat's preview or a design board
+      // under the list would hand the pointer's events to that frame's own document.
+      document.documentElement.setAttribute('data-hand-drag', 'true');
+      if (latest.current.tracked) setDragging(true);
       if (t.pointerType === 'touch') navigator.vibrate?.(8);
       // The list keeps the pointer's events, so a pointer that leaves the window still ends the drag here.
       try {
@@ -603,6 +656,8 @@ const useDrag = <TDrag extends string, TDrop extends string, TPlan>({
         slots: null,
         home: null,
         hosts: [],
+        drops: [],
+        listBox: null,
       };
       track = t;
       if (event.pointerType === 'touch') t.hold = window.setTimeout(() => activate(t), HOLD_MS);

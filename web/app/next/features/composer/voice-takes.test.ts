@@ -20,7 +20,7 @@ describe('a take on its way to the cluster', () => {
   });
 
   it('goes again when an upload failed, without a reload of the page (HRN-574)', async () => {
-    const take = startTake('m' as MachineId, 'audio/webm');
+    const take = startTake('m' as MachineId, 'audio/webm', 'conv-1');
     recordTake(take.id, [new Blob(['speech'], { type: 'audio/webm' })]);
     put.mockResolvedValueOnce(false);
     failTake(take.id);

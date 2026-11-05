@@ -22,7 +22,7 @@ import { notificationsFromChats } from '@/next/features/notifications/from-chats
 import { notificationsFromMachines } from '@/next/features/notifications/from-machines';
 import { alertOf, cardOf, choiceOf } from '@/next/bindings/shell-model';
 import { pinLocale } from '@/next/i18n';
-import type { HealthIssue, HealthLevel, MachineLoad, MessageHit } from '@/next/protocol/v2';
+import type { HealthIssue, HealthLevel, MachineId, MachineLoad, MessageHit } from '@/next/protocol/v2';
 import type { MachineView } from '@/next/stores/machines';
 import { toast, ToastHost } from '@/next/ui/toast';
 import SearchDialog from '@/next/features/search/search-dialog';
@@ -35,7 +35,14 @@ import Greeting from '@/next/features/shell/greeting';
 import PaneDrawer from '@/next/features/shell/pane-drawer';
 import ToolPane, { TOOLS_TAB } from '@/next/features/pane/tool-pane';
 import ToolsLauncher, { type ITool } from '@/next/features/pane/tools-launcher';
-import BrowserView from '@/next/features/pane/browser-view';
+import BrowserView, {
+  type IBrowserAgentView,
+  type IBrowserDevtools,
+} from '@/next/features/pane/browser-view';
+import { DEV_TAB, type TDevTab } from '@/next/features/designly/devtools-data';
+import { DOM_STATUS, type IDomBridge } from '@/next/features/designly/use-dom-bridge';
+import { FILL_SCREEN, type IBrowserScreen } from '@/next/features/pane/browser-device';
+import type { IFramePicked } from '@/next/features/pane/frame-bridge';
 import { BackgroundButton } from '@/next/features/header/header-buttons';
 import DesignlyHome from '@/next/features/designly/designly-home';
 import ResumeDialog, { type IResumeSession } from '@/next/features/shell/resume-dialog';
@@ -186,6 +193,113 @@ const PANE_GROUPS = [
   { id: 'vm', label: 'Машина acme-runner-2' },
   { id: 'links', label: 'Сервисы' },
 ];
+
+// A page open in a browser tab with its tools (?dev=shell&tab=site): a picked element's card, the device menu.
+const SAMPLE_PAGE =
+  'data:text/html;charset=utf-8,' +
+  encodeURIComponent(
+    '<body style="font:16px system-ui;margin:24px"><h1>Мероприятия</h1><p>Джазовый вечер, 12 ноября</p><button style="padding:10px 16px">Купить билет</button></body>',
+  );
+
+// The agent at work on the page (&agent=work): its cursor, nothing else.
+const agentSample = (): IBrowserAgentView | null => {
+  const shown = new URLSearchParams(window.location.search).get('agent');
+  if (shown !== 'work') return null;
+  return { cursor: { x: 89, y: 150, label: 'кнопка «Купить билет»', press: 1 } };
+};
+
+const SILENT_DOM: IDomBridge = {
+  status: DOM_STATUS.silent,
+  rows: [],
+  selected: null,
+  detail: null,
+  inspect: false,
+  toggle: () => {},
+  select: () => {},
+  hover: () => {},
+  setInspect: () => {},
+  reload: () => {},
+};
+
+const SiteTabSample = () => {
+  const [screen, setScreen] = useState<IBrowserScreen>(FILL_SCREEN);
+  const [agent] = useState(agentSample);
+  const [devOpen, setDevOpen] = useState(() => new URLSearchParams(window.location.search).has('devtools'));
+  const [devTab, setDevTab] = useState<TDevTab>(DEV_TAB.console);
+  // DevTools under the page (&devtools): without a machine the record is empty and the tree silent.
+  const devtools: IBrowserDevtools = {
+    machine: 'local' as MachineId,
+    slot: null,
+    open: devOpen,
+    onToggle: () => setDevOpen((on) => !on),
+    tab: devTab,
+    onTab: setDevTab,
+    dom: SILENT_DOM,
+    inspect: { on: false, disabled: true, onToggle: () => {} },
+    onSend: () => {},
+  };
+  const [picked, setPicked] = useState<IFramePicked | null>(
+    agent
+      ? null
+      : {
+          selector: 'body > button',
+          tag: 'button',
+          text: 'Купить билет',
+          rect: { x: 24, y: 130, width: 130, height: 40 },
+          html: '<button>Купить билет</button>',
+          component: null,
+          url: 'https://stand-1.preview.example.com/events',
+        },
+  );
+  return (
+    <BrowserView
+      address="stand-1.preview.example.com/events"
+      canBack
+      canForward={false}
+      src={SAMPLE_PAGE}
+      error={null}
+      ports={[]}
+      portsError={null}
+      onRetryPorts={() => {}}
+      onWantPorts={() => {}}
+      reloadKey={0}
+      onFrameLoad={() => {}}
+      signIn="none"
+      onSignIn={() => {}}
+      onSignInRefresh={() => {}}
+      theme="light"
+      title={null}
+      pins={[]}
+      visits={[]}
+      onPin={() => {}}
+      onUnpin={() => {}}
+      onGo={() => {}}
+      onHistory={() => {}}
+      onReload={() => {}}
+      onNewTab={() => {}}
+      picking={picked === null}
+      onPick={() => {}}
+      picked={picked}
+      onPickSend={() => setPicked(null)}
+      onPickCancel={() => setPicked(null)}
+      screen={screen}
+      onScreen={setScreen}
+      outsideUrl="https://stand-1.preview.example.com/events"
+      agent={agent}
+      devtools={devtools}
+      live={null}
+      vault={{
+        entries: [
+          { id: 'v1', login: 'anna@example.com', label: null },
+          { id: 'v2', login: 'qa-robot', label: 'тестовый' },
+        ],
+        busy: false,
+        onLogin: () => {},
+      }}
+    />
+  );
+};
+
 const PANE_PORTS = [
   {
     port: 9150,
@@ -238,12 +352,15 @@ const GalleryPane = ({
   onToggleMax: () => void;
   onClose: () => void;
 }) => {
-  const [tab, setTab] = useState({ browser: 'b1', designly: 'd1' }[params.get('tab') ?? ''] ?? TOOLS_TAB);
+  const [tab, setTab] = useState(
+    { browser: 'b1', site: 'b2', designly: 'd1' }[params.get('tab') ?? ''] ?? TOOLS_TAB,
+  );
   const [stamp] = useState(() => Date.now());
   return (
     <ToolPane
       tabs={[
         { id: 'b1', icon: 'globe', name: 'Новая вкладка' },
+        { id: 'b2', icon: 'globe', name: 'Стенд' },
         { id: 'p1', icon: 'list-checks', name: 'План' },
         { id: 'd1', icon: 'palette', name: 'Designly' },
         ...(PANE_TABS_MANY
@@ -307,6 +424,7 @@ const GalleryPane = ({
           compose={null}
         />
       )}
+      {tab === 'b2' && <SiteTabSample />}
       {tab === 'b1' && (
         <BrowserView
           address=""
@@ -333,6 +451,18 @@ const GalleryPane = ({
           onHistory={() => {}}
           onReload={() => {}}
           onNewTab={() => {}}
+          picking={false}
+          onPick={() => {}}
+          picked={null}
+          onPickSend={() => {}}
+          onPickCancel={() => {}}
+          screen={FILL_SCREEN}
+          onScreen={() => {}}
+          outsideUrl={null}
+          agent={null}
+          devtools={null}
+          vault={null}
+          live={null}
         />
       )}
     </ToolPane>

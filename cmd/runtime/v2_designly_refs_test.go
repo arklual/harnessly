@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,9 +11,9 @@ import (
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
 
-// A design attached to a chat's message is named with its folder and the rules of a design dialog, and the chat is
-// linked to it: the library lists the chat among the design's own.
-func TestAnAttachedDesignIsNamedAndLinked(t *testing.T) {
+// A design attached to a chat's message is named with its folder and the rules of a design dialog. Naming it is no work
+// on it: the chat does not become one of the design's chats.
+func TestAnAttachedDesignIsNamedNotLinked(t *testing.T) {
 	t.Setenv("RUNTIME_LOCALE", "")
 	root, data := t.TempDir(), t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "landing", "project"), 0o755); err != nil {
@@ -38,28 +39,37 @@ func TestAnAttachedDesignIsNamedAndLinked(t *testing.T) {
 			t.Errorf("the line has no %q: %s", want, line)
 		}
 	}
-	d.Line("tab-b", wire.MessageRef{Kind: wire.RefDesign, ID: "landing"})
-	d.Line("tab-a", wire.MessageRef{Kind: wire.RefDesign, ID: "landing"})
-	st := d.state()
-	if !attachedTo(st, "tab-a", "landing") || !attachedTo(st, "tab-b", "landing") || attachedTo(st, "tab-c", "landing") {
-		t.Fatalf("links: %+v", st.AttachedDesigns)
-	}
-	if got := st.AttachedDesigns["tab-a"]; len(got) != 1 {
-		t.Fatalf("linked twice: %v", got)
+	if st := d.state(); len(st.CreatedFrom) != 0 {
+		t.Fatalf("a named design made the chat its own: %v", st.CreatedFrom)
 	}
 	if _, code := d.Line("tab-a", wire.MessageRef{Kind: wire.RefDesign, ID: "nope"}); code != wire.RefuseNotFound {
 		t.Fatalf("gone: %q", code)
 	}
 }
 
-func TestAChatKeepsItsNewestDesigns(t *testing.T) {
-	var st designlyState
-	for i := range attachedMax + 3 {
-		attachDesign(&st, "tab-a", "d"+strings.Repeat("x", i))
+// The links of the older rule (a design named in a message) are dropped by the next write of the state file, and the
+// record of the chats started from a design stays bounded.
+func TestTheOldLinksGoAndTheRecordIsBounded(t *testing.T) {
+	data := t.TempDir()
+	file := filepath.Join(data, "designly.json")
+	old := `{"kinds":{},"pinned":{},"attachedDesigns":{"tab-x":["landing"]}}`
+	if err := os.WriteFile(file, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	got := st.AttachedDesigns["tab-a"]
-	if len(got) != attachedMax || got[len(got)-1] != "d"+strings.Repeat("x", attachedMax+2) {
-		t.Fatalf("%d: %v", len(got), got[len(got)-1])
+	d := &v2Designly{file: file}
+	if err := d.change(func(st *designlyState) { markCreatedFrom(st, "tab-a", "landing") }); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(file)
+	if strings.Contains(string(raw), "attachedDesigns") || !strings.Contains(string(raw), `"tab-a": "landing"`) {
+		t.Fatalf("state: %s", raw)
+	}
+	var st designlyState
+	for i := range createdFromMax + 3 {
+		markCreatedFrom(&st, fmt.Sprintf("tab-%05d", i), "landing")
+	}
+	if len(st.CreatedFrom) != createdFromMax || st.CreatedFrom["tab-00000"] != "" {
+		t.Fatalf("%d kept", len(st.CreatedFrom))
 	}
 }
 

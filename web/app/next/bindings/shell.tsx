@@ -12,7 +12,8 @@ import '@/next/styles/sidebar.css';
 import '@/next/styles/header.css';
 import '@/next/styles/tabs.css';
 
-import { useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { appConfig } from '@/platform/config';
 import { useTheme } from '@/platform/theme';
 import { useAgentTerminal } from '@/next/bindings/agent-terminal';
@@ -37,6 +38,7 @@ import ChatHeader from '@/next/features/header/chat-header';
 import type { IHeaderGoal } from '@/next/features/header/goal-dialog';
 import { settled } from '@/next/bindings/outcome';
 import { BackgroundButton, TerminalButton } from '@/next/features/header/header-buttons';
+import { ChatTerminalContext, ChatTerminalSlotContext } from '@/next/features/terminal/chat-terminal';
 import { notificationsFromChats } from '@/next/features/notifications/from-chats';
 import { notificationsFromMachines } from '@/next/features/notifications/from-machines';
 import NotificationCenter from '@/next/features/notifications/notification-center';
@@ -51,14 +53,20 @@ import { useMessageSearch } from '@/next/bindings/use-message-search';
 import { revealMessage } from '@/next/stores/reveal';
 import type { ISearchRow } from '@/next/features/search/search-dialog';
 import AppFrame, { type IAppFrameProps } from '@/next/features/shell/app-frame';
-import { toggleRail, useRail } from '@/next/bindings/rail';
+import {
+  foldRailForPane,
+  restoreRailAfterDesign,
+  restoreRailAfterPane,
+  toggleRail,
+  useRail,
+} from '@/next/bindings/rail';
+import { usePaneOpen } from '@/next/bindings/pane-open';
 import ChatStage from '@/next/features/shell/chat-stage';
 import QuietChat from '@/next/bindings/quiet-chat';
 import { PHONE_QUERY } from '@/next/features/shell/gestures';
 import Greeting from '@/next/features/shell/greeting';
 import HomeTools, { type IHomeTool } from '@/next/features/shell/home-tools';
 import { PeopleBlock } from '@/next/bindings/asks';
-import RailChats from '@/next/features/sidebar/rail-chats';
 import { useShellTabs, wantsNewTab } from '@/next/bindings/tabs';
 import { useShellKeys } from '@/next/bindings/shell-keys';
 import { useTopTabs } from '@/next/stores/tabs';
@@ -147,6 +155,19 @@ const CLOCK_MS = 60_000;
 
 /** The frame with the rail read here, so that folding the sidebar draws the frame and not the shell around it. */
 const RailFrame = (props: Omit<IAppFrameProps, 'rail'>) => <AppFrame {...props} rail={useRail()} />;
+
+/**
+ * The right pane opening on a narrow window folds the open sidebar, and its shutting opens it again. Its own
+ * component, so that the pane's opening draws nothing of the shell.
+ */
+const RailFollowsPane = () => {
+  const paneOpen = usePaneOpen();
+  useEffect(() => {
+    if (!paneOpen) restoreRailAfterPane();
+    else if (!window.matchMedia(PHONE_QUERY).matches) foldRailForPane(window.innerWidth);
+  }, [paneOpen]);
+  return null;
+};
 
 /** The Designly site's stage, which gives its room back to the page when the sidebar is folded. */
 const RailSite = (props: Omit<ComponentProps<typeof DesignlySite>, 'maxed'>) => (
@@ -253,6 +274,12 @@ const Shell = ({ owner }: IShellProps) => {
   const update = useAppUpdate();
   const release = useRelease(model.active);
   const currentId = route.kind === ROUTE.chat ? route.id : null;
+  // The sidebar folded for a design opened full screen opens again once the design is left: an app's document opened
+  // full screen («развернуть» from the pane) is such a design too.
+  const onSite = route.kind === ROUTE.site || route.kind === ROUTE.appDoc;
+  useEffect(() => {
+    if (!onSite) restoreRailAfterDesign();
+  }, [onSite]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState<INotificationsState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -305,7 +332,30 @@ const Shell = ({ owner }: IShellProps) => {
   const record = useConversation(stageId && isConvId(stageId) ? stageId : null);
   const feed = useFeed(stageId && isConvId(stageId) ? stageId : null);
   const chatMachine = record?.machineId ?? feed?.machineId ?? null;
-  const term = useAgentTerminal(route.kind === ROUTE.chat ? (record ?? null) : null);
+  // An open design has the right pane of its chat, as a chat has: the chat it came from, else its last one here.
+  const designBound = useDesignBound(
+    route.kind === ROUTE.site && model.active ? designKey(model.active, route.id) : null,
+  );
+  const designChat = route.kind === ROUTE.site ? (route.chat ?? designBound) : null;
+  const designRecord = useConversation(designChat && isConvId(designChat) ? designChat : null);
+  // A design lives on one machine: its address names it (or its chat does). Opened after a reload while another
+  // machine is active, the shell goes to the design's machine by itself, once for that design, as the person had to.
+  const siteMachine = route.kind === ROUTE.site ? (route.machine ?? designRecord?.machineId ?? null) : null;
+  const siteMachineKnown =
+    siteMachine !== null && model.startMachines.some((m) => m.id === siteMachine && !m.off);
+  const followedSite = useRef<string | null>(null);
+  const { pickMachine: pickSiteMachine } = model;
+  useEffect(() => {
+    if (route.kind !== ROUTE.site || !siteMachineKnown || siteMachine === null) return;
+    const key = `${route.id}|${siteMachine}`;
+    if (followedSite.current === key) return;
+    followedSite.current = key;
+    if (siteMachine !== model.active) void pickSiteMachine(siteMachine);
+  }, [route, siteMachine, siteMachineKnown, model.active, pickSiteMachine]);
+  // A chat's terminal on its page, and on an open design the terminal of the design's chat.
+  // A design's chat keeps its terminal in its own column, under its field: the design's view gives the slot.
+  const [termSlot, setTermSlot] = useState<HTMLElement | null>(null);
+  const term = useAgentTerminal(route.kind === ROUTE.chat ? (record ?? null) : (designRecord ?? null));
   const bg = useChatBackground(stageId && isConvId(stageId) ? stageId : null, chatMachine, now);
   const present = stageId !== null && chatMachine !== null;
 
@@ -482,12 +532,6 @@ const Shell = ({ owner }: IShellProps) => {
         {bg.header && <BackgroundButton background={bg.header} />}
       </>
     ) : null;
-  // An open design has the right pane of its chat, as a chat has: the chat it came from, else its last one here.
-  const designBound = useDesignBound(
-    route.kind === ROUTE.site && model.active ? designKey(model.active, route.id) : null,
-  );
-  const designChat = route.kind === ROUTE.site ? (route.chat ?? designBound) : null;
-  const designRecord = useConversation(designChat && isConvId(designChat) ? designChat : null);
   const pane = useRightPane(
     paneConvOf(route, record ?? null, designRecord ?? null),
     machineName,
@@ -636,16 +680,6 @@ const Shell = ({ owner }: IShellProps) => {
             setDrawerOpen(false);
           },
         }
-      }
-      rail={
-        <RailChats
-          chats={noV2 ? NO_CHATS : model.chats}
-          currentId={currentId}
-          onOpen={(id, newTab) => {
-            if (newTab) openInNewTab({ kind: ROUTE.chat, id }, true);
-            else openChat(id);
-          }}
-        />
       }
     />
   );
@@ -835,21 +869,22 @@ const Shell = ({ owner }: IShellProps) => {
           fromChat={screens.before === ROUTE.chat}
           onResume={resumeDialog.show}
           into={into}
-          tools={<HomeTools tools={homeTools} />}
-          composer={
+          composer={(hello) => (
             <HomeComposer
+              above={hello}
               machine={startOn}
               conversations={model.conversations}
               projectId={newChatInto?.id ?? null}
               resolveProject={model.personSidebar ? machineProjectOf : undefined}
               machines={startPick}
+              below={<HomeTools tools={homeTools} />}
               onCreated={(id) => {
                 newChatProjectStore.set(null);
                 newChatMachineStore.set(null);
                 goTo({ kind: ROUTE.chat, id });
               }}
             />
-          }
+          )}
         />
       )}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.chat && (
@@ -930,6 +965,11 @@ const Shell = ({ owner }: IShellProps) => {
           key={`${model.active}/${route.id}`}
           machine={model.active}
           id={route.id}
+          chat={route.chat ?? null}
+          edit={route.edit ?? false}
+          onMode={(edit) =>
+            goTo({ ...route, ...(edit ? { edit: true } : { edit: undefined }) }, { replace: true })
+          }
           onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
@@ -950,18 +990,32 @@ const Shell = ({ owner }: IShellProps) => {
       {route.kind === ROUTE.invite && <InviteAccept key={route.token} token={route.token} />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.site && !model.active && <SiteWait />}
       {boot.k !== 'failed' && !noV2 && route.kind === ROUTE.site && model.active && (
-        <RailSite
-          key={`${model.active}/${route.id}/${tabs.activeId}`}
-          machine={model.active}
-          id={route.id}
-          chat={route.chat ?? null}
-          access={route.access ?? null}
-          toolPane={pane.header}
-          onToggleMax={toggleRail}
-          onOpenDrawer={() => setDrawerOpen(true)}
-          onMissing={() => goTo({ kind: ROUTE.designly }, { replace: true })}
-        />
+        <ChatTerminalContext.Provider value={term.header}>
+          <ChatTerminalSlotContext.Provider value={term.header ? setTermSlot : null}>
+            <RailSite
+              key={`${model.active}/${route.id}/${tabs.activeId}`}
+              machine={model.active}
+              id={route.id}
+              chat={route.chat ?? null}
+              access={route.access ?? null}
+              edit={route.edit ?? false}
+              onMode={(edit) =>
+                goTo({ ...route, ...(edit ? { edit: true } : { edit: undefined }) }, { replace: true })
+              }
+              toolPane={pane.header}
+              onToggleMax={null}
+              onOpenDrawer={() => setDrawerOpen(true)}
+              onMissing={() => goTo({ kind: ROUTE.designly }, { replace: true })}
+            />
+          </ChatTerminalSlotContext.Provider>
+        </ChatTerminalContext.Provider>
       )}
+      {boot.k !== 'failed' &&
+        !noV2 &&
+        route.kind === ROUTE.site &&
+        termSlot &&
+        createPortal(term.panel, termSlot)}
+      <RailFollowsPane />
     </RailFrame>
   );
 };

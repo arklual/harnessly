@@ -3,6 +3,9 @@
 // view, with the document as its target. A document that may only be read shows the editor in read-only mode, with a line saying why;
 // one whose app is missing says that instead.
 import { useEffect, useState, type ReactNode } from 'react';
+import ModeButton from '@/next/features/designly/mode-button';
+import { MODE_KIND, modeStateKey, useDesignMode } from '@/next/features/designly/design-mode';
+import type { ISiteMode } from '@/next/features/designly/site-view';
 import AppFrame from '@/next/features/app-views/app-frame';
 import { useInstalledApps } from '@/next/features/app-views/api';
 import AppMain from '@/next/features/app-main/app-main';
@@ -22,6 +25,12 @@ import { t } from '@/next/i18n';
 interface IAppDocPageProps {
   machine: MachineId;
   id: string;
+  /** The chat the document was opened from: its mode is that chat's (design-mode); null: the address's. */
+  chat?: string | null;
+  /** The editing mode (`?edit=1`); without it the document is looked at, as read-only. */
+  edit?: boolean;
+  /** Turns the editing mode on or off (the address keeps it). */
+  onMode?: (edit: boolean) => void;
   onOpenDrawer: () => void;
 }
 
@@ -36,7 +45,9 @@ export const useAppDocStage = (
   machine: MachineId,
   id: string,
   conversation: ConvId | null,
-): { title: string | null; stage: ReactNode } => {
+  /** Looked at, not edited: the editor is shown as for a person who may only read. */
+  looking = false,
+): { title: string | null; stage: ReactNode; mayEdit: boolean } => {
   const { list, error } = useInstalledApps(machine);
   const [opening, setOpening] = useState<TOpening | null>(null);
 
@@ -58,17 +69,19 @@ export const useAppDocStage = (
   const say = (text: string) => ({
     title,
     stage: <p className="hx-appview__error">{text}</p>,
+    mayEdit: false,
   });
 
   if (error) return say(error);
   if (opening === null || list === null)
-    return { title, stage: <div className="hx-appview__wait" aria-busy="true" /> };
+    return { title, stage: <div className="hx-appview__wait" aria-busy="true" />, mayEdit: false };
   if (opening.k === 'failed') return say(`${t('next.appdoc.failed')}: ${opening.message}`);
 
   const { open } = opening;
   if (open.needsApp) {
     return {
       title,
+      mayEdit: false,
       stage: <NeedsApp app={doc?.kindTitle ?? open.kind} onOpenApps={() => goTo({ kind: ROUTE.apps })} />,
     };
   }
@@ -80,6 +93,7 @@ export const useAppDocStage = (
   const readOnly = open.readOnly === true;
   return {
     title,
+    mayEdit: !readOnly,
     stage: (
       <>
         {readOnly && <ReadOnly code={open.code} reason={open.reason} />}
@@ -91,15 +105,35 @@ export const useAppDocStage = (
           viewPort={list.viewPort}
           conversation={conversation}
           document={id}
-          readOnly={readOnly}
+          readOnly={readOnly || looking}
         />
       </>
     ),
   };
 };
 
-const AppDocPage = ({ machine, id, onOpenDrawer }: IAppDocPageProps) => {
-  const { title, stage } = useAppDocStage(machine, id, null);
+const AppDocPage = ({ machine, id, chat = null, edit = false, onMode, onOpenDrawer }: IAppDocPageProps) => {
+  const [asked, setMode] = useDesignMode({ conv: chat, id, edit, onMode });
+  const { title, stage, mayEdit } = useAppDocStage(machine, id, null, onMode !== undefined && !asked);
+  // A document is looked at unless the editing is asked for; one that may not be changed has no way into it (its line
+  // says why).
+  const mode: ISiteMode | null = (() => {
+    if (!onMode) return null;
+    const state = t(modeStateKey(MODE_KIND.doc, asked));
+    if (asked)
+      return {
+        state,
+        editing: true,
+        action: { label: t('next.site.modeView'), icon: 'eye', onClick: () => setMode(false) },
+      };
+    return {
+      state,
+      editing: false,
+      action: mayEdit
+        ? { label: t('next.site.modeEdit'), icon: 'pencil', onClick: () => setMode(true) }
+        : null,
+    };
+  })();
   useTabTitle(routePath({ kind: ROUTE.appDoc, id }), title);
   return (
     <AppMain
@@ -112,6 +146,7 @@ const AppDocPage = ({ machine, id, onOpenDrawer }: IAppDocPageProps) => {
       onBack={null}
       onOpenDrawer={onOpenDrawer}
       menu={[]}
+      lead={mode && <ModeButton mode={mode} />}
       stage={stage}
       chat={null}
       island={null}

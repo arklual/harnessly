@@ -2,6 +2,7 @@
 // behind a skeleton that shows after 150 ms, and an empty log is not the same thing as one not yet read.
 import { useEffect, useState } from 'react';
 import { fetchLog, type ILogEntry } from '@/next/features/designly/access/api';
+import { fetchResourceLog, type TResourceKind } from '@/next/features/designly/access/resource-api';
 import { Skeleton, useDelayed } from '@/next/ui/skeleton';
 import { t } from '@/next/i18n';
 
@@ -22,14 +23,44 @@ const LINES = new Set([
   'invite-revoke',
   'invite-accept',
   'expire',
+  'team_grant',
+  'team_change',
+  'team_revoke',
+  'share.create',
+  'share.update',
+  'share.revoke',
+  'share.enable',
+  'share.reissue',
+  'share.comment',
 ]);
 
-const lineOf = (entry: ILogEntry): string => {
+const TEAM = 'team:';
+
+/** Names for what a line names by id: a team (`team:<id>`), a link without sign-in. */
+export interface ILogNames {
+  teams?: ReadonlyMap<string, string>;
+  links?: ReadonlyMap<string, string>;
+}
+
+const subjectOf = (entry: ILogEntry, names: ILogNames): string => {
+  const subject = entry.subject;
+  if (subject.startsWith(TEAM)) {
+    const name = names.teams?.get(subject.slice(TEAM.length));
+    return name ? t('next.access.teamName', { name }) : t('next.access.log.someTeam');
+  }
+  const link = names.links?.get(subject);
+  if (link !== undefined) return `«${link}»`;
+  return subject;
+};
+
+const lineOf = (entry: ILogEntry, names: ILogNames): string => {
   const what = LINES.has(entry.action) ? t(`next.access.log.${entry.action}`) : entry.action;
-  return [entry.actor === 'system' ? t('next.access.log.system') : entry.actor, what, entry.subject]
+  return [entry.actor === 'system' ? t('next.access.log.system') : entry.actor, what, subjectOf(entry, names)]
     .filter(Boolean)
     .join(' · ');
 };
+
+const NO_NAMES: ILogNames = {};
 
 const when = (iso: string): string =>
   new Date(iso).toLocaleString(undefined, {
@@ -39,18 +70,30 @@ const when = (iso: string): string =>
     minute: '2-digit',
   });
 
-const AccessLog = ({ project }: { project: string }) => {
+/** `kind` reads the log through the one access API; without it, the design's older route. */
+const AccessLog = ({
+  project,
+  kind,
+  names = NO_NAMES,
+}: {
+  project: string;
+  kind?: TResourceKind;
+  names?: ILogNames;
+}) => {
   const [entries, setEntries] = useState<ILogEntry[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const skeleton = useDelayed(entries === null && failed === null);
 
   useEffect(() => {
     const abort = new AbortController();
-    fetchLog(project, abort.signal).then(setEntries, (failure: Error) => {
+    const read = kind
+      ? fetchResourceLog({ kind, id: project }, abort.signal)
+      : fetchLog(project, abort.signal);
+    read.then(setEntries, (failure: Error) => {
       if (!abort.signal.aborted) setFailed(failure.message);
     });
     return () => abort.abort();
-  }, [project]);
+  }, [project, kind]);
 
   return (
     <div className="hx-acc-stack" data-section="log">
@@ -69,7 +112,7 @@ const AccessLog = ({ project }: { project: string }) => {
         <ul className="hx-acc-log">
           {entries.map((entry) => (
             <li key={entry.id}>
-              <span>{lineOf(entry)}</span>
+              <span>{lineOf(entry, names)}</span>
               <time dateTime={entry.at}>{when(entry.at)}</time>
             </li>
           ))}

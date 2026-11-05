@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { orgErrorText } from '../../../org/api/errors';
 import type { MyChat, MyLimit, MyOverview } from '../../../org/api/member';
 import type { OverviewPeriod } from '../../../org/api/overview';
+import { navigate } from '../../../lib/router';
 import { useAction } from '../../../org/hooks';
 import { monthWord } from '../../../org/dates';
 import { resetText } from '../../../org/screens/overview/format';
@@ -29,7 +30,7 @@ import { Bars, Card, css, NO_TEAM_COLOR, Strip, SxTile, TEAM_COLORS } from './pa
 
 const askMore = (api: { requestMoreLimit: () => Promise<{ sent: true }> }) => api.requestMoreLimit();
 
-const Tiles = ({ data, period }: { data: MyOverview; period: OverviewPeriod }) => {
+const Tiles = ({ data, period, base }: { data: MyOverview; period: OverviewPeriod; base: string }) => {
   const { limit, tiles } = data;
   const when = forPeriod(period);
   const m = tiles.machine;
@@ -42,6 +43,7 @@ const Tiles = ({ data, period }: { data: MyOverview; period: OverviewPeriod }) =
           tone="#8968f4"
           icon="coins"
           label="Мой лимит"
+          hint="Сколько вы потратили из личного лимита за месяц, по прайс-листу провайдеров. Лимит ставит лид команды."
           value={
             limit
               ? `${thousandBare(limit.spentRub)} из ${rub(limit.limitRub)} · сбросится ${dayMonth(limit.resetsAt)}`
@@ -61,6 +63,7 @@ const Tiles = ({ data, period }: { data: MyOverview; period: OverviewPeriod }) =
           tone="#25a897"
           icon="messages-square"
           label={`Чатов ${when}`}
+          hint={`Сколько чатов с агентом вы вели ${when}; в скобках те, что идут сейчас.`}
           value={chatsLine(tiles.chats.week, tiles.chats.running)}
           chart={<Bars values={tiles.chats.bars} />}
         />
@@ -70,6 +73,7 @@ const Tiles = ({ data, period }: { data: MyOverview; period: OverviewPeriod }) =
           tone="#3b82f6"
           icon="git-pull-request"
           label={`MR ${when}`}
+          hint={`Сколько merge request создали ваши чаты ${when}.`}
           value={mrLine(tiles.mr.week, tiles.mr.merged)}
           chart={<Bars values={tiles.mr.bars} />}
         />
@@ -79,8 +83,14 @@ const Tiles = ({ data, period }: { data: MyOverview; period: OverviewPeriod }) =
           tone="#7c7c86"
           icon="server"
           label="Моя машина"
-          value={m ? machineLine(m) : '—'}
+          value={m ? machineLine(m) : 'пока нет'}
           chart={<Bars values={m?.bars ?? []} />}
+          hint="Машина, на которой шёл ваш последний чат. Нажмите, чтобы открыть её в разделе «Машины»."
+          onClick={
+            m
+              ? () => navigate(m.id ? `${base}/machines?m=${encodeURIComponent(m.id)}` : `${base}/machines`)
+              : undefined
+          }
         />
       </div>
     </div>
@@ -250,11 +260,19 @@ const ChatsCard = ({ chats, now }: { chats: MyChat[]; now: number }) => (
   </Card>
 );
 
-export const MemberView = ({ data, period }: { data: MyOverview; period: OverviewPeriod }) => {
+export const MemberView = ({
+  data,
+  period,
+  base,
+}: {
+  data: MyOverview;
+  period: OverviewPeriod;
+  base: string;
+}) => {
   const [now] = useState(() => Date.now());
   return (
     <>
-      <Tiles data={data} period={period} />
+      <Tiles data={data} period={period} base={base} />
       <div className="me-grid">
         <LimitCard data={data} now={now} />
         <ChatsCard chats={data.chats} now={now} />

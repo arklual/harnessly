@@ -1,13 +1,10 @@
 // A participant's machines: their own and, when there are any, the shared ones. «Открыть» leads to the machine's
 // runtime; the address comes from the hub when the button is pressed.
-import { useState } from 'react';
-
-import { orgErrorText } from '../../../org/api/errors';
 import type { MachinesList, OrgMachine } from '../../../org/api/machines';
 import { plural } from '../../../org/screens/machines/format';
-import { useOrg } from '../../../org/context';
 import { Btn, Icon } from '../../ui';
 import { hwLine } from './calc';
+import { useOpenMachine } from './open';
 import { ErrorRow } from './parts';
 
 /** «Ubuntu 24.04 · 16 ядер · 64 ГБ · 3 чата идут» (the board's wording). */
@@ -30,25 +27,10 @@ export const MemberSkeleton = () => (
 );
 
 export const MemberView = ({ list }: { list: MachinesList }) => {
-  const { api } = useOrg();
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<{ id: string; text: string } | null>(null);
+  const { busyId, error, open } = useOpenMachine();
   const all = list.groups.flatMap((g) => g.machines);
   const mine = all.filter((m) => m.mine !== false);
   const shared = all.filter((m) => m.mine === false);
-
-  const open = async (id: string) => {
-    setBusyId(id);
-    setError(null);
-    try {
-      const { url } = await api.openMachine(id);
-      window.location.assign(url);
-    } catch (e) {
-      setError({ id, text: orgErrorText(e) });
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   const group = (title: string, rows: readonly OrgMachine[]) =>
     rows.length === 0 ? null : (
@@ -89,7 +71,9 @@ export const MemberView = ({ list }: { list: MachinesList }) => {
       {error && <ErrorRow text={error.text} onRetry={() => void open(error.id)} />}
       {group('Мои', mine)}
       {group(`Общие в тенанте ${shared[0]?.tenantName ?? ''}`.trim(), shared)}
-      {all.length === 0 && <div className="mo-empty">Машин пока нет</div>}
+      {all.length === 0 && (
+        <div className="mo-empty">Машин пока нет. Попросите админа тенанта добавить вам машину.</div>
+      )}
     </>
   );
 };

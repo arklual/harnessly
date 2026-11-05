@@ -89,9 +89,11 @@ export const Signals = ({ signals, base }: { signals: Signal[]; base: string }) 
             <b>{s.title}</b>
             <span>{s.text}</span>
           </div>
-          <Link to={`${base}/${s.action.section}`} className="an-signal__go">
-            {s.action.label}
-          </Link>
+          {s.action && (
+            <Link to={`${base}/${s.action.section}`} className="an-signal__go">
+              {s.action.label}
+            </Link>
+          )}
         </li>
       ))}
     </ul>

@@ -1,4 +1,8 @@
 /* The gallery of the right pane's Designly: the chat's field on the left, the pane on the right. */
+.hx-gallery-pd.hx-gallery-pd--site {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
 .hx-gallery-pd {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);

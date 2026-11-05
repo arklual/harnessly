@@ -16,6 +16,11 @@ vi.mock('@/platform/config', () => ({
     artifactsUrl: 'https://docs.example.com',
     boardsUrl: 'https://boards.example.com',
     readerUrl: null,
+    standDomain: null,
+    trackerHosts: [],
+    gitlabHosts: [],
+    paneHosts: [],
+    defaultPins: [],
   }),
 }));
 
@@ -76,7 +81,7 @@ describe('a link to our own page', () => {
         <Markdown md="[Payments flow](https://boards.example.com/b/abc)" />
       </RefContext.Provider>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /Payments flow/ }));
+    fireEvent.click(screen.getByRole('link', { name: /Payments flow/ }));
     expect(onOpen).toHaveBeenCalledWith(
       'link',
       'https://boards.example.com/b/abc',

@@ -1,12 +1,20 @@
 // An open design as the design draws it (.hx-site): a browser with the design's pages in tabs, its bar — history,
 // the address with the pages, the device and size, more — and the page itself in the chosen viewport, in a case when
 // the device has one. The page is the board on the machine's library server, opened in a preview slot of its own.
+import { ChatTerminalSlotContext } from '@/next/features/terminal/chat-terminal';
+import {
+  pageDownloads,
+  projectDownloads,
+  ProjectDownloadMenu,
+  type IProjectDownloadsOf,
+} from '@/next/features/designly/project-downloads';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeyHint } from '@/next/features/keys/keys-help';
 import { useKeys } from '@/next/features/keys/use-keys';
 import {
   Fragment,
   useCallback,
+  useContext,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -21,8 +29,10 @@ import {
   BARS,
   BROWSERS,
   browserOf,
-  DEVICES,
+  canRotate,
+  deviceGroups,
   deviceOf,
+  deviceSizeText,
   keptSize,
   overviewBox,
   overviewOf,
@@ -35,9 +45,10 @@ import {
   type ISize,
   type TBars,
 } from '@/next/features/designly/devices';
-import { Overview, PhoneBottom, PhonePopover, PhoneTop } from '@/next/features/designly/site-device';
+import { PhoneBottom, PhonePopover, PhoneTop } from '@/next/features/designly/site-device';
+import { Overview, useOverviewGroups } from '@/next/features/designly/site-overview';
 import { qrModules } from '@/next/features/designly/qr';
-import { PaneChatModes, SiteModes, type TSiteMode } from '@/next/features/designly/site-chat';
+import { ChatPlacement, PaneChatModes, type TSiteMode } from '@/next/features/designly/site-chat';
 import { PANE_CHAT, type TPaneChat } from '@/next/features/designly/pane-chat';
 import {
   DEV_H,
@@ -57,6 +68,13 @@ import {
   type TTweakValue,
 } from '@/next/features/designly/page-bridge';
 import { DEV_TAB, type TDevTab } from '@/next/features/designly/devtools-data';
+import {
+  boardChat,
+  boardErrorAck,
+  boardErrorSink,
+  readBoardError,
+  type IBoardErrorSink,
+} from '@/next/features/designly/board-error';
 import SiteDevtools from '@/next/features/designly/site-devtools';
 import type { IStyleItem } from '@/next/features/designly/element-style';
 import { fromFrame } from '@/next/features/designly/bridge-origin';
@@ -67,9 +85,14 @@ import { loadStageOf, type ILoadProgress } from '@/next/features/designly/site-l
 import { useSiteLoad } from '@/next/features/designly/use-site-load';
 import SiteTweaks from '@/next/features/designly/site-tweaks';
 import { PaneDock, ZoomControls } from '@/next/features/designly/site-dock';
+import { ZOOM_PILL, ZoomPill } from '@/next/features/designly/zoom-pill';
+import { showPill, usePillPrefs } from '@/next/features/designly/floating-pill';
+import { PHONE_PILL, PhonePill, usePhonePillHidden } from '@/next/features/designly/phone-pill';
+import { setPhoneView, usePhoneView } from '@/next/features/designly/phone-view';
 import { useViewMemory } from '@/next/features/designly/use-view-memory';
 import type { IViewMemory } from '@/next/features/designly/view-memory';
 import { useCanvasZoom } from '@/next/features/designly/use-canvas-zoom';
+import { standardFit } from '@/next/features/designly/site-zoom';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import ImageActions, { type IImageOpen } from '@/next/features/designly/image-gen/image-actions';
 import { fileWriter } from '@/next/features/designly/image-gen/canvas';
@@ -82,6 +105,7 @@ import { usePhone } from '@/next/ui/use-media';
 import { useHScroll } from '@/next/ui/use-h-scroll';
 import { usePresence, usePresentFlag } from '@/next/ui/presence';
 import { t } from '@/next/i18n';
+import ModeButton from '@/next/features/designly/mode-button';
 import '@/next/styles/designly.css';
 import '@/next/styles/vendor-devices.css';
 import '@/next/styles/site.css';
@@ -132,7 +156,8 @@ export interface ISiteAccess {
   /** «Поделиться» for a person who manages, «Запросить правку» for one who may only look. */
   label: string;
   onOpen: () => void;
-  /** The person manages the project: a deck opens its own share popover instead of the dialog. */
+  /** A deck or a video opens its older share popover instead of the dialog: only where the gateway has no one dialog
+   *  (stage «д»). */
   manage?: boolean;
 }
 
@@ -149,6 +174,16 @@ export interface ISiteGuest {
   account?: { label: string; onOpen: () => void } | null;
   /** «Во весь экран» on the bar: the page alone over the whole window, without the bar and the device. */
   full?: { label: string; tip: string; onOpen: () => void };
+}
+
+/** The switch between looking at the design and editing it, in the bar (the one place it stands on both sizes). */
+export interface ISiteMode {
+  /** What the screen is in: «Редактирование макета» while editing, «Макет» while looking. */
+  state: string;
+  editing: boolean;
+  /** The way to the other mode: «Редактировать» or «Запросить доступ» while looking (loud), «Просмотр» while
+      editing (quiet); null: there is none. */
+  action: { label: string; icon: string; onClick: () => void } | null;
 }
 
 export interface ISiteViewProps {
@@ -177,7 +212,8 @@ export interface ISiteViewProps {
   onCopyLink: () => void;
   onRetry: () => void;
   onOpenDrawer: () => void;
-  onToggleMax: () => void;
+  /** Null where there is nothing to widen: the full Sinopia view opens its sidebar from the rail itself. */
+  onToggleMax: (() => void) | null;
   maxed: boolean;
   /** The chat beside the site and the field over it; without it the design is only looked at. */
   stage?: ISiteStage;
@@ -191,14 +227,16 @@ export interface ISiteViewProps {
   viewSeed?: IViewMemory;
   /** Set for a visitor of a guest link. */
   guest?: ISiteGuest;
+  /** The mode at the head of the bar («Макет» ↔ «Редактирование макета», a click switches); absent in a pane. */
+  mode?: ISiteMode;
   /** Set where the person may change the design: the pictures of its boards get «Изменить» / «Сгенерировать» on them. */
   images?: { machine: MachineId; artifact: string };
   /** The page alone over the view's whole box: no bar, no device, no zoom (a guest's full screen). */
   full?: boolean;
   /** Set where the gateway keeps the project's access and the person has something to do there. */
   access?: ISiteAccess;
-  /** Set where the person may publish the design as a site: the bar's «Опубликовать» opens the dialog. */
-  publish?: { onOpen: () => void };
+  /** «Скачать» (project-downloads.tsx) on the bar, in «Ещё», on a page's row and tab: the project of the pages. */
+  downloads?: Omit<IProjectDownloadsOf, 'board'>;
   /** The page's preview slot, whose record DevTools read; without it the panel is not offered. */
   devtools?: {
     machine: MachineId;
@@ -345,12 +383,13 @@ const SiteView = ({
   pane,
   toolPane = null,
   access,
-  publish,
   devtools,
   memoryKey,
   viewSeed,
   guest,
+  mode,
   images,
+  downloads,
   full = false,
 }: ISiteViewProps) => {
   const devKey = useKeyHint('site.devtools');
@@ -361,6 +400,8 @@ const SiteView = ({
   const pop = usePop();
   // A phone has one column: the chat docked to the right is stacked like the left one there.
   const phone = usePhone();
+  // A phone has one thin bar: back, the page, the mode, «…». The strip of tabs and what sits in it fold into «…».
+  const compact = phone && !pane && !guest;
   const memory = useViewMemory(memoryKey ?? null, viewSeed);
   const [deviceId, setDeviceId] = useState(memory.initial.device);
   const [size, setSize] = useState<ISize | null>(memory.initial.size);
@@ -373,6 +414,10 @@ const SiteView = ({
   /** What the page of a frame said of its way (the bridge's progress); a frame of another page starts without. */
   const [progress, setProgress] = useState<(ILoadProgress & { key: string }) | null>(null);
   const [closing, setClosing] = useState<string | null>(null);
+  // «Скачать страницу…» of one page: from its row in the list of pages or a right click on its tab, at that point.
+  const [pageSaving, setPageSaving] = useState<{ path: string; x: number; y: number; open: boolean } | null>(
+    null,
+  );
   // DevTools under the page, and the settings the board offers in a panel over it.
   const [dev, setDev] = useState(false);
   const [devTab, setDevTab] = useState<TDevTab>(DEV_TAB.console);
@@ -420,28 +465,50 @@ const SiteView = ({
   // the device's menu holds the zoom, «…» the settings, so the page's own header and tab bar stay free.
   const dockShown = pane !== undefined && !phone;
   const vp = area
-    ? viewportOf(device, area, full ? null : size, full ? false : rot, dockShown ? VP_PAD + paneRoom : VP_PAD)
+    ? viewportOf(
+        device,
+        area,
+        full ? null : size,
+        !full && rot && canRotate(device),
+        dockShown ? VP_PAD + paneRoom : VP_PAD,
+      )
     : null;
   const framed = vp?.kind === VP_KIND.frame;
   const overview = vp?.kind === VP_KIND.overview;
-  const phoneBrowser = framed && !vp.rot && chrome ? browserOf(device, browserId) : null;
+  // How the phone is drawn (its case, the status bar, a fingertip) is the person's own for every design (phone-view.ts).
+  const phoneView = usePhoneView();
+  // Turned, a phone in a case shows the page alone; upright, its status bar and its browser's bars as asked.
+  const phoneUi = framed && !vp.rot;
+  const phoneStatus = phoneUi && phoneView.status;
+  const phoneBrowser = phoneUi && chrome ? browserOf(device, browserId) : null;
+  // A phone or a tablet touched: the page's hover is off and the pointer is a fingertip (the bridge, `tk:touch`).
+  const touchOn = phoneView.touch && !full && canRotate(device);
   const browsers = phoneBrowser && device.os ? BROWSERS[device.os] : [];
   // «Обзор» keeps room at the bottom for the field, or for a guest's list of comments.
   const ovwRoom = underField || guest !== undefined;
   // The pane's field over the pill keeps its own room in the area (site-pane.css).
   const fieldRoom = paneBottomChat && dockShown ? DOCK_ROOM : 0;
-  const cards = vp && overview ? overviewOf({ w: vp.vw, h: vp.vh - fieldRoom }, ovwRoom) : [];
+  const ovwGroups = useOverviewGroups();
+  const cards =
+    vp && overview ? overviewOf({ w: vp.vw, h: vp.vh - fieldRoom }, ovwRoom, ovwGroups.groups) : [];
+  // «Все экраны» draws its screens at the cards' scale: that is its fit, so the zoom reads the screens' true scale.
+  const ovwFit = cards.length > 0 ? cards[0].scale : 1;
   const qr = useMemo(() => (phoneUrl ? qrModules(phoneUrl) : null), [phoneUrl]);
   // The canvas: the page's box zooms and pans over its area; another device or size starts at the fit again.
   const canvas = useCanvasZoom(
     areaRef,
     sectionRef,
-    vp?.fit ?? 1,
+    overview ? ovwFit : (vp?.fit ?? 1),
     vp !== null && error === null && !full,
-    `${device.id}|${size?.w ?? 0}x${size?.h ?? 0}|${rot}|${full}`,
+    // Another set of groups in «Все экраны» is another row: it starts at its fit too.
+    `${device.id}|${size?.w ?? 0}x${size?.h ?? 0}|${rot}|${full}|${overview ? ovwGroups.groups.join(',') : ''}`,
     overview ? overviewBox(cards, ovwRoom) : { w: vp ? vp.bw * vp.fit : 0, h: vp ? vp.bh * vp.fit : 0 },
+    // «Вписать»: a phone or a tablet whole, a computer whole up to its own size, «По окну» filling the window.
+    standardFit(vp?.kind ?? VP_KIND.fill, device.group),
     { start: memory.initial, onChange: memory.save },
   );
+  const pillHidden = usePillPrefs(ZOOM_PILL).hidden;
+  const phonePillHidden = usePhonePillHidden();
   // What the device says is kept with the canvas's view; the page is restored once, then followed.
   const { save } = memory;
   useEffect(() => {
@@ -522,6 +589,12 @@ const SiteView = ({
   // only from the slot's window and origin.
   const pick = stage?.pick ?? false;
   const latestStage = useRef(stage);
+  // A board's error card sends its error to the chat's field (board-error.ts): once per error, for the board on screen.
+  const boardErrors = useRef<IBoardErrorSink | null>(null);
+  const latestPagePath = useRef(pagePath);
+  useEffect(() => {
+    latestPagePath.current = pagePath;
+  });
   /** A button on a picture of the page was pressed: the editor or the generator is open for it. */
   const [imageOpen, setImageOpen] = useState<IImageOpen | null>(null);
   const imagesOn = images !== undefined && guest === undefined;
@@ -582,6 +655,14 @@ const SiteView = ({
       { type: 'tk:styles', items: latestStage.current?.styles ?? [] },
       slot.origin,
     );
+  };
+  const latestTouch = useRef(touchOn);
+  useEffect(() => {
+    latestTouch.current = touchOn;
+  });
+  const sendTouch = () => {
+    const slot = slotOf();
+    slot?.frame.contentWindow?.postMessage({ type: 'tk:touch', on: latestTouch.current }, slot.origin);
   };
   /** The page is on a canvas: its script tells Space and the middle button's drag (a board's says no hello). */
   const onCanvas = () => {
@@ -656,6 +737,15 @@ const SiteView = ({
     ping();
     const onMessage = (event: MessageEvent) => {
       if (!fromFrame(event, frame.contentWindow, origin)) return;
+      const boardError = readBoardError(event.data);
+      if (boardError) {
+        const stageNow = latestStage.current;
+        if (guest || !stageNow) return;
+        boardErrors.current ??= boardErrorSink((words) => latestStage.current?.onAttach(words));
+        if (boardErrors.current.take(boardError, latestPagePath.current ?? ''))
+          frame.contentWindow?.postMessage(boardErrorAck(boardError), origin);
+        return;
+      }
       const message = readBridgeMessage(event.data);
       const now = latestStage.current;
       if (message?.k === 'anchored') {
@@ -721,6 +811,9 @@ const SiteView = ({
         sendVeils(true);
         // Its script tells Space and the middle button's drag on a canvas too.
         frame.contentWindow?.postMessage({ type: 'tk:canvas', on: true }, origin);
+        sendTouch();
+        // Its error card may send the error to the chat when there is one.
+        frame.contentWindow?.postMessage(boardChat(!guest && now !== null), origin);
         // And it picks blocks and wears the notes' looks, as the slot's bridge does.
         if (now) {
           frame.contentWindow?.postMessage({ type: 'tk:pick', on: now.pick }, origin);
@@ -761,7 +854,8 @@ const SiteView = ({
         track.current = SCROLL_START;
         setBars(BARS.full);
       } else if (message.k === 'pick-off') now.onPickEnd();
-      else {
+      // `doc-scroll` is only told to the screens of «Все экраны» (site-overview.tsx), never by this frame.
+      else if (message.k === 'picked') {
         const box = frame.getBoundingClientRect();
         const home = sectionRef.current?.getBoundingClientRect();
         const k = frame.offsetWidth > 0 ? box.width / frame.offsetWidth : 1;
@@ -796,6 +890,11 @@ const SiteView = ({
     // sendImages reads the frame of this src and the latest flag; the flag and the page say when to tell it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imagesOn, src, reloadKey]);
+  useEffect(() => {
+    sendTouch();
+    // sendTouch reads the frame of this src and the latest flag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [touchOn, src, reloadKey]);
   // A zoom of the canvas shrinks or grows the page: its buttons are told the scale once the smooth step has settled.
   useEffect(() => {
     const timer = window.setTimeout(sendImages, 400);
@@ -963,6 +1062,10 @@ const SiteView = ({
   const noFwd = !current || current.hi >= current.hist.length - 1;
   const sizeText = vp ? `${vp.vw} × ${vp.vh}` : '';
   const fillOn = device.id === 'fill';
+  // A phone or a tablet turns from its pill and from the device menu; the full screen is «По окну».
+  const rotatable = !full && canRotate(device);
+  // The phone's pill stands by a phone or a tablet on the canvas.
+  const phonePillOn = rotatable && !failed;
   /** The host the phone's address bar shows. */
   const host = window.location.hostname;
 
@@ -970,6 +1073,48 @@ const SiteView = ({
 
   /** What «Ещё» offers: only what works here. */
   const offered: (IMoreItem | null | undefined)[] = [
+    compact
+      ? {
+          id: 'drawer',
+          icon: 'menu',
+          label: t('next.header.openMenu'),
+          pick: () => {
+            pop.close();
+            onOpenDrawer();
+          },
+        }
+      : null,
+    compact
+      ? {
+          id: 'reload',
+          icon: 'rotate-cw',
+          label: t('next.site.reload'),
+          pick: () => {
+            pop.close();
+            onReload(false);
+          },
+        }
+      : null,
+    compact
+      ? {
+          id: 'device',
+          icon: device.icon,
+          label: t('next.site.device'),
+          pick: () => pop.open(POP.device),
+        }
+      : null,
+    compact && toolPane
+      ? {
+          id: 'tool-pane',
+          icon: 'panel-right',
+          label: t('next.header.pane'),
+          on: toolPane.open,
+          pick: () => {
+            pop.close();
+            toolPane.onToggle();
+          },
+        }
+      : null,
     onOpenOutside
       ? {
           id: 'outside',
@@ -1016,17 +1161,19 @@ const SiteView = ({
         toggleInspect();
       },
     },
-    {
-      id: 'tweaks',
-      icon: 'sliders-horizontal',
-      label: t('next.site.tweaks'),
-      on: tweaksOpen,
-      disabled: noTweaks && !tweaksOpen,
-      pick: () => {
-        pop.close();
-        toggleTweaks();
-      },
-    },
+    mode && !mode.editing
+      ? null
+      : {
+          id: 'tweaks',
+          icon: 'sliders-horizontal',
+          label: t('next.site.tweaks'),
+          on: tweaksOpen,
+          disabled: noTweaks && !tweaksOpen,
+          pick: () => {
+            pop.close();
+            toggleTweaks();
+          },
+        },
     {
       id: 'hard',
       sep: true,
@@ -1069,6 +1216,30 @@ const SiteView = ({
       label: t('next.site.phone'),
       pick: () => pop.open(POP.phone),
     },
+    // The zoom pill hidden from its own menu comes back from here.
+    pillHidden && !pane && !phone
+      ? {
+          id: 'pill',
+          icon: 'eye',
+          label: t('next.site.zoomPillShow'),
+          pick: () => {
+            pop.close();
+            showPill(ZOOM_PILL);
+          },
+        }
+      : null,
+    // So does the phone's pill, while there is a phone or a tablet to set.
+    phonePillHidden && phonePillOn && !pane && !phone
+      ? {
+          id: 'phone-pill',
+          icon: 'smartphone',
+          label: t('next.site.phonePillShow'),
+          pick: () => {
+            pop.close();
+            showPill(PHONE_PILL);
+          },
+        }
+      : null,
     {
       id: 'link',
       icon: 'link',
@@ -1079,6 +1250,24 @@ const SiteView = ({
       },
     },
   ];
+  // The downloads close «Ещё» and run as jobs; their notices say how it goes.
+  const saving = downloads
+    ? projectDownloads({
+        ...downloads,
+        board: pages.some((p) => p.path === pagePath) ? pagePath : null,
+      })
+    : [];
+  saving.forEach((item, i) =>
+    offered.push({
+      ...item,
+      id: `download-${item.id}`,
+      sep: i === 0 || item.sep,
+      pick: () => {
+        pop.close();
+        item.pick();
+      },
+    }),
+  );
   const moreItems = offered.filter((item) => item != null);
   // On the phone the bar's menus (pages, device, «…») are bottom sheets: a scrim under them, a swipe down closes them.
   const barMenu = pop.shownPop === POP.pages || pop.shownPop === POP.device || pop.shownPop === POP.more;
@@ -1090,6 +1279,7 @@ const SiteView = ({
   // In the pane the section is the pane's own unless its chat is over the design or at its foot.
   const ownMode = guest ? 'view' : (stage?.mode ?? 'island');
   const paneMode = pane && !paneOwnChat ? 'pane' : ownMode;
+  const termSlot = useContext(ChatTerminalSlotContext);
 
   return (
     <section
@@ -1106,9 +1296,10 @@ const SiteView = ({
       data-sview={stage ? stage.sview && stage.mode === 'chat' : false}
     >
       {stage?.chat}
+      {!pane && termSlot && <div className="hx-site__term" ref={termSlot} />}
       <div className="hx-site__view">
         <div className="hx-browser">
-          {!pane && (
+          {!pane && !compact && (
             <div className="hx-strip">
               {!guest && (
                 <button
@@ -1145,6 +1336,11 @@ const SiteView = ({
                       data-kind="page"
                       data-state={closing === x.id ? 'closing' : 'open'}
                       title={`${pageName(path)} — ${title}`}
+                      onContextMenu={(event) => {
+                        if (!downloads || !pages.some((p) => p.path === path)) return;
+                        event.preventDefault();
+                        setPageSaving({ path, x: event.clientX, y: event.clientY, open: true });
+                      }}
                       onClick={(event) => {
                         if ((event.target as Element).closest('.hx-tab__x') || on) return;
                         pop.close();
@@ -1209,8 +1405,9 @@ const SiteView = ({
                   )}
                 </div>
               </div>
-              {stage && !guest && (
-                <SiteModes
+              {/* Where the chat stands is picked in the open chat's head; with the chat folded, here (HRN-673). */}
+              {stage && !guest && stage.mode !== 'chat' && stage.mode !== 'float' && (
+                <ChatPlacement
                   mode={stage.mode}
                   onMode={(mode) => {
                     const rect = sectionRef.current?.getBoundingClientRect();
@@ -1246,7 +1443,7 @@ const SiteView = ({
                   </span>
                 </button>
               )}
-              {!guest && (
+              {!guest && onToggleMax && (
                 <button
                   type="button"
                   className="hx-head-btn hx-tipped hx-strip__max"
@@ -1263,7 +1460,7 @@ const SiteView = ({
           )}
 
           {phone && barMenu && <SheetScrim phoneOnly state={pop.state} onClose={pop.close} />}
-          <div className="hx-browser__bar" ref={anchorsRef}>
+          <div className="hx-browser__bar" ref={anchorsRef} data-compact={compact}>
             <button
               type="button"
               className="hx-head-btn hx-tipped"
@@ -1301,6 +1498,7 @@ const SiteView = ({
                 {keys && reloadHint && <kbd>{reloadHint}</kbd>}
               </span>
             </button>
+            {mode && <ModeButton mode={mode} compact={compact} />}
             <div className="hx-browser__addr">
               <button
                 type="button"
@@ -1322,27 +1520,56 @@ const SiteView = ({
                   <SheetGrip />
                   <div className="hx-dl-pop__label">{t('next.site.pages')}</div>
                   {pages.map((p) => (
-                    <button
-                      key={p.path}
-                      type="button"
-                      role="menuitem"
-                      className="hx-option"
-                      aria-selected={p.path === pagePath}
-                      onClick={() => {
-                        pop.close();
-                        onNavigate(p.path);
-                      }}
-                    >
-                      <span className="hx-option__text">
-                        <span className="hx-option__name">{p.name}</span>
-                        <span className="hx-option__desc">{p.path}</span>
-                      </span>
-                      <Icon name="check" size="sm" className="hx-option__check" />
-                    </button>
+                    <div key={p.path} className="hx-site-page">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="hx-option"
+                        aria-selected={p.path === pagePath}
+                        onClick={() => {
+                          pop.close();
+                          onNavigate(p.path);
+                        }}
+                      >
+                        <span className="hx-option__text">
+                          <span className="hx-option__name">{p.name}</span>
+                          <span className="hx-option__desc">{p.path}</span>
+                        </span>
+                        <Icon name="check" size="sm" className="hx-option__check" />
+                      </button>
+                      {downloads && (
+                        <button
+                          type="button"
+                          className="hx-head-btn hx-site-page__dl"
+                          aria-label={t('next.download.pageOf', { name: p.name })}
+                          title={t('next.download.page')}
+                          onClick={(event) => {
+                            // The list leaves; the page's downloads open where its button was.
+                            const at = event.currentTarget.getBoundingClientRect();
+                            pop.close();
+                            setPageSaving({ path: p.path, x: at.right, y: at.bottom, open: true });
+                          }}
+                        >
+                          <Icon name="download" size="sm" />
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
             </div>
+            {compact && stage && (
+              <button
+                type="button"
+                className="hx-head-btn hx-site__swap"
+                aria-label={stage.mode === 'chat' ? t('next.site.siteFull') : t('next.site.chatFull')}
+                onClick={() => {
+                  stage.onMode(stage.mode === 'chat' ? 'island' : 'chat', sectionSize());
+                }}
+              >
+                <Icon name={stage.mode === 'chat' ? 'maximize-2' : 'message-square'} />
+              </button>
+            )}
             {stage && (
               <button
                 type="button"
@@ -1424,22 +1651,6 @@ const SiteView = ({
                     <button
                       type="button"
                       className="hx-head-btn hx-tipped"
-                      aria-label={t('next.site.rotate')}
-                      onClick={() => {
-                        if (fillOn) {
-                          const turned = keptSize(size ?? (vp ? { w: vp.vh, h: vp.vw } : null));
-                          if (turned) setSize(size ? { w: size.h, h: size.w } : turned);
-                        } else setRot((r) => !r);
-                      }}
-                    >
-                      <Icon name="rotate-ccw" size="sm" />
-                      <span className="hx-tip" data-align="end">
-                        {t('next.site.rotate')}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="hx-head-btn hx-tipped"
                       aria-disabled={fillOn && !size}
                       aria-label={t('next.site.fit')}
                       onClick={() => {
@@ -1458,7 +1669,21 @@ const SiteView = ({
                     <span className="hx-devsize__label">{t('next.site.zoom')}</span>
                     <ZoomControls zoom={canvas} />
                   </div>
-                  {framed && !vp.rot && (
+                  {rotatable && (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={rot}
+                      className="hx-option hx-devchrome"
+                      onClick={() => setRot((r) => !r)}
+                    >
+                      <span className="hx-devopt__name">{t('next.site.landscape')}</span>
+                      <span className="hx-switch" data-on={rot} aria-hidden="true">
+                        <i />
+                      </span>
+                    </button>
+                  )}
+                  {phoneUi && (
                     <button
                       type="button"
                       role="switch"
@@ -1495,34 +1720,38 @@ const SiteView = ({
                           <span className="hx-devopt__meta">{t(`next.site.browsersMeta.${b.id}`)}</span>
                         </button>
                       ))}
-                      <div className="hx-dl-pop__label">{t('next.site.deviceGroup')}</div>
                     </>
                   )}
-                  {DEVICES.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      role="menuitemradio"
-                      className="hx-option hx-devopt"
-                      aria-selected={d.id === device.id}
-                      onClick={() => {
-                        pop.close();
-                        setDeviceId(d.id);
-                        setSize(null);
-                        setRot(false);
-                        setBrowserId(null);
-                        unfoldBars();
-                      }}
-                    >
-                      <Icon name="check" size="sm" className="hx-devopt__check" />
-                      <span className="hx-devopt__name">{t(`next.site.devices.${d.id}`)}</span>
-                      <span className="hx-devopt__meta">{t(`next.site.devicesMeta.${d.id}`)}</span>
-                    </button>
+                  {deviceGroups().map(({ group, devices }) => (
+                    <Fragment key={group}>
+                      <div className="hx-dl-pop__label">{t(`next.site.deviceGroups.${group}`)}</div>
+                      {devices.map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          role="menuitemradio"
+                          className="hx-option hx-devopt"
+                          aria-selected={d.id === device.id}
+                          onClick={() => {
+                            pop.close();
+                            setDeviceId(d.id);
+                            setSize(null);
+                            setRot(false);
+                            setBrowserId(null);
+                            unfoldBars();
+                          }}
+                        >
+                          <Icon name="check" size="sm" className="hx-devopt__check" />
+                          <span className="hx-devopt__name">{t(`next.site.devices.${d.id}`)}</span>
+                          <span className="hx-devopt__size">{deviceSizeText(d)}</span>
+                        </button>
+                      ))}
+                    </Fragment>
                   ))}
                 </div>
               )}
             </div>
-            {!pane && (
+            {!pane && (mode === undefined || mode.editing) && (
               <button
                 type="button"
                 className="hx-head-btn hx-tipped hx-browser__opt"
@@ -1552,18 +1781,30 @@ const SiteView = ({
                 </span>
               </button>
             )}
-            {publish && (
-              <button
-                type="button"
-                className="hx-head-btn hx-tipped hx-browser__publish"
-                aria-label={t('next.publish.button')}
-                onClick={publish.onOpen}
-              >
-                <Icon name="globe" />
-                <span className="hx-tip" data-pos="below" data-align="end">
-                  {t('next.publish.button')}
-                </span>
-              </button>
+            {downloads && pageSaving && (
+              <ProjectDownloadMenu
+                items={pageDownloads({ ...downloads, board: pageSaving.path }, pageSaving.path, 'page')}
+                open={pageSaving.open}
+                onOpenChange={(open) => setPageSaving((now) => now && { ...now, open })}
+                anchor={{ getBoundingClientRect: () => new DOMRect(pageSaving.x, pageSaving.y, 0, 0) }}
+              />
+            )}
+            {downloads && (
+              <ProjectDownloadMenu
+                items={saving}
+                trigger={
+                  <button
+                    type="button"
+                    className="hx-head-btn hx-tipped hx-browser__download"
+                    aria-label={t('next.download.label')}
+                  >
+                    <Icon name="download" />
+                    <span className="hx-tip" data-pos="below" data-align="end">
+                      {t('next.download.label')}
+                    </span>
+                  </button>
+                }
+              />
             )}
             {(pane || access) && (
               <button
@@ -1644,6 +1885,11 @@ const SiteView = ({
                   cards={cards}
                   room={ovwRoom}
                   src={loadedFor === frameKey ? plainSrc : null}
+                  guest={guest !== undefined}
+                  groups={ovwGroups.groups}
+                  onGroup={ovwGroups.toggle}
+                  onSpace={canvas.fromPage.space}
+                  onPan={canvas.fromPage.pan}
                   onPick={(id) => {
                     setDeviceId(id);
                     setSize(null);
@@ -1664,7 +1910,10 @@ const SiteView = ({
               {!failed && (
                 <div className="hx-vpbox">
                   <div className="hx-vpscale">
-                    <div className={framed ? `device ${device.cls} ${device.color} hx-dev` : 'hx-bare'}>
+                    <div
+                      className={framed ? `device ${device.cls} ${device.color} hx-dev` : 'hx-bare'}
+                      data-case={framed && !phoneView.frame ? 'off' : undefined}
+                    >
                       <div className="device-frame">
                         <div className="device-screen hx-screen">
                           <div
@@ -1673,8 +1922,13 @@ const SiteView = ({
                             data-os={device.os ?? 'none'}
                             data-bars={phoneBrowser ? bars : BARS.full}
                           >
-                            {phoneBrowser && (
-                              <PhoneTop browser={phoneBrowser} host={host} onUnfold={unfoldBars} />
+                            {phoneUi && (
+                              <PhoneTop
+                                browser={phoneBrowser}
+                                status={phoneStatus}
+                                host={host}
+                                onUnfold={unfoldBars}
+                              />
                             )}
                             <div className="hx-site__frame">
                               <Swap
@@ -1690,6 +1944,7 @@ const SiteView = ({
                                     ref={frameRef}
                                     className="hx-site__iframe"
                                     src={src}
+                                    allow="clipboard-write"
                                     title={page?.name ?? title}
                                     onLoad={() => {
                                       loadedKey.current = frameKey;
@@ -1699,6 +1954,7 @@ const SiteView = ({
                                       anchorStore.set(null);
                                       sendAnchors();
                                       onCanvas();
+                                      sendTouch();
                                       sendImages();
                                       arm(latestStage.current?.pick === true);
                                       sendStyles();
@@ -1712,8 +1968,13 @@ const SiteView = ({
                                 </AnchorContext.Provider>
                               )}
                             </div>
-                            {phoneBrowser && (
-                              <PhoneBottom browser={phoneBrowser} host={host} onUnfold={unfoldBars} />
+                            {phoneUi && (
+                              <PhoneBottom
+                                browser={phoneBrowser}
+                                status={phoneStatus}
+                                host={host}
+                                onUnfold={unfoldBars}
+                              />
                             )}
                           </div>
                         </div>
@@ -1752,10 +2013,35 @@ const SiteView = ({
                 zoom={canvas}
               />
             )}
-            {!pane && !phone && !failed && (
-              <div className="hx-vpzoom">
-                <ZoomControls zoom={canvas} />
-              </div>
+            {!pane && !phone && !failed && <ZoomPill zoom={canvas} />}
+            {!pane && !phone && (
+              <PhonePill
+                active={phonePillOn}
+                rot={{ on: rot, onToggle: () => setRot((r) => !r) }}
+                frame={
+                  framed
+                    ? { on: phoneView.frame, onToggle: () => setPhoneView({ frame: !phoneView.frame }) }
+                    : null
+                }
+                status={
+                  phoneUi
+                    ? { on: phoneView.status, onToggle: () => setPhoneView({ status: !phoneView.status }) }
+                    : null
+                }
+                browser={
+                  phoneUi
+                    ? {
+                        on: chrome,
+                        onToggle: () => {
+                          setChrome(!chrome);
+                          unfoldBars();
+                        },
+                      }
+                    : null
+                }
+                touch={{ on: phoneView.touch, onToggle: () => setPhoneView({ touch: !phoneView.touch }) }}
+                watch={`${device.id}|${rot}|${phoneUi}`}
+              />
             )}
           </div>
           {tweaksPanel.mounted && tweaks && (

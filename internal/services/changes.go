@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/agents/roots"
 	"math"
 	"os"
 	"os/exec"
@@ -59,12 +60,7 @@ func (l *limitedBuffer) Write(p []byte) (int, error) {
 
 // allowedJsonl: a transcript of Claude Code or Codex under the runtime user's home.
 func (s *Service) allowedJsonl(p string) bool {
-	abs, err := filepath.Abs(p)
-	if err != nil || !strings.HasSuffix(abs, ".jsonl") {
-		return false
-	}
-	return strings.HasPrefix(abs, filepath.Join(s.cfg.Home, ".claude", "projects")+"/") ||
-		strings.HasPrefix(abs, filepath.Join(s.cfg.Home, ".codex", "sessions")+"/")
+	return roots.Allowed(s.cfg.Home, p)
 }
 
 // sessionStart is the first timestamp in a transcript's first 256 KiB; ok is false without one.

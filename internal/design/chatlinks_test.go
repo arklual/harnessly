@@ -95,12 +95,30 @@ func TestChatLinksClaudeTools(t *testing.T) {
 		toolUse(t, "Bash", map[string]any{"command": "cp /tmp/x.png " + r.root + "/assets-only/project/assets/x.png"}),
 		toolUse(t, "Bash", map[string]any{"command": "acme design page create new-pages --title \"Меню\" 2>&1 | tail -2"}),
 		toolUse(t, "Bash", map[string]any{"command": "acme design check checked --board \"Главная\""}),
+		// Only looking at a design through the CLI is no work on it: a screenshot of it, its logs, its list of pages.
+		toolUse(t, "Bash", map[string]any{"command": "timeout 90 acme design check looked --board \"$2\" >/dev/null 2>&1; acme design logs logged"}),
+		toolUse(t, "Bash", map[string]any{"command": "acme design page list listed; acme design notes get noted 3; acme design history kept"}),
+		toolUse(t, "Bash", map[string]any{"command": "acme design notes set slides 2 --file -"}),
+		// Opening or showing a design to the person, taking its turn, a path in a command that only reads or that stands
+		// in its folder: none of it is work on the design.
+		toolUse(t, "Bash", map[string]any{"command": "acme design claim claimed \"Главная\"; acme design release; acme design panel shown show"}),
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/standing/project && acme design check standing > /tmp/out.txt 2>&1; cat " + r.root + "/copied/a.json > /tmp/b.json"}),
+		// A `cd` sets the base of the relative targets after it.
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/cd-redirect/project && cat > board.dc.html <<'EOF'\n<html></html>\nEOF"}),
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/cd-sed && sed -i 's/a/b/' project/page.dc.html"}),
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/cd-tee/project; echo x | tee notes.md"}),
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/cd-quiet && cat a.json > /tmp/x && sed -i s/a/b/ /tmp/y && cp a.json /tmp/z"}),
+		toolUse(t, "Bash", map[string]any{"command": "cp " + r.root + "/source/project/a.png /tmp/a.png; grep -n 'x' " + r.root + "/grepped/a.html | tee /tmp/g.txt"}),
 		toolUse(t, "Write", map[string]any{"file_path": "/home/coder/notes.md", "content": "Главная.dc.html " + board}),
+		// a chat borrowing from a design wrote into its scratchpad by a variable while it stood in the design's
+		// folder; the variable's path is not under the folder, and the design is not that chat's.
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/borrowed/project/lib; mkdir -p /tmp/s; S=/tmp/s; sed 's/}/}\\n/g' viz.css > $S/viz.css; wc -l $S/viz.css"}),
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/borrowed/project; cp a.css ~/a.css; cat a.css > ${S}/b.css; echo x | tee `pwd`/../x; cd $S && touch y"}),
 	)
 	l := NewChatLinks(r.lib, "")
 	got := l.Designs([]string{p})[p]
-	want := []string{"ostrovok-dossier", "landing", "cafe-menu", "panel", "promo", "show", "assets-only", "page", "create", "new-pages", "check",
-		"checked"}
+	want := []string{"ostrovok-dossier", "landing", "assets-only", "page", "create", "new-pages", "notes",
+		"set", "slides", "2", "cd-redirect", "cd-sed", "cd-tee"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("designs = %v, want %v", got, want)
 	}

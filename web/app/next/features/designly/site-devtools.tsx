@@ -124,8 +124,9 @@ export interface ISiteDevtoolsProps {
   machine: MachineId;
   /** The page's preview slot (its origin); null while the slot opens. */
   slot: string | null;
-  /** The design, and the board on the page: the runtime's record of the server is theirs. */
-  artifact: string;
+  /** The design, and the board on the page: the runtime's record of the server is theirs. A page that is not a
+   *  design (the pane's browser) has no artifact and no «Сервер» tab; its board is the page's address. */
+  artifact: string | null;
   board: string;
   open: boolean;
   tab: TDevTab;
@@ -183,7 +184,8 @@ const SiteDevtools = ({
 }: ISiteDevtoolsProps) => {
   const inspectKey = useKeyHint('site.inspect');
   const { log, error, saving, change, retry } = useDevtools(machine, slot, open);
-  const record = useServerSources(machine, artifact, open);
+  const record = useServerSources(machine, artifact ?? '', open && artifact !== null);
+  const tabs = artifact === null ? DEV_TABS.filter((id) => id !== DEV_TAB.server) : DEV_TABS;
   const server = allServerRows(
     { requests: log.network, pageLog: record.pageLog, check: record.check },
     board,
@@ -244,7 +246,7 @@ const SiteDevtools = ({
           </span>
         </button>
         <span className="hx-devtools__sep" />
-        {DEV_TABS.map((id) => {
+        {tabs.map((id) => {
           const errors = errorsOf(id);
           return (
             <button

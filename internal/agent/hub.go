@@ -58,7 +58,8 @@ type hub struct {
 	filter      *routeFilter
 	// observe: the hub only sees the machine. The agent runs its closed cluster's link as before, and the hub
 	// link answers what can be read (hello, preflight, agents, spend) under a policy that allows nothing: no tunnel to the
-	// runtime, no keys, env, logins or installs, no limits, and nothing of the cluster's tunnels is touched.
+	// runtime, no keys, env, logins or installs, no limits, and nothing of the cluster's tunnels is touched. The one
+	// thing it takes is the hub's environment list (env.set), applied only into the link's own folder.
 	observe bool
 	// dir is the folder of the hub link's own files: the data folder, or the observe link's own folder.
 	dir string
@@ -89,6 +90,15 @@ type hub struct {
 	bg sync.WaitGroup
 }
 
+// hasSecret says whether a variable is in the environment the machine's chats start with: the agent's env files, or
+// the agent's own environment, which the runtime's launches inherit.
+func (h *hub) hasSecret(name string) bool {
+	if v, ok := h.env.Get(agentnet.ScopeAll, name); ok && v != "" {
+		return true
+	}
+	return os.Getenv(name) != ""
+}
+
 // goBG runs f on its own goroutine, counted in bg.
 func (h *hub) goBG(f func()) {
 	h.bg.Add(1)
@@ -116,6 +126,7 @@ func newHub(a *Agent, m *MachineFile, dir string, observe bool) *hub {
 		policyChanged: make(chan struct{}, 1),
 		state:         LinkState{PID: os.Getpid(), MachineID: m.MachineID, HubURL: m.HubURL, Version: cfg.Version},
 	}
+	h.environment.hasSecret = h.hasSecret
 	h.proxies = agentnet.NewProxies(h.env)
 	h.metrics = &sampler{sys: newSysReader(), path: diskPath(cfg), chats: h.chatsNow, now: time.Now}
 	h.restarts = h.newRestarter()
@@ -286,7 +297,7 @@ func (h *hub) linkUp(l *link) {
 	h.goBG(h.sendPreflight)
 	h.goBG(func() { h.refreshAgents(true) })
 	h.usageAnnounce()
-	if rev, _ := h.environment.Held(); rev > 0 && !h.observe {
+	if rev, _ := h.environment.Held(); rev > 0 {
 		h.emit(hubproto.EventEnvState, "state", h.environment.State()) // how the held list went, for a hub that lost it
 	}
 }
@@ -381,8 +392,9 @@ func (h *hub) hello() hubproto.Hello {
 	if h.usage != nil {
 		features = append(features, hubproto.FeatureUsage)
 	}
+	features = append(features, hubproto.FeatureEnvironment)
 	if !h.observe {
-		features = append(features, hubproto.FeatureBudget, hubproto.FeatureEnvironment)
+		features = append(features, hubproto.FeatureBudget)
 	}
 	if h.metrics != nil {
 		features = append(features, hubproto.FeatureMetrics)

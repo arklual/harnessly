@@ -44,7 +44,13 @@ export interface MyOverview {
     chats: { week: number; running: number; bars: number[] };
     /** `merged`: null while the hub does not tell it per session. */
     mr: { week: number; merged: number | null; bars: number[] };
-    machine: { name: string; online: boolean; loadPct: number; bars: number[] } | null;
+    machine: {
+      id: string | null;
+      name: string;
+      online: boolean;
+      loadPct: number | null;
+      bars: number[];
+    } | null;
   };
 }
 

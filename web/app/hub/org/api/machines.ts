@@ -193,6 +193,10 @@ export interface MachinesApi {
   disableMachine(id: string): Promise<MachineDetail>;
   enableMachine(id: string): Promise<MachineDetail>;
   setMachineAccess(id: string, access: { mode: AccessMode; personIds: string[] }): Promise<MachineDetail>;
+  /** `PATCH /api/machines/{id}` with a name: the hub allows it to the owner of the tenant's space. */
+  renameMachine(id: string, name: string): Promise<MachineDetail>;
+  /** `DELETE /api/machines/{id}`: its key stops working and it leaves the list (the owner of the tenant's space). */
+  removeMachine(id: string): Promise<void>;
   /** Where «Открыть» leads: the address of the machine's runtime (`GET /api/machines/{id}/open`). */
   openMachine(id: string): Promise<{ url: string }>;
 }

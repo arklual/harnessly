@@ -30,6 +30,8 @@ export interface TeamsInput {
   /** What each person and team spent this month, when the hub serves `…/spend`; null: it does not yet. */
   spend: { byPerson: Map<string, number>; byTeam: Map<string, number>; total: number } | null;
   now: number;
+  /** In the «all» view: the tenants (ids) each person without a team belongs to; absent: not looked up. */
+  memberTenants?: Map<string, string[]> | null;
 }
 
 const isMoneyMonth = (r: ApiRule): boolean =>
@@ -53,6 +55,24 @@ const primaryTeam = (m: Member, teams: Team[]): string | null => {
 };
 
 const nameOf = (m: Member): string => m.name || m.email;
+
+/**
+ * The tenant an action on a person means: the tenant of their team, else the tenant of the view, else the only one
+ * they (or the organization) have. Null: not one tenant, and an action cannot tell which.
+ */
+export const tenantOfPerson = (input: TeamsInput, userId: string): string | null => {
+  const { view, scope, members } = input;
+  if (scope.kind === 'tenant') return scope.id;
+  const m = members.find((x) => x.userId === userId);
+  if (!m) return null;
+  const team = primaryTeam(m, view.teams);
+  if (team) return view.teams.find((t) => t.id === team)?.tenantId ?? null;
+  if (scope.kind === 'team') return view.teams.find((t) => t.id === scope.id)?.tenantId ?? null;
+  const own = input.memberTenants?.get(userId);
+  if (own && own.length === 1) return own[0] ?? null;
+  if (view.tenants.length === 1) return view.tenants[0]?.id ?? null;
+  return null;
+};
 
 export const buildTeamsView = (input: TeamsInput): TeamsView => {
   const { view, scope, members, rules, currency, spend, now } = input;
@@ -92,11 +112,21 @@ export const buildTeamsView = (input: TeamsInput): TeamsView => {
     const self = m.userId === me.userId;
     const teamCaps = team ? capsOf(me, { kind: 'team', id: team }) : undefined;
     const isLead = m.grants.some((g) => g.role === 'lead' && g.scope.id === team);
-    const limitCaps = isLead || !team ? tenantCaps : teamCaps;
+    // Their tenant, from their team or the tenants they are in; ambiguous (null) in the «all» view only.
+    const own = tenantOfPerson(input, m.userId);
+    const ambiguous = scope.kind === 'org' && own === null;
+    const pCaps = own ? capsOf(me, { kind: 'tenant', id: own }) : ambiguous ? undefined : tenantCaps;
+    const limitCaps = isLead || !team ? pCaps : teamCaps;
     const canLimit = !self && (limitCaps?.setChildLimits ?? false);
     const limitNeeds: Needs = isLead || !team ? 'tenant_admin' : 'team_lead';
     const canRole = !self && team !== null && (teamCaps?.grant.includes('lead') ?? false);
-    const canTeam = !self && (tenantCaps?.manage ?? false);
+    const canTeam = !self && (pCaps?.manage ?? false);
+    const openIn = ambiguous
+      ? (input.memberTenants?.get(m.userId) ?? view.tenants.map((t) => t.id))
+          .map((id) => view.tenants.find((t) => t.id === id))
+          .filter((t): t is NonNullable<typeof t> => t !== undefined)
+          .map((t) => ({ slug: t.slug, name: t.name }))
+      : undefined;
     const personal = personalOf(rules, m.userId, team);
     const budget = team ? budgetOf(rules, { kind: 'team', id: team }) : undefined;
     const tenantBudget = tenantId ? budgetOf(rules, { kind: 'tenant', id: tenantId }) : undefined;
@@ -124,11 +154,13 @@ export const buildTeamsView = (input: TeamsInput): TeamsView => {
       chatsWeek: m.chatsWeek ?? null,
       mrsWeek: m.mrsWeek ?? null,
       self,
+      ...(openIn && openIn.length > 0 ? { openIn } : {}),
       can: { limit: canLimit, role: canRole, team: canTeam, remove: canTeam },
       needs: {
-        limit: canLimit || self ? null : limitNeeds,
+        // Nobody «could» do it for a person in several tenants: the card says which tenant to open instead.
+        limit: canLimit || self || openIn ? null : limitNeeds,
         role: canRole || self ? null : 'tenant_admin',
-        team: canTeam || self ? null : 'tenant_admin',
+        team: canTeam || self || openIn ? null : 'tenant_admin',
       },
       rules: axisRules((r) => r.userId === m.userId),
     };
@@ -144,6 +176,7 @@ export const buildTeamsView = (input: TeamsInput): TeamsView => {
     const limit = budget ? shown(budget.amount) : null;
     return {
       id: t.id,
+      tenantId: t.tenantId,
       name: t.name,
       leadName: everyone.find((p) => p.id === t.leadIds[0])?.name ?? null,
       spentRub:
@@ -178,6 +211,11 @@ export const buildTeamsView = (input: TeamsInput): TeamsView => {
 
   const own = budgetOf(rules, scope);
   const caps = capsOf(me, scope);
+  // The viewer can invite and make teams in the scope's tenant, or in any tenant when the scope is the organization.
+  const manageable =
+    scope.kind === 'org'
+      ? view.tenants.some((t) => capsOf(me, { kind: 'tenant', id: t.id })?.manage)
+      : (caps?.manage ?? false);
   const tenant = view.tenants.find((t) => t.id === tenantId);
   const team = scope.kind === 'team' ? teams[0] : undefined;
   const label = team
@@ -203,25 +241,26 @@ export const buildTeamsView = (input: TeamsInput): TeamsView => {
     activeSeries: [],
     notAccepted: everyone.filter((p) => p.invited).length,
     notVisiting: everyone.filter((p) => !p.invited && !seenWithin(p, NOT_VISITING)).length,
-    can: { createTeam: scope.kind === 'tenant' && (caps?.manage ?? false), invite: caps?.manage ?? false },
+    can: {
+      createTeam: scope.kind !== 'team' && manageable,
+      invite: scope.kind !== 'team' && manageable,
+    },
+    // The hub has no machines-per-person limit, shared accounts or secrets per team.
+    supports: { teamExtras: false },
     spendKnown: spend !== null,
   };
 };
 
+const AMBIGUOUS = 'Человек состоит в нескольких тенантах. Откройте нужный тенант и повторите.';
+
 /** Where a person's limit lives: in their team, else in the tenant. */
 export const personalScope = (input: TeamsInput, userId: string): ApiScope => {
   const member = input.members.find((m) => m.userId === userId);
-  if (!member) throw new OrgApiError('not_found', 'person not found');
+  if (!member) throw new OrgApiError('not_found', 'Такого человека нет');
   const team = primaryTeam(member, input.view.teams);
   if (team) return { kind: 'team', id: team };
-  const tenant =
-    input.scope.kind === 'tenant'
-      ? input.scope.id
-      : input.view.tenants.length === 1
-        ? input.view.tenants[0]?.id
-        : undefined;
-  if (!tenant)
-    throw new OrgApiError('invalid_request', 'Откройте тенант этого человека, чтобы поставить лимит.');
+  const tenant = tenantOfPerson(input, userId);
+  if (!tenant) throw new OrgApiError('invalid_request', AMBIGUOUS);
   return { kind: 'tenant', id: tenant };
 };
 
@@ -278,6 +317,7 @@ export const liveTeams = (): TeamsApi => {
     setShownCurrency(limits.currency.code);
     rate = limits.currency.perUsd;
     const spend = await readSpend(org, key);
+    const memberTenants = await tenantsOfLoose(org, view, scope, members);
     return {
       view,
       scope,
@@ -286,7 +326,32 @@ export const liveTeams = (): TeamsApi => {
       currency: limits.currency,
       spend,
       now: Date.now(),
+      memberTenants,
     };
+  };
+
+  // «All» view: a person with no team may sit in several tenants; ask each tenant who is in it.
+  const tenantsOfLoose = async (
+    org: string,
+    view: OrgView,
+    scope: ApiScope,
+    members: Member[],
+  ): Promise<Map<string, string[]> | null> => {
+    if (scope.kind !== 'org' || view.tenants.length < 2) return null;
+    if (!members.some((m) => primaryTeam(m, view.teams) === null)) return null;
+    const lists = await Promise.all(
+      view.tenants
+        .filter((t) => capsOf(view.me, { kind: 'tenant', id: t.id })?.view)
+        .map(async (t) => ({
+          id: t.id,
+          ids: (
+            await http.get<{ members: Member[] }>(orgPath(org, `/scopes/tenant/${t.id}/members`))
+          ).members.map((m) => m.userId),
+        })),
+    );
+    const out = new Map<string, string[]>();
+    for (const l of lists) for (const u of l.ids) out.set(u, [...(out.get(u) ?? []), l.id]);
+    return out;
   };
 
   const readSpend = async (org: string, scope: string): Promise<TeamsInput['spend']> => {
@@ -322,7 +387,7 @@ export const liveTeams = (): TeamsApi => {
     setRuleAmount: async (org, slug, ruleId, amount) => {
       const input = await read(org, slug);
       const rule = input.rules.find((r) => r.id === ruleId);
-      if (!rule) throw new OrgApiError('not_found', 'rule not found');
+      if (!rule) throw new OrgApiError('not_found', 'Такого лимита нет');
       const body: PutLimitRequest = {
         scope: rule.scope,
         userId: rule.userId,
@@ -354,7 +419,7 @@ export const liveTeams = (): TeamsApi => {
     moveToTeam: async (org, slug, personId, teamId) => {
       const input = await read(org, slug);
       const member = input.members.find((m) => m.userId === personId);
-      if (!member) throw new OrgApiError('not_found', 'person not found');
+      if (!member) throw new OrgApiError('not_found', 'Такого человека нет');
       const from = primaryTeam(member, input.view.teams);
       if (teamId) {
         await http.put(orgPath(org, `/teams/${teamId}/members/${personId}`), { isPrimary: true });
@@ -366,19 +431,28 @@ export const liveTeams = (): TeamsApi => {
       const input = await read(org, slug);
       if (input.scope.kind === 'team') {
         await http.del(orgPath(org, `/teams/${input.scope.id}/members/${personId}`));
-      } else if (input.scope.kind === 'tenant') {
-        await http.del(`/api/spaces/${input.scope.id}/members/${personId}`);
       } else {
-        throw new OrgApiError('invalid_request', 'Откройте тенант этого человека, чтобы убрать его.');
+        // In the «all» view the tenant comes from the person's team or the tenants they are in.
+        const tenant = tenantOfPerson(input, personId);
+        if (!tenant) throw new OrgApiError('invalid_request', AMBIGUOUS);
+        await http.del(`/api/spaces/${tenant}/members/${personId}`);
       }
       return load(org, slug);
     },
-    createTeam: async (org, slug, name) => {
+    createTeam: async (org, slug, name, tenantId) => {
       const input = await read(org, slug);
-      if (input.scope.kind !== 'tenant') {
-        throw new OrgApiError('invalid_request', 'Откройте тенант, чтобы создать в нём команду.');
-      }
-      await http.post(orgPath(org, '/teams'), { tenantId: input.scope.id, name: name.trim() });
+      const only = input.view.tenants.length === 1 ? input.view.tenants[0]?.id : undefined;
+      const tenant = input.scope.kind === 'tenant' ? input.scope.id : (tenantId ?? only);
+      if (!tenant) throw new OrgApiError('invalid_request', 'Выберите тенант, в котором создать команду.');
+      await http.post(orgPath(org, '/teams'), { tenantId: tenant, name: name.trim() });
+      return load(org, slug);
+    },
+    renameTeam: async (org, slug, teamId, name) => {
+      await http.patch(orgPath(org, `/teams/${teamId}`), { name: name.trim() });
+      return load(org, slug);
+    },
+    deleteTeam: async (org, slug, teamId) => {
+      await http.del(orgPath(org, `/teams/${teamId}`));
       return load(org, slug);
     },
     teamsAudit: async (org, slug, before) => {

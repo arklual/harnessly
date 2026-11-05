@@ -127,6 +127,7 @@ describe('v2 closed lists', () => {
     DesignVideoFormat: v2.DESIGN_VIDEO_FORMATS,
     DesignRole: v2.DESIGN_ROLES,
     FileKind: v2.FILE_KINDS,
+    FileGit: v2.FILE_GITS,
     AppID: v2.APP_IDS,
     OpenTab: v2.OPEN_TABS,
     AppState: v2.APP_STATES,

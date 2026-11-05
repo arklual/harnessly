@@ -65,6 +65,19 @@ func ChildPIDs(parent int) []int {
 	return out
 }
 
+// All is every process of the machine, in pid order.
+func All() []int {
+	entries, _ := os.ReadDir("/proc")
+	out := []int{}
+	for _, e := range entries {
+		if pid, err := strconv.Atoi(e.Name()); err == nil {
+			out = append(out, pid)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // ChildrenFromTable finds a process's children by reading every process's parent, as pgrep -P does.
 func ChildrenFromTable(parent int) []int {
 	entries, _ := os.ReadDir("/proc")

@@ -1,11 +1,14 @@
 // The machine card: what is going on with it, its load over a day, its resources, who may start chats, and the actions.
+import { useState } from 'react';
+
 import { useNow } from '../../../lib/hooks';
 import type { OrgMachine } from '../../../org/api/machines';
 import { LoadRow } from '../../charts/spark';
 import { Btn, Drawer, Icon } from '../../ui';
 import { AccessSection } from './access';
-import { cardSub, statusOf } from './calc';
+import { canOpen, cardSub, cleanName, statusOf } from './calc';
 import { MachineDialogs } from './dialogs';
+import { useOpenMachine } from './open';
 import { ErrorRow } from './parts';
 import { ResourcesSection } from './resources';
 import type { DrawerState } from './url';
@@ -32,6 +35,7 @@ export const MachineDrawer = ({
   mlUrl,
   url,
   onChanged,
+  onRemoved,
 }: {
   id: string;
   open: boolean;
@@ -40,8 +44,12 @@ export const MachineDrawer = ({
   mlUrl: string | null;
   url: Pick<DrawerState, 'tab' | 'dlg' | 'close' | 'setTab' | 'setDlg'>;
   onChanged: (m: OrgMachine) => void;
+  /** The machine was taken away: the list is read again and the card closes. */
+  onRemoved: () => void;
 }) => {
   const card = useMachineCard(id, onChanged);
+  const ws = useOpenMachine();
+  const [renaming, setRenaming] = useState<string | null>(null);
   const now = useNow(30_000, open);
   const d = card.detail;
   const m = d?.machine ?? hint;
@@ -60,6 +68,13 @@ export const MachineDrawer = ({
     return ok;
   };
 
+  const saveName = async () => {
+    const name = cleanName(renaming ?? '');
+    if (name === null) return;
+    if (name === m?.name) return setRenaming(null);
+    if (await card.rename(name)) setRenaming(null);
+  };
+
   const body = () => {
     if (card.loadError && !d) {
       return <ErrorRow text="Не удалось загрузить машину" onRetry={card.reload} />;
@@ -68,10 +83,17 @@ export const MachineDrawer = ({
     const off = m.state === 'offline' || m.state === 'disabled';
     return (
       <>
-        {card.error && (
+        {(card.error || ws.error?.id === id) && (
           <div className="md-err" role="alert">
-            <span>{card.error}</span>
-            <button type="button" className="md-link" onClick={card.clearError}>
+            <span>{card.error ?? ws.error?.text}</span>
+            <button
+              type="button"
+              className="md-link"
+              onClick={() => {
+                card.clearError();
+                ws.clear();
+              }}
+            >
               Закрыть
             </button>
           </div>
@@ -123,6 +145,66 @@ export const MachineDrawer = ({
           onCancel={() => url.setTab(null)}
           onSave={saveAccess}
         />
+        {m.canAdmin && (
+          <div className="md-sec">
+            <div className="md-sec__head">
+              <span className="md-sec__t">Название</span>
+              {renaming === null && busy == null && (
+                <button type="button" className="ad-add" onClick={() => setRenaming(m.name)}>
+                  Переименовать
+                </button>
+              )}
+            </div>
+            {renaming === null ? (
+              <p className="md-acc-sum">{m.name}</p>
+            ) : (
+              <form
+                className="md-rename"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void saveName();
+                }}
+              >
+                <input
+                  className="hx-set__input"
+                  value={renaming}
+                  maxLength={60}
+                  autoFocus
+                  aria-label="Название машины"
+                  aria-invalid={cleanName(renaming) === null || undefined}
+                  onChange={(e) => setRenaming(e.target.value)}
+                />
+                <Btn variant="ghost" size="sm" onClick={() => setRenaming(null)}>
+                  Отмена
+                </Btn>
+                <Btn variant="primary" size="sm" type="submit" disabled={cleanName(renaming) === null}>
+                  Сохранить
+                </Btn>
+              </form>
+            )}
+            <p className="md-note">
+              Название от 1 до 60 символов. Так машину видят все, у кого есть к ней доступ.
+            </p>
+          </div>
+        )}
+        {m.canAdmin && (
+          <div className="md-sec md-remove">
+            <div className="md-sec__t">Убрать машину</div>
+            <p className="md-note">
+              Машина пропадёт из хаба, её ключ перестанет работать. Сам сервер не удаляется.
+            </p>
+            <Btn
+              variant="outline"
+              size="sm"
+              icon="trash-2"
+              className="md-danger"
+              disabled={busy != null}
+              onClick={() => url.setDlg('remove')}
+            >
+              Убрать машину…
+            </Btn>
+          </div>
+        )}
       </>
     );
   };
@@ -139,13 +221,30 @@ export const MachineDrawer = ({
           )
         ) : (
           <>
-            {m.runnerOutdated && (
+            {canOpen(m) && (
               <Btn
                 variant="primary"
                 size="sm"
+                icon="external-link"
+                busy={ws.busyId === m.id}
+                disabled={busy != null}
+                onClick={() => void ws.open(m.id)}
+              >
+                Открыть
+              </Btn>
+            )}
+            {m.runnerOutdated && (
+              <Btn
+                variant="outline"
+                size="sm"
                 icon="download"
-                aria-disabled
-                title="Раннер обновляется вместе с перезапуском на самой машине"
+                aria-disabled={!canRestart}
+                title={
+                  !m.canManage
+                    ? NEEDS.team_lead
+                    : 'Раннер подхватит новую версию при перезапуске: выберем «Раннер» и подтвердим'
+                }
+                onClick={() => canRestart && url.setDlg('restart')}
               >
                 Обновить раннер
               </Btn>
@@ -192,6 +291,10 @@ export const MachineDrawer = ({
         onOff={() => {
           url.setDlg(null);
           void card.disable();
+        }}
+        onRemove={() => {
+          url.setDlg(null);
+          void card.remove().then((ok) => ok && onRemoved());
         }}
       />
     ) : null;

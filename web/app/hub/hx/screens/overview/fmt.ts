@@ -3,7 +3,7 @@ import type { ChatEnd } from '../../../org/api/member';
 import type { OverviewPeriod } from '../../../org/api/overview';
 import { monthWord } from '../../../org/dates';
 import { inRubles, shownSymbol } from '../../../org/money';
-import { ago, rub, tokens, usd } from '../../../org/screens/overview/format';
+import { ago, fromUsdExact, rub, tokens, usd } from '../../../org/screens/overview/format';
 import { kRub, plural, thousand } from '../../../org/screens/teams/format';
 
 export { ago, kRub, plural, rub, thousand, tokens, usd };
@@ -32,12 +32,11 @@ export const forPeriod = (p: OverviewPeriod): string => (p === 'week' ? 'за н
 
 export type Unit = 'rub' | 'usd' | 'tok';
 
-/** The units the donut counts in: money in the shown currency, dollars next to it, tokens. */
+/** The units the donut counts in: money in the shown currency and tokens; one currency on the whole hub. */
 export const unitsOf = (): { id: Unit; label: string }[] =>
   inRubles()
     ? [
         { id: 'rub', label: shownSymbol() },
-        { id: 'usd', label: '$' },
         { id: 'tok', label: 'Токены' },
       ]
     : [
@@ -70,11 +69,9 @@ export const thousandBare = (n: number): string => thousand(n).replace(/ тыс$
 
 export const people = (n: number): string => `${n} ${plural(n, 'человек', 'человека', 'человек')}`;
 
-/** «10,4 тыс ₽ · $115 · 48 млн токенов», the ruble part only when the hub counts in rubles. */
+/** «10,4 тыс ₽ · 48 млн токенов»: the money once, in the hub's currency. */
 export const spendLine = (s: { rub: number; usd: number; tokens: number }, estimated: boolean): string => {
-  const parts = [inRubles() ? rub(s.rub) : null, usd(s.usd), `${tokens(s.tokens)} токенов`].filter(
-    (x): x is string => x !== null,
-  );
+  const parts = [inRubles() ? rub(s.rub) : usd(s.usd), `${tokens(s.tokens)} токенов`];
   return `${parts.join(' · ')}${estimated ? ' · оценка' : ''}`;
 };
 
@@ -96,12 +93,14 @@ export const tileLabels = (basis: 'today' | 'period', p: OverviewPeriod) =>
         active: 'Активны сегодня',
         tasks: 'Задачи сегодня',
         nav: 'Сводка за сегодня',
+        scope: 'Считаем за сегодня.',
       }
     : {
         spend: `Расход ${forPeriod(p)}`,
         active: `Активны ${forPeriod(p)}`,
         tasks: `Задачи ${forPeriod(p)}`,
         nav: `Сводка ${forPeriod(p)}`,
+        scope: `Считаем ${forPeriod(p)}.`,
       };
 
 // ── Efficiency and subscriptions ────────────────────────────────────────────────────────────────────────────────
@@ -186,8 +185,8 @@ export const mrLine = (week: number, merged: number | null): string =>
     ? `${week}`
     : `${week} · ${merged} ${plural(merged, 'уже смёржен', 'уже смёржены', 'уже смёржены')}`;
 
-export const machineLine = (m: { name: string; online: boolean; loadPct: number }): string =>
-  `${m.name} ${m.online ? 'на связи' : 'не в сети'}${m.online ? ` · загрузка ${Math.round(m.loadPct)}%` : ''}`;
+export const machineLine = (m: { name: string; online: boolean; loadPct: number | null }): string =>
+  `${m.name} ${m.online ? 'на связи' : 'не в сети'}${m.online && m.loadPct !== null ? ` · загрузка ${Math.round(m.loadPct)}%` : ''}`;
 
 export type ChatMark = 'run' | 'ok' | 'rev' | 'drop';
 
@@ -207,8 +206,8 @@ export const chatTag = (end: ChatEnd, mr: string | null): string =>
         ? `MR ${mr ?? ''} на ревью`.replace('  ', ' ')
         : 'брошен без MR';
 
-/** «$4,2» */
-export const chatCost = (usdAmount: number): string => `$${fixed1(usdAmount)}`;
+/** «378 ₽»: a chat's cost in the hub's currency. */
+export const chatCost = (usdAmount: number): string => fromUsdExact(usdAmount);
 
 // ── The lead line under the title ───────────────────────────────────────────────────────────────────────────────
 

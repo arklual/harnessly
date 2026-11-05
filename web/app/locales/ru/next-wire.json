@@ -35,7 +35,8 @@
   "next.update.title": "Вышла новая версия",
   "next.update.reload": "Обновить",
   "next.update.later": "Позже",
-  "next.connection.now": "Сейчас",
+  "next.connection.now": "Переподключиться",
+  "next.connection.nowShort": "Сейчас",
   "next.connection.retrying": "Подключаемся",
   "next.connection.back": "Снова на связи"
 }

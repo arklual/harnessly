@@ -1264,3 +1264,14 @@
 .hx-gallery-dl__site {
   height: 100dvh;
 }
+
+.hx-gallery-dl__chat {
+  position: relative;
+  height: 100%;
+}
+.hx-gallery-dl__chat > .hx-dock {
+  position: absolute;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--hx-bg-raised);
+}

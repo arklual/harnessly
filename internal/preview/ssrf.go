@@ -193,8 +193,62 @@ func systemLookup(host string) ([]string, error) {
 
 // ResolvePublic resolves a host once and refuses it when any of its addresses is not public.
 func ResolvePublic(host string, lookup Lookup, local map[string]bool) Resolved {
+	return resolveWith(host, lookup, func(a string) bool { return IsForbiddenAddress(a, local) })
+}
+
+// The private networks a listed host may point into: an office or overlay network. Loopback, link-local, the special
+// ranges and this machine's own addresses stay refused for it too.
+var (
+	meshV4 = prefixes("10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16")
+	meshV6 = prefixes("fc00::/7")
+)
+
+// isMeshAddress: an address of a private network a listed host may lead to.
+func isMeshAddress(address string) bool {
+	a, err := netip.ParseAddr(address)
+	if err != nil || a.Zone() != "" {
+		return false
+	}
+	list := meshV6
+	if a.Is4() {
+		list = meshV4
+	}
+	for _, p := range list {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
+}
+
+// ResolveListed resolves a host the deployment named (RUNTIME_PREVIEW_PRIVATE_HOSTS, GitLab behind an overlay network,
+// say): it may point into a private network, never into the machine itself or a special range.
+func ResolveListed(host string, lookup Lookup, local map[string]bool) Resolved {
+	return resolveWith(host, lookup, func(a string) bool {
+		if local[strings.ToLower(a)] {
+			return true
+		}
+		return IsForbiddenAddress(a, local) && !isMeshAddress(a)
+	})
+}
+
+// PrivateHosts reads the deployment's list of hosts that may resolve into a private network: names only, written
+// lower-case without a trailing dot; an address or localhost in the list is ignored.
+func PrivateHosts(list []string) map[string]bool {
+	out := map[string]bool{}
+	for _, h := range list {
+		h = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(h)), ".")
+		if h == "" || LiteralAddress(h).Family != 0 || localhostName.MatchString(h) || strings.ContainsAny(h, ":/@ ") {
+			continue
+		}
+		out[h] = true
+	}
+	return out
+}
+
+func resolveWith(host string, lookup Lookup, forbidden func(address string) bool) Resolved {
 	if lit := LiteralAddress(host); lit.Family != 0 {
-		if IsForbiddenAddress(lit.Address, local) {
+		if forbidden(lit.Address) {
 			return Resolved{Error: "forbidden"}
 		}
 		return lit
@@ -210,7 +264,7 @@ func ResolvePublic(host string, lookup Lookup, local map[string]bool) Resolved {
 		return Resolved{Error: "not-found"}
 	}
 	for _, a := range answers {
-		if IsForbiddenAddress(a, local) {
+		if forbidden(a) {
 			return Resolved{Error: "forbidden"}
 		}
 	}

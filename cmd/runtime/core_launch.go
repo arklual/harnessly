@@ -16,7 +16,6 @@ import (
 	"github.com/ly-solutions/harnessly/internal/gate"
 	"github.com/ly-solutions/harnessly/internal/launch"
 	"github.com/ly-solutions/harnessly/internal/proc"
-	"github.com/ly-solutions/harnessly/internal/sessions"
 	"github.com/ly-solutions/harnessly/internal/sleep"
 	"github.com/ly-solutions/harnessly/internal/status"
 )
@@ -163,14 +162,13 @@ func (c *core) resumeConfig() launch.ResumeConfig {
 
 func newResumeConfig(home string, tm launch.ResumeTmux, installed func(string) (bool, bool), rules sleep.Config, now func() time.Time) launch.ResumeConfig {
 	activity := &claude.ActivityReader{}
-	projects := claude.NewDetector(home).ProjectsDir()
-	codexRoot := codex.NewDetector(home).SessionsRoot()
+	claudeDet, codexDet := claude.NewDetector(home), codex.NewDetector(home)
 	return launch.ResumeConfig{
 		Tmux:      tm,
 		Installed: installed,
 		LastActivity: func(provider, sid string) *float64 {
 			if provider == agents.Codex {
-				m, ok := codex.FindSessionByID(codexRoot, sid, now(), codex.ScanDays)
+				m, ok := codexDet.FindSession(sid)
 				if !ok {
 					return nil
 				}
@@ -181,7 +179,7 @@ func newResumeConfig(home string, tm launch.ResumeTmux, installed func(string) (
 				ms := float64(st.ModTime().UnixNano()) / 1e6
 				return &ms
 			}
-			path := claude.FindTranscript(projects, sid)
+			path := claudeDet.FindTranscript(sid)
 			if path == "" {
 				return nil
 			}
@@ -245,7 +243,7 @@ func (c *core) launchRoutes(f *gate.Gate, d deps, isMachineAgent func(*http.Requ
 			return nil
 		},
 		ProjectDir: func(cwd string) string {
-			return filepath.Join(c.cfg.Home, ".claude", "projects", sessions.ProjectName(cwd))
+			return c.claude.ProjectDirOf(cwd)
 		},
 		Log: coreLog,
 	}

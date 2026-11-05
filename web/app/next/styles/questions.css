@@ -16,12 +16,12 @@
   min-height: 0;
   overflow: hidden;
 }
+/* The top of the dock's one unit (composer.css): as wide as the field, its corners, the text on the field's left edge. */
 .hx-ask__inner {
-  margin: 0 18px;
-  padding: 10px 12px 12px;
+  padding: 12px 12px 12px 20px;
   border: 1px solid var(--hx-border-strong);
   border-bottom: 0;
-  border-radius: 20px 20px 0 0;
+  border-radius: var(--hx-dock-r, 28px) var(--hx-dock-r, 28px) 0 0;
   background: linear-gradient(var(--hx-bg-hover), var(--hx-bg-hover)), var(--hx-bg-raised);
   animation: hx-ask-in 360ms var(--hx-ease-out) backwards;
   transition:
@@ -35,12 +35,33 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 30px;
+  height: 28px;
+}
+/* One question: what it is about, small and quiet; several have their tabs instead. */
+.hx-ask__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  white-space: nowrap;
+}
+.hx-ask__title > .hx-icon {
+  flex: none;
+  color: var(--hx-accent);
+}
+.hx-ask__title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .hx-ask__tabs {
   display: flex;
   gap: 2px;
   min-width: 0;
+  margin-left: -10px;
   overflow: hidden;
 }
 .hx-ask__tab {
@@ -112,7 +133,7 @@
 }
 .hx-ask__panes {
   display: grid;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .hx-ask__pane {
   grid-area: 1 / 1;
@@ -137,14 +158,29 @@
 .hx-ask__pane[data-dir='prev'] {
   transform: translateX(-28px);
 }
+/* The question reads as the chat's text, not a headline: a long one stops at six lines and scrolls inside, its edge
+   fading while there is more below (a scroll timeline: a question that fits has none). */
 .hx-ask__q {
-  padding: 0 2px;
-  font-size: 15px;
-  font-weight: var(--hx-weight-semibold);
+  max-height: calc(22px * 6);
+  padding-right: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  color: var(--hx-fg-1);
+  font-size: var(--hx-text-md);
+  font-weight: var(--hx-weight-regular);
   line-height: 22px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@supports (animation-timeline: scroll()) {
+  .hx-ask__q {
+    animation: hx-ask-q-fade linear both;
+    animation-timeline: scroll(self);
+  }
 }
 .hx-ask__body {
-  margin-top: 8px;
+  margin-top: 12px;
 }
 .hx-ask__body[data-preview='true'] {
   display: grid;
@@ -152,18 +188,21 @@
   gap: 10px;
   align-items: start;
 }
+/* The options' numbers stand on the question's left edge: the rows reach out by their own padding. */
 .hx-ask__opts {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  margin: 0 0 0 -8px;
 }
 .hx-ask__opt {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 10px;
+  grid-template-columns: 20px minmax(0, 1fr) 18px;
+  align-items: start;
+  gap: 12px;
   width: 100%;
-  padding: 7px 10px 7px 8px;
+  min-height: 40px;
+  padding: 8px;
   border: 1px solid transparent;
   border-radius: 12px;
   background: none;
@@ -176,23 +215,22 @@
     border-color 260ms var(--hx-ease-out);
 }
 .hx-ask__opt:hover {
-  background: var(--hx-bg-raised);
+  background: color-mix(in srgb, var(--hx-fg-1) 5%, transparent);
 }
 .hx-ask__opt:focus-visible {
   outline: 2px solid var(--hx-focus);
   outline-offset: 1px;
 }
 .hx-ask__opt[aria-pressed='true'] {
-  background: var(--hx-bg-raised);
+  background: var(--hx-accent-soft);
   border-color: color-mix(in srgb, var(--hx-accent) 40%, transparent);
-  box-shadow: var(--hx-shadow-sm);
 }
 .hx-ask__key {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 6px;
   box-shadow: inset 0 0 0 1px var(--hx-border-strong);
   font-family: var(--hx-font-mono);
   font-size: 11px;
@@ -223,6 +261,7 @@
   line-height: 20px;
 }
 .hx-ask__desc {
+  margin-top: 1px;
   font-size: var(--hx-text-xs);
   line-height: 16px;
   color: var(--hx-fg-3);
@@ -230,6 +269,7 @@
 .hx-ask__mark {
   width: 18px;
   height: 18px;
+  margin-top: 1px;
   display: grid;
   place-items: center;
   border-radius: 5px;
@@ -276,10 +316,9 @@
 .hx-ask__foot {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-height: 32px;
   margin-top: 8px;
-  padding-left: 2px;
 }
 .hx-ask__hint {
   min-width: 0;
@@ -368,8 +407,8 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 38px;
-  padding: 0 16px;
+  height: 40px;
+  padding: 0 20px;
   border: 0;
   background: none;
   color: var(--hx-fg-1);
@@ -633,9 +672,27 @@
   color: var(--hx-danger);
 }
 
+/* A phone: the field stays in view with the keyboard up — the question is shorter and the options scroll inside; the
+   options are a finger's height. */
 @media (max-width: 900px) {
+  .hx-ask__q {
+    max-height: calc(22px * 4);
+  }
+  .hx-ask__body {
+    max-height: max(132px, calc(100dvh - var(--hx-kb, 0px) - 420px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .hx-ask__opt {
+    min-height: 48px;
+    align-items: center;
+  }
+}
+/* A narrow dock (a phone, a design's chat column, the side chat; composer.css): tighter, the preview under the options,
+   the tabs scroll and «Answer in chat» is its chevron. */
+@container hx-dock (max-width: 580px) {
   .hx-ask__inner {
-    margin: 0 14px;
+    padding: 8px 8px 12px 16px;
   }
   .hx-ask__body[data-preview='true'] {
     grid-template-columns: minmax(0, 1fr);
@@ -661,6 +718,9 @@
   .hx-ask__head > .hx-spacer {
     display: none;
   }
+  .hx-ask__title {
+    flex: 1 1 auto;
+  }
   .hx-ask__min {
     width: 32px;
     height: 32px;
@@ -668,9 +728,6 @@
     justify-content: center;
     gap: 0;
     font-size: 0;
-  }
-  .hx-ask__opt {
-    min-height: 48px;
   }
   .hx-ask__foot:has(.hx-ask__err) {
     flex-wrap: wrap;
@@ -707,12 +764,28 @@
   .hx-ask__inner {
     animation: none;
   }
+  .hx-ask__pane,
+  .hx-ask__full,
+  .hx-ask__fold,
+  .hx-ask__fullclip,
+  .hx-ask__foldclip {
+    transition-duration: 1ms;
+  }
 }
 
 @keyframes hx-ask-in {
   from {
     opacity: 0;
     transform: translateY(12px);
+  }
+}
+@keyframes hx-ask-q-fade {
+  from,
+  95% {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  }
+  to {
+    mask-image: none;
   }
 }
 @keyframes hx-ask-rows-out {

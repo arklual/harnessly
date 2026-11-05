@@ -33,6 +33,17 @@ const AgentTerminal = ({ open, url, cwd, title, provider, onClose }: IAgentTermi
     rootRef.current?.style.setProperty('--term-h', `${height}px`);
   }, [height]);
 
+  // Where the panel stands in a design's chat, the column makes room for it: the host (the design's section) is told
+  // how much, so the feed and the field rise above the panel.
+  useLayoutEffect(() => {
+    const host = rootRef.current?.closest<HTMLElement>('.hx-site');
+    if (!host) return;
+    host.style.setProperty('--term-space', open ? `${height}px` : '0px');
+    return () => {
+      host.style.removeProperty('--term-space');
+    };
+  }, [open, height]);
+
   const onGripDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     start.current = { y: event.clientY, h: height };

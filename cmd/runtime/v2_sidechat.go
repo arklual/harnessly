@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"io"
 	"net/http"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"github.com/ly-solutions/harnessly/internal/convo"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/locale"
-	"github.com/ly-solutions/harnessly/internal/sessions"
 	"github.com/ly-solutions/harnessly/internal/sidechat"
 	"github.com/ly-solutions/harnessly/internal/wire"
 )
@@ -47,7 +47,7 @@ var v2SideChatRefusals = map[string]struct {
 }
 
 func (c *v2SideChat) projectDir(cwd string) string {
-	return filepath.Join(c.home, ".claude", "projects", sessions.ProjectName(cwd))
+	return claude.NewDetector(c.home).ProjectDirOf(cwd)
 }
 
 func (c *v2SideChat) refuse(w http.ResponseWriter, code, text string) {

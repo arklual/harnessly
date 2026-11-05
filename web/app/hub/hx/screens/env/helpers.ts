@@ -4,11 +4,13 @@ import type {
   Audience,
   CatalogKind,
   EnvCard,
+  EnvDelivery,
   EnvEntryRow,
   EnvLayer,
   EnvLayerKind,
   EnvResponse,
   EnvSummary,
+  ItemDelivery,
   LockedReason,
   MeEnvItem,
   PatchEntryRequest,
@@ -102,6 +104,55 @@ export interface Tile {
   chart: TileChart;
 }
 
+const machines = (n: number): string => `${n} ${plural(n, 'машине', 'машинах', 'машинах')}`;
+
+/** How far the list got: how many of the screen's machines hold the current one. */
+export const deliveryTile = (d: EnvDelivery, total: number): Tile => {
+  const behind = Math.max(0, d.machines - d.current);
+  let value: string;
+  if (d.machines === 0) value = 'машин пока нет';
+  else if (total === 0)
+    value = `доставлять пока нечего · ${d.machines} ${plural(d.machines, 'машина', 'машины', 'машин')}`;
+  else if (behind === 0) value = `${d.current} из ${d.machines} — у всех свежий список`;
+  else if (d.reported === 0) value = `0 из ${d.machines} — машины ещё не отвечали`;
+  else value = `${d.current} из ${d.machines} · ${behind} ещё не получили`;
+  return {
+    tone: '#22a06b',
+    icon: 'server',
+    label: 'Доехало до машин',
+    value,
+    chart: {
+      strip: [
+        { weight: d.current, color: '#22a06b' },
+        { weight: Math.max(0, d.reported - d.current), color: '#c8830b' },
+        { weight: Math.max(0, d.machines - d.reported) },
+      ],
+    },
+  };
+};
+
+/** What went wrong with an item on the machines, in the board's words; null: nothing. */
+export const deliveryIssue = (d: ItemDelivery | null): string | null => {
+  if (!d) return null;
+  if (d.error) return `не встало на ${machines(d.error)}`;
+  if (d.pending) return `работает не полностью на ${machines(d.pending)}`;
+  return null;
+};
+
+/** The card's line about the machines: where the item stands and why not, if not. */
+export const deliveryText = (d: ItemDelivery | null, all: EnvDelivery): string => {
+  if (all.machines === 0) return 'Машин пока нет — список доедет, когда машина подключится';
+  if (!d)
+    return all.current
+      ? 'Машины со свежим списком об этом элементе пока не сообщили'
+      : 'Машины ещё не получили свежий список';
+  const parts = [`стоит на ${machines(d.ok)}`];
+  if (d.pending) parts.push(`не полностью на ${machines(d.pending)}`);
+  if (d.error) parts.push(`не встало на ${machines(d.error)}`);
+  const head = parts.join(', ');
+  return `${head.charAt(0).toUpperCase()}${head.slice(1)} из ${all.machines}`;
+};
+
 /** The calls of each of the 14 days over every row that is switched on. */
 export const dailyCalls = (layers: readonly EnvLayer[]): number[] => {
   const out = Array.from({ length: 14 }, () => 0);
@@ -153,15 +204,7 @@ export const tilesOf = (view: EnvResponse): Tile[] => {
         ],
       },
     },
-    {
-      tone: '#7c7c86',
-      icon: 'lock',
-      label: 'Закреплено организацией',
-      value: `${s.pinnedByOrg} — в тенанте их не выключить`,
-      chart: {
-        strip: [{ weight: s.pinnedByOrg, color: '#7c7c86' }, { weight: Math.max(0, total - s.pinnedByOrg) }],
-      },
-    },
+    deliveryTile(view.delivery, view.summary.total),
   ];
 };
 
@@ -189,6 +232,9 @@ export interface RowVM {
   icon: string;
   name: string;
   sub: string;
+  /** What went wrong on the machines, shown instead of `sub`; `why` is the machine's own reason. */
+  issue: string | null;
+  why: string | null;
   who: string;
   off: boolean;
   zero: boolean;
@@ -222,6 +268,8 @@ export const rowVM = (
   icon: KIND_ICON[row.kind],
   name: row.name,
   sub: withLayer ? `${KIND_WORD[row.kind]} · ${layer.title}` : `${KIND_WORD[row.kind]} · ${row.hint}`,
+  issue: row.enabled ? deliveryIssue(row.delivery) : null,
+  why: row.enabled ? (row.delivery?.message ?? null) : null,
   who: whoText(row, layer, teams),
   off: !row.enabled,
   zero: !row.callsWeek,

@@ -1,7 +1,9 @@
 // «Нет связи» as the design draws it (.hx-net): a pill at the top of the window, over everything and in the way of
 // nothing. The conversation, the draft and the queue stay where they are; the pill says what happens — no connection
-// and a try again in N s with «Сейчас», then «Подключаемся», then «Снова на связи», which leaves by itself.
-import { useEffect, useMemo, useState } from 'react';
+// and a try again in N s with «Переподключиться», then «Подключаемся», then «Снова на связи», which leaves by itself.
+// A short loss (a machine's restart for an update, a blink of the network) passes unseen: messages wait in the outbox
+// and a dictation is kept in the browser anyway, so the pill comes only once the loss has lasted LOSS_GRACE_MS.
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePillWidth } from '@/next/ui/use-pill-width';
 import { createPortal } from 'react-dom';
 import { secondsToRetry } from '@/next/stores/connection';
@@ -10,12 +12,18 @@ import Icon, { type TIconName } from '@/next/ui/icon';
 import { usePortalContainer } from '@/next/ui/portal';
 import { usePresence } from '@/next/ui/presence';
 import usePending, { isBusy } from '@/next/ui/use-pending';
+import { useDelayed } from '@/next/ui/skeleton';
 import { t } from '@/next/i18n';
 import '@/next/styles/connection.css';
 
-const EXIT_MS = 260;
+const EXIT_MS = 320;
 /** How long «Снова на связи» stays before it leaves. */
 const BACK_MS = 1600;
+/** A state stays at least this long, so a quick lost → retry → lost does not flicker. */
+const DWELL_MS = 700;
+/** How long a loss goes unseen. A refusal that needs the person (sign in again, update the machine) shows at once. */
+export const LOSS_GRACE_MS = 30_000;
+const LOUD_CAUSES: ReadonlySet<string> = new Set(['unauthorized', 'proto']);
 
 const NET = { lost: 'lost', retry: 'retry', back: 'back' } as const;
 type TNet = (typeof NET)[keyof typeof NET];
@@ -47,6 +55,23 @@ const useSecond = (on: boolean): number => {
   return now;
 };
 
+/** The pill as it should be, held until its last state has been up for DWELL_MS; the countdown updates at once. */
+const useSteadyPill = (pill: IPill | null): IPill | null => {
+  const [shown, setShown] = useState(pill);
+  const since = useRef(0);
+  useEffect(() => {
+    if (pill === shown) return;
+    const same = pill?.net === shown?.net;
+    const wait = same ? 0 : Math.max(0, since.current + DWELL_MS - Date.now());
+    const timer = setTimeout(() => {
+      if (!same) since.current = Date.now();
+      setShown(pill);
+    }, wait);
+    return () => clearTimeout(timer);
+  }, [pill, shown]);
+  return shown;
+};
+
 interface IBannerProps {
   connection: Connection | undefined;
   machineName: string;
@@ -57,7 +82,11 @@ interface IBannerProps {
 const ConnectionBanner = ({ connection, machineName, onRetryNow }: IBannerProps) => {
   const container = usePortalContainer();
   const retry = usePending<'retry'>();
-  const trouble = connection && (connection.k === 'stale' || connection.k === 'offline') ? connection : null;
+  const down = connection && (connection.k === 'stale' || connection.k === 'offline') ? connection : null;
+  const loud = down?.k === 'offline' && LOUD_CAUSES.has(down.cause);
+  // Counted from the last moment the link was live: the tries in between (connecting) do not start it over.
+  const late = useDelayed(connection !== undefined && connection.k !== 'live', LOSS_GRACE_MS);
+  const trouble = down && (loud || late) ? down : null;
   // Once the connection was lost, the way back is shown too: «Подключаемся», then «Снова на связи» for a moment.
   const [lost, setLost] = useState(false);
   const [back, setBack] = useState(false);
@@ -95,7 +124,7 @@ const ConnectionBanner = ({ connection, machineName, onRetryNow }: IBannerProps)
     () => (net ? { net, text, sub, canRetry: !!canRetry } : null),
     [net, text, sub, canRetry],
   );
-  const { value, state } = usePresence(pill, EXIT_MS);
+  const { value, state } = usePresence(useSteadyPill(pill), EXIT_MS);
   const { outer, inner } = usePillWidth();
   const host = container?.current;
   if (!value || !host) return null;
@@ -118,9 +147,14 @@ const ConnectionBanner = ({ connection, machineName, onRetryNow }: IBannerProps)
             type="button"
             className="hx-net__now"
             disabled={isBusy(retry.phase)}
+            aria-label={t('next.connection.now')}
             onClick={() => retry.run('retry', async () => onRetryNow())}
           >
-            {t('next.connection.now')}
+            {/* On a very narrow screen the button says it shorter, so it never leaves the pill. */}
+            <span className="hx-net__now-long">{t('next.connection.now')}</span>
+            <span className="hx-net__now-short" aria-hidden="true">
+              {t('next.connection.nowShort')}
+            </span>
           </button>
         )}
       </span>

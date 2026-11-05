@@ -1,7 +1,7 @@
-// «Ещё» (the board's .pr-menu): the downloads — PDF, PPTX, MP4, PNG, HTML, each built by the machine as a job — and
-// «Как видит гость». On a phone it also carries what the bar has no room for: the comment hint, «Чат и заметки»,
-// «Стиль» and «Поделиться». An export the machine cannot build (no Chrome, no ffmpeg, nothing recorded yet) is shown
-// disabled with the reason in place of its hint.
+// «Ещё» (the board's .pr-menu): «Скачать…» (the bar's download menu, deckDownloads: PDF, PPTX, MP4, PNG, HTML and
+// the whole project, each built by the machine as a job) and «Как видит гость». On a phone it also carries what the
+// bar has no room for: the comment hint, «Чат и заметки», «Стиль» and «Поделиться». An export the machine cannot
+// build (no Chrome, no ffmpeg, nothing recorded yet) is shown disabled with the reason in place of its hint.
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
 import { toast } from '@/next/ui/toast';
@@ -10,12 +10,14 @@ import { deckExportHref, startDeckExport } from '@/next/features/designly/deck/a
 import { downloadDeckFile, followDeckExport } from '@/next/features/designly/deck/exports';
 import { deckToast } from '@/next/features/designly/deck/deck-toast';
 import {
+  DECK_ARCHIVES,
   DECK_EXPORTS,
   DECK_REC_STATE,
   type IDeckState,
   type TDeckExport,
 } from '@/next/features/designly/deck/types';
 import type { MachineId } from '@/next/protocol/v2';
+import type { IDownloadItem } from '@/next/features/designly/project-downloads';
 
 const ITEMS = {
   pdf: {
@@ -48,6 +50,12 @@ const ITEMS = {
     hint: 'next.deck.menu.htmlHint',
     toast: 'next.deck.menu.htmlToast',
   },
+  bundle: {
+    icon: 'files',
+    name: 'next.deck.menu.bundle',
+    hint: 'next.deck.menu.bundleHint',
+    toast: 'next.deck.menu.bundleToast',
+  },
 } as const satisfies Record<TDeckExport, { icon: string; name: string; hint: string; toast: string }>;
 
 /** The newest finished recording: what the MP4 is made of. */
@@ -56,6 +64,7 @@ export const lastRecording = (deck: IDeckState): string | null =>
 
 /** Why an export cannot be built on this machine now; null when it can. */
 export const exportBlocked = (deck: IDeckState, format: TDeckExport): string | null => {
+  if (DECK_ARCHIVES.has(format)) return null;
   if (!deck.chrome) return t('next.deck.menu.needsChrome');
   if (format !== 'mp4') return null;
   if (!deck.ffmpeg) return t('next.deck.menu.needsFfmpeg');
@@ -87,18 +96,40 @@ export const exportDeck = async (
 
 export interface IDeckMenuProps {
   state: TPresenceState;
-  /** null while the deck is not read yet: the downloads wait for it. */
-  deck: IDeckState | null;
   /** Edit: the phone's section has the panel, the style and the share. */
   edit: boolean;
-  onExport: (format: TDeckExport) => void;
+  /** «Скачать…»: the bar's download menu. */
+  onDownload: () => void;
   onGuest: () => void;
   onPanel: () => void;
   onStyle: () => void;
   onShare?: () => void;
 }
 
-const DeckMenu = ({ state, deck, edit, onExport, onGuest, onPanel, onStyle, onShare }: IDeckMenuProps) => (
+/**
+ * The deck's downloads for «Скачать» on its bar (project-downloads.tsx draws them): each format with what it is, or
+ * why the machine cannot make it now. The whole project is offered to those who may change it.
+ */
+export const deckDownloads = (
+  deck: IDeckState | null,
+  archives: boolean,
+  onExport: (format: TDeckExport) => void,
+): IDownloadItem[] =>
+  DECK_EXPORTS.filter((format) => archives || !DECK_ARCHIVES.has(format)).map((format) => {
+    const item = ITEMS[format];
+    const blocked = deck === null ? null : exportBlocked(deck, format);
+    return {
+      id: format,
+      icon: item.icon,
+      label: t(item.name),
+      hint: blocked ?? t(item.hint),
+      disabled: deck === null || blocked !== null,
+      sep: DECK_ARCHIVES.has(format),
+      pick: () => onExport(format),
+    };
+  });
+
+const DeckMenu = ({ state, edit, onDownload, onGuest, onPanel, onStyle, onShare }: IDeckMenuProps) => (
   <div
     className="hx-deck-menu"
     data-closing={state === PRESENCE.closing ? '1' : undefined}
@@ -131,29 +162,10 @@ const DeckMenu = ({ state, deck, edit, onExport, onGuest, onPanel, onStyle, onSh
       )}
       <div className="hx-deck-menu__sep" />
     </div>
-    <div className="hx-deck-menu__h">{t('next.deck.menu.download')}</div>
-    {DECK_EXPORTS.map((format) => {
-      const item = ITEMS[format];
-      const blocked = deck === null ? null : exportBlocked(deck, format);
-      return (
-        <button
-          key={format}
-          type="button"
-          className="hx-deck-item"
-          role="menuitem"
-          data-format={format}
-          disabled={deck === null || blocked !== null}
-          onClick={() => onExport(format)}
-        >
-          <Icon name={item.icon} />
-          <span>
-            {t(item.name)}
-            <small>{blocked ?? t(item.hint)}</small>
-          </span>
-        </button>
-      );
-    })}
-    <div className="hx-deck-menu__sep" />
+    <button type="button" className="hx-deck-item" role="menuitem" onClick={onDownload}>
+      <Icon name="download" />
+      <span>{t('next.download.more')}</span>
+    </button>
     <button type="button" className="hx-deck-item" role="menuitem" onClick={onGuest}>
       <Icon name="eye" />
       <span>{t('next.deck.menu.asGuest')}</span>

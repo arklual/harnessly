@@ -18,6 +18,8 @@ export interface IPublished {
   url: string;
   version: number;
   name: string;
+  /** Who may open it, where the hub said (a site read back after a reload). */
+  access?: TSiteAccess;
 }
 
 /** The site's name for a design: Latin letters, digits and hyphens, as the hub takes it; empty when the title has none. */
@@ -39,3 +41,18 @@ export const publishDesign = (machine: MachineId, req: IPublishRequest): Promise
     platformPath('/design/publish'),
     postJson({ project: req.project, name: req.name, access: req.access, pages: req.pages }),
   );
+
+/** The site made from the project, as the machine's hub keeps it; null when there is none (or no hub with sites). */
+export const fetchPublished = async (machine: MachineId, project: string): Promise<IPublished | null> => {
+  const answer = await runtimeJson<{
+    site: { url: string; name: string; access: string; version: number } | null;
+  }>(machine, platformPath(`/design/published?project=${encodeURIComponent(project)}`));
+  const site = answer?.site;
+  if (!site || typeof site.url !== 'string') return null;
+  return {
+    url: site.url,
+    name: site.name,
+    version: site.version,
+    access: site.access === 'link' ? 'link' : 'team',
+  };
+};

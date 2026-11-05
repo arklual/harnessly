@@ -10,6 +10,7 @@ import LinkCard, { cardKindOf } from '@/next/features/chat/link-card';
 import MermaidBlock from '@/next/features/chat/mermaid-block';
 import { changeLinkLabel, docOfCode, splitRefs } from '@/next/features/chat/refs';
 import RefChip, { RefContext } from '@/next/features/chat/ref-chip';
+import { fileNameOf, isReportPath } from '@/next/features/chat/report-paths';
 import type { RefKind } from '@/next/features/chat/types';
 import Icon from '@/next/ui/icon';
 import { t } from '@/next/i18n';
@@ -156,12 +157,12 @@ const components = {
 
 // A path in inline code (`/home/…/review.md`, `web/app/x.ts:12`): another agent's report names its files this way, and
 // there the path opens like a chip. The agent's own text keeps its code as code.
-const CODE_PATH = /^(?:~?\/)?(?:[\w@.-]+\/)+[\w@-]+(?:\.[\w-]+)+(?::\d+)?$/;
+// The chip says the file's name; the whole path is its hint.
 const withPaths = {
   ...components,
   code: ({ children }) => {
     const text = textOf(children);
-    if (CODE_PATH.test(text)) return <RefChip kind="file" label={text} />;
+    if (isReportPath(text)) return <RefChip kind="file" label={text} text={fileNameOf(text)} hint={text} />;
     return <code className="hx-md__code">{children}</code>;
   },
 } as Components;

@@ -47,10 +47,23 @@ export interface QueueRow {
 
 /** A one-line notice over the field: the machine stopped answering, or the subscription's limit ran out. */
 export type DockNotice =
-  /** A dictation the machine could not recognize, kept in the browser; `more`: how many others wait after it. */
-  | { kind: 'voice'; ms: Ms; more: number; onRetry: () => Promise<unknown>; onDrop: () => Promise<unknown> }
-  /** The machine of the chat is switched off: the chat is a read-only copy. */
-  | { kind: 'off' }
+  /**
+   * A dictation the machine could not recognize, kept in the browser; `more`: how many others wait after it. `busy`:
+   * the machine is recognizing it again (it takes a while for a long one); `failure`: why the last try did not work.
+   */
+  | {
+      kind: 'voice';
+      ms: Ms;
+      more: number;
+      busy: boolean;
+      failure: string | null;
+      /** No link to the machine: the take waits for it and is recognized by itself when it is back. */
+      waiting: boolean;
+      onRetry: () => void;
+      onDrop: () => Promise<unknown>;
+    }
+  /** The machine of the chat has been switched off for a while: what is written waits for it and goes by itself. */
+  | { kind: 'off'; machine: string }
   | { kind: 'machine'; machine: string; onStop: () => Promise<unknown> }
   /** The key of the chat's vendor was removed: it can be added again or the chat continued in another model. */
   | { kind: 'key'; vendor: string; onOpen: () => void; onContinue: (() => void) | null }

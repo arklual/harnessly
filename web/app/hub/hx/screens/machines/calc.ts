@@ -11,6 +11,7 @@ import type {
   RestartWhat,
 } from '../../../org/api/machines';
 import { ago, BUSY_TEXT, plural } from '../../../org/screens/machines/format';
+import { fromUsd } from '../../../org/screens/overview/format';
 import { HOT_PCT, isHot } from '../../charts/geometry';
 
 export type RowSt = 'on' | 'idle' | 'off';
@@ -49,10 +50,10 @@ export const rowSub = (m: OrgMachine, mode: RowMode): string => {
   return [lead, hw].filter(Boolean).join(' · ');
 };
 
-/** «$86 · 41 чатов»; «—» while the money is not visible to the role and while nothing ran. */
+/** «7,7 тыс ₽ · 41 чат»; «—» while the money is not visible to the role and while nothing ran. */
 export const weekText = (m: OrgMachine): string => {
   if (m.weekCostUsd == null || m.weekChats === 0) return '—';
-  const usd = `$${Math.round(m.weekCostUsd).toLocaleString('ru-RU')}`;
+  const usd = fromUsd(m.weekCostUsd);
   return m.weekChats == null ? usd : `${usd} · ${m.weekChats} ${plural(m.weekChats, 'чат', 'чата', 'чатов')}`;
 };
 
@@ -66,9 +67,9 @@ export const chatsText = (m: OrgMachine): string =>
 export const verText = (m: OrgMachine): string =>
   m.runnerVersion ? (m.runnerOutdated ? `${m.runnerVersion} · старый` : m.runnerVersion) : '—';
 
-/** The group's money for the week: «$221 за неделю»; null when hidden. */
+/** The group's money for the week in the hub's currency: «19,9 тыс ₽»; null when hidden. */
 export const groupWeek = (g: MachineGroup): string | null =>
-  g.weekCostUsd == null ? null : `$${Math.round(g.weekCostUsd).toLocaleString('ru-RU')}`;
+  g.weekCostUsd == null ? null : fromUsd(g.weekCostUsd);
 
 /** «3 машины», always «машин» in the organization list (the board's wording). */
 export const machinesWord = (n: number, org: boolean): string =>
@@ -475,3 +476,12 @@ export const restartHint = (what: RestartWhat, m: OrgMachine): string =>
   what === 'runner'
     ? 'Перезапустится только раннер harnessly — займёт около 30 секунд. Помогает, когда чаты зависают или не стартуют.'
     : `Сервер перезагрузится целиком — около 2 минут.${m.cloud ? ` Если машина не отвечает, перезагрузим её через ${m.rent?.provider ?? 'провайдера'}.` : ''}`;
+
+/** A machine's name as the hub takes it: spaces collapsed, 1 to 60 characters; null when it does not fit. */
+export const cleanName = (raw: string): string | null => {
+  const name = raw.trim().replace(/\s+/g, ' ');
+  return name.length >= 1 && name.length <= 60 ? name : null;
+};
+
+/** Whether the machine's workspace can be opened now: it is on and reachable. */
+export const canOpen = (m: OrgMachine): boolean => m.state === 'online' || m.state === 'idle';

@@ -185,7 +185,7 @@ func deckViewerClose() string {
 
 // runDeckHTML writes the file as the slides come, so that a big deck is never held whole in memory.
 func runDeckHTML(ctx context.Context, run DeckExportRun) error {
-	slides, err := run.L.deckSlides(run.Artifact)
+	slides, err := run.L.runSlides(run)
 	if err != nil {
 		return err
 	}
@@ -218,10 +218,29 @@ func runDeckHTML(ctx context.Context, run DeckExportRun) error {
 		_, err := w.WriteString(s)
 		return err
 	}
+	script := deckSnapshot()
+	// One board is its page itself, as a browser would save it: no viewer around it.
+	if run.Board != "" {
+		sl := slides[0]
+		if err := tab.open(sl, 1); err != nil {
+			return fmt.Errorf("%s: %w", sl.Title, err)
+		}
+		v, err := tab.eval(script)
+		page, _ := v.(string)
+		if err != nil || page == "" {
+			return fmt.Errorf("%s: %s", sl.Title, locale.Pick("the board gave no page", "доска не отдала страницу"))
+		}
+		if err := write(page); err != nil {
+			return err
+		}
+		if err := w.Flush(); err != nil {
+			return err
+		}
+		return out.Close()
+	}
 	if err := write(deckViewerOpen(title)); err != nil {
 		return err
 	}
-	script := deckSnapshot()
 	for i, sl := range slides {
 		if err := ctx.Err(); err != nil {
 			return err

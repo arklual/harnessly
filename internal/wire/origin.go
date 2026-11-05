@@ -13,9 +13,9 @@ func crossSite(r *http.Request) bool { return sameorigin.CrossSite(r) }
 // guarded: the requests that must not come from another origin.
 func guarded(p string, r *http.Request) bool {
 	switch {
-	case p == "socket", p == "replica", p == "terminal", p == "voice", p == "designly/create", p == "designly/pin":
+	case p == "socket", p == "replica", p == "terminal", p == "voice", p == "designly/create", p == "designly/pin", p == "designly/chat":
 		return true
-	case p == "machine/processes/stop", p == "search", p == "file-bytes", p == "pane-selection", strings.HasPrefix(p, "move/"):
+	case p == "machine/processes/stop", p == "search", p == "file-bytes", p == "pane-selection", p == "pane-act", strings.HasPrefix(p, "move/"):
 		return true
 	case p == "me/settings", p == "runtime-settings", strings.HasPrefix(p, "agent-settings/"), p == "providers", strings.HasPrefix(p, "providers/"), strings.HasPrefix(p, "agents/"):
 		return r.Method != http.MethodGet && r.Method != http.MethodHead
@@ -26,6 +26,10 @@ func guarded(p string, r *http.Request) bool {
 	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/digest"):
 		return true
 	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/shot"):
+		return true
+	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/download"):
+		return true
+	case strings.HasPrefix(p, "conversations/") && (strings.HasSuffix(p, "/file-op") || strings.HasSuffix(p, "/find")):
 		return true
 	case strings.HasPrefix(p, "conversations/") && strings.HasSuffix(p, "/file"):
 		return r.Method != http.MethodGet && r.Method != http.MethodHead

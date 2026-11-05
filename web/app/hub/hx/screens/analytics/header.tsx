@@ -6,8 +6,9 @@ import type { ChangeRef, FrameWeek } from '../../../org/api/analytics';
 import { Icon, usePop } from '../../ui';
 import {
   type PickerState,
+  compareNameOf,
   hintOf,
-  labelOf,
+  nameOf,
   pickPreset,
   pickWeek,
   presetsOf,
@@ -33,8 +34,8 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
   useEffect(() => {
     if (pop.mounted && strip.current) strip.current.scrollLeft = strip.current.scrollWidth;
   }, [pop.mounted]);
-  const now = labelOf(weeks, state.a);
-  const prev = labelOf(weeks, state.b);
+  const now = nameOf(weeks, state.a, { month: true });
+  const prev = compareNameOf(weeks, state);
 
   const openTab = (k: 'a' | 'b') => {
     if (pop.open && state.edit === k) {
@@ -56,13 +57,15 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
               className="an-period anx-per__btn"
               data-set
               data-k="a"
+              title="Период, который смотрим: недели целиком, с понедельника по воскресенье"
               aria-haspopup="dialog"
               aria-expanded={pop.open && state.edit === 'a'}
               onClick={() => openTab('a')}
             >
               <span className="anx-per__dot" data-k="a" />
               <span className="an-period__label">
-                <b>{now}</b>
+                <b>{now.title}</b>
+                <span className="anx-per__d">{now.dates}</span>
               </span>
               <Icon i="chevron-down" size="sm" />
             </button>
@@ -75,13 +78,15 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
               className="an-period anx-per__btn"
               data-set
               data-k="b"
+              title="С чем сравниваем: по умолчанию столько же недель сразу перед периодом"
               aria-haspopup="dialog"
               aria-expanded={pop.open && state.edit === 'b'}
               onClick={() => openTab('b')}
             >
               <span className="anx-per__dot" data-k="b" />
               <span className="an-period__label">
-                <b>{prev}</b>
+                <b>{prev.title}</b>
+                <span className="anx-per__d">{prev.dates}</span>
               </span>
               <Icon i="chevron-down" size="sm" />
             </button>
@@ -106,7 +111,7 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
                 <span className="anx-per__dot" data-k="a" />
                 <span>
                   <small>Период</small>
-                  <b>{now}</b>
+                  <b>{`${now.title} · ${now.dates}`}</b>
                 </span>
               </button>
               <button
@@ -120,7 +125,7 @@ export const PeriodControls = ({ weeks, change, state, onChange }: PeriodControl
                 <span className="anx-per__dot" data-k="b" />
                 <span>
                   <small>Сравнить с</small>
-                  <b>{prev}</b>
+                  <b>{`${prev.title} · ${prev.dates}`}</b>
                 </span>
               </button>
             </div>

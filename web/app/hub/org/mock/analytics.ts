@@ -18,6 +18,8 @@ import type {
 } from '../api/analytics';
 import { addDays, daysBetween } from '../dates';
 import { BOARD_CURVES } from './analytics-board';
+import { monthPeriod } from '../api/analytics';
+import { KPI_COPY } from '../api/kpi-copy';
 import { later, type MockCtx } from './ctx';
 
 /** The Monday of the current (unfinished) week of the fixtures; the weeks before it are the choices. */
@@ -43,6 +45,13 @@ interface KpiSeed extends Omit<Kpi, 'series' | 'prevSeries' | 'value' | 'prev'> 
   value: number;
   prev: number;
 }
+
+/** The effects name the metrics the same way the tiles do. */
+const withCopy = (changes: Change[]): Change[] =>
+  changes.map((c) => ({
+    ...c,
+    effects: c.effects.map((e) => ({ ...e, title: KPI_COPY[e.kpi].title })),
+  }));
 
 const KPI_SEEDS: KpiSeed[] = [
   {
@@ -202,7 +211,7 @@ const sparkFor = (seed: KpiSeed): { series: number[]; prevSeries: number[] } => 
 
 const kpisFor = (): Kpi[] =>
   KPI_SEEDS.map((seed) => {
-    return { ...seed, ...sparkFor(seed) };
+    return { ...seed, ...KPI_COPY[seed.id], ...sparkFor(seed) };
   });
 
 const SIGNALS: Signal[] = [
@@ -257,7 +266,7 @@ const SIGNALS: Signal[] = [
   },
 ];
 
-const CHANGES: Change[] = [
+const CHANGES: Change[] = withCopy([
   {
     id: 'ch-mcp',
     kind: 'tool',
@@ -322,7 +331,7 @@ const CHANGES: Change[] = [
       { kpi: 'cache', title: 'Кэш', format: 'pct', before: 85, after: 88, verdict: 'better' },
     ],
   },
-];
+]);
 
 /** What a change looks like on the chart: a written edit, a new version of something, a switch of the model. */
 const CHANGE_ICON: Record<Change['kind'], 'edit' | 'announce' | 'rocket'> = {
@@ -396,16 +405,9 @@ const withMean = (
 const TEAM_PEERS: Peers = {
   title: 'Команды рядом',
   sub: 'Каждая клетка — сравнение команды со средним по тенанту за период',
-  columns: [
-    'Деньги на MR',
-    'Доходимость',
-    'Время до MR',
-    'Автономность',
-    'Ошибки',
-    'Ждёт человека',
-    'Перечитано',
-    'Кэш',
-  ],
+  columns: (
+    ['moneyPerMr', 'yield', 'timeToMr', 'autonomy', 'toolErrors', 'waiting', 'reread', 'cache'] as const
+  ).map((k) => KPI_COPY[k].title),
   rows: [
     {
       id: 'back',
@@ -511,7 +513,7 @@ const chartFor = (ctx: MockCtx, q: AnalyticsQuery, kpiId: KpiId): KpiChart => {
 export const analyticsMock = (ctx: MockCtx): AnalyticsApi => ({
   analyticsFrame: () => {
     const all = weeks();
-    const defaultPeriod = all[all.length - 2] ?? weekOf(CURRENT_MONDAY);
+    const defaultPeriod = monthPeriod(all);
     const frame: AnalyticsFrame = { weeks: all, today: TODAY, defaultPeriod, lastChange: LAST_CHANGE };
     return later(frame);
   },

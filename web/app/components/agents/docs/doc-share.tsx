@@ -5,7 +5,10 @@ import { fetchDocAccess, setDocPublic } from '@/lib/doc-threads-client';
 import type { IDocAccess } from '@/types/doc-threads';
 import { t } from '@/lib/i18n';
 import { docRef, type TGuestRights } from '@/next/features/designly/access/api';
+import { LINK_KIND, type ILinkContext } from '@/next/features/designly/access/link-form';
+import ResourceShare from '@/next/features/designly/access/resource-share';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
+import { useResourceView } from '@/next/features/designly/access/use-resource';
 import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
 import { usePortalContainer } from '@/next/ui/portal';
 import { toast } from '@/next/ui/toast';
@@ -283,14 +286,21 @@ interface IDocShareProps {
   kind: 'artifact' | 'board';
 }
 
+const DOC_LINKS: ILinkContext = { kind: LINK_KIND.doc };
+const BOARD_LINKS: ILinkContext = { kind: LINK_KIND.board };
+
 /**
- * «Поделиться» of a document or a board: the same dialog as a design's — people with their roles, what the team may
- * do («Только приглашённые» is «only me»), and links without sign-in with a term. Where the gateway
- * has no access model (a standalone runtime) a document keeps its old one-link menu and a board has no button.
+ * «Поделиться» of a document or a board: the one dialog of every kind (stage «д») — people and teams with
+ * their roles, the home team first, links without sign-in per recipient (a document's own «Скачивание» and «Копирование
+ * текста»). A gateway without the common access API keeps the older dialog; one without any access model (a
+ * standalone runtime) keeps a document's old one-link menu, and a board has no button there.
  */
 export const DocShare = ({ slug, title, kind }: IDocShareProps) => {
   const gate = useProjectAccess(docRef(slug));
   const { reload } = gate;
+  const shared = useResourceView('doc', slug, gate.state.k === ACCESS.ready);
+  const one =
+    shared.state !== null && shared.state !== 'absent' && shared.state.owner !== null ? shared.state : null;
   const [open, setOpen] = useState(false);
   // Inside the new interface's frame the dialog has its place; on a page of its own it brings one.
   const framed = usePortalContainer() !== null;
@@ -307,19 +317,38 @@ export const DocShare = ({ slug, title, kind }: IDocShareProps) => {
       );
   };
 
-  const dialog = ready && (
-    <ShareDialog
+  const legacyLink = kind === 'artifact' && open ? <LegacyPublicLink slug={slug} /> : null;
+  const dialog = one ? (
+    <ResourceShare
       open={open}
       onClose={() => setOpen(false)}
-      project={docRef(slug)}
+      target={{ kind: 'doc', id: slug }}
       title={title}
-      access={ready}
-      onNext={gate.apply}
+      view={one}
+      onNext={(next) => {
+        shared.apply(next);
+        reload();
+      }}
+      address={docAddress(slug)}
       onCopyLink={copyLink}
-      onClaim={() => Promise.resolve()}
-      guestRights={GUEST_RIGHTS}
-      extra={kind === 'artifact' && open ? <LegacyPublicLink slug={slug} /> : null}
+      linkContext={kind === 'board' ? BOARD_LINKS : DOC_LINKS}
+      extra={legacyLink}
     />
+  ) : (
+    ready && (
+      <ShareDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        project={docRef(slug)}
+        title={title}
+        access={ready}
+        onNext={gate.apply}
+        onCopyLink={copyLink}
+        onClaim={() => Promise.resolve()}
+        guestRights={GUEST_RIGHTS}
+        extra={legacyLink}
+      />
+    )
   );
 
   return (
@@ -333,6 +362,7 @@ export const DocShare = ({ slug, title, kind }: IDocShareProps) => {
         onClick={() => {
           // The dialog shows what the gateway holds now, not what it held when the document was opened.
           reload();
+          shared.reload();
           setOpen(true);
         }}
       >

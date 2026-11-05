@@ -6,6 +6,7 @@ import { PortalContext } from '@/next/ui/portal';
 import { t } from '@/next/i18n';
 import AccessLog from '@/next/features/designly/access/access-log';
 import InviteAccept from '@/next/features/designly/access/invite-accept';
+import type { IResourceView } from '@/next/features/designly/access/resource-api';
 import NoAccess from '@/next/features/designly/access/no-access';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
 import TtlPicker from '@/next/features/designly/access/ttl-picker';
@@ -420,6 +421,65 @@ describe('no access', () => {
     const call = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(call[1].body as string)).toEqual({ level: 'edit', message: 'hi' });
     view.rerender(<NoAccess project="p1" access={sent} onAsked={onAsked} onBack={vi.fn()} />);
+    expect(screen.getByText(t('next.access.requestSent'))).toBeTruthy();
+  });
+
+  it('asks through the common access API where the gateway keeps the project (HRN-675)', async () => {
+    const stranger = {
+      project: 'p1',
+      role: null,
+      owner: null,
+      ownerName: 'Boss',
+      team: 'none' as const,
+      canManage: false,
+      editorsCanShare: false,
+      request: null,
+    };
+    const common: IResourceView = {
+      resource: { kind: 'design', id: 'p1', subkind: 'site', title: 'Landing' },
+      stored: true,
+      role: null,
+      until: null,
+      canManage: false,
+      manager: false,
+      steward: false,
+      owner: { email: null, name: 'Boss' },
+      homeTeam: null,
+      editorsCanShare: false,
+      myRequest: null,
+    };
+    const asked: IResourceView = { ...common, myRequest: { id: 'r1', level: 'comment', status: 'open' } };
+    const fetchMock = vi.fn(() => json(asked));
+    vi.stubGlobal('fetch', fetchMock);
+    const onAsked = vi.fn();
+    const onView = vi.fn();
+    const view = render(
+      <NoAccess
+        project="p1"
+        access={stranger}
+        onAsked={onAsked}
+        view={common}
+        onView={onView}
+        onBack={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(t('next.access.message')), { target: { value: 'hi' } });
+    fireEvent.click(screen.getByRole('button', { name: t('next.access.ask') }));
+    await waitFor(() => expect(onView).toHaveBeenCalledWith(asked));
+    expect(onAsked).not.toHaveBeenCalled();
+    const call = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(call[0]).toContain('/access/design/p1/requests');
+    expect(JSON.parse(call[1].body as string)).toEqual({ level: 'comment', message: 'hi' });
+    view.rerender(
+      <NoAccess
+        project="p1"
+        access={stranger}
+        onAsked={onAsked}
+        view={asked}
+        onView={onView}
+        onBack={vi.fn()}
+      />,
+    );
     expect(screen.getByText(t('next.access.requestSent'))).toBeTruthy();
   });
 });

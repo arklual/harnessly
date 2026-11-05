@@ -152,7 +152,7 @@ func pdfByPictures(ctx context.Context, tab *deckTab, slides []deckSlideSrc, run
 }
 
 func runDeckPDF(ctx context.Context, run DeckExportRun) error {
-	slides, err := run.L.deckSlides(run.Artifact)
+	slides, err := run.L.runSlides(run)
 	if err != nil {
 		return err
 	}
@@ -166,6 +166,9 @@ func runDeckPDF(ctx context.Context, run DeckExportRun) error {
 		return err
 	}
 	defer tab.close()
+	if err := measureFluid(ctx, tab, slides); err != nil {
+		return err
+	}
 	pdf, err := pdfByFrames(ctx, sh, tab, slides, run)
 	if err != nil {
 		return err

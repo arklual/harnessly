@@ -1,6 +1,6 @@
-// The switch in the head of a design's chat: which chat the column shows, and the chats that worked on the design —
-// with what they do now and when they last did something — to change to, or a new one. Only a pick here changes the
-// chat; the list itself never does.
+// The switch in the head of a design's chat: which chat the column shows, and the design's chats on every machine of
+// the person — with what they do now, when they last did something and, for another machine's, which one — to change
+// to, or a new one. Only a pick here changes the chat; the list itself never does.
 import { useEffect, useRef, useState } from 'react';
 import { STATUS_LOOK } from '@/next/features/sidebar/status';
 import { CHAT_STATUS, type TChatStatus } from '@/next/features/sidebar/types';
@@ -15,6 +15,8 @@ export interface IChatSwitchRow {
   status: TChatStatus;
   /** The chat's last activity. */
   at: number;
+  /** The name of the machine the chat is on, when it is not the design's open one (it opens there); null: this one. */
+  machine: string | null;
 }
 
 export interface IChatSwitchProps {
@@ -24,6 +26,8 @@ export interface IChatSwitchProps {
   title: string;
   rows: readonly IChatSwitchRow[];
   onPick: (id: string | null) => void;
+  /** The list opens: the machines are asked again for the design's chats. */
+  onOpen?: () => void;
 }
 
 /** The menu's exit, as long as hx-dl-pop-out in site.css. */
@@ -45,7 +49,7 @@ const StatusMark = ({ status }: { status: TChatStatus }) => {
   );
 };
 
-export const ChatSwitch = ({ current, title, rows, onPick }: IChatSwitchProps) => {
+export const ChatSwitch = ({ current, title, rows, onPick, onOpen }: IChatSwitchProps) => {
   const [open, setOpen] = useState(false);
   const menu = usePresence(open ? true : null, MENU_MS);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -83,6 +87,7 @@ export const ChatSwitch = ({ current, title, rows, onPick }: IChatSwitchProps) =
         onPointerDown={(event) => event.stopPropagation()}
         onClick={() => {
           setNow(Date.now());
+          if (!open) onOpen?.();
           setOpen((on) => !on);
         }}
       >
@@ -118,6 +123,7 @@ export const ChatSwitch = ({ current, title, rows, onPick }: IChatSwitchProps) =
               onClick={() => choose(row.id)}
             >
               <span className="hx-chatswitch__name">{row.title}</span>
+              {row.machine !== null && <span className="hx-chatswitch__machine">{row.machine}</span>}
               <StatusMark status={row.status} />
               <span className="hx-chatswitch__at">{formatAgo(row.at, now)}</span>
             </button>

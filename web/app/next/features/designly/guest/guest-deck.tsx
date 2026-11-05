@@ -5,7 +5,7 @@ import DeckGuest, {
   type IDeckGuestComments,
   type IDeckGuestSlide,
 } from '@/next/features/designly/deck/deck-guest';
-import { startOpens, statsOn } from '@/next/features/designly/deck/deck-link-view';
+import { startOpens, startSlideOf, statsOn } from '@/next/features/designly/deck/deck-link-view';
 import { createSeenTracker, sendSeen } from '@/next/features/designly/deck/guest-seen';
 import { chaptersOf } from '@/next/features/designly/deck/video-chapters';
 import { boardUrl, type IGuestConfig } from '@/next/features/designly/guest/guest-config';
@@ -140,6 +140,7 @@ const GuestDeck = ({ config }: { config: IGuestConfig }) => {
         video={video}
         pdf={pdf}
         start={startOpens(config.view, video !== null)}
+        startSlide={startSlideOf(config.view, slides.length)}
         comments={comments}
         onShown={(path) => {
           current.current = path;

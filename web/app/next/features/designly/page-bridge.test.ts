@@ -88,6 +88,8 @@ describe('readBridgeMessage', () => {
   it('reads where the page was scrolled to', () => {
     expect(readBridgeMessage({ type: 'tk:scroll', y: 240 })).toEqual({ k: 'scroll', y: 240 });
     expect(readBridgeMessage({ type: 'tk:scroll', y: -3 })).toEqual({ k: 'scroll', y: 0 });
+    expect(readBridgeMessage({ type: 'tk:doc-scroll', y: 480 })).toEqual({ k: 'doc-scroll', y: 480 });
+    expect(readBridgeMessage({ type: 'tk:doc-scroll', y: 'x' })).toBeNull();
     expect(readBridgeMessage({ type: 'tk:wheel', x: 10, y: 20, dy: -8 })).toEqual({
       k: 'wheel',
       x: 10,

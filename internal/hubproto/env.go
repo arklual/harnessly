@@ -25,6 +25,10 @@ const (
 	EnvOK      = "ok"
 	EnvError   = "error"
 	EnvPending = "pending" // kept, but this runtime has no way to load it yet; Message says why
+
+	// EnvPluginDir is where, under the folder of a hub link (the agent's data folder, or <data>/hub for an observe
+	// link), the agent applies the list: a Claude Code plugin the runtime loads into new chats.
+	EnvPluginDir = "environment/claude-plugin"
 )
 
 // Kinds of an environment item and of a tool.

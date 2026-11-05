@@ -188,6 +188,8 @@ export interface IAppMainProps {
   onBack: (() => void) | null;
   onOpenDrawer: () => void;
   menu: readonly IAppMenuItem[];
+  /** Before the title, at the head of the header: the switch between looking and editing. */
+  lead?: ReactNode;
   /** The app's view. */
   stage: ReactNode;
   /** The chat (feed and field); null: no chat beside this app. */
@@ -252,6 +254,7 @@ const AppMain = (props: IAppMainProps) => {
             </span>
           </button>
         )}
+        {props.lead}
         <div className="hx-appmain__titles">
           <h1 className="hx-appmain__title">{props.title}</h1>
           {props.chatTitle && <span className="hx-appmain__sub">{props.chatTitle}</span>}

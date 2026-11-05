@@ -122,28 +122,27 @@ describe('placeRequest: a request becomes the pane’s state', () => {
     expect(placed.next.unread).toEqual(['t1']);
   });
 
-  it('a file handed over outside the chat’s folder opens in the pane’s own view, a text file there stays Legacy’s', () => {
+  it('a file outside the chat’s folder opens in the pane’s own view, a handed-over zip or a text file alike', () => {
     const zip = place(empty, { kind: 'open', tab: 'files', target: '/tmp/report.zip' });
     expect(zip.next.tabs).toEqual([{ id: 't1', kind: 'files', path: '/tmp/report.zip', file: true }]);
     expect(zip.effect).toBeNull();
-    const text = place(empty, { kind: 'open', tab: 'files', target: '/tmp/notes.txt' });
-    expect(text.effect).toMatchObject({ k: 'legacy', kind: 'files' });
+    const page = place(empty, { kind: 'open', tab: 'files', target: '/tmp/site/index.html' });
+    expect(page.next.tabs).toEqual([{ id: 't1', kind: 'files', path: '/tmp/site/index.html', file: true }]);
+    expect(page.effect).toBeNull();
   });
 
-  it('a file of the chat’s folder opens in the pane’s files tab; one outside it in Legacy’s', () => {
+  it('a file of the chat’s folder opens in the pane’s files tab; a folder outside it there too, on the machine', () => {
     const inside = place(empty, { kind: 'open', tab: 'files', target: '/home/me/work/docs/plan.md' });
     expect(inside.next.tabs).toEqual([{ id: 't1', kind: 'files', path: 'docs/plan.md', file: true }]);
     const folder = place(empty, { kind: 'open', tab: 'files', target: '/home/me/work/src' });
     expect(folder.next.tabs).toEqual([{ id: 't1', kind: 'files', path: 'src', file: false }]);
-    const outside = place(empty, { kind: 'open', tab: 'files', target: '/etc/hosts' });
-    expect(outside.next).toBe(empty);
-    expect(outside.effect).toEqual({
-      k: 'legacy',
-      kind: 'files',
-      target: '/etc/hosts',
-      background: false,
-      reload: false,
-    });
+    const outside = place(empty, { kind: 'open', tab: 'files', target: '/etc/nginx' });
+    expect(outside.next.tabs).toEqual([{ id: 't1', kind: 'files', path: '/etc/nginx', file: false }]);
+    expect(outside.effect).toBeNull();
+    // «Диск» asked for is «Файлы» on the machine.
+    const disk = place(empty, { kind: 'open', tab: 'disk' });
+    expect(disk.next.tabs).toEqual([{ id: 't1', kind: 'files', path: '/', file: false }]);
+    expect(disk.effect).toBeNull();
   });
 
   it('documents, boards, merge requests, tasks and changes are Legacy’s tabs, behind when busy', () => {

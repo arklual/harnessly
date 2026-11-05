@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -202,11 +201,9 @@ func (m madeLibrary) Tied(rec wire.Conversation) []string {
 	lib := m.d.api.L
 	st := m.d.state()
 	var ids []string
-	for _, a := range lib.ListArtifacts() {
-		dir := lib.ArtifactDir(a.ID)
-		if rec.Cwd == dir || strings.HasPrefix(rec.Cwd, dir+string(filepath.Separator)) || attachedTo(st, rec.ID, a.ID) {
-			ids = append(ids, a.ID)
-		}
+	// The design the chat was started from and the ones it edited, as the design's own list counts them.
+	if id, ok := st.CreatedFrom[rec.ID]; ok && lib.ReadArtifact(id) != nil {
+		ids = append(ids, id)
 	}
 	if m.d.links != nil && rec.TranscriptPath != "" {
 		for _, id := range m.d.links.Designs([]string{rec.TranscriptPath})[rec.TranscriptPath] {

@@ -82,8 +82,8 @@ export const AskDialog = ({ ask, open, actions, onClose }: IAskDialogProps) => (
     onClose={onClose}
     title={ask?.kind === 'approval' ? t('next.asks.approvalTitle') : t('next.asks.questionTitle')}
     lead={ask?.agent ? t('next.asks.fromAgent', { agent: ask.agent }) : undefined}
-    boxClass="hx-ask-modal"
+    boxClass="hx-pask-modal"
   >
-    <div className="hx-modal__body hx-ask-modal__body">{ask && <AskCard ask={ask} actions={actions} />}</div>
+    <div className="hx-modal__body hx-pask-modal__body">{ask && <AskCard ask={ask} actions={actions} />}</div>
   </Modal>
 );

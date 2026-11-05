@@ -494,6 +494,40 @@ const QUESTION = (now: Ms): Question => ({
   ],
 });
 
+/** One long question, as agents ask it: a paragraph of a proposal, then three options. */
+const LONG_QUESTION = (now: Ms): Question => ({
+  id: 'q2',
+  turnId: 't1',
+  askedAt: now,
+  state: { k: 'open' },
+  items: [
+    {
+      header: 'Меню',
+      question:
+        'П.8 — меню размеров и «Обзор». Предлагаю так. Сверху «Окно W×H» и масштаб (−, 100%, +, вписать, замок); ' +
+        'дальше группы с заголовками: «Вид» — «По окну» и «Все экраны»; «Телефоны» — iPhone 15 Pro, Pixel 7, ' +
+        'Galaxy S24; «Планшеты» — iPad Pro 11; «Компьютеры» — ноутбук, Full HD. «Все экраны»: холст, где экраны ' +
+        'стоят в ряд по группам, над каждым подпись «iPhone 15 Pro · 393×852». Колесо над экраном прокручивает ' +
+        'страницу, и все экраны листаются синхронно. Пробел и перетаскивание двигают холст, ⌘/Ctrl и колесо меняют ' +
+        'масштаб. Клик по подписи открывает этот размер. Делаем так?',
+      multi: false,
+      options: [
+        {
+          label: 'Делай так',
+          description: 'Группы и названия в меню и новый «Все экраны» с синхронной прокруткой',
+          preview: null,
+        },
+        {
+          label: 'Без синхронной прокрутки',
+          description: 'То же, но каждый экран листается сам',
+          preview: null,
+        },
+        { label: 'Сейчас только меню', description: '«Все экраны» — отдельным заходом', preview: null },
+      ],
+    },
+  ],
+});
+
 const PERMISSION = (now: Ms): Permission => ({
   id: 'p1',
   kind: 'tool',
@@ -781,6 +815,70 @@ const peerTurn = (now: Ms): TurnItem => {
         model: 'sonnet',
         md: 'Root cause of the 4 stuck queue rows: they come from the browser IndexedDB `feeds` store, not from `outbox`.',
       },
+    ],
+  };
+  return item;
+};
+
+// Three background teammates of one turn that finished together: what a long run of research leaves in the feed.
+const INVENTORY_MD =
+  '**Главное.** Инвентарь собран: 41 экран, 12 из них без пустого состояния.\n\n' +
+  'Полный список — `/tmp/scratchpad/research/inventory.md`. ' +
+  'Он покрывает ленту, правую панель и настройки.\n\n' +
+  '- **Лента:** 14 экранов, 5 без скелетона.\n- **Панель:** 9 вкладок, у двух нет ошибки загрузки.\n- **Настройки:** 18 разделов.';
+
+const bgAgentsTurn = (now: Ms): TurnItem => {
+  const item = turnOf({
+    prompt: null,
+    at: now - 5 * MIN,
+    minutes: 1,
+    steps: null,
+    answer: 'Все три отчёта на месте, свожу их в один план.',
+  });
+  const note = (from: string, color: string, task: string, md: string, at: number, failed = false) => ({
+    from,
+    kind: 'done' as const,
+    color,
+    event: null,
+    summary: null,
+    sentAt: at,
+    agentId: null,
+    model: 'sonnet',
+    md,
+    task,
+    opens: `a${from}0f3e9c1d2b`,
+    failed,
+  });
+  item.peer = {
+    id: nextId('p'),
+    turnId: item.turn.id,
+    at: now - 10 * MIN,
+    rev: 1,
+    t: 'peer',
+    peers: [
+      note(
+        'perf',
+        'orange',
+        'Замерить скорость первой отрисовки ленты',
+        '**Главное.** Первая отрисовка — 1,8 с на телефоне, из них 1,1 с уходит на разбор Markdown старых ходов. ' +
+          'Отчёт: `/tmp/claude-995/scratchpad/research/perf.md`.',
+        now - 10 * MIN,
+      ),
+      note(
+        'inventory',
+        'blue',
+        'Составить список экранов без пустых состояний',
+        INVENTORY_MD,
+        now - 10 * MIN,
+      ),
+      note(
+        'access',
+        'yellow',
+        'Проверить доступность ленты с клавиатуры',
+        'Не смог запустить браузер: порт 9222 занят другим процессом. Проверка не сделана.',
+        now - 11 * MIN,
+        true,
+      ),
     ],
   };
   return item;
@@ -1088,6 +1186,10 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
     title: 'Влить обратно',
     build: (now) => ({ items: history(now), sheet: SHEET_KIND.merge }),
   },
+  'bg-agents': {
+    title: 'Фоновые агенты закончили',
+    build: (now) => ({ items: [...history(now).slice(0, 1), bgAgentsTurn(now)] }),
+  },
   peers: {
     title: 'Сообщения сессий',
     build: (now) => ({
@@ -1127,6 +1229,26 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
       items: [...history(now), liveTurn(now, { now: null })],
       question: QUESTION(now),
       mode: 'answer',
+    }),
+  },
+  'question-queue': {
+    title: 'Длинный вопрос и очередь',
+    build: (now) => ({
+      items: [...history(now), liveTurn(now)],
+      question: LONG_QUESTION(now),
+      mode: 'answer',
+      queue: [
+        {
+          ...queued(
+            'Следующая пачка фиксов: 1. Когда машина отключается, у меня отображается старая плашка, а должна новая',
+          ),
+          attachments: [
+            { id: 'qa1', name: 'плашка.png', kind: 'image', mime: 'image/png' },
+            { id: 'qa2', name: 'лог.txt', kind: 'file', mime: 'text/plain' },
+          ],
+        },
+        queued('Дальше с «поделиться» надо разобраться: настройка «поделиться с кем-то вне команды» ложная'),
+      ],
     }),
   },
   permission: {

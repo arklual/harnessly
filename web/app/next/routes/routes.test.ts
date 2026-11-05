@@ -165,4 +165,24 @@ describe('placeKeyOf', () => {
     expect(placeKeyOf('/somewhere/else/?a=1#b')).toBe('/somewhere/else');
     expect(placeKeyOf('/caf%C3%A9/')).toBe('/café');
   });
+
+  it('keeps the editing mode of a design in `?edit=1`', () => {
+    expect(parseRoute('/designly/p1')).toEqual({ kind: ROUTE.site, id: 'p1' });
+    expect(parseRoute('/designly/p1?edit=1')).toEqual({ kind: ROUTE.site, id: 'p1', edit: true });
+    expect(routePath({ kind: ROUTE.site, id: 'p1', edit: true })).toBe('/designly/p1?edit=1');
+    expect(routePath({ kind: ROUTE.site, id: 'p1', edit: false })).toBe('/designly/p1');
+  });
+
+  it('keeps the editing mode of an app document in `?edit=1`', () => {
+    expect(parseRoute('/designly/doc/d1')).toEqual({ kind: ROUTE.appDoc, id: 'd1' });
+    expect(parseRoute('/designly/doc/d1?edit=1')).toEqual({ kind: ROUTE.appDoc, id: 'd1', edit: true });
+    expect(routePath({ kind: ROUTE.appDoc, id: 'd1', edit: true })).toBe('/designly/doc/d1?edit=1');
+    expect(parseRoute('/designly/doc/d1?chat=tab-1&edit=1')).toEqual({
+      kind: ROUTE.appDoc,
+      id: 'd1',
+      chat: 'tab-1',
+      edit: true,
+    });
+    expect(routePath({ kind: ROUTE.appDoc, id: 'd1', chat: 'tab-1' })).toBe('/designly/doc/d1?chat=tab-1');
+  });
 });

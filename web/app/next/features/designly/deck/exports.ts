@@ -24,6 +24,7 @@ const STARTED_TEXT = {
   [DECK_EXPORT.mp4]: 'next.deck.toast.videoBuilding',
   [DECK_EXPORT.png]: 'next.deck.menu.pngToast',
   [DECK_EXPORT.html]: 'next.deck.menu.htmlToast',
+  [DECK_EXPORT.bundle]: 'next.deck.menu.bundleToast',
 } as const satisfies Record<TDeckExport, string>;
 
 export interface IDeckExportOptions {
@@ -31,6 +32,8 @@ export interface IDeckExportOptions {
   rec?: string;
   /** A PDF also kept for the guests. */
   publish?: boolean;
+  /** A PDF or an HTML of one board (its id or path). */
+  board?: string;
   /** Called with 0..1 as the job moves. */
   onProgress?: (progress: number) => void;
   /** A guest-facing or background export says nothing and downloads nothing. */
@@ -106,7 +109,7 @@ export const runDeckExport = async (
   opts: IDeckExportOptions = {},
 ): Promise<IDeckExportJob> => {
   try {
-    const first = await startDeckExport(m, artifact, format, opts.rec, opts.publish);
+    const first = await startDeckExport(m, artifact, format, opts.rec, opts.publish, opts.board);
     if (!opts.quiet) toast(t(STARTED_TEXT[format]));
     const done = await followDeckExport(m, artifact, first, opts);
     if (opts.download !== false && format !== DECK_EXPORT.mp4 && !opts.quiet) {

@@ -17,6 +17,7 @@ import type {
   Launch,
   LimitAction,
   MachineId,
+  MessageRef,
   Model,
   ProfileId,
   Ms,
@@ -213,7 +214,7 @@ export interface NewConversation {
   /** The backend profile (Kimi, GLM, Grok) the chat starts on; absent on the CLI's own account. */
   profile?: ProfileId;
   model: Model | null;
-  first?: { text: string; attachments?: AttachmentRef[] };
+  first?: { text: string; attachments?: AttachmentRef[]; refs?: MessageRef[] };
   /** Several chats of one prompt on different models: each works in a git worktree of its own and they are grouped. */
   launch?: Launch;
   worktree?: boolean;
@@ -243,6 +244,7 @@ export function createConversation(
             clientId: firstClientId,
             text: req.first.text,
             attachmentIds: (req.first.attachments ?? []).map((a) => a.id),
+            ...(req.first.refs && req.first.refs.length > 0 ? { refs: req.first.refs } : {}),
           },
         }
       : {}),

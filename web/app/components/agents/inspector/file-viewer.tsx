@@ -113,17 +113,7 @@ export const FileViewerContent = ({
         >
           <Copy />
         </button>
-        {file.kind === 'image' || file.kind === 'video' ? (
-          <a
-            className="tw-icon-btn"
-            href={file.kind === 'video' ? fileDownloadUrl(file.path) : url}
-            download={name}
-            title={t('inspector.fileViewer.download')}
-            aria-label={t('inspector.fileViewer.download')}
-          >
-            <Download />
-          </a>
-        ) : (
+        {file.kind !== 'image' && file.kind !== 'video' && (
           <a
             className="tw-icon-btn"
             href={url}
@@ -134,6 +124,16 @@ export const FileViewerContent = ({
             <ExternalLink />
           </a>
         )}
+        {/* Any file is saved as it is on disk (HRN-679): html and pdf too, not only pictures. */}
+        <a
+          className="tw-icon-btn"
+          href={fileDownloadUrl(file.path)}
+          download={name}
+          title={t('inspector.fileViewer.download')}
+          aria-label={t('inspector.fileViewer.download')}
+        >
+          <Download />
+        </a>
         {actions}
       </div>
       <div className="tw-viewer-stage">

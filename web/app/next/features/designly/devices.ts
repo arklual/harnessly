@@ -1,13 +1,23 @@
-// What the open design is looked at on: the window itself («Резина»), an exact size, or a device in its case. The
+// What the open design is looked at on: the window itself («По окну»), an exact size, or a device in its case. The
 // viewport is the page's CSS size; the box is what is drawn and `fit` scales it into the area so all of it shows. A phone
 // or a tablet in a case also draws its own interface (a status bar, the browser's bars) which takes room from the page.
 
 export const PHONE_OS = { ios: 'ios', android: 'android', ipad: 'ipad' } as const;
 export type TPhoneOs = (typeof PHONE_OS)[keyof typeof PHONE_OS];
 
+/** The groups of the device menu; the last three are also the chips of «Все экраны». */
+export const DEVICE_GROUP = {
+  view: 'view',
+  phones: 'phones',
+  tablets: 'tablets',
+  computers: 'computers',
+} as const;
+export type TDeviceGroup = (typeof DEVICE_GROUP)[keyof typeof DEVICE_GROUP];
+
 export interface IDevice {
   id: string;
   icon: string;
+  group: TDeviceGroup;
   /** The case of Devices.css and its colour; none for a bare size. */
   cls?: string;
   color?: string;
@@ -26,13 +36,14 @@ export interface IDevice {
   browser?: string;
 }
 
+// The menu's order: the view, then the phones (the bare one last), the tablet and the computers.
 export const DEVICES: readonly IDevice[] = [
-  { id: 'overview', icon: 'layout-grid' },
-  { id: 'fill', icon: 'monitor' },
-  { id: 'bare', icon: 'smartphone', vw: 393, vh: 852 },
+  { id: 'fill', icon: 'monitor', group: DEVICE_GROUP.view },
+  { id: 'overview', icon: 'layout-grid', group: DEVICE_GROUP.view },
   {
     id: 'ip14',
     icon: 'smartphone',
+    group: DEVICE_GROUP.phones,
     vw: 390,
     vh: 844,
     cls: 'device-iphone-14',
@@ -48,6 +59,7 @@ export const DEVICES: readonly IDevice[] = [
   {
     id: 'ip15',
     icon: 'smartphone',
+    group: DEVICE_GROUP.phones,
     vw: 393,
     vh: 852,
     cls: 'device-iphone-14-pro',
@@ -63,6 +75,7 @@ export const DEVICES: readonly IDevice[] = [
   {
     id: 'ip16',
     icon: 'smartphone',
+    group: DEVICE_GROUP.phones,
     vw: 402,
     vh: 874,
     cls: 'device-iphone-14-pro',
@@ -78,6 +91,7 @@ export const DEVICES: readonly IDevice[] = [
   {
     id: 'px7',
     icon: 'smartphone',
+    group: DEVICE_GROUP.phones,
     vw: 412,
     vh: 915,
     cls: 'device-google-pixel-6-pro',
@@ -94,6 +108,7 @@ export const DEVICES: readonly IDevice[] = [
   {
     id: 's24',
     icon: 'smartphone',
+    group: DEVICE_GROUP.phones,
     vw: 360,
     vh: 780,
     cls: 'device-google-pixel-6-pro',
@@ -107,9 +122,11 @@ export const DEVICES: readonly IDevice[] = [
     sw: 376,
     sh: 816,
   },
+  { id: 'bare', icon: 'smartphone', group: DEVICE_GROUP.phones, vw: 393, vh: 852 },
   {
     id: 'ipad',
     icon: 'tablet',
+    group: DEVICE_GROUP.tablets,
     vw: 834,
     vh: 1194,
     cls: 'device-ipad-pro',
@@ -122,19 +139,31 @@ export const DEVICES: readonly IDevice[] = [
     sw: 506,
     sh: 724,
   },
-  { id: 'lap', icon: 'laptop', vw: 1280, vh: 800 },
-  { id: 'fhd', icon: 'monitor', vw: 1920, vh: 1080 },
+  { id: 'lap', icon: 'laptop', group: DEVICE_GROUP.computers, vw: 1280, vh: 800 },
+  { id: 'fhd', icon: 'monitor', group: DEVICE_GROUP.computers, vw: 1920, vh: 1080 },
 ];
+
+/** A phone or a tablet turns (lying: its width and height swapped); «По окну» and the computers do not. */
+export const canRotate = (device: IDevice): boolean =>
+  device.group === DEVICE_GROUP.phones || device.group === DEVICE_GROUP.tablets;
 
 export const deviceOf = (id: string): IDevice =>
   DEVICES.find((d) => d.id === id) ?? DEVICES.find((d) => d.id === 'fill') ?? DEVICES[0];
+
+/** The menu's groups in their order, each with its devices in the order of DEVICES. */
+export const deviceGroups = (): { group: TDeviceGroup; devices: IDevice[] }[] =>
+  Object.values(DEVICE_GROUP).map((group) => ({ group, devices: DEVICES.filter((d) => d.group === group) }));
+
+/** The size a menu row shows on its right («393×852»); null for the view's rows, which have none of their own. */
+export const deviceSizeText = (device: IDevice): string | null =>
+  device.vw && device.vh ? `${device.vw}×${device.vh}` : null;
 
 export interface ISize {
   w: number;
   h: number;
 }
 
-/** The sizes «Резина» takes: whatever was typed, dragged, turned or kept stays within them. */
+/** The sizes «По окну» takes: whatever was typed, dragged, turned or kept stays within them. */
 export const VIEWPORT_SIZE = { min: 200, max: 3840 } as const;
 /** The least scale a box is drawn at: an area measured empty (a hidden or squeezed pane) must not take it to 0%. */
 export const MIN_FIT = 0.05;
@@ -168,10 +197,11 @@ export interface IViewport {
 
 // The field (island, notes) floats over the page: a device keeps the whole area, its bottom as narrow as the sides.
 const PAD = 48;
-/** «Адаптивно» leaves this much canvas round the page (the area's padding in site.css): there is always some to grab. */
-export const FILL_INSET = 12;
+/** «По окну» is the design set into the window edge to edge, with no canvas round it; the area's padding in
+ *  site.css is the same. */
+export const FILL_INSET = 0;
 
-/** The viewport for a device in an area; `size` is the person's own size of «Резина», `rot` turns a device. */
+/** The viewport for a device in an area; `size` is the person's own size of «По окну», `rot` turns a device. */
 export const viewportOf = (
   device: IDevice,
   area: ISize,
@@ -235,9 +265,23 @@ export const viewportVars = (vp: IViewport, device: IDevice): Record<string, str
   return vars;
 };
 
-/** The devices «Обзор» shows side by side. */
-export const OVERVIEW_IDS = ['ip15', 'px7', 'ipad', 'lap'] as const;
+/** The devices «Все экраны» shows, by group (the bare phone is the size of iPhone 15 Pro, so it is left out). */
+export const OVERVIEW_IDS = ['ip14', 'ip15', 'ip16', 'px7', 's24', 'ipad', 'lap', 'fhd'] as const;
+/** The groups «Все экраны» can show: its chips. */
+export const OVERVIEW_GROUPS = [DEVICE_GROUP.phones, DEVICE_GROUP.tablets, DEVICE_GROUP.computers] as const;
+export type TOverviewGroup = (typeof OVERVIEW_GROUPS)[number];
+/** The gap between two screens of a group, and the wider one between two groups (site.css .hx-ovw). */
 const OVERVIEW_GAP = 28;
+const OVERVIEW_GROUP_GAP = 64;
+/** The row's padding above the screens (the chips stand there) and at the sides, a caption with its gap, the room
+ *  kept under the screens for the field. */
+const OVERVIEW_TOP = 60;
+const OVERVIEW_SIDE = 24;
+const OVERVIEW_CAPTION = 32;
+const OVERVIEW_BOTTOM = 20;
+const OVERVIEW_FIELD = 96;
+/** The least scale the row starts at however many screens it has: smaller, a page is unreadable, and the canvas pans. */
+const OVERVIEW_LEAST = 0.35;
 
 export interface IOverviewCard {
   device: IDevice;
@@ -245,30 +289,53 @@ export interface IOverviewCard {
   h: number;
   /** Shared by all the cards: the devices keep their true proportions. */
   scale: number;
+  /** The first card of a group after another: the wider gap is before it. */
+  lead: boolean;
 }
 
-/** The cards of «Обзор» for an area: one scale makes them all fit its width and height (under the field it keeps room). */
-export const overviewOf = (area: ISize, underField: boolean): IOverviewCard[] => {
-  const devices = OVERVIEW_IDS.map(deviceOf);
-  // A card's label takes 28 px above its screen and the area's padding 40.
-  const room = Math.max(200, area.h - 40 - 28 - (underField ? 80 : 0));
-  const across = area.w - 48 - OVERVIEW_GAP * (devices.length - 1);
+/**
+ * The cards of «Все экраны» for an area and the groups shown, at one scale. The whole row fits when it can; with many
+ * screens it stays at a readable scale, as tall as the area lets it, and runs past the area's right edge to be panned to.
+ */
+export const overviewOf = (
+  area: ISize,
+  underField: boolean,
+  groups: readonly TOverviewGroup[] = OVERVIEW_GROUPS,
+): IOverviewCard[] => {
+  const devices = OVERVIEW_IDS.map(deviceOf).filter((d) => groups.some((g) => g === d.group));
+  if (devices.length === 0) return [];
+  const leads = devices.filter((d, i) => i > 0 && devices[i - 1].group !== d.group).length;
+  const room = area.h - OVERVIEW_TOP - OVERVIEW_CAPTION - (underField ? OVERVIEW_FIELD : OVERVIEW_BOTTOM);
+  const across =
+    area.w - 2 * OVERVIEW_SIDE - OVERVIEW_GAP * (devices.length - 1 - leads) - OVERVIEW_GROUP_GAP * leads;
   const sum = devices.reduce((total, d) => total + (d.vw ?? 0), 0);
   const tallest = Math.max(...devices.map((d) => d.vh ?? 0));
-  const scale = Math.max(MIN_FIT, Math.min(1, across / sum, room / tallest));
-  return devices.map((device) => ({ device, w: device.vw ?? 0, h: device.vh ?? 0, scale }));
+  const scale = Math.max(MIN_FIT, Math.min(1, room / tallest, Math.max(across / sum, OVERVIEW_LEAST)));
+  return devices.map((device, i) => ({
+    device,
+    w: device.vw ?? 0,
+    h: device.vh ?? 0,
+    scale,
+    lead: i > 0 && devices[i - 1].group !== device.group,
+  }));
 };
 
-/** The row of «Обзор» as drawn (site.css .hx-ovw: padding 20/24, a label of 24 and a gap of 8 over each screen). */
+const gapBefore = (card: IOverviewCard): number => (card.lead ? OVERVIEW_GROUP_GAP : OVERVIEW_GAP);
+
+/** The row of «Все экраны» as drawn: the padding, a caption over each screen, the gaps, and room for the field. */
 export const overviewBox = (cards: readonly IOverviewCard[], underField: boolean): ISize => {
   if (cards.length === 0) return { w: 0, h: 0 };
-  const across = cards.reduce((total, c) => total + c.w * c.scale, 0);
+  const across = cards.reduce((total, c, i) => total + c.w * c.scale + (i === 0 ? 0 : gapBefore(c)), 0);
   const tallest = Math.max(...cards.map((c) => c.h * c.scale));
   return {
-    w: 48 + across + OVERVIEW_GAP * (cards.length - 1),
-    h: 20 + 32 + tallest + (underField ? 96 : 20),
+    w: 2 * OVERVIEW_SIDE + across,
+    h: OVERVIEW_TOP + OVERVIEW_CAPTION + tallest + (underField ? OVERVIEW_FIELD : OVERVIEW_BOTTOM),
   };
 };
+
+/** Where the other screens go when one is scrolled to `y`: the same CSS pixels from the top (each page stops at its own
+ *  end), never above it, in whole pixels so a page told the same place twice does not move. */
+export const syncedScroll = (y: number): number => Math.max(0, Math.round(y));
 
 /**
  * How a phone's browser spends the screen: heights in CSS pixels as [unfolded, folded]. `top` and `bot` bars push the

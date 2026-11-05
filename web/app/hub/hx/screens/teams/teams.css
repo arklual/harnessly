@@ -168,3 +168,55 @@
     grid-template-columns: auto;
   }
 }
+
+/* «Участник / Админ тенанта» under the address of an invitation. */
+.ad .tm-role {
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
+/* The tenant's journal: who and what on the left, when on the right, one line each. */
+.ad .tm-journal {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ad .tm-journal li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--hx-border);
+  font-size: var(--hx-text-sm);
+  color: var(--hx-fg-2);
+}
+.ad .tm-journal li:first-child {
+  border-top: 0;
+}
+.ad .tm-journal li > span {
+  flex: 1;
+  min-width: 0;
+}
+.ad .tm-journal b {
+  color: var(--hx-fg-1);
+  font-weight: 500;
+}
+.ad .tm-journal time {
+  flex: none;
+  font-size: var(--hx-text-xs);
+  color: var(--hx-fg-3);
+  white-space: nowrap;
+}
+
+/* No limit of its own: the empty bar says nothing, the text takes the whole cell. */
+.ad .pt-lim[data-loose='1'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ad .pt-lim[data-loose='1'] i {
+  display: none;
+}
+.ad .pt-lim[data-loose='1'] b {
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

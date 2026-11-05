@@ -18,6 +18,7 @@ import type { IDeckComments } from '@/next/features/designly/deck/use-deck-comme
 import type { ISiteStage } from '@/next/features/designly/site-view';
 import { t } from '@/next/i18n';
 import type { MachineId } from '@/next/protocol/v2';
+import { ChatTerminalButton } from '@/next/features/terminal/chat-terminal';
 import Icon from '@/next/ui/icon';
 import { PRESENCE, usePresence } from '@/next/ui/presence';
 
@@ -168,6 +169,7 @@ export const DeckPanel = ({
             </button>
           ))}
         </div>
+        <ChatTerminalButton />
         <button
           className="hx-btn"
           data-variant="ghost"

@@ -4,8 +4,10 @@ import { type CSSProperties, useState } from 'react';
 
 import type { MemberRole, Person, TeamBlock, TeamsView } from '../../../org/api/teams';
 import { kRub, needsText, people as peopleText } from '../../../org/screens/teams/format';
-import { useClosing } from '../../../org/ui/closing';
-import { Btn, DIALOG_MS, Drawer, Icon, initial } from '../../ui';
+import { useOrg } from '../../../org/context';
+import { navigate } from '../../../lib/router';
+import { Btn, Drawer, initial } from '../../ui';
+import { ConfirmDialog } from './confirm';
 import { LimitSlider } from './slider';
 import {
   colorOf,
@@ -40,7 +42,7 @@ const find = (view: TeamsView, s: Subject): { person?: Person; block?: TeamBlock
   return {};
 };
 
-const Seg = <T,>({
+export const Seg = <T,>({
   items,
   value,
   disabled,
@@ -74,45 +76,6 @@ const Seg = <T,>({
   </div>
 );
 
-/** «Убрать из тенанта?» — over the drawer, inside it, as the board's dialogs sit. */
-const ConfirmRemove = ({
-  open,
-  name,
-  onNo,
-  onYes,
-}: {
-  open: boolean;
-  name: string;
-  onNo: () => void;
-  onYes: () => void;
-}) => {
-  const { mounted, closing } = useClosing(open, DIALOG_MS);
-  if (!mounted) return null;
-  const c = closing ? '1' : undefined;
-  return (
-    <>
-      <div className="md-dlg-scrim" data-closing={c} onClick={onNo} />
-      <div className="md-dlg" data-closing={c} role="dialog" aria-modal="true" aria-label="Убрать из тенанта">
-        <span className="md-dlg__ic" data-tone="danger">
-          <Icon i="trash-2" />
-        </span>
-        <h4>Убрать {name} из тенанта?</h4>
-        <p className="md-dlg__lead">
-          Человек потеряет доступ к машинам и чатам тенанта. Приглашение можно отправить заново.
-        </p>
-        <div className="md-dlg__foot">
-          <Btn variant="ghost" size="sm" onClick={onNo}>
-            Отмена
-          </Btn>
-          <Btn variant="primary" size="sm" className="md-btn-danger" onClick={onYes}>
-            Убрать
-          </Btn>
-        </div>
-      </div>
-    </>
-  );
-};
-
 const Inner = ({
   subject,
   open,
@@ -128,7 +91,10 @@ const Inner = ({
   const [limit, setLimit] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeFailed, setRemoveFailed] = useState(false);
   const [failed, setFailed] = useState(false);
+  const { shell, base } = useOrg();
   if (isPerson ? !person : !block) return null;
 
   const subj = isPerson ? person! : block!;
@@ -175,6 +141,19 @@ const Inner = ({
     : `${block!.leadName ? `лид ${block!.leadName} · ` : ''}${peopleText(block!.people.length)}`;
   const color = colorOf(view.teams, isPerson ? person!.teamId : block!.id);
 
+  // The hub is asked first and the drawer waits: it closes when the person is gone, else it says why not.
+  const remove = async () => {
+    if (!person || removing) return;
+    setRemoving(true);
+    setRemoveFailed(false);
+    const ok = await apply(removePerson(person.id));
+    setRemoving(false);
+    if (ok) {
+      setConfirm(false);
+      onClose();
+    } else setRemoveFailed(true);
+  };
+
   const save = async () => {
     if (!changed || saving) return;
     setSaving(true);
@@ -214,15 +193,19 @@ const Inner = ({
       over={
         <>
           {isPerson && (
-            <ConfirmRemove
+            <ConfirmDialog
               open={confirm}
-              name={name}
-              onNo={() => setConfirm(false)}
-              onYes={() => {
+              label="Убрать из тенанта"
+              title={`Убрать ${name} из тенанта?`}
+              lead="Человек потеряет доступ к машинам и чатам тенанта. Приглашение можно отправить заново."
+              yes="Убрать"
+              busy={removing}
+              error={removeFailed ? problem : null}
+              onNo={() => {
                 setConfirm(false);
-                onClose();
-                void apply(removePerson(person!.id));
+                setRemoveFailed(false);
               }}
+              onYes={() => void remove()}
             />
           )}
           <div className="md-actions tm-actions">
@@ -281,6 +264,26 @@ const Inner = ({
                 : ROLE_HINT[roleNow]}
             </p>
           </div>
+          {person!.openIn && (
+            <div className="md-sec">
+              <div className="md-sec__t">Тенант</div>
+              <p className="md-note tm-first">
+                Человек состоит в нескольких тенантах и не входит ни в одну команду, поэтому лимит и удаление
+                относятся к тенанту. Откройте нужный:
+              </p>
+              <div className="tm-inline">
+                {person!.openIn.map((t) => (
+                  <Btn
+                    key={t.slug}
+                    size="sm"
+                    onClick={() => navigate(`/o/${shell.org.slug}/${t.slug}/teams?p=${person!.id}`)}
+                  >
+                    {t.name}
+                  </Btn>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="md-sec">
             <div className="md-sec__t">Команда</div>
             <Seg
@@ -290,7 +293,7 @@ const Inner = ({
               disabled={!person!.can.team}
               onPick={setTeam}
             />
-            {!person!.can.team && (
+            {!person!.can.team && (self || !person!.openIn) && (
               <p className="md-note">{self ? 'Себе менять нельзя' : needLabel(person!.needs.team)}</p>
             )}
           </div>
@@ -311,7 +314,9 @@ const Inner = ({
           {!canLimit
             ? self
               ? 'Себе менять нельзя: лимит ставит другой администратор'
-              : needLabel(needLimit)
+              : person?.openIn
+                ? 'Лимит ставится в тенанте человека: откройте его выше'
+                : needLabel(needLimit)
             : isPerson
               ? 'Когда лимит кончится, агенты встанут до 1-го числа — или пока лимит не поднимут. На 80% придёт предупреждение.'
               : teamLimitNote(view, block!, limitNow ?? 0)}
@@ -322,6 +327,16 @@ const Inner = ({
           </p>
         )}
       </div>
+      {!isPerson && block!.id && shell.viewer.role === 'admin' && (
+        <div className="md-sec">
+          <div className="md-sec__t">Название и удаление</div>
+          <div className="tm-inline">
+            <Btn size="sm" icon="pencil" onClick={() => navigate(`${base}/team?t=${block!.id}&dlg=edit`)}>
+              Переименовать или удалить
+            </Btn>
+          </div>
+        </div>
+      )}
     </Drawer>
   );
 };

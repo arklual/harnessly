@@ -1,10 +1,12 @@
 // What a design remembers of how it is looked at: the device (and its browser), the canvas's view and the page. It is
 // kept in the browser per design, so the Designly tab and the right pane open the same design the same way.
-import { DEVICES, keptSize, type ISize } from '@/next/features/designly/devices';
-import { FIT, ZOOM, ZOOM_FIT, type IZoom, type TFit } from '@/next/features/designly/site-zoom';
+import { canRotate, deviceOf, DEVICES, keptSize, type ISize } from '@/next/features/designly/devices';
+import { ZOOM, ZOOM_FIT, type IZoom } from '@/next/features/designly/site-zoom';
 
 const KEY_PREFIX = 'hx-next-dl-view:';
-const VERSION = 1;
+/** 2: the view is locked unless the person unlocked it; a record of 1 kept `locked: false` by default. */
+const VERSION = 2;
+const VERSIONS: readonly unknown[] = [1, VERSION];
 /** The quiet after the last change before the view is written: a pan or a drag is not written frame by frame. */
 export const SAVE_MS = 400;
 /** A box that changed by more than this since the view was saved is not the page it was moved over. */
@@ -16,8 +18,8 @@ export interface IViewMemory {
   rot: boolean;
   chrome: boolean;
   browser: string | null;
-  /** The fit the view keeps; null when the person moved it, then `zoom` is the view. */
-  fit: TFit | null;
+  /** The view is the standard one of its device; false when the person moved it, then `zoom` is the view. */
+  std: boolean;
   zoom: IZoom;
   locked: boolean;
   /** The box's size at the fit when the view was saved: a view is only carried over a box of about that size. */
@@ -31,9 +33,9 @@ export const VIEW_DEFAULT: IViewMemory = {
   rot: false,
   chrome: true,
   browser: null,
-  fit: FIT.auto,
+  std: true,
   zoom: ZOOM_FIT,
-  locked: false,
+  locked: true,
   box: null,
   page: null,
 };
@@ -52,14 +54,14 @@ const sizeOf = (value: unknown, min: number, max: number): ISize | null => {
   return { w: Math.min(max, Math.round(w)), h: Math.min(max, Math.round(h)) };
 };
 
-const fitOf = (value: unknown): TFit | null | undefined => {
-  if (value === null) return null;
-  return Object.values(FIT).find((mode) => mode === value);
-};
+/** A record from before HRN-674 kept a fit (by width, by height, whole…) or null for a moved view: any fit is the
+ *  standard view now. */
+const stdOf = (raw: Record<string, unknown>): boolean =>
+  typeof raw.std === 'boolean' ? raw.std : raw.fit !== null;
 
 /** A saved record taken apart into what is valid; whatever is not stays at its default. */
 export const parseView = (raw: unknown): IViewMemory => {
-  if (!isRecord(raw) || raw.v !== VERSION) return VIEW_DEFAULT;
+  if (!isRecord(raw) || !VERSIONS.includes(raw.v)) return VIEW_DEFAULT;
   const device =
     typeof raw.device === 'string' && DEVICES.some((d) => d.id === raw.device) ? raw.device : null;
   if (device === null) return { ...VIEW_DEFAULT, page: typeof raw.page === 'string' ? raw.page : null };
@@ -71,7 +73,6 @@ export const parseView = (raw: unknown): IViewMemory => {
     s === null || x === null || y === null
       ? ZOOM_FIT
       : { s: Math.max(ZOOM.min, Math.min(ZOOM.max, s)), x, y };
-  const fit = fitOf(raw.fit);
   return {
     device,
     // A kept size under the least of «Резина» (150 × 932 once seen) is dropped: the window fills the area again.
@@ -79,12 +80,14 @@ export const parseView = (raw: unknown): IViewMemory => {
       device === 'fill' && isRecord(raw.size)
         ? keptSize({ w: num(raw.size.w) ?? 0, h: num(raw.size.h) ?? 0 })
         : null,
-    rot: raw.rot === true,
+    // A computer turned before HRN-674 has nothing to turn it back with now: it stands.
+    rot: raw.rot === true && canRotate(deviceOf(device)),
     chrome: raw.chrome !== false,
     browser: typeof raw.browser === 'string' ? raw.browser : null,
-    fit: fit === undefined ? FIT.auto : fit,
+    std: stdOf(raw),
     zoom,
-    locked: raw.locked === true,
+    // Only an unlock the person made since the lock became the default is kept.
+    locked: raw.v !== VERSION || raw.locked !== false,
     box: sizeOf(raw.box, 1, Number.MAX_SAFE_INTEGER),
     page: typeof raw.page === 'string' ? raw.page : null,
   };
@@ -111,14 +114,14 @@ const drifted = (was: number, now: number) => was <= 0 || Math.abs(now - was) / 
 
 /**
  * The view to start with over a box of this size: a free view (a pan, a zoom) is kept only where the page is about the
- * size it was; over a very different one it is lost, so it is the fit again.
+ * size it was; over a very different one it is lost, so it is the standard view again.
  */
 export const startView = (
-  saved: Pick<IViewMemory, 'fit' | 'zoom' | 'box'>,
+  saved: Pick<IViewMemory, 'std' | 'zoom' | 'box'>,
   box: ISize,
-): { fit: TFit | null; zoom: IZoom } => {
-  if (saved.fit !== null) return { fit: saved.fit, zoom: ZOOM_FIT };
+): { std: boolean; zoom: IZoom } => {
+  if (saved.std) return { std: true, zoom: ZOOM_FIT };
   if (saved.box === null || drifted(saved.box.w, box.w) || drifted(saved.box.h, box.h))
-    return { fit: FIT.auto, zoom: ZOOM_FIT };
-  return { fit: null, zoom: saved.zoom };
+    return { std: true, zoom: ZOOM_FIT };
+  return { std: false, zoom: saved.zoom };
 };

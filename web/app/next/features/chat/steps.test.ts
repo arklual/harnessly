@@ -44,3 +44,38 @@ describe('grouping the steps of a turn', () => {
     expect(dedupeTools([call('a', null), call('b', null)])).toHaveLength(1);
   });
 });
+
+describe('groupSteps of other agents', () => {
+  const peer = (id: string, from: string): Entry => ({
+    id,
+    turnId: null,
+    at: 1,
+    rev: 1,
+    t: 'peer',
+    peers: [
+      {
+        from,
+        kind: 'done',
+        color: null,
+        event: null,
+        summary: null,
+        sentAt: null,
+        agentId: null,
+        model: null,
+        md: '',
+      },
+    ],
+  });
+
+  it('makes deliveries that follow each other one card, and keeps a later one apart', () => {
+    const nodes = groupSteps(
+      [peer('p1', 'perf'), peer('p2', 'inventory'), say('s'), peer('p3', 'access')],
+      false,
+    );
+    expect(
+      nodes.map((n) =>
+        n.kind === 'entry' && n.entry.t === 'peer' ? n.entry.peers.map((p) => p.from) : n.kind,
+      ),
+    ).toEqual([['perf', 'inventory'], 'entry', ['access']]);
+  });
+});

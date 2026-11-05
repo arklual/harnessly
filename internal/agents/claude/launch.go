@@ -28,6 +28,9 @@ type LaunchConfig struct {
 	// PluginDir is the folder of the plugin carrying the workspace's skills, loaded with --plugin-dir; nil, or "" from
 	// it, loads none.
 	PluginDir func() string
+	// EnvPluginDirs are the folders of the hub's environment plugin (skills, documents, repositories and MCP servers of
+	// the team, docs/hub/environment.md), each loaded with --plugin-dir after PluginDir; nil, or none, loads none.
+	EnvPluginDirs func() []string
 	// JoinDir is where several prompt files are joined into one for the bare CLI.
 	JoinDir string
 	// Launcher is the managed launcher to run instead of `claude`; "" runs `claude`.
@@ -303,6 +306,11 @@ func (c LaunchConfig) flagsAndWrap(workspaceID string, launch *agents.Launch, pr
 	parts := []string{"--settings " + settings, "--mcp-config " + mcp}
 	if c.PluginDir != nil {
 		if dir := c.PluginDir(); dir != "" {
+			parts = append(parts, "--plugin-dir "+agents.ShellQuote(dir))
+		}
+	}
+	if c.EnvPluginDirs != nil {
+		for _, dir := range c.EnvPluginDirs() {
 			parts = append(parts, "--plugin-dir "+agents.ShellQuote(dir))
 		}
 	}

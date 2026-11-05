@@ -65,6 +65,8 @@ export interface IPlusAttach {
   /** The keys (`kind:id`) of what the field already holds. */
   attached: ReadonlySet<string>;
   onAttach: (row: IAttachRow) => void;
+  /** The words under «Файл проекта» when the field has no chat yet (the start page: the project of the new chat). */
+  projectHint?: string;
 }
 
 /** What the field can ask of «+» from outside (a shortcut). */
@@ -218,7 +220,11 @@ const PlusMenu = ({
         >
           <Icon name={item.icon} size="sm" />
           <span className="hx-plus__name">{t(item.name)}</span>
-          {!phone && <span className="hx-plus__hint">{t(item.hint)}</span>}
+          {!phone && (
+            <span className="hx-plus__hint">
+              {t(item.kind === ATTACH_KIND.project && attach.projectHint ? attach.projectHint : item.hint)}
+            </span>
+          )}
           <Icon name="chevron-right" size="sm" className="hx-plus__chev" />
         </button>
       ))}

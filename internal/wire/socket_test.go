@@ -986,7 +986,7 @@ func TestVoicePage(t *testing.T) {
 	var lang string
 	var heard []byte
 	var fail error
-	g.srv.Voice = func(_ context.Context, r io.Reader, l string) (string, error) {
+	g.srv.Voice = func(_ context.Context, r io.Reader, l, _ string) (string, error) {
 		lang = l
 		heard, _ = io.ReadAll(r)
 		return " сказано ", fail
@@ -1009,12 +1009,25 @@ func TestVoicePage(t *testing.T) {
 	}
 	g.srv.Me = me
 	orig := g.srv.Voice
-	g.srv.Voice = func(_ context.Context, r io.Reader, _ string) (string, error) {
+	var engine string
+	g.srv.Voice = func(_ context.Context, r io.Reader, _, e string) (string, error) {
 		_, _ = io.ReadAll(r)
+		engine = e
 		return "открой синопия", nil
 	}
 	if code := g.do("POST", "/api/v2/voice", audio, &got); code != 200 || got.Text != "открой Sinopia" {
 		t.Fatalf("words: %d %q", code, got.Text)
+	}
+	// a recording sent whole is recognized by the engine the person picked, as the live dictation is.
+	if engine != "local" {
+		t.Errorf("engine %q, the person picked local", engine)
+	}
+	cur, _ = me.Me()
+	if _, err := me.Patch(cur.Rev, json.RawMessage(`{"voice":{"engine":"openai","words":[]}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if code := g.do("POST", "/api/v2/voice", audio, &got); code != 200 || engine != "openai" {
+		t.Errorf("openai: %d engine %q", code, engine)
 	}
 	g.srv.Me, g.srv.Voice = nil, orig
 	var refused wire.CmdResult
@@ -1046,7 +1059,7 @@ func TestVoicePage(t *testing.T) {
 // person's cookie or not; the page's own origin and a client that is no browser can.
 func TestCrossSiteRequestsAreRefused(t *testing.T) {
 	g := newRig(t, time.Hour)
-	g.srv.Voice = func(context.Context, io.Reader, string) (string, error) { return "x", nil }
+	g.srv.Voice = func(context.Context, io.Reader, string, string) (string, error) { return "x", nil }
 	const conv = "tab-k3Jx9QmZ"
 	host := strings.TrimPrefix(g.http.URL, "http://")
 	do := func(method, path string, h map[string]string) int {

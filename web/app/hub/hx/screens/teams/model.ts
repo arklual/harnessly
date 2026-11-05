@@ -63,19 +63,25 @@ export interface PersonRow {
   /** The bar width as a CSS percentage. */
   w: string;
   limTxt: string;
+  /** Why the line reads as it does, when it is not the person's own limit. */
+  limHint?: string;
   chats: string;
   mr: string;
 }
 
 export const rowOf = (p: Person, now: number, team: string | null): PersonRow => {
-  const limit = p.effective.amountRub;
+  // Only the tenant's ceiling acts on the person: it is shared by everyone, so «из 400 тыс» would read as theirs.
+  const shared = p.effective.source === 'tenant';
+  const limit = shared ? null : p.effective.amountRub;
   const share = limit && limit > 0 ? p.spentRub / limit : 0;
   const seen = seenOf(p, now);
   const spent = p.invited
     ? '—'
-    : limit === null
-      ? kRub(p.spentRub)
-      : `${thousand(p.spentRub)} из ${kRub(limit)}`;
+    : shared
+      ? `${kRub(p.spentRub)} · без своего лимита`
+      : limit === null
+        ? kRub(p.spentRub)
+        : `${thousand(p.spentRub)} из ${kRub(limit)}`;
   return {
     id: p.id,
     ini: initial(p.name),
@@ -87,6 +93,9 @@ export const rowOf = (p: Person, now: number, team: string | null): PersonRow =>
     hot: share >= 0.8,
     w: `${Math.min(100, Math.round(share * 100))}%`,
     limTxt: p.invited ? (limit === null ? '—' : `— из ${kRub(limit)}`) : spent,
+    limHint: shared
+      ? `Своего лимита нет: действует общий лимит тенанта ${kRub(p.effective.amountRub ?? 0)} на всех`
+      : undefined,
     chats: p.invited || p.chatsWeek === null ? '—' : String(p.chatsWeek),
     mr: p.invited || p.mrsWeek === null ? '—' : String(p.mrsWeek),
   };
@@ -246,6 +255,7 @@ export const teamLead = (b: TeamBlock): string => {
 // ───────────────────────── the limit slider ─────────────────────────
 
 export const PERSON_STEPS = [5_000, 10_000, 15_000, 20_000, 30_000, 50_000, 80_000];
+export const TENANT_STEPS = [100_000, 200_000, 300_000, 400_000, 500_000, 750_000, 1_000_000, 1_500_000];
 export const TEAM_STEPS = [50_000, 70_000, 90_000, 110_000, 120_000, 150_000, 200_000, 300_000];
 
 /** The preset stops in the shown currency plus the values that are already set (they may be off the presets). */
@@ -531,4 +541,9 @@ export const patchNewTeam = (v: TeamsView, name: string): TeamsView => {
 export const patchMachines = (v: TeamsView, teamId: string, n: number): TeamsView => ({
   ...v,
   teams: v.teams.map((t) => (t.id === teamId ? { ...t, extras: { ...t.extras, machinesPerPerson: n } } : t)),
+});
+
+export const patchRename = (v: TeamsView, teamId: string, name: string): TeamsView => ({
+  ...v,
+  teams: v.teams.map((t) => (t.id === teamId ? { ...t, name: name.trim() } : t)),
 });

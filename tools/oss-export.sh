@@ -81,6 +81,7 @@ if [ -n "$keys" ]; then
     OSS_KEYS=$keys xargs -0 perl -i -pe '
       BEGIN { $k = qr/(?:$ENV{OSS_KEYS})-\d+/ }
       if ($ARGV =~ /\.md$/ || /^\s*(?:\/\/|\/\*|\*|#)/) {
+        s/^(\s*(?:\/\/|\/\*\*?|\*|#)\s*)\((?:$k)(?:, (?:$k))*\)[.,;:]? ?/$1/;
         s/ ?\((?:$k)(?:, (?:$k))*\)//g;
         s/\((?:$k)(?:, (?:$k))*[:;,] /(/g;
         s/, (?:$k)(?:, (?:$k))*\)/)/g;
@@ -89,6 +90,11 @@ if [ -n "$keys" ]; then
   # The index takes the files as they are now; only the stripped ones change.
   git -C "$src" --work-tree="$work/tree" add -A -f -- .
   tree=$(git -C "$src" write-tree)
+  # A tag that led a comment line must not leave the Go a gofmt check refuses (`//.`).
+  if command -v gofmt >/dev/null; then
+    bad=$(git -C "$src" diff --name-only "$commit" "$tree" -- '*.go' | (cd "$work/tree" && xargs -r gofmt -l))
+    [ -z "$bad" ] || die "stripping the tags left Go gofmt refuses: $bad"
+  fi
 fi
 "$here/oss-leak-check.sh" "$work/tree" || die "the leak check refused the tree of $short; no branch made"
 

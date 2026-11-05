@@ -71,6 +71,7 @@ import { t } from '@/next/i18n';
 import { toast } from '@/next/ui/toast';
 import { useDeadline } from '@/next/ui/use-deadline';
 import { requestContinue } from '@/next/stores/ui-requests';
+import { takeBackMessage } from '@/next/bindings/take-back';
 
 interface IChatViewProps {
   conv: ConvId;
@@ -437,6 +438,7 @@ const ChatView = ({
                             if (!m) return Promise.resolve();
                             return settled(cancelMessage(clientId));
                           }}
+                          onEditMessage={(clientId) => takeBackMessage(conv, clientId)}
                           renderGate={renderGate}
                           onForkTurn={handoff.onForkTurn}
                           dock={

@@ -26,6 +26,8 @@ const (
 	publishMaxFiles = 5000
 	publishMaxBytes = 100 << 20
 	publishTimeout  = 3 * time.Minute
+	// publishedTimeout bounds the read of the published site: the dialog waits for it.
+	publishedTimeout = 15 * time.Second
 )
 
 // ErrPublishEmpty: nothing of the project is left to publish.
@@ -249,6 +251,51 @@ func (a *API) Publish(r *http.Request) Answer {
 		Title   string `json:"title"`
 		Files   int    `json:"files"`
 	}{done.URL, done.Version, req.name, title, len(files)}, h)
+}
+
+// publishedSite is what «Опубликовать как сайт» shows of the site made from a project.
+type publishedSite struct {
+	URL     string `json:"url"`
+	Name    string `json:"name"`
+	Access  string `json:"access"`
+	Version int    `json:"version"`
+}
+
+// Published is GET <platform>/design/published?project=: the site made from the project, as the machine's hub keeps
+// it, so that «Поделиться» shows its address after a reload. `site` is null when there is none, or no hub with sites.
+func (a *API) Published(r *http.Request) Answer {
+	if _, no := a.Guard(r, http.MethodGet); no != nil {
+		return *no
+	}
+	h := noStore()
+	project := QueryString(r, "project")
+	if project == "" {
+		return JSON(r, 400, errorBody(locale.Pick("Invalid request", "Неверный запрос")), h)
+	}
+	if no := a.gate(r, project, RoleManage); no != nil {
+		return *no
+	}
+	none := JSON(r, 200, struct {
+		Site *publishedSite `json:"site"`
+	}{nil}, h)
+	ctx, cancel := context.WithTimeout(r.Context(), publishedTimeout)
+	defer cancel()
+	who, _ := a.L.Identity()
+	sess, err := agent.FetchSitesSession(ctx, a.L.cfg.DataDir, a.L.cfg.AgentTokenHeader, who.PersonID)
+	if err != nil {
+		return none
+	}
+	c := &sitesclient.Client{Base: sess.URL, Token: sess.Token}
+	site, err := c.FindByOrigin(ctx, sess.Space, PublishOrigin(project))
+	if err != nil {
+		return JSON(r, 502, errorBody(locale.Pick("The hub did not answer", "Хаб не ответил")), h)
+	}
+	if site == nil {
+		return none
+	}
+	return JSON(r, 200, struct {
+		Site *publishedSite `json:"site"`
+	}{&publishedSite{URL: site.Address, Name: site.Name, Access: site.Access, Version: site.CurrentVersion}}, h)
 }
 
 // publishFailed passes on what the hub said when it refused (a name that is taken, a secret in a page, a limit).

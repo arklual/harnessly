@@ -10,13 +10,13 @@
 // bridge tells Space, a drag with the middle button and a wheel the page cannot scroll by (`fromPage`), since the
 // frame keeps them once it has the focus or the press.
 //
-// A fit (FIT) is kept: the area resized or another device keeps the box fitted the same way until the person moves the
-// view. The lock leaves the view as it is: no pan, no zoom, only a fit can be picked (and is kept).
+// The standard view (FIT, chosen by the device: standardFit) is kept: the area resized or another device keeps the box
+// fitted its way until the person moves the view. The lock leaves the view as it is: no pan, no zoom; «Вписать» (⌘0)
+// still takes the view back to the standard one.
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { IPoint } from '@/next/features/designly/site-drag';
 import { startView, type IViewMemory } from '@/next/features/designly/view-memory';
 import {
-  FIT,
   fitView,
   gestureOf,
   isFit,
@@ -39,8 +39,8 @@ import {
 
 /** The view a design kept and the way to keep it again; without it the canvas starts at its fit and keeps nothing. */
 export interface ICanvasMemory {
-  start: Pick<IViewMemory, 'fit' | 'zoom' | 'box' | 'locked'>;
-  onChange: (view: Pick<IViewMemory, 'fit' | 'zoom' | 'box' | 'locked'>) => void;
+  start: Pick<IViewMemory, 'std' | 'zoom' | 'box' | 'locked'>;
+  onChange: (view: Pick<IViewMemory, 'std' | 'zoom' | 'box' | 'locked'>) => void;
 }
 
 export interface ICanvasZoom {
@@ -51,15 +51,12 @@ export interface ICanvasZoom {
   canOut: boolean;
   zoomIn: () => void;
   zoomOut: () => void;
+  /** «Вписать»: back to the standard view of the device (smoothly), as the keys do (⌘0, Shift+1), locked or not. */
   fit: () => void;
-  /** Back to the fit, as the keys do (⌘0, Shift+1). */
-  reset: () => void;
+  /** The view is the standard one (not moved since). */
+  std: boolean;
   /** The scale the person reads set to this many percent around the middle of the area (smoothly). */
   zoomTo: (pct: number) => void;
-  /** The fit the view keeps; null once the person moved it. */
-  fitMode: TFit | null;
-  /** The box fitted this way (smoothly), and kept so. */
-  fitTo: (mode: TFit) => void;
   /** No pan and no zoom while locked. */
   locked: boolean;
   onLock: () => void;
@@ -109,23 +106,25 @@ export const useCanvasZoom = (
   resetKey: string,
   /** The box's size at the layout's fit, which a fit counts from (the box's own size may still be on its way there). */
   box: { w: number; h: number },
+  /** How the standard view fits the box (standardFit of the device). */
+  standard: TFit,
   memory?: ICanvasMemory,
 ): ICanvasZoom => {
   const view = useRef<IZoom>(ZOOM_FIT);
   const shift = useRef<IPoint>({ x: 0, y: 0 });
-  const startFit = memory ? memory.start.fit : FIT.auto;
+  const startStd = memory ? memory.start.std : true;
   const startLocked = memory?.start.locked ?? false;
-  const fitRef = useRef<TFit | null>(startFit);
+  const stdRef = useRef(startStd);
   const lockedRef = useRef(startLocked);
   const settle = useRef(0);
   // A free view kept from before waits for the box to have its size (and the area its own) to be put back over it.
-  const restore = useRef<ICanvasMemory['start'] | null>(
-    memory && memory.start.fit === null ? memory.start : null,
-  );
+  const restore = useRef<ICanvasMemory['start'] | null>(memory && !memory.start.std ? memory.start : null);
   const [shown, setShown] = useState<IShown>(shownOf(ZOOM_FIT));
-  const [fitMode, setFitMode] = useState<TFit | null>(startFit);
+  const [std, setStd] = useState(startStd);
   const [locked, setLocked] = useState(startLocked);
   const boxRef = useRef(box);
+  const standardRef = useRef(standard);
+  const fitScale = useRef(fit);
   const onChange = useRef(memory?.onChange);
   useLayoutEffect(() => {
     onChange.current = memory?.onChange;
@@ -134,7 +133,7 @@ export const useCanvasZoom = (
   const report = () => {
     if (restore.current !== null) return;
     onChange.current?.({
-      fit: fitRef.current,
+      std: stdRef.current,
       zoom: view.current,
       box: boxRef.current,
       locked: lockedRef.current,
@@ -142,12 +141,14 @@ export const useCanvasZoom = (
   };
   useLayoutEffect(() => {
     boxRef.current = box;
+    standardRef.current = standard;
+    fitScale.current = fit;
   });
 
-  const keepFit = (mode: TFit | null) => {
-    if (fitRef.current === mode) return;
-    fitRef.current = mode;
-    setFitMode(mode);
+  const keepStd = (on: boolean) => {
+    if (stdRef.current === on) return;
+    stdRef.current = on;
+    setStd(on);
   };
 
   /** The box's corner as the layout put it, in the client's pixels (a transform does not move offsets). */
@@ -170,19 +171,29 @@ export const useCanvasZoom = (
     );
   };
 
-  /** The view of the kept fit for the area as it is now. */
-  const fitted = (mode: TFit): IZoom => {
+  /** The standard view for the area as it is now. */
+  const fitted = (): IZoom => {
     const area = areaRef.current;
     if (!area) return ZOOM_FIT;
-    return fitView(mode, boxRef.current, { w: area.clientWidth, h: area.clientHeight }, insetOf(area));
+    return fitView(
+      standardRef.current,
+      boxRef.current,
+      { w: area.clientWidth, h: area.clientHeight },
+      insetOf(area),
+      fitScale.current,
+    );
   };
 
   const apply = (want: IZoom, smooth: boolean) => {
-    const next = fitRef.current === null ? bound(want) : want;
+    const next = stdRef.current ? want : bound(want);
     view.current = next;
     const area = areaRef.current;
     const section = sectionRef.current;
     if (!area || !section) return;
+    // The area clips and is never scrolled by the person, but a focus inside the page (or the browser bringing a
+    // zoomed box into view) can scroll it: the view counts from its corner, so it is put back.
+    if (area.scrollLeft !== 0) area.scrollLeft = 0;
+    if (area.scrollTop !== 0) area.scrollTop = 0;
     const origin = originOf(area);
     const home = section.getBoundingClientRect();
     shift.current = origin
@@ -211,44 +222,45 @@ export const useCanvasZoom = (
     setShown((was) => (was.s === nextShown.s && was.zoomed === nextShown.zoomed ? was : nextShown));
     report();
   };
-  /** The view moved by the person: it no longer keeps a fit. */
+  /** The view moved by the person: it is no longer the standard one. */
   const move = (want: IZoom, smooth: boolean) => {
-    keepFit(null);
+    keepStd(false);
     apply(want, smooth);
   };
-  const fitTo = (mode: TFit, smooth: boolean) => {
-    keepFit(mode);
-    apply(fitted(mode), smooth);
+  /** The standard view, kept so. */
+  const fitTo = (smooth: boolean) => {
+    keepStd(true);
+    apply(fitted(), smooth);
   };
 
   const latestApply = useRef(apply);
   const latestMove = useRef(move);
   const latestFitTo = useRef(fitTo);
   const latestBound = useRef(bound);
-  const latestKeepFit = useRef(keepFit);
+  const latestKeepStd = useRef(keepStd);
   useLayoutEffect(() => {
-    latestKeepFit.current = keepFit;
+    latestKeepStd.current = keepStd;
     latestApply.current = apply;
     latestMove.current = move;
     latestFitTo.current = fitTo;
     latestBound.current = bound;
   });
 
-  // Another device or size, or the canvas is not offered: the view takes its fit again (the auto one after a free view).
+  // Another device, size or turn, or the canvas is not offered: the view is the standard one again.
   useLayoutEffect(() => {
     const kept = restore.current;
     const area = areaRef.current;
     if (kept !== null && on && area && boxRef.current.w > 0) {
       restore.current = null;
       const start = startView(kept, boxRef.current);
-      fitRef.current = start.fit;
-      setFitMode(start.fit);
-      if (start.fit === null) {
+      stdRef.current = start.std;
+      setStd(start.std);
+      if (!start.std) {
         latestApply.current(start.zoom, false);
         return;
       }
     }
-    latestFitTo.current(fitRef.current ?? FIT.auto, false);
+    latestFitTo.current(false);
     // The area is read when the device or the offer changes, not whenever a caller hands in a new ref object.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey, on]);
@@ -258,11 +270,10 @@ export const useCanvasZoom = (
     if (areaRef.current) areaRef.current.dataset.locked = String(lockedRef.current);
   }, [areaRef]);
 
-  // The layout fitted the box to another size: a kept fit follows it.
+  // The layout fitted the box to another size, or the device's standard is another: a kept standard view follows it.
   useLayoutEffect(() => {
-    if (on && fitRef.current !== null && fitRef.current !== FIT.auto)
-      latestFitTo.current(fitRef.current, false);
-  }, [box.w, box.h, on]);
+    if (on && stdRef.current) latestFitTo.current(false);
+  }, [box.w, box.h, standard, on]);
 
   useEffect(() => () => window.clearTimeout(settle.current), []);
 
@@ -272,7 +283,7 @@ export const useCanvasZoom = (
     const area = areaRef.current;
     if (!area || !on) return;
     const observer = new ResizeObserver(() => {
-      if (fitRef.current !== null) latestFitTo.current(fitRef.current, false);
+      if (stdRef.current) latestFitTo.current(false);
       else latestApply.current(view.current, false);
     });
     observer.observe(area);
@@ -289,7 +300,7 @@ export const useCanvasZoom = (
     let frame = 0;
     let pending: IZoom | null = null;
     const schedule = (want: IZoom) => {
-      latestKeepFit.current(null);
+      latestKeepStd.current(false);
       const next = latestBound.current(want);
       pending = next;
       view.current = next;
@@ -354,14 +365,16 @@ export const useCanvasZoom = (
       const key = zoomKeyOf(event);
       if (key !== null && !typing(event.target)) {
         event.preventDefault();
+        if (key === ZOOM_KEY.reset) {
+          latestFitTo.current(true);
+          return;
+        }
         if (lockedRef.current) return;
         const z = view.current;
-        if (key === ZOOM_KEY.reset) latestFitTo.current(FIT.auto, true);
-        else
-          latestMove.current(
-            zoomAt(z, centerOf(area), z.s * (key === ZOOM_KEY.in ? ZOOM.step : 1 / ZOOM.step)),
-            true,
-          );
+        latestMove.current(
+          zoomAt(z, centerOf(area), z.s * (key === ZOOM_KEY.in ? ZOOM.step : 1 / ZOOM.step)),
+          true,
+        );
         return;
       }
       if (event.code !== 'Space' || !over || typing(event.target) || event.repeat) {
@@ -471,11 +484,9 @@ export const useCanvasZoom = (
     canOut: !locked && shown.s > ZOOM.min,
     zoomIn: () => step(ZOOM.step),
     zoomOut: () => step(1 / ZOOM.step),
-    fit: () => fitTo(FIT.auto, true),
-    reset: () => fitTo(FIT.auto, true),
+    fit: () => fitTo(true),
+    std,
     zoomTo: (pct) => aroundMiddle(pct / 100 / fit),
-    fitMode,
-    fitTo: (mode) => fitTo(mode, true),
     locked,
     onLock: () => {
       lockedRef.current = !lockedRef.current;

@@ -23,6 +23,9 @@ type API struct {
 	L *Library
 	// Session: the request carries a page session. CLIToken: it carries the runtime's cli-token.
 	Session, CLIToken func(*http.Request) bool
+	// Person is the address of the person whose page session made the request ("" when unknown: no session, a
+	// session that names no address, the machine agent's own). The owner of what they make.
+	Person func(*http.Request) string
 	// MachineAgent: the request is the machine agent's own (the access snapshot is taken from nobody else).
 	MachineAgent func(*http.Request) bool
 	// APIRefusal is the dispatcher's answer to a caller with neither; refused false for anyone else.
@@ -222,3 +225,13 @@ func (a *API) warn(msg string, err error) {
 		a.Log("warn", msg, err)
 	}
 }
+
+// PersonOf is the address of the person who made the request, or "" (then the runtime's own person stands for them).
+func (a *API) PersonOf(r *http.Request) string {
+	if a == nil || a.Person == nil || r == nil {
+		return ""
+	}
+	return a.Person(r)
+}
+
+func (a *API) person(r *http.Request) string { return a.PersonOf(r) }

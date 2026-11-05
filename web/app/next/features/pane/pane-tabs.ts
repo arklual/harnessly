@@ -13,7 +13,16 @@ export type TTab =
   | { id: string; kind: 'machine' }
   | { id: string; kind: 'designly'; design: string | null }
   | { id: string; kind: 'subagent'; focus: string | null }
-  | { id: string; kind: 'files'; path: string; file: boolean }
+  /** `against`: the file is shown against another state of it — 'git:<ref>' or the path of another file.
+   *  `at`: the place in the file to show (a line «Найти в файлах» found). */
+  | {
+      id: string;
+      kind: 'files';
+      path: string;
+      file: boolean;
+      against?: string;
+      at?: { line: number; col: number; size: number };
+    }
   | { id: string; kind: 'shell'; terminal: string }
   /** An installed app's view; `view` null: the app's first view for the pane. */
   | { id: string; kind: 'app'; app: string; view: string | null }
@@ -105,25 +114,25 @@ const placeBrowser = (
   return { next: added(state, tab, ctx.busy), effect: null, show: true };
 };
 
+/** «Файлы» on the machine: the list of the workspace's places. */
+export const MACHINE = '/';
+
 const placeFiles = (state: IPaneTabs, target: string | null, ctx: IPlaceContext): IPlaced => {
   const rel = target === null ? '' : inFolder(ctx.cwd, target);
-  // A file the agent handed over lies where it was made, maybe outside the chat's folder: it has its own view here.
-  if (rel === null && target !== null && deliveredViewOf(target) !== null) {
-    const have = state.tabs.find((x) => x.kind === 'files' && x.path === target);
+  // A file or a folder outside the chat's folder opens here too, by its absolute path: a file the agent
+  // handed over or made in a worktree beside it, a folder of the machine («Машина», what «Диск» was). The machine says
+  // what of it may be read.
+  if (rel === null) {
+    const at = target ?? MACHINE;
+    const file = deliveredViewOf(at) !== null || isFilePath(at);
+    const have = state.tabs.find((x) => x.kind === 'files' && x.path === at);
     if (have) return { next: front(state, have.id, ctx.busy), effect: null, show: true };
     return {
-      next: added(state, { id: ctx.nextId(), kind: 'files', path: target, file: true }, ctx.busy),
+      next: added(state, { id: ctx.nextId(), kind: 'files', path: at, file }, ctx.busy),
       effect: null,
       show: true,
     };
   }
-  // A file outside the chat's folder is Legacy's to show: the pane's own files tab reads only the folder.
-  if (rel === null)
-    return {
-      next: state,
-      effect: { k: 'legacy', kind: 'files', target, background: ctx.busy, reload: false },
-      show: true,
-    };
   const file = rel !== '' && isFilePath(rel);
   const have = state.tabs.find((x) => x.kind === 'files' && x.path === rel);
   if (have) return { next: front(state, have.id, ctx.busy), effect: null, show: true };
@@ -217,6 +226,9 @@ export const placeRequest = (state: IPaneTabs, request: IPaneRequest, ctx: IPlac
       // The agent's terminal is beside the chat, not in the pane; the side chat comes where it lives.
       return { next: state, effect: { k: request.k }, show: false };
     case 'legacy':
+      // «Диск» is «Файлы» on the machine now: its place, or the workspace's places.
+      if (request.kind === 'disk')
+        return reload ? nothing(state) : placeFiles(state, request.target ?? MACHINE, ctx);
       return {
         next: state,
         effect: { k: 'legacy', kind: request.kind, target: request.target, background: ctx.busy, reload },

@@ -19,6 +19,7 @@
   "next.keys.scope.video": "Video",
   "next.keys.scope.pictures": "Pictures",
   "next.keys.scope.site": "Site design",
+  "next.keys.scope.files": "Files",
   "next.keys.cmd.global.help": "Shortcuts sheet",
   "next.keys.cmd.global.search": "Search",
   "next.keys.cmd.global.newChat": "New chat",
@@ -71,5 +72,7 @@
   "next.keys.cmd.site.inspect": "Pick an element on the page",
   "next.keys.copied": "The answer is copied",
   "next.keys.cmd.site.pick": "Pick a place to comment",
-  "next.keys.cmd.site.stopInspect": "Leave picking an element"
+  "next.keys.cmd.site.stopInspect": "Leave picking an element",
+  "next.keys.cmd.files.quickOpen": "Go to file",
+  "next.keys.cmd.files.find": "Find in files"
 }

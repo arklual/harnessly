@@ -1,6 +1,6 @@
 // The design's chats on the stores (features/designly/design-conv.ts says which one the column shows): the last chat
-// the person worked on each design in and the chats it was opened from, kept in the browser so the design opens on its
-// chat at once; the first message of a design without a chat, which creates exactly one conversation however many times
+// the person worked on each design in, kept in the browser so the design opens on its chat at once (which chats are the
+// design's is the machines' answer, not the browser's: HRN-675); the first message of a design without a chat, which creates exactly one conversation however many times
 // it is pressed; and the message of that create, shown in the column from the moment it is sent until the new chat's
 // own feed has it.
 import { useEffect, useState } from 'react';
@@ -10,10 +10,10 @@ import { createKeyedStore, useKey } from '@/next/core/store';
 import {
   designKey,
   pickDesignConv,
-  withSeen,
   type IDesignBinding,
   type TDesignConv,
 } from '@/next/features/designly/design-conv';
+import { recordDesignChat } from '@/next/features/designly/api';
 import type { IModelChoice } from '@/next/features/composer/agents';
 import type { AttachmentRef, ClientId, ConvId, MachineId } from '@/next/protocol/v2';
 import { useConversationList, useConvsAnswered } from '@/next/stores/conversations';
@@ -25,13 +25,10 @@ const STORAGE_KEY = 'hx-next-design-convs';
 
 /** The last chat of each design. */
 export const designBindingStore = createKeyedStore<string, IDesignBinding>();
-/** The chats each design was opened from or worked in, newest first. */
-export const designSeenStore = createKeyedStore<string, readonly string[]>();
-
-const NO_SEEN: readonly string[] = [];
 
 let restored = false;
-/** What the browser kept, read once. An older page kept only the last chat, as a bare id. */
+/** What the browser kept, read once. An older page kept only the last chat, as a bare id; the chats a design was opened
+ * from (`seen`) an older page kept are no longer read: opening a design from a chat does not make it the design's. */
 const restore = () => {
   if (restored) return;
   restored = true;
@@ -39,14 +36,9 @@ const restore = () => {
     const raw: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
     if (typeof raw !== 'object' || raw === null) return;
     for (const [k, value] of Object.entries(raw as Record<string, unknown>)) {
-      const kept =
-        typeof value === 'string' ? { last: value, seen: [value] } : (value as Record<string, unknown>);
+      const kept = typeof value === 'string' ? { last: value } : (value as Record<string, unknown>);
       const last = typeof kept?.last === 'string' ? kept.last : null;
-      const seen = Array.isArray(kept?.seen)
-        ? kept.seen.filter((x): x is string => typeof x === 'string')
-        : [];
       if (last && !designBindingStore.has(k)) designBindingStore.set(k, { id: last, fresh: false });
-      if (seen.length > 0 && !designSeenStore.has(k)) designSeenStore.set(k, seen);
     }
   } catch {
     // Private mode or a broken value: the designs open on a new chat.
@@ -54,9 +46,11 @@ const restore = () => {
 };
 
 const keep = () => {
-  const all: Record<string, { last: string | null; seen: readonly string[] }> = {};
-  for (const k of new Set([...designBindingStore.keys(), ...designSeenStore.keys()]))
-    all[k] = { last: designBindingStore.get(k)?.id ?? null, seen: designSeenStore.get(k) ?? NO_SEEN };
+  const all: Record<string, { last: string }> = {};
+  for (const k of designBindingStore.keys()) {
+    const id = designBindingStore.get(k)?.id;
+    if (id) all[k] = { last: id };
+  }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
   } catch {
@@ -64,13 +58,11 @@ const keep = () => {
   }
 };
 
-/** Makes a chat the design's last one (null: none, the next message starts a new one); it joins the design's chats. */
+/** Makes a chat the design's last one (null: none, the next message starts a new one). */
 export const bindDesignConv = (key: string, binding: IDesignBinding | null): void => {
   restore();
-  if (binding) {
-    designBindingStore.set(key, binding);
-    designSeenStore.set(key, withSeen(designSeenStore.get(key) ?? NO_SEEN, binding.id));
-  } else designBindingStore.delete(key);
+  if (binding) designBindingStore.set(key, binding);
+  else designBindingStore.delete(key);
   keep();
 };
 
@@ -80,15 +72,9 @@ export const useDesignBound = (key: string | null): string | null => {
   return useKey(designBindingStore, key ?? '')?.id ?? null;
 };
 
-export const useDesignSeen = (key: string): readonly string[] => {
-  restore();
-  return useKey(designSeenStore, key) ?? NO_SEEN;
-};
-
 /** Only for tests: forget everything, what the browser kept included. */
 export const resetDesignConvs = (): void => {
   for (const k of [...designBindingStore.keys()]) designBindingStore.delete(k);
-  for (const k of [...designSeenStore.keys()]) designSeenStore.delete(k);
   for (const k of [...creatingStore.keys()]) creatingStore.delete(k);
   restored = false;
 };
@@ -105,6 +91,8 @@ export const useDesignCreating = (key: string | null) => useKey(creatingStore, k
 
 export interface IDesignFirst {
   machine: MachineId;
+  /** The design's id in the library. */
+  design: string;
   key: string;
   dir: string;
   choice: IModelChoice | null;
@@ -121,6 +109,7 @@ export interface IDesignFirst {
  */
 export const startDesignConv = ({
   machine,
+  design,
   key,
   dir,
   choice,
@@ -147,6 +136,8 @@ export const startDesignConv = ({
   });
   void created.conversation.then((id) => {
     if (!id) return;
+    // The machine keeps that the chat was started from the design: every machine and page lists it as the design's.
+    void recordDesignChat(machine, design, id).catch(() => undefined);
     bindDesignConv(key, { id, fresh: true });
     creatingStore.patch(key, (have) => have && { ...have, conv: id });
   });
@@ -190,7 +181,7 @@ export const useDesignConv = (machine: MachineId, design: string, fromChat: stri
   const pick = (id: string | null) => {
     setOverridden(fromChat);
     // The address stops naming the chat it came from: a reload shows the pick (the design's last chat), not the old one.
-    if (fromChat !== null) goTo({ kind: ROUTE.site, id: design }, { replace: true });
+    if (fromChat !== null) goTo({ kind: ROUTE.site, id: design, edit: true }, { replace: true });
     bindDesignConv(key, id === null ? null : { id, fresh: false });
   };
   return { picked, pick };

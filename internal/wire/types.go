@@ -864,6 +864,12 @@ type PeerNote struct {
 	// Model is the model that subagent was asked to run on, when it said.
 	Model *string `json:"model"`
 	MD    string  `json:"md"`
+	// Task is what a named teammate was started for (its Agent call's description); absent when the feed has no such call.
+	Task *string `json:"task,omitempty"`
+	// Opens is the id of the agent's own conversation the page can open beside the chat; absent when it has none.
+	Opens *string `json:"opens,omitempty"`
+	// Failed: the agent this note settles ended in a failure.
+	Failed bool `json:"failed,omitempty"`
 }
 
 // PeerNoteKind is what a peer note is.
@@ -1744,6 +1750,8 @@ type FirstMessage struct {
 	ClientID      string   `json:"clientId"`
 	Text          string   `json:"text"`
 	AttachmentIDs []string `json:"attachmentIds"`
+	// Refs are the places the first message points at (as SendCmd.Refs); absent when none.
+	Refs []MessageRef `json:"refs,omitempty"`
 }
 
 // ConversationRenameCmd sets a conversation's title.

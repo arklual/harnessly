@@ -4,7 +4,15 @@
 // menu key). A tab is carried along the strip on the shared drag (ui/use-drag: the tab itself follows the pointer, its
 // neighbours step aside, it settles into its place on the drop) and the order is kept by the owner. A tab has the
 // width of its title between a least and a most; only a crowded strip narrows them, then it scrolls sideways.
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type AnimationEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+} from 'react';
 import Icon from '@/next/ui/icon';
 import Tooltip from '@/next/ui/tooltip';
 import { useLeavingList } from '@/next/ui/presence';
@@ -66,6 +74,13 @@ const TabStrip = ({
   // The menu keeps its tab and place while it leaves, so it does not change under the exit.
   const [menu, setMenu] = useState<ITabMenuAt | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The tabs whose entrance has run: only a tab not yet among them grows in (data-enter, tabs.css). React moves a
+  // reordered tab out of the list and back, and an entrance on the tab itself would replay at every drop.
+  const [entered, setEntered] = useState<ReadonlySet<string>>(() => new Set());
+  const onEntered = (event: AnimationEvent<HTMLDivElement>, id: string) => {
+    if (event.target !== event.currentTarget || event.animationName !== 'hx-gtab-in') return;
+    setEntered((was) => (was.has(id) ? was : new Set(was).add(id)));
+  };
   const openMenu = (tabId: string, x: number, y: number) => {
     setMenu({ tabId, x, y });
     setMenuOpen(true);
@@ -167,6 +182,8 @@ const TabStrip = ({
                 role="tab"
                 data-tab={tab.id}
                 data-state={leaving ? 'closing' : undefined}
+                data-enter={entered.has(tab.id) ? undefined : ''}
+                onAnimationEnd={(event) => onEntered(event, tab.id)}
                 data-drag={leaving ? undefined : TAB}
                 data-drag-id={tab.id}
                 data-drop={leaving ? undefined : TAB}

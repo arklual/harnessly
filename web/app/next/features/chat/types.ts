@@ -123,6 +123,12 @@ export interface PeerNote {
   agentId: string | null;
   model: string | null;
   md: string;
+  /** What a named teammate was started for; absent when the feed has no such call. */
+  task?: string;
+  /** The id of the agent's own conversation the pane opens; absent when it has none. */
+  opens?: string;
+  /** The agent ended in a failure. */
+  failed?: boolean;
 }
 export type PeerEntry = EntryBase & { t: 'peer'; peers: PeerNote[] };
 

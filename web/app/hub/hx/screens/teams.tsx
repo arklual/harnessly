@@ -14,6 +14,7 @@ import { InviteSheet, NewTeamSheet } from './teams/extra';
 import { flatOf, groupsOf } from './teams/model';
 import { Empty, GroupCard, LoadFailed, PeopleTable, Problem, Tiles, TeamsSkeleton } from './teams/parts';
 import { PersonOrTeamSheet, type Subject } from './teams/sheet';
+import { TenantSheet } from './teams/tenant';
 import { useTeams } from './teams/use-teams';
 import { useUrl } from './teams/url';
 
@@ -23,7 +24,7 @@ type Mode = 'team' | 'flat';
 const List = () => {
   const { scope, shell } = useOrg();
   const slug = scope.kind === 'org' ? 'all' : scope.tenant.slug;
-  const { view, error, reload, apply, problem, clearProblem } = useTeams(slug);
+  const { view, error, reload, refresh, apply, problem, clearProblem } = useTeams(slug);
   const url = useUrl(CARDS);
   const now = useNow(60_000);
   const [q, setQ] = useState('');
@@ -58,7 +59,8 @@ const List = () => {
 
   const noResult = needle !== '' && (mode === 'team' ? groups.length === 0 : flat.length === 0);
   const nobody = view !== null && view.total === 0 && teamCount === 0;
-  const tenant = scope.kind === 'tenant' ? scope.tenant : null;
+  // Where an invitation or a team goes: the open tenant; in «all» every tenant, and the form asks when there are several.
+  const tenants = scope.kind === 'tenant' ? [scope.tenant] : shell.tenants;
 
   return (
     <>
@@ -66,12 +68,22 @@ const List = () => {
         <Titles title="Команды" lead={lead} />
         {view && (
           <div className="ad-tools">
-            {view.can.invite && tenant && (
+            {scope.kind === 'tenant' && (
+              <Btn
+                size="sm"
+                icon="settings"
+                data-variant="outline"
+                onClick={() => url.open({ dlg: 'tenant' })}
+              >
+                Тенант
+              </Btn>
+            )}
+            {view.can.invite && tenants.length > 0 && (
               <Btn size="sm" icon="mail" data-variant="outline" onClick={() => url.open({ dlg: 'invite' })}>
                 Пригласить
               </Btn>
             )}
-            {view.can.createTeam && (
+            {view.can.createTeam && tenants.length > 0 && (
               <Btn variant="primary" size="sm" icon="plus" onClick={() => url.open({ dlg: 'new' })}>
                 Новая команда
               </Btn>
@@ -183,13 +195,24 @@ const List = () => {
             apply={apply}
             problem={problem}
             taken={view.teams.map((t) => t.name)}
+            tenants={tenants}
           />
-          {tenant && (
+          {scope.kind === 'tenant' && (
+            <TenantSheet
+              open={dlg === 'tenant'}
+              tenant={scope.tenant}
+              view={view}
+              apply={apply}
+              problem={problem}
+              onClose={() => url.close()}
+            />
+          )}
+          {tenants.length > 0 && (
             <InviteSheet
               open={dlg === 'invite'}
-              tenant={tenant}
+              tenants={tenants}
               onClose={() => url.close()}
-              onChanged={reload}
+              onChanged={refresh}
             />
           )}
         </>

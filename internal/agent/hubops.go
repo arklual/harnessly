@@ -129,9 +129,8 @@ func (h *hub) handle(l *link, req map[string]json.RawMessage) (any, func(), erro
 		}
 		return h.opBudget(req)
 	case hubproto.OpEnvSet:
-		if h.observe {
-			return nil, nil, h.allow(op, false, "the hub's environment")
-		}
+		// Served on an observe link too: the list is applied only into the link's own folder (a plugin the runtime adds
+		// to new chats) and changes nothing the cluster set up.
 		return h.opEnvSet(req)
 	}
 	if closedClusterOps[op] {
@@ -387,6 +386,9 @@ func (h *hub) opEnv(op string, req map[string]json.RawMessage, pol hubproto.Poli
 		return nil, nil, err
 	}
 	h.audit.Record(op, true, map[string]any{"name": name})
+	if h.environment.Reapply() { // an MCP server of the list may have waited for this secret
+		h.emit(hubproto.EventEnvState, "state", h.environment.State())
+	}
 	names := h.env.Names(agentnet.ScopeAll, agentnet.IsProxyName)
 	if names == nil {
 		names = []string{}

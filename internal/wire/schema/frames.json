@@ -304,7 +304,7 @@
       ]
     },
     "RetryableRefuseCode": {"enum": ["machine-offline", "rate-limited", "internal", "timeout"]},
-    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
+    "HttpKind": {"enum": ["hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"]},
     "Channel": {"type": "string", "pattern": "^(machine|convs|conv:tab-[A-Za-z0-9_-]+)$"},
     "EntryId": {"type": "string", "pattern": "^((c:[0-9a-f-]+|x:[0-9]+)#[0-9]+|live:(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+)$"},
     "TurnId": {"type": "string", "pattern": "^(c:[0-9a-f-]+|x:[0-9]+)#[0-9]+$"},
@@ -676,6 +676,12 @@
       "required": ["id", "pinned"],
       "additionalProperties": false,
       "properties": {"id": {"type": "string", "minLength": 1}, "pinned": {"type": "boolean"}}
+    },
+    "DesignlyChat": {
+      "type": "object",
+      "required": ["id", "conv"],
+      "additionalProperties": false,
+      "properties": {"id": {"type": "string", "minLength": 1}, "conv": {"$ref": "#/$defs/ConvId"}}
     },
     "DesignlyRefusal": {
       "type": "object",
@@ -1231,11 +1237,12 @@
       }
     },
     "FileKind": {"enum": ["file", "directory"]},
+    "FileGit": {"enum": ["new", "changed"]},
     "FileEntry": {
       "type": "object",
       "required": ["name", "path", "kind"],
       "additionalProperties": false,
-      "properties": {"name": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}, "kind": {"$ref": "#/$defs/FileKind"}}
+      "properties": {"name": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}, "kind": {"$ref": "#/$defs/FileKind"}, "git": {"$ref": "#/$defs/FileGit"}}
     },
     "DirListing": {
       "type": "object",
@@ -1244,7 +1251,8 @@
       "properties": {
         "path": {"type": "string"},
         "entries": {"type": "array", "items": {"$ref": "#/$defs/FileEntry"}},
-        "truncated": {"type": "boolean"}
+        "truncated": {"type": "boolean"},
+        "root": {"type": "string", "minLength": 1}
       }
     },
     "FileContent": {
@@ -1628,7 +1636,10 @@
         "sentAt": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
         "agentId": {"oneOf": [{"type": "string"}, {"type": "null"}]},
         "model": {"oneOf": [{"type": "string"}, {"type": "null"}]},
-        "md": {"type": "string"}
+        "md": {"type": "string"},
+        "task": {"type": "string"},
+        "opens": {"type": "string"},
+        "failed": {"type": "boolean"}
       }
     },
     "Entry": {
@@ -3873,6 +3884,15 @@
           "properties": {
             "http": {"const": "designlyPin"},
             "response": {"oneOf": [{"$ref": "#/$defs/DesignlyPin"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["http", "response"],
+          "additionalProperties": false,
+          "properties": {
+            "http": {"const": "designlyChat"},
+            "response": {"oneOf": [{"$ref": "#/$defs/DesignlyChat"}, {"$ref": "#/$defs/DesignlyRefusal"}]}
           }
         },
         {

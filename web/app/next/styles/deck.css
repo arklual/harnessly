@@ -1317,7 +1317,8 @@
   left: 10px;
   right: 10px;
   bottom: 84px;
-  --sw: min(416px, calc(100cqw - 44px));
+  /* As big as the pane lets it: its width, or its height less the bar, the strip, the notes and the pager. */
+  --sw: min(calc(100cqw - 44px), calc((100cqh - 300px) * 16 / 9));
   justify-content: center;
   padding-top: 0;
 }
@@ -2428,6 +2429,13 @@
   font-size: var(--hx-text-sm);
   white-space: nowrap;
 }
+.hx-deck-file__thumb {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+}
 .hx-deck-file small {
   color: var(--hx-fg-3);
 }
@@ -3071,4 +3079,20 @@
   margin: 8px 0 0;
   font-size: var(--hx-text-xs);
   color: var(--hx-fg-2);
+}
+
+/* A phone: the bar keeps back, the title, the mode switch and the rest as icons; the guest's «Слайды / Видео» choice
+   belongs to the owner's preview of a link, not to looking. */
+@media (max-width: 560px) {
+  .hx-deck[data-screen='link'] .hx-deck__lmode,
+  .hx-deck[data-screen='link'] .hx-deck__bar [data-k='full'] {
+    display: none;
+  }
+  .hx-video__bar [data-k='source'] {
+    display: none;
+  }
+  .hx-deck__bar .hx-deck__addr {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }

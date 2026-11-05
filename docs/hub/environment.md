@@ -72,6 +72,10 @@ type EnvResponse = {
   };
   layers: EnvLayer[];                    // the organization, then the tenants, then the teams
   teams: { id: string; name: string; tenantId: string }[];   // for the audience pickers
+  // How far the list got: the screen's working machines (not revoked or disabled; of the team when `team` is set),
+  // those that reported what they hold, those whose hash is the one the hub computes for them now.
+  // A machine whose list is empty counts as current without a report: the hub sends no first empty list.
+  delivery: { machines: number; reported: number; current: number; lastAt: string | null };
 };
 type EnvLayer = {
   layer: 'org' | 'tenant' | 'team'; scopeId: string; tenantId: string;  // tenantId "" on the organization layer
@@ -86,6 +90,9 @@ type EnvEntry = {
   callsWeek: number | null; spark14: number[];         // 14 UTC days, the oldest first
   lastUsedAt: string | null;
   unused: boolean | null;                               // null: unknown
+  // Enabled rows only: what the machines holding the current list said about the item; null: none reported it.
+  // A machine with an older list is not counted. `message` is the first reason a machine gave.
+  delivery: { ok: number; pending: number; error: number; message: string | null } | null;
 };
 ```
 
@@ -174,11 +181,17 @@ A machine gets the list of its team: what the layers put in for the machine's te
   machine (`env_state`).
 
 The agent keeps the list in `environment.json` in its data folder (atomic write, `0600`). An identical hash only bumps the
-rev; a list whose hash does not match its items is refused (`invalid`); an observe link refuses `env.set` (it is not
-served there). Item ids must match `[A-Za-z0-9_-]{1,64}`, at most 500 items, a source at most 256 KiB. A skill with a body
-is written to `<data>/environment/claude-plugin/skills/<itemId>/SKILL.md` with a `.claude-plugin/plugin.json`. Every item
-is reported `pending`, with the reason, until the runtime loads that folder (it does not pass it to `--plugin-dir` for
-chats yet); a bad id or an unknown kind is `error`.
+rev; a list whose hash does not match its items is refused (`invalid`). An observe link (`AGENT_HUB_OBSERVE_FILE`)
+accepts `env.set` too and keeps the list in its own folder (`<data>/hub/`); its budget, tunnel and policy stay closed.
+Item ids must match `[A-Za-z0-9_-]{1,64}`, at most 500 items, a source at most 256 KiB.
+
+The agent writes the list as a Claude plugin `hub-environment` in `<link folder>/environment/claude-plugin`
+(`hubproto.EnvPluginDir`): a skill with a body becomes `skills/<itemId>/SKILL.md`; a document, a repository or a reference
+becomes a reference skill that tells the chat where to look; an MCP server goes to `.mcp.json`, its secrets as
+`${NAME:-}` from the machine's environment. An MCP server whose secret the machine does not have, or an HTTP server with
+more than one secret, is `pending` with the reason; a bad id or an unknown kind is `error`. An empty list removes the
+plugin. The runtime passes `--plugin-dir` for every such folder that exists to each new Claude chat; the list reaches a
+running chat with its next start. The screen shows this as «Доехало до машин» and, per row, what did not go in.
 
 ## Storage
 
@@ -200,8 +213,7 @@ the flag is for the whole hub. `HUB_USAGE_INGEST=on` is needed for the numbers.
 - A member's own additions from the catalog (not only switching off) have no storage.
 - Personal switches are not applied to a machine's list; machines get the team's list.
 - Tool names of sessions already in an agent's facts cache appear after their transcript is parsed again.
-- The agent keeps and reports the list but does not load it into chats (every item is `pending`); MCP servers, repositories
-  and documents are not applied at all.
+- Codex chats do not get the list.
 - Turning the flag off leaves the machines with their last list.
-- The applied status per machine (`env_state`) has no read endpoint.
+- The applied status is shown summed over the screen's machines; there is no per-machine view.
 - The flag is not in `GET /api/config`.

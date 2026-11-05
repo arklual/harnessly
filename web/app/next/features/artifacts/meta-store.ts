@@ -4,10 +4,14 @@
 // for the next opening, in localStorage for the next load of the page, and an old answer is shown while a new one is
 // read underneath (the runtime keeps its own for five minutes). An answer that did not come is not remembered as "none":
 // it is asked again, once by itself and then by the person's «Повторить».
+//
+// The platform's reader shows a document behind the person's sign-in, so the runtime cannot read its title there: a
+// reader link is asked of the gateway's catalogue (…/docs/<slug>) instead.
 import { useEffect, useSyncExternalStore } from 'react';
-import { runtimePath, platformPath } from '@/next/core/net/machine';
+import { gatewayPath, runtimePath, platformPath } from '@/next/core/net/machine';
 import { pageClock } from '@/next/core/clock';
 import {
+  ARTIFACT_KIND,
   LOOK,
   readMeta,
   readableInOrder,
@@ -104,6 +108,28 @@ const save = () => {
   }, SAVE_DELAY_MS);
 };
 
+// A document by the platform's reader `/…/docs/<slug>`, the address the publishing tool prints.
+const DOC_PATH = /^\/(?:.*\/)?docs\/([\w-]+)\/?$/;
+
+/** The slug of a document by its reader address; null for a board or anything else. */
+const docSlug = (item: IArtifactItem): string | null => {
+  if (item.kind !== ARTIFACT_KIND.doc) return null;
+  try {
+    const url = new URL(item.url);
+    return url.protocol === 'https:' ? (DOC_PATH.exec(url.pathname)?.[1] ?? null) : null;
+  } catch {
+    return null;
+  }
+};
+
+/** The catalogue's answer as a link's metadata: its title, nothing more. */
+const docMeta = (v: unknown): TMeta | null => {
+  const doc = typeof v === 'object' && v !== null ? (v as { doc?: unknown }).doc : null;
+  return readMeta(
+    typeof doc === 'object' && doc !== null ? { ...doc, kind: 'artifact', description: null } : null,
+  );
+};
+
 const addressOf = (job: IJob): string => {
   const route = job.item.github ? '/github/link-meta' : '/link-meta';
   return runtimePath(
@@ -119,10 +145,15 @@ const read = async (job: IJob): Promise<{ r: typeof RESULT.found; meta: TMeta } 
   const clock = pageClock();
   const timer = clock.setTimeout(() => ctl.abort(), REQUEST_MS);
   try {
-    const res = await fetcher(addressOf(job), ctl.signal);
+    const slug = docSlug(job.item);
+    const res = await fetcher(
+      slug ? gatewayPath(`/docs/${encodeURIComponent(slug)}` as `/${string}`) : addressOf(job),
+      ctl.signal,
+    );
     if (res.status === 404) return { r: RESULT.none };
     if (!res.ok) return { r: RESULT.lost };
-    const meta = readMeta(await res.json());
+    const body: unknown = await res.json();
+    const meta = slug ? docMeta(body) : readMeta(body);
     return meta ? { r: RESULT.found, meta } : { r: RESULT.none };
   } catch {
     return { r: RESULT.lost };

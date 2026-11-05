@@ -87,6 +87,11 @@
     color 160ms ease,
     background 160ms ease,
     opacity 160ms ease;
+}
+/* A tab grows in once, when it opens (tab-strip.tsx keeps data-enter until its entrance has run). A tab moved to another
+   place (a drop, Alt+←/→) is taken out of the list and put back by React, and an animation of the tab itself would play
+   again from nothing: the moved tab would vanish and grow back under the pointer that has just let it go. */
+.hx-gtab[data-enter] {
   animation: hx-gtab-in 260ms var(--hx-ease-out) backwards;
 }
 /* The hover of a quiet tab: a pill inside it, as a browser's. */
@@ -277,19 +282,14 @@
   outline-offset: -2px;
 }
 
-/* ── The start page's places, a row of quiet tiles under the field ── */
+/* ── The start page's places, a row of quiet tiles under the field (in the dock) ── */
 .hx-hometools {
-  position: absolute;
-  left: var(--hx-space-8);
-  right: var(--hx-space-8);
-  top: calc(50cqh + 150px);
-  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--hx-space-2);
-  max-width: calc(var(--hx-feed-max) + 120px);
-  margin: 0 auto;
+  /* It lives in the dock, under the field: the field grows down and pushes the row with it instead of covering it. */
+  margin-top: var(--hx-space-10);
 }
 .hx-hometool {
   display: inline-flex;
@@ -329,80 +329,6 @@
 @media (max-width: 900px), (max-height: 560px) {
   .hx-hometools {
     display: none;
-  }
-}
-
-/* ── The folded sidebar: the live chats in place of the projects' letters ── */
-.hx-railchats {
-  display: none;
-}
-.hx-app[data-side='closed'] .hx-railchats {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: var(--hx-space-1);
-}
-.hx-app[data-side='closed'] .hx-sidebar__list > section:not(.hx-railchats) {
-  display: none;
-}
-.hx-railchat {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 34px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--hx-radius-sm);
-  background: none;
-  cursor: pointer;
-  animation: hx-railchat-in 320ms var(--hx-ease-out) backwards;
-  transition: background var(--hx-dur-sm);
-}
-.hx-railchat:hover {
-  background: var(--hx-shell-hover);
-}
-.hx-railchat[aria-current='page'] {
-  background: var(--hx-shell-active);
-}
-.hx-railchat__mark {
-  transition: opacity var(--hx-dur-sm);
-}
-/* A chat whose agent has no terminal running is quieter, as in the open sidebar. */
-.hx-railchat[data-terminal='off'] .hx-railchat__mark {
-  opacity: 0.55;
-}
-.hx-railchat[data-terminal='off']:hover .hx-railchat__mark,
-.hx-railchat[data-terminal='off'][aria-current='page'] .hx-railchat__mark {
-  opacity: 1;
-}
-.hx-railchat:focus-visible {
-  outline: 2px solid var(--hx-focus);
-  outline-offset: -2px;
-}
-.hx-railchat__mark {
-  width: 20px;
-  height: 20px;
-}
-.hx-railchat__badge {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  display: grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--hx-bg-rail);
-}
-.hx-railchat .hx-railchat__status {
-  width: 11px;
-  height: 11px;
-}
-@keyframes hx-railchat-in {
-  from {
-    opacity: 0;
-    transform: scale(0.85);
   }
 }
 
@@ -457,7 +383,7 @@
     animation-iteration-count: infinite !important;
   }
   .hx-gtab,
-  .hx-railchat,
+  .hx-gtab[data-enter],
   .hx-app.hx-app[data-peek] > .hx-sidebar {
     animation: none;
     transition: none;

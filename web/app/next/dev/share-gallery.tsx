@@ -1,7 +1,8 @@
 // «Поделиться» of a design on made-up data, for the eye and for screenshots: ?dev=share with the
 // installation's next-ui feature. The gateway is played in the page: every change answers with the new state, the people
 // search knows two people. &role=view opens it for a person who may only look, &theme=light|dark and &lang=en|ru pick
-// the look. Never part of a production path.
+// the look, &v=one the one dialog of HRN-675 (its own gateway, /access/…), with &kind=deck|video|doc|board the same
+// dialog of another kind. Never part of a production path.
 import '@/next/styles/tokens.css';
 import '@/next/styles/base.css';
 import '@/next/styles/shell.css';
@@ -14,7 +15,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from '@/platform/router';
 import { pinLocale } from '@/next/i18n';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
+import ResourceShare from '@/next/features/designly/access/resource-share';
 import type { IProjectAccess, TGrantRole } from '@/next/features/designly/access/api';
+import type { IAccessLink, IGrant, IResourceView } from '@/next/features/designly/access/resource-api';
+import { LINK_KIND, type ILinkContext } from '@/next/features/designly/access/link-form';
+import { usePublish } from '@/next/features/designly/publish/use-publish';
+import type { MachineId } from '@/next/protocol/v2';
 import { PortalContext } from '@/next/ui/portal';
 
 const DAY_MS = 86_400_000;
@@ -104,6 +110,128 @@ const HITS = [
   { id: 'nikita@example.com', name: 'Никита' },
 ];
 
+const LINKS: IAccessLink[] = [
+  {
+    id: 'l1',
+    forWhom: 'Иван, инвестор',
+    rights: 'view',
+    expiresAt: '2026-11-11T20:59:59Z',
+    disabledAt: null,
+    opens: 3,
+    lastOpenedAt: new Date(Date.now() - DAY_MS).toISOString(),
+    createdAt: '2026-11-01T10:00:00Z',
+    createdBy: 'peter@example.com',
+    comments: 0,
+    options: { device: 'fill' },
+    version: 'pinned',
+    pages: null,
+    copyable: true,
+  },
+  {
+    id: 'l2',
+    forWhom: 'Агентство, правки',
+    rights: 'comment',
+    expiresAt: null,
+    disabledAt: null,
+    opens: 0,
+    lastOpenedAt: null,
+    createdAt: '2026-10-28T10:00:00Z',
+    createdBy: 'peter@example.com',
+    comments: 2,
+    options: { device: 'ip14' },
+    version: 'latest',
+    pages: ['index.dc.html'],
+    copyable: false,
+  },
+  {
+    id: 'l3',
+    forWhom: 'Кастдев, октябрь',
+    rights: 'view',
+    expiresAt: '2026-10-30T20:59:59Z',
+    disabledAt: '2026-10-25T10:00:00Z',
+    opens: 1,
+    lastOpenedAt: '2026-10-24T10:00:00Z',
+    createdAt: '2026-10-20T10:00:00Z',
+    createdBy: 'ivan@example.com',
+    comments: 0,
+    options: {},
+    version: 'pinned',
+    pages: null,
+    copyable: true,
+  },
+];
+
+const ONE: IResourceView = {
+  resource: { kind: 'design', id: 'landing', subkind: 'site', title: 'Лендинг фестиваля' },
+  stored: true,
+  role: 'owner',
+  until: null,
+  canManage: true,
+  manager: true,
+  steward: false,
+  owner: { email: 'peter@example.com', name: 'Пётр' },
+  homeTeam: { teamId: 't-design', name: 'Дизайн', role: 'edit' },
+  editorsCanShare: true,
+  grants: [
+    {
+      type: 'user',
+      id: 'ivan@example.com',
+      name: 'Иван',
+      sub: 'ivan@example.com',
+      role: 'edit',
+      canShare: true,
+      expiresAt: null,
+    },
+    {
+      type: 'team',
+      id: 't-mkt',
+      name: 'Маркетинг',
+      sub: 'Тиксли · 6',
+      role: 'view',
+      canShare: false,
+      expiresAt: null,
+    },
+    {
+      type: 'user',
+      id: 'oleg@example.com',
+      name: 'Олег',
+      sub: 'oleg@example.com',
+      role: 'comment',
+      canShare: false,
+      expiresAt: '2026-11-12T20:59:59Z',
+    },
+  ],
+  requests: [
+    {
+      id: 'r1',
+      email: 'bob@partner.ru',
+      name: 'Боб',
+      level: 'edit',
+      message: 'Поправлю тексты',
+      createdAt: '2026-10-24T10:00:00Z',
+    },
+  ],
+  links: LINKS,
+  myRequest: null,
+};
+
+const ONE_VIEWER: IResourceView = {
+  ...ONE,
+  role: 'view',
+  canManage: false,
+  manager: false,
+  grants: undefined,
+  requests: undefined,
+};
+
+const DIRECTORY = {
+  people: [
+    { email: 'nastya@example.com', name: 'Настя', teams: [] },
+    { email: 'nikita@example.com', name: 'Никита', teams: [] },
+  ],
+  teams: [{ teamId: 't-sales', name: 'Продажи', orgName: 'Тиксли', members: 4 }],
+};
+
 const until = (ttl: unknown): string | null => {
   if (typeof ttl !== 'string') return null;
   const step = STEP_MS[ttl as keyof typeof STEP_MS];
@@ -185,6 +313,185 @@ const playGateway = (box: { access: IProjectAccess }) => {
   };
 };
 
+/** The one access API, played in the page. */
+const playOne = (box: { view: IResourceView }) => {
+  const real = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const answer = (body: unknown) =>
+      new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+    if (url.includes('/design/published')) return answer({ site: null });
+    if (url.includes('/design/publish')) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const body = JSON.parse(String(init?.body ?? '{}')) as { name?: string };
+      return answer({ url: `https://${body.name}.sites.example.com/`, version: 1, name: body.name });
+    }
+    if (url.includes('/access/directory')) {
+      const q = decodeURIComponent(url.split('q=')[1] ?? '').toLowerCase();
+      return answer({
+        people: DIRECTORY.people.filter((p) => p.email.startsWith(q) || p.name.toLowerCase().startsWith(q)),
+        teams: DIRECTORY.teams.filter((team) => team.name.toLowerCase().startsWith(q)),
+      });
+    }
+    const found = /\/access\/(?:design|doc)\//.exec(url);
+    if (!found) return real(input, init);
+    const [, what, type, key] = url
+      .slice(found.index + found[0].length)
+      .split('?')[0]!
+      .split('/')
+      .map(decodeURIComponent);
+    const method = init?.method ?? 'GET';
+    const body = (init?.body ? JSON.parse(String(init.body)) : {}) as Record<string, unknown>;
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const v = box.view;
+    if (what === 'log') return answer({ log: LOG });
+    if (what === 'links') {
+      const all = v.links ?? [];
+      if (type && key === 'address') return answer({ url: `https://ai.example.com/s/${type}` });
+      if (type && method === 'PATCH') {
+        const changed = all.find((l) => l.id === type)!;
+        const next = {
+          ...changed,
+          ...(body as Partial<IAccessLink>),
+          disabledAt: body.disabled ? new Date().toISOString() : null,
+        };
+        box.view = { ...v, links: all.map((l) => (l.id === type ? next : l)) };
+        return answer({ link: next });
+      }
+      if (!type && method === 'POST') {
+        const fresh: IAccessLink = {
+          ...LINKS[0]!,
+          ...(body as Partial<IAccessLink>),
+          id: `n${all.length + 1}`,
+          opens: 0,
+          lastOpenedAt: null,
+          expiresAt: until(body.ttl),
+          createdAt: new Date().toISOString(),
+        };
+        box.view = { ...v, links: [fresh, ...all] };
+        return answer({ link: fresh, url: `https://ai.example.com/s/${fresh.id}` });
+      }
+    }
+    if (what === 'team' && v.homeTeam)
+      box.view = { ...v, homeTeam: { ...v.homeTeam, role: body.role as IGrant['role'] | null } };
+    if (what === 'settings') box.view = { ...v, editorsCanShare: Boolean(body.editorsCanShare) };
+    if (what === 'requests' && type) box.view = { ...v, requests: [] };
+    if (what === 'requests' && !type)
+      box.view = { ...v, myRequest: { id: 'm1', level: 'edit', status: 'open' } };
+    if (what === 'grants' && type && key) {
+      const grants = v.grants ?? [];
+      const known = DIRECTORY.teams.find((team) => team.teamId === key);
+      const person = DIRECTORY.people.find((p) => p.email === key);
+      const grant: IGrant = {
+        type: type as IGrant['type'],
+        id: key,
+        name: known?.name ?? person?.name ?? key,
+        sub: known ? `${known.orgName} · ${known.members}` : key,
+        role: body.role as IGrant['role'],
+        canShare: Boolean(body.canShare),
+        expiresAt: until(body.ttl),
+      };
+      const same = (g: IGrant) => g.type === type && g.id === key;
+      if (method === 'DELETE') box.view = { ...v, grants: grants.filter((g) => !same(g)) };
+      else
+        box.view = {
+          ...v,
+          grants: grants.some(same)
+            ? grants.map((g) => (same(g) ? { ...grant, name: g.name, sub: g.sub } : g))
+            : [...grants, grant],
+        };
+    }
+    return answer(box.view);
+  };
+};
+
+const PAGES = [
+  { path: 'index.dc.html', title: 'Главная' },
+  { path: 'tickets.dc.html', title: 'Билеты' },
+];
+
+/** What each kind of the gallery is: its name, where it lives in the API, what its links offer. */
+const KINDS: Record<string, { title: string; ref: 'design' | 'doc'; subkind: string; ctx: ILinkContext }> = {
+  design: {
+    title: 'Лендинг фестиваля',
+    ref: 'design',
+    subkind: 'site',
+    ctx: { kind: LINK_KIND.design, pages: PAGES },
+  },
+  deck: {
+    title: 'Питч мероприятия',
+    ref: 'design',
+    subkind: 'deck',
+    ctx: { kind: LINK_KIND.deck, slides: 12 },
+  },
+  video: {
+    title: 'Ролик мероприятия',
+    ref: 'design',
+    subkind: 'video',
+    ctx: { kind: LINK_KIND.video, formats: ['16:9', '9:16'] },
+  },
+  doc: { title: 'Спека «Поделиться»', ref: 'doc', subkind: 'artifact', ctx: { kind: LINK_KIND.doc } },
+  board: { title: 'Схема доступа', ref: 'doc', subkind: 'board', ctx: { kind: LINK_KIND.board } },
+};
+
+const OneGallery = ({ viewer, kind, ask }: { viewer: boolean; kind: string; ask: boolean }) => {
+  const shape = KINDS[kind] ?? KINDS.design!;
+  const [view, setView] = useState<IResourceView>(() => {
+    const seed = viewer ? ONE_VIEWER : ONE;
+    const box = {
+      view: {
+        ...seed,
+        resource: { kind: shape.ref, id: 'landing', subkind: shape.subkind, title: shape.title },
+        // A document's first link reads only from the screen: the list marks it «без копирования».
+        links:
+          kind === 'doc'
+            ? seed.links?.map((link, i) =>
+                i === 0 ? { ...link, options: { download: false, copy: false } } : link,
+              )
+            : seed.links,
+      },
+    };
+    playOne(box);
+    return box.view;
+  });
+  const [links, setLinks] = useState(SEED);
+  const publish = usePublish({
+    machine: 'gallery' as MachineId,
+    project: 'landing',
+    title: 'Festival',
+    pages: [
+      { path: 'index.dc.html', title: 'Главная' },
+      { path: 'tickets.dc.html', title: 'Билеты' },
+    ],
+  });
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setOpen(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return (
+    <>
+      <button type="button" className="hx-btn" data-gallery-open onClick={() => setOpen(true)}>
+        Поделиться
+      </button>
+      <ResourceShare
+        open={open}
+        onClose={() => setOpen(false)}
+        target={{ kind: shape.ref, id: 'landing' }}
+        title={shape.title}
+        view={view}
+        onNext={setView}
+        address="https://example.com/designly/landing"
+        onCopyLink={() => undefined}
+        links={{ project: 'landing', access: links, onNext: setLinks }}
+        linkContext={shape.ctx}
+        publish={viewer || shape.subkind !== 'site' ? undefined : publish}
+        ask={ask}
+      />
+    </>
+  );
+};
+
 const ShareGallery = () => {
   const { query } = useRouter();
   const dark = query.theme !== 'light';
@@ -211,19 +518,29 @@ const ShareGallery = () => {
   return (
     <PortalContext value={portal}>
       <div className="hx-root">
-        <button type="button" className="hx-btn" data-gallery-open onClick={() => setOpen(true)}>
-          Поделиться
-        </button>
-        <ShareDialog
-          open={open}
-          onClose={() => setOpen(false)}
-          project="landing"
-          title="Лендинг фестиваля"
-          access={access}
-          onNext={setAccess}
-          onCopyLink={() => undefined}
-          onClaim={async () => undefined}
-        />
+        {query.v === 'one' ? (
+          <OneGallery
+            viewer={query.role === 'view'}
+            kind={typeof query.kind === 'string' ? query.kind : 'design'}
+            ask={query.ask === '1'}
+          />
+        ) : (
+          <>
+            <button type="button" className="hx-btn" data-gallery-open onClick={() => setOpen(true)}>
+              Поделиться
+            </button>
+            <ShareDialog
+              open={open}
+              onClose={() => setOpen(false)}
+              project="landing"
+              title="Лендинг фестиваля"
+              access={access}
+              onNext={setAccess}
+              onCopyLink={() => undefined}
+              onClaim={async () => undefined}
+            />
+          </>
+        )}
         <div ref={portal} className="hx-portal" />
       </div>
     </PortalContext>

@@ -325,6 +325,19 @@ describe('commands', () => {
       state: { k: 'queued', reason: 'launching' },
     });
   });
+
+  it('create carries the places of the first message (the start page attaches them like a chat does)', async () => {
+    const { m } = await bootFake();
+    const ref = { kind: 'design' as const, id: 'landing', title: 'Лендинг', target: '' };
+    const h = createConversation(m, {
+      where: { projectId: 'p7k2m9x4q1aa' },
+      provider: 'claude',
+      model: null,
+      first: { text: 'Продолжим', refs: [ref] },
+    });
+    expect(msg(h.firstClientId!).refs).toEqual([ref]);
+    await settle();
+  });
 });
 
 describe('gates', () => {

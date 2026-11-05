@@ -103,6 +103,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.PaneSelection.ServeHTTP(w, r)
+	case p == "pane-act":
+		if s.PaneAct == nil {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.PaneAct.ServeHTTP(w, r)
 	case p == "file-bytes":
 		if s.FileBytes == nil {
 			refuse(w, RefuseNotFound)
@@ -232,6 +238,14 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 		s.handoffDraft(w, r, parts[0])
 		return
 	}
+	if len(parts) == 2 && parts[1] == "file-op" {
+		if s.EntryOp == nil || r.Method != http.MethodPost || !ValidConvID(parts[0]) {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.EntryOp(w, r, parts[0])
+		return
+	}
 	saving := len(parts) == 2 && parts[1] == "file" && r.Method == http.MethodPut
 	if r.Method != http.MethodGet && !saving {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -242,6 +256,30 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 		return
 	}
 	id := parts[0]
+	if len(parts) == 2 && parts[1] == "file-git" {
+		if s.GitSide == nil || r.Method != http.MethodGet {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.GitSide(w, r, id)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "find" {
+		if s.FindText == nil || r.Method != http.MethodGet {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.FindText(w, r, id)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "download" {
+		if s.Download == nil || r.Method != http.MethodGet && r.Method != http.MethodHead {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.Download(w, r, id)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(s.Limits.CmdBudgetMs)*time.Millisecond)
 	defer cancel()
 	var v interface{ Validate() error }

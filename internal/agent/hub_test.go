@@ -1183,9 +1183,12 @@ func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
 		t.Fatalf("observe policy %+v", p)
 	}
 	for _, f := range hello.Features {
-		if f == "tunnel" || f == hubproto.FeatureBudget || f == hubproto.FeatureEnvironment {
+		if f == "tunnel" || f == hubproto.FeatureBudget {
 			t.Errorf("an observe link offers %s: %v", f, hello.Features)
 		}
+	}
+	if !contains(hello.Features, hubproto.FeatureEnvironment) {
+		t.Errorf("an observe link does not take the hub's environment: %v", hello.Features)
 	}
 	m := r.machine
 	for op, params := range map[string]map[string]any{
@@ -1198,7 +1201,6 @@ func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
 		"runtime.session": {"subject": "a@example.com"},
 		"tunnel.open":     {"spec": map[string]string{"tunnelId": strings.Repeat("a", 32), "target": "runtime"}},
 		"budget.set":      {"version": 1, "mode": "stop", "entries": []any{}},
-		"env.set":         {"rev": 1, "hash": hubproto.EnvHash(nil), "items": []any{}},
 	} {
 		if _, e := c.call(op, params); !strings.HasPrefix(e, "policy_denied: ") {
 			t.Errorf("%s: %q", op, e)
@@ -1207,6 +1209,12 @@ func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
 	// What can be read stays open.
 	c.mustCall("agents.status", nil)
 	c.mustCall("preflight.run", nil)
+	// The hub's environment list is taken, and applied only into the link's own folder.
+	items := []hubproto.EnvItem{{ItemID: "skill1", Kind: "skill", Name: "Ревью", Source: json.RawMessage(`{"body":"Коротко."}`)}}
+	st := decode[hubproto.EnvState](t, c.mustCall(hubproto.OpEnvSet, map[string]any{"rev": 1, "hash": hubproto.EnvHash(items), "items": items}))
+	if len(st.Applied) != 1 || st.Applied[0].Status != hubproto.EnvOK {
+		t.Fatalf("env.set on an observe link: %+v", st)
+	}
 
 	// The cluster's tunnels keep the runtime's own port: no route filter was put in front of it.
 	if got := r.agent.tunnels.runtimePort; got != r.runtime.port {
@@ -1225,7 +1233,10 @@ func TestHubObserveLinkSeesTheMachineAndChangesNothing(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	for _, name := range []string{"machine.json", "agent-audit.log", linkStateFile, "budget.json"} {
+	if _, err := os.Stat(filepath.Join(hubDir, "environment", "claude-plugin", "skills", "skill1", "SKILL.md")); err != nil {
+		t.Errorf("the observe link's environment: %v", err)
+	}
+	for _, name := range []string{"machine.json", "agent-audit.log", linkStateFile, "budget.json", "environment.json", "environment"} {
 		if _, err := os.Stat(filepath.Join(dataDir, name)); !os.IsNotExist(err) {
 			t.Errorf("%s in the cluster agent's data folder: %v", name, err)
 		}

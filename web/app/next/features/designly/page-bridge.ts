@@ -129,6 +129,8 @@ export type TBridgeMessage =
   | { k: 'styled'; gone: number[] }
   /** The page was scrolled to `y` CSS pixels. */
   | { k: 'scroll'; y: number }
+  /** The document itself was scrolled to `y` (only while the screens scroll together, «Все экраны»). */
+  | { k: 'doc-scroll'; y: number }
   /** A pinch or ⌘/Ctrl + wheel over the page, in the page's pixels: the canvas zooms by it. */
   | { k: 'wheel'; x: number; y: number; dy: number }
   /** Space held (or let go) over the page: the canvas's hand. */
@@ -282,6 +284,7 @@ export const readBridgeMessage = (data: unknown): TBridgeMessage | null => {
     return { k: 'styled', gone: gone.slice(0, MAX_TWEAKS) };
   }
   if (m.type === 'tk:scroll') return isNum(m.y) ? { k: 'scroll', y: Math.max(0, m.y) } : null;
+  if (m.type === 'tk:doc-scroll') return isNum(m.y) ? { k: 'doc-scroll', y: Math.max(0, m.y) } : null;
   if (m.type === 'tk:wheel')
     return isNum(m.x) && isNum(m.y) && isNum(m.dy)
       ? { k: 'wheel', x: m.x, y: m.y, dy: Math.max(-MAX_WHEEL, Math.min(MAX_WHEEL, m.dy)) }

@@ -207,6 +207,12 @@ const QuestionCard = ({ question, device, ownAnswer, onAnswer, onFold, onSendRea
                     ))}
                   </div>
                 )}
+                {items.length === 1 && (
+                  <span className="hx-ask__title">
+                    <Icon name="message-square-text" size="sm" />
+                    <span>{current.header || t('next.ask.label')}</span>
+                  </span>
+                )}
                 <span className="hx-spacer" />
                 <button
                   type="button"

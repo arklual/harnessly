@@ -3,6 +3,7 @@
 // button sends, or stops the agent while it works. Keys are in keys.ts; ↑ in an empty field opens the earlier prompts
 // and the quick ones (prompt-history.tsx), «/» the commands, skills and settings of the agent (slash-palette.tsx). On a phone the dock rides over the keyboard.
 import AttachmentThumb from '@/next/ui/attachment-thumb';
+import { useFileDrop } from '@/next/features/composer/use-file-drop';
 import ContextRing, { type IContextRingProps } from '@/next/features/composer/context-ring';
 import {
   useEffect,
@@ -14,6 +15,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
   type Ref,
+  type RefObject,
 } from 'react';
 import { isStashKey, KEY_ACTION, keyAction } from '@/next/features/composer/keys';
 import LimitsChip from '@/next/features/limits/limits-chip';
@@ -37,7 +39,7 @@ import type {
 } from '@/next/features/composer/types';
 import useKeyboardInset from '@/next/features/composer/use-keyboard-inset';
 import { RoundButton } from '@/next/ui/button';
-import { useFitField } from '@/next/ui/use-fit-field';
+import { useFieldEdges, useFitField } from '@/next/ui/use-fit-field';
 import { boxOf, canAnimate, claimEdit, FLIGHT_EASE, FLIGHT_MS, launchFrom } from '@/next/ui/flight';
 import Icon, { type TIconName } from '@/next/ui/icon';
 import { toast } from '@/next/ui/toast';
@@ -62,6 +64,30 @@ const PLACEHOLDER_KEYS: Record<ComposerMode, string> = {
   stopped: 'next.composer.placeholderStopped',
   working: 'next.composer.placeholderWorking',
   answer: 'next.composer.placeholderAnswer',
+};
+/** A narrow field (a design's chat column, the side chat) says the same in a few words; the whole hint is its tooltip. */
+const SHORT_PLACEHOLDER_KEYS: Partial<Record<ComposerMode, string>> = {
+  idle: 'next.composer.placeholderShort',
+  stopped: 'next.composer.placeholderStoppedShort',
+  working: 'next.composer.placeholderWorkingShort',
+};
+/** Narrower than this, the field's own text box takes the short placeholder. */
+const NARROW_FIELD_PX = 480;
+
+/** Whether the text box is narrow, kept current as its column changes (the window, the pane, a design's chat). */
+const useNarrowField = (field: RefObject<HTMLTextAreaElement | null>): boolean => {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const node = field.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+    // A box not laid out yet (width 0) is not narrow.
+    const observer = new ResizeObserver(() =>
+      setNarrow(node.clientWidth > 0 && node.clientWidth < NARROW_FIELD_PX),
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [field]);
+  return narrow;
 };
 
 export interface IComposerQuote {
@@ -179,11 +205,12 @@ const Composer = (props: IComposerProps) => {
   if (bar && !recorded) setRecorded(true);
   // «Stop and send»: the text is still being recognized; it goes when the recording is over and the field has it.
   const [sendAfter, setSendAfter] = useState(false);
-  const [dropping, setDropping] = useState(false);
   useKeyboardInset(rootRef);
   useImperativeHandle(props.inputRef, () => fieldRef.current as HTMLTextAreaElement, []);
 
+  const narrowField = useNarrowField(fieldRef);
   useFitField(fieldRef, value);
+  useFieldEdges(fieldRef, value);
 
   // While it listens the layer over the field shows the same text: the newest words are in view, the layer scrolls with
   // the field and wraps where the field's scrollbar leaves room.
@@ -422,48 +449,19 @@ const Composer = (props: IComposerProps) => {
   };
 
   const { onFiles } = props;
-  // Files dragged anywhere over the window go to the field (the design's dragDepth): enter and leave come in pairs
-  // for every element crossed, so the depth says whether the drag is still over the page.
-  useEffect(() => {
-    let depth = 0;
-    const carries = (event: globalThis.DragEvent) => !!event.dataTransfer?.types.includes('Files');
-    const enter = (event: globalThis.DragEvent) => {
-      if (!carries(event)) return;
-      depth += 1;
-      setDropping(true);
-    };
-    const over = (event: globalThis.DragEvent) => {
-      if (carries(event)) event.preventDefault();
-    };
-    const leave = (event: globalThis.DragEvent) => {
-      if (!carries(event)) return;
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) setDropping(false);
-    };
-    const drop = (event: globalThis.DragEvent) => {
-      if (!carries(event)) return;
-      event.preventDefault();
-      depth = 0;
-      setDropping(false);
-      onFiles([...(event.dataTransfer?.files ?? [])]);
-    };
-    window.addEventListener('dragenter', enter);
-    window.addEventListener('dragover', over);
-    window.addEventListener('dragleave', leave);
-    window.addEventListener('drop', drop);
-    return () => {
-      window.removeEventListener('dragenter', enter);
-      window.removeEventListener('dragover', over);
-      window.removeEventListener('dragleave', leave);
-      window.removeEventListener('drop', drop);
-    };
-  }, [onFiles]);
+  const dropping = useFileDrop(onFiles);
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = [...event.clipboardData.files];
     if (files.length === 0) return;
     event.preventDefault();
     onFiles(files);
   };
+
+  let fullPlaceholder = props.placeholder ?? t(PLACEHOLDER_KEYS[mode]);
+  if (bar) fullPlaceholder = t(bar.preparing ? 'next.voice.preparing' : 'next.voice.listening');
+  const shortKey = SHORT_PLACEHOLDER_KEYS[mode];
+  const placeholder =
+    narrowField && !bar && props.placeholder === undefined && shortKey ? t(shortKey) : fullPlaceholder;
 
   return (
     <div
@@ -546,11 +544,8 @@ const Composer = (props: IComposerProps) => {
               rows={1}
               disabled={props.quiet}
               value={value}
-              placeholder={
-                bar
-                  ? t(bar.preparing ? 'next.voice.preparing' : 'next.voice.listening')
-                  : (props.placeholder ?? t(PLACEHOLDER_KEYS[mode]))
-              }
+              placeholder={placeholder}
+              title={placeholder === fullPlaceholder ? undefined : fullPlaceholder}
               aria-label={t('next.composer.label')}
               aria-invalid={tooLong || undefined}
               onChange={(event) => {

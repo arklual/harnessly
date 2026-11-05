@@ -868,7 +868,8 @@
     width: 32px;
     height: 32px;
   }
-  .hx-browser__bar > .hx-site-modes {
+  .hx-browser__bar > .hx-site-modes,
+  .hx-browser__bar > .hx-placement {
     margin-left: auto;
   }
 }
@@ -919,6 +920,16 @@
 }
 .hx-devopt__meta::before {
   content: '· ';
+}
+.hx-devopt__size {
+  margin-left: auto;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hx-devopt__size:empty {
+  display: none;
 }
 .hx-more {
   width: 290px;
@@ -1104,19 +1115,24 @@
   min-width: 0;
   min-height: 0;
   display: grid;
+  /* A box larger than the padded inside (a phone over the island's room) starts at its start rather than spilling up
+     past the area's top; the canvas's standard view counts from there (layoutCorner in site-zoom.ts). */
   place-items: center;
+  place-items: safe center;
   overflow: hidden;
   padding: 24px;
   background: var(--hx-bg-canvas);
 }
-/* «Адаптивно»: the page takes the area but for a margin of canvas (FILL_INSET in devices.ts), which is always there to
-   grab and pan by. */
+/* «По окну»: the page is set into the area edge to edge, no canvas and no frame round it (FILL_INSET in devices.ts);
+   zoomed in or out it gets its thin edge back, to tell it from the canvas. */
 .hx-vparea[data-dev='fill'] {
   display: block;
-  padding: 12px;
+  padding: 0;
 }
 .hx-vparea[data-dev='fill'] .hx-bare {
   overflow: hidden;
+}
+.hx-vparea[data-dev='fill'][data-zoomed='true'] .hx-bare {
   border-radius: 4px;
   box-shadow: 0 0 0 1px var(--hx-border);
 }
@@ -1429,7 +1445,7 @@
     system-ui,
     sans-serif;
 }
-.hx-vp[data-ui='ipad'] .hx-pbar {
+.hx-vp[data-os='ipad'] .hx-pbar {
   padding: 0 22px;
   font-size: 13px;
 }
@@ -1461,7 +1477,7 @@
   margin: 10px 0;
   background: rgba(255, 255, 255, 0.7);
 }
-.hx-vp[data-ui='ipad'] .hx-phome {
+.hx-vp[data-os='ipad'] .hx-phome {
   width: 180px;
   margin-left: -90px;
 }
@@ -1478,7 +1494,6 @@
 }
 .hx-vparea[data-dev='overview'] {
   padding: 0;
-  background: #1b1b21;
 }
 .hx-ovw[data-room='true'] {
   padding-bottom: 96px;
@@ -2001,7 +2016,8 @@
   .hx-site {
     padding-top: calc(8px + env(safe-area-inset-top));
   }
-  .hx-site-modes {
+  .hx-site-modes,
+  .hx-browser__bar > .hx-placement {
     display: none !important;
   }
 }
@@ -2183,7 +2199,7 @@
   position: relative;
   overflow: hidden;
 }
-/* «Обзор» draws its frames in the cards and not in the case: the case stays mounted, hidden, so the page is not loaded
+/* «Все экраны» draws its frames in the cards and not in the case: the case stays mounted, hidden, so the page is not loaded
    anew when a device is chosen. */
 .hx-vparea[data-dev='overview'] .hx-vpbox {
   display: none;
@@ -2193,7 +2209,7 @@
   width: 100%;
   height: 100%;
   border: 0;
-  background: #0f0f13;
+  background: var(--hx-bg-raised);
 }
 /* Not in the design: a field or a pill let go of snaps back without the slide. */
 @media (prefers-reduced-motion: reduce) {
@@ -2420,13 +2436,16 @@
   background: rgba(255, 255, 255, 0.85);
   pointer-events: none;
 }
-/* The row is the canvas's box (use-canvas-zoom): it keeps its own size, centred in the area, and pans and zooms. */
+/* «Все экраны»: the row is the canvas's box (use-canvas-zoom): it keeps its own size, centred in the area while it fits
+   and from the left edge once it does not, and pans and zooms. The sizes are devices.ts's (overviewOf, overviewBox). */
 .hx-ovw {
   display: flex;
   align-items: flex-start;
+  align-self: safe center;
+  justify-self: safe center;
   gap: 28px;
   width: max-content;
-  padding: 20px 24px;
+  padding: 60px 24px 20px;
 }
 .hx-ovw__card {
   flex: none;
@@ -2437,17 +2456,9 @@
   width: calc(var(--w) * var(--s));
   animation: hx-dl-in 380ms var(--site-ease) backwards;
 }
-.hx-ovw__card:nth-child(2) {
-  animation-delay: 40ms;
-}
-.hx-ovw__card:nth-child(3) {
-  animation-delay: 80ms;
-}
-.hx-ovw__card:nth-child(4) {
-  animation-delay: 120ms;
-}
-.hx-ovw__card:nth-child(5) {
-  animation-delay: 160ms;
+/* The first screen of the next group: the gap between groups is wider than within one. */
+.hx-ovw__card[data-lead='true'] {
+  margin-left: 36px;
 }
 .hx-ovw__label {
   display: inline-flex;
@@ -2456,14 +2467,16 @@
   align-self: flex-start;
   max-width: 100%;
   height: 24px;
-  padding: 0 8px 0 6px;
+  padding: 0 8px;
+  margin-left: -8px;
   overflow: hidden;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--hx-radius-sm);
   background: none;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--hx-fg-1);
   font: inherit;
   font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -2471,11 +2484,11 @@
     color 160ms ease;
 }
 .hx-ovw__label:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: var(--hx-bg-hover);
 }
-.hx-ovw__label .hx-icon {
-  flex: none;
+.hx-ovw__label:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
 }
 .hx-ovw__name {
   min-width: 0;
@@ -2484,11 +2497,15 @@
 }
 .hx-ovw__size {
   flex: none;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--hx-fg-3);
+  font-weight: var(--hx-weight-regular);
   font-variant-numeric: tabular-nums;
 }
-/* The label is no wider than its screen: on a small card the name stays, the sizes are in its tip. */
-@container (max-width: 180px) {
+.hx-ovw__size::before {
+  content: '· ';
+}
+/* The caption is no wider than its screen: on a small one the name stays, the size is in its label. */
+@container (max-width: 150px) {
   .hx-ovw__size {
     display: none;
   }
@@ -2499,10 +2516,10 @@
   height: calc(var(--h) * var(--s));
   overflow: hidden;
   border-radius: 6px;
-  background: #0f0f13;
+  background: var(--hx-bg-raised);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 16px 40px rgba(0, 0, 0, 0.4);
+    0 0 0 1px var(--hx-border),
+    var(--hx-shadow-overlay);
 }
 .hx-ovw__screen[data-round='true'] {
   border-radius: calc(36px * var(--s) + 4px);
@@ -2510,22 +2527,54 @@
 .hx-ovw__scroll {
   width: var(--w);
   height: var(--h);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   transform: scale(var(--s));
   transform-origin: 0 0;
-  scrollbar-width: none;
 }
-.hx-ovw__scroll::-webkit-scrollbar {
-  display: none;
+/* The groups shown: chips over the canvas, which stay put while it pans and zooms. */
+.hx-ovwchips {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 2px;
+  height: 36px;
+  padding: 3px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
 }
-.hx-ovw__doc {
-  width: 100%;
-  background: var(--img) center top / 100% auto no-repeat;
+.hx-ovwchip {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--hx-radius-full);
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
 }
-.hx-ovw {
-  align-items: flex-end;
-  justify-content: safe center;
+.hx-ovwchip:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-ovwchip[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-ovwchip[aria-disabled='true'] {
+  cursor: default;
+}
+.hx-ovwchip:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 1px;
 }
 .hx-pchrome {
   overflow: hidden;
@@ -2805,6 +2854,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Another machine's chat: its machine, quiet, before the time. */
+.hx-chatswitch__machine {
+  flex: none;
+  max-width: 96px;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .hx-chatswitch__at {
   flex: none;
   color: var(--hx-fg-3);
@@ -2959,6 +3018,18 @@
   opacity: 0.35;
   pointer-events: none;
 }
+/* Locked (the default): the scale reads as fixed and the lock is lit, so a dead − and + tell why. */
+.hx-zoomctl .hx-head-btn[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-zoomctl[data-locked='true'] .hx-zoomctl__pct {
+  color: var(--hx-fg-3);
+  cursor: default;
+}
+.hx-zoomctl[data-locked='true'] .hx-zoomctl__pct:hover {
+  background: none;
+}
 .hx-zoomctl {
   position: relative;
 }
@@ -3029,9 +3100,12 @@
 }
 .hx-vpzoom {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
+  right: var(--pill-r, 12px);
+  bottom: var(--pill-b, 12px);
   z-index: 6;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   display: flex;
   height: 36px;
   padding: 0 4px;
@@ -3042,7 +3116,7 @@
 }
 /* A narrow canvas (a phone): the field's pill «Ask the agent» takes the bottom's middle, the zoom goes to the top. */
 @container (max-width: 560px) {
-  .hx-vpzoom {
+  .hx-vpzoom:not([data-placed='true']) {
     top: 12px;
     bottom: auto;
   }
@@ -3247,11 +3321,12 @@
 }
 
 /* Designly's bar on the phone: back, reload, the page's name, picking, the device and «…» stay, a finger
-   wide each; forward and «Поделиться» are in «…». The page's name has the room that is left. The bar's menus are
+   wide each; forward, «Скачать» and «Поделиться» are in «…». The page's name has the room that is left. The bar's menus are
    sheets (.hx-sheet-phone) with their rows a finger tall. */
 @media (max-width: 900px) {
   .hx-browser__bar > .hx-browser__fwd,
-  .hx-browser__bar > .hx-browser__share {
+  .hx-browser__bar > .hx-browser__share,
+  .hx-browser__bar > .hx-browser__download {
     display: none;
   }
   .hx-browser__bar {
@@ -3320,4 +3395,322 @@
   .hx-main__body:has(> .hx-pane:not([data-state='closing'])) .hx-deck[data-embed='0'] {
     padding-right: calc(var(--pane-w) + 24px);
   }
+}
+
+/* Where the chat stands, in words: the place it is in, and on hover the places with what each one is. */
+.hx-placement {
+  position: relative;
+  flex: none;
+}
+.hx-placement__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--hx-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 160ms var(--hx-ease-out),
+    color 160ms var(--hx-ease-out);
+}
+.hx-placement__btn:hover,
+.hx-placement__btn[aria-expanded='true'] {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-placement__chev {
+  color: var(--hx-fg-3);
+  transition: transform 200ms var(--hx-ease-out);
+}
+.hx-placement__btn[aria-expanded='true'] .hx-placement__chev {
+  transform: rotate(180deg);
+}
+.hx-placement__menu {
+  width: 290px;
+  white-space: normal;
+}
+/* The way from the button to the list is part of the hover: the pointer crossing it does not fold the menu. */
+.hx-placement__menu::before {
+  content: '';
+  position: absolute;
+  inset: -10px 0 auto;
+  height: 10px;
+}
+.hx-placement__row {
+  align-items: center;
+  min-height: 44px;
+}
+.hx-placement__check {
+  flex: none;
+  color: var(--hx-accent);
+}
+
+/* The zoom pill dragged: it follows the pointer, lifted over the canvas. */
+.hx-vpzoom[data-dragging='true'] {
+  cursor: grabbing;
+  box-shadow:
+    var(--hx-shadow-overlay),
+    0 10px 28px rgba(12, 14, 34, 0.22);
+}
+.hx-vpzoom[data-dragging='true'] * {
+  cursor: grabbing;
+}
+/* Its settings, on a right click: over the pill, by its right edge. */
+.hx-zoompill__menu {
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: 240px;
+  cursor: default;
+  transform-origin: calc(100% - 20px) 100%;
+}
+.hx-zoompill__scales {
+  display: flex;
+  gap: 4px;
+  padding: 2px 4px 6px;
+}
+.hx-zoompill__scale {
+  flex: 1;
+  height: 30px;
+  border: 1px solid var(--hx-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.hx-zoompill__scale:hover {
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-1);
+}
+.hx-zoompill__scale[aria-checked='true'] {
+  border-color: var(--hx-accent);
+  color: var(--hx-accent);
+}
+.hx-zoompill__scale[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+.hx-zoompill__menu .hx-option {
+  justify-content: flex-start;
+}
+.hx-zoompill__kbd {
+  margin-left: auto;
+  color: var(--hx-fg-3);
+  font: inherit;
+  font-size: var(--hx-text-xs);
+}
+.hx-zoompill__hint {
+  padding: 6px 10px 2px;
+  color: var(--hx-fg-3);
+  font-size: 11px;
+}
+/* The phone's pill: beside a phone or a tablet, level with its top, standing up (phone-pill.tsx); lying along
+   the phone's top where its right has no room. Dragged like the zoom pill (floating-pill.tsx). */
+.hx-phonepill {
+  position: absolute;
+  right: var(--pill-r, 12px);
+  bottom: var(--pill-b, 12px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
+  background: var(--hx-bg-raised);
+  box-shadow: var(--hx-shadow-overlay);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  animation: hx-phonepill-in 260ms var(--hx-ease-out) backwards;
+}
+.hx-phonepill[data-axis='row'] {
+  flex-direction: row;
+}
+.hx-phonepill[data-state='closing'] {
+  animation: hx-phonepill-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.hx-phonepill .hx-head-btn {
+  width: 30px;
+  height: 30px;
+  animation: none;
+}
+.hx-phonepill .hx-head-btn[aria-pressed='true'] {
+  background: var(--hx-accent-soft);
+  color: var(--hx-accent);
+}
+.hx-phonepill[data-dragging='true'] {
+  cursor: grabbing;
+  box-shadow:
+    var(--hx-shadow-overlay),
+    0 10px 28px rgba(12, 14, 34, 0.22);
+}
+.hx-phonepill[data-dragging='true'] * {
+  cursor: grabbing;
+}
+/* Standing up, its hints are beside it, on the side with room: over the buttons they would hide the next one. */
+.hx-phonepill[data-axis='col'] .hx-tipped > .hx-tip {
+  top: 50%;
+  bottom: auto;
+  left: calc(100% + 10px);
+  right: auto;
+  translate: none;
+  transform: translate(-4px, -50%) scale(0.98);
+}
+.hx-phonepill[data-axis='col'][data-side='start'] .hx-tipped > .hx-tip {
+  left: auto;
+  right: calc(100% + 10px);
+  transform: translate(4px, -50%) scale(0.98);
+}
+.hx-phonepill[data-axis='col'] .hx-tipped:hover > .hx-tip,
+.hx-phonepill[data-axis='col'] .hx-tipped:focus-visible > .hx-tip {
+  transform: translate(0, -50%) scale(1);
+}
+.hx-phonepill[data-dragging='true'] .hx-tip,
+.hx-phonepill[data-state='closing'] .hx-tip {
+  display: none;
+}
+/* Its settings, on a right click: under it or over it, toward the side of the canvas with room. */
+.hx-phonepill__menu {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: 0;
+  right: auto;
+  width: 248px;
+  cursor: default;
+  transform-origin: 20px 0;
+}
+.hx-phonepill[data-side='start'] .hx-phonepill__menu {
+  left: auto;
+  right: 0;
+  transform-origin: calc(100% - 20px) 0;
+}
+.hx-phonepill[data-drop='up'] .hx-phonepill__menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform-origin: 20px 100%;
+}
+.hx-phonepill[data-drop='up'][data-side='start'] .hx-phonepill__menu {
+  transform-origin: calc(100% - 20px) 100%;
+}
+.hx-phonepill__menu .hx-option {
+  justify-content: flex-start;
+}
+.hx-phonepill__opt .hx-switch {
+  margin-left: auto;
+  pointer-events: none;
+}
+@keyframes hx-phonepill-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes hx-phonepill-out {
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-phonepill,
+  .hx-phonepill[data-state='closing'] {
+    animation-duration: 1ms;
+  }
+}
+
+/* A phone without its case (the phone's pill): the screen alone, with its corners and a shadow to lift it off the
+   canvas; the case fades away rather than vanishing. */
+.hx-dev .device-frame,
+.hx-dev > :not(.device-frame),
+.hx-dev .device-screen {
+  transition:
+    background-color 260ms var(--hx-ease-out),
+    border-color 260ms var(--hx-ease-out),
+    box-shadow 260ms var(--hx-ease-out),
+    opacity 260ms var(--hx-ease-out);
+}
+.hx-dev.hx-dev[data-case='off'] .device-frame {
+  border-color: transparent;
+  background-color: transparent;
+  box-shadow: none;
+}
+.hx-dev[data-case='off'] > :not(.device-frame) {
+  opacity: 0;
+}
+.hx-dev[data-case='off'] .device-screen {
+  box-shadow:
+    0 0 0 1px var(--hx-border-strong),
+    0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+/* While the zoom pill is dragged, no frame takes the pointer: a fast move over the board must not drop the drag. */
+:root[data-pill-drag='true'] iframe {
+  pointer-events: none;
+}
+
+/* The look-only / editing switch in the bar (ISiteMode). */
+/* A phone: one thin bar. The reload, the forward, the device and the turn live in «…». */
+.hx-browser__bar[data-compact='true'] {
+  flex-wrap: nowrap;
+  height: 44px;
+  padding: 0 6px;
+  gap: 4px;
+}
+.hx-browser__bar[data-compact='true']
+  :is(.hx-browser__reload, .hx-browser__fwd, .hx-browser__dev, .hx-browser__path) {
+  display: none;
+}
+.hx-browser__bar[data-compact='true'] .hx-browser__addr {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.hx-browser__bar[data-compact='true'] .hx-browser__url {
+  width: 100%;
+}
+.hx-browser__bar[data-compact='true'] .hx-browser__tool-label {
+  display: none;
+}
+/* A page in the list of pages: the row opens it, its own button downloads it. */
+.hx-site-page {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.hx-site-page > .hx-option {
+  flex: 1;
+  min-width: 0;
+}
+.hx-site-page__dl {
+  flex: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.hx-site-page:hover > .hx-site-page__dl,
+.hx-site-page__dl:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .hx-site-page__dl {
+    opacity: 0.75;
+  }
+}
+/* «Скачать»: the rows say what file they make, so the menu is wide enough for them. */
+.hx-dlmenu {
+  min-width: 260px;
+}
+.hx-dlmenu .hx-cmenu__item[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
 }

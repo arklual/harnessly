@@ -1404,10 +1404,14 @@ func (r *Runtime) openConv(rec wire.Conversation, req LaunchRequest, first *wire
 		res = wire.Accepted(wire.ChannelConvs, c.convsSeq())
 		if first != nil {
 			c.send(wire.SendCmd{OpID: first.ClientID, ClientID: first.ClientID, ConversationID: id, Text: first.Text,
-				AttachmentIDs: first.AttachmentIDs, Mode: wire.ModeQueue, Kind: wire.KindPrompt}, now)
+				AttachmentIDs: first.AttachmentIDs, Refs: first.Refs, Mode: wire.ModeQueue, Kind: wire.KindPrompt}, now)
 			// The first message goes with the launch, as the agent's first prompt: the starting terminal takes no keys
 			// for a while and drops what is typed into it, a prompt of the command line it does not.
-			ch, carried := c.box.Carry(first.ClientID, now)
+			// A first message with places carries nothing: their block is under its words, which the launch line lacks.
+			ch, carried := outbox.Change{}, false
+			if len(first.Refs) == 0 {
+				ch, carried = c.box.Carry(first.ClientID, now)
+			}
 			c.change(ch, now)
 			if carried {
 				req.First = first.Text

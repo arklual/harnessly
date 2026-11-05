@@ -1,12 +1,25 @@
 // A text file as an editor (.hx-fed): CodeMirror over the file's text with an IDE's status row — the language, the
 // place of the cursor, whether the text differs from the disk. Markdown also reads as a page («Просмотр»). The editor
 // keeps its own text; the one who opened it hears whether it is changed and receives the unsaved text when it leaves.
+import { usePhone } from '@/next/ui/use-media';
 import { EditorState, type Text } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
+import { openSearchPanel } from '@codemirror/search';
+import { createPortal } from 'react-dom';
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { WordedError } from '@/next/core/net/worded';
 import { extensions, language } from '@/next/features/pane/editor/setup';
-import { isMarkdown, isPlain, languageLabel, loadLanguage } from '@/next/features/pane/editor/language';
+import { askTip, type IAskChoice } from '@/next/features/pane/editor/ask-tip';
+import {
+  isMarkdown,
+  isPlain,
+  languageLabel,
+  loadLanguage,
+  SHOWN_AS,
+  shownAs,
+  type TShownAs,
+} from '@/next/features/pane/editor/language';
+import { inlineAssets, type TReadAsset } from '@/next/features/pane/editor/html-assets';
 import type { FileContent } from '@/next/protocol/v2';
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
@@ -15,7 +28,62 @@ import Segmented from '@/next/ui/segmented';
 
 const MdPreview = lazy(() => import('@/next/features/pane/editor/md-preview'));
 
+const JsonTree = lazy(() => import('@/next/features/pane/editor/json-tree'));
+const DiffView = lazy(() => import('@/next/features/pane/editor/diff-view'));
+
+/** An html file as the page it makes, from the editor's text (unsaved edits too), with the files it names beside it
+ *  put in. Its scripts run in a frame of no origin: they reach neither the app nor its cookies. */
+const HtmlPage = ({
+  html,
+  name,
+  path,
+  readAsset,
+}: {
+  html: string;
+  name: string;
+  path: string;
+  readAsset?: TReadAsset;
+}) => {
+  const [page, setPage] = useState<{ from: string; doc: string } | null>(null);
+  useEffect(() => {
+    if (!readAsset) return undefined;
+    let alive = true;
+    inlineAssets(html, path, readAsset).then(
+      (doc) => alive && setPage({ from: html, doc }),
+      () => alive && setPage({ from: html, doc: html }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [html, path, readAsset]);
+  const doc = readAsset ? (page?.from === html ? page.doc : null) : html;
+  if (doc === null) return <span className="hx-sk hx-fed__wait" />;
+  return <iframe className="hx-fed__frame" title={name} sandbox="allow-scripts allow-popups" srcDoc={doc} />;
+};
+
+/** An svg file as the picture it draws, from the editor's text; as an image its scripts never run. */
+const SvgPicture = ({ svg, name }: { svg: string; name: string }) => (
+  <div className="hx-fed__pic">
+    <img alt={name} src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`} />
+  </div>
+);
+
+/** The modes of a file that reads two ways: which one is the text, which the view, and which comes first. */
+const MODES_OF: Record<TShownAs, { view: string; edit: string; first: 'edit' | 'preview' }> = {
+  markdown: { view: 'next.editor.preview', edit: 'next.editor.edit', first: 'edit' },
+  html: { view: 'next.editor.page', edit: 'next.editor.code', first: 'preview' },
+  json: { view: 'next.editor.tree', edit: 'next.editor.code', first: 'preview' },
+  svg: { view: 'next.editor.picture', edit: 'next.editor.code', first: 'preview' },
+};
+
 const EXIT_MS = 200;
+
+/** The bar over a selection: ask, explain, fix. */
+const askChoices = (): IAskChoice[] => [
+  { label: t('next.editor.ask'), note: null, icon: true },
+  { label: t('next.editor.askExplain'), note: t('next.editor.askExplainNote') },
+  { label: t('next.editor.askFix'), note: t('next.editor.askFixNote') },
+];
 
 /** What the editor opens with, and what it hands back when it leaves unsaved: the text, the disk's text it differs from,
  *  and the revision of that disk text. */
@@ -42,7 +110,29 @@ export interface IFileEditorProps {
   onState: (state: { dirty: boolean; saving: boolean }) => void;
   /** Hands the save to whoever shows the editor's button; null when the editor goes. */
   onHandle: (handle: IFileEditorHandle | null) => void;
+  /** Reads a file beside this one (relative to its folder): an html page's styles, scripts and pictures. */
+  readAsset?: TReadAsset;
+  /** Another state of the file to show the editor's text against (git's, another file's); null: no diff. */
+  compare?: ICompare | null;
+  onCloseCompare?: () => void;
+  /** A place to show (a line «Найти в файлах» found): the text there is selected and scrolled to the middle. */
+  at?: { line: number; col: number; size: number } | null;
+  /** Hands the selection to the chat's field as a quote: the path with the lines, the code, the person's ask. */
+  onAsk?: (quote: string, note: string | null) => void;
+  /** Where the switch of the view goes (the folder's head row, beside the crumbs); without it, a bar of its own. */
+  modeSlot?: HTMLElement | null;
 }
+
+/** What the editor's text is shown against: its name over the diff, its text, or why there is none. */
+export interface ICompare {
+  label: string;
+  text: string | null;
+  /** Why there is nothing to compare with (not in git, a binary, too large); null while it loads or when it has text. */
+  failure: string | null;
+}
+
+const LAYOUT = { split: 'split', inline: 'inline' } as const;
+type TLayout = (typeof LAYOUT)[keyof typeof LAYOUT];
 
 interface ILive {
   view: EditorView;
@@ -59,25 +149,65 @@ interface INotice {
 const MODE = { edit: 'edit', preview: 'preview' } as const;
 type TMode = (typeof MODE)[keyof typeof MODE];
 
+const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1);
+
+/** The language word of a markdown code fence: the file's extension, which most renderers know. */
+const fenceLanguage = (path: string) => {
+  const name = nameOf(path);
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : '';
+};
+
 const stateOf = (saving: boolean, dirty: boolean) => {
   if (saving) return 'saving';
   return dirty ? 'dirty' : 'saved';
 };
 
-const FileEditor = ({ path, initial, onSave, onReload, onLeave, onState, onHandle }: IFileEditorProps) => {
+const FileEditor = ({
+  path,
+  initial,
+  onSave,
+  onReload,
+  onLeave,
+  onState,
+  onHandle,
+  readAsset,
+  compare = null,
+  onCloseCompare,
+  onAsk,
+  modeSlot = null,
+  at = null,
+}: IFileEditorProps) => {
   const host = useRef<HTMLDivElement>(null);
   const live = useRef<ILive | null>(null);
   const busy = useRef(false);
   const [start] = useState(initial);
   const markdown = isMarkdown(path);
+  const shown = shownAs(path);
+  const modes = shown ? MODES_OF[shown] : null;
   const [dirty, setDirty] = useState(start.text !== start.base);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<INotice | null>(null);
-  const [mode, setMode] = useState<TMode>(MODE.edit);
-  const [page, setPage] = useState('');
+  // A page, a tree or a picture opens as what it makes: that is what it is for; the source is a click away.
+  // A file opened at a found line opens as its text: the line is what was asked for.
+  const opensAsPage = modes?.first === 'preview' && at === null;
+  const [mode, setMode] = useState<TMode>(opensAsPage ? MODE.preview : MODE.edit);
+  const [page, setPage] = useState(opensAsPage ? start.text : '');
   const [place, setPlace] = useState({ line: 1, col: 1, selected: 0 });
   const shownNotice = usePresence(notice, EXIT_MS);
   const reading = usePresentFlag(mode === MODE.preview, EXIT_MS);
+  // The diff over the editor: its text is the editor's as it was when the diff opened.
+  const diff = usePresence(compare, EXIT_MS);
+  // Two columns do not fit a phone: there the diff starts inside the text, until the person picks otherwise.
+  const phone = usePhone();
+  const [picked, setLayout] = useState<TLayout | null>(null);
+  const layout = picked ?? (phone ? LAYOUT.inline : LAYOUT.split);
+  const [after, setAfter] = useState('');
+  const readText = useEffectEvent(() => live.current?.view.state.sliceDoc(0) ?? '');
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the editor's text is read once, as the diff opens
+    if (compare) setAfter(readText());
+  }, [compare]);
 
   const track = useEffectEvent((update: ViewUpdate) => {
     const l = live.current;
@@ -90,19 +220,38 @@ const FileEditor = ({ path, initial, onSave, onReload, onLeave, onState, onHandl
   });
   const leave = useEffectEvent((draft: IDraft | null) => onLeave(draft));
 
+  // The selection as a quote for the chat: where it is (path and lines) and the code in a fence of its language.
+  const ask = (view: EditorView, note: string | null) => {
+    if (!onAsk) return;
+    const range = view.state.selection.main;
+    if (range.empty) return;
+    const from = view.state.doc.lineAt(range.from).number;
+    const to = view.state.doc.lineAt(range.to).number;
+    const lines = from === to ? `${from}` : `${from}-${to}`;
+    const fence = view.state.sliceDoc(range.from, range.to).includes('```') ? '````' : '```';
+    const lang = fenceLanguage(path);
+    onAsk(`${path}:${lines}\n${fence}${lang}\n${view.state.sliceDoc(range.from, range.to)}\n${fence}`, note);
+  };
+  const askOf = useEffectEvent(ask);
+  // Whether there is a chat to ask: the bar over a selection is part of the editor only then.
+  const askable = onAsk !== undefined;
+
   useEffect(() => {
     const parent = host.current;
     if (!parent) return;
     const eol = start.text.includes('\r\n') ? '\r\n' : '\n';
     const state = EditorState.create({
       doc: start.text,
-      extensions: extensions({
-        eol,
-        text: start.text,
-        markdown,
-        wrap: markdown || isPlain(path),
-        onUpdate: track,
-      }),
+      extensions: [
+        extensions({
+          eol,
+          text: start.text,
+          markdown,
+          wrap: markdown || isPlain(path),
+          onUpdate: track,
+        }),
+        ...(askable ? [askTip(askChoices, (on, note) => askOf(on, note))] : []),
+      ],
     });
     const view = new EditorView({ state, parent });
     const entry: ILive = { view, saved: state.toText(start.base), revision: start.revision };
@@ -125,7 +274,25 @@ const FileEditor = ({ path, initial, onSave, onReload, onLeave, onState, onHandl
       live.current = null;
       leave(draft);
     };
-  }, [path, start, markdown]);
+  }, [path, start, markdown, askable]);
+
+  // The place asked for: selected, in the middle of the view, with the focus in the text.
+  const atLine = at?.line ?? 0;
+  const atCol = at?.col ?? 0;
+  const atSize = at?.size ?? 0;
+  useEffect(() => {
+    const view = live.current?.view;
+    if (!view || atLine < 1) return;
+    const doc = view.state.doc;
+    const line = doc.line(Math.min(atLine, doc.lines));
+    const from = Math.min(line.from + Math.max(atCol - 1, 0), line.to);
+    const to = Math.min(from + atSize, line.to);
+    view.dispatch({
+      selection: { anchor: from, head: to },
+      effects: EditorView.scrollIntoView(from, { y: 'center' }),
+    });
+    view.focus();
+  }, [path, start, atLine, atCol, atSize]);
 
   const report = useEffectEvent(() => onState({ dirty, saving }));
   useEffect(() => report(), [dirty, saving]);
@@ -182,21 +349,28 @@ const FileEditor = ({ path, initial, onSave, onReload, onLeave, onState, onHandl
   };
 
   const stateKey = stateOf(saving, dirty);
+  const modeSwitch = modes && (
+    <Segmented
+      label={t('next.editor.mode')}
+      value={mode}
+      options={
+        modes.first === 'preview'
+          ? [
+              { value: MODE.preview, label: t(modes.view) },
+              { value: MODE.edit, label: t(modes.edit) },
+            ]
+          : [
+              { value: MODE.edit, label: t(modes.edit) },
+              { value: MODE.preview, label: t(modes.view) },
+            ]
+      }
+      onChange={changeMode}
+    />
+  );
   return (
-    <div className="hx-fed" data-kind={markdown ? 'markdown' : 'code'}>
-      {markdown && (
-        <div className="hx-fed__bar">
-          <Segmented
-            label={t('next.editor.mode')}
-            value={mode}
-            options={[
-              { value: MODE.edit, label: t('next.editor.edit') },
-              { value: MODE.preview, label: t('next.editor.preview') },
-            ]}
-            onChange={changeMode}
-          />
-        </div>
-      )}
+    <div className="hx-fed" data-kind={shown ?? 'code'}>
+      {modes && modeSlot && createPortal(modeSwitch, modeSlot)}
+      {modes && !modeSlot && <div className="hx-fed__bar">{modeSwitch}</div>}
       {shownNotice.value && (
         <div
           className="hx-fed__notice"
@@ -229,10 +403,55 @@ const FileEditor = ({ path, initial, onSave, onReload, onLeave, onState, onHandl
       <div className="hx-fed__main">
         <div ref={host} className="hx-fed__host" />
         {reading.mounted && (
-          <div className="hx-fed__page" data-state={reading.state}>
-            <Suspense fallback={null}>
-              <MdPreview md={page} />
-            </Suspense>
+          <div className="hx-fed__page" data-state={reading.state} data-view={shown ?? undefined}>
+            {shown === SHOWN_AS.html && (
+              <HtmlPage html={page} name={nameOf(path)} path={path} readAsset={readAsset} />
+            )}
+            {shown === SHOWN_AS.svg && <SvgPicture svg={page} name={nameOf(path)} />}
+            {(shown === SHOWN_AS.markdown || shown === SHOWN_AS.json) && (
+              <Suspense fallback={null}>
+                {shown === SHOWN_AS.markdown ? <MdPreview md={page} /> : <JsonTree text={page} />}
+              </Suspense>
+            )}
+          </div>
+        )}
+        {diff.value && (
+          <div className="hx-fed__diff" data-state={diff.state}>
+            <div className="hx-fed__diffbar">
+              <Icon name="git-compare" size="sm" />
+              <span className="hx-fed__difflabel">{diff.value.label}</span>
+              <span className="hx-spacer" />
+              <Segmented
+                label={t('next.editor.diffLayout')}
+                value={layout}
+                options={[
+                  { value: LAYOUT.split, label: t('next.editor.diffSplit') },
+                  { value: LAYOUT.inline, label: t('next.editor.diffInline') },
+                ]}
+                onChange={setLayout}
+              />
+              <button
+                type="button"
+                className="hx-head-btn"
+                aria-label={t('next.editor.diffClose')}
+                onClick={onCloseCompare}
+              >
+                <Icon name="x" size="sm" />
+              </button>
+            </div>
+            {diff.value.failure !== null && <div className="hx-fed__diffnote">{diff.value.failure}</div>}
+            {diff.value.failure === null && diff.value.text === null && (
+              <span className="hx-sk hx-fed__wait" />
+            )}
+            {diff.value.text !== null && (
+              <Suspense fallback={<span className="hx-sk hx-fed__wait" />}>
+                {diff.value.text === after ? (
+                  <div className="hx-fed__diffnote">{t('next.editor.diffSame')}</div>
+                ) : (
+                  <DiffView path={path} before={diff.value.text} after={after} layout={layout} />
+                )}
+              </Suspense>
+            )}
           </div>
         )}
       </div>
@@ -241,6 +460,18 @@ const FileEditor = ({ path, initial, onSave, onReload, onLeave, onState, onHandl
         <span>{t('next.editor.cursor', { line: place.line, col: place.col })}</span>
         {place.selected > 0 && <span>{t('next.editor.selected', { n: place.selected })}</span>}
         <span className="hx-spacer" />
+        <button
+          type="button"
+          className="hx-head-btn"
+          aria-label={t('next.editor.find')}
+          title={t('next.editor.findHint')}
+          onClick={() => {
+            const view = live.current?.view;
+            if (view) openSearchPanel(view);
+          }}
+        >
+          <Icon name="search" size="sm" />
+        </button>
         <span className="hx-fed__state" data-state={stateKey} role="status">
           {t(`next.editor.${stateKey}`)}
         </span>

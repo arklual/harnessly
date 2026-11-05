@@ -6,7 +6,9 @@ import { Bars } from '../../charts/bars';
 import { Meter } from '../../charts/meter';
 import { Strip } from '../../charts/strip';
 import { Btn, Icon, initial } from '../../ui';
+import { useRowOpen } from './open';
 import {
+  canOpen,
   chatsText,
   groupWeek,
   liveLoad,
@@ -77,6 +79,18 @@ export const ErrorRow = ({ text, onRetry }: { text: string; onRetry: () => void 
     </Btn>
   </div>
 );
+
+/** The call to action of an empty list: the button for who may add, a hint for who may not. */
+export const AddCta = ({ onAdd, lead }: { onAdd?: () => void; lead?: boolean }) =>
+  onAdd ? (
+    <div>
+      <Btn variant="primary" size="sm" icon="plus" onClick={onAdd}>
+        Добавить машину
+      </Btn>
+    </div>
+  ) : lead ? (
+    <small className="md-note">Машину добавляет админ тенанта: попросите его выдать код установки.</small>
+  ) : null;
 
 export const SearchBox = ({
   value,
@@ -180,8 +194,22 @@ export const MachineRow = ({
 }) => {
   const st = rowSt(m);
   const off = st === 'off';
+  const ws = useRowOpen();
+  const shortcut = ws && m.canManage && canOpen(m);
   return (
-    <button type="button" className="mt-row" data-st={st} onClick={() => onOpen(m.id)}>
+    <div
+      role="button"
+      tabIndex={0}
+      className="mt-row"
+      data-st={st}
+      onClick={() => onOpen(m.id)}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onOpen(m.id);
+        }
+      }}
+    >
       <span className="mt-name">
         <span className="mo-dot" data-st={st} />
         <span className="mt-name__t">
@@ -200,7 +228,22 @@ export const MachineRow = ({
         {verText(m)}
       </span>
       <span className="mt-week">{weekText(m)}</span>
-    </button>
+      {shortcut && (
+        <button
+          type="button"
+          className="mt-open"
+          disabled={ws.busyId === m.id}
+          aria-label={`Открыть рабочее пространство ${m.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            void ws.open(m.id);
+          }}
+        >
+          <Icon i="external-link" size="sm" />
+          Открыть
+        </button>
+      )}
+    </div>
   );
 };
 

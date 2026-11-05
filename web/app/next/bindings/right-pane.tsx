@@ -3,6 +3,7 @@
 // the machine keeps until the tab closes it) or a browser tab with its own history. Only tools the machine really has are offered; the rest of the design's list waits for its API.
 import { requestFilePlace } from '@/next/features/pane/file-place';
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useMemo,
@@ -21,6 +22,9 @@ import { heldTools, quietTools, toolOfRequest } from '@/next/features/pane/tools
 import { useChatMade } from '@/next/bindings/chat-made';
 import BrowserTab from '@/next/bindings/browser-tab';
 import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
+import { downloadHref, saveFrom } from '@/next/features/pane/download';
+import { useFolderUploads } from '@/next/legacy/folder-uploads';
+import FileMenu from '@/next/features/pane/file-menu';
 import SideChat from '@/next/features/pane/side-chat';
 import { SideFloat } from '@/next/features/pane/side-float';
 import { onOpenSubagent, openSubagent } from '@/next/features/subagents/open';
@@ -35,8 +39,19 @@ import { loadKindDocs } from '@/next/features/app-catalog/api';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { useSubagents } from '@/next/bindings/subagents';
 import { setPaneOpen } from '@/next/bindings/pane-open';
+import { usePaneOpenBeside } from '@/next/bindings/pane-beside';
 import LazyFileEditor from '@/next/features/pane/editor/lazy';
-import { listFolder, readFile, saveFile } from '@/next/features/pane/chat-files-api';
+import {
+  findFiles,
+  findText,
+  entryOp,
+  listFolder,
+  readFile,
+  readGitSide,
+  saveFile,
+} from '@/next/features/pane/chat-files-api';
+import type { ICompare } from '@/next/features/pane/editor/file-editor';
+import { addQuote } from '@/next/stores/quotes';
 import { useFileEdits, type IFileEdits } from '@/next/bindings/file-edits';
 import Modal from '@/next/features/shell/modal';
 import { Button } from '@/next/ui/button';
@@ -65,9 +80,10 @@ import { toast } from '@/next/ui/toast';
 import { usePresence } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
 import { isLegacyTab, useLegacyPane, type ILegacyPane, type TLegacyHandoff } from '@/next/legacy/pane';
-import { browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
+import { MACHINE, browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
 import { requestOf, type IPaneIntent, type IPaneRequest } from '@/next/features/pane/intents';
 import { usePaneIntents } from '@/next/bindings/pane-intents';
+import { foldRailForDesign } from '@/next/bindings/rail';
 import { usePhone } from '@/next/ui/use-media';
 import { KEY_SCOPE } from '@/next/features/keys/commands';
 import { useKeys } from '@/next/features/keys/use-keys';
@@ -88,13 +104,15 @@ const DesignlyPane = later(() => import('@/next/bindings/designly-pane'));
 /** A design opened beside the chat, full screen: Sinopia Design with this chat; a document of an app's type, its own page. */
 const openDesignFull = async (machine: MachineId, design: string, chat: ConvId) => {
   const docs = await loadKindDocs(machine).catch(() => []);
+  foldRailForDesign();
   goTo(
     docs.some((d) => d.document === design)
-      ? { kind: ROUTE.appDoc, id: design }
-      : { kind: ROUTE.site, id: design, chat },
+      ? { kind: ROUTE.appDoc, id: design, chat }
+      : { kind: ROUTE.site, id: design, chat, machine },
   );
 };
 const FilesView = later(() => import('@/next/features/pane/files-view'));
+const UploadsStrip = later(() => import('@/next/legacy/uploads-strip'));
 const DeliveredView = later(() => import('@/next/features/pane/delivered-view'));
 const AgentBrowserView = later(() => import('@/next/features/pane/agent-browser-view'));
 
@@ -113,7 +131,6 @@ const TOOL_ORDER = [
   'shell',
   'browser',
   'agent-browser',
-  'L:disk',
   'machine',
   'L:gitlab',
   'designly',
@@ -141,7 +158,6 @@ const LEGACY_HINTS: Record<string, string> = {
   'L:artifacts': 'next.pane.hint.artifacts',
   'L:peers': 'next.pane.hint.peers',
   'L:economics': 'next.pane.hint.economics',
-  'L:disk': 'next.pane.hint.disk',
   'L:gitlab': 'next.pane.hint.gitlab',
   'L:vault': 'next.pane.hint.vault',
 };
@@ -250,6 +266,17 @@ const SubagentTab = ({ conv, focus }: { conv: Conversation; focus: string | null
   return <SubagentView agents={useSubagents(conv.id)} workflows={workflows} focus={focus} />;
 };
 
+/** A path of the chat's folder made absolute; an absolute one stays. */
+/** The folder of the machine a tab is in: its own, or its file's; null for the chat's folder. */
+const machineFolderOf = (path: string, file: boolean): string | null => {
+  if (!path.startsWith('/')) return null;
+  if (!file) return path;
+  return path.slice(0, path.lastIndexOf('/')) || '/';
+};
+
+const absIn = (cwd: string, path: string) =>
+  path.startsWith('/') ? path : `${cwd.replace(/\/+$/, '')}/${path}`;
+
 interface IShownFile {
   key: string;
   listing: DirListing | null;
@@ -267,14 +294,22 @@ const FilesTab = ({
   edits,
   guard,
   onChange,
+  onOpenBeside,
+  tools,
 }: {
   conv: Conversation;
   tab: Extract<TTab, { kind: 'files' }>;
   edits: IFileEdits;
   guard: (tabs: readonly string[], run: () => void) => void;
   onChange: (tab: Extract<TTab, { kind: 'files' }>) => void;
+  /** Opens a file or a folder in a tab of its own beside this one. */
+  onOpenBeside: (path: string, kind: 'file' | 'directory') => void;
+  /** The open text file's controls, in the folder's head row beside the crumbs. */
+  tools: ReactNode;
 }) => {
   const [shown, setShown] = useState<IShownFile | null>(null);
+  // The editor's switch of the view goes into the head row too.
+  const [modeSlot, setModeSlot] = useState<HTMLElement | null>(null);
   // A zip, a picture, a PDF or a file to be saved is not read as text: the pane shows it its own way.
   const delivered = tab.file ? deliveredViewOf(tab.path) : null;
   // A new epoch is the disk's text read again over the editor's.
@@ -324,7 +359,77 @@ const FilesTab = ({
     return () => abort.abort();
   }, [conv.machineId, conv.id, tab.id, tab.path, tab.file, epoch, draftOf, listingAgain, delivered]);
   const now = shown?.key === key ? shown : null;
+  // «Перейти к файлу» searches the chat's folder; on the machine, the folder on screen (a file's own folder).
+  const searchIn = machineFolderOf(tab.path, tab.file);
+  const find = useCallback(
+    async (query: string, signal: AbortSignal) => {
+      const found = await findFiles(conv.machineId, searchIn ?? conv.cwd, query, signal);
+      return searchIn === null ? found : found.map((p) => `${searchIn.replace(/\/+$/, '')}/${p}`);
+    },
+    [conv.machineId, conv.cwd, searchIn],
+  );
+  const findLines = useCallback(
+    (query: string, signal: AbortSignal) => findText(conv.machineId, conv.id, searchIn ?? '', query, signal),
+    [conv.machineId, conv.id, searchIn],
+  );
+  // New files, new names and the trash in the folder on screen; the list of the places has none.
+  const entryOps = useMemo(
+    () =>
+      tab.file || tab.path === MACHINE
+        ? null
+        : {
+            newFile: (name: string) => entryOp(conv.machineId, conv.id, 'newFile', tab.path, name),
+            rename: (path: string, name: string) => entryOp(conv.machineId, conv.id, 'rename', path, name),
+            trash: (path: string) => entryOp(conv.machineId, conv.id, 'trash', path),
+          },
+    [conv.machineId, conv.id, tab.file, tab.path],
+  );
+  // Files sent into the folder on screen and new folders in it: the list is read again as each arrives.
+  const uploads = useFolderUploads(conv.id, tab.file ? null : absIn(conv.cwd, tab.path), () =>
+    setEpoch((n) => n + 1),
+  );
 
+  // The state the file is shown against: git's revision or another file, read when the tab asks for it.
+  const [compare, setCompare] = useState<{ key: string; value: ICompare } | null>(null);
+  const against = tab.file ? (tab.against ?? null) : null;
+  useEffect(() => {
+    if (against === null) return undefined;
+    const abort = new AbortController();
+    const key = `${tab.path}|${against}`;
+    const git = against.startsWith('git:') ? against.slice(4) : null;
+    const label = git
+      ? t('next.editor.diffGit', { ref: git })
+      : t('next.editor.diffFile', { name: against.slice(against.lastIndexOf('/') + 1) });
+    const put = (value: ICompare) => {
+      if (!abort.signal.aborted) setCompare({ key, value });
+    };
+    put({ label, text: null, failure: null });
+    const failed = (failure: Error) => put({ label, text: null, failure: failure.message });
+    if (git)
+      readGitSide(conv.machineId, conv.id, tab.path, git, abort.signal).then((side) => {
+        if (!side.inRepo) put({ label, text: null, failure: t('next.editor.diffNoRepo') });
+        else if (!side.tracked) put({ label, text: '', failure: null });
+        else if (side.binary || side.truncated)
+          put({ label, text: null, failure: t('next.editor.diffTooBig') });
+        else put({ label, text: side.content, failure: null });
+      }, failed);
+    else
+      readFile(conv.machineId, conv.id, against, abort.signal).then(
+        (other) => put({ label, text: other.content, failure: null }),
+        failed,
+      );
+    return () => abort.abort();
+  }, [conv.machineId, conv.id, tab.path, against]);
+  const shownCompare = against !== null && compare?.key === `${tab.path}|${against}` ? compare.value : null;
+
+  // A page's neighbours (styles, scripts, pictures) read the way a download does: the same places, no secrets.
+  const readAsset = useCallback(
+    async (path: string) => {
+      const res = await fetch(downloadHref(conv.machineId, conv.id, [path]), { credentials: 'same-origin' });
+      return res.ok ? res.blob() : null;
+    },
+    [conv.machineId, conv.id],
+  );
   const save = async (text: string, revision: string, over: boolean) => {
     // Over whatever the disk has now: the revision it has now is the one the save names.
     const current = over ? (await readFile(conv.machineId, conv.id, tab.path)).revision : revision;
@@ -344,6 +449,15 @@ const FilesTab = ({
         }}
         onLeave={(draft) => edits.onLeave(tab.id, tab.path, draft)}
         onState={(state) => edits.onState(tab.id, state)}
+        readAsset={readAsset}
+        compare={shownCompare}
+        onCloseCompare={() => onChange({ ...tab, against: undefined })}
+        modeSlot={modeSlot}
+        at={tab.at ?? null}
+        onAsk={(quote, note) => {
+          addQuote(conv.id, quote, note);
+          toast(t('next.editor.asked'), { tone: 'success' });
+        }}
       />
     ) : null;
   if (delivered)
@@ -362,10 +476,43 @@ const FilesTab = ({
       listing={now?.listing ?? null}
       file={now?.file ?? null}
       editor={editor}
+      tools={tools}
+      onModeSlot={setModeSlot}
       error={now?.error ?? null}
       opening={tab.file ? 'file' : 'folder'}
       onRetry={() => setEpoch((n) => n + 1)}
-      onOpen={(path, kind) => guard([tab.id], () => onChange({ ...tab, path, file: kind === 'file' }))}
+      onOpen={(path, kind) =>
+        guard([tab.id], () =>
+          onChange({ ...tab, path, file: kind === 'file', against: undefined, at: undefined }),
+        )
+      }
+      onCompare={(a, b) => guard([tab.id], () => onChange({ ...tab, path: a, file: true, against: b }))}
+      onDownload={(paths) => saveFrom(downloadHref(conv.machineId, conv.id, paths))}
+      take={uploads.ready ? uploads : null}
+      find={find}
+      findText={findLines}
+      onOpenAt={(hit, size) => {
+        const at = { line: hit.line, col: hit.col, size };
+        const show = () => onChange({ ...tab, path: hit.path, file: true, against: undefined, at });
+        if (tab.file && tab.path === hit.path) show();
+        else guard([tab.id], show);
+      }}
+      below={<UploadsStrip uploads={uploads.uploads} queue={uploads.queue} />}
+      entryOps={entryOps}
+      onOpenBeside={onOpenBeside}
+      menuOf={(path, kind, trigger, acts) => (
+        <FileMenu
+          trigger={trigger}
+          machine={conv.machineId}
+          conv={conv.id}
+          path={path}
+          abs={absIn(conv.cwd, path)}
+          kind={kind}
+          onOpenBeside={() => onOpenBeside(path, kind)}
+          onRename={acts?.onRename}
+          onTrash={acts?.onTrash}
+        />
+      )}
     />
   );
 };
@@ -700,24 +847,71 @@ const PaneBody = (props: IPaneBodyProps) => {
         </button>
       );
     }
-    if (!tab || tab.kind !== 'files') return null;
-    // «Поделиться» of a file that can be a document, next to «Сохранить».
-    const share = tab.file && isShareable(tab.path) && (
-      <FileShareButton key={tab.path} machine={conv.machineId} conv={conv.id} path={tab.path} />
-    );
-    if (!saveButton) return share || null;
+    // A file shown its own way (a picture, a PDF) keeps its controls on the bar over it; a text file has them in the
+    // folder's head row, beside the crumbs (fileTools).
+    if (tab?.kind !== 'files' || !tab.file || deliveredViewOf(tab.path) === null) return null;
     return (
       <>
-        {share}
-        <Button
-          variant="primary"
-          size="sm"
-          busy={edits.live?.saving}
-          disabled={!edits.unsaved.has(tab.id)}
-          onClick={() => void edits.save()}
+        {fileShare()}
+        {fileMenu(false)}
+      </>
+    );
+  };
+  /** «…» of the open file; `compare`: «Сравнить с git» (a text file). */
+  const fileMenu = (compare: boolean) =>
+    tab?.kind === 'files' &&
+    tab.file && (
+      <FileMenu
+        key={`menu:${tab.path}`}
+        trigger={
+          <button type="button" className="hx-head-btn" aria-label={t('next.fileMenu.label')}>
+            <Icon name="ellipsis" size="sm" />
+          </button>
+        }
+        machine={conv.machineId}
+        conv={conv.id}
+        path={tab.path}
+        abs={absIn(conv.cwd, tab.path)}
+        kind="file"
+        onCompare={
+          compare
+            ? () =>
+                setTabs((list) => list.map((x) => (x.id === tab.id ? { ...tab, against: 'git:HEAD' } : x)))
+            : undefined
+        }
+      />
+    );
+  /** «Поделиться» of a file that can be a document. */
+  const fileShare = () =>
+    tab?.kind === 'files' &&
+    tab.file &&
+    isShareable(tab.path) && (
+      <FileShareButton key={tab.path} machine={conv.machineId} conv={conv.id} path={tab.path} />
+    );
+  /** The open text file's controls: download, share, «…», and «Сохранить» while there is something to save. */
+  const fileTools = () => {
+    if (!tab || tab.kind !== 'files' || !tab.file || deliveredViewOf(tab.path) !== null) return null;
+    const unsaved = edits.unsaved.has(tab.id) || (saveButton && edits.live?.saving === true);
+    return (
+      <>
+        <a
+          className="hx-head-btn hx-tipped"
+          href={downloadHref(conv.machineId, conv.id, [tab.path])}
+          download
+          aria-label={t('next.files.downloadFile')}
         >
-          {t('next.editor.save')}
-        </Button>
+          <Icon name="download" size="sm" />
+          <span className="hx-tip" data-pos="below" data-align="end">
+            {t('next.files.downloadFile')}
+          </span>
+        </a>
+        {fileShare()}
+        {fileMenu(true)}
+        {saveButton && unsaved && (
+          <Button variant="primary" size="sm" busy={edits.live?.saving} onClick={() => void edits.save()}>
+            {t('next.editor.save')}
+          </Button>
+        )}
       </>
     );
   };
@@ -828,6 +1022,8 @@ const PaneBody = (props: IPaneBodyProps) => {
           edits={edits}
           guard={guard}
           onChange={(next) => setTabs((list) => list.map((x) => (x.id === next.id ? next : x)))}
+          onOpenBeside={(path, kind) => add({ id: nextId(), kind: 'files', path, file: kind === 'file' })}
+          tools={fileTools()}
         />
       )}
       {tab?.kind === 'shell' && (
@@ -885,11 +1081,20 @@ export const useRightPane = (
   const machineId = conv?.machineId ?? null;
   // The chat's pane is read as the chat is: the first frame of another chat already draws its own pane.
   const state = useChatPane(convId);
-  const { open, maxed } = state;
+  // Beside a design the pane opens at its side, never over it: the chat's own «wide» is for the chat's page (a pane
+  // widened there must not cover the design opened from it). Widened here, it stays so only while the design is open.
+  const [wideBeside, setWideBeside] = useState(false);
+  const maxed = besideDesign ? wideBeside : state.maxed;
   const setState = (change: (pane: IChatPane) => IChatPane) => {
     if (convId) chatPanes.update(convId, machineId, change);
   };
-  const setOpen = (next: boolean) => setState((s) => (s.open === next ? s : { ...s, open: next }));
+  // Beside a design the pane is out only once it is opened there (pane-beside).
+  const [open, setOpen] = usePaneOpenBeside(
+    state.open,
+    (next) => setState((s) => (s.open === next ? s : { ...s, open: next })),
+    besideDesign,
+    convId,
+  );
   // The chat on screen now, for what answers after the person went to another one.
   const shownConv = useRef(convId);
   useEffect(() => {
@@ -950,7 +1155,10 @@ export const useRightPane = (
   };
 
   const setTabs = (change: (list: TTab[]) => TTab[]) => setState((s) => ({ ...s, tabs: change(s.tabs) }));
-  const setMaxed = (next: boolean) => setState((s) => (s.maxed === next ? s : { ...s, maxed: next }));
+  const setMaxed = (next: boolean) => {
+    if (besideDesign) setWideBeside(next);
+    else setState((s) => (s.maxed === next ? s : { ...s, maxed: next }));
+  };
   const setActive = (id: string) =>
     setState((s) => ({ ...s, active: id, unread: s.unread.filter((x) => x !== id) }));
 

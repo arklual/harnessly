@@ -3,6 +3,7 @@
 // and hands it back in index.json. Without a remembered view there is nothing to carry.
 import type { IGuestView } from '@/next/features/designly/access/api';
 import { DEVICES } from '@/next/features/designly/devices';
+import { FIT } from '@/next/features/designly/site-zoom';
 import { readView, VIEW_DEFAULT } from '@/next/features/designly/view-memory';
 
 const MAX_BYTES = 2048;
@@ -24,7 +25,7 @@ export const guestViewOf = (design: string): IGuestView | undefined => {
     width = memory.rot ? device.vh : device.vw;
     height = memory.rot ? device.vw : device.vh;
   }
-  const free = memory.fit === null;
+  const free = !memory.std;
   const view: IGuestView = {
     v: 1,
     device: memory.device,
@@ -33,7 +34,8 @@ export const guestViewOf = (design: string): IGuestView | undefined => {
     height,
     chrome: memory.chrome,
     browser: memory.browser,
-    fit: memory.fit,
+    // The standard view («Вписать») goes as the fit «auto» that every guest page reads as it.
+    fit: free ? null : FIT.auto,
     zoom: free ? memory.zoom.s : null,
     panX: free ? memory.zoom.x : null,
     panY: free ? memory.zoom.y : null,

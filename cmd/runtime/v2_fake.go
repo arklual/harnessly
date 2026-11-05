@@ -57,7 +57,7 @@ func v2Fake(d deps) (*wire.Server, func(http.Handler) http.Handler) {
 	srv.HandoffDraft = svc.HandoffDraft
 	srv.Files = svc.Files()
 	srv.Tasks = svc.Tasks
-	srv.Voice = func(_ context.Context, audio io.Reader, _ string) (string, error) {
+	srv.Voice = func(_ context.Context, audio io.Reader, _, _ string) (string, error) {
 		_, err := io.Copy(io.Discard, audio)
 		return v2FakeTranscript, err
 	}

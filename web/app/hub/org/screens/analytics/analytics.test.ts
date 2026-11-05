@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createOrgApi } from '../../api';
-import type { Kpi } from '../../api/analytics';
+import { type Kpi, monthPeriod } from '../../api/analytics';
 import { deltaOf, formatValue, minutesText } from './format';
 import { defaultCompare, presetsOf, weekCount } from './period';
 
@@ -62,7 +62,21 @@ describe('periods', () => {
     const presets = presetsOf(frame);
     expect(presets.map((p) => p.id)).toEqual(['last-week', 'four-weeks', 'after-change']);
     expect(weekCount(presets[1]?.period ?? { from: '', to: '' })).toBe(4);
-    expect(frame.defaultPeriod.from).toBe('2026-10-19');
+    // Opens on the current month through the current week, as «Обзор» does.
+    expect(frame.defaultPeriod.from).toBe('2026-09-28');
+    expect(frame.defaultPeriod.to).toBe('2026-11-01');
+  });
+
+  it("monthPeriod takes the weeks of the last week's month, by Thursday", () => {
+    const w = (from: string, to: string) => ({ from, to });
+    const weeks = [
+      w('2026-09-21', '2026-09-27'),
+      w('2026-09-28', '2026-10-04'),
+      w('2026-10-05', '2026-10-11'),
+    ];
+    expect(monthPeriod(weeks)).toEqual({ from: '2026-09-28', to: '2026-10-11' });
+    expect(monthPeriod([w('2026-10-26', '2026-11-01')])).toEqual({ from: '2026-10-26', to: '2026-11-01' });
+    expect(() => monthPeriod([])).toThrow();
   });
 });
 

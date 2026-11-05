@@ -2,6 +2,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCanvasZoom } from '@/next/features/designly/use-canvas-zoom';
+import { FIT, type TFit } from '@/next/features/designly/site-zoom';
 
 class FakeObserver {
   observe() {}
@@ -9,7 +10,7 @@ class FakeObserver {
 }
 
 /** An area 800×600 with a box 400×300 in its middle; the layout is faked, jsdom has none. */
-const setup = () => {
+const setup = (standard: TFit = FIT.auto) => {
   const area = document.createElement('div');
   const box = document.createElement('div');
   box.className = 'hx-vpbox';
@@ -27,7 +28,7 @@ const setup = () => {
   });
   Object.defineProperties(area, { clientWidth: { value: 800 }, clientHeight: { value: 600 } });
   const view = renderHook(() =>
-    useCanvasZoom({ current: area }, { current: section }, 1, true, 'device', { w: 400, h: 300 }),
+    useCanvasZoom({ current: area }, { current: section }, 1, true, 'device', { w: 400, h: 300 }, standard),
   );
   return { area, view };
 };
@@ -90,12 +91,12 @@ describe('useCanvasZoom', () => {
     expect(area.dataset.zoomed).toBe('false');
   });
 
-  it('resets the view, and sets a scale from the menu smoothly', () => {
+  it('fits the view back, and sets a scale from the menu smoothly', () => {
     const { area, view } = setup();
     act(() => view.result.current.zoomTo(200));
     expect(view.result.current.pct).toBe(200);
     expect(area.dataset.zsmooth).toBe('true');
-    act(() => view.result.current.reset());
+    act(() => view.result.current.fit());
     expect(view.result.current.pct).toBe(100);
     expect(view.result.current.zoomed).toBe(false);
   });
@@ -129,23 +130,28 @@ describe('useCanvasZoom', () => {
     });
     expect(view.result.current.pct).toBe(100);
   });
-  it('fits the box by width, height or whole, and a pan lets the fit go', () => {
-    const { area, view } = setup();
-    act(() => view.result.current.fitTo('width'));
-    expect(view.result.current.fitMode).toBe('width');
+  it('starts at the standard view of the device, and «Вписать» puts it back after a zoom and a pan', () => {
+    // The area has no padding in jsdom: a box 400 × 300 fitted whole into 800 × 600 is twice as large, at the corner.
+    const { area, view } = setup(FIT.whole);
+    expect(view.result.current.std).toBe(true);
     expect(view.result.current.pct).toBe(200);
     expect(area.style.getPropertyValue('--zx')).toBe('-200px');
-    expect(area.dataset.zsmooth).toBe('true');
-    act(() => view.result.current.fitTo('height'));
-    expect(view.result.current.pct).toBe(200);
+    expect(area.style.getPropertyValue('--zy')).toBe('-150px');
+    wheel(area, { ctrlKey: true, deltaY: 20, clientX: 780, clientY: 590 });
     wheel(area, { deltaX: 0, deltaY: 40 });
-    expect(view.result.current.fitMode).toBeNull();
-    act(() => view.result.current.reset());
-    expect(view.result.current.fitMode).toBe('auto');
-    expect(view.result.current.zoomed).toBe(false);
+    expect(view.result.current.std).toBe(false);
+    expect(view.result.current.pct).toBeLessThan(200);
+    area.scrollTop = 120;
+    act(() => view.result.current.fit());
+    expect(view.result.current.std).toBe(true);
+    expect(view.result.current.pct).toBe(200);
+    expect(area.style.getPropertyValue('--zx')).toBe('-200px');
+    expect(area.style.getPropertyValue('--zy')).toBe('-150px');
+    expect(area.dataset.zsmooth).toBe('true');
+    expect(area.scrollTop).toBe(0);
   });
 
-  it('locked, neither pans nor zooms, but still fits', () => {
+  it('locked, neither pans nor zooms, but «Вписать» still works', () => {
     const { area, view } = setup();
     act(() => view.result.current.onLock());
     expect(view.result.current.locked).toBe(true);
@@ -161,8 +167,26 @@ describe('useCanvasZoom', () => {
     act(() => view.result.current.fromPage.pan(30, 30, true));
     expect(view.result.current.pct).toBe(100);
     expect(area.style.getPropertyValue('--zx')).toBe('0px');
-    act(() => view.result.current.fitTo('whole'));
-    expect(view.result.current.pct).toBe(200);
+    act(() => view.result.current.zoomTo(50));
+    expect(view.result.current.pct).toBe(100);
+    // Locked, «Вписать» and ⌘0 still take the view back.
+    const moveLocked = () => {
+      act(() => view.result.current.onLock());
+      act(() => view.result.current.zoomTo(50));
+      act(() => view.result.current.onLock());
+      expect(view.result.current.pct).toBe(50);
+      expect(view.result.current.std).toBe(false);
+    };
+    moveLocked();
+    act(() => view.result.current.fit());
+    expect(view.result.current.pct).toBe(100);
+    expect(view.result.current.std).toBe(true);
+    moveLocked();
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '0', metaKey: true, cancelable: true }));
+    });
+    expect(view.result.current.pct).toBe(100);
+    expect(view.result.current.std).toBe(true);
     act(() => view.result.current.onLock());
     expect(view.result.current.canIn).toBe(true);
   });

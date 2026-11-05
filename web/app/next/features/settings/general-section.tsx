@@ -72,6 +72,8 @@ export interface IGeneralSectionProps {
   updates?: ReactNode;
   /** «Проверка машины» (checks-group.tsx): what is not in order on the machine; null when all is. */
   checks?: ReactNode;
+  /** «Ссылки» (pane-sites-group.tsx): which sites the chat's links open in the pane. */
+  links?: ReactNode;
 }
 
 const SignOutRow = ({ account, onSignOut }: Pick<IGeneralSectionProps, 'account' | 'onSignOut'>) => {
@@ -124,6 +126,7 @@ const GeneralSection = ({
   onSignOut,
   updates = null,
   checks = null,
+  links = null,
 }: IGeneralSectionProps) => (
   <>
     {checks}
@@ -199,6 +202,7 @@ const GeneralSection = ({
         />
       )}
     </Group>
+    {links}
     {delegation !== null && (
       <Group title={t('next.settings.delegation.title')}>
         <SegRow

@@ -3,10 +3,17 @@
 // (live scenes or the published MP4), «Комментировать», «Стиль», «Собрать MP4» and «Поделиться».
 import { t } from '@/next/i18n';
 import Icon from '@/next/ui/icon';
+import ModeButton from '@/next/features/designly/mode-button';
+import type { ISiteMode } from '@/next/features/designly/site-view';
 import { RENDER_BADGE, type TRenderBadge } from '@/next/features/designly/video/video-model';
 import { VIDEO_SOURCE, type TVideoFormat, type TVideoSource } from '@/next/features/designly/video/types';
+import { ProjectDownloadMenu, type IDownloadItem } from '@/next/features/designly/project-downloads';
 
 export interface IVideoBarProps {
+  /** The switch between looking and editing; absent in the pane of a chat. */
+  mode?: ISiteMode;
+  /** The video is looked at: no panel, comments, style or render here. */
+  viewing?: boolean;
   title: string;
   /** The place: «Сцена 3 · 0:12». */
   crumb: string;
@@ -30,6 +37,8 @@ export interface IVideoBarProps {
   /** Absent: the person may not share this video. */
   onShare?: () => void;
   shareOn: boolean;
+  /** «Скачать»: the MP4, the scene on screen and every scene, the project as a ZIP. */
+  downloads?: readonly IDownloadItem[];
 }
 
 interface IBarButtonProps {
@@ -83,7 +92,7 @@ const VideoBar = (p: IVideoBarProps) => (
       text={false}
       onClick={p.onBack}
     />
-    {p.onPanel && (
+    {p.onPanel && !p.viewing && (
       <BarButton
         k="panel"
         icon="panel-left"
@@ -93,6 +102,7 @@ const VideoBar = (p: IVideoBarProps) => (
         onClick={p.onPanel}
       />
     )}
+    {p.mode && <ModeButton mode={p.mode} />}
     <div className="hx-deck__addr">
       <b>{p.title}</b>
       {p.crumb !== '' && (
@@ -147,27 +157,49 @@ const VideoBar = (p: IVideoBarProps) => (
         {t('next.video.shell.mp4')}
       </button>
     </div>
-    <BarButton
-      k="comment"
-      icon="message-square-plus"
-      label={t('next.video.shell.comment')}
-      onClick={p.onComment}
-    />
-    <BarButton
-      k="style"
-      icon="palette"
-      label={t('next.video.shell.style')}
-      pressed={p.styleOn}
-      onClick={p.onStyle}
-    />
-    <BarButton
-      k="render"
-      icon="clapperboard"
-      label={t('next.video.shell.render')}
-      pressed={p.renderOn}
-      mark={p.badge === RENDER_BADGE.outdated}
-      onClick={p.onRender}
-    />
+    {!p.viewing && (
+      <>
+        <BarButton
+          k="comment"
+          icon="message-square-plus"
+          label={t('next.video.shell.comment')}
+          onClick={p.onComment}
+        />
+        <BarButton
+          k="style"
+          icon="palette"
+          label={t('next.video.shell.style')}
+          pressed={p.styleOn}
+          onClick={p.onStyle}
+        />
+        <BarButton
+          k="render"
+          icon="clapperboard"
+          label={t('next.video.shell.render')}
+          pressed={p.renderOn}
+          mark={p.badge === RENDER_BADGE.outdated}
+          onClick={p.onRender}
+        />
+      </>
+    )}
+    {p.downloads && (
+      <ProjectDownloadMenu
+        items={p.downloads}
+        trigger={
+          <button
+            type="button"
+            className="hx-btn"
+            data-variant="ghost"
+            data-size="sm"
+            data-shape="icon"
+            data-k="download"
+            aria-label={t('next.download.label')}
+          >
+            <Icon name="download" />
+          </button>
+        }
+      />
+    )}
     <BarButton
       k="share"
       icon="link"

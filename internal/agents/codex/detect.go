@@ -11,8 +11,10 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/proc"
@@ -38,9 +40,28 @@ type Detector struct {
 	Now func() time.Time
 }
 
+// seenDirs are the other homes Codexes of this account were seen to use ($CODEX_HOME of a running one's environment,
+// ~/.codex next to a variable of the runtime's own), shared by every detector of the process and kept after they exit.
+var seenDirs struct {
+	mu   sync.Mutex
+	list []string
+}
+
+func remember(dir string) {
+	seenDirs.mu.Lock()
+	defer seenDirs.mu.Unlock()
+	if !slices.Contains(seenDirs.list, dir) {
+		seenDirs.list = append(seenDirs.list, dir)
+	}
+}
+
 // NewDetector looks at the machine's processes and <home>/.codex.
 func NewDetector(home string) *Detector {
-	return &Detector{Dir: filepath.Join(home, ".codex"), Procs: proc.System(), Match: agents.MatchArgv, Now: time.Now}
+	d := &Detector{Dir: agentcfg.CodexDirIn(os.Getenv, home), Procs: proc.System(), Match: agents.MatchArgv, Now: time.Now}
+	if def := filepath.Join(home, ".codex"); def != d.Dir {
+		remember(def)
+	}
+	return d
 }
 
 func (d *Detector) now() time.Time {
@@ -52,6 +73,41 @@ func (d *Detector) now() time.Time {
 
 // SessionsRoot holds the session folders.
 func (d *Detector) SessionsRoot() string { return filepath.Join(d.Dir, "sessions") }
+
+// SessionsRoots are SessionsRoot and the session folders of the homes running Codexes were seen to use instead.
+func (d *Detector) SessionsRoots() []string {
+	seenDirs.mu.Lock()
+	dirs := agentcfg.Unique(append([]string{d.Dir}, seenDirs.list...)...)
+	seenDirs.mu.Unlock()
+	for i, dir := range dirs {
+		dirs[i] = filepath.Join(dir, "sessions")
+	}
+	return dirs
+}
+
+// DirOf is the home the Codex process pid uses: its own $CODEX_HOME, else Dir.
+func (d *Detector) DirOf(pid int) string {
+	env, ok := d.Procs.EnvironOf(pid)
+	dir := ""
+	if ok {
+		dir = agentcfg.DirOfEnv(env, agentcfg.CodexDirEnv)
+	}
+	if dir == "" || dir == d.Dir {
+		return d.Dir
+	}
+	remember(dir)
+	return dir
+}
+
+// FindSession is a session's rollout in any of SessionsRoots.
+func (d *Detector) FindSession(id string) (SessionMeta, bool) {
+	for _, root := range d.SessionsRoots() {
+		if m, ok := FindSessionByID(root, id, d.now(), ScanDays); ok {
+			return m, true
+		}
+	}
+	return SessionMeta{}, false
+}
 
 // IsRunning: one of the shell's children or grandchildren is Codex (its launcher counts).
 func (d *Detector) IsRunning(children []int) bool {
@@ -245,15 +301,6 @@ func running(pid int, cwd string, m *SessionMeta) agents.SessionInfo {
 // allowCwdFallback (the timeline only) a fresh Codex gets the newest session of its folder that started with it. A
 // new session's id normally comes from the hooks, not from here.
 func (d *Detector) Detect(children []int, allowCwdFallback bool) agents.SessionInfo {
-	if _, err := os.Stat(d.Dir); err != nil {
-		if d.Installed != nil && d.Installed() {
-			return agents.Info(agents.NotInitialized)
-		}
-		return agents.Info(agents.NotInstalled)
-	}
-	if len(children) == 0 {
-		return agents.Info(agents.NotRunning)
-	}
 	pid, args := 0, ""
 	for _, p := range d.Procs.WithGrandchildren(children) {
 		a, ok := d.Procs.ArgsOf(p)
@@ -263,22 +310,38 @@ func (d *Detector) Detect(children []int, allowCwdFallback bool) agents.SessionI
 		pid, args = p, a
 		break
 	}
+	dir := d.Dir
+	if pid != 0 {
+		dir = d.DirOf(pid)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		if d.Installed != nil && d.Installed() {
+			return agents.Info(agents.NotInitialized)
+		}
+		return agents.Info(agents.NotInstalled)
+	}
 	if pid == 0 {
 		return agents.Info(agents.NotRunning)
 	}
+	root := filepath.Join(dir, "sessions")
 	cwd := d.Procs.CwdOf(pid)
+	info := func(m *SessionMeta) agents.SessionInfo {
+		i := running(pid, cwd, m)
+		i.Dir = dir
+		return i
+	}
 	if id := ResumeID(args); id != "" {
-		if m, ok := FindSessionByID(d.SessionsRoot(), id, d.now(), ScanDays); ok {
-			return running(pid, cwd, &m)
+		if m, ok := FindSessionByID(root, id, d.now(), ScanDays); ok {
+			return info(&m)
 		}
-		return running(pid, cwd, &SessionMeta{SessionID: id})
+		return info(&SessionMeta{SessionID: id})
 	}
 	if allowCwdFallback && cwd != "" {
-		if m, ok := FindLatestForCwd(d.SessionsRoot(), cwd, d.now(), ScanDays); ok && d.startedWith(pid, m) {
-			return running(pid, cwd, &m)
+		if m, ok := FindLatestForCwd(root, cwd, d.now(), ScanDays); ok && d.startedWith(pid, m) {
+			return info(&m)
 		}
 	}
-	return running(pid, cwd, nil)
+	return info(nil)
 }
 
 // startedWith: the session started no earlier than a minute before the process (or the process's start is unknown).

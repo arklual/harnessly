@@ -20,7 +20,7 @@ vi.mock('@/next/routes/routes', () => ({
   goTo: (...a: unknown[]) => goTo(...a),
   ROUTE: { designly: 'designly' },
 }));
-vi.mock('@/next/ui/use-media', () => ({ useMedia: () => phone }));
+vi.mock('@/next/ui/use-media', () => ({ useMedia: () => phone, usePhone: () => phone }));
 vi.mock('@/next/features/designly/deck/api', () => ({
   fetchDeck: vi.fn(() => new Promise(() => undefined)),
   putDeckSettings: vi.fn(),

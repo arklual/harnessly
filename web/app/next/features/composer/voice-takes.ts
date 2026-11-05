@@ -20,6 +20,11 @@ export interface VoiceTake {
   /** Whose it is: personKey of the account that recorded it; '' while that was not known (kept in the page only). */
   person: string;
   machine: MachineId;
+  /**
+   * The field it was recorded in (a chat's id, or the start page's draft): a failed take waits over that field only.
+   * null: a field that shows no failed takes (they are in «Записи»); absent on takes kept before HRN-674.
+   */
+  scope?: string | null;
   at: Ms;
   /** The last time the recording page wrote it. */
   seen: Ms;
@@ -163,12 +168,13 @@ meStore.subscribe(() => {
   if (person) void loadTakes();
 });
 
-export const startTake = (machine: MachineId, mime: string): VoiceTake => {
+export const startTake = (machine: MachineId, mime: string, scope: string | null): VoiceTake => {
   const now = Date.now();
   const take: VoiceTake = {
     id: uuidv7(now),
     person: personNow() ?? '',
     machine,
+    scope,
     at: now,
     seen: now,
     mime,
@@ -210,8 +216,22 @@ export const dropTake = (id: string) => {
   if (take.cloud) void deleteCloudTake(id);
 };
 
-/** The signed-in person's takes of the machine that wait to be recognized, oldest first. */
-export const useFailedTakes = (machine: MachineId | null): VoiceTake[] => {
+/**
+ * Whether a take waits over the field of `scope`: the one it was recorded in. A take kept before takes had a field waits
+ * over the start page's (`home`), not over every chat of the machine.
+ */
+export const takeIn = (take: VoiceTake, scope: string | null, home: string): boolean => {
+  if (scope === null) return false;
+  if (take.scope === undefined) return scope === home;
+  return take.scope === scope;
+};
+
+/** The signed-in person's takes of the machine recorded in the field of `scope` that wait to be recognized, oldest first. */
+export const useFailedTakes = (
+  machine: MachineId | null,
+  scope: string | null,
+  home: string,
+): VoiceTake[] => {
   const me = useMe();
   const person = me.k === 'ready' ? personKey(me.me) : null;
   return useAll(
@@ -222,7 +242,8 @@ export const useFailedTakes = (machine: MachineId | null): VoiceTake[] => {
           (take) =>
             (take.person === person || take.person === '') &&
             take.machine === machine &&
-            take.state === 'failed',
+            take.state === 'failed' &&
+            takeIn(take, scope, home),
         )
         .sort((a, b) => a.at - b.at),
     sameItems,

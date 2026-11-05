@@ -33,6 +33,7 @@
   color: var(--hx-fg-2);
 }
 .hx-dl__composer {
+  position: relative;
   margin-top: var(--hx-space-6);
   padding: var(--hx-space-4) var(--hx-space-4) var(--hx-space-3) var(--hx-space-5);
   border: 1px solid var(--hx-border-strong);

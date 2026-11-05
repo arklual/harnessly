@@ -327,3 +327,20 @@ func TestExtraMCP(t *testing.T) {
 		t.Fatalf("the apps extend %q, retoken %q", f.settings, f.retokened)
 	}
 }
+
+// The hub's environment plugins ride after the skills plugin, one --plugin-dir each.
+func TestEnvPluginDirsFlag(t *testing.T) {
+	c := testConfig(t)
+	c.PluginDir = func() string { return "/data/skills" }
+	var dirs []string
+	c.EnvPluginDirs = func() []string { return dirs }
+	base := "--settings /tmp/hooks.json --mcp-config /tmp/preview-mcp.json --plugin-dir '/data/skills'"
+	if got, _ := c.Flags("", nil, nil); got != base {
+		t.Fatalf("no environment: %q", got)
+	}
+	dirs = []string{"/data/environment/claude-plugin", "/data/hub/environment/claude-plugin"}
+	want := base + " --plugin-dir '/data/environment/claude-plugin' --plugin-dir '/data/hub/environment/claude-plugin'"
+	if got, _ := c.Flags("", nil, nil); got != want {
+		t.Fatalf("%q", got)
+	}
+}

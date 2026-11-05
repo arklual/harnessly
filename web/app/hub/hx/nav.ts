@@ -1,5 +1,5 @@
 // The new hub's menu by role, as the design draws it: the admin sees the tenant, its settings and the organization;
-// the lead sees their team; the member sees their own three screens. Items without a screen yet are greyed out.
+// the lead sees their team; the member sees their own screens. A section that is off for the organization is not shown at all.
 import type { Role, Section } from '../org/types';
 
 export interface HxNavItem {
@@ -23,25 +23,24 @@ const item = (id: string, label: string, icon: string, section?: Section): HxNav
 });
 
 export const navOf = (role: Role, teamName: string | null, features: readonly string[]): HxNavGroup[] => {
-  const env = item('env', 'Окружение', 'layers', features.includes('env') ? 'env' : undefined);
+  const env = features.includes('env') ? [item('env', 'Окружение', 'layers', 'env')] : [];
   const overview = item('overview', 'Обзор', 'chart-column', 'overview');
   const analytics = item('analytics', 'Аналитика', 'activity', 'analytics');
   const machines = item('machines', 'Машины', 'server', 'machines');
   const accounts = item('accounts', 'Аккаунты', 'key-round', 'accounts');
-  if (role === 'member') return [{ label: '', items: [overview, analytics, env] }];
+  if (role === 'member') return [{ label: '', items: [overview, analytics, machines, ...env] }];
   if (role === 'lead') {
     return [
       {
         label: teamName ? `Команда ${teamName}` : 'Команда',
         items: [overview, analytics, machines, item('team', 'Моя команда', 'users', 'team')],
       },
-      { label: 'Настройки', items: [env, accounts] },
+      { label: 'Настройки', items: [...env, accounts] },
     ];
   }
   return [
     { label: 'Тенант', items: [overview, analytics, machines, item('teams', 'Команды', 'users', 'teams')] },
-    { label: 'Настройки', items: [env, accounts] },
-    { label: 'Организация', items: [item('apps', 'Подключения', 'plug')] },
+    { label: 'Настройки', items: [...env, accounts] },
   ];
 };
 

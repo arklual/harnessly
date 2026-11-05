@@ -447,6 +447,20 @@ export const machinesMock = (ctx: MockCtx): MachinesApi => {
         160,
       );
     },
+    renameMachine: async (id, name) => {
+      const m = get(id);
+      need(m, true);
+      const next = name.trim();
+      if (next === '' || next.length > 60)
+        throw new OrgApiError('invalid_request', 'Название — от 1 до 60 символов');
+      put({ ...m, name: next });
+      return later(detail(get(id)), 400);
+    },
+    removeMachine: async (id) => {
+      need(get(id), true);
+      await later(null, 700);
+      store.delete(id);
+    },
     openMachine: async (id) => later({ url: `#machine-${get(id).id}` }, 200),
     restartMachine: async (id, what: RestartWhat, when: RestartWhen) => {
       const m = get(id);

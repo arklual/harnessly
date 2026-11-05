@@ -1,6 +1,12 @@
 // The period and the comparison, chosen as ranges of the weeks on the picker's strip. Pure: the picker's clicks are
 // `pickWeek` / `pickPreset`, the URL is `encodePeriod` / `decodePeriod`, nothing here touches the DOM.
-import type { AnalyticsQuery, ChangeRef, FrameWeek, Week } from '../../../org/api/analytics';
+import {
+  type AnalyticsQuery,
+  type ChangeRef,
+  type FrameWeek,
+  monthPeriod,
+  type Week,
+} from '../../../org/api/analytics';
 import { dayOfMonth, monthShort, parseDay, rangeLabel } from '../../../org/dates';
 import { ru } from './calc';
 
@@ -64,6 +70,45 @@ export const hintOf = (s: PickerState): string => {
     ? 'Нажми на неделю. Чтобы взять несколько недель подряд — на первую и последнюю'
     : 'Нажми на неделю для сравнения. По умолчанию — столько же недель сразу перед периодом';
 };
+
+/** The weeks of the current month on the strip: what «Этот месяц» is, as on «Обзор». */
+export const monthRange = (weeks: readonly FrameWeek[]): Range | null => {
+  if (weeks.length === 0) return null;
+  const m = monthPeriod(weeks);
+  const i = weeks.findIndex((w) => w.from === m.from);
+  return i < 0 ? null : [i, weeks.length - 1];
+};
+
+/** A range as a person says it: a name where there is one, and the dates always. */
+export interface RangeName {
+  title: string;
+  dates: string;
+}
+
+const WEEK_WORD = ['неделя', 'недели', 'недель'] as const;
+
+/** «Этот месяц», «Эта неделя», «Прошлая неделя»; any other range is named by its length: «4 недели». */
+export const nameOf = (weeks: readonly FrameWeek[], r: Range, opts: { month?: boolean } = {}): RangeName => {
+  const dates = labelOf(weeks, r);
+  const last = weeks.length - 1;
+  const month = opts.month ? monthRange(weeks) : null;
+  const n = r[1] - r[0] + 1;
+  if (month && sameRange(r, month)) return { title: 'Этот месяц', dates };
+  if (n === 1 && r[0] === last && weeks[last]?.current) return { title: 'Эта неделя', dates };
+  if (n === 1 && r[0] === lastFullWeek(weeks)) return { title: 'Прошлая неделя', dates };
+  if (n === 1) return { title: '1 неделя', dates };
+  const word =
+    n % 10 === 1 && n % 100 !== 11
+      ? WEEK_WORD[0]
+      : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)
+        ? WEEK_WORD[1]
+        : WEEK_WORD[2];
+  return { title: `${n} ${word}`, dates };
+};
+
+/** What the comparison is called: the same length right before the period, or what was chosen by hand. */
+export const compareNameOf = (weeks: readonly FrameWeek[], s: PickerState): RangeName =>
+  s.auto ? { title: 'Предыдущий период', dates: labelOf(weeks, s.b) } : nameOf(weeks, s.b);
 
 const weekAt = (weeks: readonly FrameWeek[], i: number): FrameWeek => {
   const w = weeks[i];

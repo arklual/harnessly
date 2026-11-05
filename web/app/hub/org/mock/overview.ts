@@ -56,6 +56,9 @@ const SIGNALS: Signal[] = [
   },
 ];
 
+/** Signals put off in this session of the mock. */
+const snoozed = new Set<string>();
+
 const SPAN_K: Record<SpendSpan, number> = { day: 0.035, week: 0.24, month: 1 };
 
 const CUTS: Record<SpendCut, { key: string; label: string; rub: number; tokens: number }[]> = {
@@ -285,6 +288,14 @@ const activeOf = (who: ActivePerson[]) => ({
 });
 
 export const overviewMock = (ctx: MockCtx): OverviewApi => ({
+  snoozeSignal: (id) => {
+    snoozed.add(id);
+    return later(undefined);
+  },
+  unsnoozeSignal: (id) => {
+    snoozed.delete(id);
+    return later(undefined);
+  },
   overview: async (_tenant, period) => {
     const now = Date.now();
     const k = period === 'week' ? 0.24 : 1;
@@ -296,7 +307,7 @@ export const overviewMock = (ctx: MockCtx): OverviewApi => ({
         tasks: { closed: 14, inProgress: 6, bars: BARS.tasks },
         subscriptions: { accounts: 3, worstName: '№2', worstPct: 87 },
       },
-      signals: SIGNALS,
+      signals: SIGNALS.filter((x) => !snoozed.has(x.id)),
       subscriptions: [
         { id: 'a2', name: 'Claude Max №2', teams: ['Фронт', 'Дизайн'], resetsOn: 'пн', usedPct: 87 },
         { id: 'a1', name: 'Claude Max №1', teams: ['Бэкенд'], resetsOn: 'ср', usedPct: 62 },

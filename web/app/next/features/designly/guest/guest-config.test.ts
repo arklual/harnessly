@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { boardUrl, readGuestConfig, sharedView } from '@/next/features/designly/guest/guest-config';
-import { FIT } from '@/next/features/designly/site-zoom';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -76,19 +75,20 @@ describe('the view the owner shared', () => {
     expect(view).toMatchObject({
       device: 'fill',
       size: { w: 800, h: 600 },
-      rot: true,
+      // «По окну» does not turn (its size is turned instead): only a phone or a tablet keeps a turn.
+      rot: false,
       chrome: false,
       browser: 'chrome',
-      fit: null,
+      std: false,
       zoom: { s: 1.5, x: 10, y: -4 },
       locked: true,
       page: 'a.html',
     });
   });
 
-  it('keeps a fit mode and ignores a pan', () => {
+  it('takes a fit as the standard view and ignores a pan', () => {
     const view = sharedView({ v: 1, device: 'fill', fit: 'width', zoom: 3, panX: 1, panY: 1 });
-    expect(view?.fit).toBe(FIT.width);
+    expect(view?.std).toBe(true);
     expect(view?.zoom).toMatchObject({ s: 1 });
   });
 });

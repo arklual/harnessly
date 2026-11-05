@@ -56,6 +56,9 @@ export interface MachineCard {
   cancelRestart: () => Promise<boolean>;
   disable: () => Promise<boolean>;
   enable: () => Promise<boolean>;
+  rename: (name: string) => Promise<boolean>;
+  /** Takes the machine away; true once the hub has done it. */
+  remove: () => Promise<boolean>;
   resize: (to: { cores: number; ramGb: number; diskGb: number }) => Promise<boolean>;
   saveAccess: (mode: AccessMode, personIds: string[]) => Promise<boolean>;
 }
@@ -173,6 +176,25 @@ export const useMachineCard = (id: string, onChanged: (m: OrgMachine) => void): 
         () => api.enableMachine(id),
         'подключена обратно',
       ),
+    rename: (name) =>
+      act(
+        (d) => ({ ...d, machine: { ...d.machine, name } }),
+        () => api.renameMachine(id, name),
+        'название изменено',
+      ),
+    remove: async () => {
+      setError(null);
+      flying.current += 1;
+      try {
+        await api.removeMachine(id);
+        return true;
+      } catch (e) {
+        if (alive.current) setError(orgErrorText(e));
+        return false;
+      } finally {
+        flying.current -= 1;
+      }
+    },
     resize: (to) =>
       act(
         (d) => withBusy(d, 'resize'),

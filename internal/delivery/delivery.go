@@ -23,9 +23,6 @@ import (
 // Host is the address a record is written under: it never resolves, it only says what the line is.
 const Host = "delivered.harnessly.invalid"
 
-// MaxSumBytes is the biggest file whose sha256 is read; a bigger one is not delivered (it is not downloadable anyway).
-const MaxSumBytes = files.MaxDownloadBytes
-
 // Info is a delivered file.
 type Info struct {
 	// Path is the real, absolute path.
@@ -128,7 +125,7 @@ func sumOf(real string) (string, error) {
 	}
 	defer f.Close()
 	h := sha256.New()
-	if _, err := io.Copy(h, io.LimitReader(f, MaxSumBytes+1)); err != nil {
+	if _, err := io.Copy(h, f); err != nil {
 		return "", fmt.Errorf("the file cannot be read")
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil

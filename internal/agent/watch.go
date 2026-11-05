@@ -28,7 +28,7 @@ type lineEnd struct {
 // transcriptWatch tells the cluster about transcripts as they change: a watcher on every directory of the two roots
 // and, as a safety net, a full scan now and then.
 type transcriptWatch struct {
-	roots     Roots
+	roots     *rootSet
 	broadcast func(any)
 
 	mu       sync.Mutex
@@ -39,7 +39,7 @@ type transcriptWatch struct {
 	watched  map[string]bool
 }
 
-func newTranscriptWatch(roots Roots, broadcast func(any)) *transcriptWatch {
+func newTranscriptWatch(roots *rootSet, broadcast func(any)) *transcriptWatch {
 	t := &transcriptWatch{roots: roots, broadcast: broadcast, known: map[string]string{}, pending: map[string]bool{}, lineEnds: map[string]lineEnd{}, watched: map[string]bool{}}
 	if w, err := fsnotify.NewWatcher(); err == nil {
 		t.watcher = w
@@ -54,7 +54,7 @@ func key(size int64, inode uint64) string { return fmt.Sprintf("%d:%d", inode, s
 
 // Scan compares every transcript with what the agent saw last and announces the changed ones.
 func (t *transcriptWatch) Scan() error {
-	files, err := ListTranscripts(t.roots)
+	files, err := ListTranscripts(t.roots.Get())
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,8 @@ func (t *transcriptWatch) Scan() error {
 // WatchRoots puts a watcher on every directory under the roots. A CLI that was never started has no directory yet;
 // every scan tries again, so its first session is watched as soon as it appears.
 func (t *transcriptWatch) WatchRoots() {
-	for _, root := range []string{t.roots.Claude, t.roots.Codex} {
+	r := t.roots.Get()
+	for _, root := range append(r.ClaudeRoots(), r.CodexRoots()...) {
 		t.watchTree(root)
 	}
 }
@@ -143,10 +144,11 @@ func (t *transcriptWatch) events() {
 }
 
 func (t *transcriptWatch) onFile(file string) {
-	if !strings.HasSuffix(file, ".jsonl") || !t.roots.IsTranscriptPath(file) {
+	r := t.roots.Get()
+	if !strings.HasSuffix(file, ".jsonl") || !r.IsTranscriptPath(file) {
 		return
 	}
-	provider := t.roots.provider(file)
+	provider := r.provider(file)
 	seenAt := time.Now().UnixMilli()
 	t.mu.Lock()
 	if t.pending[file] {

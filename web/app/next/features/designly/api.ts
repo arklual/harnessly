@@ -74,6 +74,24 @@ export const fetchEngine = (m: MachineId, signal?: AbortSignal) =>
 export const pinDesign = (m: MachineId, id: string, pinned: boolean) =>
   page(m, '/designly/pin', parsePage.designlyPin, { method: 'POST', body: { id, pinned } });
 
+/** The chat conv was started from the design's own column: the machine lists it among the design's chats. */
+export const recordDesignChat = (m: MachineId, id: string, conv: string) =>
+  page(m, '/designly/chat', parsePage.designlyChat, { method: 'POST', body: { id, conv } });
+
+/**
+ * The design's chats as one machine has them: started from the design, then the ones that edited its files. The
+ * library is read without becoming the kept one (`keptLibrary` is the open machine's).
+ */
+export const fetchDesignChats = async (
+  m: MachineId,
+  design: string,
+  signal?: AbortSignal,
+): Promise<string[]> => {
+  const library = await page(m, '/designly/library', parsePage.designlyLibrary, { signal });
+  const found = library.artifacts.find((a) => a.id === design);
+  return found ? [...found.convs, ...(found.touchedBy ?? [])] : [];
+};
+
 /** The project goes to the machine's trash; resolves once the machine has moved it. */
 export const deleteDesign = async (m: MachineId, id: string): Promise<void> => {
   await runtimeJson<unknown>(m, platformPath('/design/library/delete'), postJson({ project: id }));
