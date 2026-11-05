@@ -177,9 +177,9 @@ browser_libraries_present() {
 	else
 		library_cache=$(/sbin/ldconfig -p 2>/dev/null) || return 1
 	fi
-	for library in libnss3 libnspr4 libatk-1.0 libatk-bridge-2.0 libcups libdrm libxkbcommon \
+	for library in libnss3 libnspr4 libatk-1.0 libatk-bridge-2.0 libatspi libcups libdrm libxkbcommon \
 		libX11 libXcomposite libXdamage libXext libXfixes libXrandr libgbm libasound libpango-1.0 libcairo \
-		libdbus-1 libxcb libexpat libglib-2.0 libgio-2.0 libgobject-2.0; do
+		libdbus-1 libxcb libexpat libglib-2.0 libgio-2.0 libgobject-2.0 libudev; do
 		printf '%s\n' "$library_cache" | grep -F "$library.so" >/dev/null || return 1
 	done
 }
@@ -231,8 +231,9 @@ ensure_browser() {
 			release=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | tr -d '"')
 			case "$distro:$release" in ubuntu:2[4-9].* | debian:1[3-9]) suffix=t64 ;; esac
 			packages="xvfb fonts-liberation fonts-noto-color-emoji libnss3 libnspr4 libatk1.0-0$suffix"
-			packages="$packages libatk-bridge2.0-0$suffix libcups2$suffix libdrm2 libxkbcommon0"
+			packages="$packages libatk-bridge2.0-0$suffix libatspi2.0-0$suffix libcups2$suffix libdrm2 libxkbcommon0"
 			packages="$packages libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2$suffix"
+			packages="$packages libpango-1.0-0 libcairo2 libudev1"
 			browser_script="apt-get update -qq && env DEBIAN_FRONTEND=noninteractive apt-get install -y $packages"
 		elif have dnf; then
 			browser_script="dnf install -y chromium xorg-x11-server-Xvfb liberation-fonts google-noto-color-emoji-fonts"

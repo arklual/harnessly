@@ -376,3 +376,26 @@ func TestSandboxCommandAppArmorSyntax(t *testing.T) {
 		}
 	}
 }
+
+func TestLibraryErrorNamesWhatLddMissed(t *testing.T) {
+	ldd := "\tlibdl.so.2 => /lib/libdl.so.2 (0x7f)\n\tlibpango-1.0.so.0 => not found\n\tlibcairo.so.2 => not found\n"
+	got := libraryError(missingLibraries(ldd)...).Error()
+	if !strings.Contains(got, "(libpango-1.0.so.0, libcairo.so.2)") {
+		t.Fatal(got)
+	}
+	if got := libraryError().Error(); strings.Contains(got, "()") || !strings.Contains(got, "shared libraries. Run:") {
+		t.Fatal(got)
+	}
+}
+
+// A clean Debian or Ubuntu has none of what Chrome links against, so the command must name every one of them.
+func TestLibrariesCommandCoversChromesLibraries(t *testing.T) {
+	for _, release := range []string{"ID=ubuntu\nVERSION_ID=\"24.04\"", "ID=ubuntu\nVERSION_ID=\"22.04\"", "ID=debian\nVERSION_ID=\"12\""} {
+		got := LibrariesCommand(release)
+		for _, want := range []string{"libnss3", "libpango-1.0-0", "libcairo2", "libatspi2.0-0", "libudev1", "libgbm1", "libxkbcommon0"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s: %s is missing from %s", release, want, got)
+			}
+		}
+	}
+}

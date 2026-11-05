@@ -71,15 +71,32 @@ func LibrariesCommand(release string) string {
 			suffix = "t64"
 		}
 		return "sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libatk1.0-0" + suffix +
-			" libatk-bridge2.0-0" + suffix + " libcups2" + suffix +
-			" libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2" + suffix
+			" libatk-bridge2.0-0" + suffix + " libatspi2.0-0" + suffix + " libcups2" + suffix +
+			" libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2" + suffix +
+			" libpango-1.0-0 libcairo2 libudev1"
 	}
 	return InstallCommand(release)
 }
 
-func libraryError() error {
+// libraryError names the libraries when ldd told them: a fixed command alone cannot show that it left one out.
+func libraryError(missing ...string) error {
 	command := LibrariesCommand(osRelease())
-	return &Diagnostic{Message: "Chrome has missing shared libraries. Run: " + command, Command: command}
+	message := "Chrome has missing shared libraries"
+	if len(missing) > 0 {
+		message += " (" + strings.Join(missing, ", ") + ")"
+	}
+	return &Diagnostic{Message: message + ". Run: " + command, Command: command}
+}
+
+// missingLibraries reads the sonames ldd reports as not found.
+func missingLibraries(ldd string) []string {
+	missing := []string{}
+	for _, line := range strings.Split(ldd, "\n") {
+		if name, _, found := strings.Cut(strings.TrimSpace(line), " => not found"); found {
+			missing = append(missing, name)
+		}
+	}
+	return missing
 }
 
 func appArmorPath(chrome string) string {
@@ -194,7 +211,7 @@ func ProbeWithSandbox(ctx context.Context, chrome, data string, noSandbox *bool)
 	if _, err := exec.LookPath("ldd"); err == nil {
 		output, _ := exec.CommandContext(ctx, "ldd", chrome).CombinedOutput()
 		if strings.Contains(string(output), "not found") || strings.Contains(string(output), "Error loading shared library") {
-			return result, libraryError()
+			return result, libraryError(missingLibraries(string(output))...)
 		}
 	}
 	versionCtx, stopVersion := context.WithTimeout(ctx, 3*time.Second)
