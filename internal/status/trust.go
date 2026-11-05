@@ -1,6 +1,7 @@
 package status
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -13,9 +14,13 @@ const trustWindow = 10 * time.Minute
 // trustRepeat is how long an answered trust dialog is left to close before it is answered again.
 const trustRepeat = 3000.0
 
+// trustSettle is how long an arrow is given to show on the screen before the dialog is read for the next step.
+const trustSettle = 600.0
+
 // acceptTrust answers an agent's folder trust dialog with yes when it asks about the folder the tab runs in, or the
 // repository holding it (Codex): the person chose that folder for the agent, and the dialog is not on the page, so
-// otherwise the agent would wait at it unseen while messages pile up. True when the keys went out.
+// otherwise the agent would wait at it unseen while messages pile up. Each call takes one step, so Enter follows what
+// the screen shows and not what the arrows were meant to do. True when the keys went out.
 func (m *Manager) acceptTrust(tabID, session, pane string) bool {
 	if m.d.AskFolderTrust {
 		return false
@@ -33,19 +38,26 @@ func (m *Manager) acceptTrust(tabID, session, pane string) bool {
 	if keys == nil {
 		return false
 	}
+	answers := slices.Contains(keys, "Enter")
+	wait := trustSettle
+	if answers {
+		wait = trustRepeat
+	}
 	m.mu.Lock()
 	now := m.now()
-	if last, ok := m.trustAnswered[tabID]; ok && now-last < trustRepeat {
+	if next, ok := m.trustNext[tabID]; ok && now < next {
 		m.mu.Unlock()
 		return false
 	}
-	m.trustAnswered[tabID] = now
+	m.trustNext[tabID] = now + wait
 	m.mu.Unlock()
 	for _, key := range keys {
 		if err := m.d.Tmux.SendRawKeys(session, key); err != nil {
 			return false
 		}
 	}
-	m.d.Log("info", "folder trust dialog answered yes", "tabId", tabID, "agent", prompt.Agent, "folder", prompt.FolderPath)
+	if answers {
+		m.d.Log("info", "folder trust dialog answered yes", "tabId", tabID, "agent", prompt.Agent, "folder", prompt.FolderPath)
+	}
 	return true
 }
