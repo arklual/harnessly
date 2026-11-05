@@ -191,6 +191,7 @@ function ProjectForm({
       project={project}
       folders={[]}
       browserSettings={browser}
+      chats={{ count: 0, working: 0 }}
       onClose={onClose}
       onSave={async (change) => {
         await onSave(change);
