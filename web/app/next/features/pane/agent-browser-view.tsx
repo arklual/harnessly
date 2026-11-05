@@ -95,8 +95,8 @@ export default function AgentBrowserView({
   useEffect(() => {
     if (focusNew.current && active?.url === 'about:blank') {
       focusNew.current = false;
+      // No select(): what the person typed while the tab was opening is the address, and the next key would replace it.
       address.current?.focus();
-      address.current?.select();
     }
   }, [active?.id, active?.url]);
   useEffect(() => {

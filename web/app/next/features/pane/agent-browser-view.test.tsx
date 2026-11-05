@@ -66,6 +66,19 @@ describe('agent browser panel', () => {
     tabs([tab('b')]);
     expect(screen.getAllByRole('tab')).toHaveLength(1);
   });
+  it('keeps what was typed in the address while a new tab was opening', () => {
+    render(<AgentBrowserView url="ws://test" />);
+    Socket.last.emit({ t: 'status', state: 'up', profile: { id: 'common', name: 'Common' } });
+    tabs([tab('a')]);
+    fireEvent.click(screen.getByLabelText('newTab'));
+    const address = screen.getByLabelText('addressLabel') as HTMLInputElement;
+    fireEvent.change(address, { target: { value: 'http' } });
+    tabs([tab('a'), tab('b')], 'b');
+    expect(document.activeElement).toBe(address);
+    expect(address.value).toBe('http');
+    // Selected, the next key would replace the part already typed.
+    expect(address.selectionStart).toBe(address.selectionEnd);
+  });
   it('shows preparing, server errors and recoverable notices', () => {
     render(<AgentBrowserView url="ws://test" />);
     Socket.last.emit({
