@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
+	"github.com/ly-solutions/harnessly/internal/browseract"
 	"github.com/ly-solutions/harnessly/internal/jsvalue"
 	"github.com/ly-solutions/harnessly/internal/mcpserver"
 	"github.com/ly-solutions/harnessly/internal/secrets"
@@ -26,7 +27,7 @@ func TestDisabledUnknownAndStarting(t *testing.T) {
 	set := Tools{S: &Service{Manager: off}}
 	server := mcpserver.Server{Sets: []mcpserver.Toolset{set}}
 	_, b := server.Handle(t.Context(), jsvalue.NewObject("jsonrpc", "2.0", "id", float64(1), "method", "tools/list"))
-	if strings.Contains(string(b), "browser_") {
+	if strings.Contains(string(b), "chrome_") {
 		t.Fatal(string(b))
 	}
 	slow := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
@@ -34,14 +35,14 @@ func TestDisabledUnknownAndStarting(t *testing.T) {
 	manager := agentbrowser.New(agentbrowser.Config{DataDir: t.TempDir(), CDP: slow.URL})
 	defer manager.Close()
 	set.S = &Service{Manager: manager}
-	if out := set.Call(t.Context(), "browser_tabs", jsvalue.NewObject()); !strings.Contains(string(jsvalue.Stringify(out, "")), "Cannot identify this chat") {
+	if out := set.Call(t.Context(), "chrome_tabs", jsvalue.NewObject()); !strings.Contains(string(jsvalue.Stringify(out, "")), "Cannot identify this chat") {
 		t.Fatal(out)
 	}
 	set.Caller = "chat"
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(t.Context(), 1200*time.Millisecond)
 	defer cancel()
-	out := set.Call(ctx, "browser_tabs", jsvalue.NewObject())
+	out := set.Call(ctx, "chrome_tabs", jsvalue.NewObject())
 	if time.Since(started) < time.Second {
 		t.Fatal("startup still uses the old short deadline")
 	}
@@ -163,7 +164,7 @@ func TestPreparingDoesNotWaitForDownload(t *testing.T) {
 	}
 	set := Tools{S: &Service{Manager: manager}, Caller: "chat"}
 	start := time.Now()
-	out := set.Call(t.Context(), "browser_tabs", jsvalue.NewObject())
+	out := set.Call(t.Context(), "chrome_tabs", jsvalue.NewObject())
 	if time.Since(start) > time.Second || !strings.Contains(string(jsvalue.Stringify(out, "")), "Preparing browser") {
 		t.Fatalf("download blocked the tool: %s", jsvalue.Stringify(out, ""))
 	}
@@ -189,5 +190,26 @@ func TestRecordingOverlappingProfileValues(t *testing.T) {
 	set := Tools{Caller: "chat", S: &Service{tabs: map[string]*tabState{"profile/chat/one": first, "profile/chat/two": second}}}
 	if set.redact(long) != "[redacted]" {
 		t.Fatal("response masking exposed an overlapping tab value")
+	}
+}
+
+// An MCP client refuses a server that lists one name twice, and the chat tools hold both sets.
+func TestToolNamesDoNotCollideWithThePaneTools(t *testing.T) {
+	manager := agentbrowser.New(agentbrowser.Config{DataDir: t.TempDir()})
+	defer manager.Close()
+	seen := map[string]bool{}
+	sets := []mcpserver.Toolset{Tools{S: &Service{Manager: manager}}, browseract.Tools{}}
+	for _, set := range sets {
+		listed := set.Tools()
+		if len(listed) == 0 {
+			t.Fatalf("%T lists nothing", set)
+		}
+		for _, tool := range listed {
+			name := tool.(*jsvalue.Object).String("name")
+			if seen[name] {
+				t.Fatalf("%s is listed twice", name)
+			}
+			seen[name] = true
+		}
 	}
 }

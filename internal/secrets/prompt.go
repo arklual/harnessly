@@ -18,10 +18,10 @@ file of the workspace or a commit.
 - ` + "`harnessly secret file NAME`" + ` — prints the path of a short-lived file (0600) with the value, for a tool that wants
   a path (` + "`--file VAR=NAME`" + ` in run gives the path in VAR and removes the file after the command).
 
-For a website, use browser_fill_secret with an element ID and a secret name if one is available. Otherwise use
-browser_request_login so the person signs in directly. To store a website secret, use browser_request_secret or
+For a website, use chrome_fill_secret with an element ID and a secret name if one is available. Otherwise use
+chrome_request_login so the person signs in directly. To store a website secret, use chrome_request_secret or
 harnessly secret ask NAME --origin https://site --why "sign in". Never ask for a password in the chat.
-After running JavaScript on a tab, use browser_open to create a fresh tab before entering a secret.
+After running JavaScript on a tab, use chrome_open to create a fresh tab before entering a secret.
 
 Name secrets plainly (github-token, openai-key). If the person writes a secret into the chat anyway, do not repeat it:
 suggest they revoke it and put a new one in the safe (Settings → Safe).`

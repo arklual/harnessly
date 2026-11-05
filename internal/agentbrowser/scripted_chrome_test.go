@@ -24,7 +24,7 @@ func TestChromeScriptedPopupAndFreshContext(t *testing.T) {
 			must(t, err)
 			for _, tab := range []Tab{parent, other} {
 				if got := string(evaluate(t, i, tab.ID, "window.opener===null")); got != "true" {
-					t.Fatal("browser_open created a window with an opener")
+					t.Fatal("chrome_open created a window with an opener")
 				}
 				raw, err := i.connection().Call(t.Context(), "Target.getTargetInfo", map[string]any{"targetId": tab.ID}, "")
 				must(t, err)
@@ -33,11 +33,11 @@ func TestChromeScriptedPopupAndFreshContext(t *testing.T) {
 				}
 				must(t, json.Unmarshal(raw, &info))
 				if info.Target.Opener != "" {
-					t.Fatal("browser_open target has an opener relation")
+					t.Fatal("chrome_open target has an opener relation")
 				}
 			}
 			// Named lookup crosses same-origin windows in the same browsing-context
-			// group. A fresh browser_open group must create a third window instead.
+			// group. A fresh chrome_open group must create a third window instead.
 			evaluate(t, i, other.ID, "window.name='fixture-window';true")
 			must(t, i.MarkScripted("chat", parent.ID))
 			evaluate(t, i, parent.ID, `window.open('/popup','fixture-window');true`)
@@ -47,7 +47,7 @@ func TestChromeScriptedPopupAndFreshContext(t *testing.T) {
 				t.Fatal("fresh context group or scripted popup inheritance failed")
 			}
 			if i.Tabs("other")[0].Scripted {
-				t.Fatal("unrelated browser_open context was tainted")
+				t.Fatal("unrelated chrome_open context was tainted")
 			}
 			must(t, i.SetControl(parent.ID, "person"))
 			evaluate(t, i, parent.ID, `window.open('/person-popup','_blank');true`)

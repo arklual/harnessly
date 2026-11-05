@@ -171,7 +171,7 @@ document.querySelector('form').onsubmit=e=>{e.preventDefault();fetch('/submit',{
 				finished := make(chan *jsvalue.Object, 1)
 				go func() {
 					set := Tools{S: service, Caller: a.c.chat}
-					finished <- set.Call(a.t.Context(), "browser_evaluate", jsvalue.NewObject("expression", "1"))
+					finished <- set.Call(a.t.Context(), "chrome_evaluate", jsvalue.NewObject("expression", "1"))
 				}()
 				select {
 				case <-finished:
@@ -216,7 +216,7 @@ document.querySelector('form').onsubmit=e=>{e.preventDefault();fetch('/submit',{
 				a.refuseFill("JavaScript")
 				a.c.text("navigate", map[string]any{"url": pageURL + "/login"})
 				a.refuseFill("JavaScript")
-				// A new browser_open target has neither an opener nor access from the old component.
+				// A new chrome_open target has neither an opener nor access from the old component.
 				a.open("/login")
 				a.assertPrivate(`opener===null`)
 				a.fill()
@@ -425,7 +425,7 @@ document.querySelector('form').onsubmit=e=>{e.preventDefault();fetch('/submit',{
 					finished := make(chan *jsvalue.Object, 1)
 					go func() {
 						set := Tools{S: service, Caller: a.c.chat}
-						finished <- set.Call(a.t.Context(), "browser_wait_for", jsvalue.NewObject(
+						finished <- set.Call(a.t.Context(), "chrome_wait_for", jsvalue.NewObject(
 							"tab", first, "text", "never appears", "timeout_ms", 20000))
 					}()
 					deadline := time.Now().Add(3 * time.Second)

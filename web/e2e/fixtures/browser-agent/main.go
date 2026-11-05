@@ -120,7 +120,7 @@ func run() error {
 			return
 		}
 		set := browsertools.Tools{S: browserTools, Caller: conv}
-		result := set.Call(r.Context(), "browser_evaluate", jsvalue.NewObject("tab", tabs[0].ID, "expression", "document.title"))
+		result := set.Call(r.Context(), "chrome_evaluate", jsvalue.NewObject("tab", tabs[0].ID, "expression", "document.title"))
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(jsvalue.Stringify(result, ""))
 	})

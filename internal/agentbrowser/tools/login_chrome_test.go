@@ -43,7 +43,7 @@ func TestChromeLoginToolControl(t *testing.T) {
 			defer page.Close()
 			set := Tools{S: service, Caller: "chat"}
 			askArgs := jsvalue.NewObject("url", page.URL, "why", "Sign in to continue")
-			result := set.Call(t.Context(), "browser_request_login", askArgs)
+			result := set.Call(t.Context(), "chrome_request_login", askArgs)
 			if raw := string(jsvalue.Stringify(result, "")); !strings.Contains(raw, "waiting") || strings.Contains(raw, `"isError":true`) {
 				t.Fatal(raw)
 			}
@@ -107,7 +107,7 @@ func TestChromeLoginToolControl(t *testing.T) {
 			} {
 				for _, target := range []string{tab, popup} {
 					tt.args.Set("tab", target)
-					out := set.Call(t.Context(), "browser_"+tt.name, tt.args)
+					out := set.Call(t.Context(), "chrome_"+tt.name, tt.args)
 					raw := string(jsvalue.Stringify(out, ""))
 					if !strings.Contains(raw, `"isError":true`) || !strings.Contains(raw, "person") {
 						t.Fatalf("%s on %s: %s", tt.name, target, raw)
@@ -124,17 +124,17 @@ func TestChromeLoginToolControl(t *testing.T) {
 			if instance.Tabs("chat")[0].Dialog == nil {
 				t.Fatal("fixture dialog did not open")
 			}
-			out := set.Call(t.Context(), "browser_tabs", jsvalue.NewObject())
+			out := set.Call(t.Context(), "chrome_tabs", jsvalue.NewObject())
 			if strings.Contains(string(jsvalue.Stringify(out, "")), "Private") {
-				t.Fatal("person-controlled title or dialog leaked through browser_tabs")
+				t.Fatal("person-controlled title or dialog leaked through chrome_tabs")
 			}
 			must(t, instance.HandleDialog(t.Context(), tab, false, ""))
 			must(t, access.AnswerLogin(t.Context(), asks[0].ID, "done"))
-			out = set.Call(t.Context(), "browser_request_login", askArgs)
+			out = set.Call(t.Context(), "chrome_request_login", askArgs)
 			if raw := string(jsvalue.Stringify(out, "")); !strings.Contains(raw, "done") || strings.Contains(raw, "Private") {
 				t.Fatal(raw)
 			}
-			out = set.Call(t.Context(), "browser_snapshot", jsvalue.NewObject())
+			out = set.Call(t.Context(), "chrome_snapshot", jsvalue.NewObject())
 			if !strings.Contains(string(jsvalue.Stringify(out, "")), "Private account contents") {
 				t.Fatal("Done did not return access to the agent")
 			}

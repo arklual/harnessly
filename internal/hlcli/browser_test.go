@@ -20,7 +20,7 @@ func TestBrowserHelpAndArguments(t *testing.T) {
 	}
 	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/cli/browser/browser_navigate" {
+		if r.URL.Path != "/api/cli/browser/chrome_navigate" {
 			t.Errorf("wrong path: %s", r.URL.Path)
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

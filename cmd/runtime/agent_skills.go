@@ -117,10 +117,11 @@ func workspacePromptText(agentName string, integ integrations.Config) string {
 		"starts it without the workspace's hooks.\n\n")
 	if !strings.EqualFold(strings.TrimSpace(os.Getenv("RUNTIME_BROWSER")), "off") {
 		b.WriteString("## Browser\n\n")
-		b.WriteString("The browser is already available: use `browser_*` tools or `harnessly browser`. " +
-			"Install nothing and never ask for passwords in chat. Take a `browser_snapshot` before acting on elements. " +
-			"To sign in, use `browser_fill_secret` for an existing safe entry; otherwise use `browser_request_login`. " +
-			"If you ran JavaScript on a tab, use `browser_open` to create a fresh tab before entering a secret.\n\n")
+		b.WriteString("A Chrome of your own is already available, with or without the person's page: use `chrome_*` tools or " +
+			"`harnessly browser`. Any `browser_*` tools act in the tab the person has open in the right pane instead. " +
+			"Install nothing and never ask for passwords in chat. Take a `chrome_snapshot` before acting on elements. " +
+			"To sign in, use `chrome_fill_secret` for an existing safe entry; otherwise use `chrome_request_login`. " +
+			"If you ran JavaScript on a tab, use `chrome_open` to create a fresh tab before entering a secret.\n\n")
 	}
 	b.WriteString("## Handing files over\n\n")
 	b.WriteString("When the person asks you to send or collect a file (\"put it in a zip\", \"give me the docx\"), hand it over with " +

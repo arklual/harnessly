@@ -10,7 +10,7 @@ import (
 
 func (t Tools) profileCall(ctx context.Context, name string, args *jsvalue.Object) *jsvalue.Object {
 	for _, key := range args.Keys() {
-		expected := name == "browser_use_profile" && key == "name" || name == "browser_request_profile" && key == "why"
+		expected := name == "chrome_use_profile" && key == "name" || name == "chrome_request_profile" && key == "why"
 		if !expected {
 			return mcpserver.TextResult("Unexpected profile argument", true)
 		}
@@ -26,15 +26,15 @@ func (t Tools) profileCall(ctx context.Context, name string, args *jsvalue.Objec
 	var result any
 	var err error
 	switch name {
-	case "browser_profiles":
+	case "chrome_profiles":
 		profiles, current, e := a.List(t.Caller)
 		err = e
 		result = map[string]any{"profiles": profiles, "current": current}
-	case "browser_use_profile":
+	case "chrome_use_profile":
 		p, e := a.UseName(ctx, t.Caller, args.String("name"))
 		err = e
 		result = map[string]any{"profile": p, "message": "Profile selected; this chat's tabs in the previous profile were closed."}
-	case "browser_request_profile":
+	case "chrome_request_profile":
 		result, err = a.Request(ctx, t.Caller, args.String("why"))
 	}
 	if err != nil {

@@ -152,8 +152,8 @@ func TestAgentBrowserWorkspacePrompt(t *testing.T) {
 		p := workspacePrompts()
 		for _, provider := range []string{"claude", "codex"} {
 			text, _ := p.Text(provider, "ws-browser")
-			for _, phrase := range []string{"## Browser", "`browser_*`", "`harnessly browser`", "never ask for passwords",
-				"`browser_fill_secret`", "`browser_request_login`"} {
+			for _, phrase := range []string{"## Browser", "`chrome_*`", "`harnessly browser`", "never ask for passwords",
+				"`chrome_fill_secret`", "`chrome_request_login`"} {
 				if strings.Contains(text, phrase) != (mode != "off") {
 					t.Errorf("provider %s, mode %q: wrong presence of %q", provider, mode, phrase)
 				}

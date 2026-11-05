@@ -113,9 +113,9 @@ func TestAgentBrowserProfilesCLIConnectionIsolation(t *testing.T) {
 			return
 		}
 		set := browsertools.Tools{S: service, Caller: id}
-		name, args := "browser_use_profile", jsvalue.NewObject("name", body.Name)
+		name, args := "chrome_use_profile", jsvalue.NewObject("name", body.Name)
 		if body.Name == "" {
-			name, args = "browser_profiles", jsvalue.NewObject()
+			name, args = "chrome_profiles", jsvalue.NewObject()
 		}
 		raw := string(jsvalue.Stringify(set.Call(r.Context(), name, args), ""))
 		results <- raw

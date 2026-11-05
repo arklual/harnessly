@@ -384,7 +384,7 @@ it in Settings → Connections. Never ask for a token in the chat.
 const browserHelp = `harnessly browser <tool> [--json '{...}']
 
 Use the built-in browser from the chat's tmux terminal. Install nothing.
-Tool names accept the browser_ prefix or its omission. Results are MCP JSON;
+Tool names accept the chrome_ prefix or its omission. Results are MCP JSON;
 screenshots carry a base64 JPEG image. Use path to save inside the chat folder.
 
   harnessly browser navigate --json '{"url":"http://localhost:4400"}'

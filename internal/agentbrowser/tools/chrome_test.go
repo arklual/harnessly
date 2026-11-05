@@ -92,7 +92,7 @@ func (c mcpClient) call(name string, args map[string]any) map[string]any {
 	if args == nil {
 		args = map[string]any{}
 	}
-	r := c.rpc("tools/call", map[string]any{"name": "browser_" + name, "arguments": args})
+	r := c.rpc("tools/call", map[string]any{"name": "chrome_" + name, "arguments": args})
 	if r["isError"] == true {
 		c.t.Fatalf("%s: %s", name, jsonText(r))
 	}
@@ -114,7 +114,7 @@ func (c mcpClient) text(name string, args map[string]any) string {
 }
 func (c mcpClient) refuses(name string, args map[string]any, contains string) {
 	c.t.Helper()
-	r := c.rpc("tools/call", map[string]any{"name": "browser_" + name, "arguments": args})
+	r := c.rpc("tools/call", map[string]any{"name": "chrome_" + name, "arguments": args})
 	if r["isError"] != true || !strings.Contains(resultText(r), contains) {
 		c.t.Fatalf("expected refusal %s: %s", contains, jsonText(r))
 	}
@@ -364,7 +364,7 @@ window.addEventListener('keydown',e=>document.body.dataset.code=e.code);true`})
 					text       string
 				}{{"Alert action", "", true, ""}, {"Confirm action", "confirm", false, "false"}, {"Prompt action", "prompt", true, "answer"}} {
 					c.text("click", map[string]any{"id": c.node(dialog.label)})
-					c.refuses("snapshot", map[string]any{}, "browser_dialog")
+					c.refuses("snapshot", map[string]any{}, "chrome_dialog")
 					c.text("dialog", map[string]any{"accept": dialog.accept, "text": dialog.text})
 					if dialog.key != "" {
 						c.eval("document.body.dataset."+dialog.key, dialog.text)

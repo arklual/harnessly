@@ -353,8 +353,8 @@ The runtime service must use `KillMode=process` to preserve the host on restart.
 Profiles and machine-local project/chat permissions are stored atomically in
 `<data>/agent-browser/profiles.json` with mode `0600`. Each project gets its own managed profile on first use.
 Chats without a project use the existing `common` directory. Sharing requires a person to grant access through
-Settings → Browser, project settings, or a `browser_request_profile` card. MCP and CLI share the same permission
-checks; `browser_profiles` and `browser_use_profile` never enumerate other projects' profile names.
+Settings → Browser, project settings, or a `chrome_request_profile` card. MCP and CLI share the same permission
+checks; `chrome_profiles` and `chrome_use_profile` never enumerate other projects' profile names.
 
 Settings → Browser can copy an existing Chrome user-data folder after its Chrome has stopped. Every import shows an explicit warning that cookies depending on a system key store may require signing in again;
 managed profiles use

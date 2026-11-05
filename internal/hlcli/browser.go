@@ -11,8 +11,8 @@ func (c *cli) browser(args []string) error {
 		return nil
 	}
 	name := args[0]
-	if !strings.HasPrefix(name, "browser_") {
-		name = "browser_" + name
+	if !strings.HasPrefix(name, "chrome_") {
+		name = "chrome_" + name
 	}
 	values := map[string]any{}
 	if len(args) > 1 {

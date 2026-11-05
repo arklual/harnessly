@@ -13,5 +13,5 @@ func IsBrowserTool(tool string, servers ...string) bool {
 	tool = strings.TrimPrefix(tool, "mcp__")
 	name, verb, ok := strings.Cut(tool, "__")
 	return ok && (name == server || name == strings.ReplaceAll(server, "-", "_")) &&
-		strings.HasPrefix(verb, "browser_") && len(verb) > len("browser_")
+		strings.HasPrefix(verb, "chrome_") && len(verb) > len("chrome_")
 }

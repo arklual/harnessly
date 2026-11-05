@@ -11,7 +11,7 @@ import (
 	"github.com/ly-solutions/harnessly/internal/agentbrowser"
 )
 
-var errStale = errors.New("Element ID is stale or missing; refresh the snapshot with browser_snapshot")
+var errStale = errors.New("Element ID is stale or missing; refresh the snapshot with chrome_snapshot")
 
 func (t Tools) resolve(ctx context.Context, i *agentbrowser.Instance, st *tabState, a arguments) (nodeRef, string, error) {
 	st.mu.Lock()
@@ -50,7 +50,7 @@ func (t Tools) resolve(ctx context.Context, i *agentbrowser.Instance, st *tabSta
 	return ref, r.Object.ID, nil
 }
 func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabState, name string, a arguments) (string, error) {
-	if name == "browser_press_key" {
+	if name == "chrome_press_key" {
 		return "", t.pressKey(ctx, i, a.Tab, a.Key)
 	}
 	ref, obj, err := t.resolve(ctx, i, st, a)
@@ -64,8 +64,8 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 		return i.AgentFrameCall(ctx, t.Caller, a.Tab, ref.session, method, p)
 	}
 	switch name {
-	case "browser_click", "browser_hover":
-		if name == "browser_click" {
+	case "chrome_click", "chrome_hover":
+		if name == "chrome_click" {
 			handled, output, e := t.selectOption(ctx, i, a.Tab, ref, obj, "", true)
 			if handled || e != nil {
 				return output, e
@@ -78,7 +78,7 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 		if _, e = t.dispatch(ctx, i, a.Tab, "Input.dispatchMouseEvent", map[string]any{"type": "mouseMoved", "x": x, "y": y}); e != nil {
 			return "", e
 		}
-		if name == "browser_hover" {
+		if name == "chrome_hover" {
 			return "", nil
 		}
 		warning, e := t.obstruction(ctx, i, a.Tab, ref, obj)
@@ -93,7 +93,7 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 			}
 		}
 		return warning, nil
-	case "browser_type":
+	case "chrome_type":
 		raw, e := call("Runtime.callFunctionOn", map[string]any{
 			"objectId": obj, "functionDeclaration": "function(){return this.type==='password'}", "returnByValue": true,
 		})
@@ -121,11 +121,11 @@ func (t Tools) action(ctx context.Context, i *agentbrowser.Instance, st *tabStat
 		}
 		_, e = i.AgentCall(ctx, t.Caller, a.Tab, "Input.insertText", map[string]any{"text": a.Text})
 		return "", e
-	case "browser_select":
+	case "chrome_select":
 		_, output, e := t.selectOption(ctx, i, a.Tab, ref, obj, a.Value, false)
 		return output, e
 
-	case "browser_upload":
+	case "chrome_upload":
 		if len(a.Files) == 0 {
 			return "", errors.New("files must contain at least one path")
 		}
@@ -291,7 +291,7 @@ func (t Tools) pressKey(ctx context.Context, i *agentbrowser.Instance, id, key s
 }
 
 // Input replies may wait for the dialog they opened. Stop waiting once the core sees it;
-// the event has already been delivered and browser_dialog is the next operation.
+// the event has already been delivered and chrome_dialog is the next operation.
 func (t Tools) dispatch(ctx context.Context, i *agentbrowser.Instance, id, method string, p any) (json.RawMessage, error) {
 	return t.dispatchFrame(ctx, i, id, "", method, p)
 }
@@ -373,7 +373,7 @@ func (t Tools) selectOption(ctx context.Context, i *agentbrowser.Instance, id st
  if (!select || select.tagName !== 'SELECT') {
   const role = this.getAttribute('role');
   return {handled:true, error:'Element is not a native <select>' +
-   (role ? ' (role="'+role+'")' : '') + '; use browser_click and browser_press_key for custom controls.'};
+   (role ? ' (role="'+role+'")' : '') + '; use chrome_click and chrome_press_key for custom controls.'};
  }
  const options = [...select.options];
  const option = optionClick ? this : options.find(o => o.value === value) || options.find(o => o.label === value);

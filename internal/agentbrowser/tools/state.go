@@ -165,7 +165,7 @@ func (st *tabState) event(e agentbrowser.AgentEvent) {
 		}
 		st.console = ringPush(st.console, st.redactLocked(jsonText(map[string]any{"type": v["type"], "args": values})))
 	case "Runtime.exceptionThrown":
-		st.console = ringPush(st.console, "JavaScript exception (use browser_evaluate to inspect explicitly)")
+		st.console = ringPush(st.console, "JavaScript exception (use chrome_evaluate to inspect explicitly)")
 	case "Network.requestWillBeSent", "Network.responseReceived":
 		request, _ := v["requestId"].(string)
 		key := e.Session + "/" + request
@@ -236,7 +236,7 @@ func (st *tabState) remember(p string) {
 }
 
 func (t Tools) recording(ctx context.Context, i *agentbrowser.Instance, st *tabState, name string, a arguments) (*jsvalue.Object, error) {
-	if name == "browser_network" && a.RequestID != "" {
+	if name == "chrome_network" && a.RequestID != "" {
 		st.mu.Lock()
 		session, ok := st.requests[a.RequestID]
 		st.mu.Unlock()
@@ -252,12 +252,12 @@ func (t Tools) recording(ctx context.Context, i *agentbrowser.Instance, st *tabS
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	entries := st.console
-	if name == "browser_network" {
+	if name == "chrome_network" {
 		entries = st.network
 	}
 	out := st.redactLocked(strings.Join(entries, "\n"))
 	if a.Clear {
-		if name == "browser_network" {
+		if name == "chrome_network" {
 			st.network = nil
 		} else {
 			st.console = nil

@@ -1,6 +1,6 @@
 [
   {
-    "name": "browser_tabs",
+    "name": "chrome_tabs",
     "description": "List this chat\u2019s tabs and working tab.",
     "inputSchema": {
       "type": "object",
@@ -10,7 +10,7 @@
     }
   },
   {
-    "name": "browser_open",
+    "name": "chrome_open",
     "description": "Open a URL in a new working tab.",
     "inputSchema": {
       "type": "object",
@@ -26,7 +26,7 @@
     }
   },
   {
-    "name": "browser_navigate",
+    "name": "chrome_navigate",
     "description": "Navigate the working or named tab; creates the first tab.",
     "inputSchema": {
       "type": "object",
@@ -46,7 +46,7 @@
     }
   },
   {
-    "name": "browser_close_tab",
+    "name": "chrome_close_tab",
     "description": "Close an owned tab.",
     "inputSchema": {
       "type": "object",
@@ -61,7 +61,7 @@
     }
   },
   {
-    "name": "browser_resize",
+    "name": "chrome_resize",
     "description": "Set the viewport in CSS pixels.",
     "inputSchema": {
       "type": "object",
@@ -85,7 +85,7 @@
     }
   },
   {
-    "name": "browser_snapshot",
+    "name": "chrome_snapshot",
     "description": "Read a compact accessibility snapshot with element IDs, including frames. For large pages use interactive_only (controls and headings) or follow next_offset with the same options. Offset 0 starts a fresh snapshot; continuation pages retain all earlier IDs.",
     "inputSchema": {
       "type": "object",
@@ -116,7 +116,7 @@
     }
   },
   {
-    "name": "browser_screenshot",
+    "name": "chrome_screenshot",
     "description": "Return a JPEG image; optional path saves inside the chat folder.",
     "inputSchema": {
       "type": "object",
@@ -134,7 +134,7 @@
     }
   },
   {
-    "name": "browser_wait_for",
+    "name": "chrome_wait_for",
     "description": "Wait for rendered text anywhere in the page or its frames, including open shadow roots. Polls every 250 ms in isolated worlds.",
     "inputSchema": {
       "type": "object",
@@ -157,7 +157,7 @@
     }
   },
   {
-    "name": "browser_evaluate",
+    "name": "chrome_evaluate",
     "description": "Evaluate JavaScript, await promises; output limited to 20 KiB. Permanently prevents safe input in this tab and its opener-connected tabs. Refuses while any tab of this chat is sealed. Default timeout 10 seconds.",
     "inputSchema": {
       "type": "object",
@@ -180,7 +180,7 @@
     }
   },
   {
-    "name": "browser_console",
+    "name": "chrome_console",
     "description": "Read up to 500 recorded console entries; optional clear.",
     "inputSchema": {
       "type": "object",
@@ -198,7 +198,7 @@
     }
   },
   {
-    "name": "browser_network",
+    "name": "chrome_network",
     "description": "Read up to 500 network entries. Only request_id explicitly retrieves a bounded response body.",
     "inputSchema": {
       "type": "object",
@@ -219,7 +219,7 @@
     }
   },
   {
-    "name": "browser_click",
+    "name": "chrome_click",
     "description": "Click an element from the latest snapshot. Clicking a native <option> selects it, including in a closed list.",
     "inputSchema": {
       "type": "object",
@@ -239,7 +239,7 @@
     }
   },
   {
-    "name": "browser_hover",
+    "name": "chrome_hover",
     "description": "Hover an element from the latest snapshot.",
     "inputSchema": {
       "type": "object",
@@ -259,7 +259,7 @@
     }
   },
   {
-    "name": "browser_type",
+    "name": "chrome_type",
     "description": "Focus and replace the text of a snapshot element. Never request passwords.",
     "inputSchema": {
       "type": "object",
@@ -283,7 +283,7 @@
     }
   },
   {
-    "name": "browser_press_key",
+    "name": "chrome_press_key",
     "description": "Press Enter, Tab, Escape, arrows, Backspace, Delete or a character; supports Control/Alt/Shift/Meta+key.",
     "inputSchema": {
       "type": "object",
@@ -303,7 +303,7 @@
     }
   },
   {
-    "name": "browser_select",
+    "name": "chrome_select",
     "description": "Select a native <select> option by exact value or visible label; value wins if both match. Errors list available labels and values.",
     "inputSchema": {
       "type": "object",
@@ -328,7 +328,7 @@
     }
   },
   {
-    "name": "browser_upload",
+    "name": "chrome_upload",
     "description": "Set a file input from files inside the chat folder only.",
     "inputSchema": {
       "type": "object",
@@ -355,7 +355,7 @@
     }
   },
   {
-    "name": "browser_dialog",
+    "name": "chrome_dialog",
     "description": "Accept or dismiss the open dialog; text answers a prompt.",
     "inputSchema": {
       "type": "object",
@@ -378,7 +378,7 @@
     }
   },
   {
-    "name": "browser_profiles",
+    "name": "chrome_profiles",
     "description": "List only browser profiles allowed to this chat and the current profile.",
     "inputSchema": {
       "type": "object",
@@ -388,14 +388,14 @@
     }
   },
   {
-    "name": "browser_use_profile",
+    "name": "chrome_use_profile",
     "description": "Select an allowed browser profile by name. Closes this chat's tabs in the previous profile.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "description": "An allowed profile name from browser_profiles."
+          "description": "An allowed profile name from chrome_profiles."
         }
       },
       "required": [
@@ -405,7 +405,7 @@
     }
   },
   {
-    "name": "browser_request_profile",
+    "name": "chrome_request_profile",
     "description": "Ask the person for another browser profile. Waits up to 55 seconds; when waiting, call again with the same reason. No access is granted until the person answers.",
     "inputSchema": {
       "type": "object",
@@ -422,8 +422,8 @@
     }
   },
   {
-    "name": "browser_fill_secret",
-    "description": "Fill a visible writable input from the safe without returning its value. The field origin and chat project must be allowed. JavaScript must never have been evaluated in this tab or its opener-connected tabs; otherwise use browser_open for a fresh tab. While sealed, evaluate, console, network and screenshots refuse across all tabs of this chat. A new main/field document or removal of the field releases the seal after history is reset; clearing the value does not.",
+    "name": "chrome_fill_secret",
+    "description": "Fill a visible writable input from the safe without returning its value. The field origin and chat project must be allowed. JavaScript must never have been evaluated in this tab or its opener-connected tabs; otherwise use chrome_open for a fresh tab. While sealed, evaluate, console, network and screenshots refuse across all tabs of this chat. A new main/field document or removal of the field releases the seal after history is reset; clearing the value does not.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -445,7 +445,7 @@
     }
   },
   {
-    "name": "browser_request_secret",
+    "name": "chrome_request_secret",
     "description": "Ask the person to store or authorize a secret for a site. Never ask for its value in chat. Waits up to 55 seconds; repeat while waiting.",
     "inputSchema": {
       "type": "object",
@@ -469,7 +469,7 @@
     }
   },
   {
-    "name": "browser_request_login",
+    "name": "chrome_request_login",
     "description": "Ask the person to sign in. Opens a person-controlled tab; waits up to 55 seconds. Repeat the request while waiting.",
     "inputSchema": {
       "type": "object",

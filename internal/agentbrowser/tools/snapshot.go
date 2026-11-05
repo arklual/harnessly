@@ -156,7 +156,7 @@ func (t Tools) snapshot(ctx context.Context, i *agentbrowser.Instance, st *tabSt
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if len(st.snapshot) == 0 || st.interactive != a.InteractiveOnly || a.Offset >= len(st.snapshot) {
-		return "", errors.New("Snapshot offset is unavailable; refresh with browser_snapshot offset 0")
+		return "", errors.New("Snapshot offset is unavailable; refresh with chrome_snapshot offset 0")
 	}
 	var out strings.Builder
 	end := a.Offset
@@ -190,7 +190,7 @@ func (t Tools) snapshot(ctx context.Context, i *agentbrowser.Instance, st *tabSt
 		end++
 	}
 	if end < len(st.snapshot) {
-		fmt.Fprintf(&out, "\nnext_offset: %d\nContinue with browser_snapshot {\"tab\":%s,\"offset\":%d,\"interactive_only\":%t}. IDs from earlier parts remain valid.\n",
+		fmt.Fprintf(&out, "\nnext_offset: %d\nContinue with chrome_snapshot {\"tab\":%s,\"offset\":%d,\"interactive_only\":%t}. IDs from earlier parts remain valid.\n",
 			end, jsonText(a.Tab), end, a.InteractiveOnly)
 	} else {
 		out.WriteString("\nnext_offset: null (end of snapshot)\n")
@@ -301,7 +301,7 @@ func (t Tools) buildSnapshot(ctx context.Context, i *agentbrowser.Instance, st *
 	defer st.mu.Unlock()
 	for frame, version := range versions {
 		if st.epochs[frame] != version {
-			return errors.New("Page changed during snapshot; refresh with browser_snapshot")
+			return errors.New("Page changed during snapshot; refresh with chrome_snapshot")
 		}
 	}
 	st.snapshot, st.interactive = lines, a.InteractiveOnly

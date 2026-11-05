@@ -150,7 +150,7 @@ func (i *Instance) personDocument(ctx context.Context, id string) (string, error
 
 // ErrPersonDocument keeps agent JavaScript away from a document containing human input.
 var ErrPersonDocument = errors.New("The person typed on this page; JavaScript is unavailable here until the tab loads " +
-	"a new document (navigating to the same address works). Use browser_snapshot.")
+	"a new document (navigating to the same address works). Use chrome_snapshot.")
 
 // CheckPersonDocuments checks the live opener component before marking or executing
 // agent JavaScript. Other tools and independent tabs do not use this guard.

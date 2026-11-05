@@ -110,7 +110,7 @@ subdomain, another port or another scheme does not inherit permission. Use
 
 Remaining limitations:
 
-- GET forms put values in the current URL and Chrome history. A manually submitted value can reach browser_tabs
+- GET forms put values in the current URL and Chrome history. A manually submitted value can reach chrome_tabs
   before any scan collected it for masking; resetting navigation history does not scrub that URL or the history database.
 - The allowed site receives the value and can store or send it. Its DOM copies may remain visible in snapshots or
   other permitted output, including arbitrary transformations that byte masking cannot recognize.
@@ -122,7 +122,7 @@ Remaining limitations:
 - Before the wall, shell access and the same Unix account can bypass tool guards: secret run can retrieve a
   project-authorized entry; the safe key, browser files and private CDP remain accessible to that account.
 
-Use `browser_fill_secret {id, secret}` for an existing entry, or `browser_request_secret {name, origin, why}` to open
+Use `chrome_fill_secret {id, secret}` for an existing entry, or `chrome_request_secret {name, origin, why}` to open
 the same safe card without a shell. Entries without allowed origins cannot be filled. The runtime checks the field's
 `securityOrigin` from `Page.getFrameTree`, not JavaScript and not the top-level URL. Consequently, an allowed iframe
 embedded on a different site is permitted deliberately; a foreign iframe on an allowed site is refused.
@@ -136,7 +136,7 @@ focus in an embedding document cannot redirect this document's insertion. Contro
 input events. The safe records the chat and field origin in `UsedBy`. TOTP is calculated locally using RFC 6238.
 
 An agent evaluation permanently marks the tab and its live opener-connected component `Scripted`. Such tabs cannot
-receive safe input; the panel always warns the person, even while the agent holds control. `browser_open` creates an
+receive safe input; the panel always warns the person, even while the agent holds control. `chrome_open` creates an
 independent browsing context group. Popups inherit their opener's chat, control and scripted state, including late discovery.
 An evaluation is refused while any live opener-connected tab is person-controlled, even if the target popup still
 belongs to the agent. Independent tabs remain usable. This prevents a new sibling evaluation from reading a personal
@@ -186,7 +186,7 @@ before returning control and settling login completion. These untracked seals re
 Mask values stay only in memory. Registry URL/title restoration is disabled for secret-touched tabs so page metadata
 does not persist secret bytes in `tabs.json`. Cookies remain in the browser profile, never in the safe.
 
-For CAPTCHA, 2FA and account-provider sign-in, `browser_request_login {url, why}` opens a person-controlled tab and a
+For CAPTCHA, 2FA and account-provider sign-in, `chrome_request_login {url, why}` opens a person-controlled tab and a
 login card. The browser panel offers Done and Cancel. The call waits up to 55 seconds, then returns `waiting`; repeat it
 to continue the same request. Returning control also means Done; closing the tab cancels. Other tabs remain usable.
 The response contains only status and current URL. Login cookies are shared by chats authorized for that browser profile.

@@ -231,7 +231,7 @@ func (i *Instance) loginURL(id string) string {
 	return "about:blank"
 }
 
-// AllowedURL is shared by browser_open and login requests, including localhost.
+// AllowedURL is shared by chrome_open and login requests, including localhost.
 func AllowedURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err == nil && ((u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.User == nil || raw == "about:blank") {

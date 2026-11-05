@@ -22,7 +22,7 @@ type sealedField struct {
 }
 
 var errSealed = errors.New("Tab is sealed: a secret was entered; submit the form or navigate to another page")
-var errSecretUnavailable = errors.New("Secret is unavailable to this chat; use browser_request_secret or harnessly secret ask NAME --origin SITE")
+var errSecretUnavailable = errors.New("Secret is unavailable to this chat; use chrome_request_secret or harnessly secret ask NAME --origin SITE")
 
 func (t Tools) requestSecret(ctx context.Context, args *jsvalue.Object) *jsvalue.Object {
 	for _, key := range args.Keys() {
@@ -138,7 +138,7 @@ func (t Tools) checkSeals(ctx context.Context, i *agentbrowser.Instance, target,
 	if target == "" {
 		target = i.Current(t.Caller)
 	}
-	blocked := tool == "browser_evaluate" || tool == "browser_console" || tool == "browser_network" || tool == "browser_screenshot"
+	blocked := tool == "chrome_evaluate" || tool == "chrome_console" || tool == "chrome_network" || tool == "chrome_screenshot"
 	for _, tab := range i.Tabs(t.Caller) {
 		if !tab.Sealed {
 			continue
@@ -155,7 +155,7 @@ func (t Tools) checkSeals(ctx context.Context, i *agentbrowser.Instance, target,
 			unknown = tab.SecretUntracked || len(st.sealed) == 0
 			st.mu.Unlock()
 		}
-		if blocked || tab.ID == target && unknown && (tool == "browser_snapshot" || tool == "browser_wait_for") {
+		if blocked || tab.ID == target && unknown && (tool == "chrome_snapshot" || tool == "chrome_wait_for") {
 			return fmt.Errorf("%w (%s): submit the form, navigate to another page, or close that tab", errSealed, tab.ID)
 		}
 	}
@@ -335,7 +335,7 @@ const atomicSecretInput = `function(value, origin){
 func (t Tools) fillSecret(ctx context.Context, i *agentbrowser.Instance, st *tabState, a arguments) (string, error) {
 	for _, tab := range i.Tabs(t.Caller) {
 		if tab.ID == a.Tab && tab.Scripted {
-			return "", errors.New("JavaScript was executed in this tab; open the site in a new tab with browser_open and fill the secret there")
+			return "", errors.New("JavaScript was executed in this tab; open the site in a new tab with chrome_open and fill the secret there")
 		}
 	}
 	if t.S.Secrets == nil || t.S.Identity == nil {
@@ -350,7 +350,7 @@ func (t Tools) fillSecret(ctx context.Context, i *agentbrowser.Instance, st *tab
 		return "", errSecretUnavailable
 	}
 	if len(view.Origins) == 0 {
-		return "", errors.New("Secret has no allowed sites; use harnessly secret ask NAME --origin SITE or browser_request_secret")
+		return "", errors.New("Secret has no allowed sites; use harnessly secret ask NAME --origin SITE or chrome_request_secret")
 	}
 	st.mu.Lock()
 	ref, ok := st.refs[a.ID]

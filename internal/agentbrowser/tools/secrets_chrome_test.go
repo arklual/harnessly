@@ -274,8 +274,8 @@ func TestChromeFillSecret(t *testing.T) {
 			navigate("/login")
 			id := c.node("Credential")
 			c.refuses("fill_secret", map[string]any{"id": id, "secret": "unbound"}, "no allowed sites")
-			absent := c.rpc("tools/call", map[string]any{"name": "browser_fill_secret", "arguments": map[string]any{"id": id, "secret": "missing"}})
-			foreign := c.rpc("tools/call", map[string]any{"name": "browser_fill_secret", "arguments": map[string]any{"id": id, "secret": "foreign"}})
+			absent := c.rpc("tools/call", map[string]any{"name": "chrome_fill_secret", "arguments": map[string]any{"id": id, "secret": "missing"}})
+			foreign := c.rpc("tools/call", map[string]any{"name": "chrome_fill_secret", "arguments": map[string]any{"id": id, "secret": "foreign"}})
 			if jsonText(absent) != jsonText(foreign) {
 				t.Fatal("foreign entry existence disclosed")
 			}

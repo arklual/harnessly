@@ -33,32 +33,32 @@ func TestMCPProfilesNeverEnumerateOtherProjects(t *testing.T) {
 		}
 		return string(raw)
 	}
-	list := call("browser_profiles", jsvalue.NewObject())
+	list := call("chrome_profiles", jsvalue.NewObject())
 	if !strings.Contains(list, "Private b") || strings.Contains(list, "usedBy") {
 		t.Fatal(list)
 	}
-	denied := call("browser_use_profile", jsvalue.NewObject("name", private.Name))
-	missing := call("browser_use_profile", jsvalue.NewObject("name", "missing"))
+	denied := call("chrome_use_profile", jsvalue.NewObject("name", private.Name))
+	missing := call("chrome_use_profile", jsvalue.NewObject("name", "missing"))
 	if denied != missing || !strings.Contains(denied, "unavailable to this chat") {
 		t.Fatal(denied, missing)
 	}
-	pending := call("browser_request_profile", jsvalue.NewObject("why", "Use another account"))
+	pending := call("chrome_request_profile", jsvalue.NewObject("why", "Use another account"))
 	if !strings.Contains(pending, "waiting") || len(a.Asks.Pending()) != 1 {
 		t.Fatal(pending)
 	}
-	pendingAgain := call("browser_request_profile", jsvalue.NewObject("why", "Use another account"))
+	pendingAgain := call("chrome_request_profile", jsvalue.NewObject("why", "Use another account"))
 	if !strings.Contains(pendingAgain, "waiting") || len(a.Asks.Pending()) != 1 {
 		t.Fatal(pendingAgain)
 	}
 	must(t, a.Answer(context.Background(), a.Asks.Pending()[0].ID, "", "decline", "", ""))
-	if got := call("browser_request_profile", jsvalue.NewObject("why", "Use another account")); !strings.Contains(got, "declined") {
+	if got := call("chrome_request_profile", jsvalue.NewObject("why", "Use another account")); !strings.Contains(got, "declined") {
 		t.Fatal(got)
 	}
 	// Agent arguments cannot choose the caller/project or submit an approval.
 	for _, args := range []*jsvalue.Object{
 		jsvalue.NewObject("project", "a"), jsvalue.NewObject("conv", "a"), jsvalue.NewObject("scope", "project"),
 	} {
-		if got := call("browser_profiles", args); !strings.Contains(got, "isError") {
+		if got := call("chrome_profiles", args); !strings.Contains(got, "isError") {
 			t.Fatal(got)
 		}
 	}
