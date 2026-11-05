@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -64,7 +65,7 @@ func (s *Stream) Write(ctx context.Context, b []byte) error {
 	// A cancelled partial write cannot be resumed by another command.
 	stop := context.AfterFunc(ctx, func() { _ = s.Close() })
 	defer stop()
-	b = append(append(make([]byte, 0, len(b)+1), b...), 0)
+	b = slices.Concat(b, []byte{0})
 	for len(b) > 0 {
 		n, err := s.rw.Write(b)
 		if err != nil {

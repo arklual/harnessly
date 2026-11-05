@@ -108,10 +108,8 @@ func importPath(path string) error {
 	if strings.TrimSpace(path) == "" {
 		return errors.New("Chrome import path is required")
 	}
-	for _, part := range strings.Split(filepath.ToSlash(path), "/") {
-		if part == ".." {
-			return errors.New("Chrome import refuses parent traversal")
-		}
+	if strings.Contains(path, "..") {
+		return errors.New("Chrome import refuses parent traversal")
 	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
