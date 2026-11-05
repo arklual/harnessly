@@ -24,6 +24,7 @@
 <p align="center">
   <a href="#features">Features</a> ·
   <a href="#quick-start">Quick start</a> ·
+  <a href="#apps-and-plugins">Apps</a> ·
   <a href="#self-hosted-hub">Hub</a> ·
   <a href="#releases-and-verification">Releases</a> ·
   <a href="docs/comparison.md">Compared</a> ·
@@ -87,6 +88,52 @@ harnessly design engine status      # what the machine has: engine, browser, ffm
 ```
 
 Details: [docs/design-engine.md](docs/design-engine.md), [docs/design-pages.md](docs/design-pages.md).
+
+### Apps and plugins
+
+Extend harnessly without forking it. An app is a Claude Code plugin plus one manifest (`harnessly/app.json`): you write
+it once and turn it on where you work, in a chat, a tab of the pane, a full screen of its own or a Sinopia document.
+A plugin is an app without views.
+
+- **Plugins** change how the agent works where they are on: instructions, skills, slash commands, MCP servers. No code
+  runs.
+- **Views** are static pages of your package: a tab of the pane, a card in the chat, the app's own screen, a panel or a
+  check in a Sinopia document. They talk to the host through a small SDK (`chat.read`, `pane.open`, `storage`,
+  `sinopia.*`, ...).
+- **Backend** is yours, not the host's: a remote MCP server, or, for a trusted app, a local program.
+- **Safe by default.** Every call needs a permission named in the manifest, every view runs in a sandboxed frame on an
+  origin of its own, and an app declares its trust tier: `declarative`, `sandboxed` or `trusted`.
+- **Sharing.** Versions and channels (dev, beta, stable), the team's and the public catalog, links, and evals that
+  gate an app's way to stable.
+
+```sh
+harnessly app new acme.cashback --template pane-chat   # start from a template
+harnessly app dev ./cashback                            # install the folder itself while you write it
+harnessly app validate ./cashback --strict              # every problem names its field
+harnessly app publish ./cashback --channel beta         # a beta channel; evals gate the way to stable
+harnessly app docs                                      # the whole guide, built into the binary
+```
+
+Start with [the guide](docs/build-apps/README.md) ([in Russian](docs/ru/build-apps/README.md)): eight chapters from an
+empty folder to a published app. Look up a field, an SDK call or a limit in [the reference](docs/apps.md). Five
+complete examples in [docs/apps](docs/apps):
+
+| Example | What it shows |
+| --- | --- |
+| [mr-review](docs/apps/mr-review) | a plugin only: reviews a merge request in the chat, reads the diff, edits and pushes nothing |
+| [cashback](docs/apps/cashback) | a view in the pane and a card on a Sinopia site: the person picks, the agent sees the choice |
+| [standup](docs/apps/standup) | the [worked example](docs/build-apps/08-worked-example.md): the agent collects updates, a view edits them, a local program keeps them |
+| [deck-lint](docs/apps/deck-lint) | a check in Sinopia presentations: marks slides with too much text and blocks sharing until they are fixed |
+| [moodboard](docs/apps/moodboard) | a new Sinopia document type built entirely from the app SDK, with a schema and its migration |
+
+### The safe and connections
+
+- [The safe](docs/safe.md) keeps tokens, passwords and keys for the agents. A secret never travels through the chat:
+  the agent asks by name, the person puts it in, and the agent runs a command with it, the output masked.
+- [Connections](docs/connections.md): Jira, Confluence, YouTrack, Linear, GitLab, GitHub and wikis, connected once by a
+  pasted link. Agents read them with `harnessly issues` and `harnessly pages`.
+- [MCP servers](docs/mcp-connections.md) connected in Settings reach every Claude Code and Codex chat; the runtime
+  keeps the credentials and signs the requests.
 
 ### Voice input
 
@@ -244,6 +291,12 @@ gh attestation verify oci://ghcr.io/ly-solutions/harnessly:latest --repo ly-solu
 | [Getting started](docs/getting-started.md) | build, run standalone, open tabs, run agents, connect the machine agent |
 | [Deploy](docs/deploy.md) | quick start, verification, updating, systemd, Docker, compose, Helm, Argo CD |
 | [Configuration](docs/configuration.md) | every `RUNTIME_*` and `AGENT_*` variable |
+| [Build apps and plugins](docs/build-apps/README.md) | the guide: from an empty folder to a published app, views and backend, with diagrams and examples ([in Russian](docs/ru/build-apps/README.md)) |
+| [Apps reference](docs/apps.md) | every manifest field, SDK call, limit and security layer of apps |
+| [Example apps](docs/apps) | mr-review, cashback, standup, deck-lint, moodboard: complete packages to copy from |
+| [The safe](docs/safe.md) | secrets for the agents without the chat: storage, the ask flow, the threat model |
+| [Connections](docs/connections.md) | trackers, wikis and code hosts by a pasted link; the agents' `harnessly issues` |
+| [MCP servers](docs/mcp-connections.md) | remote MCP servers from Settings: OAuth sign-in, the proxy, how the agents get them |
 | [Voice input](docs/voice.md) | the microphone, the built-in recognition, how to change or turn it off |
 | [Board engine](docs/design-engine.md) | the built-in engine, the optional vendor engine, moving upstream changes over |
 | [Design pages](docs/design-pages.md) | the page model of a design project and the page commands |
