@@ -269,9 +269,9 @@ cat "$UNIT_DIR/harnessly.service"`, map[string]string{"systemctl": "exit 0", "lo
 
 func TestRootInstallerLibraryDetection(t *testing.T) {
 	for _, missing := range []bool{false, true} {
-		cache := `for lib in libnss3 libnspr4 libatk-1.0 libatk-bridge-2.0 libcups libdrm libxkbcommon \
+		cache := `for lib in libnss3 libnspr4 libatk-1.0 libatk-bridge-2.0 libatspi libcups libdrm libxkbcommon \
  libX11 libXcomposite libXdamage libXext libXfixes libXrandr libgbm libasound libpango-1.0 libcairo \
- libdbus-1 libxcb libexpat libglib-2.0 libgio-2.0 libgobject-2.0; do echo "$lib.so.1"; done`
+ libdbus-1 libxcb libexpat libglib-2.0 libgio-2.0 libgobject-2.0 libudev; do echo "$lib.so.1"; done`
 		if missing {
 			cache = "echo libnss3.so"
 		}
