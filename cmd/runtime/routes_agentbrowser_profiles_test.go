@@ -143,3 +143,45 @@ func TestAgentBrowserSandboxFallbackRequiresUnavailableSandbox(t *testing.T) {
 	}
 	t.Log("sandbox bypass permission checked against the real renderer probe")
 }
+
+func TestAgentBrowserProfilesKeepProjectAccessUntilTheCatalogIsLoaded(t *testing.T) {
+	dir := t.TempDir()
+	a := agentbrowser.NewProfileAccess(agentbrowser.OpenProfiles(dir, ""), func(string) (agentbrowser.ConversationIdentity, bool) {
+		return agentbrowser.ConversationIdentity{}, false
+	})
+	m := agentbrowser.New(agentbrowser.Config{DataDir: dir, LookupProfile: a.Store.Lookup, ProfileOf: a.ProfileOf})
+	a.Manager = m
+	defer m.Close()
+	profile, err := a.Store.Create("Work", "#123456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, project := range []string{"kept", "removed"} {
+		if err := a.Store.SetProject(project, agentbrowser.ProjectAccess{Default: profile.ID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	known := map[string]bool{}
+	d := deps{DataDir: dir, SessionOK: func(*http.Request) bool { return true }}
+	handler := agentBrowserProfileRoutes(d, a, func(id string) bool { return known[id] })[0].Handler
+	read := func() map[string]agentbrowser.ProjectAccess {
+		t.Helper()
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest("GET", "http://example.org/api/agent-browser/profiles", nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("%d %s", w.Code, w.Body.String())
+		}
+		_, projects := a.Store.Snapshot()
+		return projects
+	}
+	// An open page asks while the runtime is still reading its projects: nobody lost access.
+	if got := read(); len(got) != 2 {
+		t.Fatalf("access lost before the catalog loaded: %v", got)
+	}
+	// Once the catalog answers, a project it no longer has goes.
+	known["kept"] = true
+	got := read()
+	if _, ok := got["kept"]; !ok || len(got) != 1 {
+		t.Fatalf("after the catalog loaded: %v", got)
+	}
+}

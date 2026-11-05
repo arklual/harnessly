@@ -101,9 +101,13 @@ func browserProfilesRead(w http.ResponseWriter, r *http.Request, d deps, a *agen
 			live[id] = true
 		}
 	}
-	if err := a.ReconcileProjects(live); err != nil {
-		secretJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
+	// A catalog that knows none of them is not an answer: the runtime is still reading it, which takes a while on a busy
+	// machine while an open page keeps asking, or could not read it. Reconciling then would drop every project's access.
+	if len(live) > 0 {
+		if err := a.ReconcileProjects(live); err != nil {
+			secretJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
 	}
 	profiles, projects := a.Store.Snapshot()
 	views := make([]browserProfileView, 0, len(profiles))
