@@ -185,6 +185,9 @@ jobs:
     name: fresh browser install (${{ matrix.image }})
     runs-on: ubuntu-latest
     container: ${{ matrix.image }}
+    env:
+      # The checkout belongs to another user than the container's root, so git refuses to answer for VCS stamping.
+      GOFLAGS: -buildvcs=false
     strategy:
       fail-fast: false
       matrix:
