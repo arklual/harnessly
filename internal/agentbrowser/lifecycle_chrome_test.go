@@ -291,6 +291,41 @@ func TestChromeIdleRespectsViewersAndCalls(t *testing.T) {
 	}
 }
 
+// This pins that a renderer's crash reaches the tab's state. It runs without Chrome's sandbox: on a kernel that restricts
+// user namespaces, as the GitHub runners do, a sandboxed renderer never answers Page.crash and no crash is reported.
+func TestChromeCrashedTabState(t *testing.T) {
+	m, _ := lifecycleChrome(t, "headless")
+	m.cfg.NoSandbox = func() bool { return true }
+	ctx, cancel := context.WithTimeout(t.Context(), 120*time.Second)
+	defer cancel()
+	i, err := m.Instance(ctx, DefaultProfile)
+	must(t, err)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, "<body>crash fixture</body>")
+	}))
+	defer server.Close()
+	crash, err := i.NewTab(ctx, "chat-a", "agent", server.URL)
+	must(t, err)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		callCtx, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		_, _ = i.Call(callCtx, crash.ID, "Page.crash", nil)
+	}()
+	eventually(t, 15*time.Second, func() bool {
+		for _, tab := range i.Tabs("") {
+			if tab.ID == crash.ID {
+				return tab.Crashed
+			}
+		}
+		return false
+	})
+	<-done
+	must(t, i.CloseTab(ctx, crash.ID))
+}
+
 func TestChromeSandboxPreferenceLaunchAndProbe(t *testing.T) {
 	for _, mode := range []string{"headless", "xvfb"} {
 		t.Run(mode, func(t *testing.T) {

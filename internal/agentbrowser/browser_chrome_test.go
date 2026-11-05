@@ -256,28 +256,6 @@ setInterval(()=>{document.body.style.background=n++%2?'red':'blue'},80);
 				a, e = i.NewTab(ctx, "chat-a", "agent", server.URL)
 				must(t, e)
 			})
-			t.Run("crashed_tab_state", func(t *testing.T) {
-				crash, err := i.NewTab(ctx, "chat-a", "agent", server.URL)
-				must(t, err)
-				done := make(chan struct{})
-				go func() {
-					defer close(done)
-					callCtx, cancel := context.WithTimeout(ctx, time.Second)
-					defer cancel()
-					_, _ = i.Call(callCtx, crash.ID, "Page.crash", nil)
-				}()
-				eventually(t, 5*time.Second, func() bool {
-					for _, tab := range i.Tabs("") {
-						if tab.ID == crash.ID {
-							return tab.Crashed
-						}
-					}
-					return false
-				})
-				<-done
-				must(t, i.CloseTab(ctx, crash.ID))
-			})
-
 			t.Run("hard_kill_recovers_persistent_cookie", func(t *testing.T) {
 				evaluate(t, i, a.ID, `document.cookie="persistent=kept; Max-Age=3600; Path=/"`)
 				// Chrome batches cookie writes. SIGKILL cannot preserve data it has not flushed.

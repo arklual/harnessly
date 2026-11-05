@@ -43,6 +43,19 @@ func must(t *testing.T, err error) {
 	}
 }
 
+// chromeModes are the display modes the slow tool tests run in. The tools do not depend on the display and the
+// lifecycle tests cover both, so one is enough: what a machine picks by itself, Xvfb when it has it. Set
+// AGENT_BROWSER_TEST_ALL_MODES to run both after a change that could tell them apart.
+func chromeModes() []string {
+	if os.Getenv("AGENT_BROWSER_TEST_ALL_MODES") != "" {
+		return []string{"headless", "xvfb"}
+	}
+	if _, err := exec.LookPath("Xvfb"); err == nil {
+		return []string{"xvfb"}
+	}
+	return []string{"headless"}
+}
+
 type mcpClient struct {
 	t                   *testing.T
 	url, chat, password string
@@ -154,7 +167,7 @@ func TestChromeMCP(t *testing.T) {
 	}
 	chrome, err := agentbrowser.FindChrome()
 	must(t, err)
-	for _, mode := range []string{"headless", "xvfb"} {
+	for _, mode := range chromeModes() {
 		t.Run(mode, func(t *testing.T) {
 			if mode == "xvfb" {
 				_, err = exec.LookPath("Xvfb")

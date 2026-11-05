@@ -27,7 +27,7 @@ import (
 func TestChromeFillSecret(t *testing.T) {
 	chrome, err := agentbrowser.FindChrome()
 	must(t, err)
-	for _, mode := range []string{"headless", "xvfb"} {
+	for _, mode := range chromeModes() {
 		t.Run(mode, func(t *testing.T) {
 			data := t.TempDir()
 			exe, err := os.Executable()

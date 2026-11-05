@@ -30,7 +30,7 @@ import (
 func TestChromeSecretAdversary(t *testing.T) {
 	chrome, err := agentbrowser.FindChrome()
 	must(t, err)
-	for _, mode := range []string{"headless", "xvfb"} {
+	for _, mode := range chromeModes() {
 		t.Run(mode, func(t *testing.T) {
 			data := t.TempDir()
 			exe, err := os.Executable()
@@ -732,7 +732,7 @@ input.addEventListener('input',()=>{window.savedBySite=input.value;input.value='
 				}
 			}
 
-			if mode == "headless" {
+			if mode == chromeModes()[0] {
 				run("profile-persistence", func(a *secretAttack) {
 					a.open("/login?type=text")
 					a.fill()
