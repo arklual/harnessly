@@ -4,9 +4,10 @@
 package agentdetect
 
 import (
-	"path/filepath"
+	"os"
 	"time"
 
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
 	"github.com/ly-solutions/harnessly/internal/agents/codex"
@@ -88,11 +89,11 @@ func (d *Detector) procs() procfs.Procs {
 // claudeDetector reads like the previous runtime's check: "claude" anywhere in a command line, pid files left alone
 // (the answer is read-only), and nothing asked about the installation.
 func (d *Detector) claudeDetector() *claude.Detector {
-	return &claude.Detector{Dir: filepath.Join(d.Home, ".claude"), Procs: d.procs(), Match: agents.MatchSubstring}
+	return &claude.Detector{Dir: agentcfg.ClaudeDirIn(os.Getenv, d.Home), Procs: d.procs(), Match: agents.MatchSubstring}
 }
 
 func (d *Detector) codexDetector() *codex.Detector {
-	return &codex.Detector{Dir: filepath.Join(d.Home, ".codex"), Procs: d.procs(), Match: agents.MatchSubstring, Now: d.Now}
+	return &codex.Detector{Dir: agentcfg.CodexDirIn(os.Getenv, d.Home), Procs: d.procs(), Match: agents.MatchSubstring, Now: d.Now}
 }
 
 func (d *Detector) answer(at int64, info agents.SessionInfo, p *Provider) Answer {

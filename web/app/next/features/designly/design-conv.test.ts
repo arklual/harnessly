@@ -2,29 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   DESIGN_CONV,
   designChats,
-  inFolder,
   pickDesignConv,
-  SEEN_MAX,
-  withSeen,
   type IDesignConvRow,
 } from '@/next/features/designly/design-conv';
 
-const DIR = '/lib/abc';
-const row = (id: string, lastActivityAt: number, cwd = DIR): IDesignConvRow => ({ id, cwd, lastActivityAt });
+const row = (id: string, lastActivityAt: number): IDesignConvRow => ({ id, lastActivityAt });
 const conv = (id: string) => ({ k: DESIGN_CONV.conv, id });
 const NONE = { k: DESIGN_CONV.none };
 
-describe('inFolder', () => {
-  it('takes the folder and what is under it, not a sibling with the same start', () => {
-    expect(inFolder('/lib/abc', DIR)).toBe(true);
-    expect(inFolder('/lib/abc/', DIR)).toBe(true);
-    expect(inFolder('/lib/abc/pages', DIR)).toBe(true);
-    expect(inFolder('/lib/abc2', DIR)).toBe(false);
-  });
-});
-
 describe('pickDesignConv', () => {
-  const list = [row('tab-last', 10), row('tab-from', 20, '/elsewhere'), row('tab-busy', 99)];
+  const list = [row('tab-last', 10), row('tab-from', 20), row('tab-busy', 99)];
 
   it('shows the chat the person came from, over the last one', () => {
     const bound = { id: 'tab-last', fresh: false };
@@ -60,57 +47,51 @@ describe('pickDesignConv', () => {
 });
 
 describe('designChats', () => {
-  it("lists the folder's chats and the ones the design was opened from, the latest first", () => {
+  const RUNNER = 'runner-2';
+  const ROMA = 'dev-department';
+  const on = (machineId: string, id: string, lastActivityAt: number) => ({
+    ...row(id, lastActivityAt),
+    machineId,
+  });
+
+  it("gathers the design's chats of both machines, the latest first", () => {
     const list = [
-      row('tab-a', 10),
-      row('tab-other', 30, '/elsewhere'),
-      row('tab-from', 50, '/x'),
-      row('tab-b', 20),
+      on(RUNNER, 'tab-r1', 10),
+      on(ROMA, 'tab-d1', 40),
+      on(RUNNER, 'tab-r2', 30),
+      on(ROMA, 'tab-d2', 5),
+      on(ROMA, 'tab-other', 90),
     ];
-    const ids = designChats({ list, dir: DIR, seen: ['tab-from'], touched: [], current: null }).map(
+    const found = [
+      { machine: RUNNER, convs: ['tab-r1', 'tab-r2'] },
+      { machine: ROMA, convs: ['tab-d1', 'tab-d2', 'tab-gone'] },
+    ];
+    const ids = designChats({ list, found, fresh: null }).map((c) => `${c.machineId}:${c.id}`);
+    expect(ids).toEqual([`${ROMA}:tab-d1`, `${RUNNER}:tab-r2`, `${RUNNER}:tab-r1`, `${ROMA}:tab-d2`]);
+  });
+
+  it('takes a chat only from the machine that named it', () => {
+    // The same id on another machine is another chat.
+    const list = [on(RUNNER, 'tab-a', 10), on(ROMA, 'tab-a', 20)];
+    const ids = designChats({ list, found: [{ machine: ROMA, convs: ['tab-a'] }], fresh: null }).map(
+      (c) => c.machineId,
+    );
+    expect(ids).toEqual([ROMA]);
+  });
+
+  it('lists no chat the machines did not name: not the one the design was opened from, not one of its folder', () => {
+    // «Макет дизайн-системы Harnessly» opened the design to borrow from it; «Безопасность коротких URL» stood
+    // in its folder. Neither started from the design or edited it, so the machine names neither.
+    const list = [on(ROMA, 'tab-Ox54W1', 50), on(ROMA, 'tab-7dcegrokh', 60), on(ROMA, 'tab-design', 10)];
+    const ids = designChats({ list, found: [{ machine: ROMA, convs: ['tab-design'] }], fresh: null }).map(
       (c) => c.id,
     );
-    expect(ids).toEqual(['tab-from', 'tab-b', 'tab-a']);
+    expect(ids).toEqual(['tab-design']);
   });
 
-  it('lists after them the chats of other folders that worked on the design, the latest first, each once', () => {
-    const list = [
-      row('tab-old', 5, '/home/x'),
-      row('tab-folder', 10),
-      row('tab-new', 40, '/home/y'),
-      row('tab-never', 90, '/home/z'),
-      row('tab-from', 1, '/home/w'),
-    ];
-    const ids = designChats({
-      list,
-      dir: DIR,
-      seen: ['tab-from'],
-      touched: ['tab-old', 'tab-new', 'tab-from', 'tab-gone'],
-      current: null,
-    }).map((c) => c.id);
-    expect(ids).toEqual(['tab-folder', 'tab-from', 'tab-new', 'tab-old']);
-  });
-
-  it('lists a chat that worked on the design before it was opened anywhere', () => {
-    const list = [row('tab-hackathon', 30, '/home/coder/workspace/acme')];
-    const ids = designChats({ list, dir: DIR, seen: [], touched: ['tab-hackathon'], current: null }).map(
-      (c) => c.id,
-    );
-    expect(ids).toEqual(['tab-hackathon']);
-  });
-
-  it('keeps the current chat in the list wherever it works', () => {
-    const list = [row('tab-x', 5, '/x')];
-    expect(
-      designChats({ list, dir: null, seen: [], touched: [], current: 'tab-x' }).map((c) => c.id),
-    ).toEqual(['tab-x']);
-  });
-});
-
-describe('withSeen', () => {
-  it('puts the chat first once and keeps a bounded history', () => {
-    expect(withSeen(['a', 'b', 'c'], 'b')).toEqual(['b', 'a', 'c']);
-    const many = Array.from({ length: SEEN_MAX }, (_, i) => `c${i}`);
-    expect(withSeen(many, 'new')).toHaveLength(SEEN_MAX);
+  it('keeps a chat just started from the column before the machine names it', () => {
+    const list = [on(RUNNER, 'tab-new', 5)];
+    expect(designChats({ list, found: [], fresh: 'tab-new' }).map((c) => c.id)).toEqual(['tab-new']);
+    expect(designChats({ list: null, found: [], fresh: 'tab-new' })).toEqual([]);
   });
 });

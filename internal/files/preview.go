@@ -62,6 +62,8 @@ type Access struct {
 	VersionsDir string
 	Roots       []string
 	secret      *regexp.Regexp
+	// partial: the leading folders of the secret paths of more than one part (".config" of ".config/acme").
+	partial []string
 }
 
 // NewAccess builds the rules. roots are the folders files may be in (made absolute and clean); configDirs are more
@@ -78,6 +80,10 @@ func NewAccess(roots, configDirs []string) *Access {
 	for _, d := range configDirs {
 		if d = strings.Trim(d, "/"); d != "" {
 			alts = append(alts, regexp.QuoteMeta(d))
+			parts := strings.Split(strings.ToLower(d), "/")
+			for k := 1; k < len(parts); k++ {
+				a.partial = append(a.partial, strings.Join(parts[:k], "/"))
+			}
 		}
 	}
 	alts = append(alts, `\.credentials\.json`, `\.netrc`, `id_[a-z0-9]+`, `.*\.pem`, `.*\.key`)
@@ -96,6 +102,18 @@ func resolveAbs(p string) string {
 
 // Secret: the path looks like it holds credentials.
 func (a *Access) Secret(p string) bool { return a.secret.MatchString(p) }
+
+// HoldsSecret: a new name or a move of the folder p would take a secret folder of several parts out of the rule
+// (p is ".config" of ".config/acme"). Such a folder keeps its name and its place.
+func (a *Access) HoldsSecret(p string) bool {
+	low := "/" + strings.Trim(strings.ToLower(p), "/")
+	for _, head := range a.partial {
+		if strings.HasSuffix(low, "/"+head) {
+			return true
+		}
+	}
+	return false
+}
 
 func (a *Access) allowed(real string) bool {
 	for _, root := range a.Roots {

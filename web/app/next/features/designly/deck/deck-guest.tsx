@@ -48,6 +48,8 @@ export interface IDeckGuestProps {
   /** The published PDF's address, only where the owner allowed it; null otherwise. */
   pdf: string | null;
   start: TDeckOpens;
+  /** The slide shown first (0-based): the link's «С какого слайда». */
+  startSlide?: number;
   /** Null for a link that only shows. */
   comments: IDeckGuestComments | null;
   /** The owner looking as a guest: «Назад» is there (a guest has no way back). */
@@ -82,12 +84,22 @@ interface IDraft {
   text: string;
 }
 
-const DeckGuest = ({ title, slides, video, pdf, start, comments, onBack, onShown }: IDeckGuestProps) => {
+const DeckGuest = ({
+  title,
+  slides,
+  video,
+  pdf,
+  start,
+  startSlide = 0,
+  comments,
+  onBack,
+  onShown,
+}: IDeckGuestProps) => {
   const touch = useTouch();
   const root = useRef<HTMLDivElement>(null);
   const slot = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => Math.min(Math.max(startSlide, 0), Math.max(slides.length - 1, 0)));
   const [mode, setMode] = useState<TMode>(start === DECK_OPENS.video && video ? MODE.video : MODE.slides);
   const [full, setFull] = useState<(typeof FULL)[keyof typeof FULL]>(
     start === DECK_OPENS.full ? FULL.on : FULL.off,

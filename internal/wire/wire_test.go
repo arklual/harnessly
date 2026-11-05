@@ -94,7 +94,7 @@ func roundTrip(b []byte) ([]byte, error) {
 }
 
 // httpKinds is the answers of the v2 HTTP pages a fixture can hold.
-var httpKinds = []string{"hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"}
+var httpKinds = []string{"hello", "turns", "entries", "output", "upload", "dirs", "sessions", "terminals", "terminal", "voice", "designlyCreate", "designlyLibrary", "designlySystems", "designlyPin", "designlyChat", "files", "file", "tasks", "legacy", "open", "openRefs", "made", "messageStatus", "context", "search", "digest", "machineStats", "machineStop", "apps", "agentSettings", "runtimeSettings", "rewindPlan", "handoffDraft", "profiles", "profileKey", "profileTest", "profileSwitch", "login", "loginOK"}
 
 func decodePage(kind string, b []byte) (interface{ Validate() error }, error) {
 	var v interface{ Validate() error }
@@ -149,6 +149,8 @@ func decodePage(kind string, b []byte) (interface{ Validate() error }, error) {
 		v = &DesignSystems{}
 	case "designlyPin":
 		v = &DesignlyPin{}
+	case "designlyChat":
+		v = &DesignlyChat{}
 	case "tasks":
 		v = &Tasks{}
 	case "files":
@@ -342,7 +344,7 @@ func TestClosedListsMatchTheSchema(t *testing.T) {
 		"ServerFrameKind": strs(ServerFrameKinds), "MachineEventType": strs(MachineEventTypes),
 		"ConvsEventType": strs(ConvsEventTypes), "ConvEventType": strs(ConvEventTypes),
 		"CompactionPhase": strs(CompactionPhases), "Op": strs(Ops), "PromoteTo": strs(PromoteTos),
-		"DesignKind": strs(DesignKinds), "DesignDeckTone": strs(DesignDeckTones), "DesignVideoFormat": strs(DesignVideoFormats), "DesignRole": strs(DesignRoles), "FileKind": strs(FileKinds), "AppID": strs(AppIDs), "OpenTab": strs(OpenTabs), "AppState": strs(AppStates), "AppReason": strs(AppReasons), "AppSectionID": strs(AppSectionIDs), "AppFlag": strs(AppFlags), "AppTone": strs(AppTones), "AppRole": strs(AppRoles), "AppPipeline": strs(AppPipelines), "AgentOptionKey": strs(AgentOptionKeys), "AgentMcpKind": strs(AgentMcpKinds), "AgentAccountMethod": strs(AgentAccountMethods), "DiskPartID": strs(DiskPartIDs), "MachineProcKind": strs(MachineProcKinds), "MachineStopReason": strs(MachineStopReasons), "TaskStatus": strs(TaskStatuses), "ResultKind": strs(ResultKinds), "RefuseCode": strs(RefuseCodes), "RetryableRefuseCode": strs(RetryableRefuseCodes), "HttpKind": httpKinds, "TerminalStopBy": strs(TerminalStopBys), "IdleStop": strs(IdleStops), "FileChange": strs(FileChanges), "OriginKind": strs(OriginKinds), "OriginVia": strs(OriginVias), "HandoffMode": strs(HandoffModes), "DraftMode": strs(DraftModes), "OnOff": strs(OnOffs), "LimitWindow": strs(LimitWindows), "LimitAction": strs(LimitActions), "AutoContinueWhy": strs(AutoContinueWhys), "TerminalAside": strs(TerminalAsides), "ProfileVendor": strs(ProfileVendors), "ProfileTestReason": strs(ProfileTestReasons), "ProfileSwitchReason": strs(ProfileSwitchReasons), "LoginMode": strs(LoginModes), "LoginState": strs(LoginStates), "MessageRole": strs(MessageRoles), "LoginInput": strs(LoginInputs), "LoginReason": strs(LoginReasons), "MessageStatusKind": strs(MessageStatusKinds), "HandedWhere": strs(HandedWheres),
+		"DesignKind": strs(DesignKinds), "DesignDeckTone": strs(DesignDeckTones), "DesignVideoFormat": strs(DesignVideoFormats), "DesignRole": strs(DesignRoles), "FileKind": strs(FileKinds), "FileGit": strs(FileGits), "AppID": strs(AppIDs), "OpenTab": strs(OpenTabs), "AppState": strs(AppStates), "AppReason": strs(AppReasons), "AppSectionID": strs(AppSectionIDs), "AppFlag": strs(AppFlags), "AppTone": strs(AppTones), "AppRole": strs(AppRoles), "AppPipeline": strs(AppPipelines), "AgentOptionKey": strs(AgentOptionKeys), "AgentMcpKind": strs(AgentMcpKinds), "AgentAccountMethod": strs(AgentAccountMethods), "DiskPartID": strs(DiskPartIDs), "MachineProcKind": strs(MachineProcKinds), "MachineStopReason": strs(MachineStopReasons), "TaskStatus": strs(TaskStatuses), "ResultKind": strs(ResultKinds), "RefuseCode": strs(RefuseCodes), "RetryableRefuseCode": strs(RetryableRefuseCodes), "HttpKind": httpKinds, "TerminalStopBy": strs(TerminalStopBys), "IdleStop": strs(IdleStops), "FileChange": strs(FileChanges), "OriginKind": strs(OriginKinds), "OriginVia": strs(OriginVias), "HandoffMode": strs(HandoffModes), "DraftMode": strs(DraftModes), "OnOff": strs(OnOffs), "LimitWindow": strs(LimitWindows), "LimitAction": strs(LimitActions), "AutoContinueWhy": strs(AutoContinueWhys), "TerminalAside": strs(TerminalAsides), "ProfileVendor": strs(ProfileVendors), "ProfileTestReason": strs(ProfileTestReasons), "ProfileSwitchReason": strs(ProfileSwitchReasons), "LoginMode": strs(LoginModes), "LoginState": strs(LoginStates), "MessageRole": strs(MessageRoles), "LoginInput": strs(LoginInputs), "LoginReason": strs(LoginReasons), "MessageStatusKind": strs(MessageStatusKinds), "HandedWhere": strs(HandedWheres),
 	}
 	for name, def := range sc.defs {
 		if _, isEnum := def.(map[string]any)["enum"]; isEnum {

@@ -20,8 +20,12 @@ export interface IFrameAct {
   dy?: number;
   ms?: number;
   submit?: boolean;
+  /** A wait for a video or audio: ended, playing or paused. */
+  event?: string;
   tool?: string;
   input?: string;
+  /** The site the person let the agent act on: the live browser checks the page is still there. */
+  host?: string;
 }
 
 type TWaiter = (acted: IFrameActed | null) => void;
@@ -40,8 +44,8 @@ interface IFrameBridgeArgs {
   origin: string | null;
   /** The person pressed «Открыть» on the offer of a redirect to another site. */
   onOpen: (url: string) => void;
-  /** The site redirected to another one (a sign-in, say): the tab may follow it by itself. */
-  onRedirect: (url: string) => void;
+  /** The site redirected to another one (a sign-in, say): the tab may follow it by itself; true when it does. */
+  onRedirect: (url: string) => boolean;
 }
 
 export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBridgeArgs) => {
@@ -52,7 +56,7 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBrid
   /** How many times a page's bridge said hello: each new document says it again. */
   const [hellos, setHellos] = useState(0);
   const opened = useEffectEvent((url: string) => onOpen(url));
-  const redirected = useEffectEvent((url: string) => onRedirect(url));
+  const redirected = useEffectEvent((url: string): boolean => onRedirect(url));
   // The actions waiting for the frame's answer, and those waiting for the next page's hello.
   const acts = useRef(new Map<string, TWaiter>());
   const waitHello = useRef(new Set<() => void>());
@@ -88,8 +92,14 @@ export const useFrameBridge = ({ frame, origin, onOpen, onRedirect }: IFrameBrid
       else if (message.k === 'picked') {
         setPicking(false);
         setPicked(message.picked);
-      } else if (message.k === 'redirect') redirected(message.url);
-      else if (message.k === 'open') opened(message.url);
+      } else if (message.k === 'redirect') {
+        // The page's bridge holds back a page that leaves by script until it hears whether the tab goes there itself.
+        const follow = redirected(message.url);
+        frame.current?.contentWindow?.postMessage(
+          { type: 'tk:redirect-answer', url: message.url, follow },
+          origin,
+        );
+      } else if (message.k === 'open') opened(message.url);
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);

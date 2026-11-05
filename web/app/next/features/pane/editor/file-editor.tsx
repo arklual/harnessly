@@ -1,12 +1,15 @@
 // A text file as an editor (.hx-fed): CodeMirror over the file's text with an IDE's status row — the language, the
 // place of the cursor, whether the text differs from the disk. Markdown also reads as a page («Просмотр»). The editor
 // keeps its own text; the one who opened it hears whether it is changed and receives the unsaved text when it leaves.
+import { usePhone } from '@/next/ui/use-media';
 import { EditorState, type Text } from '@codemirror/state';
 import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { openSearchPanel } from '@codemirror/search';
+import { createPortal } from 'react-dom';
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { WordedError } from '@/next/core/net/worded';
 import { extensions, language } from '@/next/features/pane/editor/setup';
+import { askTip, type IAskChoice } from '@/next/features/pane/editor/ask-tip';
 import {
   isMarkdown,
   isPlain,
@@ -75,6 +78,13 @@ const MODES_OF: Record<TShownAs, { view: string; edit: string; first: 'edit' | '
 
 const EXIT_MS = 200;
 
+/** The bar over a selection: ask, explain, fix. */
+const askChoices = (): IAskChoice[] => [
+  { label: t('next.editor.ask'), note: null, icon: true },
+  { label: t('next.editor.askExplain'), note: t('next.editor.askExplainNote') },
+  { label: t('next.editor.askFix'), note: t('next.editor.askFixNote') },
+];
+
 /** What the editor opens with, and what it hands back when it leaves unsaved: the text, the disk's text it differs from,
  *  and the revision of that disk text. */
 export interface IDraft {
@@ -105,8 +115,12 @@ export interface IFileEditorProps {
   /** Another state of the file to show the editor's text against (git's, another file's); null: no diff. */
   compare?: ICompare | null;
   onCloseCompare?: () => void;
+  /** A place to show (a line «Найти в файлах» found): the text there is selected and scrolled to the middle. */
+  at?: { line: number; col: number; size: number } | null;
   /** Hands the selection to the chat's field as a quote: the path with the lines, the code, the person's ask. */
   onAsk?: (quote: string, note: string | null) => void;
+  /** Where the switch of the view goes (the folder's head row, beside the crumbs); without it, a bar of its own. */
+  modeSlot?: HTMLElement | null;
 }
 
 /** What the editor's text is shown against: its name over the diff, its text, or why there is none. */
@@ -161,6 +175,8 @@ const FileEditor = ({
   compare = null,
   onCloseCompare,
   onAsk,
+  modeSlot = null,
+  at = null,
 }: IFileEditorProps) => {
   const host = useRef<HTMLDivElement>(null);
   const live = useRef<ILive | null>(null);
@@ -173,14 +189,19 @@ const FileEditor = ({
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<INotice | null>(null);
   // A page, a tree or a picture opens as what it makes: that is what it is for; the source is a click away.
-  const [mode, setMode] = useState<TMode>(modes?.first === 'preview' ? MODE.preview : MODE.edit);
-  const [page, setPage] = useState(modes?.first === 'preview' ? start.text : '');
+  // A file opened at a found line opens as its text: the line is what was asked for.
+  const opensAsPage = modes?.first === 'preview' && at === null;
+  const [mode, setMode] = useState<TMode>(opensAsPage ? MODE.preview : MODE.edit);
+  const [page, setPage] = useState(opensAsPage ? start.text : '');
   const [place, setPlace] = useState({ line: 1, col: 1, selected: 0 });
   const shownNotice = usePresence(notice, EXIT_MS);
   const reading = usePresentFlag(mode === MODE.preview, EXIT_MS);
   // The diff over the editor: its text is the editor's as it was when the diff opened.
   const diff = usePresence(compare, EXIT_MS);
-  const [layout, setLayout] = useState<TLayout>(LAYOUT.split);
+  // Two columns do not fit a phone: there the diff starts inside the text, until the person picks otherwise.
+  const phone = usePhone();
+  const [picked, setLayout] = useState<TLayout | null>(null);
+  const layout = picked ?? (phone ? LAYOUT.inline : LAYOUT.split);
   const [after, setAfter] = useState('');
   const readText = useEffectEvent(() => live.current?.view.state.sliceDoc(0) ?? '');
   useEffect(() => {
@@ -199,19 +220,38 @@ const FileEditor = ({
   });
   const leave = useEffectEvent((draft: IDraft | null) => onLeave(draft));
 
+  // The selection as a quote for the chat: where it is (path and lines) and the code in a fence of its language.
+  const ask = (view: EditorView, note: string | null) => {
+    if (!onAsk) return;
+    const range = view.state.selection.main;
+    if (range.empty) return;
+    const from = view.state.doc.lineAt(range.from).number;
+    const to = view.state.doc.lineAt(range.to).number;
+    const lines = from === to ? `${from}` : `${from}-${to}`;
+    const fence = view.state.sliceDoc(range.from, range.to).includes('```') ? '````' : '```';
+    const lang = fenceLanguage(path);
+    onAsk(`${path}:${lines}\n${fence}${lang}\n${view.state.sliceDoc(range.from, range.to)}\n${fence}`, note);
+  };
+  const askOf = useEffectEvent(ask);
+  // Whether there is a chat to ask: the bar over a selection is part of the editor only then.
+  const askable = onAsk !== undefined;
+
   useEffect(() => {
     const parent = host.current;
     if (!parent) return;
     const eol = start.text.includes('\r\n') ? '\r\n' : '\n';
     const state = EditorState.create({
       doc: start.text,
-      extensions: extensions({
-        eol,
-        text: start.text,
-        markdown,
-        wrap: markdown || isPlain(path),
-        onUpdate: track,
-      }),
+      extensions: [
+        extensions({
+          eol,
+          text: start.text,
+          markdown,
+          wrap: markdown || isPlain(path),
+          onUpdate: track,
+        }),
+        ...(askable ? [askTip(askChoices, (on, note) => askOf(on, note))] : []),
+      ],
     });
     const view = new EditorView({ state, parent });
     const entry: ILive = { view, saved: state.toText(start.base), revision: start.revision };
@@ -234,7 +274,25 @@ const FileEditor = ({
       live.current = null;
       leave(draft);
     };
-  }, [path, start, markdown]);
+  }, [path, start, markdown, askable]);
+
+  // The place asked for: selected, in the middle of the view, with the focus in the text.
+  const atLine = at?.line ?? 0;
+  const atCol = at?.col ?? 0;
+  const atSize = at?.size ?? 0;
+  useEffect(() => {
+    const view = live.current?.view;
+    if (!view || atLine < 1) return;
+    const doc = view.state.doc;
+    const line = doc.line(Math.min(atLine, doc.lines));
+    const from = Math.min(line.from + Math.max(atCol - 1, 0), line.to);
+    const to = Math.min(from + atSize, line.to);
+    view.dispatch({
+      selection: { anchor: from, head: to },
+      effects: EditorView.scrollIntoView(from, { y: 'center' }),
+    });
+    view.focus();
+  }, [path, start, atLine, atCol, atSize]);
 
   const report = useEffectEvent(() => onState({ dirty, saving }));
   useEffect(() => report(), [dirty, saving]);
@@ -284,20 +342,6 @@ const FileEditor = ({
     return () => document.removeEventListener('keydown', press);
   }, []);
 
-  // The selection as a quote for the chat: where it is (path and lines) and the code in a fence of its language.
-  const ask = (note: string | null) => {
-    const view = live.current?.view;
-    if (!view || !onAsk) return;
-    const range = view.state.selection.main;
-    if (range.empty) return;
-    const from = view.state.doc.lineAt(range.from).number;
-    const to = view.state.doc.lineAt(range.to).number;
-    const lines = from === to ? `${from}` : `${from}-${to}`;
-    const fence = view.state.sliceDoc(range.from, range.to).includes('```') ? '````' : '```';
-    const lang = fenceLanguage(path);
-    onAsk(`${path}:${lines}\n${fence}${lang}\n${view.state.sliceDoc(range.from, range.to)}\n${fence}`, note);
-  };
-
   const changeMode = (next: TMode) => {
     if (next === MODE.preview) setPage(live.current?.view.state.sliceDoc(0) ?? '');
     setMode(next);
@@ -305,28 +349,28 @@ const FileEditor = ({
   };
 
   const stateKey = stateOf(saving, dirty);
+  const modeSwitch = modes && (
+    <Segmented
+      label={t('next.editor.mode')}
+      value={mode}
+      options={
+        modes.first === 'preview'
+          ? [
+              { value: MODE.preview, label: t(modes.view) },
+              { value: MODE.edit, label: t(modes.edit) },
+            ]
+          : [
+              { value: MODE.edit, label: t(modes.edit) },
+              { value: MODE.preview, label: t(modes.view) },
+            ]
+      }
+      onChange={changeMode}
+    />
+  );
   return (
     <div className="hx-fed" data-kind={shown ?? 'code'}>
-      {modes && (
-        <div className="hx-fed__bar">
-          <Segmented
-            label={t('next.editor.mode')}
-            value={mode}
-            options={
-              modes.first === 'preview'
-                ? [
-                    { value: MODE.preview, label: t(modes.view) },
-                    { value: MODE.edit, label: t(modes.edit) },
-                  ]
-                : [
-                    { value: MODE.edit, label: t(modes.edit) },
-                    { value: MODE.preview, label: t(modes.view) },
-                  ]
-            }
-            onChange={changeMode}
-          />
-        </div>
-      )}
+      {modes && modeSlot && createPortal(modeSwitch, modeSlot)}
+      {modes && !modeSlot && <div className="hx-fed__bar">{modeSwitch}</div>}
       {shownNotice.value && (
         <div
           className="hx-fed__notice"
@@ -416,24 +460,6 @@ const FileEditor = ({
         <span>{t('next.editor.cursor', { line: place.line, col: place.col })}</span>
         {place.selected > 0 && <span>{t('next.editor.selected', { n: place.selected })}</span>}
         <span className="hx-spacer" />
-        {onAsk && place.selected > 0 && (
-          <span className="hx-fed__ask">
-            <button type="button" className="hx-fed__askbtn" onClick={() => ask(null)}>
-              <Icon name="message-square-text" size="sm" />
-              {t('next.editor.ask')}
-            </button>
-            <button
-              type="button"
-              className="hx-fed__askbtn"
-              onClick={() => ask(t('next.editor.askExplainNote'))}
-            >
-              {t('next.editor.askExplain')}
-            </button>
-            <button type="button" className="hx-fed__askbtn" onClick={() => ask(t('next.editor.askFixNote'))}>
-              {t('next.editor.askFix')}
-            </button>
-          </span>
-        )}
         <button
           type="button"
           className="hx-head-btn"

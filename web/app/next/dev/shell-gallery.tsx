@@ -201,20 +201,11 @@ const SAMPLE_PAGE =
     '<body style="font:16px system-ui;margin:24px"><h1>Мероприятия</h1><p>Джазовый вечер, 12 ноября</p><button style="padding:10px 16px">Купить билет</button></body>',
   );
 
-// The agent at work on the page (&agent=work), or asking to act on the site (&agent=ask).
+// The agent at work on the page (&agent=work): its cursor, nothing else.
 const agentSample = (): IBrowserAgentView | null => {
   const shown = new URLSearchParams(window.location.search).get('agent');
-  if (shown !== 'work' && shown !== 'ask') return null;
-  return {
-    cursor: shown === 'work' ? { x: 89, y: 150, label: 'кнопка «Купить билет»', press: 1 } : null,
-    asking: shown === 'ask' ? 'stand-1.preview.example.com' : null,
-    working: shown === 'work',
-    paused: false,
-    onAllow: () => {},
-    onDeny: () => {},
-    onStop: () => {},
-    onResume: () => {},
-  };
+  if (shown !== 'work') return null;
+  return { cursor: { x: 89, y: 150, label: 'кнопка «Купить билет»', press: 1 } };
 };
 
 const SILENT_DOM: IDomBridge = {
@@ -296,6 +287,7 @@ const SiteTabSample = () => {
       outsideUrl="https://stand-1.preview.example.com/events"
       agent={agent}
       devtools={devtools}
+      live={null}
       vault={{
         entries: [
           { id: 'v1', login: 'anna@example.com', label: null },
@@ -470,6 +462,7 @@ const GalleryPane = ({
           agent={null}
           devtools={null}
           vault={null}
+          live={null}
         />
       )}
     </ToolPane>

@@ -143,6 +143,7 @@ const DeckBar = (p: IDeckBarProps) => {
           onClick={p.onPanel}
         />
       )}
+      {p.mode && (edit || link) && <ModeButton mode={p.mode} />}
       <div className="hx-deck__addr">
         <b>{p.title}</b>
         {p.crumb !== '' && (
@@ -155,7 +156,6 @@ const DeckBar = (p: IDeckBarProps) => {
       <span className="hx-deck-grow" />
       {edit && (
         <>
-          {p.mode && <ModeButton mode={p.mode} />}
           <BarButton
             k="comment"
             icon="message-square-plus"
@@ -200,7 +200,6 @@ const DeckBar = (p: IDeckBarProps) => {
       )}
       {link && (
         <>
-          {p.mode && <ModeButton mode={p.mode} />}
           <div className="hx-deck-seg hx-deck__lmode" role="group">
             <button
               type="button"

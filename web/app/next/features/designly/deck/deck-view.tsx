@@ -847,7 +847,7 @@ const DeckView = (props: IDeckViewProps) => {
     return null;
   })();
   const mdock = phone && edit && panel === DECK_PANEL.off && sheet === null && !pick.draft;
-  // A person who manages the project gets the deck's share popover; anyone else the access dialog (ask for edit).
+  // «Поделиться» is the one dialog of every kind; the deck's older popover only where the gateway has none.
   const onShare = access ? () => (access.manage ? togglePop(POP.share) : access.onOpen()) : undefined;
 
   return (

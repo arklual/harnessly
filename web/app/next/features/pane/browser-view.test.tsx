@@ -53,6 +53,7 @@ const props = (over: Partial<IBrowserViewProps> = {}): IBrowserViewProps => ({
   agent: null,
   devtools: null,
   vault: null,
+  live: null,
   ...over,
 });
 

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agent"
 	"github.com/ly-solutions/harnessly/internal/agents"
@@ -70,7 +69,7 @@ func (c *core) newTimeline(cfg timelineConfig) *timeline.Server {
 				return jscompat.Basename(p, ".jsonl")
 			},
 			ValidSessionID: agents.IsUUID,
-			FindSession:    func(id string) string { return claude.FindTranscript(projects, id) },
+			FindSession:    claudeDet.FindTranscript,
 			SessionsDir:    filepath.Join(claudeDet.Dir, "sessions"),
 		},
 		agents.CodexPanel: {
@@ -81,7 +80,7 @@ func (c *core) newTimeline(cfg timelineConfig) *timeline.Server {
 			SessionIDFromPath: codex.SessionIDFromPath,
 			ValidSessionID:    agents.IsUUID,
 			FindSession: func(id string) string {
-				if m, ok := codex.FindSessionByID(codexDet.SessionsRoot(), id, time.Now(), codex.ScanDays); ok {
+				if m, ok := codexDet.FindSession(id); ok {
 					return m.JSONLPath
 				}
 				return ""
@@ -97,8 +96,12 @@ func (c *core) newTimeline(cfg timelineConfig) *timeline.Server {
 		ResumeLine:     c.timelineResumeLine,
 		ClaudeProjects: projects,
 		CodexSessions:  codexDet.SessionsRoot(),
-		StatsDir:       filepath.Join(c.cfg.DataDir, "session-stats"),
-		Codex:          transcript.CodexOptions{ImageURL: transcript.NewCodexImageURL(cfg.UploadsDir, cfg.AppBase)},
+		// A Claude or Codex started with CLAUDE_CONFIG_DIR or CODEX_HOME of its own writes elsewhere.
+		MoreRoots: func() (claudeProjects, codexSessions []string) {
+			return claudeDet.ProjectsDirs(), codexDet.SessionsRoots()
+		},
+		StatsDir: filepath.Join(c.cfg.DataDir, "session-stats"),
+		Codex:    transcript.CodexOptions{ImageURL: transcript.NewCodexImageURL(cfg.UploadsDir, cfg.AppBase)},
 		Log: func(level, msg string, kv ...any) {
 			fields := make([]agent.F, 0, len(kv)/2)
 			for i := 0; i+1 < len(kv); i += 2 {
@@ -203,7 +206,7 @@ func (l timelineLayout) Recover(session string) (string, string, bool) {
 	}
 	found := agents.RecoverTabSession(*tab, claude.Tabs{}, agents.RecoveryDeps{
 		Exists:         func(p string) bool { _, err := os.Stat(p); return err == nil },
-		FindTranscript: func(id string) string { return claude.FindTranscript(l.c.claude.ProjectsDir(), id) },
+		FindTranscript: l.c.claude.FindTranscript,
 		History: func() ([]agents.HistoryEntry, error) {
 			var out []agents.HistoryEntry
 			for _, e := range l.c.history.All() {

@@ -944,6 +944,16 @@ func (b *builder) teammatesSettle(s *step, notes []wire.PeerNote) []wire.PeerNot
 		if id, named := b.teammates[n.From]; named {
 			i, known = b.byID[id]
 			notes[k].AgentID = nil
+			if known && b.entries[i].T == wire.EntrySubagent {
+				notes[k].Task = optStr(b.entries[i].Description)
+				if notes[k].Model == nil {
+					notes[k].Model = b.entries[i].Model
+				}
+				// Until the launch result names the agent its id is the Agent call's, which opens nothing.
+				if aid := b.entries[i].AgentID; aid != "" && b.tools[aid] == "" {
+					notes[k].Opens = optStr(aid)
+				}
+			}
 		} else if n.AgentID != nil {
 			for j := len(b.entries) - 1; j >= 0 && !known; j-- {
 				if b.entries[j].T == wire.EntrySubagent && b.entries[j].AgentID == n.From {
@@ -956,6 +966,10 @@ func (b *builder) teammatesSettle(s *step, notes []wire.PeerNote) []wire.PeerNot
 				notes[k].From = b.entries[i].Description
 				notes[k].Model = b.entries[i].Model
 			}
+			notes[k].Opens = n.AgentID
+		}
+		if known && b.entries[i].T == wire.EntrySubagent && b.entries[i].Status == wire.SubagentFailed {
+			notes[k].Failed = true
 		}
 		if !finished || !known || b.entries[i].T != wire.EntrySubagent {
 			continue

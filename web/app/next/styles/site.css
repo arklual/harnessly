@@ -2854,6 +2854,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Another machine's chat: its machine, quiet, before the time. */
+.hx-chatswitch__machine {
+  flex: none;
+  max-width: 96px;
+  overflow: hidden;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .hx-chatswitch__at {
   flex: none;
   color: var(--hx-fg-3);

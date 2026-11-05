@@ -197,6 +197,8 @@ func newV2Live(d deps, c *core) *v2Live {
 	v.srv.Files = v2f
 	v.srv.Download = v2f.ServeDownload
 	v.srv.GitSide = v2f.ServeGitSide
+	v.srv.FindText = v2f.ServeSearch
+	v.srv.EntryOp = v2f.ServeEntryOp
 	v.srv.Tasks = v.rt.Tasks
 	if terminals != nil {
 		v.srv.Rewind = v.rt

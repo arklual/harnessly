@@ -5,7 +5,9 @@
 import { useEffect, useState } from 'react';
 import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
 import { docRef } from '@/next/features/designly/access/api';
+import ResourceShare from '@/next/features/designly/access/resource-share';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
+import { useResourceView } from '@/next/features/designly/access/use-resource';
 import { shareFileAsDoc, unlinkFileDoc, type IFileDoc } from '@/next/features/filedoc/api';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { Button } from '@/next/ui/button';
@@ -35,10 +37,15 @@ interface IDialogProps extends IFileShareProps {
 const Dialog = ({ machine, conv, path, open, onClose, doc, onDoc }: IDialogProps) => {
   const gate = useProjectAccess(docRef(doc.slug));
   const { reload } = gate;
+  // the one dialog of every kind where the gateway answers the common access API; the older one otherwise.
+  const shared = useResourceView('doc', doc.slug, gate.state.k === ACCESS.ready);
+  const { reload: reloadShared } = shared;
   // The dialog shows what the gateway holds now, not what it held when it was last open.
   useEffect(() => {
-    if (open) reload();
-  }, [open, reload]);
+    if (!open) return;
+    reload();
+    reloadShared();
+  }, [open, reload, reloadShared]);
   const [unlinking, setUnlinking] = useState(false);
   if (gate.state.k !== ACCESS.ready) return null;
 
@@ -64,6 +71,39 @@ const Dialog = ({ machine, conv, path, open, onClose, doc, onDoc }: IDialogProps
       },
     );
   };
+  const unlinkButton = doc.linked && (
+    <button
+      type="button"
+      className="hx-btn"
+      data-variant="ghost"
+      data-size="sm"
+      data-busy={unlinking || undefined}
+      disabled={unlinking}
+      onClick={unlink}
+    >
+      <span>{t('next.share.unlink')}</span>
+    </button>
+  );
+  const one =
+    shared.state !== null && shared.state !== 'absent' && shared.state.owner !== null ? shared.state : null;
+  if (one) {
+    return (
+      <ResourceShare
+        open={open}
+        onClose={onClose}
+        target={{ kind: 'doc', id: doc.slug }}
+        title={baseName(path)}
+        view={one}
+        onNext={(next) => {
+          shared.apply(next);
+          reload();
+        }}
+        address={docAddress(doc.slug)}
+        onCopyLink={copyLink}
+        footExtra={unlinkButton}
+      />
+    );
+  }
   return (
     <ShareDialog
       open={open}
@@ -74,21 +114,7 @@ const Dialog = ({ machine, conv, path, open, onClose, doc, onDoc }: IDialogProps
       onNext={gate.apply}
       onCopyLink={copyLink}
       onClaim={() => Promise.resolve()}
-      footExtra={
-        doc.linked && (
-          <button
-            type="button"
-            className="hx-btn"
-            data-variant="ghost"
-            data-size="sm"
-            data-busy={unlinking || undefined}
-            disabled={unlinking}
-            onClick={unlink}
-          >
-            <span>{t('next.share.unlink')}</span>
-          </button>
-        )
-      }
+      footExtra={unlinkButton}
     />
   );
 };

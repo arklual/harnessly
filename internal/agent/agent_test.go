@@ -286,7 +286,7 @@ func TestAppendedSince(t *testing.T) {
 	r := TranscriptRoots(home)
 	file := filepath.Join(r.Claude, "p", "s.jsonl")
 	writeFile(t, file, "one\n")
-	w := newTranscriptWatch(r, func(any) {})
+	w := newTranscriptWatch(newRootSet(home, nil), func(any) {})
 	info, _ := os.Stat(file)
 	inode, _ := fileID(info)
 	if a := w.appendedSince(file, inode, info.Size()); a != nil {

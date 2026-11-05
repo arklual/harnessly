@@ -22,6 +22,8 @@ export interface IFoundComponent {
 export type TParentMessage =
   | { type: 'tk:pick'; on: boolean }
   | { type: 'tk:go'; action: 'back' | 'forward' | 'reload' }
+  /** The tab's answer to a page leaving for another site by script (`tk:redirect`): it goes there itself, or not. */
+  | { type: 'tk:redirect-answer'; url: string; follow: boolean }
   /** The parent saw the frame load and asks whether a bridge lives in this document: the answer is `tk:hello`. */
   | { type: 'tk:ping' }
   /** A chip in the composer was clicked: scroll to the element and outline it for a moment. */
@@ -74,6 +76,7 @@ export type TDomMessageIn =
 
 export type TActOp =
   | 'snapshot'
+  | 'read'
   | 'locate'
   | 'click'
   | 'type'
@@ -97,6 +100,8 @@ export interface IActMessage {
   dy?: number;
   ms?: number;
   submit?: boolean;
+  /** `wait`: the state of a video or audio to wait for: ended, playing or paused. */
+  event?: string;
   /** `call`: the name of one of the page's own (WebMCP) tools. */
   tool?: string;
   /** `call`: the tool's input as JSON text. */
@@ -259,12 +264,84 @@ export const parseDomMessage = (message: Record<string, unknown>): TDomMessageIn
 export const isDomMessage = (message: { type: string }): message is TDomMessageIn =>
   message.type.startsWith('tk:dom-');
 
+const MAX_LEAVE_URL = 8192;
+
+/** How long a page leaving for another site by script waits for the tab's answer before it goes on by itself (a
+ *  parent that does not know the question never answers). */
+export const LEAVE_WAIT_MS = 1500;
+
+/**
+ * A page leaving the slot for another site by script (`location.replace`, the hop back of a sign-in): the slot would
+ * carry the frame to that site directly, past the proxy and its cookies. The navigation is held back and told to the
+ * parent as a redirect; when the tab goes there itself the page stays put, and otherwise it leaves as it asked. A
+ * click, a form and a traversal are the person's and go on untouched; so does a browser without the Navigation API.
+ */
+export const installLeave = (win: any, post: (message: Record<string, unknown>) => void) => {
+  const navigation = win.navigation;
+  const waiting = new Map<string, { timer: number; replace: boolean }>();
+  let passing = '';
+  const leave = (url: string) => {
+    const held = waiting.get(url);
+    if (!held) return;
+    waiting.delete(url);
+    win.clearTimeout(held.timer);
+    passing = url;
+    if (held.replace) win.location.replace(url);
+    else win.location.assign(url);
+  };
+  if (navigation && typeof navigation.addEventListener === 'function') {
+    navigation.addEventListener('navigate', (event: any) => {
+      const to = String(event.destination?.url ?? '');
+      if (to === passing) {
+        passing = '';
+        return;
+      }
+      if (!event.cancelable || event.userInitiated || event.hashChange || event.formData) return;
+      if (event.navigationType !== 'push' && event.navigationType !== 'replace') return;
+      if (event.downloadRequest !== null && event.downloadRequest !== undefined) return;
+      let url: URL;
+      try {
+        url = new win.URL(to);
+      } catch {
+        return;
+      }
+      if (url.protocol !== 'https:' || url.origin === win.location.origin || to.length > MAX_LEAVE_URL)
+        return;
+      event.preventDefault();
+      if (waiting.has(to)) return;
+      waiting.set(to, {
+        timer: win.setTimeout(() => leave(to), LEAVE_WAIT_MS),
+        replace: event.navigationType === 'replace',
+      });
+      post({ type: 'tk:redirect', url: to });
+    });
+  }
+  return (url: string, follow: boolean) => {
+    const held = waiting.get(url);
+    if (!held) return;
+    if (!follow) {
+      leave(url);
+      return;
+    }
+    // The tab opens the site itself and takes this document away; until then the page stays as it is.
+    waiting.delete(url);
+    win.clearTimeout(held.timer);
+  };
+};
+
 export const parseParentMessage = (data: unknown): TParentMessage | null => {
   if (!data || typeof data !== 'object') return null;
   const message = data as Record<string, unknown>;
   if (message.type === 'tk:pick' && typeof message.on === 'boolean')
     return { type: 'tk:pick', on: message.on };
   if (message.type === 'tk:ping') return { type: 'tk:ping' };
+  if (
+    message.type === 'tk:redirect-answer' &&
+    typeof message.url === 'string' &&
+    message.url.length <= MAX_LEAVE_URL &&
+    typeof message.follow === 'boolean'
+  )
+    return { type: 'tk:redirect-answer', url: message.url, follow: message.follow };
   if (
     message.type === 'tk:highlight' &&
     typeof message.selector === 'string' &&
@@ -316,6 +393,7 @@ export const parseParentMessage = (data: unknown): TParentMessage | null => {
 
 const ACT_OPS = [
   'snapshot',
+  'read',
   'locate',
   'click',
   'type',
@@ -328,10 +406,13 @@ const ACT_OPS = [
   'call',
 ];
 const TOOL_NAME = /^[A-Za-z0-9_.:-]{1,128}$/;
+/** What a wait may be for on a video or audio, and how long such a wait may take. */
+const ACT_EVENTS = /^(ended|playing|paused)$/;
+const ACT_EVENT_MS = 25_000;
 
 /** An action as the parent sent it: every field that is there must be right, else the whole message is dropped. */
 export const parseActMessage = (message: Record<string, unknown>): IActMessage | null => {
-  const { id, op, ref, text, key, value, dy, ms, submit, tool, input } = message;
+  const { id, op, ref, text, key, value, dy, ms, submit, event, tool, input } = message;
   if (typeof id !== 'string' || id.length < 1 || id.length > 64) return null;
   if (typeof op !== 'string' || !ACT_OPS.includes(op)) return null;
   const act: IActMessage = { type: 'tk:act', id, op: op as TActOp };
@@ -355,8 +436,13 @@ export const parseActMessage = (message: Record<string, unknown>): IActMessage |
     if (typeof dy !== 'number' || !Number.isFinite(dy) || Math.abs(dy) > 20_000) return null;
     if (dy !== 0) act.dy = dy;
   }
+  if (event !== undefined && event !== null && event !== '') {
+    if (typeof event !== 'string' || !ACT_EVENTS.test(event)) return null;
+    act.event = event;
+  }
   if (ms !== undefined && ms !== null) {
-    if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0 || ms > 10_000) return null;
+    const limit = act.event ? ACT_EVENT_MS : 10_000;
+    if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0 || ms > limit) return null;
     if (ms !== 0) act.ms = ms;
   }
   if (submit !== undefined && submit !== null) {
@@ -1583,6 +1669,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
     return fits ? el : (query(item.selector) ?? el);
   };
   const setAnchors = core.installAnchors(win, doc, post, findAnchor, core);
+  const answerLeave = core.installLeave(win, post);
 
   const nav = () => {
     if (win.location.href === lastUrl) return;
@@ -1809,6 +1896,7 @@ export const installBridge = (win: any, doc: any, parentOrigin: string, core: an
       const message = core.parseParentMessage(bound.messageData ? bound.messageData.call(event) : event.data);
       if (!message) return;
       if (message.type === 'tk:ping') hello();
+      else if (message.type === 'tk:redirect-answer') answerLeave(message.url, message.follow);
       else if (message.type === 'tk:highlight') flash(message.selector);
       else if (message.type === 'tk:pick') setPicking(message.on, false);
       else if (message.type === 'tk:styles') setStyles(message.items);
@@ -2626,7 +2714,8 @@ const ACT_MAX_CHARS = 24_000;
 const ACT_ROLES = 'button|link|checkbox|radio|tab|menuitem|option|switch|combobox|textbox';
 const ACT_ITEM_SELECTOR =
   `a[href],button,input:not([type="hidden"]),textarea,select,summary,[role]:not([role=""]),` +
-  `[contenteditable]:not([contenteditable="false"]),h1,h2,h3`;
+  `[contenteditable]:not([contenteditable="false"]),h1,h2,h3,video,audio`;
+const ACT_MAX_READ = 8000;
 const ACT_FOCUSABLE_SELECTOR =
   'a[href],button,input:not([type="hidden"]),select,textarea,summary,[tabindex],[contenteditable]:not([contenteditable="false"])';
 const ACT_SECRET_NAME = /card|cvv|cvc|ccnum|cc-?num|cardnumber|(^|[^a-z])pan([^a-z]|$)/i;
@@ -2730,6 +2819,7 @@ export const actRole = (bound: any, el: any): string => {
   const explicit = (actAttr(bound, el, 'role') ?? '').trim().toLowerCase().split(/\s+/)[0];
   if (explicit && new RegExp(`^(${ACT_ROLES})$`).test(explicit)) return explicit;
   if (tag === 'a') return 'link';
+  if (tag === 'video' || tag === 'audio') return tag;
   if (tag === 'button' || tag === 'summary') return 'button';
   if (tag === 'select') return 'combobox';
   if (tag === 'textarea') return 'textbox';
@@ -2811,10 +2901,73 @@ const actHref = (win: any, bound: any, el: any): string | null => {
 };
 
 /** The words after the name: what the element is in (disabled, checked, expanded…) and what it holds. */
+/** A video or audio of the page: whether it plays, where it is and how long it is. */
+const actIsMedia = (bound: any, el: any): boolean => {
+  const tag = actTag(bound, el);
+  return tag === 'video' || tag === 'audio';
+};
+const actSeconds = (n: unknown): string =>
+  typeof n === 'number' && Number.isFinite(n) ? `${Math.round(n * 10) / 10}s` : '?';
+const actMediaWords = (el: any): string[] => {
+  try {
+    const words = [
+      el.ended === true ? 'ended' : el.paused === false ? 'playing' : 'paused',
+      `at=${actSeconds(el.currentTime)}`,
+      `of=${actSeconds(el.duration)}`,
+    ];
+    if (el.muted === true) words.push('muted');
+    if (el.loop === true) words.push('loop');
+    return words;
+  } catch {
+    return [];
+  }
+};
+const actMediaShown = (win: any, doc: any, bound: any): any[] =>
+  actSelectAll(bound, doc, 'video,audio').filter((el) => {
+    try {
+      return actVisible(win, el, bound) || el.paused === false;
+    } catch {
+      return false;
+    }
+  });
+/** The media an event is about: the ref given, else the one playing, else the biggest one shown. */
+const actMediaOf = (
+  win: any,
+  doc: any,
+  bound: any,
+  refs: IActRefs,
+  ref: string | undefined,
+): { el: any } | { fail: IActResult } => {
+  if (ref) {
+    const found = actResolve(refs, bound, ref);
+    if ('fail' in found) return found;
+    if (!actIsMedia(bound, found.el))
+      return {
+        fail: actFail(`${ref} is not a video or audio: give the ref of one from the snapshot, or no ref.`),
+      };
+    return found;
+  }
+  const area = (el: any): number => {
+    const b = actBox(win, bound, el);
+    return b ? b.width * b.height : 0;
+  };
+  const shown = actMediaShown(win, doc, bound);
+  const playing = shown.find((el) => {
+    try {
+      return el.paused === false && el.ended !== true;
+    } catch {
+      return false;
+    }
+  });
+  const el = playing ?? shown.sort((a, b) => area(b) - area(a))[0];
+  return el ? { el } : { fail: actFail('No video or audio is on the page.') };
+};
+
 const actStates = (win: any, bound: any, el: any, role: string): string[] => {
   const words: string[] = [];
   const tag = actTag(bound, el);
   const flag = (name: string) => actAttr(bound, el, name)?.toLowerCase();
+  if (tag === 'video' || tag === 'audio') return actMediaWords(el);
   try {
     if (el.disabled === true || flag('aria-disabled') === 'true') words.push('disabled');
   } catch {
@@ -3377,8 +3530,117 @@ const actSelect = (doc: any, bound: any, el: any, value: string | undefined): IA
   return { ok: true, text: `selected "${textOf(found)}" in ${what}` };
 };
 
-export const actWait = async (win: any, doc: any, bound: any, act: IActMessage): Promise<IActResult> => {
-  if (act.text === undefined && act.ms === undefined) return actFail('wait needs text or ms.');
+/** The page's state as text: address, title, its videos and audios, and its text (or one element's). */
+export const actRead = (win: any, doc: any, bound: any, refs: IActRefs, act: IActMessage): IActResult => {
+  let title = '';
+  try {
+    title = String(bound.title.call(doc));
+  } catch {
+    title = '';
+  }
+  const lines = [`url: ${String(win.location.href)}`, `title: ${actClip(title, 200)}`];
+  for (const el of actMediaShown(win, doc, bound))
+    lines.push(`- ${actTag(bound, el)} [${actRefOf(refs, bound, el)}] ${actMediaWords(el).join(' ')}`);
+  let text: string;
+  if (act.ref) {
+    const found = actResolve(refs, bound, act.ref);
+    if ('fail' in found) return found.fail;
+    let own: unknown;
+    try {
+      own = bound.innerText ? bound.innerText.call(found.el) : undefined;
+    } catch {
+      own = undefined;
+    }
+    text = typeof own === 'string' ? own : actTextOf(bound, found.el);
+  } else {
+    text = actPageText(bound, doc);
+  }
+  text = text
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  lines.push(
+    'text:',
+    text.length > ACT_MAX_READ
+      ? `${text.slice(0, ACT_MAX_READ)}… (${text.length - ACT_MAX_READ} more characters)`
+      : text || '(no text)',
+  );
+  return { ok: true, text: lines.join('\n') };
+};
+
+const actWaitEvent = async (
+  win: any,
+  doc: any,
+  bound: any,
+  refs: IActRefs,
+  act: IActMessage,
+): Promise<IActResult> => {
+  const event = String(act.event);
+  const found = actMediaOf(win, doc, bound, refs, act.ref);
+  if ('fail' in found) return found.fail;
+  const el = found.el;
+  const what = `${actTag(bound, el)} [${actRefOf(refs, bound, el)}]`;
+  const limit = Math.min(act.ms || ACT_EVENT_MS, ACT_EVENT_MS);
+  const time = (): number => {
+    try {
+      return Number(el.currentTime) || 0;
+    } catch {
+      return 0;
+    }
+  };
+  const state = (): { paused: boolean; ended: boolean; duration: number } => {
+    try {
+      return { paused: el.paused !== false, ended: el.ended === true, duration: Number(el.duration) };
+    } catch {
+      return { paused: true, ended: false, duration: NaN };
+    }
+  };
+  let waited = 0;
+  let last = time();
+  for (;;) {
+    const now = time();
+    const { paused, ended, duration } = state();
+    // A clip that loops, or that the page starts over, never ends: its jump back to the start counts as its end.
+    const over =
+      ended ||
+      (last > 0.5 && now + 0.5 < last) ||
+      (Number.isFinite(duration) && duration > 0 && now >= duration - 0.05);
+    const met = event === 'ended' ? over : event === 'playing' ? !paused && !ended : paused;
+    if (met) {
+      const verb =
+        event === 'ended'
+          ? ended
+            ? 'has ended'
+            : 'played to its end'
+          : event === 'playing'
+            ? 'is playing'
+            : 'is paused';
+      return {
+        ok: true,
+        text: `the ${what} ${verb}: ${actMediaWords(el).join(' ')}`,
+        rect: actBox(win, bound, el),
+      };
+    }
+    if (waited >= limit)
+      return actFail(
+        `The ${what} is not ${event} after ${limit} ms: ${actMediaWords(el).join(' ')}. Call again to keep waiting.`,
+      );
+    last = now;
+    const step = Math.min(100, limit - waited);
+    await actPause(win, bound, step);
+    waited += step;
+  }
+};
+
+export const actWait = async (
+  win: any,
+  doc: any,
+  bound: any,
+  act: IActMessage,
+  refs: IActRefs = makeActRefs(),
+): Promise<IActResult> => {
+  if (act.event) return actWaitEvent(win, doc, bound, refs, act);
+  if (act.text === undefined && act.ms === undefined) return actFail('wait needs text, an event or ms.');
   if (act.text === undefined) {
     await actPause(win, bound, act.ms as number);
     return { ok: true, text: `waited ${act.ms} ms` };
@@ -3419,7 +3681,8 @@ export const runAct = async (
     }
     if (act.op === 'tools') return actToolsList(bound);
     if (act.op === 'call') return await actToolCall(win, bound, act, before);
-    if (act.op === 'wait') return await core.actWait(win, doc, bound, act);
+    if (act.op === 'read') return core.actRead(win, doc, bound, refs, act);
+    if (act.op === 'wait') return await core.actWait(win, doc, bound, act, refs);
     if (act.op === 'press') {
       if (!act.key) return actFail('press needs a key.');
       const target = actActive(bound, doc);

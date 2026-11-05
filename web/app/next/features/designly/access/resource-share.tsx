@@ -4,12 +4,14 @@
 // «Передать владение» (the owner, the lead and the admin of a team resource). One who may only look gets the address,
 // «Копировать ссылку» and «Попросить правку». Views slide in inside the dialog; on the phone it is a bottom sheet whose
 // head stays while its body scrolls, lifted over the keyboard. Every change waits for the gateway.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import AccessLinks from '@/next/features/designly/access/access-links';
-import AccessLog from '@/next/features/designly/access/access-log';
+import AccessLog, { type ILogNames } from '@/next/features/designly/access/access-log';
 import { EMAIL, type IProjectAccess } from '@/next/features/designly/access/api';
 import type { IScopePage } from '@/next/features/designly/access/link-scope';
+import { LINK_KIND, type ILinkContext } from '@/next/features/designly/access/link-form';
 import PersonField from '@/next/features/designly/access/person-field';
+import RequestForm from '@/next/features/designly/access/request-form';
 import ResourceAdd from '@/next/features/designly/access/resource-add';
 import {
   askFor,
@@ -22,6 +24,7 @@ import ResourcePeople, {
   ResourceRequests,
   type IResourceSection,
 } from '@/next/features/designly/access/resource-people';
+import { LinkScreen, ResourceLinks, useLinksScreen } from '@/next/features/designly/access/resource-links';
 import { Frame } from '@/next/features/designly/access/share-dialog';
 import { useAction } from '@/next/features/designly/access/use-action';
 import { useMe } from '@/next/stores/me';
@@ -35,12 +38,13 @@ import type { TAccessFocus } from '@/next/routes/routes';
 import { t } from '@/next/i18n';
 import '@/next/styles/design-access.css';
 
-const VIEW = { log: 'log', transfer: 'transfer', links: 'links', publish: 'publish' } as const;
+const VIEW = { log: 'log', transfer: 'transfer', links: 'links', link: 'link', publish: 'publish' } as const;
 type TView = (typeof VIEW)[keyof typeof VIEW];
 const VIEW_TITLE: Record<TView, string> = {
   log: 'next.access.history',
   transfer: 'next.access.transferTitle',
   links: 'next.access.linksTitle',
+  link: 'next.access.linkNew',
   publish: 'next.publish.section',
 };
 /** A view leaves in this long (styles/design-access.css, .hx-acc-view--sub[data-state='closing']). */
@@ -58,11 +62,19 @@ export interface IResourceShareProps {
   address: string;
   onCopyLink: () => void;
   focus?: TAccessFocus | null;
+  /** Opened to ask for more (the «Запросить доступ» of the viewing mode): one who may only look gets the request form open. */
+  ask?: boolean;
   /** The links without sign-in on their older routes, until they move to this dialog (stage «г»): the view the
    *  «Ссылки без входа» row opens. */
   links?: ILegacyLinks;
   /** «Опубликовать как сайт», last, where the design may be published as a site. */
   publish?: IPublishState;
+  /** What the screen of a link knows of the thing shared (stage «г»): its kind, pages, slides, formats, look. */
+  linkContext?: ILinkContext;
+  /** A block after the links for whoever manages: a document's old public link, while it is open (stage «д»). */
+  extra?: ReactNode;
+  /** What the foot carries after «Копировать ссылку»: a document made of a file puts its «Отвязать» here. */
+  footExtra?: ReactNode;
 }
 
 export interface ILegacyLinks {
@@ -259,11 +271,36 @@ const Transfer = ({ props, onDone }: { props: IResourceSection; onDone: () => vo
   );
 };
 
-/** One who may only look: the address, their role and «Попросить правку». */
-const Looker = ({ props, address }: { props: IResourceSection; address: string }) => {
-  const { target, view, action, onNext } = props;
-  const asked = view.myRequest?.status === 'open';
+/** How long the request form takes to fold away (its closing animation in design-access.css). */
+const ASK_OUT_MS = 160;
+
+/**
+ * One who may only look: the address, their role and «Попросить правку», which opens the request (the level and a word
+ * to the owner) right here; sent, it goes to the owner and those who run the access, and the line says so while it is
+ * open. `askFirst`: the dialog was opened to ask (the «Запросить доступ» of the viewing mode), the form is open at once.
+ */
+const Looker = ({
+  props,
+  address,
+  askFirst,
+}: {
+  props: IResourceSection;
+  address: string;
+  askFirst: boolean;
+}) => {
+  const { target, view, onNext } = props;
+  const status = view.myRequest?.status ?? null;
+  const asked = status === 'open';
   const role = view.role;
+  const mayAsk = role !== 'edit' && role !== 'owner';
+  const [asking, setAsking] = useState(askFirst && mayAsk && !asked);
+  // Opened again to ask: the form opens again (state adjusted during render, not in an effect).
+  const [wasAskFirst, setWasAskFirst] = useState(askFirst);
+  if (askFirst !== wasAskFirst) {
+    setWasAskFirst(askFirst);
+    if (askFirst && mayAsk && !asked) setAsking(true);
+  }
+  const form = usePresence(asking && !asked ? true : null, ASK_OUT_MS);
   return (
     <section className="hx-acc-sec" data-section="own">
       <div className="hx-acc-addr">
@@ -272,7 +309,7 @@ const Looker = ({ props, address }: { props: IResourceSection; address: string }
       </div>
       <p className="hx-acc-ro">
         {role !== null && role !== 'owner' && <span>{t(`next.access.youCan.${role}`)}</span>}
-        {role !== 'edit' && role !== 'owner' && (
+        {mayAsk && (
           <>
             {role !== null && <span aria-hidden="true"> · </span>}
             {asked ? (
@@ -281,9 +318,8 @@ const Looker = ({ props, address }: { props: IResourceSection; address: string }
               <button
                 type="button"
                 className="hx-acc-ro__ask"
-                data-busy={action.busy === 'ask'}
-                disabled={action.busy !== null}
-                onClick={() => void action.run('ask', async () => onNext(await askFor(target, 'edit')))}
+                aria-expanded={asking}
+                onClick={() => setAsking((now) => !now)}
               >
                 {t('next.access.askEditShort')}
               </button>
@@ -291,8 +327,32 @@ const Looker = ({ props, address }: { props: IResourceSection; address: string }
           </>
         )}
       </p>
+      {form.value && (
+        <div className="hx-acc-ro__form" data-state={form.state}>
+          <RequestForm
+            mayComment={role === null || role === 'view'}
+            status={status}
+            initialLevel="edit"
+            autoFocus
+            onSend={async (level, message) => {
+              onNext(await askFor(target, level, message));
+              setAsking(false);
+            }}
+          />
+        </div>
+      )}
     </section>
   );
+};
+
+const DOC_LINKS: ILinkContext = { kind: LINK_KIND.doc };
+
+/** The names the history shows for ids: the teams the view knows and its links. */
+const logNamesOf = (view: IResourceView): ILogNames => {
+  const teams = new Map<string, string>();
+  if (view.homeTeam) teams.set(view.homeTeam.teamId, view.homeTeam.name);
+  for (const grant of view.grants ?? []) if (grant.type === 'team') teams.set(grant.id, grant.name);
+  return { teams, links: new Map((view.links ?? []).map((link) => [link.id, link.forWhom])) };
 };
 
 const ResourceShare = ({
@@ -305,8 +365,12 @@ const ResourceShare = ({
   address,
   onCopyLink,
   focus = null,
+  ask = false,
   links,
   publish,
+  linkContext = DOC_LINKS,
+  extra,
+  footExtra,
 }: IResourceShareProps) => {
   const action = useAction();
   const me = useMe();
@@ -317,6 +381,10 @@ const ResourceShare = ({
   const shown = usePresence(sub, VIEW_OUT_MS);
   const props: IResourceSection = { target, view, action, onNext };
   const manages = view.canManage;
+  const linkForm = useId();
+  const screen = useLinksScreen({ target, view, ctx: linkContext, action, onNext });
+  // The gateway of stage «г» answers the links in the view; an older one keeps them on their older routes.
+  const ownLinks = view.links !== undefined;
   useSheetKeyboard(body, open && phone);
 
   // The dialog opens again on its main view.
@@ -357,7 +425,16 @@ const ResourceShare = ({
               <ResourceAdd {...props} inputRef={field} />
               <ResourceRequests {...props} />
               <ResourcePeople {...props} me={me.k === 'ready' ? me.me.email : null} />
-              {links && (
+              {ownLinks && (
+                <ResourceLinks
+                  {...props}
+                  ctx={linkContext}
+                  me={me.k === 'ready' ? me.me.email : null}
+                  screen={screen}
+                  onOpen={() => go(VIEW.link)}
+                />
+              )}
+              {!ownLinks && links && (
                 <section className="hx-acc-sec" data-section="links">
                   <h3 className="hx-acc-sec__title">{t('next.access.guestLinks')}</h3>
                   <button type="button" className="hx-acc-row hx-acc-golinks" onClick={() => go(VIEW.links)}>
@@ -372,6 +449,7 @@ const ResourceShare = ({
                   </button>
                 </section>
               )}
+              {extra}
               {publish && (
                 <PublishSection state={publish} onPush={phone ? () => go(VIEW.publish) : undefined} />
               )}
@@ -387,17 +465,35 @@ const ResourceShare = ({
                   >
                     <Icon name="arrow-left" />
                   </button>
-                  <h3 className="hx-acc-back__title">{t(VIEW_TITLE[shown.value])}</h3>
+                  <h3 className="hx-acc-back__title">
+                    {shown.value === VIEW.link && screen.editing
+                      ? t('next.access.links.editTitle')
+                      : t(VIEW_TITLE[shown.value])}
+                  </h3>
                 </div>
-                {shown.value === VIEW.log && <AccessLog project={target.id} kind={target.kind} />}
+                {shown.value === VIEW.log && (
+                  <AccessLog project={target.id} kind={target.kind} names={logNamesOf(view)} />
+                )}
                 {shown.value === VIEW.transfer && <Transfer props={props} onDone={() => go(null)} />}
                 {shown.value === VIEW.links && links && <LegacyLinks links={links} />}
+                {shown.value === VIEW.link && (
+                  <LinkScreen
+                    id={linkForm}
+                    screen={screen}
+                    ctx={linkContext}
+                    onSubmit={() =>
+                      void screen.submit().then((done) => {
+                        if (done) go(null);
+                      })
+                    }
+                  />
+                )}
                 {shown.value === VIEW.publish && publish && <PublishForm state={publish} />}
               </div>
             )}
           </div>
         ) : (
-          <Looker props={props} address={address} />
+          <Looker props={props} address={address} askFirst={ask} />
         )}
         {action.error && (
           <p className="hx-create__err" role="alert">
@@ -405,17 +501,35 @@ const ResourceShare = ({
           </p>
         )}
       </div>
-      <div className="hx-modal__foot hx-acc-foot">
-        <div className="hx-acc-foot__left">
-          <button type="button" className="hx-btn" data-variant="ghost" data-size="sm" onClick={onCopyLink}>
+      {sub === VIEW.link ? (
+        <div className="hx-modal__foot hx-acc-foot hx-acc-foot--full">
+          <button
+            type="submit"
+            form={linkForm}
+            className="hx-btn"
+            data-variant="primary"
+            data-busy={action.busy === 'link-save'}
+            disabled={action.busy !== null}
+          >
             <Icon name="link" size="sm" />
-            <span>{t('next.access.copyLink')}</span>
+            <span>{screen.editing ? t('next.access.links.save') : t('next.access.links.create')}</span>
+            <span className="hx-gate__spin" aria-hidden="true" />
           </button>
         </div>
-        <button type="button" className="hx-btn" data-variant="primary" data-size="sm" onClick={onClose}>
-          {t('next.access.done')}
-        </button>
-      </div>
+      ) : (
+        <div className="hx-modal__foot hx-acc-foot">
+          <div className="hx-acc-foot__left">
+            <button type="button" className="hx-btn" data-variant="ghost" data-size="sm" onClick={onCopyLink}>
+              <Icon name="link" size="sm" />
+              <span>{t('next.access.copyLink')}</span>
+            </button>
+            {footExtra}
+          </div>
+          <button type="button" className="hx-btn" data-variant="primary" data-size="sm" onClick={onClose}>
+            {t('next.access.done')}
+          </button>
+        </div>
+      )}
     </Frame>
   );
 };

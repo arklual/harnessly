@@ -20,9 +20,9 @@ import {
   startDesignConv,
   useDesignConv,
   useDesignCreating,
-  useDesignSeen,
   type IDesignCreating,
 } from '@/next/bindings/design-conv';
+import { useDesignChatsFound } from '@/next/bindings/design-chats';
 import { hub, useConversationChannel } from '@/next/core/realtime/hub';
 import Feed from '@/next/features/chat/feed';
 import type { FeedItem } from '@/next/features/chat/types';
@@ -75,7 +75,7 @@ import { useConnection } from '@/next/stores/connection';
 import { useFeed, useNow } from '@/next/stores/conversation';
 import { useConversation, useConversationList } from '@/next/stores/conversations';
 import { clearDraft, setDraft, useDraft, type DraftKey } from '@/next/stores/drafts';
-import { limitsOf, useMachine } from '@/next/stores/machines';
+import { limitsOf, useMachine, useMachines } from '@/next/stores/machines';
 import { useEnterSends, useMe } from '@/next/stores/me';
 import { useMessage } from '@/next/stores/messages';
 import { AttachmentSrc } from '@/next/ui/attachment-thumb';
@@ -370,8 +370,8 @@ export interface IStageOptions {
   fromChat: string | null;
   /** The project's folder; null while the library loads. */
   dir: string | null;
-  /** The chats of other folders the machine found worked on the design (the library's `touchedBy`). */
-  touched: readonly string[];
+  /** The design's chats this machine has: started from it, then the ones that edited its files (`convs`, `touchedBy`). */
+  tied: readonly string[];
   title: string;
   /** The page on screen, its path on the library server: its notes are on it. */
   pageUrl: string;
@@ -388,7 +388,7 @@ export const useSiteStage = ({
   design,
   fromChat,
   dir,
-  touched,
+  tied,
   title,
   pageUrl,
   port,
@@ -398,10 +398,17 @@ export const useSiteStage = ({
   const key = designKey(machine, design);
   const current = useDesignConv(machine, design, fromChat);
   const { picked } = current;
-  const list = useConversationList(machine);
+  const machines = useMachines();
+  const machineNames = useMemo(
+    () => new Map((machines ?? []).map((v) => [v.machine.id as string, v.machine.name])),
+    [machines],
+  );
   const connection = useConnection(machine);
   const moveOn = useMoveEnabled(machine);
-  const seen = useDesignSeen(key);
+  // The chats of every machine: the switch lists the design's chats wherever they are.
+  const everywhere = useConversationList(null);
+  const [asked, setAsked] = useState(0);
+  const found = useDesignChatsFound(machine, design, tied, asked);
   // A pick in the switch: the chat on screen gives way, the next one comes in.
   const [epoch, setEpoch] = useState(0);
   const swap = useSwap(picked, epoch);
@@ -491,6 +498,7 @@ export const useSiteStage = ({
     }
     return startDesignConv({
       machine,
+      design,
       key,
       dir,
       choice: start.choice,
@@ -598,14 +606,22 @@ export const useSiteStage = ({
     tools: pickTool,
   };
 
+  const rowsOf = designChats({ list: everywhere, found, fresh: creating?.conv ?? null });
   const pickChat = (id: string | null) => {
+    const row = id === null ? undefined : rowsOf.find((c) => c.id === id);
+    // A chat of another machine opens on its machine, in its own page: the design's column is this machine's.
+    if (row && row.machineId !== machine) {
+      goTo({ kind: ROUTE.chat, id: row.id });
+      return;
+    }
     current.pick(id);
     setEpoch((n) => n + 1);
   };
   const online = connection === undefined || connection.k === 'live';
-  const rows = designChats({ list, dir, seen, touched, current: convId }).map((c) => ({
+  const rows = rowsOf.map((c) => ({
     id: c.id,
     title: c.title,
+    machine: c.machineId === machine ? null : (machineNames.get(c.machineId) ?? c.machineId),
     status: chatStatusOf(c, online),
     at: c.lastActivityAt,
   }));
@@ -644,6 +660,7 @@ export const useSiteStage = ({
         title={conv?.title ?? (convId ? title : t('next.site.newDesignChat'))}
         rows={rows}
         onPick={pickChat}
+        onOpen={() => setAsked((n) => n + 1)}
       />
     ),
     swapping: swap.leaving,

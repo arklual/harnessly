@@ -1,5 +1,5 @@
 // The machine's door for the agent's actions on the pane's browser: the page waits for the next action of a
-// chat (a long poll the machine holds up to 25 s) and says how it ended.
+// chat (a long poll the machine holds up to 10 s) and says how it ended.
 import { runtimePath } from '@/next/core/net/machine';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 
@@ -21,7 +21,8 @@ export const pollPaneAct = async (
     runtimePath(`/api/v2/pane-act?conversation=${encodeURIComponent(conv)}` as TPath, machine),
     { credentials: 'same-origin', signal, cache: 'no-store' },
   );
-  if (res.status === 204) return null;
+  // A gateway that gave up before the machine answered is a poll with nothing in it: the next one goes at once.
+  if (res.status === 204 || res.status === 504) return null;
   if (res.status === 404 || res.status === 405) throw new PaneActClosed(String(res.status));
   if (!res.ok) throw new Error(String(res.status));
   return res.json();

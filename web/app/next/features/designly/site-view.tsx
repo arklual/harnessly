@@ -156,7 +156,8 @@ export interface ISiteAccess {
   /** «Поделиться» for a person who manages, «Запросить правку» for one who may only look. */
   label: string;
   onOpen: () => void;
-  /** The person manages the project: a deck opens its own share popover instead of the dialog. */
+  /** A deck or a video opens its older share popover instead of the dialog: only where the gateway has no one dialog
+   *  (stage «д»). */
   manage?: boolean;
 }
 
@@ -226,7 +227,7 @@ export interface ISiteViewProps {
   viewSeed?: IViewMemory;
   /** Set for a visitor of a guest link. */
   guest?: ISiteGuest;
-  /** The mode and the way to the other one («Макет» · «Редактировать», «Редактирование макета» · eye); absent in a pane. */
+  /** The mode at the head of the bar («Макет» ↔ «Редактирование макета», a click switches); absent in a pane. */
   mode?: ISiteMode;
   /** Set where the person may change the design: the pictures of its boards get «Изменить» / «Сгенерировать» on them. */
   images?: { machine: MachineId; artifact: string };
@@ -1497,6 +1498,7 @@ const SiteView = ({
                 {keys && reloadHint && <kbd>{reloadHint}</kbd>}
               </span>
             </button>
+            {mode && <ModeButton mode={mode} compact={compact} />}
             <div className="hx-browser__addr">
               <button
                 type="button"
@@ -1556,7 +1558,6 @@ const SiteView = ({
                 </div>
               )}
             </div>
-            {mode && <ModeButton mode={mode} compact={compact} />}
             {compact && stage && (
               <button
                 type="button"

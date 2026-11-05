@@ -76,7 +76,7 @@ func ToolsDir(dataDir string) string { return filepath.Join(dataDir, "agent-skil
 var browserOperator string
 
 // browserTools are the MCP tools of the browser-operator subagent, by their names without the server.
-var browserTools = []string{"browser_snapshot", "browser_click", "browser_type", "browser_press", "browser_hover",
+var browserTools = []string{"browser_snapshot", "browser_read", "browser_click", "browser_type", "browser_press", "browser_hover",
 	"browser_select", "browser_scroll", "browser_wait", "browser_navigate", "browser_back", "browser_site_tools",
 	"browser_call_site_tool"}
 

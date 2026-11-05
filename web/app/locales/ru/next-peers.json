@@ -59,18 +59,30 @@
   "next.settings.peers.machine": "машина",
   "next.settings.peers.conflict": "Настройки только что изменили в другом месте, показываю, что сейчас",
   "next.peers.note.message": "сообщение",
-  "next.peers.note.done": "закончил",
+  "next.peers.note.done": "готово",
   "next.peers.note.idle": "ждёт",
   "next.peers.note.shutdownRequest": "просит завершить работу",
   "next.peers.note.shutdownApproved": "завершил работу",
   "next.peers.note.shutdownRejected": "не стал завершать",
   "next.peers.note.event": "событие",
-  "next.peers.sub.says": "Сабагент пишет агенту",
   "next.peers.sub.unknown": "Сабагент",
-  "next.peers.sub.open": "Открыть этого сабагента",
-  "next.peers.note.more": "Показать целиком",
-  "next.peers.note.less": "Свернуть",
   "next.systemNote.title": "Системное уведомление",
   "next.terminalStop.idle": "Терминал остановлен: {n} ч без работы",
-  "next.terminalStop.person": "Терминал остановлен"
+  "next.terminalStop.person": "Терминал остановлен",
+  "next.peers.note.failed": "ошибка",
+  "next.peers.note.openChat": "Открыть разговор агента",
+  "next.peers.note.openFile": "Открыть файл",
+  "next.peers.note.openNamed": "Открыть {name}",
+  "next.peers.note.groupDone": {
+    "one": "{n} фоновый агент закончил",
+    "few": "{n} фоновых агента закончили",
+    "many": "{n} фоновых агентов закончили",
+    "other": "{n} фоновых агента закончили"
+  },
+  "next.peers.note.groupSome": {
+    "one": "{n} сообщение от агентов",
+    "few": "{n} сообщения от агентов",
+    "many": "{n} сообщений от агентов",
+    "other": "{n} сообщения от агентов"
+  }
 }

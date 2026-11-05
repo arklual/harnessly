@@ -2,6 +2,7 @@ package wirefake
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/ly-solutions/harnessly/internal/wire"
@@ -135,6 +136,23 @@ func (s designly) Pin(_ context.Context, id string, pinned bool) error {
 	for i := range s.designs {
 		if s.designs[i].a.ID == id {
 			s.designs[i].a.Pinned = pinned
+			return nil
+		}
+	}
+	return &wire.DesignlyError{Code: wire.RefuseNotFound, Message: "Макета больше нет"}
+}
+
+func (s designly) Chat(_ context.Context, id, conv string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.designs == nil {
+		s.designs = fakeDesigns(s.now())
+	}
+	for i := range s.designs {
+		if s.designs[i].a.ID == id {
+			if !slices.Contains(s.designs[i].a.Convs, conv) {
+				s.designs[i].a.Convs = append(s.designs[i].a.Convs, conv)
+			}
 			return nil
 		}
 	}

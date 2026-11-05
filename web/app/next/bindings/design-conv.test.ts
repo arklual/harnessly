@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const create = vi.hoisted(() => vi.fn());
 vi.mock('@/next/commands', () => ({ createConversation: create }));
+const record = vi.hoisted(() => vi.fn(() => Promise.resolve({ id: 'abc', conv: 'tab-new' })));
+vi.mock('@/next/features/designly/api', () => ({ recordDesignChat: record }));
 const goTo = vi.hoisted(() => vi.fn());
 vi.mock('@/next/routes/routes', async (original) => ({
   ...(await original<typeof import('@/next/routes/routes')>()),
@@ -14,7 +16,6 @@ import {
   bindDesignConv,
   creatingStore,
   designBindingStore,
-  designSeenStore,
   resetDesignConvs,
   startDesignConv,
   useDesignConv,
@@ -56,6 +57,7 @@ beforeEach(() => {
   localStorage.clear();
   resetDesignConvs();
   create.mockReset();
+  record.mockClear();
 });
 afterEach(() => {
   cleanup();
@@ -71,7 +73,6 @@ describe("the design's current chat", () => {
     const { result } = renderHook(() => useDesignConv(M, 'abc', 'tab-from'));
     expect(result.current.picked).toEqual({ k: DESIGN_CONV.conv, id: 'tab-from' });
     expect(designBindingStore.get(KEY)).toEqual({ id: 'tab-from', fresh: false });
-    expect(designSeenStore.get(KEY)).toEqual(['tab-from', 'tab-last']);
   });
 
   it('opens on the last chat the browser kept, before the machine has answered', () => {
@@ -134,6 +135,7 @@ describe("the design's first message", () => {
     const finish = pendingCreate();
     const first = {
       machine: M,
+      design: 'abc',
       key: KEY,
       dir: DIR,
       choice: null,
@@ -155,15 +157,28 @@ describe("the design's first message", () => {
     putList([conv('tab-old', 1), conv('tab-new', 2)]);
     expect(result.current.picked).toEqual({ k: DESIGN_CONV.conv, id: 'tab-new' });
     expect(designBindingStore.get(KEY)).toEqual({ id: 'tab-new', fresh: false });
+    // The machine keeps that the chat was started from the design.
+    expect(record).toHaveBeenCalledWith(M, 'abc', 'tab-new');
   });
 
   it('gives the words back and binds nothing when the machine refuses the chat', async () => {
     const finish = pendingCreate();
     const onRefused = vi.fn();
-    startDesignConv({ machine: M, key: KEY, dir: DIR, choice: null, text: 'hi', attachments: [], onRefused });
+    record.mockClear();
+    startDesignConv({
+      machine: M,
+      design: 'abc',
+      key: KEY,
+      dir: DIR,
+      choice: null,
+      text: 'hi',
+      attachments: [],
+      onRefused,
+    });
     await act(async () => finish(null));
     expect(onRefused).toHaveBeenCalledWith('hi');
     expect(creatingStore.has(KEY)).toBe(false);
     expect(designBindingStore.has(KEY)).toBe(false);
+    expect(record).not.toHaveBeenCalled();
   });
 });

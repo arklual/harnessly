@@ -13,14 +13,20 @@ import (
 
 // Defaults of a Hub; each is a field so a test can shorten it.
 const (
-	holdFor       = 25 * time.Second  // a poll with nothing to give ends after this (under any proxy's idle limit)
-	presentFor    = 35 * time.Second  // a page stays present this long after its last poll ended
-	answerTimeout = 30 * time.Second  // the agent waits this long for the page
-	askTimeout    = 120 * time.Second // ... this long once the page is asking the person
-	maxPolls      = 4                 // open polls of one chat
-	rateLimit     = 120               // actions a minute of one chat
-	rateWindowMs  = 60_000
-	maxChats      = 512 // chats kept without a page or an action; the idle ones are dropped past it
+	holdFor    = 10 * time.Second // a poll with nothing to give ends after this, well before a gateway gives up on it
+	presentFor = 35 * time.Second // a page stays present this long after its last poll ended
+	// answerTimeout is how long the agent waits for the page to take an action and answer. askTimeout is the whole
+	// wait of one call once the page asks the person: the agent's MCP bridge cuts a call without an answer at 60 s,
+	// so the call ends before that with «the person is being asked», and the next call keeps waiting.
+	answerTimeout = 30 * time.Second
+	askTimeout    = 55 * time.Second
+	// askStale is how long a page may stay silent while it asks: it repeats «asking» every few seconds, so a question
+	// older than this belongs to a tab that is gone (closed without a word) and no longer holds the chat.
+	askStale     = 30 * time.Second
+	maxPolls     = 4   // open polls of one chat
+	rateLimit    = 120 // actions a minute of one chat
+	rateWindowMs = 60_000
+	maxChats     = 512 // chats kept without a page or an action; the idle ones are dropped past it
 )
 
 // Action is what the agent asks of the page. All fields are always sent; the unused ones are zero.
@@ -36,12 +42,15 @@ type Action struct {
 	DY      int    `json:"dy"`
 	MS      int    `json:"ms"`
 	Submit  bool   `json:"submit"`
+	// Event is what a wait is for on a video or audio of the page: ended, playing or paused.
+	Event string `json:"event"`
 	// Tool and Input are a site tool's name and its arguments as JSON text (op "call").
 	Tool  string `json:"tool"`
 	Input string `json:"input"`
 }
 
-// Outcome is how an action ended: answered (Failed and Text tell how), no-ui, timeout, busy or rate-limited.
+// Outcome is how an action ended: answered (Failed and Text tell how), asking (Text is the site the person is asked
+// about, "" when the page did not say), no-ui, timeout, busy or rate-limited.
 type Outcome struct {
 	Kind   string
 	Failed bool
@@ -58,8 +67,8 @@ const (
 // Hub holds each chat's page presence and its one action in flight.
 type Hub struct {
 	Now func() time.Time
-	// Hold, Present, Timeout and AskTimeout are the durations above.
-	Hold, Present, Timeout, AskTimeout time.Duration
+	// Hold, Present, Timeout, AskTimeout and AskStale are the durations above.
+	Hold, Present, Timeout, AskTimeout, AskStale time.Duration
 
 	mu    sync.Mutex
 	chats map[string]*chat
@@ -78,12 +87,20 @@ type flight struct {
 	action Action
 	taken  bool
 	done   chan Outcome
-	extend chan struct{}
+	// asked is closed once the page says it asks the person; asking is the site, askedAt when the page last said so.
+	asked   chan struct{}
+	asking  string
+	askedAt time.Time
+	// detached: the call that sent the action went back to the agent with «asking»; the question is still open in the
+	// pane. waited: a later call waits for its answer before sending its own action.
+	detached bool
+	waited   bool
 }
 
 // NewHub is a hub with the default durations.
 func NewHub() *Hub {
-	return &Hub{Now: time.Now, Hold: holdFor, Present: presentFor, Timeout: answerTimeout, AskTimeout: askTimeout, chats: map[string]*chat{}}
+	return &Hub{Now: time.Now, Hold: holdFor, Present: presentFor, Timeout: answerTimeout, AskTimeout: askTimeout,
+		AskStale: askStale, chats: map[string]*chat{}}
 }
 
 func (h *Hub) chat(id string) *chat {
@@ -145,10 +162,49 @@ func (h *Hub) Poll(ctx context.Context, chatID string) (Action, int) {
 	}
 }
 
-// Dispatch gives the action to the chat's page and waits for its outcome.
+// Dispatch gives the action to the chat's page and waits for its outcome. While the page asks the person about the
+// site, the call ends with «asking» before the bridge's cut and the question stays open: the next call waits for the
+// person's answer, then sends its own action.
 func (h *Hub) Dispatch(ctx context.Context, chatID string, a Action) Outcome {
+	started := h.Now()
+	whole := time.NewTimer(h.AskTimeout)
+	defer whole.Stop()
+
 	h.mu.Lock()
 	c := h.chat(chatID)
+	if f := c.act; f != nil {
+		switch {
+		case !isClosed(f.asked):
+			// Another call's action, not asked about: the page is busy with it.
+			h.mu.Unlock()
+			return Outcome{Kind: "busy"}
+		case !f.detached || f.waited:
+			// The question is open and a call already waits on it.
+			h.mu.Unlock()
+			return Outcome{Kind: "asking", Text: f.asking}
+		case started.Sub(f.askedAt) > h.AskStale:
+			// The asking tab went away without a word: the question no longer holds the chat.
+			c.act = nil
+		default:
+			f.waited = true
+			h.mu.Unlock()
+			select {
+			case <-f.done:
+				// The person answered and the earlier action ran or was refused: this one goes the usual way, and a
+				// refusal for the site comes back from the page at once.
+			case <-whole.C:
+				h.unwait(f)
+				return Outcome{Kind: "asking", Text: f.asking}
+			case <-ctx.Done():
+				h.unwait(f)
+				return Outcome{Kind: "asking", Text: f.asking}
+			}
+			h.mu.Lock()
+			if c.act == f {
+				c.act = nil
+			}
+		}
+	}
 	now := h.Now()
 	switch {
 	case !c.present(now, h.Present):
@@ -165,31 +221,66 @@ func (h *Hub) Dispatch(ctx context.Context, chatID string, a Action) Outcome {
 		return Outcome{Kind: "rate-limited"}
 	}
 	a.ID = panel.UUID()
-	f := &flight{action: a, done: make(chan Outcome, 1), extend: make(chan struct{}, 1)}
+	f := &flight{action: a, done: make(chan Outcome, 1), asked: make(chan struct{})}
 	c.act = f
 	close(c.wake)
 	c.wake = make(chan struct{})
 	h.mu.Unlock()
 
-	timer := time.NewTimer(h.Timeout)
-	defer timer.Stop()
+	answer := time.NewTimer(h.Timeout)
+	defer answer.Stop()
+	asked, asking := f.asked, false
 	for {
 		select {
 		case o := <-f.done:
 			return o
-		case <-f.extend:
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
+		case <-asked:
+			// The page asks the person: the answer's timer no longer counts, only the whole call's.
+			asked, asking = nil, true
+			answer.Stop()
+		case <-answer.C:
+			return h.abandon(chatID, f, Outcome{Kind: "timeout"})
+		case <-whole.C:
+			if asking {
+				return h.detach(f)
 			}
-			timer.Reset(h.AskTimeout)
-		case <-timer.C:
 			return h.abandon(chatID, f, Outcome{Kind: "timeout"})
 		case <-ctx.Done():
+			if asking {
+				return h.detach(f)
+			}
 			return h.abandon(chatID, f, Outcome{Kind: "timeout"})
 		}
+	}
+}
+
+func isClosed(ch chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *Hub) unwait(f *flight) {
+	h.mu.Lock()
+	f.waited = false
+	h.mu.Unlock()
+}
+
+// detach leaves the question open in the pane and tells the agent whom it waits for; an answer that came at the last
+// moment wins.
+func (h *Hub) detach(f *flight) Outcome {
+	h.mu.Lock()
+	f.detached = true
+	host := f.asking
+	h.mu.Unlock()
+	select {
+	case o := <-f.done:
+		return o
+	default:
+		return Outcome{Kind: "asking", Text: host}
 	}
 }
 
@@ -208,8 +299,8 @@ func (h *Hub) abandon(chatID string, f *flight, reason Outcome) Outcome {
 	}
 }
 
-// Answer settles the chat's action: "done" and "failed" end it with text, "asking" only extends the wait. False for an
-// id that is not the chat's action in flight.
+// Answer settles the chat's action: "done" and "failed" end it with text, "asking" says the page asks the person about
+// the site in text (repeated while the question is open). False for an id that is not the chat's action in flight.
 func (h *Hub) Answer(chatID, id, state, text string) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -218,10 +309,15 @@ func (h *Hub) Answer(chatID, id, state, text string) bool {
 		return false
 	}
 	f := c.act
+	// A page that answers is there, whatever its polls: it stops polling while it asks the person.
+	c.lastPoll = h.Now()
 	if state == "asking" {
-		select {
-		case f.extend <- struct{}{}:
-		default:
+		f.askedAt = c.lastPoll
+		if text != "" {
+			f.asking = text
+		}
+		if !isClosed(f.asked) {
+			close(f.asked)
 		}
 		return true
 	}

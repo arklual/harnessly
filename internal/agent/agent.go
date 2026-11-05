@@ -20,6 +20,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/ly-solutions/harnessly/internal/hubproto"
+	"github.com/ly-solutions/harnessly/internal/proc"
 )
 
 const (
@@ -38,7 +39,7 @@ type Agent struct {
 	secret []byte
 	// secretMu guards secret for a hub-mode agent, which starts before the runtime has written it.
 	secretMu   sync.Mutex
-	roots      Roots
+	roots      *rootSet
 	hello      Hello
 	appsGuests *appsGuests
 	client     *http.Client
@@ -93,7 +94,6 @@ func New(cfg Config) (*Agent, error) {
 	a := &Agent{
 		cfg:              cfg,
 		secret:           secret,
-		roots:            TranscriptRoots(cfg.Home),
 		hello:            Hello{Protocol: Protocol, AgentVersion: cfg.Version, User: username, Home: cfg.Home, Hostname: hostname, Features: features},
 		client:           &http.Client{},
 		tunnels:          newTunnels(cfg.RuntimePort, cfg.FilesPort),
@@ -102,6 +102,7 @@ func New(cfg Config) (*Agent, error) {
 		pendingStates:    map[string]chan StateResult{},
 		pendingDocs:      map[string]chan DocResult{},
 	}
+	a.roots = newRootSet(cfg.Home, func() ([]string, []string) { return cliDirs(cfg.Home, a.cliEnv, proc.System()) })
 	a.state = newStateFiles(cfg.DataDir, cfg.ExtraStateFiles, a.broadcast, a.notifyRuntimeOfState)
 	a.transcripts = newTranscriptWatch(a.roots, a.broadcast)
 	switch {
@@ -124,6 +125,14 @@ func (a *Agent) sessionSecret() []byte {
 		}
 	}
 	return a.secret
+}
+
+// cliEnv is a variable as a CLI started by the agent would see it.
+func (a *Agent) cliEnv(provider, name string) string {
+	if a.hub != nil {
+		return a.hub.cliEnv(provider, name)
+	}
+	return os.Getenv(name)
 }
 
 func (a *Agent) broadcast(ev any) {
@@ -297,7 +306,7 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 	case "hello":
 		return a.hello, nil, nil
 	case "transcripts.list":
-		files, err := ListTranscripts(a.roots)
+		files, err := ListTranscripts(a.roots.Refresh())
 		return files, nil, err
 	case "state.list":
 		return a.state.List(), nil, nil
@@ -340,7 +349,8 @@ func (a *Agent) handle(l *link, req map[string]json.RawMessage) (any, func(), er
 		return map[string]bool{"settled": true}, nil, nil
 	case "transcripts.read":
 		path, _ := field[string](req, "path")
-		if !a.roots.IsTranscriptPath(path) {
+		// A folder a CLI started using since the last look is looked for once more before the read is refused.
+		if !a.roots.Get().IsTranscriptPath(path) && !a.roots.Refresh().IsTranscriptPath(path) {
 			return nil, nil, errors.New("path is not a transcript of this account")
 		}
 		maxBytes, _ := field[float64](req, "maxBytes")
@@ -578,6 +588,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	a.transcripts.WatchRoots()
 	go every(ctx, a.cfg.ScanInterval, true, func() {
+		a.roots.Refresh()
 		a.transcripts.WatchRoots()
 		if err := a.transcripts.Scan(); err != nil {
 			Log("warn", "transcript scan failed", F{"error", err.Error()})

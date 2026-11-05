@@ -1,84 +1,69 @@
-/* The mode of a project in its bar (features/designly/mode-button): what the screen is in, then the way out of it. */
+/* The mode of a project at the head of its bar (features/designly/mode-button): «Макет» or «Редактирование макета»,
+   a quiet switch beside the address. */
 .hx-mode {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: 30px;
-  padding: 0 3px 0 10px;
-  border: 1px solid var(--hx-border);
-  border-radius: var(--hx-radius-md, 8px);
-  color: var(--hx-fg-2);
-  font-size: var(--hx-text-sm);
-  white-space: nowrap;
-}
-.hx-mode[data-act='false'] {
-  padding-right: 10px;
-}
-.hx-mode__state {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.hx-mode[data-editing='true'] .hx-mode__state {
-  color: var(--hx-fg-1);
-}
-.hx-mode[data-editing='true'] .hx-mode__icon {
-  color: var(--hx-accent);
-}
-.hx-mode__act {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 24px;
-  min-width: 24px;
-  padding: 0 6px;
+  padding: 0 10px 0 8px;
   border: 0;
-  border-radius: calc(var(--hx-radius-md, 8px) - 3px);
+  border-radius: 8px;
   background: transparent;
   color: var(--hx-fg-2);
   font: inherit;
-  cursor: pointer;
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
   transition:
     background 140ms ease,
     color 140ms ease,
     transform 160ms var(--hx-ease-out);
 }
-.hx-mode__act:hover {
+button.hx-mode {
+  cursor: pointer;
+}
+button.hx-mode:hover {
   background: var(--hx-bg-hover);
   color: var(--hx-fg-1);
 }
-.hx-mode__act:active {
-  transform: scale(0.96);
+button.hx-mode:active {
+  transform: scale(0.97);
 }
-.hx-mode__act:focus-visible {
+button.hx-mode:focus-visible {
   outline: 2px solid var(--hx-focus);
   outline-offset: 1px;
 }
-.hx-mode__act[data-primary='true'] {
-  padding: 0 10px;
-  background: var(--hx-primary);
-  color: var(--hx-primary-fg);
+.hx-mode[data-editing='true'] {
+  color: var(--hx-fg-1);
   font-weight: var(--hx-weight-medium);
 }
-.hx-mode__act[data-primary='true']:hover {
-  background: color-mix(in srgb, var(--hx-primary) 88%, transparent);
-  color: var(--hx-primary-fg);
+.hx-mode[data-editing='true'] .hx-mode__icon {
+  color: var(--hx-accent);
 }
-/* A phone's bar: the icon says the mode, the button stays. */
-.hx-mode[data-compact='true'] {
-  padding-left: 8px;
-}
-.hx-mode[data-compact='true'] .hx-mode__name {
+/* Editing: the whole «Редактирование макета» on a wide screen, «Редактирование» on a usual one. */
+.hx-mode__short {
   display: none;
 }
-@media (max-width: 640px) {
-  .hx-mode {
-    padding-left: 8px;
+@media (max-width: 1599px) {
+  .hx-mode[data-editing='true'] .hx-mode__name {
+    display: none;
   }
-  .hx-mode__name {
+  .hx-mode[data-editing='true'] .hx-mode__short {
+    display: inline;
+  }
+}
+/* A phone's bar, a narrow window: the icon says the mode, the hint the rest. */
+.hx-mode[data-compact='true'] {
+  padding: 0 8px;
+}
+.hx-mode[data-compact='true'] :is(.hx-mode__name, .hx-mode__short) {
+  display: none;
+}
+@media (max-width: 900px) {
+  .hx-mode {
+    padding: 0 8px;
+  }
+  .hx-mode[data-editing] :is(.hx-mode__name, .hx-mode__short) {
     display: none;
   }
 }

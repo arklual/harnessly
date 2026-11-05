@@ -9,6 +9,7 @@ export const KEY_SCOPE = {
   video: 'video',
   pictures: 'pictures',
   site: 'site',
+  files: 'files',
 } as const;
 export type TKeyScope = (typeof KEY_SCOPE)[keyof typeof KEY_SCOPE];
 
@@ -92,6 +93,9 @@ export const KEY_COMMANDS = [
   cmd('site', 'inspect', 'Mod+Shift+KeyC'),
   cmd('site', 'pick', 'KeyV'),
   fixed('site', 'stopInspect', 'Escape'),
+
+  cmd('files', 'quickOpen', 'Mod+KeyP'),
+  cmd('files', 'find', 'Mod+Shift+KeyF'),
 ] as const satisfies readonly IKeyCommand[];
 
 export const KEY_SCOPES: readonly TKeyScope[] = Object.values(KEY_SCOPE);

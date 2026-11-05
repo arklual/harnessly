@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { IGuestLink } from '@/next/features/designly/access/api';
 import {
+  autoplayOn,
   readVideoLinkView,
   shareFormatsOf,
   startFormat,
+  timelineCommentsOn,
   videoLinkOf,
   videoViewOf,
 } from '@/next/features/designly/video/share-view';
@@ -68,5 +70,16 @@ describe('the formats of the share popover', () => {
   it('keeps the order and is null for none', () => {
     expect(shareFormatsOf(['16:9', '9:16'])).toEqual(['16:9', '9:16']);
     expect(shareFormatsOf([])).toBeNull();
+  });
+});
+
+describe('what a video link of HRN-675 asks of the guest page', () => {
+  it('starts by itself only when asked; comments stay on the timeline unless turned off', () => {
+    expect(autoplayOn({ deck: 'video', autoplay: true })).toBe(true);
+    expect(autoplayOn({ deck: 'video' })).toBe(false);
+    expect(autoplayOn(null)).toBe(false);
+    expect(timelineCommentsOn({ deck: 'video', tlComments: false })).toBe(false);
+    expect(timelineCommentsOn({ deck: 'video' })).toBe(true);
+    expect(timelineCommentsOn(null)).toBe(true);
   });
 });

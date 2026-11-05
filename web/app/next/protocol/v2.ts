@@ -758,9 +758,9 @@ export interface DesignOwner {
   me: boolean;
 }
 /**
- * A project of the library; convs are the v2 conversations whose folder is the project's, touchedBy the others that
- * worked on it from any folder (their agent wrote its files or named it to the design CLI, read from the transcripts:
- * the chats from before count too), the latest activity first; an older runtime leaves it out. The owner is there for
+ * A project of the library; convs are the v2 conversations started from it, touchedBy the others that worked
+ * on it from any folder (their agent wrote its files or named it to a writing command of the design CLI, read from the
+ * transcripts: the chats from before count too), the latest activity first; an older runtime leaves it out. The owner is there for
  * a project made after owners were recorded: an older one has none.
  */
 export interface DesignArtifact {
@@ -791,6 +791,11 @@ export interface DesignSystemInfo {
 export interface DesignlyPin {
   id: string;
   pinned: boolean;
+}
+/** POST /api/v2/designly/chat: conv was started from the design's own column. */
+export interface DesignlyChat {
+  id: string;
+  conv: string;
 }
 /** What a designly page answers when it refuses (status 4xx/5xx): projectId names a project made before the failure. */
 export interface DesignlyRefusal {
@@ -1175,16 +1180,22 @@ export interface OpenedRefs {
 export type FileKind = 'file' | 'directory';
 export const FILE_KINDS: readonly FileKind[] = ['file', 'directory'];
 /** One entry of a conversation's folder; path is from the folder's root. */
+/** What git says of an entry: not in git yet, or with changes not committed. */
+export type FileGit = 'new' | 'changed';
+export const FILE_GITS: readonly FileGit[] = ['new', 'changed'];
 export interface FileEntry {
   name: string;
   path: string;
   kind: FileKind;
+  git?: FileGit;
 }
 /** GET /api/v2/conversations/{id}/files?path=: folders first, then files, by name; truncated: the folder holds more. */
 export interface DirListing {
   path: string;
   entries: FileEntry[];
   truncated: boolean;
+  /** The place of the workspace an absolute folder lies in: the crumbs go up to it. */
+  root?: string;
 }
 /** GET /api/v2/conversations/{id}/file?path=: a UTF-8 text file of at most 1 MB, with the revision a save names. */
 export interface FileContent {
@@ -1501,6 +1512,12 @@ export interface PeerNote {
   agentId: string | null; // a background subagent of this session wrote it: `from` is its task
   model: string | null;
   md: string;
+  /** What a named teammate was started for (its Agent call's description); absent when the feed has no such call. */
+  task?: string;
+  /** The id of the agent's own conversation the pane can open; absent when it has none. */
+  opens?: string;
+  /** The agent this note settles ended in a failure. */
+  failed?: boolean;
 }
 export interface ToolOutput {
   text: string;
@@ -2463,6 +2480,7 @@ const madeItems: Decoder<MadeItem[]> = (v, p) => {
 const chatMade: Decoder<ChatMade> = object({ items: madeItems, complete: bool });
 const designSystemInfo: Decoder<DesignSystemInfo> = object({ id, label: id, desc: str });
 const designlyPin: Decoder<DesignlyPin> = object({ id, pinned: bool });
+const designlyChat: Decoder<DesignlyChat> = object({ id, conv: convId });
 
 const taskStatus = oneOf(TASK_STATUSES);
 const task: Decoder<Task> = object({ id, subject: str, status: taskStatus });
@@ -2641,7 +2659,10 @@ const legacyTab: Decoder<LegacyTab> = object({
   cwd: str,
 });
 const fileKind = oneOf(FILE_KINDS);
-const fileEntry: Decoder<FileEntry> = object({ name: id, path: id, kind: fileKind });
+const fileEntry: Decoder<FileEntry> = object(
+  { name: id, path: id, kind: fileKind },
+  { git: oneOf(FILE_GITS) },
+);
 
 const dir: Decoder<Dir> = object({ path: id, name: id, git: bool, branch: nullable(id), empty: bool });
 
@@ -3396,8 +3417,9 @@ export const parsePage = {
     object({ port: int, root: id, artifacts: array(designArtifact) })(v, '$'),
   designlySystems: (v: unknown): DesignSystemInfo[] => array(designSystemInfo)(v, '$'),
   designlyPin: (v: unknown): DesignlyPin => designlyPin(v, '$'),
+  designlyChat: (v: unknown): DesignlyChat => designlyChat(v, '$'),
   files: (v: unknown): DirListing =>
-    object({ path: str, entries: array(fileEntry), truncated: bool })(v, '$'),
+    object({ path: str, entries: array(fileEntry), truncated: bool }, { root: str })(v, '$'),
   file: (v: unknown): FileContent => object({ path: id, content: str, revision: id, bytes: int })(v, '$'),
   tasks: (v: unknown): Task[] => array(task)(v, '$'),
   legacy: (v: unknown): LegacyTab | null => {

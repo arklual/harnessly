@@ -272,8 +272,9 @@ const Shell = ({ owner }: IShellProps) => {
   const update = useAppUpdate();
   const release = useRelease(model.active);
   const currentId = route.kind === ROUTE.chat ? route.id : null;
-  // The sidebar folded for a design opened full screen opens again once the design is left.
-  const onSite = route.kind === ROUTE.site;
+  // The sidebar folded for a design opened full screen opens again once the design is left: an app's document opened
+  // full screen («развернуть» from the pane) is such a design too.
+  const onSite = route.kind === ROUTE.site || route.kind === ROUTE.appDoc;
   useEffect(() => {
     if (!onSite) restoreRailAfterDesign();
   }, [onSite]);

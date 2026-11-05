@@ -110,6 +110,10 @@ func TestChatLinksClaudeTools(t *testing.T) {
 		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/cd-quiet && cat a.json > /tmp/x && sed -i s/a/b/ /tmp/y && cp a.json /tmp/z"}),
 		toolUse(t, "Bash", map[string]any{"command": "cp " + r.root + "/source/project/a.png /tmp/a.png; grep -n 'x' " + r.root + "/grepped/a.html | tee /tmp/g.txt"}),
 		toolUse(t, "Write", map[string]any{"file_path": "/home/coder/notes.md", "content": "Главная.dc.html " + board}),
+		// a chat borrowing from a design wrote into its scratchpad by a variable while it stood in the design's
+		// folder; the variable's path is not under the folder, and the design is not that chat's.
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/borrowed/project/lib; mkdir -p /tmp/s; S=/tmp/s; sed 's/}/}\\n/g' viz.css > $S/viz.css; wc -l $S/viz.css"}),
+		toolUse(t, "Bash", map[string]any{"command": "cd " + r.root + "/borrowed/project; cp a.css ~/a.css; cat a.css > ${S}/b.css; echo x | tee `pwd`/../x; cd $S && touch y"}),
 	)
 	l := NewChatLinks(r.lib, "")
 	got := l.Designs([]string{p})[p]

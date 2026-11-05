@@ -51,7 +51,7 @@ import {
 } from '@/next/stores/pane-sites';
 import PaneSitesGroup from '@/next/features/settings/pane-sites-group';
 import BrowserAgentGroup from '@/next/features/settings/browser-agent-group';
-import { setBrowserAgentAsk, setSiteDecision, useBrowserAgent } from '@/next/stores/browser-agent';
+import { setSiteBlocked, useBrowserAgent } from '@/next/stores/browser-agent';
 import { setFeedKind, useFeedKinds } from '@/next/stores/feed-kinds';
 import { useTheme } from '@/platform/theme';
 
@@ -238,10 +238,9 @@ export const GeneralPage = ({ machine, name, pending }: IGeneralPageProps) => {
             onReset={resetPaneSites}
           />
           <BrowserAgentGroup
-            ask={browserAgent.ask}
-            sites={browserAgent.sites}
-            onAsk={setBrowserAgentAsk}
-            onForget={(host) => setSiteDecision(host, null)}
+            blocked={browserAgent.blocked}
+            onBlock={(host) => setSiteBlocked(host, true)}
+            onUnblock={(host) => setSiteBlocked(host, false)}
           />
         </>
       }

@@ -145,17 +145,43 @@ func (m *Manager) watchLaunch(tabID string, started float64) {
 	}
 }
 
+// resolveRetries are the pauses between looks for the transcript of a tab that started working without one. A new
+// Claude creates its transcript only after the hook of the first prompt has fired: one look at that moment finds
+// nothing, and without more the chat waited for the next poll of the tabs (30-60 s) to show an answer that was there.
+// Past the last one the poll takes over.
+var resolveRetries = []time.Duration{
+	200 * time.Millisecond, 500 * time.Millisecond, time.Second, 2 * time.Second, 3 * time.Second, 5 * time.Second,
+	8 * time.Second, 10 * time.Second,
+}
+
 // resolveTranscript finds the transcript of a tab that started working without one: from the session id its layout
-// keeps, else from the agent running in the pane.
+// keeps, else from the agent running in the pane; looked for again while it is not on disk yet.
 func (m *Manager) resolveTranscript(tabID, session string) {
+	for i := 0; ; i++ {
+		e, transcript, done := m.lookForTranscript(tabID, session)
+		if done {
+			return
+		}
+		if transcript != "" {
+			m.setResolvedTranscript(tabID, e, transcript)
+			return
+		}
+		if i >= len(resolveRetries) {
+			return
+		}
+		time.Sleep(resolveRetries[i])
+	}
+}
+
+// lookForTranscript is one look; done when the tab is gone or has its transcript already.
+func (m *Manager) lookForTranscript(tabID, session string) (e *Entry, transcript string, done bool) {
 	m.mu.Lock()
-	e := m.tabs[tabID]
+	e = m.tabs[tabID]
 	if e == nil || e.JSONLPath != "" {
 		m.mu.Unlock()
-		return
+		return e, "", true
 	}
 	m.mu.Unlock()
-	transcript := ""
 	if wsID, _, _, ok := m.d.Tmux.ParseSessionName(session); ok {
 		if tabs, ok := m.d.Layouts.Tabs(wsID); ok {
 			for _, t := range tabs {
@@ -200,9 +226,10 @@ func (m *Manager) resolveTranscript(tabID, session string) {
 			}
 		}
 	}
-	if transcript == "" {
-		return
-	}
+	return e, transcript, false
+}
+
+func (m *Manager) setResolvedTranscript(tabID string, e *Entry, transcript string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.tabs[tabID] != e {

@@ -302,6 +302,8 @@ func testDeckLibrary(t *testing.T) *Library {
 	root := t.TempDir()
 	l := New(Config{LibraryDir: root, PlatformAPI: "/api/x", Texts: Texts{Tag: "test-design", CLI: "acme"}})
 	t.Cleanup(l.StopWatching)
+	// The exports a test starts run in the background: wait for them before the temp dir goes.
+	t.Cleanup(func() { waitDeckJobs(l) })
 	project := filepath.Join(root, "demo", ProjectDirname)
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)
@@ -640,4 +642,24 @@ func remoteResources(page string) []string {
 	page = strings.NewReplacer("&quot;", `"`, "&amp;", "&", "&lt;", "<", "&gt;", ">").Replace(page)
 	re := regexp.MustCompile(`(?i)(?:\b(?:src|poster|srcset)=["']?\s*|url\(\s*["']?)(?:https?:)?//[^\s"')]+`)
 	return re.FindAllString(page, -1)
+}
+
+// waitDeckJobs waits, up to a while, for the library's exports to finish.
+func waitDeckJobs(l *Library) {
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		s := l.deckJobs()
+		s.mu.Lock()
+		busy := false
+		for _, j := range s.jobs {
+			if j.State == DeckJobQueued || j.State == DeckJobRunning {
+				busy = true
+			}
+		}
+		s.mu.Unlock()
+		if !busy {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }

@@ -18,7 +18,7 @@ import {
   type IGuestPick,
 } from '@/next/features/designly/guest/guest-video-model';
 import { useComments } from '@/next/features/designly/guest/use-guest-comments';
-import { startFormat } from '@/next/features/designly/video/share-view';
+import { autoplayOn, startFormat, timelineCommentsOn } from '@/next/features/designly/video/share-view';
 import { VIDEO_FORMATS, type TVideoFormat } from '@/next/features/designly/video/types';
 import { Button } from '@/next/ui/button';
 import { toast } from '@/next/ui/toast';
@@ -86,7 +86,10 @@ const GuestVideo = ({ config }: IGuestVideoProps) => {
     () => scenesOf(chapters, config.boards, total ?? 0),
     [chapters, config.boards, total],
   );
+  // The link may keep comments off the timeline: the list beside the player still has them.
+  const onTimeline = timelineCommentsOn(config.view);
   const marks = useMemo(() => marksOf(list, scenes), [list, scenes]);
+  const autoplay = autoplayOn(config.view);
   const nowMs = time * 1000;
   const here = sceneAt(scenes, nowMs);
   const at = currentChapter(
@@ -152,7 +155,7 @@ const GuestVideo = ({ config }: IGuestVideoProps) => {
     return share * total;
   };
   const down = (event: PointerEvent<HTMLDivElement>) => {
-    if (!commenting) return;
+    if (!commenting || !onTimeline) return;
     const ms = msAt(event);
     if (ms === null) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -262,7 +265,9 @@ const GuestVideo = ({ config }: IGuestVideoProps) => {
               src={`${config.mediaBase}${mediaName(format)}`}
               controls
               playsInline
-              preload="metadata"
+              autoPlay={autoplay}
+              muted={autoplay}
+              preload={autoplay ? 'auto' : 'metadata'}
               onTimeUpdate={(event) => setTime(event.currentTarget.currentTime)}
               onLoadedMetadata={(event) => loaded(event.currentTarget)}
               onPlay={() => setPlaying(true)}
@@ -274,7 +279,7 @@ const GuestVideo = ({ config }: IGuestVideoProps) => {
             <div
               ref={strip}
               className="hx-vg__strip"
-              data-edit={commenting ? '1' : '0'}
+              data-edit={commenting && onTimeline ? '1' : '0'}
               aria-label={t('next.video.guest.strip')}
               onPointerDown={down}
               onPointerMove={move}
@@ -283,7 +288,7 @@ const GuestVideo = ({ config }: IGuestVideoProps) => {
               {scenes.map((s) => (
                 <Placed key={s.id} className="hx-vg__cut" from={share(s.start)} />
               ))}
-              {marks.map((m) => (
+              {(onTimeline ? marks : []).map((m) => (
                 <Placed
                   key={m.id}
                   tag="button"

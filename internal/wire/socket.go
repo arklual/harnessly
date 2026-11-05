@@ -82,6 +82,12 @@ type Server struct {
 	// GitSide answers GET .../file-git?path=<p>[&ref=HEAD]: a file as a git revision has it, for the editor's diff
 	// nil: a 404.
 	GitSide func(w http.ResponseWriter, r *http.Request, conv string)
+	// FindText answers GET .../find?q=<text>[&path=<folder>]: the lines of the folder's text files that hold the text,
+	// for «Найти в файлах». nil: a 404.
+	FindText func(w http.ResponseWriter, r *http.Request, conv string)
+	// EntryOp answers POST .../file-op {op, path, name}: a new empty file, a new name or the trash for an entry of
+	// «Файлы». nil: a 404.
+	EntryOp func(w http.ResponseWriter, r *http.Request, conv string)
 	// Files reads the folders of the conversations: .../files lists a folder, .../file reads a text file. nil: both are
 	// 404s.
 	Files FilesSource

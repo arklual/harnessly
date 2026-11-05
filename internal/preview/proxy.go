@@ -11,6 +11,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"regexp"
@@ -883,6 +884,9 @@ func (p *Proxy) answerRedirect(w *trackedWriter, r *http.Request, c *Claim, rt *
 		reply(w, 502, locale.Pick("The site redirects to an address that cannot be opened in the preview", "Сайт перенаправляет на адрес, который нельзя открыть в превью"))
 		return true
 	}
+	// The cookies the site set on its way out stay the site's: a sign-in elsewhere comes back to them (a Teleport
+	// application keeps the state of its session exchange in one).
+	p.keepSetCookies(w, c, rt, a)
 	if !isDocumentRequest(r) {
 		reply(w, 502, locale.Pick("The site redirects to ", "Сайт перенаправляет на ")+next.Origin())
 		return true
@@ -890,6 +894,18 @@ func (p *Proxy) answerRedirect(w *trackedWriter, r *http.Request, c *Claim, rt *
 	nonce := newNonce()
 	writeOffer(w, nonce, offerPage(next, c.ParentOrigin, nonce))
 	return true
+}
+
+// keepSetCookies puts a target's Set-Cookie on an answer of the proxy's own, tagged for the slot like a passed answer's.
+func (p *Proxy) keepSetCookies(w *trackedWriter, c *Claim, rt *route, a *answer) {
+	if len(a.headers["set-cookie"]) == 0 {
+		return
+	}
+	h := rewriteCtxOf(c).rewriteResponseHeaders(Headers{"set-cookie": a.headers["set-cookie"]}, p.cfg.Stands,
+		headerOptions{cookieTag: p.cookieTag(c), stand: p.isStandRoute(rt)})
+	for _, line := range h["set-cookie"] {
+		w.Header().Add("Set-Cookie", line)
+	}
 }
 
 // watchdog cuts a url target's request when it stops making progress: until the headers, then while the body flows.
@@ -939,6 +955,53 @@ func (d *watchdog) timedOut() bool {
 
 var errTimedOut = errors.New("preview upstream timed out")
 
+// Phases of a url target's request that the watchdog or the dialer can cut: the person is told where it stood.
+const (
+	phaseConnect = "connect" // no TCP connection to the address
+	phaseTLS     = "tls"     // connected, the TLS handshake did not finish
+	phaseHeaders = "headers" // connected, no answer's headers
+)
+
+// upstreamTimeout is a url target's request cut for time, with where it stood and the address it went to.
+type upstreamTimeout struct {
+	phase   string
+	address string
+}
+
+func (e *upstreamTimeout) Error() string {
+	return "preview upstream timed out (" + e.phase + " " + e.address + ")"
+}
+func (e *upstreamTimeout) Unwrap() error { return errTimedOut }
+
+// requestPhase follows a request through its connection.
+type requestPhase struct {
+	mu    sync.Mutex
+	phase string
+}
+
+func (r *requestPhase) set(phase string) {
+	r.mu.Lock()
+	r.phase = phase
+	r.mu.Unlock()
+}
+
+func (r *requestPhase) get() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.phase
+}
+
+func (r *requestPhase) trace() *httptrace.ClientTrace {
+	return &httptrace.ClientTrace{
+		ConnectDone: func(_, _ string, err error) {
+			if err == nil {
+				r.set(phaseTLS)
+			}
+		},
+		GotConn: func(httptrace.GotConnInfo) { r.set(phaseHeaders) },
+	}
+}
+
 // idleBody re-arms the watchdog with every read.
 type idleBody struct {
 	io.ReadCloser
@@ -966,6 +1029,8 @@ func (p *Proxy) roundTrip(r *http.Request, c *Claim, rt *route, noStore bool, lo
 		u.ForceQuery = true
 	}
 	dog := &watchdog{}
+	var phase *requestPhase
+	address := ""
 	if rt.kind == "port" {
 		u.Host = net.JoinHostPort(p.upstreamHostFor(rt.port), strconv.Itoa(rt.port))
 	} else {
@@ -986,6 +1051,9 @@ func (p *Proxy) roundTrip(r *http.Request, c *Claim, rt *route, noStore bool, lo
 			target.serverName = name
 		}
 		ctx = context.WithValue(ctx, dialKey{}, target)
+		phase = &requestPhase{phase: phaseConnect}
+		address = target.address
+		ctx = httptrace.WithClientTrace(ctx, phase.trace())
 		dog.arm(p.cfg.Timeouts.Connect+p.cfg.Timeouts.Headers, cancel)
 	}
 	var upload io.Reader = http.NoBody
@@ -1023,6 +1091,9 @@ func (p *Proxy) roundTrip(r *http.Request, c *Claim, rt *route, noStore bool, lo
 		if dog.timedOut() {
 			err = errTimedOut
 		}
+		if phase != nil && nodeCode(err) == "ETIMEDOUT" {
+			err = &upstreamTimeout{phase: phase.get(), address: address}
+		}
 		dog.stop()
 		return nil, cancel, err
 	}
@@ -1032,6 +1103,22 @@ func (p *Proxy) roundTrip(r *http.Request, c *Claim, rt *route, noStore bool, lo
 		log.progress = dog.progress
 	}
 	return res, func() { dog.stop(); cancel() }, nil
+}
+
+// timeoutDetail says where a url target's request stood when it was cut: the network of the machine (no connection to
+// the address) or the site (connected, no answer).
+func timeoutDetail(err error) string {
+	var t *upstreamTimeout
+	if !errors.As(err, &t) {
+		return ""
+	}
+	switch t.phase {
+	case phaseConnect:
+		return locale.Pick(": this machine could not connect to "+t.address, ": машина не смогла подключиться к "+t.address)
+	case phaseTLS:
+		return locale.Pick(": connected to "+t.address+", the TLS handshake did not finish", ": подключение к "+t.address+" есть, TLS не завершился")
+	}
+	return locale.Pick(": connected to "+t.address+", no answer came", ": подключение к "+t.address+" есть, ответа нет")
 }
 
 var tlsCode = regexp.MustCompile(`CERT|SSL|TLS|ISSUER|SIGNATURE`)
@@ -1082,7 +1169,7 @@ func failure(err error, rt *route) (int, string) {
 	code := nodeCode(err)
 	switch {
 	case code == "ETIMEDOUT":
-		return 504, host + locale.Pick(" did not respond in time", " не ответил вовремя")
+		return 504, host + locale.Pick(" did not respond in time", " не ответил вовремя") + timeoutDetail(err)
 	case tlsCode.MatchString(code):
 		return 502, locale.Pick("The certificate of "+host+" failed verification", "Сертификат "+host+" не прошёл проверку")
 	}

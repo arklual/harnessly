@@ -244,6 +244,21 @@ describe('the one «Поделиться»', () => {
     expect(within(menu).queryByRole('menuitemcheckbox')).toBeNull();
   });
 
+  it("puts a document's extra block after the links and its foot button after «Копировать ссылку»", async () => {
+    inRoot(
+      <ResourceShare
+        {...props(owner, {
+          target: { kind: 'doc' as const, id: 'spec' },
+          extra: <section data-testid="legacy">old public link</section>,
+          footExtra: <button type="button">Отвязать</button>,
+        })}
+      />,
+    );
+    expect(await screen.findByTestId('legacy')).toBeTruthy();
+    const foot = screen.getByRole('button', { name: t('next.access.copyLink') }).parentElement!;
+    expect(within(foot).getByRole('button', { name: 'Отвязать' })).toBeTruthy();
+  });
+
   it('gives one who may only look the address, the copy and «Попросить правку»', async () => {
     const asked: IResourceView = { ...viewer, myRequest: { id: 'r9', level: 'edit', status: 'open' } };
     let answer: (v: Response) => void = () => undefined;
@@ -258,16 +273,55 @@ describe('the one «Поделиться»', () => {
     expect(screen.queryByRole('button', { name: t('next.access.more') })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: t('next.access.copyLink') }));
     expect(onCopyLink).toHaveBeenCalled();
+    // «Попросить правку» opens the request here: the level (edit first) and a word to the owner.
     fireEvent.click(screen.getByRole('button', { name: t('next.access.askEditShort') }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.change(await screen.findByLabelText(t('next.access.message')), {
+      target: { value: 'Поправлю тексты' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: t('next.access.ask') }));
     expect(calls(fetchMock)[0]).toEqual([
       expect.stringContaining('/access/design/p1/requests'),
       'POST',
-      { level: 'edit', message: '' },
+      { level: 'edit', message: 'Поправлю тексты' },
     ]);
     // Pessimistic: nothing is taken for sent until the gateway answers.
     expect(onNext).not.toHaveBeenCalled();
     await act(async () => answer(await json(asked)));
     await waitFor(() => expect(onNext).toHaveBeenCalledWith(asked));
+  });
+
+  it('opened to ask (the viewing mode), has the request form open; a sent request says so, a denied one asks again', async () => {
+    const fetchMock = vi.fn(() => json(viewer));
+    vi.stubGlobal('fetch', fetchMock);
+    const view = inRoot(<ResourceShare {...props(viewer)} ask />);
+    fireEvent.click(await screen.findByRole('radio', { name: t('next.access.level.comment') }));
+    fireEvent.click(screen.getByRole('button', { name: t('next.access.ask') }));
+    await waitFor(() =>
+      expect(calls(fetchMock)[0]).toEqual([
+        expect.stringContaining('/access/design/p1/requests'),
+        'POST',
+        { level: 'comment', message: '' },
+      ]),
+    );
+    const sent: IResourceView = { ...viewer, myRequest: { id: 'r1', level: 'comment', status: 'open' } };
+    view.rerender(
+      <PortalContext.Provider value={host}>
+        <div className="hx-root" ref={host} />
+        <ResourceShare {...props(sent)} ask />
+      </PortalContext.Provider>,
+    );
+    expect(await screen.findByText(t('next.access.askedOwner'))).toBeTruthy();
+    expect(screen.queryByLabelText(t('next.access.message'))).toBeNull();
+    const denied: IResourceView = { ...viewer, myRequest: { id: 'r1', level: 'comment', status: 'denied' } };
+    view.rerender(
+      <PortalContext.Provider value={host}>
+        <div className="hx-root" ref={host} />
+        <ResourceShare {...props(denied)} ask />
+      </PortalContext.Provider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: t('next.access.askEditShort') }));
+    expect(await screen.findByText(t('next.access.requestDenied'))).toBeTruthy();
   });
 });
 

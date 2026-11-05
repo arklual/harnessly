@@ -10,30 +10,105 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
+	"github.com/ly-solutions/harnessly/internal/agents"
+	"github.com/ly-solutions/harnessly/internal/agents/claude"
+	"github.com/ly-solutions/harnessly/internal/agents/codex"
+	"github.com/ly-solutions/harnessly/internal/proc"
 )
 
-// Roots are where the two CLIs keep a Unix account's transcripts.
+// Roots are where the two CLIs keep a Unix account's transcripts: the folders under the home, and the ones a
+// CLAUDE_CONFIG_DIR or CODEX_HOME moved them to.
 type Roots struct {
 	Claude string
 	Codex  string
+	// MoreClaude and MoreCodex are the projects and sessions folders of the other places the CLIs keep their state.
+	MoreClaude, MoreCodex []string
 }
 
+// TranscriptRoots are the folders under the home.
 func TranscriptRoots(home string) Roots {
 	return Roots{Claude: filepath.Join(home, ".claude", "projects"), Codex: filepath.Join(home, ".codex", "sessions")}
 }
 
+// ClaudeRoots and CodexRoots are every projects and sessions folder, the home's first.
+func (r Roots) ClaudeRoots() []string {
+	return agentcfg.Unique(append([]string{r.Claude}, r.MoreClaude...)...)
+}
+func (r Roots) CodexRoots() []string {
+	return agentcfg.Unique(append([]string{r.Codex}, r.MoreCodex...)...)
+}
+
 // provider names the CLI whose root holds path, or "".
 func (r Roots) provider(path string) string {
-	switch {
-	case strings.HasPrefix(path, r.Claude+string(filepath.Separator)):
-		return "claude"
-	case strings.HasPrefix(path, r.Codex+string(filepath.Separator)):
-		return "codex"
+	for _, root := range r.ClaudeRoots() {
+		if strings.HasPrefix(path, root+string(filepath.Separator)) {
+			return "claude"
+		}
+	}
+	for _, root := range r.CodexRoots() {
+		if strings.HasPrefix(path, root+string(filepath.Separator)) {
+			return "codex"
+		}
 	}
 	return ""
+}
+
+// rootSet is the agent's roots as they grow: a folder a running CLI was seen to use stays a root after it exits, its
+// transcripts are still there.
+type rootSet struct {
+	mu       sync.Mutex
+	roots    Roots
+	discover func() (claudeDirs, codexDirs []string)
+}
+
+func newRootSet(home string, discover func() (claudeDirs, codexDirs []string)) *rootSet {
+	s := &rootSet{roots: TranscriptRoots(home), discover: discover}
+	s.Refresh()
+	return s
+}
+
+// Get is the roots as last refreshed.
+func (s *rootSet) Get() Roots {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r := s.roots
+	r.MoreClaude, r.MoreCodex = slices.Clone(r.MoreClaude), slices.Clone(r.MoreCodex)
+	return r
+}
+
+// Refresh adds the folders the CLIs use now and returns the roots.
+func (s *rootSet) Refresh() Roots {
+	if s.discover != nil {
+		claudeDirs, codexDirs := s.discover()
+		s.mu.Lock()
+		for _, d := range claudeDirs {
+			s.roots.MoreClaude = agentcfg.Unique(append(s.roots.MoreClaude, filepath.Join(d, "projects"))...)
+		}
+		for _, d := range codexDirs {
+			s.roots.MoreCodex = agentcfg.Unique(append(s.roots.MoreCodex, filepath.Join(d, "sessions"))...)
+		}
+		s.mu.Unlock()
+	}
+	return s.Get()
+}
+
+// cliDirs are the folders the CLIs of this account keep their state in: as a CLI the agent starts would see its
+// variables (getenv), as each running claude and codex was started (their own environment: the person's shell may
+// set CLAUDE_CONFIG_DIR where the agent's service does not), and the defaults under the home.
+func cliDirs(home string, getenv func(provider, name string) string, procs proc.Procs) (claudeDirs, codexDirs []string) {
+	claudeDirs = append([]string{
+		agentcfg.ClaudeDirIn(func(n string) string { return getenv("claude", n) }, home),
+	}, agents.LiveDirs(procs, claude.Binary, agentcfg.ClaudeDirEnv)...)
+	codexDirs = append([]string{
+		agentcfg.CodexDirIn(func(n string) string { return getenv("codex", n) }, home),
+	}, agents.LiveDirs(procs, codex.Binary, agentcfg.CodexDirEnv)...)
+	return agentcfg.Unique(claudeDirs...), agentcfg.Unique(codexDirs...)
 }
 
 func listDir(dir string) ([]os.DirEntry, error) {
@@ -61,70 +136,74 @@ func ListTranscripts(r Roots) ([]TranscriptFile, error) {
 	type candidate struct{ provider, path string }
 	var candidates []candidate
 
-	projects, err := listDir(r.Claude)
-	if err != nil {
-		return nil, err
-	}
-	for _, project := range projects {
-		if !project.IsDir() {
-			continue
-		}
-		projectDir := filepath.Join(r.Claude, project.Name())
-		entries, err := listDir(projectDir)
+	for _, root := range r.ClaudeRoots() {
+		projects, err := listDir(root)
 		if err != nil {
 			return nil, err
 		}
-		for _, entry := range entries {
-			switch {
-			case entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".jsonl"):
-				candidates = append(candidates, candidate{"claude", filepath.Join(projectDir, entry.Name())})
-			case entry.IsDir():
-				subagents := filepath.Join(projectDir, entry.Name(), "subagents")
-				subs, err := listDir(subagents)
-				if err != nil {
-					return nil, err
-				}
-				for _, sub := range subs {
-					if sub.Type().IsRegular() && strings.HasSuffix(sub.Name(), ".jsonl") {
-						candidates = append(candidates, candidate{"claude", filepath.Join(subagents, sub.Name())})
+		for _, project := range projects {
+			if !project.IsDir() {
+				continue
+			}
+			projectDir := filepath.Join(root, project.Name())
+			entries, err := listDir(projectDir)
+			if err != nil {
+				return nil, err
+			}
+			for _, entry := range entries {
+				switch {
+				case entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".jsonl"):
+					candidates = append(candidates, candidate{"claude", filepath.Join(projectDir, entry.Name())})
+				case entry.IsDir():
+					subagents := filepath.Join(projectDir, entry.Name(), "subagents")
+					subs, err := listDir(subagents)
+					if err != nil {
+						return nil, err
+					}
+					for _, sub := range subs {
+						if sub.Type().IsRegular() && strings.HasSuffix(sub.Name(), ".jsonl") {
+							candidates = append(candidates, candidate{"claude", filepath.Join(subagents, sub.Name())})
+						}
 					}
 				}
 			}
 		}
 	}
 
-	years, err := listDir(r.Codex)
-	if err != nil {
-		return nil, err
-	}
-	for _, year := range years {
-		if !year.IsDir() || !yearDir.MatchString(year.Name()) {
-			continue
-		}
-		months, err := listDir(filepath.Join(r.Codex, year.Name()))
+	for _, root := range r.CodexRoots() {
+		years, err := listDir(root)
 		if err != nil {
 			return nil, err
 		}
-		for _, month := range months {
-			if !month.IsDir() {
+		for _, year := range years {
+			if !year.IsDir() || !yearDir.MatchString(year.Name()) {
 				continue
 			}
-			days, err := listDir(filepath.Join(r.Codex, year.Name(), month.Name()))
+			months, err := listDir(filepath.Join(root, year.Name()))
 			if err != nil {
 				return nil, err
 			}
-			for _, day := range days {
-				if !day.IsDir() {
+			for _, month := range months {
+				if !month.IsDir() {
 					continue
 				}
-				dir := filepath.Join(r.Codex, year.Name(), month.Name(), day.Name())
-				entries, err := listDir(dir)
+				days, err := listDir(filepath.Join(root, year.Name(), month.Name()))
 				if err != nil {
 					return nil, err
 				}
-				for _, entry := range entries {
-					if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".jsonl") {
-						candidates = append(candidates, candidate{"codex", filepath.Join(dir, entry.Name())})
+				for _, day := range days {
+					if !day.IsDir() {
+						continue
+					}
+					dir := filepath.Join(root, year.Name(), month.Name(), day.Name())
+					entries, err := listDir(dir)
+					if err != nil {
+						return nil, err
+					}
+					for _, entry := range entries {
+						if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".jsonl") {
+							candidates = append(candidates, candidate{"codex", filepath.Join(dir, entry.Name())})
+						}
 					}
 				}
 			}

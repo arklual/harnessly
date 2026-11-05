@@ -26,6 +26,18 @@ const (
 // FileKinds is every FileKind, in the schema's order.
 var FileKinds = []FileKind{FileFile, FileDirectory}
 
+// FileGit is what git says of an entry: a file or folder git does not have yet, or one with changes not
+// committed. A folder is new when all that changed in it is new. An entry git has nothing to say of has none.
+type FileGit string
+
+const (
+	FileGitNew     FileGit = "new"
+	FileGitChanged FileGit = "changed"
+)
+
+// FileGits is every FileGit, in the schema's order.
+var FileGits = []FileGit{FileGitNew, FileGitChanged}
+
 // FilesPathMax is the longest path a page may ask for, in bytes.
 const FilesPathMax = 4096
 
@@ -34,10 +46,15 @@ type FileEntry struct {
 	Name string   `json:"name"`
 	Path string   `json:"path"`
 	Kind FileKind `json:"kind"`
+	Git  FileGit  `json:"git,omitempty"`
 }
 
 func (e FileEntry) Validate() error {
-	return errors.Join(need("name", e.Name), need("path", e.Path), in("kind", e.Kind, FileKinds))
+	var git error
+	if e.Git != "" {
+		git = in("git", e.Git, FileGits)
+	}
+	return errors.Join(need("name", e.Name), need("path", e.Path), in("kind", e.Kind, FileKinds), git)
 }
 
 // DirListing is the answer of GET /api/v2/conversations/{id}/files?path=<folder>: folders first, then files, by name.
@@ -46,6 +63,8 @@ type DirListing struct {
 	Path      string      `json:"path"`
 	Entries   []FileEntry `json:"entries"`
 	Truncated bool        `json:"truncated"`
+	// Root is the place of the workspace an absolute folder lies in: the crumbs go up to it, not further.
+	Root string `json:"root,omitempty"`
 }
 
 func (d DirListing) Validate() error { return each("entries", d.Entries) }

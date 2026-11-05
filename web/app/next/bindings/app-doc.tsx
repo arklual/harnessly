@@ -146,7 +146,7 @@ const AppDocPage = ({ machine, id, chat = null, edit = false, onMode, onOpenDraw
       onBack={null}
       onOpenDrawer={onOpenDrawer}
       menu={[]}
-      action={mode && <ModeButton mode={mode} />}
+      lead={mode && <ModeButton mode={mode} />}
       stage={stage}
       chat={null}
       island={null}

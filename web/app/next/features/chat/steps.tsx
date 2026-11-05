@@ -317,6 +317,12 @@ export const groupSteps = (rawSteps: Entry[], live: boolean): TStepNode[] => {
       return;
     }
     flush(false);
+    // Deliveries of other agents that follow each other are one card with a count.
+    const prev = out.at(-1);
+    if (entry.t === 'peer' && prev?.kind === 'entry' && prev.entry.t === 'peer') {
+      prev.entry = { ...prev.entry, peers: [...prev.entry.peers, ...entry.peers] };
+      return;
+    }
     if (entry.t !== 'subagent') {
       out.push({ kind: 'entry', entry });
       return;

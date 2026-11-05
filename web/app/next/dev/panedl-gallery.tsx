@@ -260,7 +260,7 @@ const Viewer = ({
     design: DESIGN,
     fromChat: CONV,
     dir: '/home/coder/design/ostrovok',
-    touched: [],
+    tied: [],
     title: 'Досье отеля — хакатон Островка',
     pageUrl: `/d/${DESIGN}/${path}`,
     port: 5555,

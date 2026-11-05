@@ -102,6 +102,7 @@ const VideoBar = (p: IVideoBarProps) => (
         onClick={p.onPanel}
       />
     )}
+    {p.mode && <ModeButton mode={p.mode} />}
     <div className="hx-deck__addr">
       <b>{p.title}</b>
       {p.crumb !== '' && (
@@ -156,7 +157,6 @@ const VideoBar = (p: IVideoBarProps) => (
         {t('next.video.shell.mp4')}
       </button>
     </div>
-    {p.mode && <ModeButton mode={p.mode} />}
     {!p.viewing && (
       <>
         <BarButton

@@ -16,11 +16,13 @@ type Procs struct {
 	Cwd       func(pid int) string
 	Environ   func(pid int) ([]string, bool)
 	StartTime func(pid int) (time.Time, bool)
+	// All is every process of the machine.
+	All func() []int
 }
 
 // System reads this machine's /proc.
 func System() Procs {
-	return Procs{Children: ChildPIDs, Args: Cmdline, Argv: Argv, Cwd: Cwd, Environ: Environ, StartTime: StartTime}
+	return Procs{Children: ChildPIDs, Args: Cmdline, Argv: Argv, Cwd: Cwd, Environ: Environ, StartTime: StartTime, All: All}
 }
 
 // ChildrenOf is p.Children, empty when unset.
@@ -57,6 +59,14 @@ func (p Procs) CwdOf(pid int) string {
 		return ""
 	}
 	return p.Cwd(pid)
+}
+
+// AllPids is p.All, empty when unset.
+func (p Procs) AllPids() []int {
+	if p.All == nil {
+		return nil
+	}
+	return p.All()
 }
 
 // EnvironOf is p.Environ, false when unset.

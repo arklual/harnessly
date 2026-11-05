@@ -23,6 +23,7 @@ import { useChatMade } from '@/next/bindings/chat-made';
 import BrowserTab from '@/next/bindings/browser-tab';
 import { deliveredViewOf } from '@/next/features/pane/delivered-kind';
 import { downloadHref, saveFrom } from '@/next/features/pane/download';
+import { useFolderUploads } from '@/next/legacy/folder-uploads';
 import FileMenu from '@/next/features/pane/file-menu';
 import SideChat from '@/next/features/pane/side-chat';
 import { SideFloat } from '@/next/features/pane/side-float';
@@ -38,8 +39,17 @@ import { loadKindDocs } from '@/next/features/app-catalog/api';
 import { goTo, ROUTE } from '@/next/routes/routes';
 import { useSubagents } from '@/next/bindings/subagents';
 import { setPaneOpen } from '@/next/bindings/pane-open';
+import { usePaneOpenBeside } from '@/next/bindings/pane-beside';
 import LazyFileEditor from '@/next/features/pane/editor/lazy';
-import { listFolder, readFile, readGitSide, saveFile } from '@/next/features/pane/chat-files-api';
+import {
+  findFiles,
+  findText,
+  entryOp,
+  listFolder,
+  readFile,
+  readGitSide,
+  saveFile,
+} from '@/next/features/pane/chat-files-api';
 import type { ICompare } from '@/next/features/pane/editor/file-editor';
 import { addQuote } from '@/next/stores/quotes';
 import { useFileEdits, type IFileEdits } from '@/next/bindings/file-edits';
@@ -70,7 +80,7 @@ import { toast } from '@/next/ui/toast';
 import { usePresence } from '@/next/ui/presence';
 import { plural, t } from '@/next/i18n';
 import { isLegacyTab, useLegacyPane, type ILegacyPane, type TLegacyHandoff } from '@/next/legacy/pane';
-import { browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
+import { MACHINE, browserAt, placeRequest, type IPaneTabs, type TTab } from '@/next/features/pane/pane-tabs';
 import { requestOf, type IPaneIntent, type IPaneRequest } from '@/next/features/pane/intents';
 import { usePaneIntents } from '@/next/bindings/pane-intents';
 import { foldRailForDesign } from '@/next/bindings/rail';
@@ -102,6 +112,7 @@ const openDesignFull = async (machine: MachineId, design: string, chat: ConvId) 
   );
 };
 const FilesView = later(() => import('@/next/features/pane/files-view'));
+const UploadsStrip = later(() => import('@/next/legacy/uploads-strip'));
 const DeliveredView = later(() => import('@/next/features/pane/delivered-view'));
 
 /** The launcher's tools in the design's order; one not named keeps its place after them. */
@@ -118,7 +129,6 @@ const TOOL_ORDER = [
   'terminal',
   'shell',
   'browser',
-  'L:disk',
   'machine',
   'L:gitlab',
   'designly',
@@ -146,7 +156,6 @@ const LEGACY_HINTS: Record<string, string> = {
   'L:artifacts': 'next.pane.hint.artifacts',
   'L:peers': 'next.pane.hint.peers',
   'L:economics': 'next.pane.hint.economics',
-  'L:disk': 'next.pane.hint.disk',
   'L:gitlab': 'next.pane.hint.gitlab',
   'L:vault': 'next.pane.hint.vault',
 };
@@ -249,6 +258,13 @@ const SubagentTab = ({ conv, focus }: { conv: Conversation; focus: string | null
 };
 
 /** A path of the chat's folder made absolute; an absolute one stays. */
+/** The folder of the machine a tab is in: its own, or its file's; null for the chat's folder. */
+const machineFolderOf = (path: string, file: boolean): string | null => {
+  if (!path.startsWith('/')) return null;
+  if (!file) return path;
+  return path.slice(0, path.lastIndexOf('/')) || '/';
+};
+
 const absIn = (cwd: string, path: string) =>
   path.startsWith('/') ? path : `${cwd.replace(/\/+$/, '')}/${path}`;
 
@@ -269,14 +285,22 @@ const FilesTab = ({
   edits,
   guard,
   onChange,
+  onOpenBeside,
+  tools,
 }: {
   conv: Conversation;
   tab: Extract<TTab, { kind: 'files' }>;
   edits: IFileEdits;
   guard: (tabs: readonly string[], run: () => void) => void;
   onChange: (tab: Extract<TTab, { kind: 'files' }>) => void;
+  /** Opens a file or a folder in a tab of its own beside this one. */
+  onOpenBeside: (path: string, kind: 'file' | 'directory') => void;
+  /** The open text file's controls, in the folder's head row beside the crumbs. */
+  tools: ReactNode;
 }) => {
   const [shown, setShown] = useState<IShownFile | null>(null);
+  // The editor's switch of the view goes into the head row too.
+  const [modeSlot, setModeSlot] = useState<HTMLElement | null>(null);
   // A zip, a picture, a PDF or a file to be saved is not read as text: the pane shows it its own way.
   const delivered = tab.file ? deliveredViewOf(tab.path) : null;
   // A new epoch is the disk's text read again over the editor's.
@@ -326,6 +350,35 @@ const FilesTab = ({
     return () => abort.abort();
   }, [conv.machineId, conv.id, tab.id, tab.path, tab.file, epoch, draftOf, listingAgain, delivered]);
   const now = shown?.key === key ? shown : null;
+  // «Перейти к файлу» searches the chat's folder; on the machine, the folder on screen (a file's own folder).
+  const searchIn = machineFolderOf(tab.path, tab.file);
+  const find = useCallback(
+    async (query: string, signal: AbortSignal) => {
+      const found = await findFiles(conv.machineId, searchIn ?? conv.cwd, query, signal);
+      return searchIn === null ? found : found.map((p) => `${searchIn.replace(/\/+$/, '')}/${p}`);
+    },
+    [conv.machineId, conv.cwd, searchIn],
+  );
+  const findLines = useCallback(
+    (query: string, signal: AbortSignal) => findText(conv.machineId, conv.id, searchIn ?? '', query, signal),
+    [conv.machineId, conv.id, searchIn],
+  );
+  // New files, new names and the trash in the folder on screen; the list of the places has none.
+  const entryOps = useMemo(
+    () =>
+      tab.file || tab.path === MACHINE
+        ? null
+        : {
+            newFile: (name: string) => entryOp(conv.machineId, conv.id, 'newFile', tab.path, name),
+            rename: (path: string, name: string) => entryOp(conv.machineId, conv.id, 'rename', path, name),
+            trash: (path: string) => entryOp(conv.machineId, conv.id, 'trash', path),
+          },
+    [conv.machineId, conv.id, tab.file, tab.path],
+  );
+  // Files sent into the folder on screen and new folders in it: the list is read again as each arrives.
+  const uploads = useFolderUploads(conv.id, tab.file ? null : absIn(conv.cwd, tab.path), () =>
+    setEpoch((n) => n + 1),
+  );
 
   // The state the file is shown against: git's revision or another file, read when the tab asks for it.
   const [compare, setCompare] = useState<{ key: string; value: ICompare } | null>(null);
@@ -390,6 +443,8 @@ const FilesTab = ({
         readAsset={readAsset}
         compare={shownCompare}
         onCloseCompare={() => onChange({ ...tab, against: undefined })}
+        modeSlot={modeSlot}
+        at={tab.at ?? null}
         onAsk={(quote, note) => {
           addQuote(conv.id, quote, note);
           toast(t('next.editor.asked'), { tone: 'success' });
@@ -412,15 +467,31 @@ const FilesTab = ({
       listing={now?.listing ?? null}
       file={now?.file ?? null}
       editor={editor}
+      tools={tools}
+      onModeSlot={setModeSlot}
       error={now?.error ?? null}
       opening={tab.file ? 'file' : 'folder'}
       onRetry={() => setEpoch((n) => n + 1)}
       onOpen={(path, kind) =>
-        guard([tab.id], () => onChange({ ...tab, path, file: kind === 'file', against: undefined }))
+        guard([tab.id], () =>
+          onChange({ ...tab, path, file: kind === 'file', against: undefined, at: undefined }),
+        )
       }
       onCompare={(a, b) => guard([tab.id], () => onChange({ ...tab, path: a, file: true, against: b }))}
       onDownload={(paths) => saveFrom(downloadHref(conv.machineId, conv.id, paths))}
-      menuOf={(path, kind, trigger) => (
+      take={uploads.ready ? uploads : null}
+      find={find}
+      findText={findLines}
+      onOpenAt={(hit, size) => {
+        const at = { line: hit.line, col: hit.col, size };
+        const show = () => onChange({ ...tab, path: hit.path, file: true, against: undefined, at });
+        if (tab.file && tab.path === hit.path) show();
+        else guard([tab.id], show);
+      }}
+      below={<UploadsStrip uploads={uploads.uploads} queue={uploads.queue} />}
+      entryOps={entryOps}
+      onOpenBeside={onOpenBeside}
+      menuOf={(path, kind, trigger, acts) => (
         <FileMenu
           trigger={trigger}
           machine={conv.machineId}
@@ -428,6 +499,9 @@ const FilesTab = ({
           path={path}
           abs={absIn(conv.cwd, path)}
           kind={kind}
+          onOpenBeside={() => onOpenBeside(path, kind)}
+          onRename={acts?.onRename}
+          onTrash={acts?.onTrash}
         />
       )}
     />
@@ -753,26 +827,20 @@ const PaneBody = (props: IPaneBodyProps) => {
         </button>
       );
     }
-    if (!tab || tab.kind !== 'files') return null;
-    // «Поделиться» of a file that can be a document, next to «Сохранить».
-    const share = tab.file && isShareable(tab.path) && (
-      <FileShareButton key={tab.path} machine={conv.machineId} conv={conv.id} path={tab.path} />
+    // A file shown its own way (a picture, a PDF) keeps its controls on the bar over it; a text file has them in the
+    // folder's head row, beside the crumbs (fileTools).
+    if (tab?.kind !== 'files' || !tab.file || deliveredViewOf(tab.path) === null) return null;
+    return (
+      <>
+        {fileShare()}
+        {fileMenu(false)}
+      </>
     );
-    // «Скачать» of a file open as text; a file shown its own way has the button in its view.
-    const download = tab.file && deliveredViewOf(tab.path) === null && (
-      <a
-        className="hx-head-btn hx-tipped"
-        href={downloadHref(conv.machineId, conv.id, [tab.path])}
-        download
-        aria-label={t('next.files.downloadFile')}
-      >
-        <Icon name="download" size="sm" />
-        <span className="hx-tip" data-pos="below" data-align="end">
-          {t('next.files.downloadFile')}
-        </span>
-      </a>
-    );
-    const menu = tab.file && (
+  };
+  /** «…» of the open file; `compare`: «Сравнить с git» (a text file). */
+  const fileMenu = (compare: boolean) =>
+    tab?.kind === 'files' &&
+    tab.file && (
       <FileMenu
         key={`menu:${tab.path}`}
         trigger={
@@ -786,35 +854,44 @@ const PaneBody = (props: IPaneBodyProps) => {
         abs={absIn(conv.cwd, tab.path)}
         kind="file"
         onCompare={
-          deliveredViewOf(tab.path) === null
+          compare
             ? () =>
                 setTabs((list) => list.map((x) => (x.id === tab.id ? { ...tab, against: 'git:HEAD' } : x)))
             : undefined
         }
       />
     );
-    if (!saveButton)
-      return share || download || menu ? (
-        <>
-          {download}
-          {share}
-          {menu}
-        </>
-      ) : null;
+  /** «Поделиться» of a file that can be a document. */
+  const fileShare = () =>
+    tab?.kind === 'files' &&
+    tab.file &&
+    isShareable(tab.path) && (
+      <FileShareButton key={tab.path} machine={conv.machineId} conv={conv.id} path={tab.path} />
+    );
+  /** The open text file's controls: download, share, «…», and «Сохранить» while there is something to save. */
+  const fileTools = () => {
+    if (!tab || tab.kind !== 'files' || !tab.file || deliveredViewOf(tab.path) !== null) return null;
+    const unsaved = edits.unsaved.has(tab.id) || (saveButton && edits.live?.saving === true);
     return (
       <>
-        {download}
-        {share}
-        {menu}
-        <Button
-          variant="primary"
-          size="sm"
-          busy={edits.live?.saving}
-          disabled={!edits.unsaved.has(tab.id)}
-          onClick={() => void edits.save()}
+        <a
+          className="hx-head-btn hx-tipped"
+          href={downloadHref(conv.machineId, conv.id, [tab.path])}
+          download
+          aria-label={t('next.files.downloadFile')}
         >
-          {t('next.editor.save')}
-        </Button>
+          <Icon name="download" size="sm" />
+          <span className="hx-tip" data-pos="below" data-align="end">
+            {t('next.files.downloadFile')}
+          </span>
+        </a>
+        {fileShare()}
+        {fileMenu(true)}
+        {saveButton && unsaved && (
+          <Button variant="primary" size="sm" busy={edits.live?.saving} onClick={() => void edits.save()}>
+            {t('next.editor.save')}
+          </Button>
+        )}
       </>
     );
   };
@@ -925,6 +1002,8 @@ const PaneBody = (props: IPaneBodyProps) => {
           edits={edits}
           guard={guard}
           onChange={(next) => setTabs((list) => list.map((x) => (x.id === next.id ? next : x)))}
+          onOpenBeside={(path, kind) => add({ id: nextId(), kind: 'files', path, file: kind === 'file' })}
+          tools={fileTools()}
         />
       )}
       {tab?.kind === 'shell' && (
@@ -974,7 +1053,6 @@ export const useRightPane = (
   const machineId = conv?.machineId ?? null;
   // The chat's pane is read as the chat is: the first frame of another chat already draws its own pane.
   const state = useChatPane(convId);
-  const { open } = state;
   // Beside a design the pane opens at its side, never over it: the chat's own «wide» is for the chat's page (a pane
   // widened there must not cover the design opened from it). Widened here, it stays so only while the design is open.
   const [wideBeside, setWideBeside] = useState(false);
@@ -982,7 +1060,13 @@ export const useRightPane = (
   const setState = (change: (pane: IChatPane) => IChatPane) => {
     if (convId) chatPanes.update(convId, machineId, change);
   };
-  const setOpen = (next: boolean) => setState((s) => (s.open === next ? s : { ...s, open: next }));
+  // Beside a design the pane is out only once it is opened there (pane-beside).
+  const [open, setOpen] = usePaneOpenBeside(
+    state.open,
+    (next) => setState((s) => (s.open === next ? s : { ...s, open: next })),
+    besideDesign,
+    convId,
+  );
   // The chat on screen now, for what answers after the person went to another one.
   const shownConv = useRef(convId);
   useEffect(() => {

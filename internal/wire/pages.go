@@ -238,6 +238,14 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 		s.handoffDraft(w, r, parts[0])
 		return
 	}
+	if len(parts) == 2 && parts[1] == "file-op" {
+		if s.EntryOp == nil || r.Method != http.MethodPost || !ValidConvID(parts[0]) {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.EntryOp(w, r, parts[0])
+		return
+	}
 	saving := len(parts) == 2 && parts[1] == "file" && r.Method == http.MethodPut
 	if r.Method != http.MethodGet && !saving {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -254,6 +262,14 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request, parts []string) {
 			return
 		}
 		s.GitSide(w, r, id)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "find" {
+		if s.FindText == nil || r.Method != http.MethodGet {
+			refuse(w, RefuseNotFound)
+			return
+		}
+		s.FindText(w, r, id)
 		return
 	}
 	if len(parts) == 2 && parts[1] == "download" {

@@ -197,6 +197,18 @@ func TestANamedTeammateIsDoneWhenItGoesIdle(t *testing.T) {
 	if e := scout(); e.Status != wire.SubagentDone || e.Output == nil || e.Output.Text != "Привет отправлен." {
 		t.Fatalf("idle: %+v", e)
 	}
+	// The note says what the teammate was started for, not only its name.
+	tasks := 0
+	for _, e := range f.b.entries {
+		for _, n := range e.Peers {
+			if n.From == "scout" && n.Task != nil && *n.Task == "Scout" {
+				tasks++
+			}
+		}
+	}
+	if tasks != 2 {
+		t.Fatalf("the teammate's task on its notes:\n%s", shape(f))
+	}
 }
 
 func TestAShutdownNoticeSaysNoIds(t *testing.T) {

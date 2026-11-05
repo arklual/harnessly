@@ -14,6 +14,7 @@ import AccessPeople from '@/next/features/designly/access/access-people';
 import AccessRequests from '@/next/features/designly/access/access-requests';
 import AccessTransfer from '@/next/features/designly/access/access-transfer';
 import {
+  askAccess,
   atLeast,
   isUnowned,
   type IProjectAccess,
@@ -224,7 +225,11 @@ const ShareDialog = ({
               <p className="hx-acc-note">{t('next.access.yourRole', { role: roleLabel(access.role) })}</p>
             )}
             {(access.role === 'view' || access.role === 'comment') && (
-              <RequestForm project={project} role={access.role} request={access.request} onAsked={onNext} />
+              <RequestForm
+                mayComment={access.role === 'view'}
+                status={access.request?.status ?? null}
+                onSend={async (level, message) => onNext(await askAccess(project, level, message))}
+              />
             )}
             {isUnowned(access) && atLeast(access.role, 'edit') && (
               <div className="hx-acc-line">

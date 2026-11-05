@@ -1,22 +1,22 @@
 // The agent's hands in the open browser tab: while the page is in view, the tab waits for the next action the
-// chat's agent asks for, asks the person before the first action on a site, moves the agent's cursor to the element,
-// has the page's frame do the action and tells the machine how it ended. One action at a time.
+// chat's agent asks for, moves the agent's cursor to the element, has the page's frame do the action and tells the
+// machine how it ended. One action at a time. The agent is not asked for on a site: the person sees its
+// cursor, and the sites they blocked in Settings → General refuse at once.
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
-  ACT_LET,
   ACT_REFUSED,
   AGENT_OP,
   CURSOR_MOVE_MS,
   FRAME_ACT_MS,
   FRAME_OPS,
   POINTED_OPS,
+  actBlocked,
   actHost,
-  actLet,
   readAgentAct,
   type IAgentAct,
 } from '@/next/features/pane/agent-acts';
 import { PANE_ACT_STATE, PaneActClosed, answerPaneAct, pollPaneAct } from '@/next/core/net/pane-act';
-import { browserAgentSnapshot, setSiteDecision, SITE_DECISION } from '@/next/stores/browser-agent';
+import { browserAgentSnapshot } from '@/next/stores/browser-agent';
 import { parseAddress } from '@/next/features/pane/address';
 import type { IFrameActed } from '@/next/features/pane/frame-bridge';
 import type { IFrameAct } from '@/next/features/pane/use-frame-bridge';
@@ -48,8 +48,8 @@ interface IOutcome {
   text: string;
 }
 
-/** How long the bar stays after the last action. */
-const WORKING_MS = 4000;
+/** How long the cursor stays after the last action. */
+const CURSOR_STAYS_MS = 4000;
 
 const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve) => {
@@ -81,36 +81,17 @@ const center = (rect: IFrameActed['rect']) =>
 
 export const useAgentActs = ({ machine, conv, pageUrl, act, nextHello, back, go }: IAgentActsArgs) => {
   const [cursor, setCursor] = useState<IAgentCursor | null>(null);
-  const [asking, setAsking] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const answer = useRef<((allowed: boolean) => void) | null>(null);
   const workTimer = useRef(0);
 
+  /** The cursor goes away a moment after the last action. */
   const busy = () => {
-    setWorking(true);
     window.clearTimeout(workTimer.current);
-    workTimer.current = window.setTimeout(() => {
-      setWorking(false);
-      setCursor(null);
-    }, WORKING_MS);
+    workTimer.current = window.setTimeout(() => setCursor(null), CURSOR_STAYS_MS);
   };
 
-  /** Asks the person about a site; resolves with their answer, false when the tab went away. */
-  const askPerson = (host: string, signal: AbortSignal) =>
-    new Promise<boolean>((resolve) => {
-      answer.current = (allowed) => {
-        answer.current = null;
-        setAsking(null);
-        resolve(allowed);
-      };
-      setAsking(host);
-      signal.addEventListener('abort', () => answer.current?.(false), { once: true });
-    });
-
-  const frameOp = async (a: IAgentAct): Promise<IOutcome> => {
+  const frameOp = async (a: IAgentAct, host: string): Promise<IOutcome> => {
     if (POINTED_OPS.has(a.op) || (a.op === AGENT_OP.scroll && a.ref)) {
-      const located = await act({ id: `${a.id}:locate`, op: 'locate', ref: a.ref }, 3000);
+      const located = await act({ id: `${a.id}:locate`, op: 'locate', ref: a.ref, host }, 3000);
       if (!located) return { ok: false, text: ACT_REFUSED.noBridge };
       if (!located.ok) return { ok: false, text: located.text };
       const at = center(located.rect);
@@ -140,10 +121,12 @@ export const useAgentActs = ({ machine, conv, pageUrl, act, nextHello, back, go 
         dy: a.dy,
         ms: a.ms,
         submit: a.submit,
+        event: a.event,
         tool: a.tool,
         input: a.input,
+        host,
       },
-      FRAME_ACT_MS,
+      FRAME_ACT_MS + (a.op === AGENT_OP.wait && a.event ? a.ms : 0),
     );
     if (!acted) {
       if (await arrived)
@@ -158,23 +141,14 @@ export const useAgentActs = ({ machine, conv, pageUrl, act, nextHello, back, go 
     return { ok: acted.ok, text: acted.text };
   };
 
-  const run = useEffectEvent(async (a: IAgentAct, signal: AbortSignal): Promise<IOutcome> => {
-    if (paused) return { ok: false, text: ACT_REFUSED.stopped };
+  const run = useEffectEvent(async (a: IAgentAct): Promise<IOutcome> => {
     const target = a.op === AGENT_OP.navigate ? parseAddress(a.url) : null;
     if (a.op === AGENT_OP.navigate && (!target || !/^https?:\/\//i.test(a.url)))
       return { ok: false, text: ACT_REFUSED.badUrl };
     const host = actHost(a.op === AGENT_OP.navigate ? a.url : pageUrl());
     if (host === null) return { ok: false, text: ACT_REFUSED.noPage };
 
-    const may = actLet(browserAgentSnapshot(), host);
-    if (may === ACT_LET.refuse) return { ok: false, text: ACT_REFUSED.denied(host) };
-    if (may === ACT_LET.ask) {
-      void answerPaneAct(machine, conv, a.id, PANE_ACT_STATE.asking);
-      const allowed = await askPerson(host, signal);
-      if (signal.aborted) return { ok: false, text: ACT_REFUSED.declined(host) };
-      setSiteDecision(host, allowed ? SITE_DECISION.allow : SITE_DECISION.deny);
-      if (!allowed) return { ok: false, text: ACT_REFUSED.declined(host) };
-    }
+    if (actBlocked(browserAgentSnapshot(), host)) return { ok: false, text: ACT_REFUSED.denied(host) };
 
     busy();
     if (a.op === AGENT_OP.navigate && target) {
@@ -193,7 +167,7 @@ export const useAgentActs = ({ machine, conv, pageUrl, act, nextHello, back, go 
       return { ok: true, text: loaded ? `Went back to ${pageUrl() ?? 'the previous page'}.` : 'Went back.' };
     }
     if (FRAME_OPS.has(a.op)) {
-      const outcome = await frameOp(a);
+      const outcome = await frameOp(a, host);
       busy();
       return outcome;
     }
@@ -223,7 +197,7 @@ export const useAgentActs = ({ machine, conv, pageUrl, act, nextHello, back, go 
         }
         const a = readAgentAct(data);
         if (!a) continue;
-        const outcome = await run(a, signal);
+        const outcome = await run(a);
         await answerPaneAct(
           machine,
           conv,
@@ -240,20 +214,5 @@ export const useAgentActs = ({ machine, conv, pageUrl, act, nextHello, back, go 
     };
   }, [machine, conv]);
 
-  return {
-    cursor,
-    /** The site the agent waits to be let onto; null when nobody is asked. */
-    asking,
-    working,
-    paused,
-    allow: () => answer.current?.(true),
-    deny: () => answer.current?.(false),
-    stop: () => {
-      setPaused(true);
-      setWorking(false);
-      setCursor(null);
-      answer.current?.(false);
-    },
-    resume: () => setPaused(false),
-  };
+  return { cursor };
 };

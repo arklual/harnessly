@@ -402,6 +402,9 @@ func build(cfg gate.Config) (*runtimeGate, error) {
 	f.Add(hubRoutes(d)...)
 	f.Add(f.AsRoutes(machineSliceRoutes(d, cfg.Listen, cfg.Upstream, pusher, hooks)...)...)
 	f.Add(voiceRoutes(d)...)
+	liveBrowser := newLiveBrowser(d)
+	defer liveBrowser.Close()
+	f.Add(liveBrowserRoutes(d, liveBrowser)...)
 	for _, group := range routeGroups {
 		f.Add(f.AsRoutes(group(d)...)...)
 	}

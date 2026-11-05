@@ -27,6 +27,11 @@ export interface IFileMenuProps {
   align?: 'start' | 'end';
   /** «Сравнить с git»: set where the file can be shown against its last commit. */
   onCompare?: () => void;
+  /** «Открыть в новой вкладке»: the entry in a tab of the pane of its own. */
+  onOpenBeside?: () => void;
+  /** «Переименовать» and «В корзину»: set where the entry can be changed (the list of «Файлы»). */
+  onRename?: () => void;
+  onTrash?: () => void;
 }
 
 const FileMenu = ({
@@ -39,6 +44,9 @@ const FileMenu = ({
   side = 'bottom',
   align = 'end',
   onCompare,
+  onOpenBeside,
+  onRename,
+  onTrash,
 }: IFileMenuProps) => {
   const actions = useMenuActions();
   const folder = kind === 'directory';
@@ -68,6 +76,12 @@ const FileMenu = ({
             {t(folder ? 'next.fileMenu.downloadZip' : 'next.fileMenu.download')}
           </span>
         </Menu.Item>
+        {onOpenBeside && (
+          <Menu.Item className="hx-cmenu__item" onClick={onOpenBeside}>
+            <Icon name="app-window" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.fileMenu.openBeside')}</span>
+          </Menu.Item>
+        )}
         {!folder && IN_TAB.test(abs) && (
           <Menu.Item
             className="hx-cmenu__item"
@@ -92,6 +106,19 @@ const FileMenu = ({
           <Icon name="copy" size="sm" />
           <span className="hx-cmenu__txt">{t('next.fileMenu.copyPath')}</span>
         </Menu.Item>
+        {(onRename || onTrash) && <Menu.Separator className="hx-cmenu__sep" />}
+        {onRename && (
+          <Menu.Item className="hx-cmenu__item" onClick={onRename}>
+            <Icon name="pencil" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.fileMenu.rename')}</span>
+          </Menu.Item>
+        )}
+        {onTrash && (
+          <Menu.Item className="hx-cmenu__item" data-danger="true" onClick={onTrash}>
+            <Icon name="trash-2" size="sm" />
+            <span className="hx-cmenu__txt">{t('next.fileMenu.trash')}</span>
+          </Menu.Item>
+        )}
       </MenuPanel>
     </Menu.Root>
   );

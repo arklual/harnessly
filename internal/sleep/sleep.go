@@ -277,7 +277,7 @@ func (s *Sleeper) transcript(t Tab) string {
 		return t.JSONLPath
 	}
 	if t.AgentSessionID != "" {
-		return claude.FindTranscript(s.Claude.ProjectsDir(), t.AgentSessionID)
+		return s.Claude.FindTranscript(t.AgentSessionID)
 	}
 	return ""
 }

@@ -6,9 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/jscompat"
 	"github.com/ly-solutions/harnessly/internal/proc"
@@ -32,10 +35,20 @@ type Detector struct {
 	RemoveStale bool
 }
 
+// seenDirs are the other folders Claudes of this account were seen to use ($CLAUDE_CONFIG_DIR of a running one's
+// environment, ~/.claude next to a variable of the runtime's own), shared by every detector of the process and kept
+// after the Claudes exit: their transcripts stay there.
+var seenDirs struct {
+	mu   sync.Mutex
+	list []string
+}
+
 // NewDetector looks at the machine's processes and <home>/.claude, recognising Claude by its program name and
 // removing stale pid files.
 func NewDetector(home string) *Detector {
-	return &Detector{Dir: filepath.Join(home, ".claude"), Procs: proc.System(), Match: agents.MatchArgv, RemoveStale: true}
+	d := &Detector{Dir: agentcfg.ClaudeDirIn(os.Getenv, home), Procs: proc.System(), Match: agents.MatchArgv, RemoveStale: true}
+	d.remember(filepath.Join(home, ".claude"))
+	return d
 }
 
 func exists(p string) bool {
@@ -73,9 +86,79 @@ func (d *Detector) IsRunning(children []int) bool {
 // ProjectsDir holds the transcripts, one folder per working folder.
 func (d *Detector) ProjectsDir() string { return filepath.Join(d.Dir, "projects") }
 
-// TranscriptIn is <projects>/<folder of cwd>/<id>.jsonl when it exists, else "".
+// Dirs are Dir and the folders running Claudes were seen to use instead ($CLAUDE_CONFIG_DIR of their environment).
+func (d *Detector) Dirs() []string {
+	seenDirs.mu.Lock()
+	defer seenDirs.mu.Unlock()
+	return agentcfg.Unique(append([]string{d.Dir}, seenDirs.list...)...)
+}
+
+// ProjectsDirs are the projects folders of Dirs.
+func (d *Detector) ProjectsDirs() []string {
+	dirs := d.Dirs()
+	for i, dir := range dirs {
+		dirs[i] = filepath.Join(dir, "projects")
+	}
+	return dirs
+}
+
+// remember keeps a folder a running Claude uses.
+func (d *Detector) remember(dir string) {
+	if dir == "" || dir == d.Dir {
+		return
+	}
+	seenDirs.mu.Lock()
+	defer seenDirs.mu.Unlock()
+	if !slices.Contains(seenDirs.list, dir) {
+		seenDirs.list = append(seenDirs.list, dir)
+	}
+}
+
+// DirOf is the folder the Claude process pid keeps its state in: its own $CLAUDE_CONFIG_DIR, else Dir.
+func (d *Detector) DirOf(pid int) string {
+	if env, ok := d.Procs.EnvironOf(pid); ok {
+		if dir := agentcfg.DirOfEnv(env, agentcfg.ClaudeDirEnv); dir != "" {
+			d.remember(dir)
+			return dir
+		}
+	}
+	return d.Dir
+}
+
+// TranscriptIn is <projects>/<folder of cwd>/<id>.jsonl when it exists in one of Dirs, else "".
 func (d *Detector) TranscriptIn(cwd, id string) string {
-	p := filepath.Join(d.ProjectsDir(), sessions.ProjectName(cwd), id+".jsonl")
+	for _, projects := range d.ProjectsDirs() {
+		if p := transcriptIn(projects, cwd, id); p != "" {
+			return p
+		}
+	}
+	return ""
+}
+
+// FindTranscript is a session's transcript in any project folder of any of Dirs.
+func (d *Detector) FindTranscript(id string) string {
+	for _, projects := range d.ProjectsDirs() {
+		if p := FindTranscript(projects, id); p != "" {
+			return p
+		}
+	}
+	return ""
+}
+
+// ProjectDirOf is the transcripts folder of a working folder: the first of Dirs that has one, else Dir's.
+func (d *Detector) ProjectDirOf(cwd string) string {
+	name := sessions.ProjectName(cwd)
+	dirs := d.ProjectsDirs()
+	for _, projects := range dirs {
+		if p := filepath.Join(projects, name); exists(p) {
+			return p
+		}
+	}
+	return filepath.Join(dirs[0], name)
+}
+
+func transcriptIn(projects, cwd, id string) string {
+	p := filepath.Join(projects, sessions.ProjectName(cwd), id+".jsonl")
 	if exists(p) {
 		return p
 	}
@@ -83,6 +166,8 @@ func (d *Detector) TranscriptIn(cwd, id string) string {
 }
 
 type pidFile struct {
+	// dir is the Claude folder the file is in.
+	dir       string
 	path      string
 	pid       int
 	sessionID any
@@ -90,7 +175,7 @@ type pidFile struct {
 	startedAt any
 }
 
-func readPidFile(path string) (pidFile, bool) {
+func readPidFile(dir, path string) (pidFile, bool) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return pidFile{}, false
@@ -102,7 +187,7 @@ func readPidFile(path string) (pidFile, bool) {
 	if !jscompat.Truthy(rec["pid"]) || !jscompat.Truthy(rec["sessionId"]) {
 		return pidFile{}, false
 	}
-	pf := pidFile{path: path, pid: -1, sessionID: rec["sessionId"], cwd: rec["cwd"], startedAt: rec["startedAt"]}
+	pf := pidFile{dir: dir, path: path, pid: -1, sessionID: rec["sessionId"], cwd: rec["cwd"], startedAt: rec["startedAt"]}
 	if n, ok := rec["pid"].(float64); ok && n == float64(int(n)) {
 		pf.pid = int(n)
 	}
@@ -111,36 +196,55 @@ func readPidFile(path string) (pidFile, bool) {
 
 var digitsJSON = regexp.MustCompile(`^\d+\.json$`)
 
-// pidFiles are the records of the given processes: looked up by name first (Claude names its file after its pid),
-// every other file of the folder only when none is.
+// pidFiles are the records of the given processes: looked up by name first (Claude names its file after its pid) in
+// the folder the process itself uses, every other file of those folders only when none is.
 func (d *Detector) pidFiles(pids []int) []pidFile {
-	dir := filepath.Join(d.Dir, "sessions")
 	wanted := map[int]bool{}
+	dirs := []string{}
+	var found []pidFile
 	for _, p := range pids {
 		wanted[p] = true
 	}
-	var found []pidFile
 	for _, p := range pids {
-		if rec, ok := readPidFile(filepath.Join(dir, strconv.Itoa(p)+".json")); ok && wanted[rec.pid] {
+		// A launcher in front of Claude passes its environment on, so every process of the pane is asked.
+		dir := d.DirOf(p)
+		dirs = append(dirs, dir)
+		if rec, ok := readPidFile(dir, filepath.Join(dir, "sessions", strconv.Itoa(p)+".json")); ok && wanted[rec.pid] {
 			found = append(found, rec)
 		}
 	}
 	if len(found) > 0 {
 		return found
 	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".json") || digitsJSON.MatchString(e.Name()) {
+	for _, dir := range agentcfg.Unique(append([]string{d.Dir}, dirs...)...) {
+		sessionsDir := filepath.Join(dir, "sessions")
+		entries, err := os.ReadDir(sessionsDir)
+		if err != nil {
 			continue
 		}
-		if rec, ok := readPidFile(filepath.Join(dir, e.Name())); ok && wanted[rec.pid] {
-			found = append(found, rec)
+		for _, e := range entries {
+			if !strings.HasSuffix(e.Name(), ".json") || digitsJSON.MatchString(e.Name()) {
+				continue
+			}
+			if rec, ok := readPidFile(dir, filepath.Join(sessionsDir, e.Name())); ok && wanted[rec.pid] {
+				found = append(found, rec)
+			}
 		}
 	}
 	return found
+}
+
+// installedIn: Dir or the folder of a Claude among pids exists.
+func (d *Detector) installedIn(pids []int) bool {
+	if exists(d.Dir) {
+		return true
+	}
+	for _, p := range pids {
+		if d.Match.Is(d.Procs, p, Binary) && exists(d.DirOf(p)) {
+			return true
+		}
+	}
+	return false
 }
 
 var (
@@ -152,7 +256,8 @@ var (
 // process among the children and grandchildren (Claude may run under a launcher or re-spawn itself), else from a
 // `claude --resume <id>` command line.
 func (d *Detector) Detect(children []int) (agents.SessionInfo, error) {
-	if !exists(d.Dir) {
+	all := d.Procs.WithGrandchildren(d.throughSandbox(children))
+	if !d.installedIn(all) {
 		if d.Installed != nil && d.Installed() {
 			return agents.Info(agents.NotInitialized), nil
 		}
@@ -161,7 +266,6 @@ func (d *Detector) Detect(children []int) (agents.SessionInfo, error) {
 	if len(children) == 0 {
 		return agents.Info(agents.NotRunning), nil
 	}
-	all := d.Procs.WithGrandchildren(d.throughSandbox(children))
 	for _, rec := range d.pidFiles(all) {
 		args, ok := d.Procs.ArgsOf(rec.pid)
 		if !ok || !d.Match.Is(d.Procs, rec.pid, Binary) {
@@ -180,15 +284,17 @@ func (d *Detector) Detect(children []int) (agents.SessionInfo, error) {
 			RawSessionID: rec.sessionID,
 			PID:          rec.pid,
 			Cwd:          cwd,
+			Dir:          rec.dir,
 		}
 		if n, ok := rec.startedAt.(float64); ok {
 			info.StartedAt = &n
 		}
-		info.JSONLPath = d.TranscriptIn(cwd, info.SessionID)
+		projects := filepath.Join(rec.dir, "projects")
+		info.JSONLPath = transcriptIn(projects, cwd, info.SessionID)
 		if info.JSONLPath == "" {
 			// A resumed Claude writes into the resumed conversation until its own transcript exists.
 			if m := resumeArg.FindStringSubmatch(args); m != nil {
-				if p := d.TranscriptIn(cwd, m[1]); p != "" {
+				if p := transcriptIn(projects, cwd, m[1]); p != "" {
 					info.JSONLPath, info.SessionID, info.RawSessionID = p, m[1], m[1]
 				}
 			}
@@ -208,7 +314,8 @@ func (d *Detector) Detect(children []int) (agents.SessionInfo, error) {
 		if cwd == "" {
 			break
 		}
-		return agents.SessionInfo{Status: agents.Running, SessionID: m[1], RawSessionID: m[1], JSONLPath: d.TranscriptIn(cwd, m[1]), PID: pid, Cwd: cwd}, nil
+		dir := d.DirOf(pid)
+		return agents.SessionInfo{Status: agents.Running, SessionID: m[1], RawSessionID: m[1], JSONLPath: transcriptIn(filepath.Join(dir, "projects"), cwd, m[1]), PID: pid, Cwd: cwd, Dir: dir}, nil
 	}
 	return agents.Info(agents.NotRunning), nil
 }

@@ -27,7 +27,10 @@ import (
 
 const (
 	// chatLinksVersion 3: a design counts only for what the chat wrote or created, not for a path in a command.
-	chatLinksVersion = 3
+	// 4: a path the shell expands (`$S/x.css`, `~/x`) has no place; it was read under the folder the chat stood in, so a
+	// chat that wrote into its scratchpad from a design's folder counted as that design's. The kept index of
+	// an older version is read anew.
+	chatLinksVersion = 4
 	// chatLinksSyncBytes is the most a lookup reads itself; the rest is Run's.
 	chatLinksSyncBytes = 512 << 10
 	// chatLinksLineMax is the longest line read whole; a longer one (a huge tool result) is skipped.
@@ -543,6 +546,8 @@ func cdTarget(seg, base string) (string, bool) {
 	}
 	dir := strings.Trim(words[1], `"'`)
 	switch {
+	case unplaceable(dir):
+		return "", true
 	case filepath.IsAbs(dir):
 		return filepath.Clean(dir), true
 	case base != "" && !strings.HasPrefix(dir, "-"):
@@ -552,10 +557,16 @@ func cdTarget(seg, base string) (string, bool) {
 	return "", true
 }
 
+// unplaceable: a path the shell expands first (a variable, a home, a command's output, a glob's braces) — where it
+// points is not known from the text.
+func unplaceable(p string) bool {
+	return strings.HasPrefix(p, "~") || strings.ContainsAny(p, "$`{")
+}
+
 // resolveIn is an absolute path as it is, a relative one under base, "" when it has no place.
 func resolveIn(base, p string) string {
 	switch {
-	case p == "":
+	case p == "", unplaceable(p):
 		return ""
 	case filepath.IsAbs(p):
 		return p

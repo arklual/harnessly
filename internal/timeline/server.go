@@ -96,6 +96,9 @@ type Deps struct {
 	// ClaudeProjects holds Claude's transcripts, one folder per working folder; CodexSessions holds Codex's.
 	ClaudeProjects string
 	CodexSessions  string
+	// MoreRoots are every folder of each kind the agents of this account were seen to write to (CLAUDE_CONFIG_DIR and
+	// CODEX_HOME of a running agent), ClaudeProjects and CodexSessions among them; nil: those two only.
+	MoreRoots func() (claudeProjects, codexSessions []string)
 	// StatsDir holds the statusline figures of each Claude session.
 	StatsDir string
 	Codex    transcript.CodexOptions
@@ -420,7 +423,7 @@ func (s *Server) setup(cn *conn, hint string) {
 		s.sessions[cn.session] = s.watchSessions(cn.session, pid, p)
 	}
 	if info.Status == agents.Running && info.JSONLPath == "" && info.SessionID != "" && info.Cwd != "" {
-		s.watchForJSONL(cn.session, info.SessionID, info.Cwd, p)
+		s.watchForJSONL(cn.session, info.SessionID, info.Cwd, info.Dir, p)
 	}
 	// The agent may write its pid file between the first look and the watcher's start: a second look covers it.
 	if starting {
@@ -437,7 +440,7 @@ func (s *Server) setup(cn *conn, hint string) {
 			} else if re.Cwd != "" {
 				sendJSON(cn.c, sessionChanged(re.SessionID, "session-waiting"))
 				sendJSON(cn.c, emptyInit(re.SessionID, true))
-				s.watchForJSONL(cn.session, re.SessionID, re.Cwd, p)
+				s.watchForJSONL(cn.session, re.SessionID, re.Cwd, re.Dir, p)
 			}
 		} else {
 			sendJSON(cn.c, emptyInit("", true))
@@ -546,13 +549,31 @@ func (s *Server) allowedPath(p string) bool {
 	if err != nil || !strings.HasSuffix(abs, ".jsonl") {
 		return false
 	}
-	return s.d.ClaudeProjects != "" && strings.HasPrefix(abs, s.d.ClaudeProjects+string(filepath.Separator)) ||
-		s.d.CodexSessions != "" && strings.HasPrefix(abs, s.d.CodexSessions+string(filepath.Separator))
+	claudeRoots, codexRoots := s.roots()
+	return under(abs, claudeRoots) || under(abs, codexRoots)
+}
+
+// roots are the folders of each agent's transcripts.
+func (s *Server) roots() (claudeProjects, codexSessions []string) {
+	if s.d.MoreRoots != nil {
+		claudeProjects, codexSessions = s.d.MoreRoots()
+	}
+	return append([]string{s.d.ClaudeProjects}, claudeProjects...), append([]string{s.d.CodexSessions}, codexSessions...)
+}
+
+func under(abs string, roots []string) bool {
+	for _, r := range roots {
+		if r != "" && strings.HasPrefix(abs, r+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) isCodexPath(p string) bool {
 	abs, err := filepath.Abs(p)
-	return err == nil && s.d.CodexSessions != "" && strings.HasPrefix(abs, s.d.CodexSessions+string(filepath.Separator)) && strings.HasSuffix(abs, ".jsonl")
+	_, codexRoots := s.roots()
+	return err == nil && under(abs, codexRoots) && strings.HasSuffix(abs, ".jsonl")
 }
 
 // resolveJSONLPath is a session's transcript: Codex by its id; Claude in the pane's project folder, else wherever it is.
@@ -618,7 +639,7 @@ func (s *Server) resume(cn *conn, id, tmuxSession string) {
 	}
 	sendJSON(c, emptyInit(id, false))
 	if cwd := s.d.Tmux.SessionCwd(tmuxSession); cwd != "" {
-		s.watchForJSONL(cn.session, id, cwd, cn.provider)
+		s.watchForJSONL(cn.session, id, cwd, "", cn.provider)
 	}
 }
 

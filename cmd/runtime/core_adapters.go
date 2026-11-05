@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"time"
 
 	"github.com/ly-solutions/harnessly/internal/agents"
 	"github.com/ly-solutions/harnessly/internal/agents/claude"
@@ -105,7 +104,7 @@ func (l coreLayouts) RecoverSession(session string) (string, bool) {
 	}
 	found := agents.RecoverTabSession(tab.Agent, claude.Tabs{}, agents.RecoveryDeps{
 		Exists:         func(p string) bool { _, err := os.Stat(p); return err == nil },
-		FindTranscript: func(id string) string { return claude.FindTranscript(l.claude.ProjectsDir(), id) },
+		FindTranscript: l.claude.FindTranscript,
 		History: func() ([]agents.HistoryEntry, error) {
 			var out []agents.HistoryEntry
 			if l.history == nil {
@@ -202,7 +201,7 @@ func (p codexProvider) ReadSessionID(t agents.TabAgent) string { return codex.Ta
 func (p codexProvider) ReadJSONLPath(t agents.TabAgent) string { return codex.Tabs{}.ReadJSONLPath(t) }
 func (p codexProvider) ReadSummary(t agents.TabAgent) string   { return codex.Tabs{}.ReadSummary(t) }
 func (p codexProvider) FindSession(id string) string {
-	if m, ok := codex.FindSessionByID(p.det.SessionsRoot(), id, time.Now(), codex.ScanDays); ok {
+	if m, ok := p.det.FindSession(id); ok {
 		return m.JSONLPath
 	}
 	return ""

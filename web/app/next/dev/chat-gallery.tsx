@@ -820,6 +820,70 @@ const peerTurn = (now: Ms): TurnItem => {
   return item;
 };
 
+// Three background teammates of one turn that finished together: what a long run of research leaves in the feed.
+const INVENTORY_MD =
+  '**Главное.** Инвентарь собран: 41 экран, 12 из них без пустого состояния.\n\n' +
+  'Полный список — `/tmp/scratchpad/research/inventory.md`. ' +
+  'Он покрывает ленту, правую панель и настройки.\n\n' +
+  '- **Лента:** 14 экранов, 5 без скелетона.\n- **Панель:** 9 вкладок, у двух нет ошибки загрузки.\n- **Настройки:** 18 разделов.';
+
+const bgAgentsTurn = (now: Ms): TurnItem => {
+  const item = turnOf({
+    prompt: null,
+    at: now - 5 * MIN,
+    minutes: 1,
+    steps: null,
+    answer: 'Все три отчёта на месте, свожу их в один план.',
+  });
+  const note = (from: string, color: string, task: string, md: string, at: number, failed = false) => ({
+    from,
+    kind: 'done' as const,
+    color,
+    event: null,
+    summary: null,
+    sentAt: at,
+    agentId: null,
+    model: 'sonnet',
+    md,
+    task,
+    opens: `a${from}0f3e9c1d2b`,
+    failed,
+  });
+  item.peer = {
+    id: nextId('p'),
+    turnId: item.turn.id,
+    at: now - 10 * MIN,
+    rev: 1,
+    t: 'peer',
+    peers: [
+      note(
+        'perf',
+        'orange',
+        'Замерить скорость первой отрисовки ленты',
+        '**Главное.** Первая отрисовка — 1,8 с на телефоне, из них 1,1 с уходит на разбор Markdown старых ходов. ' +
+          'Отчёт: `/tmp/claude-995/scratchpad/research/perf.md`.',
+        now - 10 * MIN,
+      ),
+      note(
+        'inventory',
+        'blue',
+        'Составить список экранов без пустых состояний',
+        INVENTORY_MD,
+        now - 10 * MIN,
+      ),
+      note(
+        'access',
+        'yellow',
+        'Проверить доступность ленты с клавиатуры',
+        'Не смог запустить браузер: порт 9222 занят другим процессом. Проверка не сделана.',
+        now - 11 * MIN,
+        true,
+      ),
+    ],
+  };
+  return item;
+};
+
 const noteTurn = (now: Ms, detail: string): TurnItem => {
   const item = turnOf({
     prompt: null,
@@ -1121,6 +1185,10 @@ const SCENES: Record<string, { title: string; build: (now: Ms) => IScene }> = {
   'merge-sheet': {
     title: 'Влить обратно',
     build: (now) => ({ items: history(now), sheet: SHEET_KIND.merge }),
+  },
+  'bg-agents': {
+    title: 'Фоновые агенты закончили',
+    build: (now) => ({ items: [...history(now).slice(0, 1), bgAgentsTurn(now)] }),
   },
   peers: {
     title: 'Сообщения сессий',

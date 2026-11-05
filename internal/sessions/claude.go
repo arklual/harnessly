@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
 	"io"
 	"os"
 	"path/filepath"
@@ -83,9 +84,9 @@ type ClaudeLister struct {
 	reading map[string]*sync.Mutex
 }
 
-// NewClaudeLister lists under <home>/.claude/projects.
+// NewClaudeLister lists under the projects folder of $CLAUDE_CONFIG_DIR, else <home>/.claude.
 func NewClaudeLister(home string) *ClaudeLister {
-	return &ClaudeLister{ProjectsDir: filepath.Join(home, ".claude", "projects"), Workers: 4, scans: map[string]scan{}, reading: map[string]*sync.Mutex{}}
+	return &ClaudeLister{ProjectsDir: filepath.Join(agentcfg.ClaudeDirIn(os.Getenv, home), "projects"), Workers: 4, scans: map[string]scan{}, reading: map[string]*sync.Mutex{}}
 }
 
 // ProjectDir is the transcripts folder of a working folder.

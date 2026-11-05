@@ -322,6 +322,55 @@ describe('the agent acting on the page', () => {
     expect(await run({ op: 'wait', ms: 20 })).toEqual({ ok: true, text: 'waited 20 ms' });
   });
 
+  it('lists a video with its state, reads the page, and waits for the clip to end', async () => {
+    document.body.innerHTML = '<h1>Ролик</h1><p>Про мероприятие</p><video aria-label="Клип"></video>';
+    const video = document.querySelector('video') as HTMLVideoElement;
+    const state = { paused: true, ended: false, currentTime: 0, duration: 12 };
+    for (const key of Object.keys(state) as (keyof typeof state)[])
+      Object.defineProperty(video, key, { get: () => state[key], configurable: true });
+    const text = await snapshot();
+    expect(text).toMatch(/- video "Клип" \[e\d+\] paused at=0s of=12s/);
+    const ref = refOf(text, '"Клип"');
+    const read = await run({ op: 'read' });
+    expect(read.ok).toBe(true);
+    expect(read.text).toContain(`- video [${ref}] paused at=0s of=12s\ntext:\n`);
+    expect(read.text).toContain('Про мероприятие');
+    const one = await run({ op: 'read', ref: refOf(text, '"Клип"') });
+    expect(one.ok).toBe(true);
+    const notYet = await run({ op: 'wait', event: 'ended', ref, ms: 250 });
+    expect(notYet.ok).toBe(false);
+    expect(notYet.text).toContain(`The video [${ref}] is not ended after 250 ms`);
+    expect((await run({ op: 'wait', event: 'ended', ref: 'e999' })).ok).toBe(false);
+    state.paused = false;
+    expect(await run({ op: 'wait', event: 'playing', ms: 1000 })).toMatchObject({
+      ok: true,
+      text: `the video [${ref}] is playing: playing at=0s of=12s`,
+    });
+    window.setTimeout(() => {
+      state.currentTime = 11.9;
+      state.ended = true;
+      state.paused = true;
+    }, 150);
+    const over = await run({ op: 'wait', event: 'ended', ms: 3000 });
+    expect(over).toMatchObject({ ok: true, text: `the video [${ref}] has ended: ended at=11.9s of=12s` });
+    // A clip that starts over (a loop, or the page's own replay) counts as ended.
+    state.ended = false;
+    state.paused = false;
+    state.currentTime = 11;
+    window.setTimeout(() => {
+      state.currentTime = 0.2;
+    }, 150);
+    expect((await run({ op: 'wait', event: 'ended', ms: 3000 })).text).toContain('played to its end');
+    expect(core.parseParentMessage({ type: 'tk:act', id: 'x', op: 'wait', event: 'stopped' })).toBeNull();
+    expect(
+      core.parseParentMessage({ type: 'tk:act', id: 'x', op: 'wait', event: 'ended', ms: 20000 }),
+    ).toMatchObject({
+      event: 'ended',
+      ms: 20000,
+    });
+    expect(core.parseParentMessage({ type: 'tk:act', id: 'x', op: 'wait', ms: 20000 })).toBeNull();
+  });
+
   it('reads an element whose name shadows a built-in of its form', async () => {
     document.body.innerHTML =
       '<form><input name="tagName" aria-label="Odd"><input name="querySelectorAll" aria-label="Odd 2"></form>';

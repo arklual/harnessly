@@ -1,5 +1,7 @@
-/* What other agents' sessions wrote (a `peer` entry): a compact card per message on the left, in the sender's color —
-   a dot, the name, what kind of message, when; the body folded to about six lines. */
+/* What other agents wrote (a `peer` entry): one card on the feed's neutral surface. The first line is where it comes
+   from — «Фоновый агент» and its task — and when; under it the state is the only colour, the agent's name muted. The
+   words fold to two plain lines and open by height (a grid row between 0fr and 1fr), both ways animated. Several notes
+   are one card with a count over them and a hairline between. */
 
 .hx-msg[data-kind='peer-note'] {
   align-items: stretch;
@@ -7,165 +9,269 @@
 .hx-pnotes {
   display: flex;
   flex-direction: column;
-  gap: var(--hx-space-2);
   min-width: 0;
   max-width: 88%;
+  border: 1px solid var(--hx-border);
+  border-radius: var(--hx-radius-md);
+  background: var(--hx-bg-raised);
+  overflow: hidden;
+}
+.hx-pnotes__head {
+  padding: 10px 14px 2px;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
+  line-height: 18px;
 }
 .hx-pnote {
-  --hx-pnote-c: var(--hx-fg-3);
   display: flex;
   flex-direction: column;
-  gap: 6px;
   min-width: 0;
-  padding: 10px 14px 10px 12px;
-  border: 1px solid var(--hx-border);
-  border-left: 3px solid color-mix(in srgb, var(--hx-pnote-c) 70%, transparent);
-  border-radius: var(--hx-radius-md);
-  background: color-mix(in srgb, var(--hx-pnote-c) 5%, var(--hx-bg-raised));
+  padding: 10px 14px 12px;
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
 }
-.hx-pnote[data-color='red'] {
-  --hx-pnote-c: var(--hx-p-red-500);
+.hx-pnote + .hx-pnote {
+  border-top: 1px solid var(--hx-border);
 }
-.hx-pnote[data-color='blue'] {
-  --hx-pnote-c: var(--hx-p-blue-500);
-}
-.hx-pnote[data-color='green'] {
-  --hx-pnote-c: var(--hx-p-green-500);
-}
-.hx-pnote[data-color='yellow'] {
-  --hx-pnote-c: var(--hx-p-amber-500);
-}
-.hx-pnote[data-color='purple'] {
-  --hx-pnote-c: var(--hx-p-violet-500);
-}
-.hx-pnote[data-color='orange'] {
-  --hx-pnote-c: #f97316;
-}
-.hx-pnote[data-color='pink'] {
-  --hx-pnote-c: #ec4899;
-}
-.hx-pnote[data-color='cyan'] {
-  --hx-pnote-c: #06b6d4;
-}
-html[data-theme='dark'] .hx-pnote {
-  background: color-mix(in srgb, var(--hx-pnote-c) 7%, var(--hx-bg-raised));
+.hx-pnote:has(> button.hx-pnote__head:hover),
+.hx-pnote:has(> .hx-pnote__gist:hover) {
+  background: var(--hx-bg-hover);
 }
 
+/* ── Where it comes from and when ── */
 .hx-pnote__head {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: var(--hx-space-2);
+  width: 100%;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-1);
+  font: inherit;
+  text-align: left;
+}
+button.hx-pnote__head {
+  cursor: pointer;
+}
+button.hx-pnote__head:focus-visible {
+  outline: 2px solid var(--hx-focus);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.hx-pnote__line {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--hx-text-md);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hx-pnote__lead {
+  color: var(--hx-fg-2);
+}
+.hx-pnote__lead::after {
+  content: ' · ';
+  color: var(--hx-fg-3);
+}
+.hx-pnote__title {
+  font-weight: var(--hx-weight-medium);
+}
+.hx-pnote__at {
+  flex: none;
+  color: var(--hx-fg-3);
+  font-size: var(--hx-text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hx-pnote__chev {
+  flex: none;
+  align-self: center;
+  color: var(--hx-fg-3);
+  transition: transform var(--hx-dur-sm) var(--hx-ease-out);
+}
+.hx-pnote[data-open='true'] .hx-pnote__chev {
+  transform: rotate(180deg);
+}
+
+/* ── The state and the agent's own name ── */
+.hx-pnote__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  color: var(--hx-fg-3);
   font-size: var(--hx-text-xs);
   line-height: 18px;
 }
-.hx-pnote__dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
+.hx-pnote__state {
+  --hx-pnote-tone: var(--hx-fg-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
   border-radius: var(--hx-radius-full);
-  background: var(--hx-pnote-c);
+  background: var(--hx-bg-hover);
+  color: var(--hx-fg-2);
+  font-weight: var(--hx-weight-medium);
 }
-.hx-pnote__who {
+.hx-pnote__state::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hx-pnote-tone);
+}
+.hx-pnote[data-tone='ok'] .hx-pnote__state {
+  --hx-pnote-tone: var(--hx-success);
+  background: var(--hx-success-soft);
+}
+.hx-pnote[data-tone='failed'] .hx-pnote__state {
+  --hx-pnote-tone: var(--hx-danger);
+  background: color-mix(in srgb, var(--hx-danger) 12%, transparent);
+}
+.hx-pnote__name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: var(--hx-weight-semibold);
-  color: var(--hx-fg-1);
 }
-button.hx-pnote__who {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: left;
-}
-.hx-pnote__who--link {
-  cursor: pointer;
-  transition: color var(--hx-dur-sm) var(--hx-ease-out);
-}
-.hx-pnote__who--link:hover {
-  color: var(--hx-accent);
-  text-decoration: underline;
-}
-.hx-pnote__who--link:focus-visible {
-  outline: 2px solid var(--hx-focus);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-.hx-pnote__model {
-  flex: none;
-  color: var(--hx-fg-3);
-}
-.hx-pnote__kind {
-  flex: none;
-  color: var(--hx-fg-2);
-}
-.hx-pnote__at {
-  flex: none;
-  margin-left: auto;
-  color: var(--hx-fg-3);
-  font-variant-numeric: tabular-nums;
-}
-.hx-pnote__sum {
-  font-size: var(--hx-text-sm);
-  font-weight: var(--hx-weight-medium);
-  color: var(--hx-fg-1);
-  overflow-wrap: anywhere;
+/* In a card of several the count over them says where they come from: each row starts with its task. */
+.hx-pnotes[data-many] .hx-pnote__lead {
+  display: none;
 }
 
-.hx-pnote__body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
+/* ── Two plain lines of what it said; the whole text takes their place once opened ── */
+.hx-pnote__gist {
+  display: grid;
+  grid-template-rows: 1fr;
+  width: 100%;
+  padding: 0;
+  margin: 6px 0 0;
+  border: 0;
+  background: none;
+  color: var(--hx-fg-2);
+  font: inherit;
+  font-size: var(--hx-text-sm);
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    grid-template-rows 280ms var(--hx-ease-out),
+    margin 280ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
 }
-.hx-pnote__text {
-  max-height: 132px;
+.hx-pnote__gist-in {
+  display: -webkit-box;
+  min-height: 0;
   overflow: hidden;
   overflow-wrap: anywhere;
-  mask-image: linear-gradient(to bottom, #000 65%, transparent);
-  transition: max-height var(--hx-dur-md) var(--hx-ease-out);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
-.hx-pnote__body[data-open='true'] .hx-pnote__text {
-  max-height: none;
-  mask-image: none;
+.hx-pnote[data-open='true'] .hx-pnote__gist {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.hx-pnote__body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  animation: hx-pnote-in 320ms var(--hx-ease-out);
+  transition:
+    grid-template-rows 280ms var(--hx-ease-out),
+    opacity 200ms var(--hx-ease-out);
+}
+.hx-pnote__body[data-state='closing'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes hx-pnote-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.hx-pnote__fold {
+  min-height: 0;
+  overflow: hidden;
+}
+.hx-pnote__text {
+  padding-top: 8px;
+  overflow-wrap: anywhere;
 }
 .hx-pnote__text .hx-md {
   font-size: var(--hx-text-sm);
 }
-/* A long path wraps inside the card rather than running out of it. */
-.hx-pnote__text .hx-ref {
-  height: auto;
-  min-height: 22px;
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
+/* A file is a short chip that stays on its line with the word or the stop after it. */
+.hx-pnote__text .hx-ref[data-type='file'],
+.hx-hcard .hx-ref[data-type='file'] {
+  max-width: min(100%, 260px);
+  white-space: nowrap;
+  vertical-align: -5px;
 }
-.hx-pnote__more {
-  align-self: flex-start;
-  padding: 0;
-  border: 0;
+
+/* ── What can be done with it ── */
+.hx-pnote__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 10px;
+}
+.hx-pnote__act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--hx-border-strong);
+  border-radius: var(--hx-radius-full);
   background: none;
-  color: var(--hx-fg-3);
+  color: var(--hx-fg-1);
   font: inherit;
   font-size: var(--hx-text-xs);
+  font-weight: var(--hx-weight-medium);
   cursor: pointer;
-  transition: color var(--hx-dur-sm) var(--hx-ease-out);
+  transition: background var(--hx-dur-sm) var(--hx-ease-out);
 }
-.hx-pnote__more:hover {
-  color: var(--hx-fg-1);
+.hx-pnote__act:hover {
+  background: var(--hx-bg-active);
 }
-.hx-pnote__more:focus-visible {
+.hx-pnote__act:focus-visible {
   outline: 2px solid var(--hx-focus);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 @media (max-width: 640px) {
   .hx-pnotes {
     max-width: 100%;
+  }
+  /* On a phone the task wraps to a second line rather than ending in an ellipsis at a few words. */
+  .hx-pnote__line {
+    display: -webkit-box;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-pnote__gist,
+  .hx-pnote__body,
+  .hx-pnote__chev {
+    transition: none;
+    animation: none;
   }
 }
 

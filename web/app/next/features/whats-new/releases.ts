@@ -13,6 +13,86 @@ export interface IRelease {
 
 export const RELEASES = [
   {
+    id: '2026-11-05n',
+    items: [{ key: 'designChats', icon: 'messages-square' }],
+  },
+  {
+    id: '2026-11-05m',
+    items: [{ key: 'askAccess', icon: 'lock-keyhole' }],
+  },
+  {
+    id: '2026-11-05h',
+    items: [
+      { key: 'shareEverywhere', icon: 'share-2' },
+      { key: 'docLinks', icon: 'file-lock' },
+      { key: 'deckLinks', icon: 'presentation' },
+    ],
+  },
+  {
+    id: '2026-11-05g',
+    items: [{ key: 'castFast', icon: 'gauge' }],
+  },
+  {
+    id: '2026-11-05f',
+    items: [{ key: 'liveTools', icon: 'square-mouse-pointer' }],
+  },
+  {
+    id: '2026-11-05e',
+    items: [
+      { key: 'guestLinks', icon: 'link' },
+      { key: 'guestLinkSettings', icon: 'sliders-horizontal' },
+      { key: 'siteAddress', icon: 'globe' },
+    ],
+  },
+  {
+    id: '2026-11-05d',
+    items: [{ key: 'agentCards', icon: 'message-square-text' }],
+  },
+  {
+    id: '2026-11-05b',
+    items: [{ key: 'noAsk', icon: 'square-dashed-mouse-pointer' }],
+  },
+  {
+    id: '2026-11-05a',
+    items: [{ key: 'liveBrowser', icon: 'globe' }],
+  },
+  {
+    id: '2026-11-04z',
+    items: [{ key: 'browserAsk', icon: 'shield-question' }],
+  },
+  {
+    id: '2026-11-04y',
+    items: [
+      { key: 'findInFiles', icon: 'text-search' },
+      { key: 'gitMarks', icon: 'git-compare' },
+      { key: 'fileOps', icon: 'file-plus' },
+    ],
+  },
+  {
+    id: '2026-11-04x',
+    items: [{ key: 'claudeConfigDir', icon: 'message-square-text' }],
+  },
+  {
+    id: '2026-11-04w',
+    items: [
+      { key: 'machineFiles', icon: 'hard-drive' },
+      { key: 'quickOpen', icon: 'search' },
+      { key: 'phoneFiles', icon: 'list-checks' },
+    ],
+  },
+  {
+    id: '2026-11-04u',
+    items: [{ key: 'teleportApps', icon: 'log-in' }],
+  },
+  {
+    id: '2026-11-04t',
+    items: [{ key: 'fullQuiet', icon: 'maximize-2' }],
+  },
+  {
+    id: '2026-11-04s',
+    items: [{ key: 'modeLeft', icon: 'pencil' }],
+  },
+  {
     id: '2026-11-04r',
     items: [{ key: 'sinopiaDownload', icon: 'download' }],
   },

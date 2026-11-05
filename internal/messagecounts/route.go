@@ -2,11 +2,10 @@ package messagecounts
 
 import (
 	"bytes"
+	"github.com/ly-solutions/harnessly/internal/agents/roots"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"syscall"
 	"unicode/utf8"
@@ -78,12 +77,7 @@ func (rt *Route) Answer(r *http.Request) (int, any, http.Header) {
 
 // AllowedJsonl: a .jsonl under Claude Code's projects or Codex's sessions in the home, the path resolved first.
 func AllowedJsonl(home, p string) bool {
-	abs, err := filepath.Abs(p)
-	if err != nil || !strings.HasSuffix(abs, ".jsonl") {
-		return false
-	}
-	return strings.HasPrefix(abs, filepath.Join(home, ".claude", "projects")+"/") ||
-		strings.HasPrefix(abs, filepath.Join(home, ".codex", "sessions")+"/")
+	return roots.Allowed(home, p)
 }
 
 func (rt *Route) entry(path string) *file {

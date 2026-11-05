@@ -45,6 +45,8 @@ interface IRefChipProps {
   href?: string | null;
   /** What the chip says when it is not the label itself (a link's text). */
   text?: string;
+  /** The whole of what the chip shortens (a file's path), shown on hover. */
+  hint?: string;
 }
 
 interface IChipBodyProps {
@@ -127,7 +129,7 @@ const LinkChip = ({ kind, label, href, text }: ILinkChipProps) => {
   );
 };
 
-const RefChip = ({ kind, label, href = null, text }: IRefChipProps) => {
+const RefChip = ({ kind, label, href = null, text, hint }: IRefChipProps) => {
   const { onOpen } = useContext(RefContext);
   if ((kind === 'link' || kind === 'mr') && opensOutside(href))
     return <LinkChip kind={kind} label={label} href={href} text={text} />;
@@ -136,6 +138,7 @@ const RefChip = ({ kind, label, href = null, text }: IRefChipProps) => {
     <span
       className="hx-ref"
       data-type={kind}
+      title={hint}
       role="button"
       tabIndex={0}
       onClick={open}

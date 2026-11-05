@@ -420,26 +420,36 @@ button.hx-jtree__row:hover {
 }
 
 /* «Спросить агента» about the selection, in the status row. */
-.hx-fed__ask {
-  display: inline-flex;
-  gap: 4px;
+.hx-asktip {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
   animation: hx-fade-in var(--hx-dur-sm) var(--hx-ease-out) backwards;
 }
-.hx-fed__askbtn {
+.hx-asktip__btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--hx-border);
-  border-radius: 999px;
-  background: var(--hx-bg-raised);
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
   color: var(--hx-fg-1);
   font: inherit;
-  font-size: var(--hx-text-xs);
+  font-family: var(--hx-font-ui);
+  font-size: var(--hx-text-sm);
+  white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms ease;
 }
-.hx-fed__askbtn:hover {
+.hx-asktip__btn:hover {
   background: var(--hx-bg-hover);
+}
+.hx-asktip__btn:first-child {
+  color: var(--hx-accent);
+}
+@media (hover: none) {
+  .hx-asktip__btn {
+    height: 36px;
+  }
 }

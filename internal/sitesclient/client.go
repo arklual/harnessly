@@ -137,6 +137,32 @@ func (c *Client) Claim(ctx context.Context, space, name, access, origin string) 
 	return err
 }
 
+// Site is a site as the server lists it: what «Поделиться» shows of a published design.
+type Site struct {
+	Name           string `json:"name"`
+	Address        string `json:"address"`
+	Access         string `json:"access"`
+	CurrentVersion int    `json:"currentVersion"`
+	Origin         string `json:"origin"`
+}
+
+// FindByOrigin is the caller's site made from origin (sinopia:<project>), or nil when there is none. The server lists a
+// machine its own sites only.
+func (c *Client) FindByOrigin(ctx context.Context, space, origin string) (*Site, error) {
+	var out struct {
+		Sites []Site `json:"sites"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/api/sites/"+url.PathEscape(space), nil, "", &out); err != nil {
+		return nil, err
+	}
+	for i := range out.Sites {
+		if origin != "" && out.Sites[i].Origin == origin {
+			return &out.Sites[i], nil
+		}
+	}
+	return nil, nil
+}
+
 // SetAccess changes who may open the site.
 func (c *Client) SetAccess(ctx context.Context, space, name, access string) error {
 	return c.json(ctx, http.MethodPatch, sitePath(space, name), map[string]string{"access": access}, nil)

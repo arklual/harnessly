@@ -8,7 +8,7 @@ import {
   VaultMenu,
   type IVaultView,
 } from '@/next/features/pane/browser-tools';
-import { AgentAsk, AgentBar, AgentCursor, type IAgentCursorAt } from '@/next/features/pane/agent-overlay';
+import { AgentCursor, type IAgentCursorAt } from '@/next/features/pane/agent-overlay';
 import SiteDevtools from '@/next/features/designly/site-devtools';
 import type { TDevTab } from '@/next/features/designly/devtools-data';
 import type { IDomBridge } from '@/next/features/designly/use-dom-bridge';
@@ -26,6 +26,7 @@ import type { IListeningPort } from '@/next/core/net/preview';
 import { t } from '@/next/i18n';
 import { SIGN_IN, type TSignIn } from '@/next/features/pane/stand-sign-in';
 import LoadFailed, { LOAD_FAILED_SIZE } from '@/next/ui/load-failed';
+import LiveView, { type ILiveViewProps } from '@/next/features/pane/live-view';
 
 export interface IBrowserViewProps {
   /** What the bar shows; empty for a new tab. */
@@ -81,6 +82,16 @@ export interface IBrowserViewProps {
   devtools: IBrowserDevtools | null;
   /** The safe's entries for the page's site; null where the safe has none for it. */
   vault: IVaultView | null;
+  /** The page in the machine's live browser (an outside site); null when the page is in a slot. */
+  live: IBrowserLive | null;
+}
+
+export interface IBrowserLive {
+  machine: MachineId;
+  tab: string;
+  url: string;
+  onPage: ILiveViewProps['onPage'];
+  onControl: ILiveViewProps['onControl'];
 }
 
 export interface IBrowserDevtools {
@@ -102,14 +113,6 @@ const THROTTLE_OUT_MS = 160;
 
 export interface IBrowserAgentView {
   cursor: IAgentCursorAt | null;
-  /** The site the agent asks to act on. */
-  asking: string | null;
-  working: boolean;
-  paused: boolean;
-  onAllow: () => void;
-  onDeny: () => void;
-  onStop: () => void;
-  onResume: () => void;
 }
 
 const translate = (key: string) => t(key);
@@ -148,6 +151,8 @@ const BrowserView = (props: IBrowserViewProps) => {
     window.addEventListener('pointerup', up);
   };
   const frame = useRef<HTMLIFrameElement | null>(null);
+  // The live browser's picture: the agent's cursor is placed over it as over the frame.
+  const liveBox = useRef<HTMLDivElement | null>(null);
   const size = screenSize(props.screen);
   const vw = size?.w ?? 0;
   const vh = size?.h ?? 0;
@@ -315,17 +320,6 @@ const BrowserView = (props: IBrowserViewProps) => {
             }
           />
         </div>
-        {props.agent && (
-          <>
-            <AgentAsk host={props.agent.asking} onAllow={props.agent.onAllow} onDeny={props.agent.onDeny} />
-            <AgentBar
-              working={props.agent.working}
-              paused={props.agent.paused}
-              onStop={props.agent.onStop}
-              onResume={props.agent.onResume}
-            />
-          </>
-        )}
         {props.signIn !== SIGN_IN.none && (
           <div className="hx-tbrowser__offer" role="group" aria-label={t('next.pane.signInLabel')}>
             <span className="hx-tbrowser__offer-text">
@@ -434,8 +428,28 @@ const BrowserView = (props: IBrowserViewProps) => {
         {address !== '' && error !== null && (
           <LoadFailed title={t('next.load.page')} reason={error} onRetry={props.onReload} />
         )}
-        {address !== '' && error === null && src === null && <div className="hx-tbrowser__page" />}
-        {address !== '' && src !== null && (
+        {address !== '' && error === null && src === null && props.live === null && (
+          <div className="hx-tbrowser__page" />
+        )}
+        {address !== '' && props.live !== null && (
+          <div ref={stage} className="hx-tbrowser__stage" data-device={props.screen.device}>
+            <LiveView
+              key={`${props.live.tab}|${reloadKey}`}
+              machine={props.live.machine}
+              tab={props.live.tab}
+              url={props.live.url}
+              size={size}
+              theme={props.theme}
+              onPage={props.live.onPage}
+              onControl={props.live.onControl}
+              onBox={(el) => {
+                liveBox.current = el;
+              }}
+            />
+            <AgentCursor cursor={props.agent?.cursor ?? null} frame={liveBox} fit={size === null ? 1 : fit} />
+          </div>
+        )}
+        {address !== '' && props.live === null && src !== null && (
           <div ref={stage} className="hx-tbrowser__stage" data-device={props.screen.device}>
             <iframe
               key={reloadKey}

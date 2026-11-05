@@ -2,6 +2,7 @@ package gitread
 
 import (
 	"errors"
+	"github.com/ly-solutions/harnessly/internal/agents/roots"
 	"io"
 	"math"
 	"os"
@@ -71,7 +72,7 @@ var changesRun = run{timeout: 15 * time.Second, maxBuffer: 8 * mib}
 
 // TranscriptRoots are the folders a transcript may be read from (the agents' conversation folders under the home).
 func TranscriptRoots(home string) []string {
-	return []string{filepath.Join(home, ".claude", "projects"), filepath.Join(home, ".codex", "sessions")}
+	return roots.All(home)
 }
 
 func allowedTranscript(p string, roots []string) bool {

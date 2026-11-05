@@ -5,6 +5,8 @@ import type { IBrowserAgentChoice } from '@/next/stores/browser-agent';
 
 export const AGENT_OP = {
   snapshot: 'snapshot',
+  /** The page's text and the state of its videos. */
+  read: 'read',
   click: 'click',
   type: 'type',
   press: 'press',
@@ -21,6 +23,10 @@ export const AGENT_OP = {
 export type TAgentOp = (typeof AGENT_OP)[keyof typeof AGENT_OP];
 
 const OPS = new Set<string>(Object.values(AGENT_OP));
+/** What a wait may be for on a video or audio of the page. */
+const WAIT_EVENTS = new Set(['ended', 'playing', 'paused']);
+/** A wait for a video's event has more time than one for a text. */
+export const WAIT_EVENT_MS = 25_000;
 
 export interface IAgentAct {
   id: string;
@@ -35,6 +41,8 @@ export interface IAgentAct {
   dy: number;
   ms: number;
   submit: boolean;
+  /** What a wait is for on a video or audio: ended, playing, paused; '' for a text or a time. */
+  event: string;
   /** A site tool's name and its arguments as JSON text (call). */
   tool: string;
   input: string;
@@ -43,6 +51,7 @@ export interface IAgentAct {
 /** The ops the page's frame runs itself; navigate and back are the tab's. */
 export const FRAME_OPS: ReadonlySet<TAgentOp> = new Set([
   AGENT_OP.snapshot,
+  AGENT_OP.read,
   AGENT_OP.click,
   AGENT_OP.type,
   AGENT_OP.press,
@@ -78,6 +87,8 @@ export const readAgentAct = (data: unknown): IAgentAct | null => {
   if (tool && !/^[A-Za-z0-9_.:-]{1,128}$/.test(tool)) return null;
   const input = typeof m.input === 'string' ? m.input : '';
   if (input.length > 8000) return null;
+  const event = str(m.event, 16);
+  if (event && !WAIT_EVENTS.has(event)) return null;
   return {
     id: m.id,
     op: m.op as TAgentOp,
@@ -88,8 +99,9 @@ export const readAgentAct = (data: unknown): IAgentAct | null => {
     value: str(m.value, 500),
     url: str(m.url, 2048),
     dy: num(m.dy, -20000, 20000),
-    ms: num(m.ms, 0, 10000),
+    ms: num(m.ms, 0, event ? WAIT_EVENT_MS : 10000),
     submit: m.submit === true,
+    event,
     tool,
     input,
   };
@@ -106,30 +118,21 @@ export const actHost = (url: string | null): string | null => {
   }
 };
 
-export const ACT_LET = { go: 'go', ask: 'ask', refuse: 'refuse' } as const;
-export type TActLet = (typeof ACT_LET)[keyof typeof ACT_LET];
-
-/** Whether the agent may act on a site now: the person's answer for it, else ask when asking is on. */
-export const actLet = (choice: IBrowserAgentChoice, host: string): TActLet => {
-  const decision = choice.sites[host];
-  if (decision === 'deny') return ACT_LET.refuse;
-  if (decision === 'allow' || !choice.ask) return ACT_LET.go;
-  return ACT_LET.ask;
-};
+/** Whether the person blocked the site for the agent (Settings → General); anywhere else it acts without asking. */
+export const actBlocked = (choice: IBrowserAgentChoice, host: string): boolean =>
+  choice.blocked.includes(host);
 
 /** What the agent hears when it may not act: plain sentences, the agent's language. */
 export const ACT_REFUSED = {
   denied: (host: string) =>
-    `The person does not let agents act on ${host}. Ask them in the chat if it is needed.`,
-  declined: (host: string) => `The person declined to let the agent act on ${host} this time.`,
-  stopped: 'The person stopped the agent in this browser tab. Ask them in the chat before trying again.',
+    `The person blocked ${host} for agents (Settings → General): nothing was done there. Ask them in the chat if it is needed.`,
   noPage: 'The browser tab has no page open yet: open one with browser_navigate or `harnessly open <url>`.',
   noBridge:
     'This page does not take actions (its frame did not answer): it may still be loading; wait and take a snapshot again.',
   badUrl: 'Give an http(s) address.',
 } as const;
 
-/** How long the frame has for one action: wait takes up to 10 s of its own. */
+/** How long the frame has for one action: wait takes up to 10 s of its own (a video's event: its ms on top). */
 export const FRAME_ACT_MS = 13_000;
 /** The cursor's way to its element before the action, as long as hx-agent-cursor's move in pane.css. */
 export const CURSOR_MOVE_MS = 360;

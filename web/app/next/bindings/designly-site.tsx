@@ -2,7 +2,7 @@
 // history, and the page on screen shown in a preview slot. The slot is opened once per load; switching pages inside it
 // only moves the frame to the page's plain address, which skips the ticket round trip and its redirect. Anyone taking
 // the slot meanwhile (another preview, another window) or its cookie nearing its end opens it anew on the next switch.
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import SiteView, {
   type ISiteAccess,
   type ISiteMode,
@@ -12,6 +12,8 @@ import SiteView, {
 import { ACCESS, useProjectAccess } from '@/next/features/designly/access/use-access';
 import { ROLE, claimOwnership, fetchAccess } from '@/next/features/designly/access/api';
 import ShareDialog from '@/next/features/designly/access/share-dialog';
+import { guestViewOf } from '@/next/features/designly/access/guest-view';
+import { LINK_KIND, type ILinkContext } from '@/next/features/designly/access/link-form';
 import ResourceShare from '@/next/features/designly/access/resource-share';
 import { useResourceView } from '@/next/features/designly/access/use-resource';
 import PublishSection from '@/next/features/designly/publish/publish-section';
@@ -36,6 +38,9 @@ import { modeKindOf, modeStateKey, useDesignMode } from '@/next/features/designl
 import { goTo, ROUTE, routePath, type TAccessFocus } from '@/next/routes/routes';
 import { useLinkRestored } from '@/next/stores/connection';
 import { useConversationList } from '@/next/stores/conversations';
+import { changeDeck, useDeck } from '@/next/stores/deck';
+import { putDeckPdfAuto } from '@/next/features/designly/deck/api';
+import { useVideo } from '@/next/stores/video';
 import type { ConvId, MachineId } from '@/next/protocol/v2';
 import { toast } from '@/next/ui/toast';
 import { t } from '@/next/i18n';
@@ -69,7 +74,7 @@ interface IProject {
 const pagesOf = (design: IDesign): ISitePage[] =>
   design.boards.map((b) => ({ path: b.path, name: b.title || b.path }));
 
-/** An older runtime does not say which other chats worked on a design. */
+/** No chats of the design (an older runtime does not say which other chats worked on it). */
 const NO_TOUCHED: readonly string[] = [];
 
 let tabSeq = 0;
@@ -186,9 +191,18 @@ const DesignlySiteBody = ({
   // Who may do what with the project, from the gateway; where there is none (standalone) the design is as it was.
   const gate = useProjectAccess(id);
   const [shareOpen, setShareOpen] = useState(false);
+  // Opened from the viewing mode's «Запросить доступ»: the one dialog opens with the request form (stage «ж»).
+  const [askOpen, setAskOpen] = useState(false);
+  const openShare = (ask: boolean) => {
+    setAskOpen(ask);
+    setShareOpen(true);
+  };
   // the one «Поделиться» of every kind reads the gateway's common access API; an older gateway answers nothing
   // there and the older dialog stays.
   const shared = useResourceView('design', id, gate.state.k === ACCESS.ready);
+  // A deck's slides and a video's built formats, as their views read them: what the screen of a link offers.
+  const deckRead = useDeck(id);
+  const videoRead = useVideo(id);
   const focusPending = useRef(accessFocus);
   const seeded = useRef(tabs.length > 0);
   // The link coming back reads the library again, quietly: the open design stays as it is.
@@ -320,12 +334,19 @@ const DesignlySiteBody = ({
   const shownPath = shownTab?.hist[shownTab.hi] ?? '';
   // A design is on its own page or in a pane for as long as it is open: which stage it has never changes.
   const useStage: (options: IStageOptions) => IStageWithChat = pane ? usePaneChatStage : useSiteOnlyStage;
+  // The design's chats this machine has: started from it, then the ones that edited its files.
+  const startedHere = project?.design.convs;
+  const touchedBy = project?.design.touchedBy;
+  const tied = useMemo(
+    () => [...(startedHere ?? NO_TOUCHED), ...(touchedBy ?? NO_TOUCHED)],
+    [startedHere, touchedBy],
+  );
   const { stage, chat: paneChat } = useStage({
     machine,
     design: id,
     fromChat: chat,
     dir: project?.dir ?? null,
-    touched: project?.design.touchedBy ?? NO_TOUCHED,
+    tied,
     title: project?.design.title ?? '',
     pageUrl: boardHref(id, shownPath),
     port: project?.port ?? null,
@@ -468,19 +489,58 @@ const DesignlySiteBody = ({
     project: id,
     title: project?.design.title ?? '',
     pages: boards ?? [],
+    enabled:
+      gate.state.k === ACCESS.ready &&
+      gate.state.access.canManage &&
+      !!project &&
+      project.design.kind !== 'slides' &&
+      project.design.kind !== 'video',
   });
-  // The one dialog for a design page (decks and videos move in stage «д»), once the gateway answers its API and the
-  // project has an owner; a project without one is still claimed in the older dialog.
+  // The one dialog of every kind (a design, a deck, a video), once the gateway answers its API and the project has an
+  // owner; a project without one is still claimed in the older dialog, and a deck or a video keeps its older popover.
   const oneDialog =
     project !== null &&
-    project.design.kind !== 'slides' &&
-    project.design.kind !== 'video' &&
     shared.state !== null &&
     shared.state !== 'absent' &&
     shared.state.stored &&
     shared.state.owner !== null
       ? shared.state
       : null;
+  // A deck's PDF for guests is built by the runtime while a live link offers it, and stops when none does: the one
+  // dialog changes the links, this keeps the runtime in step (the older popover did it itself).
+  // The latest end among the live links that offer the PDF (Infinity: one never ends); null: none offers it, or the
+  // dialog is not the one here. Whether that end has passed is read in the effect: the clock is not read in render.
+  const pdfUntil =
+    oneDialog !== null && oneDialog.canManage && project?.design.kind === 'slides' && deckRead !== undefined
+      ? (oneDialog.links ?? [])
+          .filter((link) => link.disabledAt === null && link.options.pdf === true)
+          .reduce(
+            (end, link) => Math.max(end, link.expiresAt === null ? Infinity : Date.parse(link.expiresAt)),
+            -Infinity,
+          )
+      : null;
+  const pdfAuto = deckRead?.published.pdfAuto;
+  const pdfAsked = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (pdfUntil === null) return;
+    const pdfWanted = pdfUntil > Date.now();
+    if (pdfWanted === pdfAuto || pdfAsked.current === pdfWanted) return;
+    if (pdfWanted && deckRead?.chrome !== true) return;
+    pdfAsked.current = pdfWanted;
+    putDeckPdfAuto(machine, id, pdfWanted).then(
+      (published) => changeDeck(id, (d) => ({ ...d, published })),
+      () => {
+        pdfAsked.current = null;
+      },
+    );
+  }, [pdfUntil, pdfAuto, deckRead?.chrome, machine, id]);
+  // What the screen of a link offers by kind: a design's pages and look, a deck's slides, a video's built formats.
+  const linkContext = ((): ILinkContext => {
+    if (project?.design.kind === 'slides') return { kind: LINK_KIND.deck, slides: deckRead?.slides.length };
+    if (project?.design.kind === 'video')
+      return { kind: LINK_KIND.video, formats: videoRead?.settings.formats };
+    return { kind: LINK_KIND.design, pages: boards, look: guestViewOf(id) };
+  })();
   // Wherever the gateway keeps the project's access, «Поделиться» opens its dialog, in the pane as on the page: who
   // manages shares there, anyone else sees their role, asks for more or copies the link from it.
   const shareButton = ((): ISiteAccess | undefined => {
@@ -488,12 +548,13 @@ const DesignlySiteBody = ({
     if (gated.canManage)
       return {
         label: t('next.pane.designShare'),
-        onOpen: () => sinopia.gate(() => setShareOpen(true)),
-        manage: true,
+        onOpen: () => sinopia.gate(() => openShare(false)),
+        // A deck and a video open their older share popover only where the one dialog is not there.
+        manage: oneDialog === null,
       };
     if (gated.role === 'view' || gated.role === 'comment')
-      return { label: t('next.access.askEdit'), onOpen: () => setShareOpen(true) };
-    return { label: t('next.pane.designShare'), onOpen: () => sinopia.gate(() => setShareOpen(true)) };
+      return { label: t('next.access.askEdit'), onOpen: () => openShare(false) };
+    return { label: t('next.pane.designShare'), onOpen: () => sinopia.gate(() => openShare(false)) };
   })();
 
   // Who may change pictures: where there is no gateway the design is as it was (its person edits); otherwise the owner and editors.
@@ -503,7 +564,16 @@ const DesignlySiteBody = ({
 
   const back = pane ? pane.onBack : () => goTo({ kind: ROUTE.designly });
   if (gated !== null && gated.role === null) {
-    return <NoAccess project={id} access={gated} onAsked={gate.apply} onBack={back} />;
+    return (
+      <NoAccess
+        project={id}
+        access={gated}
+        onAsked={gate.apply}
+        view={shared.state !== null && shared.state !== 'absent' ? shared.state : null}
+        onView={shared.apply}
+        onBack={back}
+      />
+    );
   }
   if (missing && project === null && granted && exhausted) {
     return <ProjectAway ownerName={gated?.ownerName ?? ''} onRetry={lookAgain} onBack={back} />;
@@ -539,7 +609,7 @@ const DesignlySiteBody = ({
       state,
       editing,
       action: shareButton
-        ? { label: t('next.site.modeAsk'), icon: 'lock-keyhole', onClick: shareButton.onOpen }
+        ? { label: t('next.site.modeAsk'), icon: 'lock-keyhole', onClick: () => openShare(true) }
         : null,
     };
   })();
@@ -700,6 +770,7 @@ const DesignlySiteBody = ({
           address={shareUrl}
           onCopyLink={copyLink}
           focus={accessFocus}
+          ask={askOpen}
           links={{
             project: id,
             access: gated,
@@ -707,6 +778,7 @@ const DesignlySiteBody = ({
             pages: boards,
           }}
           publish={mayPublish ? sitePublish : undefined}
+          linkContext={linkContext}
         />
       )}
       {gated !== null && oneDialog === null && (

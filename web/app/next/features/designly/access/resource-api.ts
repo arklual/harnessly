@@ -29,6 +29,29 @@ export interface IResourceRequest {
   createdAt: string;
 }
 
+/** A link without sign-in (stage «г»): its own for each recipient, view or comment, never edit. */
+export interface IAccessLink {
+  id: string;
+  forWhom: string;
+  rights: 'view' | 'comment';
+  expiresAt: string | null;
+  /** When it was switched off; a link whose maker may no longer share counts as off from now. */
+  disabledAt: string | null;
+  opens: number;
+  lastOpenedAt: string | null;
+  createdAt: string;
+  createdBy: string;
+  comments: number;
+  /** What the link allows: a design's `view` (device, deck opening, pdf, video...), a document's `download` and `copy`. */
+  options: Record<string, TLinkScalar>;
+  version: 'latest' | 'pinned';
+  pages: string[] | null;
+  /** The address can be copied again; false for a link made before the addresses were kept (it can be reissued). */
+  copyable: boolean;
+}
+
+export type TLinkScalar = string | number | boolean | null;
+
 export interface IResourceView {
   resource: { kind: string; id: string; subkind: string; title: string };
   /** False while the resource has no row: nothing was changed yet, the older dialog handles it. */
@@ -45,6 +68,8 @@ export interface IResourceView {
   editorsCanShare: boolean;
   grants?: IGrant[];
   requests?: IResourceRequest[];
+  /** Links without sign-in, for those who run the access; absent from a gateway before stage «г». */
+  links?: IAccessLink[];
   myRequest: { id: string; level: 'comment' | 'edit'; status: 'open' | 'allowed' | 'denied' } | null;
 }
 
@@ -125,4 +150,57 @@ const isDirectory = (v: unknown): v is IDirectory =>
 export const searchDirectory = async (q: string, signal?: AbortSignal): Promise<IDirectory> => {
   const answer = await send('GET', `/access/directory?q=${encodeURIComponent(q)}`, undefined, signal);
   return isDirectory(answer) ? answer : { people: [], teams: [] };
+};
+
+export interface ILinkInput {
+  forWhom: string;
+  rights: 'view' | 'comment';
+  ttl: TTtlValue;
+  options: Record<string, TLinkScalar> | null;
+  version: 'latest' | 'pinned';
+  pages: string[] | null;
+}
+
+export interface ILinkChange extends Partial<ILinkInput> {
+  disabled?: boolean;
+}
+
+const isLink = (v: unknown): v is IAccessLink =>
+  typeof v === 'object' && v !== null && typeof (v as IAccessLink).id === 'string' && 'forWhom' in v;
+
+const linkOf = (answer: unknown): IAccessLink => {
+  const link = (answer as { link?: unknown } | null)?.link;
+  if (!isLink(link)) throw new AccessError(t('next.failure.http'), 'unknown', 0);
+  return link;
+};
+
+const urlOf = (answer: unknown): string | null => {
+  const url = (answer as { url?: unknown } | null)?.url;
+  return typeof url === 'string' ? url : null;
+};
+
+/** Makes a link; the answer has its address, the one moment it is surely known. */
+export const createLink = async (
+  ref: IResourceRef,
+  input: ILinkInput,
+): Promise<{ link: IAccessLink; url: string }> => {
+  const answer = await send('POST', `${at(ref)}/links`, input);
+  const url = urlOf(answer);
+  if (url === null) throw new AccessError(t('next.failure.http'), 'unknown', 0);
+  return { link: linkOf(answer), url };
+};
+
+/** Changes a link; `disabled: true` switches it off at once, `false` on again. */
+export const changeLink = async (ref: IResourceRef, id: string, change: ILinkChange): Promise<IAccessLink> =>
+  linkOf(await send('PATCH', `${at(ref)}/links/${encodeURIComponent(id)}`, change));
+
+/** The address again; null for a link made before the addresses were kept. */
+export const linkAddress = async (ref: IResourceRef, id: string): Promise<string | null> =>
+  urlOf(await send('GET', `${at(ref)}/links/${encodeURIComponent(id)}/address`));
+
+/** A new address; the old one stops opening at once. */
+export const reissueLink = async (ref: IResourceRef, id: string): Promise<string> => {
+  const url = urlOf(await send('POST', `${at(ref)}/links/${encodeURIComponent(id)}/address`));
+  if (url === null) throw new AccessError(t('next.failure.http'), 'unknown', 0);
+  return url;
 };

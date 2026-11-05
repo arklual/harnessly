@@ -262,7 +262,8 @@ func (m *Manager) updateFromHook(session, event, notificationType string) {
 		m.persistToLayout(e)
 		m.touchBackground(tabID, e, true)
 	}
-	resolve := (next == Busy || next == NeedsInput) && e.JSONLPath == ""
+	// A turn that ended before its transcript was found (a short answer) is looked for at its end too.
+	resolve := (next == Busy || next == NeedsInput || event == EventStop || event == EventStopFailure) && e.JSONLPath == ""
 	refresh := (event == EventStop || event == EventStopFailure) && e.JSONLPath != ""
 	transcript, p := e.JSONLPath, m.provider(e)
 	m.mu.Unlock()

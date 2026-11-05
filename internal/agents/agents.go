@@ -101,6 +101,9 @@ type SessionInfo struct {
 	// StartedAt is the session's start in epoch milliseconds, when the agent recorded it.
 	StartedAt *float64
 	Cwd       string
+	// Dir is the agent's own folder (Claude's $CLAUDE_CONFIG_DIR or ~/.claude, Codex's $CODEX_HOME or ~/.codex) as
+	// the running process was given it; "" when not known.
+	Dir string
 }
 
 // Info is a session without a process.

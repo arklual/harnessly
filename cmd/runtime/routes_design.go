@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ly-solutions/harnessly/internal/agentcfg"
 	"io/fs"
 	"net/http"
 	"os"
@@ -70,8 +71,8 @@ func designConfig(d deps) design.Config {
 			TokenFile: os.Getenv("RUNTIME_DESIGN_HUB_TOKEN_FILE"),
 		},
 		// The transcripts the listing reads to see who works on what: the agents' own folders under the home.
-		ClaudeProjects: filepath.Join(d.Home, ".claude", "projects"),
-		CodexSessions:  filepath.Join(d.Home, ".codex", "sessions"),
+		ClaudeProjects: filepath.Join(agentcfg.ClaudeDirIn(os.Getenv, d.Home), "projects"),
+		CodexSessions:  filepath.Join(agentcfg.CodexDirIn(os.Getenv, d.Home), "sessions"),
 		Texts: design.Texts{
 			CLI:          env("RUNTIME_CLI_NAME", "harnessly"),
 			Host:         env("RUNTIME_PLATFORM_HOST", "localhost"),
@@ -169,6 +170,7 @@ func designRoutes(d deps) []gate.JSONRoute {
 		designRoute(platformAPI+"/design/library/releases", a.Releases),
 		designRoute(platformAPI+"/design/access", a.PostAccess),
 		designRoute(platformAPI+"/design/publish", a.Publish),
+		designRoute(platformAPI+"/design/published", a.Published),
 		designRoute(platformAPI+"/design/library/claim", a.ClaimProject),
 		designRoute(platformAPI+"/design/library/delete", a.DeleteProject),
 		designRoute(platformAPI+"/design/engine", a.EngineStatus),

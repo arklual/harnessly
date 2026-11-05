@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACT_LET, actHost, actLet, readAgentAct } from '@/next/features/pane/agent-acts';
+import { actBlocked, actHost, readAgentAct } from '@/next/features/pane/agent-acts';
 import { readFrameMessage } from '@/next/features/pane/frame-bridge';
 
 const act = {
@@ -14,6 +14,7 @@ const act = {
   dy: 0,
   ms: 0,
   submit: false,
+  event: '',
   tool: '',
   input: '',
 };
@@ -33,6 +34,20 @@ describe("the agent's action from the machine", () => {
     expect(readAgentAct({ ...act, op: 'wait', ms: -5 })?.ms).toBe(0);
   });
 
+  it("carries a video's event, gives such a wait more time, and reads the page", () => {
+    expect(readAgentAct({ ...act, op: 'wait', event: 'ended', ms: 20000 })).toMatchObject({
+      event: 'ended',
+      ms: 20000,
+    });
+    expect(readAgentAct({ ...act, op: 'wait', ms: 20000 })?.ms).toBe(10000);
+    expect(readAgentAct({ ...act, op: 'wait', event: 'stopped' })).toBeNull();
+    expect(readAgentAct({ ...act, op: 'read', ref: 'e2' })).toMatchObject({
+      op: 'read',
+      ref: 'e2',
+      event: '',
+    });
+  });
+
   it("carries a site tool's name and arguments, and drops a bad name or too long arguments", () => {
     const call = { ...act, op: 'call', ref: '', tool: 'add_to_cart', input: '{"id":"e-12"}' };
     expect(readAgentAct(call)).toMatchObject({ op: 'call', tool: 'add_to_cart', input: '{"id":"e-12"}' });
@@ -43,13 +58,11 @@ describe("the agent's action from the machine", () => {
 });
 
 describe('whether the agent may act on a site', () => {
-  it('follows the answer for the site, else asks while asking is on', () => {
-    const sites = { 'a.example.com': 'allow', 'b.example.com': 'deny' } as const;
-    expect(actLet({ ask: true, sites }, 'a.example.com')).toBe(ACT_LET.go);
-    expect(actLet({ ask: true, sites }, 'b.example.com')).toBe(ACT_LET.refuse);
-    expect(actLet({ ask: true, sites }, 'c.example.com')).toBe(ACT_LET.ask);
-    expect(actLet({ ask: false, sites }, 'c.example.com')).toBe(ACT_LET.go);
-    expect(actLet({ ask: false, sites }, 'b.example.com')).toBe(ACT_LET.refuse);
+  it('refuses the sites the person blocked, and only those', () => {
+    const blocked = ['b.example.com'];
+    expect(actBlocked({ blocked }, 'a.example.com')).toBe(false);
+    expect(actBlocked({ blocked }, 'b.example.com')).toBe(true);
+    expect(actBlocked({ blocked: [] }, 'b.example.com')).toBe(false);
   });
 
   it('is about the host of an http(s) page', () => {

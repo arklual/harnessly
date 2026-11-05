@@ -59,18 +59,26 @@
   "next.settings.peers.machine": "machine",
   "next.settings.peers.conflict": "The settings were just changed elsewhere; showing them as they are now",
   "next.peers.note.message": "message",
-  "next.peers.note.done": "finished",
+  "next.peers.note.done": "done",
   "next.peers.note.idle": "waiting",
   "next.peers.note.shutdownRequest": "asks to shut down",
   "next.peers.note.shutdownApproved": "shut down",
   "next.peers.note.shutdownRejected": "declined to shut down",
   "next.peers.note.event": "event",
-  "next.peers.sub.says": "Subagent → agent",
   "next.peers.sub.unknown": "Subagent",
-  "next.peers.sub.open": "Open this subagent",
-  "next.peers.note.more": "Show all",
-  "next.peers.note.less": "Collapse",
   "next.systemNote.title": "System notice",
   "next.terminalStop.idle": "Terminal stopped: {n} h without work",
-  "next.terminalStop.person": "Terminal stopped"
+  "next.terminalStop.person": "Terminal stopped",
+  "next.peers.note.failed": "failed",
+  "next.peers.note.openChat": "Open the agent's conversation",
+  "next.peers.note.openFile": "Open file",
+  "next.peers.note.openNamed": "Open {name}",
+  "next.peers.note.groupDone": {
+    "one": "{n} background agent finished",
+    "other": "{n} background agents finished"
+  },
+  "next.peers.note.groupSome": {
+    "one": "{n} message from agents",
+    "other": "{n} messages from agents"
+  }
 }

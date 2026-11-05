@@ -36,101 +36,128 @@ const entry = (md: string): PeerEntry => ({
   ],
 });
 
+const note = (over: Partial<PeerEntry['peers'][number]>): PeerEntry['peers'][number] => ({
+  from: 'rev-t4',
+  kind: 'done',
+  color: 'yellow',
+  event: null,
+  summary: null,
+  sentAt: null,
+  agentId: null,
+  model: null,
+  md: '',
+  ...over,
+});
+
 describe('PeerNotes', () => {
-  it('draws who, what of, and the body as Markdown with its path opening as a file', async () => {
+  it('says where it comes from, folds to plain lines and opens with a file chip and its actions', async () => {
     const onOpen = vi.fn();
+    const opened = vi.fn();
+    const off = onOpenSubagent(opened);
     const { container } = render(
       <RefContext value={{ refs: {}, onOpen }}>
-        <PeerNotes entry={entry(LONG)} />
+        <PeerNotes
+          entry={{ ...entry(''), peers: [note({ md: LONG, task: 'Review task 4', opens: 'arev4' })] }}
+        />
       </RefContext>,
     );
+    expect(screen.getByText('Background agent')).toBeTruthy();
+    expect(screen.getByText('Review task 4')).toBeTruthy();
     expect(screen.getByText('rev-t4')).toBeTruthy();
-    expect(screen.getByText('finished')).toBeTruthy();
-    expect(container.querySelector('.hx-pnote')?.getAttribute('data-color')).toBe('yellow');
-    const chip = await screen.findByText('/home/coder/task-4-review.md', {}, { timeout: 20000 });
+    expect(screen.getByText('done')).toBeTruthy();
+    expect(container.querySelector('.hx-pnote')?.getAttribute('data-color')).toBeNull();
+    // Folded: the gist names the file, not its whole path, and there is no Markdown yet.
+    expect(container.querySelector('.hx-pnote__gist')?.textContent).toContain('task-4-review.md');
+    expect(container.querySelector('.hx-pnote__gist')?.textContent).not.toContain('/home/coder');
+    expect(container.querySelector('.hx-pnote__body')).toBeNull();
+    const head = container.querySelector('button.hx-pnote__head') as HTMLButtonElement;
+    act(() => head.click());
+    expect(head.getAttribute('aria-expanded')).toBe('true');
+    const chip = await screen.findByText(
+      'task-4-review.md',
+      { selector: '.hx-ref__label' },
+      { timeout: 20000 },
+    );
+    expect(chip.closest('.hx-ref')?.getAttribute('title')).toBe('/home/coder/task-4-review.md');
     fireEvent.click(chip);
     expect(onOpen).toHaveBeenCalledWith('file', '/home/coder/task-4-review.md', null);
-    const more = screen.getByRole('button', { name: 'Show all' });
-    act(() => more.click());
-    expect(screen.getByRole('button', { name: 'Collapse' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Open file' }));
+    expect(onOpen).toHaveBeenLastCalledWith('file', '/home/coder/task-4-review.md', null);
+    fireEvent.click(screen.getByRole('button', { name: "Open the agent's conversation" }));
+    expect(opened).toHaveBeenCalledWith('arev4');
+    off();
+  });
+
+  it('marks a failed agent and counts several agents of one delivery', () => {
+    const { container } = render(
+      <PeerNotes
+        entry={{
+          ...entry(''),
+          peers: [note({ md: 'ok', task: 'One' }), note({ from: 'b', md: 'no', task: 'Two', failed: true })],
+        }}
+      />,
+    );
+    expect(screen.getByText('2 background agents finished')).toBeTruthy();
+    expect(container.querySelectorAll('.hx-pnote')[1].getAttribute('data-tone')).toBe('failed');
+    expect(screen.getByText('failed')).toBeTruthy();
   });
 
   it('names a shutdown in words, without its ids', () => {
-    const shut: PeerEntry = {
-      ...entry(''),
-      peers: [
-        {
-          from: 'scout',
-          kind: 'event',
-          color: 'blue',
-          event: 'shutdown_approved',
-          summary: null,
-          sentAt: null,
-          agentId: null,
-          model: null,
-          md: '',
-        },
-      ],
-    };
-    const { container } = render(<PeerNotes entry={shut} />);
+    const { container } = render(
+      <PeerNotes
+        entry={{ ...entry(''), peers: [note({ from: 'scout', kind: 'event', event: 'shutdown_approved' })] }}
+      />,
+    );
     expect(screen.getByText('shut down')).toBeTruthy();
-    expect(container.querySelector('.hx-pnote__body')).toBeNull();
+    expect(container.querySelector('button.hx-pnote__head')).toBeNull();
   });
 
-  it('signs a subagent message with its task, says who writes to whom and opens the subagent on a click', () => {
-    const sub: PeerEntry = {
-      ...entry(''),
-      peers: [
-        {
-          from: 'Debug stuck delivered queue items',
-          kind: 'message',
-          color: null,
-          event: null,
-          summary: null,
-          sentAt: null,
-          agentId: 'a68d2e2f655d5c31e',
-          model: 'sonnet',
-          md: 'Root cause found in **feeds**.',
-        },
-      ],
-    };
+  it('signs a subagent message with its task and opens the subagent from it', () => {
     const opened = vi.fn();
     const off = onOpenSubagent(opened);
-    const { container } = render(<PeerNotes entry={sub} />);
-    expect(screen.getByText('Subagent → agent')).toBeTruthy();
+    const { container } = render(
+      <PeerNotes
+        entry={{
+          ...entry(''),
+          peers: [
+            note({
+              from: 'Debug stuck delivered queue items',
+              kind: 'message',
+              color: null,
+              agentId: 'a68d2e2f655d5c31e',
+              model: 'sonnet',
+              md: 'Root cause found in **feeds**.',
+            }),
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText('Debug stuck delivered queue items')).toBeTruthy();
     expect(screen.getByText('sonnet')).toBeTruthy();
     expect(container.textContent).not.toContain('a68d2e2f655d5c31e');
-    expect(container.querySelector('.hx-agent')?.getAttribute('data-agent')).toBe('claude');
-    fireEvent.click(screen.getByRole('button', { name: 'Debug stuck delivered queue items' }));
+    act(() => (container.querySelector('button.hx-pnote__head') as HTMLButtonElement).click());
+    fireEvent.click(screen.getByRole('button', { name: "Open the agent's conversation" }));
     expect(opened).toHaveBeenCalledWith('a68d2e2f655d5c31e');
     off();
   });
 
   it('never shows the hex id of a subagent it has no task for', () => {
-    const sub: PeerEntry = {
-      ...entry(''),
-      peers: [
-        {
-          from: '',
-          kind: 'message',
-          color: null,
-          event: null,
-          summary: null,
-          sentAt: null,
-          agentId: 'a68d2e2f655d5c31e',
-          model: null,
-          md: 'hi',
-        },
-      ],
-    };
-    const { container } = render(<PeerNotes entry={sub} />);
-    expect(screen.getByRole('button', { name: 'Subagent' })).toBeTruthy();
+    const { container } = render(
+      <PeerNotes
+        entry={{
+          ...entry(''),
+          peers: [note({ from: '', kind: 'message', color: null, agentId: 'a68d2e2f655d5c31e', md: 'hi' })],
+        }}
+      />,
+    );
+    expect(screen.getByText('Subagent')).toBeTruthy();
     expect(container.textContent).not.toContain('a68d2e2f655d5c31e');
   });
 
   it('never renders markup from the body', async () => {
     const { container } = render(<PeerNotes entry={entry('<img src=x onerror=alert(1)><b>bold</b> text')} />);
-    await screen.findByText(/text/, {}, { timeout: 20000 });
+    act(() => (container.querySelector('button.hx-pnote__head') as HTMLButtonElement).click());
+    await screen.findByText(/text/, { selector: '.hx-pnote__text *' }, { timeout: 20000 });
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('b')).toBeNull();
   });
