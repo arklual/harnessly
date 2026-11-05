@@ -44,6 +44,8 @@ import { toast } from '@/next/ui/toast';
 const SLICE_MS = 250;
 /** From the stop to the final text; the machine answers in about a second, the rest is slack for a slow tunnel. */
 const FINAL_MS = 15_000;
+/** The ChatGPT plan's model hears the recording only after the stop, so a long one takes longer (its request gives up at 60 s). */
+const FINAL_WHOLE_MS = 65_000;
 /** How often the recording so far is written to the browser's storage. */
 const KEEP_MS = 1000;
 
@@ -295,13 +297,16 @@ export const useVoice = (
   const askFinal = (m: MachineId, session: ISession) => {
     flush(session);
     session.dictation?.stop();
-    session.finalTimer = setTimeout(() => {
-      if (session.closed) return;
-      session.dictation?.abort();
-      session.dictation = null;
-      if (session.spoken) commit(session, session.spoken);
-      else void recognizeWhole(m, session);
-    }, FINAL_MS);
+    session.finalTimer = setTimeout(
+      () => {
+        if (session.closed) return;
+        session.dictation?.abort();
+        session.dictation = null;
+        if (session.spoken) commit(session, session.spoken);
+        else void recognizeWhole(m, session);
+      },
+      voiceSettings().engine === 'chatgpt' ? FINAL_WHOLE_MS : FINAL_MS,
+    );
   };
 
   /** `at`: where the caret stands in the field; the dictated words go there (at the end without it). */

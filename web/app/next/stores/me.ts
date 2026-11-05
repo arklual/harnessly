@@ -9,7 +9,7 @@ import { getPage, sendJson } from '@/next/core/net/http';
 import type { MachineId } from '@/next/protocol/v2';
 
 /** The recognition models of dictation: the machine's own, OpenAI's, Yandex's. */
-export const VOICE_ENGINE_IDS = ['local', 'openai', 'yandex'] as const;
+export const VOICE_ENGINE_IDS = ['local', 'chatgpt', 'openai', 'yandex'] as const;
 export type VoiceEngineId = (typeof VOICE_ENGINE_IDS)[number];
 
 /** A word dictation gets wrong: how it is written and, optionally, how it is heard. */

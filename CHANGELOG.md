@@ -27,6 +27,9 @@ All notable changes to this project are documented here. The format follows
   Yandex SpeechKit v3 (streaming). Their keys are saved in Models and keys; a model without a key cannot be picked, and the
   audio leaves the machine only for the picked cloud model.
 
+- Dictation: the recognition model «ChatGPT plan (unofficial)» recognizes on the plan the machine's Codex CLI is signed in
+  with, whole after the stop, through an undocumented endpoint (docs/voice.md says what that costs).
+
 - «Сразу» (⌃↵ in the field, ↑ on a queued message) while several messages wait sends them all as one message now, in
   the queue's order, a blank line between them, every attachment kept; the queue is empty after it. Commands («/…»,
   «! …») still go alone.
