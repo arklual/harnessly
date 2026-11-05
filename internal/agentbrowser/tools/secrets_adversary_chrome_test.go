@@ -557,7 +557,7 @@ for(const type of ['hidden','checkbox','radio','submit','button','reset','file',
 const input=document.querySelector('input');
 input.addEventListener('input',()=>{window.savedBySite=input.value;input.value=''});`})
 				must(a.t, err)
-				a.personType(a.value)
+				a.personTypeUntil(a.value, `typeof window.savedBySite === 'string' && window.savedBySite.length > 0`)
 				a.c.refuses("evaluate", map[string]any{"expression": `window.savedBySite.split('').reverse().join('')`}, "The person typed")
 				if tab := i.Tabs(a.c.chat)[0]; tab.Sealed || tab.Scripted || tab.PersonDocument == "" {
 					a.t.Fatal("document guard was lost or confused with a seal")
@@ -839,9 +839,34 @@ func (a *secretAttack) evalExact(expression, want string) {
 // Human CDP goes through the same Call path as panel keys, paste and screen keyboard.
 func (a *secretAttack) personType(value string) {
 	a.t.Helper()
+	quoted, err := json.Marshal(value)
+	must(a.t, err)
+	a.personTypeUntil(value, `document.querySelector('input')?.value.includes(`+string(quoted)+`) === true`)
+}
+
+// personTypeUntil types into the first input until the expression holds. Text sent before the page or its focus is ready
+// goes nowhere. A person sees that and types again, and a test must not go on as if the page held a value: with nothing
+// in it, nothing would be sealed.
+func (a *secretAttack) personTypeUntil(value, landed string) {
+	a.t.Helper()
 	i, tab := a.instance(), a.tab()
-	_, err := i.Call(a.t.Context(), tab, "Runtime.evaluate", map[string]any{"expression": `document.querySelector('input').focus()`})
-	must(a.t, err)
-	_, err = i.Call(a.t.Context(), tab, "Input.insertText", map[string]any{"text": value})
-	must(a.t, err)
+	holds := func() bool {
+		raw, err := i.Call(a.t.Context(), tab, "Runtime.evaluate", map[string]any{"expression": landed, "returnByValue": true})
+		var r struct {
+			Result struct {
+				Value bool `json:"value"`
+			} `json:"result"`
+		}
+		return err == nil && json.Unmarshal(raw, &r) == nil && r.Result.Value
+	}
+	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		_, err := i.Call(a.t.Context(), tab, "Runtime.evaluate", map[string]any{"expression": `document.querySelector('input')?.focus()`})
+		if err == nil {
+			_, err = i.Call(a.t.Context(), tab, "Input.insertText", map[string]any{"text": value})
+		}
+		if err == nil && holds() {
+			return
+		}
+	}
+	a.t.Fatal("the typed text did not reach the page")
 }
