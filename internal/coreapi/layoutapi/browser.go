@@ -4,7 +4,9 @@ import "github.com/ly-solutions/harnessly/internal/jsvalue"
 
 func (a *api) cliBrowser(c *call) {
 	var args *jsvalue.Object
-	id := c.agentGuard(func() bool {
+	session := ""
+	tab := c.agentGuard(func() bool {
+		session, _ = c.str("session")
 		value, ok := c.field("arguments")
 		args, _ = value.(*jsvalue.Object)
 		if ok && args == nil {
@@ -16,12 +18,12 @@ func (a *api) cliBrowser(c *call) {
 		}
 		return true
 	}, "This tmux session does not belong to a chat; run the browser command in the chat's terminal")
-	if id == "" {
+	if tab == "" {
 		return
 	}
 	if a.d.Browser == nil {
 		c.fail(503, "Browser tools are unavailable")
 		return
 	}
-	c.reply(200, a.d.Browser(c.r, id, c.param("tool"), args))
+	c.reply(200, a.d.Browser(c.r, session, c.param("tool"), args))
 }

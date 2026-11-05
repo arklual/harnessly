@@ -123,7 +123,8 @@ type Sync interface {
 // Deps is everything the routes use. Status and Agents may be nil until they exist: tabs are then not registered,
 // every agent counts as available and a conversation start is refused.
 type Deps struct {
-	// Browser calls the same conversation-bound tools as MCP after the CLI guard succeeds.
+	// Browser calls the same conversation-bound tools as MCP after the CLI guard succeeds. It gets the tmux session the
+	// command names, because a chat's id is not the id of its tab.
 	Browser func(*http.Request, string, string, *jsvalue.Object) *jsvalue.Object
 	Store   *state.Store
 	Tmux    Tmux
